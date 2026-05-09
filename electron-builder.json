@@ -9,12 +9,10 @@
     "claude/**/*"
   ],
   "mac": {
-    "target": "dmg",
-    "icon": "assets/icon.icns"
+    "target": "dmg"
   },
   "win": {
-    "target": "nsis",
-    "icon": "assets/icon.ico"
+    "target": "nsis"
   },
   "linux": {
     "target": "AppImage"

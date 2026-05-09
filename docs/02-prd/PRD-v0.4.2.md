@@ -1,3 +1,5 @@
+> **Historical document (v0.4.2 · April 26, 2026).** Superseded by [PRD-v0.6.0.md](PRD-v0.6.0.md). Kept to show the design evolution — some concepts below (multiple named boards, free node placement, plugin system, extra node types) were cut or changed in later iterations.
+
 *v0.4.2 · April 26, 2026*
 
 ---

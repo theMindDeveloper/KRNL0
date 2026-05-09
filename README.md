@@ -2,9 +2,9 @@
 
 > *One canvas. Talk to it. Yours to own.*
 
-**krnl0** is a voice-driven personal planning canvas. Three anchored widgets — Pomodoro, Todos, Habits — sit at fixed positions on a paper-toned infinite canvas. A terminal node sits beside them as a fourth peer. A floating orb is the AI assistant.
+**krnl0** is a voice-driven personal planning canvas. Four anchored mother nodes — Pomodoro, Todos, Habits, Terminal — sit at fixed positions on a paper-toned infinite canvas. A floating orb is the AI assistant.
 
-You can click and type — or press the orb and talk.
+You can click and type, or press the orb and talk.
 
 *"Plan a two-hour deep-work block on the thesis, then a walk."*
 
@@ -13,8 +13,6 @@ The assistant transcribes your speech, decides what to do, runs commands against
 ---
 
 ## The design idea
-
-This is the deliverable for HTW Berlin's *Natural User Interfaces* course, theme **Inclusive Design**. Three modalities, one model underneath:
 
 | Modality | How |
 |---|---|
@@ -26,11 +24,11 @@ All three converge on the same `sys` surface, the same `board.json`, the same ca
 
 ---
 
-## Three convictions
+## Principles
 
-1. **Visible systems beat invisible ones.** Connections between nodes are rendered. Event flow is observable. Your setup is on the canvas, not buried in settings.
-2. **The terminal is a peer, not an escape hatch.** Every GUI capability is reachable through `sys`. If `sys` can't do it, voice can't do it, and AI can't drive it.
-3. **AI wires, it does not replace.** The assistant operates the same surface a user has — `sys` commands, `board.json`, `CLAUDE.md`. No backdoor, no privileged API.
+- **Visible systems.** Connections between nodes are rendered on the canvas. Your setup is something you can see, not something buried in settings.
+- **Terminal as peer.** Every GUI action is reachable through `sys`. If `sys` can't do it, voice can't either.
+- **AI uses the same surface.** The assistant runs `sys` commands like a user would. No privileged API, no backdoor.
 
 ---
 
@@ -147,5 +145,12 @@ npm run typecheck # tsc --noEmit
 | 03 Aug 2026 | Written documentation submission |
 
 ---
+## License
 
-*HTW Berlin · Natural User Interfaces · Inclusive Design · Solo build · 2026*
+THE SYSTEM is licensed under the [Functional Source License v1.1](LICENSE.md), with an Apache 2.0 future grant.
+
+- Free to use, fork, modify, self-host, contribute to
+- Free to build plugins and themes for
+- Not free to sell as a competing commercial product
+- Each release becomes Apache 2.0 two years after publication
+

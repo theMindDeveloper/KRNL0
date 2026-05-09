@@ -1,72 +1,53 @@
-# krnl0 — Product Description & Requirements
+# krnl0 — Product Description
 *April 26, 2026 · Pre-architecture draft*
+
+> **Historical draft.** Written before the architecture was locked in PRD v0.6.0. The v1 scope is narrower than this document originally implied — projects, journaling, and a plugin system were cut. Kept here for the design record.
 
 ---
 
 ## What is krnl0?
 
-krnl0 is an all-in-one personal operating system for people who want to
-manage their entire life — tasks, focus, habits, projects, journaling, and
-automation — from a single, beautiful, spatial workspace.
+krnl0 is a single-canvas personal planning tool. Pomodoro, todos, and habits live as anchored widgets on an infinite whiteboard, alongside a terminal that exposes the full app surface as a CLI. An AI assistant operates the same surface through voice.
 
-It is best understood as the intersection of products that have never
-been properly combined:
+Influences:
 
-- **Obsidian** — depth, local-first, extensible, yours to own
-- **Miro** — infinite canvas, spatial thinking, visual organization
-- **A terminal** — programmable, AI-native, automatable
-- **Habit tracker** — rolling 7-day grid, streaks, momentum
-- **To-do list** — fast, taggable, connected to other nodes
-- **Pomodoro timer** — native, event-emitting, connectable to other nodes
-- **AI agent** — a helpful assistant that can talk to all the nodes and operate the system by voice or text commands
+- **Obsidian** — local-first, file-based, yours to own
+- **Miro** — infinite canvas, spatial layout, visible connections
+- **A terminal** — programmable and AI-driveable
+- **Habit tracker / to-do / Pomodoro** — productivity primitives, treated as connectable nodes rather than separate apps
 
-The result is a whiteboard where every widget is a living tool, every tool
-can talk to every other tool, and the whole thing can be driven by AI agents
-through a native CLI integration.
-
-It is not a note-taking app. It is not a project tracker. It is not a habit
-app. It is the layer above all of them — one place where your work, your
-routines, your focus sessions, and your thinking coexist and connect.
+Every widget is a node. Nodes can be wired together: a finished Pomodoro can mark a habit done, complete a task, or trigger any other node's command. The same surface a power user types into the terminal is the surface the AI assistant operates.
 
 ---
 
 ## The problem it solves
 
-The average productive person runs 6 to 10 separate apps to manage their
-life: a task manager, a habit tracker, a Pomodoro timer, a notes tool, a
-project board, a journal, a calendar. None of these tools share state.
-None of them know about each other. Switching between them costs time and
-attention, every single day.
+A typical productivity stack is several apps: a task manager, a habit tracker, a Pomodoro timer, a notes tool, a calendar. They don't share state and they don't know about each other, so context-switching between them costs attention all day.
 
-The deeper problem is that these things are not actually separate. Your
-focus session is related to your task list. Your habits feed your project
-momentum. Your journal reflects on your goals. Keeping them in separate
-apps is an artificial constraint imposed by how software has been built,
-not by how human productivity actually works.
+These things are not actually independent. A focus session relates to a task; a habit feeds a goal. The separation is an artifact of how the apps were built, not of how the work flows.
 
-krnl0 removes that constraint. Everything lives on one canvas.
-Everything can connect to everything else.
+krnl0 puts them on one canvas and lets them talk to each other.
 
 ---
 
 ## Core principles
 
 **One canvas, everything on it.**
-There is no switching between apps. Your Pomodoro timer, your tasks, your
-habits, your journal, your project board — all of it lives on the same
-infinite whiteboard. You arrange it the way your brain works, not the way
-a product manager decided it should work.
+There is no switching between apps. Your Pomodoro timer, your tasks, and
+your habits all live on the same infinite whiteboard. Four anchored nodes —
+Pomodoro, Todos, Habits, Terminal — are always present, always in view.
 
-**Modular by design.**
-Every widget is a node. Every node is independent, configurable, and
-replaceable. You can have one Pomodoro node or five. You can have a habit
-tracker for fitness and a separate one for work. The canvas is yours to
-compose as you see fit.
+**Fixed mothers, free children.**
+The four core nodes (mothers) are anchored at fixed positions and cannot be
+moved or deleted — they are the skeleton of the canvas. Everything else is
+a child node spawned by a mother or the assistant, free to drag, rearrange,
+and delete. There is exactly one of each mother type; the canvas stays
+legible without configuration.
 
 **Connections are first-class.**
 Nodes can be wired together. When your Pomodoro session ends, it can mark
-a task done, log a journal entry, or increment a habit. These connections
-are visible on the canvas — you can see your system, not just use it.
+a task done or increment a habit. These connections are visible on the
+canvas — you can see your system, not just use it.
 
 **The terminal is a peer, not a power-user escape hatch.**
 The CLI is not a hidden feature for developers. It is a first-class
@@ -83,10 +64,11 @@ Colors, fonts, density, and layout can be configured.
 ## What the app contains
 
 ### The canvas
-An infinite, pannable, zoomable whiteboard. Nodes are placed freely. The
-user arranges them in whatever spatial layout makes sense to them — a
-daily dashboard, a project war room, a morning routine board, a weekly
-review spread. There is no imposed structure.
+An infinite, pannable, zoomable whiteboard. Four mother nodes are anchored
+at fixed positions on startup — Pomodoro at center, Todos to the left,
+Habits to the right, Terminal below. They cannot be moved or deleted.
+The user pans and zooms freely around them. Child nodes spawned by the
+assistant or by the user are free to drag and arrange anywhere on the canvas.
 
 Nodes can be connected with visible edges. Connections carry events and
 data between nodes, making the workspace behave as a system rather than a

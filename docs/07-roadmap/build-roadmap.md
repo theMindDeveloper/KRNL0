@@ -21,12 +21,12 @@
 ## Week 1 (May 9–15) · Setup + kernel
 
 - Electron + React + TypeScript scaffold
-- Token system, fonts, light/dark toggle
+- Token system, fonts, cyber theme (light + dark variants)
 - Zustand store with `Node` and `Edge` types
 - `Persistence.save/load` with round-trip test
 - One placeholder node renders on canvas
 
-**Demo:** open app, see paper canvas with one square, toggle theme, save & reload.
+**Demo:** open app, see paper canvas with one node, toggle dark variant, save & reload.
 
 ---
 
@@ -148,5 +148,5 @@ So we don't drift back:
 - MCP server (v1.1 polish)
 - ElevenLabs (v1.1 opt-in)
 - Background tray app
-- Custom themes (token system supports them; we don't ship more than light + dark)
+- Custom themes (the token system ships cyber as the native theme + noir as an alternate vibe; nothing else)
 - Web/browser version

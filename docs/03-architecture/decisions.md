@@ -102,7 +102,7 @@ The `sys` CLI uses the same command surface that edges use. Edges fire commands 
 
 **Chosen: `board.json` as singleton**
 
-One JSON file in `~/Documents/the-system/board.json`. No SQLite, no IndexedDB, no cloud.
+One JSON file in `~/Documents/krnl0/board.json`. No SQLite, no IndexedDB, no cloud.
 
 Why:
 - Human-readable, diffable, backupable

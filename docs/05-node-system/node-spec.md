@@ -73,7 +73,7 @@ Edges are data, stored in `board.json`. The kernel maintains an edge table. When
 
 ### Three ways to create an edge
 
-1. **Drag** from output port `●` to target node.
+1. **Drag** from output port `●` to target node. *(Child nodes only — mother nodes have no drag ports. Use voice or CLI to wire mothers to each other.)*
 2. **Voice:** *"when I finish a Pomodoro, mark deep-work done"*
 3. **CLI:** `sys edge add --from pomo:onComplete --to habit:markDone --args habit=deep-work`
 
@@ -111,7 +111,7 @@ Same rule for habits (store completion log, derive "is today done") and edges (s
 
 User data folder:
 ```
-~/Documents/the-system/
+~/Documents/krnl0/
 ├── board.json
 └── notes/                     ← markdown sidecars (Journal v1.5)
     └── journal-2026-05-09.md

@@ -1,6 +1,8 @@
-*v0.6.0 · May 9, 2026 · Architecture Locked · Ready for Build*
+# PRD v0.6.0 — Summary
 
-> This is the canonical PRD. It supersedes v0.4.2 and v0.5.0. Every architectural decision is locked. Code follows the doc; if a decision needs to change, the doc changes first.
+*May 9, 2026 · Architecture locked · Ready for build*
+
+> Short index of v0.6.0. The full canonical document lives at the repo root: [`krnl0-PRD-v0.6.0.md`](../../krnl0-PRD-v0.6.0.md). This file is the at-a-glance map.
 
 ---
 
@@ -23,7 +25,7 @@
 
 ## What it is
 
-**krnl0** is a voice-driven canvas for personal planning. Three anchored widgets — Pomodoro, Todos, Habits — sit at fixed positions on a paper-toned canvas. A terminal node sits beside them as a fourth peer. A floating orb is the AI assistant.
+**krnl0** is a voice-driven canvas for personal planning. Four anchored mother nodes — Pomodoro, Todos, Habits, Terminal — sit at fixed positions on a paper-toned canvas. A floating orb is the AI assistant.
 
 You can click and type — or press the orb and talk:
 
