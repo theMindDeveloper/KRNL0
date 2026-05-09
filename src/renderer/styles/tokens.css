@@ -1,0 +1,192 @@
+/* ── krnl0 — Design Tokens ────────────────────────────────────────────
+   Source of truth: docs/04-visual-system/design-tokens.md
+   Derived from:    FRONTEND REF/LifeOS Whiteboard.html
+   Native theme:    cyber (no [data-vibe] attribute)
+   Additional:      noir (set [data-vibe="noir"])
+   Luminosity:      [data-theme="dark"] toggles dark variant
+   ─────────────────────────────────────────────────────────────────── */
+
+/* ── Cyber (native) — light ─────────────────────────────────────────── */
+:root {
+  /* Surface */
+  --paper:    #f5f1e8;
+  --paper-2:  #ede7d6;
+  --paper-3:  #e3dcc7;
+  --node-bg:  #fdfaf2;
+
+  /* Ink */
+  --ink:      #1a1814;
+  --ink-2:    #3d362b;
+  --ink-3:    #6b6354;
+  --ink-4:    #9a9180;
+
+  /* Signal — invariant across light/dark */
+  --acid:      #c9f158;
+  --acid-glow: #d8ff6e;
+  --spine:     #5e7d1d;
+  --spine-hot: #7ea22b;
+  --rust:      #c8553d;
+  --rust-deep: #a83e2a;
+  --plum:      #6b4ea8;
+  --cyan:      #4ea8b0;
+
+  /* Terminal — always dark */
+  --term-bg:    #0c0a08;
+  --term-bg-2:  #15110d;
+  --term-fg:    #d4cfc0;
+  --term-dim:   #6b6354;
+  --term-acid:  #c9f158;
+  --term-rust:  #e87a5f;
+
+  /* Grid */
+  --grid:        rgba(26, 24, 20, 0.06);
+  --grid-strong: rgba(26, 24, 20, 0.12);
+  --grid-minor:  32px;
+  --grid-major:  160px;
+
+  /* Geometry */
+  --radius:    6px;
+  --radius-lg: 10px;
+
+  /* Shadow */
+  --shadow-1:    0 1px 0 rgba(26,24,20,.04), 0 2px 6px rgba(26,24,20,.06);
+  --shadow-2:    0 2px 0 rgba(26,24,20,.04), 0 8px 24px rgba(26,24,20,.10);
+  --shadow-glow: 0 0 0 1px var(--acid), 0 0 24px rgba(201,241,88,.25);
+
+  /* Typography */
+  --font-mono:  'JetBrains Mono', ui-monospace, monospace;
+  --font-sans:  'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+
+  /* Orb */
+  --orb-size: 56px;
+
+  /* Animation */
+  --edge-pulse-duration:  600ms;
+  --orb-breathe-duration: 6s;
+  --spawn-duration:       200ms;
+}
+
+/* ── Cyber — dark ───────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --paper:   #0e0d0b;
+  --paper-2: #1a1814;
+  --paper-3: #2a2620;
+  --node-bg: #18160f;
+
+  --ink:   #f0ebdd;
+  --ink-2: #d4cfc0;
+  --ink-3: #8a8270;
+  --ink-4: #5a5244;
+
+  --spine:     #6e8f25;
+  --spine-hot: #9ac33c;
+  --rust:      #e87a5f;
+  --rust-deep: #c8553d;
+
+  --term-bg:   #05040a;
+  --term-bg-2: #0a0812;
+
+  --grid:        rgba(240, 235, 221, 0.05);
+  --grid-strong: rgba(240, 235, 221, 0.10);
+}
+
+/* ── Noir (additional) — light ──────────────────────────────────────── */
+[data-vibe="noir"] {
+  --paper:   #ebe9e4;
+  --paper-2: #d8d6d0;
+  --paper-3: #b4b2ac;
+  --node-bg: #f6f5f1;
+
+  --ink:   #0a0a0a;
+  --ink-2: #1d1d1d;
+  --ink-3: #555555;
+  --ink-4: #888888;
+
+  /* Monochrome: rust collapses to ink, acid becomes near-white */
+  --acid:      #fafaf6;
+  --acid-glow: #ffffff;
+  --rust:      #0a0a0a;
+  --rust-deep: #0a0a0a;
+  --spine:     #0a0a0a;
+  --spine-hot: #0a0a0a;
+
+  --grid:        rgba(0, 0, 0, 0.05);
+  --grid-strong: rgba(0, 0, 0, 0.10);
+
+  /* Sharp corners */
+  --radius:    0;
+  --radius-lg: 0;
+}
+
+/* ── Noir — dark ────────────────────────────────────────────────────── */
+[data-vibe="noir"][data-theme="dark"] {
+  --paper:   #0a0a0a;
+  --paper-2: #161616;
+  --paper-3: #2c2c2c;
+  --node-bg: #131313;
+
+  --ink:   #fafaf6;
+  --ink-2: #d4d4d0;
+  --ink-3: #888888;
+  --ink-4: #555555;
+
+  --rust:      #fafaf6;
+  --rust-deep: #fafaf6;
+  --spine:     #fafaf6;
+  --spine-hot: #fafaf6;
+
+  --grid:        rgba(255, 255, 255, 0.05);
+  --grid-strong: rgba(255, 255, 255, 0.10);
+}
+
+/* ── High-contrast variant ──────────────────────────────────────────── */
+[data-contrast="high"] {
+  --paper:   #ffffff;
+  --paper-2: #f0f0f0;
+  --paper-3: #cccccc;
+  --ink:     #000000;
+  --ink-2:   #1a1a1a;
+  --ink-3:   #333333;
+  --ink-4:   #555555;
+}
+[data-theme="dark"][data-contrast="high"] {
+  --paper:   #000000;
+  --paper-2: #111111;
+  --paper-3: #333333;
+  --ink:     #ffffff;
+  --ink-2:   #e6e6e6;
+  --ink-3:   #cccccc;
+  --ink-4:   #999999;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --edge-pulse-duration:  0ms;
+    --orb-breathe-duration: 0ms;
+    --spawn-duration:       0ms;
+  }
+}
+[data-motion="reduced"] {
+  --edge-pulse-duration:  0ms;
+  --orb-breathe-duration: 0ms;
+  --spawn-duration:       0ms;
+}
+
+/* ── Base reset ─────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+}
