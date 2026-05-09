@@ -133,21 +133,11 @@ npm test          # Vitest
 npm run typecheck # tsc --noEmit
 ```
 
----
-
-## Deadlines
-
-| Date | Deliverable |
-|---|---|
-| 06 Jun 2026 | 5-min progress presentation |
-| 02 Jul 2026 | 5-min progress presentation |
-| **20 Jul 2026** | **15-min final presentation + live demo** |
-| 03 Aug 2026 | Written documentation submission |
 
 ---
 ## License
 
-THE SYSTEM is licensed under the [Functional Source License v1.1](LICENSE.md), with an Apache 2.0 future grant.
+KRNL0 is licensed under the [Functional Source License v1.1](LICENSE.md), with an Apache 2.0 future grant.
 
 - Free to use, fork, modify, self-host, contribute to
 - Free to build plugins and themes for
