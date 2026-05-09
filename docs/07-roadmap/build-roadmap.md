@@ -1,4 +1,4 @@
-# THE SYSTEM — 10-Week Build Roadmap
+# krnl0 — 10-Week Build Roadmap
 
 *Extracted from PRD v0.6.0 §14*
 *Solo build. Learning TypeScript. Scope sized for that reality.*

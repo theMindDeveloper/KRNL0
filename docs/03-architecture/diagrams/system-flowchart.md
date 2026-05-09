@@ -1,4 +1,4 @@
-# THE SYSTEM — Canonical Architecture Diagram
+# krnl0 — Canonical Architecture Diagram
 
 *Extracted from PRD v0.6.0 §5*
 

@@ -1,6 +1,6 @@
-THE SYSTEM — Architecture Brief for Claude Code
+krnl0 — Architecture Brief for Claude Code
 Context
-I'm building THE SYSTEM: a desktop app that's an infinite-canvas personal OS. Pomodoro, habits, todos, journal, project board — all as connectable nodes on one whiteboard. Local-first. Plugin-driven eventually.
+I'm building krnl0: a desktop app that's an infinite-canvas personal OS. Pomodoro, habits, todos, journal, project board — all as connectable nodes on one whiteboard. Local-first. Plugin-driven eventually.
 The defining feature: Claude Code runs inside a terminal node on the canvas and can drive the app itself. The user opens a terminal node, types claude, Claude Code takes over, and from there the user can speak or type instructions that read and modify the board. The terminal is a first-class peer to the GUI, not a power-user escape hatch.
 I'm a junior developer. I've never built a desktop app, never embedded a terminal, never written an MCP server. I need help thinking through the architecture before I write code.
 What I need you to help me decide

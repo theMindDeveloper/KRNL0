@@ -1,4 +1,4 @@
-# THE SYSTEM — Architecture Decision Log
+# krnl0 — Architecture Decision Log
 *May 2026 · Pre-build architecture brief*
 
 This document records the key architectural decisions made before writing code — including alternatives considered and why they were rejected.
@@ -7,7 +7,7 @@ This document records the key architectural decisions made before writing code �
 
 ## Context
 
-Building THE SYSTEM: a desktop app that's an infinite-canvas personal OS. Pomodoro, habits, todos — all as connectable nodes on one whiteboard. Local-first.
+Building krnl0: a desktop app that's an infinite-canvas personal OS. Pomodoro, habits, todos — all as connectable nodes on one whiteboard. Local-first.
 
 The defining feature: Claude Code can drive the app itself through a defined CLI surface. The user opens a terminal node, types `claude`, and from there can speak or type instructions that read and modify the board. The terminal is a first-class peer to the GUI, not a power-user escape hatch.
 

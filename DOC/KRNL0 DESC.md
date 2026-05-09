@@ -1,11 +1,11 @@
-# THE SYSTEM — Product Description & Requirements
+# krnl0 — Product Description & Requirements
 *April 26, 2026 · Pre-architecture draft*
 
 ---
 
-## What is THE SYSTEM?
+## What is krnl0?
 
-THE SYSTEM is an all-in-one personal operating system for people who want to
+krnl0 is an all-in-one personal operating system for people who want to
 manage their entire life — tasks, focus, habits, projects, journaling, and
 automation — from a single, beautiful, spatial workspace.
 
@@ -40,7 +40,7 @@ momentum. Your journal reflects on your goals. Keeping them in separate
 apps is an artificial constraint imposed by how software has been built,
 not by how human productivity actually works.
 
-THE SYSTEM removes that constraint. Everything lives on one canvas.
+krnl0 removes that constraint. Everything lives on one canvas.
 Everything can connect to everything else.
 
 ---
@@ -71,7 +71,7 @@ automations, and configure the system programmatically. The terminal node
 lives on the canvas alongside everything else.
 
 **Open and extensible.**
-THE SYSTEM ships with a core set of nodes. Everything beyond that is a
+krnl0 ships with a core set of nodes. Everything beyond that is a
 plugin. The community can build and publish new node types — a finance
 tracker, a reading list, a GitHub issue viewer, a sleep logger — and
 anyone can install them. The system grows with its users.
@@ -159,7 +159,7 @@ task list based on your calendar — all of this is possible through the
 CLI layer.
 
 ### Plugin system
-Beyond the built-in node library, THE SYSTEM supports community-built
+Beyond the built-in node library, krnl0 supports community-built
 node types. A plugin is a self-contained node that installs from a
 registry or a local file. The goal is that any tool a productive person
 might want on their canvas can be built, shared, and installed without
@@ -202,7 +202,7 @@ contributing a new node type achievable in an afternoon.
 
 ## What makes it different
 
-| | THE SYSTEM | Notion | Obsidian | Miro | Linear |
+| | krnl0 | Notion | Obsidian | Miro | Linear |
 |---|---|---|---|---|---|
 | Infinite canvas | ✓ | — | — | ✓ | — |
 | Native Pomodoro | ✓ | — | plugin | — | — |

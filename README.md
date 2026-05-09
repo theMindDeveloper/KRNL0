@@ -1,8 +1,8 @@
-# THE SYSTEM — `krnl0`
+# krnl0
 
 > *One canvas. Talk to it. Yours to own.*
 
-**THE SYSTEM** is a voice-driven personal planning canvas. Three anchored widgets — Pomodoro, Todos, Habits — sit at fixed positions on a paper-toned infinite canvas. A terminal node sits beside them as a fourth peer. A floating orb is the AI assistant.
+**krnl0** is a voice-driven personal planning canvas. Three anchored widgets — Pomodoro, Todos, Habits — sit at fixed positions on a paper-toned infinite canvas. A terminal node sits beside them as a fourth peer. A floating orb is the AI assistant.
 
 You can click and type — or press the orb and talk.
 

@@ -1,4 +1,4 @@
-# THE SYSTEM — Research & References
+# krnl0 — Research & References
 
 *Extracted from PRD v0.6.0 §16*
 *For the Aug 3 documentation submission*
@@ -10,20 +10,20 @@
 ### 1. Obsidian
 Local-first, file-based personal knowledge management.
 
-**Influence on THE SYSTEM:**
+**Influence on krnl0:**
 - Filesystem-as-source-of-truth (`board.json` mirrors Obsidian's markdown-file approach)
 - Project-folder-with-instructions (`CLAUDE.md` in the source folder)
 - Markdown sidecars for the Journal node (v1.5)
 - "Yours to own" philosophy
 
-**Where we diverge:** Obsidian is page-based. THE SYSTEM is spatial. Obsidian's graph view is a read-only visualization. Our canvas is the primary interface.
+**Where we diverge:** Obsidian is page-based. krnl0 is spatial. Obsidian's graph view is a read-only visualization. Our canvas is the primary interface.
 
 ---
 
 ### 2. Miro / FigJam
 Infinite canvas collaboration tools.
 
-**Influence on THE SYSTEM:**
+**Influence on krnl0:**
 - Canvas interaction model (pan, zoom, drag nodes, connect with edges)
 - Visible connections as a first-class concept
 
@@ -34,9 +34,9 @@ Infinite canvas collaboration tools.
 ### 3. Notion
 Block-based all-in-one productivity tool.
 
-**Influence on THE SYSTEM:** Counter-example.
+**Influence on krnl0:** Counter-example.
 
-Notion buries everything in nested pages. Information is hierarchical and hidden. THE SYSTEM surfaces everything spatially — your Pomodoro, todos, and habits are always visible at a glance, not buried three clicks deep.
+Notion buries everything in nested pages. Information is hierarchical and hidden. krnl0 surfaces everything spatially — your Pomodoro, todos, and habits are always visible at a glance, not buried three clicks deep.
 
 Notion has no native programmable surface. Our `sys` CLI is.
 
@@ -45,7 +45,7 @@ Notion has no native programmable surface. Our `sys` CLI is.
 ### 4. Iron Man / J.A.R.V.I.S.
 Voice-first ambient assistant in the Marvel universe.
 
-**Influence on THE SYSTEM:**
+**Influence on krnl0:**
 - The orb interaction model (always present, always listenable, speaks back)
 - The idea that AI should operate the same tools the user operates, not have special powers
 
@@ -54,7 +54,7 @@ Voice-first ambient assistant in the Marvel universe.
 ### 5. Loop Habit Tracker
 Android app for minimalist habit tracking.
 
-**Influence on THE SYSTEM:**
+**Influence on krnl0:**
 - Habit mother node visual density (compact 7-day grid, high information per pixel)
 - Streak display design
 

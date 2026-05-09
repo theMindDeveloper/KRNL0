@@ -1,4 +1,4 @@
-# THE SYSTEM — Design Patterns Map
+# krnl0 — Design Patterns Map
 
 *Extracted from PRD v0.6.0 §6*
 

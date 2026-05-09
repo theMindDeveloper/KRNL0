@@ -1,4 +1,4 @@
-# THE SYSTEM — Product Requirements Document
+# krnl0 — Product Requirements Document
 
 *v0.6.0 · May 9, 2026 · Architecture Locked · Ready for Build*
 
@@ -27,7 +27,7 @@ The major shifts since v0.4.2:
 
 ## 1. What it is
 
-**THE SYSTEM** is a voice-driven canvas for personal planning. Three anchored widgets — Pomodoro, Todos, Habits — sit at fixed positions on a paper-toned canvas. A terminal node sits beside them as a fourth peer. A floating orb is the AI assistant. You can click and type, or you can press the orb and talk: *"plan a two-hour deep-work block on the thesis, then a walk."* The assistant transcribes your speech, decides what to do, runs commands against the same `sys` CLI a power user would type by hand, the canvas redraws to show the new pipeline, and the assistant reads back what it did.
+**krnl0** is a voice-driven canvas for personal planning. Three anchored widgets — Pomodoro, Todos, Habits — sit at fixed positions on a paper-toned canvas. A terminal node sits beside them as a fourth peer. A floating orb is the AI assistant. You can click and type, or you can press the orb and talk: *"plan a two-hour deep-work block on the thesis, then a walk."* The assistant transcribes your speech, decides what to do, runs commands against the same `sys` CLI a power user would type by hand, the canvas redraws to show the new pipeline, and the assistant reads back what it did.
 
 The product is a Natural User Interface demo. The voice flow is the embodied-input demonstration. The canvas is the visible system the voice produces. The terminal proves that everything voice can do, the keyboard can do too — same surface, different mouth.
 
@@ -515,12 +515,12 @@ How it works concretely:
 claude -p "<user transcript>" \
   --output-format json \
   --allowedTools "Bash,Read,Edit,Write" \
-  --append-system-prompt "You are the assistant for THE SYSTEM..."
+  --append-system-prompt "You are the assistant for krnl0..."
 # CWD = the codebase folder, where CLAUDE.md lives
 ```
 
 Claude Code reads `CLAUDE.md` from its working directory automatically. That file teaches it:
-- What THE SYSTEM is.
+- What krnl0 is.
 - That the user data lives at `~/Documents/the-system/board.json`.
 - That mutations happen through `sys <subcommand>` (the CLI, available on PATH).
 - Common patterns and example sessions (see `skills/*.md`).

@@ -1,0 +1,3799 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRNL0</title><style>/* LifeOS — Anthropic warmth × cyberpunk ASCII */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Instrument+Serif&family=Geist:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Anthropic-ish warm neutrals */
+  --paper: #f5f1e8;
+  --paper-2: #ede7d6;
+  --paper-3: #e3dcc7;
+  --ink: #1a1814;
+  --ink-2: #3d362b;
+  --ink-3: #6b6354;
+  --ink-4: #9a9180;
+
+  /* Cyberpunk accents — restrained, high signal */
+  --acid: #c9f158;          /* terminal green-yellow */
+  --acid-glow: #d8ff6e;
+  --spine:     #5e7d1d;     /* deep theme-green for fixed modules */
+  --spine-hot: #7ea22b;     /* hover/active brighter green */
+  --rust: #c8553d;          /* claude orange-rust */
+  --rust-deep: #a83e2a;
+  --plum: #6b4ea8;
+  --cyan: #4ea8b0;
+
+  /* Terminal */
+  --term-bg: #0c0a08;
+  --term-bg-2: #15110d;
+  --term-fg: #d4cfc0;
+  --term-dim: #6b6354;
+  --term-acid: #c9f158;
+  --term-rust: #e87a5f;
+
+  --grid: rgba(26, 24, 20, 0.06);
+  --grid-strong: rgba(26, 24, 20, 0.12);
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow-1: 0 1px 0 rgba(26,24,20,0.04), 0 2px 6px rgba(26,24,20,0.06);
+  --shadow-2: 0 2px 0 rgba(26,24,20,0.04), 0 8px 24px rgba(26,24,20,0.10);
+  --shadow-glow: 0 0 0 1px var(--acid), 0 0 24px rgba(201, 241, 88, 0.25);
+
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+
+  --node-bg: #fdfaf2;
+}
+
+/* === DARK MODE ============================================== */
+[data-theme="dark"] {
+  --paper: #0e0d0b;
+  --paper-2: #1a1814;
+  --paper-3: #2a2620;
+  --ink: #f0ebdd;
+  --ink-2: #d4cfc0;
+  --ink-3: #8a8270;
+  --ink-4: #5a5244;
+
+  --rust: #e87a5f;
+  --rust-deep: #c8553d;
+  --spine:     #6e8f25;
+  --spine-hot: #9ac33c;
+
+  --term-bg: #05040a;
+  --term-bg-2: #0a0812;
+  --term-fg: #d4cfc0;
+
+  --grid: rgba(240, 235, 221, 0.05);
+  --grid-strong: rgba(240, 235, 221, 0.10);
+
+  --shadow-1: 0 1px 0 rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.4);
+  --shadow-2: 0 2px 0 rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.5);
+
+  --node-bg: #18160f;
+}
+[data-theme="dark"] .brand-mark { background: var(--acid); color: var(--paper); }
+[data-theme="dark"] .node-head { border-bottom-color: var(--paper-3); }
+[data-theme="dark"] .habit-row { border-bottom-color: var(--paper-3); }
+[data-theme="dark"] .todo-add { border-top-color: var(--paper-3); }
+[data-theme="dark"] .image-frame { background: linear-gradient(135deg, #1a1a22 0%, #0d0d14 60%, #050508 100%); }
+[data-theme="dark"] .pomo-btn.ghost { border-color: var(--paper-3); color: var(--ink-2); }
+[data-theme="dark"] .pomo-btn { background: var(--acid); color: var(--paper); }
+[data-theme="dark"] .pomo-btn:hover { background: var(--acid-glow); }
+[data-theme="dark"] .habit-cell { background: var(--paper-2); border-color: var(--paper-3); }
+[data-theme="dark"] .habit-cell.done { background: var(--acid); border-color: var(--acid); }
+[data-theme="dark"] .habit-cell.done::after { background: var(--paper); }
+[data-theme="dark"] .todo-item.done .todo-check { background: var(--acid); border-color: var(--acid); }
+[data-theme="dark"] .todo-item.done .todo-check::after { color: var(--paper); }
+[data-theme="dark"] .btn.primary { background: var(--acid); color: var(--paper); border-color: var(--acid); }
+[data-theme="dark"] .btn.primary:hover { background: var(--acid-glow); border-color: var(--acid-glow); }
+[data-theme="dark"] .dock-btn.active { background: var(--acid); color: var(--paper); }
+[data-theme="dark"] .statusbar { background: #05040a; border-top: 1px solid var(--paper-3); }
+[data-theme="dark"] .node.terminal { border-color: var(--paper-3); }
+[data-theme="dark"] .term-head { background: #0a0812; border-bottom-color: var(--paper-3); }
+[data-theme="dark"] .connections path { stroke: var(--ink-3); opacity: 0.82; }
+[data-theme="dark"] .node.selected { border-color: var(--ink-2); box-shadow: 0 0 0 2px rgba(201, 241, 88, 0.18), 0 8px 28px rgba(0,0,0,0.55); }
+[data-theme="dark"] .topbar { background: rgba(14, 13, 11, 0.85); border-bottom-color: var(--paper-3); }
+[data-theme="dark"] .dock { background: rgba(26, 24, 20, 0.92); border-color: var(--paper-3); }
+[data-theme="dark"] .minimap { background: rgba(26, 24, 20, 0.92); border-color: var(--paper-3); }
+[data-theme="dark"] .tweaks { background: rgba(24, 22, 15, 0.96); border-color: var(--paper-3); }
+[data-theme="dark"] .tweaks-head { border-bottom-color: var(--paper-3); }
+[data-theme="dark"] .tweak-opt { background: var(--paper-2); border-color: var(--paper-3); color: var(--ink-2); }
+[data-theme="dark"] .tweak-opt:hover { background: var(--paper-3); }
+[data-theme="dark"] .tweak-opt.active { background: var(--acid); color: var(--paper); border-color: var(--acid); }
+[data-theme="dark"] .btn { border-color: var(--paper-3); color: var(--ink-2); }
+[data-theme="dark"] .btn:hover { background: var(--paper-2); color: var(--ink); border-color: var(--ink-4); }
+[data-theme="dark"] .btn .kbd { background: var(--paper-2); border-color: var(--paper-3); color: var(--ink-3); }
+[data-theme="dark"] .dock-btn { color: var(--ink-2); }
+[data-theme="dark"] .dock-btn:hover { background: var(--paper-2); color: var(--ink); }
+[data-theme="dark"] .dock-divider { background: var(--paper-3); }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root { height: 100%; }
+
+/* === APP CHROME ============================================== */
+.app {
+  position: relative;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+/* Top bar */
+.topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 44px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 12px;
+  background: rgba(245, 241, 232, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--paper-3);
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+}
+.brand-mark {
+  width: 22px; height: 22px;
+  background: var(--ink);
+  color: var(--acid);
+  display: grid; place-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 3px;
+  letter-spacing: -0.05em;
+  position: relative;
+}
+.brand-mark::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 1px dashed var(--ink-4);
+  border-radius: 5px;
+  opacity: 0.6;
+}
+.brand-name { color: var(--ink); text-transform: uppercase; }
+.brand-name .dim { color: var(--ink-4); font-weight: 400; }
+
+.crumb {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  display: flex; align-items: center; gap: 6px;
+  padding-left: 14px;
+  margin-left: 4px;
+  border-left: 1px solid var(--paper-3);
+}
+.crumb .live { color: var(--acid); background: var(--ink); padding: 2px 7px; border-radius: 3px; font-size: 9.5px; letter-spacing: 0.08em; }
+
+.topbar-spacer { flex: 1; }
+
+.top-actions { display: flex; gap: 6px; align-items: center; }
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--paper-3);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.12s ease;
+  letter-spacing: 0.01em;
+}
+.btn:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+  border-color: var(--ink-4);
+}
+.btn.primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.btn.primary:hover { background: var(--ink-2); border-color: var(--ink-2); }
+.btn .kbd {
+  font-size: 10px;
+  color: var(--ink-3);
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* Left dock */
+.dock {
+  position: absolute;
+  left: 14px;
+  top: 60px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(245, 241, 232, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--paper-3);
+  border-radius: 8px;
+  box-shadow: var(--shadow-1);
+}
+.dock-btn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--ink-2);
+  background: transparent;
+  border: none;
+  position: relative;
+  transition: all 0.1s;
+}
+.dock-btn:hover { background: var(--paper-2); color: var(--ink); }
+.dock-btn.active { background: var(--ink); color: var(--acid); }
+.dock-btn[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 46px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+}
+.dock-divider {
+  height: 1px;
+  background: var(--paper-3);
+  margin: 4px 2px;
+}
+
+/* Bottom bar */
+.statusbar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 28px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 14px;
+  background: var(--ink);
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+.status-item { display: flex; align-items: center; gap: 6px; }
+.status-item .label { color: var(--ink-4); }
+.status-item .val { color: var(--paper-3); }
+.status-item.acid .val { color: var(--acid); }
+.status-item.rust .val { color: var(--rust); }
+.status-spacer { flex: 1; }
+
+/* === CANVAS ================================================== */
+.canvas-wrap {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  overflow: hidden;
+  contain: layout;
+}
+.canvas-wrap.panning { cursor: grabbing; }
+.canvas-wrap.connecting { cursor: crosshair; }
+
+.canvas-bg {
+  position: absolute;
+  inset: 0;
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(circle at center, var(--grid-strong) 1px, transparent 1px),
+    radial-gradient(circle at center, var(--grid) 1px, transparent 1px);
+  background-size: 160px 160px, 32px 32px;
+  background-position: 0 0;
+}
+
+.canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 1px; height: 1px;
+  transform-origin: 0 0;
+  will-change: transform;
+  overflow: visible;
+}
+
+.connections {
+  position: absolute;
+  top: 0; left: 0;
+  overflow: visible;
+  pointer-events: none;
+  width: 1px; height: 1px;
+}
+.connections path {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  pointer-events: stroke;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.connections path:hover { stroke: var(--rust); opacity: 1; }
+.connections path.active {
+  stroke: var(--spine);
+  stroke-dasharray: none;
+  opacity: 1;
+  filter: drop-shadow(0 0 4px rgba(94, 125, 29, 0.45));
+}
+[data-theme="dark"] .connections path.active {
+  stroke: var(--acid);
+  filter: drop-shadow(0 0 5px rgba(201, 241, 88, 0.7));
+}
+.connections .pending {
+  stroke: var(--rust);
+  stroke-dasharray: 6 4;
+  stroke-width: 1.5;
+  opacity: 0.8;
+}
+
+/* === NODE BASE =============================================== */
+.node {
+  position: absolute;
+  background: var(--node-bg);
+  border: 1px solid var(--paper-3);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  user-select: none;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.node:hover { box-shadow: var(--shadow-2); border-color: var(--ink-4); }
+.node.selected {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(26, 24, 20, 0.08), var(--shadow-2);
+}
+
+.node-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid var(--paper-2);
+  cursor: grab;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.node-head:active { cursor: grabbing; }
+.node-head .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+.node-head .title { color: var(--ink-2); font-weight: 500; }
+.node-head .actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.node:hover .node-head .actions, .node.selected .node-head .actions { opacity: 1; }
+.node-head .actions button {
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  width: 18px; height: 18px;
+  display: grid; place-items: center;
+  border-radius: 3px;
+  padding: 0;
+}
+.node-head .actions button:hover { background: var(--paper-2); color: var(--ink); }
+
+/* Connection ports */
+.port {
+  position: absolute;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1.5px solid var(--ink-3);
+  cursor: crosshair;
+  z-index: 5;
+  transition: all 0.12s;
+}
+.port:hover {
+  background: var(--acid);
+  border-color: var(--ink);
+  transform: scale(1.3);
+  box-shadow: 0 0 0 4px rgba(201, 241, 88, 0.3);
+}
+.port.left { left: -7px; top: 50%; transform: translateY(-50%); }
+.port.right { right: -7px; top: 50%; transform: translateY(-50%); }
+.port.left:hover { transform: translateY(-50%) scale(1.3); }
+.port.right:hover { transform: translateY(-50%) scale(1.3); }
+
+/* === POMODORO NODE =========================================== */
+.node.pomodoro { width: 240px; }
+.pomo-body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.pomo-clock {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 64px;
+  font-weight: 300;
+  color: var(--ink-4);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  display: inline-block;
+  margin: 4px 0 2px;
+  isolation: isolate;
+}
+.pomo-clock .layer { display: inline-block; }
+.pomo-clock .layer.fill {
+  position: absolute;
+  inset: 0;
+  color: var(--spine-hot);
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to top,
+    #000 0%,
+    #000 var(--fill, 0%),
+    transparent calc(var(--fill, 0%) + 0.4%)
+  );
+          mask-image: linear-gradient(to top,
+    #000 0%,
+    #000 var(--fill, 0%),
+    transparent calc(var(--fill, 0%) + 0.4%)
+  );
+  text-shadow:
+    0 0 14px rgba(126, 162, 43, 0.55),
+    0 0 4px rgba(201, 241, 88, 0.45);
+  transition: -webkit-mask-image 0.6s linear, mask-image 0.6s linear;
+}
+[data-theme="dark"] .pomo-clock .layer.fill { color: var(--acid); text-shadow: 0 0 18px rgba(201,241,88,0.65), 0 0 4px rgba(201,241,88,0.55); }
+.pomo-clock::after {
+  /* meniscus at the fill level */
+  content: '';
+  position: absolute;
+  left: -4%; right: -4%;
+  height: 2px;
+  bottom: var(--fill, 0%);
+  background: linear-gradient(to right,
+    transparent 0%,
+    rgba(201,241,88,0.0) 4%,
+    var(--acid) 30%,
+    var(--acid-glow) 50%,
+    var(--acid) 70%,
+    rgba(201,241,88,0.0) 96%,
+    transparent 100%
+  );
+  filter: drop-shadow(0 0 6px var(--acid));
+  pointer-events: none;
+  opacity: 0.9;
+  transform: translateY(50%);
+  transition: bottom 0.6s linear;
+}
+.pomo-clock .colon {
+  color: var(--rust);
+  animation: blink 1s steps(2) infinite;
+}
+.pomo-clock .layer.fill .colon { color: inherit; animation: none; }
+@keyframes blink { 50% { opacity: 0.3; } }
+.pomo-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--paper-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pomo-bar .fill {
+  height: 100%;
+  background: var(--rust);
+  transition: width 0.5s;
+}
+/* session pips — 4 dots showing 4-pomo cycle */
+.pomo-pips {
+  display: flex;
+  gap: 8px;
+  margin: 2px 0 4px;
+}
+.pomo-pips .pip {
+  width: 9px; height: 9px;
+  border: 1.5px solid var(--ink-4);
+  border-radius: 50%;
+  background: transparent;
+  position: relative;
+}
+.pomo-pips .pip.done {
+  background: var(--rust);
+  border-color: var(--rust);
+}
+.pomo-pips .pip.active {
+  border-color: var(--rust);
+  background: transparent;
+  box-shadow: 0 0 0 3px rgba(200, 85, 61, 0.16);
+}
+.pomo-pips .pip.active::after {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  background: var(--rust);
+  border-radius: 50%;
+  animation: blink 1.6s ease-in-out infinite;
+}
+/* big sweeping ring that wraps around the clock as the timer drains */
+.pomo-ring-wrap {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  display: grid;
+  place-items: center;
+  margin: 4px 0;
+}
+.pomo-ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+.pomo-ring .track { stroke: var(--paper-3); }
+[data-theme="dark"] .pomo-ring .track { stroke: rgba(255,255,255,0.06); }
+.pomo-ring .progress {
+  stroke: var(--rust);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s linear;
+  filter: drop-shadow(0 0 4px rgba(200,85,61,0.4));
+}
+.pomo-clock-inner { position: relative; z-index: 1; }
+.pomo-meta {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pomo-meta .session { color: var(--ink-2); }
+.pomo-controls {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+.pomo-btn {
+  flex: 1;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  padding: 8px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pomo-btn:hover { background: var(--ink-2); }
+.pomo-btn.ghost {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid var(--paper-3);
+}
+.pomo-btn.ghost:hover { background: var(--paper-2); }
+
+.pomo-ascii {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1;
+  color: var(--ink-4);
+  white-space: pre;
+  text-align: center;
+  letter-spacing: -0.05em;
+}
+
+/* === HABIT TRACKER NODE ====================================== */
+.node.habit { width: 320px; }
+.habit-body { padding: 12px 14px 14px; }
+.habit-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--paper-2);
+}
+.habit-row:last-child { border-bottom: none; }
+.habit-name {
+  font-size: 13px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.habit-name .glyph {
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.habit-streak {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--rust);
+}
+.habit-grid {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+}
+.habit-cell {
+  width: 14px; height: 14px;
+  border-radius: 2px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  cursor: pointer;
+  position: relative;
+}
+.habit-cell.done {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.habit-cell.done::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background: var(--acid);
+  border-radius: 1px;
+}
+.habit-cell.today { border-color: var(--rust); border-width: 1.5px; }
+.habit-cell:hover { transform: scale(1.15); }
+.habit-week-labels {
+  display: flex;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.habit-week-labels span { width: 14px; text-align: center; }
+
+/* === TODO NODE =============================================== */
+.node.todo { width: 280px; }
+.todo-body { padding: 10px 14px 12px; }
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.todo-item:hover { background: var(--paper-2); margin: 0 -8px; padding: 6px 8px; }
+.todo-check {
+  width: 14px; height: 14px;
+  border: 1.5px solid var(--ink-4);
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: grid;
+  place-items: center;
+  transition: all 0.12s;
+}
+.todo-item.done .todo-check {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.todo-item.done .todo-check::after {
+  content: '✓';
+  color: var(--acid);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+.todo-item.done .todo-text {
+  color: var(--ink-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-4);
+}
+.todo-text { flex: 1; line-height: 1.35; }
+.todo-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-3);
+  background: var(--paper-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.todo-add {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  border-top: 1px dashed var(--paper-3);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+.todo-add:hover { color: var(--ink); }
+
+/* === TEXT NODE =============================================== */
+.node.text { width: 260px; background: transparent; border: 1px dashed var(--paper-3); box-shadow: none; }
+.node.text:hover { border-style: solid; box-shadow: var(--shadow-1); }
+.node.text .node-head { border-bottom: none; padding-bottom: 4px; }
+.text-body {
+  padding: 4px 14px 14px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  line-height: 1.35;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.text-body em { color: var(--rust-deep); font-style: italic; }
+
+/* === IMAGE NODE ============================================== */
+.node.image { width: 240px; padding: 0; overflow: visible; border-radius: var(--radius-lg); }
+.node.image .image-frame { border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg); }
+.image-frame {
+  width: 100%;
+  height: 160px;
+  background: linear-gradient(135deg, #2a3441 0%, #1a2030 60%, #0f1420 100%);
+  position: relative;
+  overflow: hidden;
+}
+.image-frame .ascii-image {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--acid);
+  white-space: pre;
+  opacity: 0.85;
+  letter-spacing: -0.05em;
+}
+.image-cap {
+  padding: 8px 12px 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  display: flex;
+  justify-content: space-between;
+}
+.image-cap .name { color: var(--ink-2); }
+
+/* === TERMINAL NODE =========================================== */
+.node.terminal {
+  width: 460px;
+  background: var(--term-bg);
+  border-color: #2a241c;
+  color: var(--term-fg);
+  font-family: var(--font-mono);
+  overflow: visible; /* let the SLOT slug poke above without being clipped */
+}
+.node.terminal .term-head {
+  border-top-left-radius: calc(var(--radius-lg) - 1px);
+  border-top-right-radius: calc(var(--radius-lg) - 1px);
+}
+.node.terminal .term-body {
+  border-bottom-left-radius: calc(var(--radius-lg) - 1px);
+  border-bottom-right-radius: calc(var(--radius-lg) - 1px);
+}
+.node.terminal:hover { border-color: var(--acid); box-shadow: 0 0 0 1px var(--acid), var(--shadow-2); }
+.node.terminal.selected { border-color: var(--acid); box-shadow: var(--shadow-glow); }
+
+.term-head {
+  background: var(--term-bg-2);
+  border-bottom: 1px solid #2a241c;
+  display: flex;
+  align-items: center;
+  padding: 7px 10px;
+  gap: 8px;
+  cursor: grab;
+}
+.term-head .lights { display: flex; gap: 5px; }
+.term-head .light {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: #3a342a;
+}
+.term-head .light.r { background: #c8553d; }
+.term-head .light.y { background: #c9a455; }
+.term-head .light.g { background: #7ba87b; }
+.term-head .label {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  color: var(--term-dim);
+  letter-spacing: 0.04em;
+}
+.term-head .badge {
+  font-size: 9px;
+  color: var(--term-bg);
+  background: var(--acid);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.term-body {
+  padding: 10px 12px 12px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  min-height: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.term-body::-webkit-scrollbar { width: 6px; }
+.term-body::-webkit-scrollbar-track { background: transparent; }
+.term-body::-webkit-scrollbar-thumb { background: #2a241c; border-radius: 3px; }
+
+.term-line { white-space: pre-wrap; word-break: break-word; }
+.term-line.dim { color: var(--term-dim); }
+.term-line.acid { color: var(--term-acid); }
+.term-line.rust { color: var(--term-rust); }
+.term-line.bold { font-weight: 600; }
+
+.term-prompt {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.term-prompt .sigil { color: var(--term-acid); }
+.term-prompt .path { color: var(--term-rust); }
+.term-prompt .arrow { color: var(--term-fg); opacity: 0.5; }
+.term-prompt input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--term-fg);
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  caret-color: var(--acid);
+}
+.term-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background: var(--acid);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: blink 1.05s steps(2) infinite;
+}
+
+.term-ascii {
+  color: var(--term-acid);
+  white-space: pre;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 700;
+  margin: 4px 0 10px;
+  letter-spacing: 0;
+  text-shadow: 0 0 6px rgba(201, 241, 88, 0.4);
+}
+.term-ascii.rust { color: var(--term-rust); }
+
+/* === AI ASSISTANT BLOB ====================================== */
+.ai-blob {
+  position: fixed;
+  left: 22px;
+  bottom: 56px;
+  z-index: 200;
+  font-family: var(--font-mono);
+  /* override via inline style when dragged */
+}
+.ai-blob.dragging .ai-orb { animation: none; cursor: grabbing; }
+.ai-orb-grip {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  z-index: 1;
+}
+
+@keyframes ai-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-6px) rotate(2deg); }
+}
+@keyframes ai-swirl {
+  from { transform: rotate(0deg); transform-origin: 40px 40px; }
+  to   { transform: rotate(360deg); transform-origin: 40px 40px; }
+}
+@keyframes ai-ring {
+  0%   { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0;   }
+}
+@keyframes ai-dot {
+  0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
+  40%           { opacity: 1;   transform: translateY(-3px); }
+}
+
+.ai-orb {
+  width: 64px; height: 64px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  display: block;
+  filter:
+    drop-shadow(0 0 18px rgba(201, 241, 88, 0.55))
+    drop-shadow(0 0 40px rgba(201, 241, 88, 0.25))
+    drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
+  animation: ai-float 6s ease-in-out infinite;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ai-orb:hover {
+  filter:
+    drop-shadow(0 0 24px rgba(201, 241, 88, 0.8))
+    drop-shadow(0 0 60px rgba(201, 241, 88, 0.4))
+    drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
+}
+.ai-orb:active { transform: scale(0.95) !important; }
+
+.orb-svg { width: 100%; height: 100%; display: block; }
+.orb-swirl { animation: ai-swirl 8s linear infinite; }
+
+.ai-blob.listening .ai-orb {
+  filter:
+    drop-shadow(0 0 28px rgba(201, 241, 88, 1))
+    drop-shadow(0 0 70px rgba(201, 241, 88, 0.6))
+    drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
+}
+.ai-blob.thinking .ai-orb {
+  filter:
+    drop-shadow(0 0 24px rgba(180, 140, 240, 0.9))
+    drop-shadow(0 0 60px rgba(180, 140, 240, 0.4))
+    drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
+}
+.ai-blob.thinking .orb-swirl { animation-duration: 1.8s; }
+
+.orb-ring {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(201, 241, 88, 0.5);
+  pointer-events: none;
+  animation: ai-ring 1.6s ease-out infinite;
+}
+.orb-ring.r2 { animation-delay: 0.5s; }
+.orb-ring.r3 { animation-delay: 1.0s; }
+
+/* Panel */
+.ai-panel {
+  position: absolute;
+  left: 0;
+  bottom: 80px;
+  width: 340px;
+  max-height: 480px;
+  background: rgba(14, 13, 11, 0.94);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(201, 241, 88, 0.22);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(201, 241, 88, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    0 0 80px rgba(201, 241, 88, 0.15);
+  animation: ai-panel-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes ai-panel-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.ai-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(201, 241, 88, 0.15);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ai-name::before {
+  content: '◆';
+  color: var(--acid);
+  margin-right: 8px;
+  text-shadow: 0 0 8px var(--acid-glow);
+}
+.ai-close {
+  background: transparent;
+  border: 0;
+  color: var(--ink-3);
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+.ai-close:hover { color: var(--ink); }
+
+.ai-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  min-height: 80px;
+  max-height: 340px;
+}
+.ai-hint { color: var(--ink-3); }
+.ai-greet {
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.ai-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-suggest button {
+  background: rgba(201, 241, 88, 0.06);
+  border: 1px solid rgba(201, 241, 88, 0.15);
+  color: var(--ink-2);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  transition: all 0.15s;
+}
+.ai-suggest button:hover {
+  background: rgba(201, 241, 88, 0.12);
+  border-color: rgba(201, 241, 88, 0.4);
+  color: var(--ink);
+}
+.ai-msg { line-height: 1.5; }
+.ai-msg.user { color: var(--ink-3); }
+.ai-msg.ai { color: var(--ink); }
+.ai-msg.ai::first-letter { color: var(--acid); }
+
+.thinking-line .dots {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 4px;
+}
+.thinking-line .dots span {
+  width: 5px; height: 5px;
+  background: var(--acid);
+  border-radius: 50%;
+  display: inline-block;
+  animation: ai-dot 1.2s ease-in-out infinite;
+  box-shadow: 0 0 6px var(--acid);
+}
+.thinking-line .dots span:nth-child(2) { animation-delay: 0.15s; }
+.thinking-line .dots span:nth-child(3) { animation-delay: 0.3s; }
+
+.ai-listening {
+  color: var(--acid);
+  text-shadow: 0 0 8px rgba(201, 241, 88, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lis-dot {
+  width: 8px; height: 8px;
+  background: var(--acid);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--acid);
+  animation: ai-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ai-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.8); }
+}
+
+.ai-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(201, 241, 88, 0.15);
+  background: rgba(0, 0, 0, 0.2);
+}
+.ai-prompt { color: var(--acid); font-weight: 700; }
+.ai-form input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 4px 0;
+}
+.ai-form input::placeholder { color: var(--ink-4); }
+.ai-mic {
+  background: rgba(201, 241, 88, 0.08);
+  border: 1px solid rgba(201, 241, 88, 0.2);
+  color: var(--acid);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s;
+}
+.ai-mic:hover { background: rgba(201, 241, 88, 0.18); }
+.ai-mic.on {
+  background: var(--acid);
+  color: var(--paper);
+  box-shadow: 0 0 12px var(--acid);
+}
+
+/* === RESIZE HANDLE ========================================== */
+.resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: se-resize;
+  z-index: 10;
+}
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--ink-3);
+  border-bottom: 2px solid var(--ink-3);
+  border-radius: 1px;
+  transition: border-color 0.1s;
+}
+.resize-handle:hover::before {
+  border-color: var(--acid);
+}
+[data-theme="dark"] .resize-handle::before {
+  border-color: var(--ink-3);
+}
+
+.minimap {
+  position: absolute;
+  right: 14px;
+  bottom: 40px;
+  width: 200px;
+  height: 130px;
+  background: rgba(245, 241, 232, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--paper-3);
+  border-radius: 6px;
+  z-index: 30;
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+.minimap-canvas {
+  position: absolute;
+  inset: 0;
+}
+.minimap-node {
+  position: absolute;
+  background: var(--ink-3);
+  border-radius: 1px;
+}
+.minimap-node.terminal { background: var(--acid); }
+.minimap-node.pomodoro { background: var(--rust); }
+.minimap-vp {
+  position: absolute;
+  border: 1px solid var(--rust);
+  background: rgba(200, 85, 61, 0.08);
+  pointer-events: none;
+}
+.minimap-label {
+  position: absolute;
+  top: 4px; left: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+/* === TWEAKS PANEL ============================================ */
+.tweaks {
+  position: absolute;
+  right: 14px;
+  top: 60px;
+  width: 260px;
+  background: rgba(253, 250, 242, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--paper-3);
+  border-radius: 8px;
+  box-shadow: var(--shadow-2);
+  z-index: 60;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  display: none;
+}
+.tweaks.open { display: block; }
+.tweaks-head {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--paper-2);
+  display: flex;
+  align-items: center;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.tweaks-head .x {
+  margin-left: auto;
+  cursor: pointer;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  font-size: 14px;
+  padding: 0;
+}
+.tweaks-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
+.tweak-row { display: flex; flex-direction: column; gap: 5px; }
+.tweak-row .label {
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.tweak-row .opts { display: flex; gap: 4px; flex-wrap: wrap; }
+.tweak-opt {
+  flex: 1;
+  min-width: 0;
+  background: var(--paper);
+  border: 1px solid var(--paper-3);
+  color: var(--ink-2);
+  padding: 5px 8px;
+  font-family: inherit;
+  font-size: 10.5px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: lowercase;
+}
+.tweak-opt:hover { background: var(--paper-2); }
+.tweak-opt.active { background: var(--ink); color: var(--acid); border-color: var(--ink); }
+
+/* === DENSITY ================================================ */
+[data-density="compact"] .pomo-body { padding: 10px 12px 12px; gap: 8px; }
+[data-density="compact"] .pomo-ring-wrap { width: 188px; height: 188px; }
+[data-density="compact"] .pomo-clock { font-size: 54px; }
+[data-density="compact"] .todo-body,
+[data-density="compact"] .habit-body,
+[data-density="compact"] .cal-body { padding: 10px 12px 12px; }
+[data-density="compact"] .todo-item { padding: 4px 0; }
+[data-density="compact"] .habit-row { padding: 5px 0; }
+[data-density="compact"] .term-body { padding: 10px 12px; font-size: 11px; }
+
+[data-density="spacious"] .pomo-body { padding: 18px 20px 20px; gap: 16px; }
+[data-density="spacious"] .pomo-ring-wrap { width: 240px; height: 240px; }
+[data-density="spacious"] .pomo-clock { font-size: 72px; }
+[data-density="spacious"] .todo-body,
+[data-density="spacious"] .habit-body,
+[data-density="spacious"] .cal-body { padding: 18px 20px 20px; }
+[data-density="spacious"] .todo-item { padding: 9px 0; }
+[data-density="spacious"] .habit-row { padding: 9px 0; }
+[data-density="spacious"] .term-body { padding: 16px 18px; font-size: 13px; }
+
+/* === COMMAND PALETTE HINT ==================================== */
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 42px;
+  transform: translateX(-50%);
+  z-index: 30;
+  background: rgba(26, 24, 20, 0.92);
+  color: var(--paper-3);
+  padding: 7px 14px;
+  border-radius: 100px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  opacity: 0;
+  animation: hintFade 6s ease 1s forwards;
+}
+.hint .kbd {
+  background: rgba(245, 241, 232, 0.15);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--paper);
+  font-size: 9.5px;
+}
+@keyframes hintFade {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  10%, 75% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+}
+
+/* === FIXED ANCHORED MODULES ================================ */
+.node.fixed {
+  border: 1px solid var(--paper-3);
+  border-radius: 6px;
+  background: var(--node-bg);
+  box-shadow: 0 8px 24px rgba(26,24,20,0.08);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.25s cubic-bezier(.34,1.2,.64,1);
+}
+.node.fixed:hover {
+  border-color: var(--ink-4);
+  box-shadow: 0 14px 30px rgba(26,24,20,0.14);
+}
+.node.fixed.selected {
+  border-color: var(--ink-3);
+  box-shadow: 0 16px 34px rgba(26,24,20,0.18);
+}
+[data-theme="dark"] .node.fixed {
+  border-color: var(--paper-3);
+  box-shadow: 0 14px 28px rgba(0,0,0,0.45);
+}
+[data-theme="dark"] .node.fixed:hover { border-color: var(--ink-4); }
+[data-theme="dark"] .node.fixed.selected { border-color: var(--ink-3); }
+.node.fixed::before { content: none; }
+
+/* corner brackets — neutral ink, subtle by default */
+.fixed-corners {
+  position: absolute;
+  inset: -8px;
+  pointer-events: none;
+  opacity: 0.35;
+  transition: opacity 0.18s;
+}
+.node.fixed:hover .fixed-corners,
+.node.fixed.selected .fixed-corners { opacity: 0.85; }
+.fixed-corners span {
+  position: absolute;
+  width: 9px; height: 9px;
+  border: 1.5px solid var(--ink-3);
+  transition: border-color 0.18s;
+}
+.node.fixed:hover .fixed-corners span,
+.node.fixed.selected .fixed-corners span { border-color: var(--ink-2); }
+.fixed-corners .tl { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+.fixed-corners .tr { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+.fixed-corners .bl { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+.fixed-corners .br { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+[data-theme="dark"] .fixed-corners { opacity: 0.3; }
+[data-theme="dark"] .node.fixed:hover .fixed-corners,
+[data-theme="dark"] .node.fixed.selected .fixed-corners { opacity: 0.85; }
+
+.fixed-slot-tag {
+  position: absolute;
+  top: -11px;
+  left: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2.5px 8px 3px;
+  border-radius: 2px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  z-index: 6;
+  pointer-events: none;
+  font-weight: 600;
+  border: 1px solid var(--ink);
+}
+.fixed-slot-tag .num { color: var(--spine-hot); margin-right: 1px; }
+[data-theme="dark"] .fixed-slot-tag {
+  background: var(--paper-2);
+  color: var(--ink-2);
+  border-color: var(--paper-3);
+}
+[data-theme="dark"] .fixed-slot-tag .num { color: var(--spine-hot); }
+
+.fixed-reorder {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px; height: 36px;
+  background: var(--paper);
+  border: 1px solid var(--ink-3);
+  border-radius: 3px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  z-index: 7;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.12s;
+}
+.node.fixed:hover .fixed-reorder,
+.node.fixed.selected .fixed-reorder { opacity: 1; }
+.fixed-reorder.left { left: -22px; }
+.fixed-reorder.right { right: -22px; }
+.fixed-reorder:hover { background: var(--ink); color: var(--acid); border-color: var(--ink); }
+.fixed-reorder:disabled { opacity: 0 !important; pointer-events: none; }
+[data-theme="dark"] .fixed-reorder { background: var(--paper-2); color: var(--ink-2); border-color: var(--paper-3); }
+
+.node.fixed .port { display: none; }
+.node.fixed .resize-handle { display: none; }
+
+.node.fixed .node-head { cursor: default; }
+
+/* === CALENDAR NODE =========================================== */
+.node.calendar { width: 304px; }
+.cal-body { padding: 12px 14px 14px; }
+.cal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 11px;
+  margin-bottom: 8px;
+}
+.cal-head .month { color: var(--ink); font-weight: 600; letter-spacing: 0.04em; }
+.cal-head .month .yr { color: var(--ink-3); margin-left: 6px; font-weight: 400; }
+.cal-head .nav { display: flex; gap: 2px; }
+.cal-head .nav button {
+  background: none; border: none; color: var(--ink-3);
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  width: 20px; height: 20px; border-radius: 3px;
+}
+.cal-head .nav button:hover { background: var(--paper-2); color: var(--ink); }
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-dow {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  text-align: center;
+  text-transform: uppercase;
+  padding: 4px 0 6px;
+  letter-spacing: 0.08em;
+}
+.cal-cell {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  border-radius: 3px;
+  position: relative;
+  cursor: pointer;
+}
+.cal-cell:hover { background: var(--paper-2); }
+.cal-cell.muted { color: var(--ink-4); opacity: 0.4; }
+.cal-cell.today {
+  background: var(--ink);
+  color: var(--acid);
+  font-weight: 600;
+}
+[data-theme="dark"] .cal-cell.today {
+  background: var(--acid);
+  color: var(--paper);
+  font-weight: 700;
+}
+[data-theme="dark"] .cal-cell.today.event::after { background: var(--paper); }
+.cal-cell.event::after {
+  content: '';
+  position: absolute;
+  bottom: 3px; left: 50%;
+  transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--rust);
+}
+.cal-cell.today.event::after { background: var(--acid); }
+.cal-events {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--paper-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-theme="dark"] .cal-events { border-top-color: var(--paper-3); }
+.cal-event {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  align-items: baseline;
+}
+.cal-event .time {
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+  font-size: 10px;
+  width: 38px;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+.cal-event .what {
+  color: var(--ink);
+  flex: 1;
+  line-height: 1.3;
+}
+.cal-event .pip {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--rust);
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* === TASK NODE (chained from todo) =========================== */
+.node.task { width: 220px; }
+.task-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.task-head-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rust);
+}
+.task-head-bar .num { color: var(--rust); font-weight: 600; }
+.task-head-bar .tag {
+  color: var(--ink-3);
+  background: var(--paper-2);
+  padding: 1px 5px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+}
+.task-row {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.task-check {
+  width: 15px; height: 15px;
+  border: 1.5px solid var(--ink-4);
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: grid; place-items: center;
+  transition: all 0.12s;
+}
+.task-check:hover { border-color: var(--ink-2); }
+.node.task.done .task-check {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.node.task.done .task-check::after {
+  content: '✓';
+  color: var(--acid);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.task-text {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+  flex: 1;
+}
+.node.task.done .task-text {
+  color: var(--ink-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-4);
+}
+.task-foot {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 4px;
+  border-top: 1px dashed var(--paper-3);
+}
+[data-theme="dark"] .task-foot { border-top-color: var(--paper-3); }
+
+/* === TASK FLOW EDGES — cyan, thick, lightening source→target =========== */
+@keyframes task-flow-march {
+  from { stroke-dashoffset: 40; }
+  to   { stroke-dashoffset: 0; }
+}
+.connections path.task-edge {
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 14 8;
+  opacity: 1;
+  filter: drop-shadow(0 0 5px rgba(78,168,176,0.45));
+  animation: task-flow-march 1.6s linear infinite;
+}
+.connections path.task-edge:hover { filter: drop-shadow(0 0 9px rgba(154,237,246,0.85)); }
+.connections path.task-edge.flashing {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 14px rgba(154,237,246,0.95)) drop-shadow(0 0 4px rgba(78,168,176,1));
+  animation: task-flow-march 0.55s linear infinite;
+}
+/* Pomo edges — rust dotted, attaching pomos to their owning task */
+.connections path.pomo-edge {
+  stroke: var(--rust);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 4;
+  opacity: 0.7;
+  filter: drop-shadow(0 0 3px rgba(200,85,61,0.25));
+}
+@keyframes edge-pulse-travel {
+  0%   { offset-distance: 0%;   opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.task-pulse {
+  fill: var(--acid);
+  filter: drop-shadow(0 0 6px var(--acid)) drop-shadow(0 0 12px rgba(201,241,88,0.6));
+}
+
+/* Spawn-in animation for new task nodes */
+@keyframes task-spawn {
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.92); }
+  60%  { opacity: 1; transform: translateY(0) scale(1.02); }
+  100% { transform: scale(1); }
+}
+.node.task.fresh {
+  animation: task-spawn 0.45s cubic-bezier(.34,1.4,.64,1) both;
+  transform-origin: 30% 50%;
+}
+
+/* "Add task" — emphasized as it spawns nodes */
+.todo-add {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+.todo-add::before {
+  content: '◆';
+  color: var(--rust);
+  margin-right: 6px;
+  font-size: 10px;
+}
+.todo-add:hover { color: var(--rust); }
+.todo-add .kbd {
+  margin-left: auto;
+  font-size: 9px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: var(--ink-3);
+}
+
+/* todo node in fixed strip — bigger ; show ports = no */
+.node.todo.fixed { width: 300px; }
+/* Fixed modules use unified sizing from JS NODE_SIZE; ensure no ancestor
+   width overrides leak in. The fixed body fills its container. */
+.node.fixed { display: flex; flex-direction: column; }
+.node.fixed > .term-head,
+.node.fixed > .node-head { flex: 0 0 auto; }
+.node.fixed > .pomo-body,
+.node.fixed > .todo-body,
+.node.fixed > .cal-body,
+.node.fixed > .habit-body,
+.node.fixed > .term-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.node.fixed { cursor: default; }
+
+/* Task pomo-spawn button in the task header */
+.task-pomo-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--ink-4);
+  color: var(--cyan, #4ea8b0);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.task-pomo-btn:hover { background: var(--cyan, #4ea8b0); color: var(--paper); border-color: var(--cyan, #4ea8b0); }
+[data-theme="dark"] .task-pomo-btn { border-color: var(--paper-3); }
+
+/* ============================================================ */
+/* === TIMER VARIANTS (5 different ideas, switched via tweak) === */
+/* ============================================================ */
+.pomo-variant {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* (1) RING — keep the existing ring/clock combo as-is via .pomo-ring-wrap. */
+
+/* (2) ASCII — pure terminal block bar in a mono frame */
+.pomo-ascii-frame {
+  width: 100%;
+  background: var(--term-bg);
+  color: var(--term-fg);
+  border: 1px solid #2a241c;
+  border-radius: 6px;
+  padding: 14px 14px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  position: relative;
+  box-shadow: inset 0 0 24px rgba(0,0,0,0.45);
+}
+.pomo-ascii-frame .head {
+  color: var(--term-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 9.5px;
+  display: flex; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.pomo-ascii-frame .head .live { color: var(--term-acid); }
+.pomo-ascii-frame .big {
+  font-family: var(--font-mono);
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--term-acid);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(201,241,88,0.45);
+  line-height: 1;
+  margin: 4px 0 8px;
+}
+.pomo-ascii-frame .big .colon { color: var(--term-rust); animation: blink 1s steps(2) infinite; }
+.pomo-ascii-frame .bar {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--term-acid);
+  white-space: pre;
+}
+.pomo-ascii-frame .bar .empty { color: var(--term-dim); }
+.pomo-ascii-frame .legend {
+  display: flex; justify-content: space-between;
+  margin-top: 6px;
+  font-size: 9.5px;
+  color: var(--term-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.pomo-ascii-frame .legend .pct { color: var(--term-rust); }
+
+/* (3) LCD — huge minimal seven-segment look, no ring */
+.pomo-lcd {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.pomo-lcd .panel {
+  background: linear-gradient(180deg, #1c1a14 0%, #0c0b08 100%);
+  border: 1px solid #2a241c;
+  border-radius: 8px;
+  padding: 22px 18px 18px;
+  position: relative;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,0.04), inset 0 -2px 6px rgba(0,0,0,0.6);
+  overflow: hidden;
+}
+.pomo-lcd .panel::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.0) 0,
+    rgba(255,255,255,0.0) 2px,
+    rgba(0,0,0,0.18) 2px,
+    rgba(0,0,0,0.18) 3px
+  );
+  pointer-events: none;
+  opacity: 0.7;
+}
+.pomo-lcd .digits {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 78px;
+  letter-spacing: -0.06em;
+  color: var(--rust);
+  font-variant-numeric: tabular-nums;
+  line-height: 0.85;
+  text-align: center;
+  text-shadow:
+    0 0 4px rgba(232, 122, 95, 0.55),
+    0 0 18px rgba(232, 122, 95, 0.4);
+  position: relative;
+}
+.pomo-lcd .digits .ghost {
+  position: absolute;
+  inset: 0;
+  color: rgba(255,255,255,0.04);
+  text-shadow: none;
+  pointer-events: none;
+}
+.pomo-lcd .digits .colon { color: var(--acid); animation: blink 1s steps(2) infinite; }
+.pomo-lcd .meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 4px 0;
+}
+.pomo-lcd .meta-row .led {
+  display: inline-block;
+  width: 8px; height: 8px;
+  background: var(--rust);
+  border-radius: 50%;
+  margin-right: 6px;
+  box-shadow: 0 0 8px var(--rust);
+  animation: blink 1.4s ease infinite;
+  vertical-align: -1px;
+}
+
+/* (4) BLOCKS — 25 chunky vertical bars, 1 per minute, drains as time passes */
+.pomo-blocks {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.pomo-blocks .stack {
+  display: grid;
+  grid-template-columns: repeat(25, 1fr);
+  gap: 2px;
+  height: 110px;
+  align-items: end;
+  padding: 6px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  border-radius: 4px;
+}
+[data-theme="dark"] .pomo-blocks .stack { background: var(--paper-2); border-color: var(--paper-3); }
+.pomo-blocks .stack span {
+  display: block;
+  background: var(--ink-4);
+  border-radius: 1px;
+  height: 22%;
+  transition: background 0.2s, height 0.4s ease;
+}
+.pomo-blocks .stack span.on  { background: var(--rust); height: 95%; }
+.pomo-blocks .stack span.now {
+  background: var(--acid);
+  height: 100%;
+  box-shadow: 0 0 10px var(--acid);
+  animation: blink 1.4s ease infinite;
+}
+.pomo-blocks .read {
+  display: flex; align-items: baseline; gap: 12px;
+  font-family: var(--font-mono);
+}
+.pomo-blocks .read .num {
+  font-size: 32px;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.pomo-blocks .read .colon { color: var(--rust); animation: blink 1s steps(2) infinite; }
+.pomo-blocks .read .label {
+  margin-left: auto;
+  font-size: 9.5px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* (5) VAPOR — vertical glass tube of acid liquid draining downward */
+.pomo-vapor {
+  width: 100%;
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  min-height: 200px;
+}
+.pomo-vapor .tube {
+  position: relative;
+  width: 64px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.12));
+  border: 1.5px solid var(--ink-3);
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: inset 2px 0 0 rgba(255,255,255,0.04), inset -2px 0 0 rgba(0,0,0,0.12);
+}
+[data-theme="dark"] .pomo-vapor .tube { background: rgba(0,0,0,0.5); border-color: var(--paper-3); }
+.pomo-vapor .liquid {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: linear-gradient(180deg, var(--acid-glow) 0%, var(--acid) 40%, #6e8a1f 100%);
+  transition: height 0.6s linear;
+  box-shadow: 0 0 24px var(--acid), inset 0 -8px 16px rgba(0,0,0,0.25);
+}
+.pomo-vapor .liquid::before {
+  content: '';
+  position: absolute;
+  top: -3px; left: 0; right: 0;
+  height: 6px;
+  background: linear-gradient(180deg, var(--acid-glow), transparent);
+  filter: blur(2px);
+}
+.pomo-vapor .bubbles {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pomo-vapor .bubbles span {
+  position: absolute;
+  bottom: 0;
+  width: 6px; height: 6px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 50%;
+  animation: vapor-rise linear infinite;
+}
+@keyframes vapor-rise {
+  0%   { transform: translateY(0) scale(1); opacity: 0; }
+  10%  { opacity: 0.8; }
+  90%  { opacity: 0.4; }
+  100% { transform: translateY(-180px) scale(0.5); opacity: 0; }
+}
+.pomo-vapor .ticks {
+  position: absolute;
+  top: 0; bottom: 0;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+[data-theme="dark"] .pomo-vapor .ticks { color: var(--ink-3); }
+.pomo-vapor .info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+}
+.pomo-vapor .info .num {
+  font-size: 44px;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  font-weight: 300;
+}
+.pomo-vapor .info .colon { color: var(--rust); animation: blink 1s steps(2) infinite; }
+.pomo-vapor .info .label {
+  font-size: 9.5px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.pomo-vapor .info .pct {
+  font-size: 11px;
+  color: var(--acid);
+  margin-top: 4px;
+}
+[data-theme="dark"] .pomo-vapor .info .pct { color: var(--acid); text-shadow: 0 0 8px rgba(201,241,88,0.45); }
+
+/* ============================================================ */
+/* === DESIGN VIBES (overall design overhaul, switchable)     == */
+/* ============================================================ */
+
+/* PAPER vibe — softer, warmer, less neon, serif accents on titles */
+[data-vibe="paper"] {
+  --paper:    #f7f0df;
+  --paper-2:  #efe6cf;
+  --paper-3:  #e0d5b8;
+  --ink:      #2a2418;
+  --node-bg:  #fffbef;
+  --rust:     #b94f37;
+  --acid:     #b9d843;
+  --acid-glow:#cee864;
+}
+[data-vibe="paper"] .topbar {
+  background: rgba(247, 240, 223, 0.92);
+  border-bottom-color: #d6c8a4;
+}
+[data-vibe="paper"] .brand-mark {
+  background: var(--rust);
+  color: #fff8e0;
+  border-radius: 2px;
+}
+[data-vibe="paper"] .brand-mark::before {
+  border-color: var(--rust);
+  border-style: solid;
+  opacity: 0.25;
+}
+[data-vibe="paper"] .canvas-bg {
+  background-image:
+    linear-gradient(rgba(180,150,90,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180,150,90,0.07) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+}
+[data-vibe="paper"] .node {
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(120,90,40,0.08), 0 6px 18px rgba(120,90,40,0.10);
+}
+[data-vibe="paper"] .node.fixed {
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(120,90,40,0.10), 0 12px 30px rgba(120,90,40,0.12);
+}
+[data-vibe="paper"] .node-head .title,
+[data-vibe="paper"] .term-head .label {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+[data-vibe="paper"] .text-body em { color: var(--rust); }
+[data-vibe="paper"] .pomo-clock,
+[data-vibe="paper"] .pomo-lcd .digits,
+[data-vibe="paper"] .pomo-blocks .read .num {
+  font-family: var(--font-serif);
+  font-weight: 400;
+}
+[data-vibe="paper"] .connections path { stroke: var(--rust); opacity: 0.4; }
+
+/* NOIR vibe — high-contrast monochrome, sharp edges, no neon */
+[data-vibe="noir"] {
+  --paper:    #ebe9e4;
+  --paper-2:  #d8d6d0;
+  --paper-3:  #b4b2ac;
+  --ink:      #0a0a0a;
+  --ink-2:    #1d1d1d;
+  --ink-3:    #555;
+  --ink-4:    #888;
+  --node-bg:  #f6f5f1;
+  --rust:     #0a0a0a;
+  --acid:     #fafaf6;
+  --acid-glow:#ffffff;
+  --grid:        rgba(0,0,0,0.05);
+  --grid-strong: rgba(0,0,0,0.10);
+}
+[data-vibe="noir"][data-theme="dark"] {
+  --paper:    #0a0a0a;
+  --paper-2:  #161616;
+  --paper-3:  #2c2c2c;
+  --ink:      #fafaf6;
+  --ink-2:    #d4d4d0;
+  --ink-3:    #888;
+  --ink-4:    #555;
+  --node-bg:  #131313;
+  --rust:     #fafaf6;
+  --acid:     #fafaf6;
+}
+[data-vibe="noir"] .node,
+[data-vibe="noir"] .node.fixed {
+  border-radius: 0;
+  border-width: 1.5px;
+}
+[data-vibe="noir"] .node-head { text-transform: uppercase; letter-spacing: 0.18em; }
+[data-vibe="noir"] .brand-mark { border-radius: 0; background: var(--ink); color: var(--paper); }
+[data-vibe="noir"] .brand-mark::before { display: none; }
+[data-vibe="noir"] .btn,
+[data-vibe="noir"] .tweak-opt,
+[data-vibe="noir"] .pomo-btn {
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+[data-vibe="noir"] .canvas-bg {
+  background-image:
+    linear-gradient(var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+}
+[data-vibe="noir"] .pomo-ring .progress { stroke: var(--ink); filter: none; }
+[data-vibe="noir"] .pomo-clock { color: var(--ink-3); }
+[data-vibe="noir"] .pomo-clock .layer.fill { color: var(--ink); text-shadow: none; }
+[data-vibe="noir"] .pomo-clock::after { display: none; }
+[data-vibe="noir"] .connections path { stroke: var(--ink); }
+[data-vibe="noir"] .connections path.task-edge { filter: none; stroke: var(--ink) !important; }
+[data-vibe="noir"] .ai-orb { filter: drop-shadow(0 8px 24px rgba(0,0,0,0.4)) !important; }
+
+/* SOLAR vibe — warm, sun-bleached, poppy-red + amber, more breathing room */
+[data-vibe="solar"] {
+  --paper:    #fff5e0;
+  --paper-2:  #ffe9bf;
+  --paper-3:  #f3d49a;
+  --ink:      #2b1a0a;
+  --ink-2:    #4a2f17;
+  --ink-3:    #8a6840;
+  --ink-4:    #b89a6c;
+  --node-bg:  #fff9ec;
+  --rust:     #d83a2a;
+  --rust-deep:#a82a1c;
+  --acid:     #ffb12a;
+  --acid-glow:#ffd065;
+  --cyan:     #00786b;
+  --grid:        rgba(180,90,30,0.06);
+  --grid-strong: rgba(180,90,30,0.10);
+}
+[data-vibe="solar"] .node,
+[data-vibe="solar"] .node.fixed { border-radius: 14px; }
+[data-vibe="solar"] .brand-mark {
+  background: var(--rust);
+  color: #fff5e0;
+  border-radius: 50%;
+}
+[data-vibe="solar"] .brand-mark::before {
+  border-style: solid;
+  border-color: var(--rust);
+  border-radius: 50%;
+  opacity: 0.3;
+  inset: -5px;
+}
+[data-vibe="solar"] .canvas-bg {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(255,177,42,0.18), transparent 60%),
+    radial-gradient(ellipse at 90% 100%, rgba(216,58,42,0.10), transparent 60%),
+    radial-gradient(circle, var(--grid-strong) 1px, transparent 1px),
+    radial-gradient(circle, var(--grid) 1px, transparent 1px);
+  background-size: auto, auto, 160px 160px, 32px 32px;
+}
+[data-vibe="solar"] .node-head .title,
+[data-vibe="solar"] .text-body {
+  font-family: var(--font-serif);
+}
+[data-vibe="solar"] .text-body em { color: var(--rust); font-style: italic; }
+[data-vibe="solar"] .pomo-ring .progress { stroke: var(--rust); }
+[data-vibe="solar"] .pomo-clock .layer.fill { color: var(--rust); text-shadow: 0 0 12px rgba(216,58,42,0.4); }
+[data-vibe="solar"] .pomo-clock::after { background: linear-gradient(to right, transparent, var(--rust), transparent); }
+[data-vibe="solar"] .btn.primary { background: var(--rust); border-color: var(--rust); color: #fff5e0; }
+[data-vibe="solar"] .btn.primary:hover { background: var(--rust-deep); border-color: var(--rust-deep); }
+[data-vibe="solar"] .connections path.task-edge { filter: drop-shadow(0 0 6px rgba(216,58,42,0.4)); }
+[data-vibe="solar"] .ai-orb {
+  filter:
+    drop-shadow(0 0 18px rgba(255,177,42,0.6))
+    drop-shadow(0 0 40px rgba(216,58,42,0.3))
+    drop-shadow(0 8px 24px rgba(0,0,0,0.3));
+}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head><body><div id="root"></div>
+<script type="text/babel" data-presets="react">
+// LifeOS — Node components
+// Each node renders its own body. All accept {node, selected, onPortDown}.
+
+const { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } = React;
+
+// --- Shared bits ---
+function NodeHead({ kind, title, dotColor, onClose }) {
+  return (
+    <div className="node-head" data-drag-handle>
+      <span className="dot" style={{ background: dotColor }} />
+      <span className="title">{title}</span>
+      <span style={{ color: 'var(--ink-4)', marginLeft: 4 }}>{kind}</span>
+      <div className="actions">
+        <button title="More">⋯</button>
+        <button title="Delete" onClick={onClose}>×</button>
+      </div>
+    </div>);
+
+}
+
+function Ports({ onPortDown, nodeId }) {
+  if (!onPortDown) return null;
+  return (
+    <>
+      <div className="port left" onMouseDown={(e) => { e.stopPropagation(); onPortDown(e, nodeId, 'left'); }} />
+      <div className="port right" onMouseDown={(e) => { e.stopPropagation(); onPortDown(e, nodeId, 'right'); }} />
+    </>);
+
+}
+
+// --- POMODORO ---
+// Five completely different timer visuals; switched via the global "timer" tweak.
+// Reads the current style from <html data-timer="..."> and re-renders on change.
+function useTimerStyle() {
+  const [style, setStyle] = useState(() =>
+    document.documentElement.getAttribute('data-timer') || 'ring');
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setStyle(document.documentElement.getAttribute('data-timer') || 'ring');
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-timer'] });
+    return () => obs.disconnect();
+  }, []);
+  return style;
+}
+
+function PomodoroNode({ node, onPortDown }) {
+  const [seconds, setSeconds] = useState(node.data?.seconds ?? 18 * 60 + 42);
+  const [running, setRunning] = useState(node.data?.running ?? true);
+  const total = 25 * 60;
+  const timerStyle = useTimerStyle();
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  const elapsedPct = (total - seconds) / total * 100;
+  const remainingPct = seconds / total * 100;
+
+  return (
+    <>
+      <NodeHead kind="pomo.025" title="Deep Work" dotColor="var(--rust)" />
+      <div className="pomo-body">
+        {timerStyle === 'ring'   && <TimerRing   m={m} s={s} elapsedPct={elapsedPct} remainingPct={remainingPct} />}
+        {timerStyle === 'ascii'  && <TimerAscii  m={m} s={s} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />}
+        {timerStyle === 'lcd'    && <TimerLcd    m={m} s={s} running={running} />}
+        {timerStyle === 'blocks' && <TimerBlocks m={m} s={s} elapsedPct={elapsedPct} />}
+        {timerStyle === 'vapor'  && <TimerVapor  m={m} s={s} remainingPct={remainingPct} />}
+
+        <div className="pomo-pips">
+          <div className="pip done" />
+          <div className="pip done" />
+          <div className="pip active" />
+          <div className="pip" />
+        </div>
+        <div className="pomo-meta">
+          <span>SESSION <span className="session">3 / 4</span></span>
+          <span>{running ? '● RUN' : '○ PAUSE'}</span>
+        </div>
+        <div className="pomo-controls">
+          <button className="pomo-btn ghost" onClick={() => setSeconds(25 * 60)}>RESET</button>
+          <button className="pomo-btn" onClick={() => setRunning((r) => !r)}>
+            {running ? 'PAUSE' : 'START'}
+          </button>
+        </div>
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+}
+
+// (1) RING — original radial ring + double-layer drain clock
+function TimerRing({ m, s, elapsedPct, remainingPct }) {
+  const R = 92, C = 2 * Math.PI * R;
+  const dashOffset = C * (1 - remainingPct / 100);
+  return (
+    <div className="pomo-ring-wrap">
+      <svg className="pomo-ring" viewBox="0 0 200 200">
+        <circle className="track" cx="100" cy="100" r={R} fill="none" strokeWidth="3" />
+        <circle className="progress" cx="100" cy="100" r={R} fill="none" strokeWidth="3"
+          strokeDasharray={C} strokeDashoffset={dashOffset} />
+      </svg>
+      <div className="pomo-clock-inner">
+        <div className="pomo-clock" style={{ '--fill': elapsedPct + '%' }}>
+          <span className="layer base">{m}<span className="colon">:</span>{s}</span>
+          <span className="layer fill" aria-hidden="true">{m}<span className="colon">:</span>{s}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// (2) ASCII — terminal block bar
+function TimerAscii({ m, s, elapsedPct, remainingPct, running }) {
+  const filled = Math.round(remainingPct / 100 * 24);
+  const bar = '█'.repeat(filled) + '░'.repeat(24 - filled);
+  return (
+    <div className="pomo-ascii-frame">
+      <div className="head">
+        <span>krnl0 · pomodoro</span>
+        <span className="live">{running ? '● LIVE' : '○ HALT'}</span>
+      </div>
+      <div className="big">{m}<span className="colon">:</span>{s}</div>
+      <div className="bar">[<span style={{ color: 'var(--term-acid)' }}>{'█'.repeat(filled)}</span><span className="empty">{'░'.repeat(24 - filled)}</span>]</div>
+      <div className="legend">
+        <span>{Math.round(elapsedPct)}% elapsed</span>
+        <span className="pct">{Math.round(remainingPct)}% left</span>
+      </div>
+    </div>
+  );
+}
+
+// (3) LCD — flip-clock / seven-segment look
+function TimerLcd({ m, s, running }) {
+  return (
+    <div className="pomo-lcd">
+      <div className="panel">
+        <div className="digits">
+          <span className="ghost">88<span style={{ color: 'rgba(255,255,255,0.04)' }}>:</span>88</span>
+          {m}<span className="colon">:</span>{s}
+        </div>
+      </div>
+      <div className="meta-row">
+        <span><span className="led" />{running ? 'recording focus' : 'standby'}</span>
+        <span>25 min cycle</span>
+      </div>
+    </div>
+  );
+}
+
+// (4) BLOCKS — 25 vertical bars, one per minute
+function TimerBlocks({ m, s, elapsedPct }) {
+  const minsElapsed = Math.floor(elapsedPct / 100 * 25);
+  const bars = Array.from({ length: 25 }, (_, i) => {
+    if (i < minsElapsed) return 'on';
+    if (i === minsElapsed) return 'now';
+    return '';
+  });
+  return (
+    <div className="pomo-blocks">
+      <div className="stack">
+        {bars.map((cls, i) => <span key={i} className={cls} />)}
+      </div>
+      <div className="read">
+        <span className="num">{m}<span className="colon">:</span>{s}</span>
+        <span className="label">min {minsElapsed + 1} / 25</span>
+      </div>
+    </div>
+  );
+}
+
+// (5) VAPOR — vertical glass tube of acid liquid draining
+function TimerVapor({ m, s, remainingPct }) {
+  const bubbles = useMemo(() => Array.from({ length: 4 }, (_, i) => ({
+    left: 8 + i * 14,
+    delay: i * 0.7,
+    dur: 3.2 + (i % 2) * 1.4
+  })), []);
+  return (
+    <div className="pomo-vapor">
+      <div className="tube">
+        <div className="liquid" style={{ height: remainingPct + '%' }} />
+        <div className="bubbles">
+          {bubbles.map((b, i) => (
+            <span key={i} style={{
+              left: b.left + 'px',
+              animationDuration: b.dur + 's',
+              animationDelay: b.delay + 's'
+            }} />
+          ))}
+        </div>
+        <div className="ticks">
+          <span>25</span><span>20</span><span>15</span><span>10</span><span>05</span><span>00</span>
+        </div>
+      </div>
+      <div className="info">
+        <div className="num">{m}<span className="colon">:</span>{s}</div>
+        <div className="label">deep work · phase 03</div>
+        <div className="pct">{Math.round(remainingPct)}% reserve</div>
+      </div>
+    </div>
+  );
+}
+
+// --- HABIT TRACKER ---
+function HabitNode({ node, onPortDown }) {
+  const [habits, setHabits] = useState(node.data?.habits ?? [
+  { name: 'Morning pages', glyph: '✎', days: [1, 1, 1, 0, 1, 1, 1], streak: 12 },
+  { name: 'Run / move 30m', glyph: '↗', days: [1, 0, 1, 1, 1, 0, 1], streak: 4 },
+  { name: 'No phone before 9', glyph: '◍', days: [1, 1, 1, 1, 1, 1, 0], streak: 23 },
+  { name: 'Read 20 pages', glyph: '⌬', days: [0, 1, 1, 1, 0, 1, 1], streak: 7 }]
+  );
+
+  const toggle = (hi, di) => setHabits((h) => h.map((row, i) =>
+  i === hi ? { ...row, days: row.days.map((d, j) => j === di ? d ? 0 : 1 : d) } : row
+  ));
+
+  return (
+    <>
+      <NodeHead kind="hbt.week" title="Habits — week 16" dotColor="var(--acid)" />
+      <div className="habit-body">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+          <div className="habit-week-labels">
+            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+          </div>
+        </div>
+        {habits.map((h, hi) =>
+        <div className="habit-row" key={hi}>
+            <div>
+              <div className="habit-name">
+                <span className="glyph">{h.glyph}</span>
+                {h.name}
+              </div>
+              <div className="habit-streak">▲ {h.streak} day streak</div>
+            </div>
+            <div className="habit-grid">
+              {h.days.map((d, di) =>
+            <div
+              key={di}
+              className={`habit-cell ${d ? 'done' : ''} ${di === 6 ? 'today' : ''}`}
+              onClick={() => toggle(hi, di)} />
+
+            )}
+            </div>
+          </div>
+        )}
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+
+}
+
+// --- TODO ---
+const TODO_TAG_OPTIONS = ['work', 'life', 'read', 'home'];
+function TodoNode({ node, onPortDown, onAddTask }) {
+  const [items, setItems] = useState(node.data?.items ?? []);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef(null);
+  const toggle = (i) => setItems((it) => it.map((x, j) => j === i ? { ...x, done: !x.done } : x));
+
+  useEffect(() => {
+    if (adding) inputRef.current?.focus();
+  }, [adding]);
+
+  const commit = () => {
+    const text = draft.trim();
+    if (!text) {setAdding(false);setDraft('');return;}
+    const tag = TODO_TAG_OPTIONS[items.length % TODO_TAG_OPTIONS.length];
+    setItems((it) => [...it, { text, tag, done: false }]);
+    onAddTask?.({ text, tag });
+    setDraft('');
+    setAdding(false);
+  };
+
+  return (
+    <>
+      <NodeHead kind="td.chain" title={node.data?.title || 'Today'} dotColor="var(--rust)" />
+      <div className="todo-body">
+        {items.map((it, i) =>
+        <div key={i} className={`todo-item ${it.done ? 'done' : ''}`} onClick={() => toggle(i)}>
+            <div className="todo-check" />
+            <span className="todo-text">{it.text}</span>
+            <span className="todo-tag">{it.tag}</span>
+          </div>
+        )}
+        {adding ?
+        <div className="todo-item" style={{ background: 'var(--paper-2)', margin: '0 -8px', padding: '6px 8px', borderRadius: 4 }}>
+            <div className="todo-check" />
+            <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit();else
+              if (e.key === 'Escape') {setDraft('');setAdding(false);}
+            }}
+            onBlur={commit}
+            placeholder="task → spawns a node…"
+            style={{
+              flex: 1, background: 'transparent', border: 'none', outline: 'none',
+              font: 'inherit', color: 'var(--ink)', fontSize: 13
+            }} />
+          
+          </div> :
+
+        <div className="todo-add" onClick={() => setAdding(true)}>
+            add task <span className="kbd">↵</span>
+          </div>
+        }
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+
+}
+
+// --- CALENDAR ---
+function CalendarNode({ node, onPortDown }) {
+  const today = 8; // visual "today" — May 8
+  const monthLen = 31;
+  const firstDow = 5; // Friday-first-of-month for May 2026
+  const events = node.data?.events ?? [
+  { day: 8, time: '09:30', what: 'Standup · core', pip: 'rust' },
+  { day: 8, time: '14:00', what: 'Design review', pip: 'acid' },
+  { day: 9, time: '11:00', what: 'Q2 planning', pip: 'rust' },
+  { day: 12, time: '16:30', what: 'Coffee · Marta', pip: 'rust' }];
+
+  const eventDays = new Set(events.map((e) => e.day));
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push({ muted: true, n: 30 - firstDow + 1 + i });
+  for (let d = 1; d <= monthLen; d++) cells.push({ n: d, today: d === today, event: eventDays.has(d) });
+  while (cells.length % 7 !== 0) cells.push({ muted: true, n: cells.length - firstDow - monthLen + 1 });
+
+  return (
+    <>
+      <NodeHead kind="cal.month" title={`May ${today}, fri`} dotColor="var(--cyan)" />
+      <div className="cal-body">
+        <div className="cal-head">
+          <div className="month">MAY <span className="yr">2026</span></div>
+          <div className="nav">
+            <button title="prev">‹</button>
+            <button title="today">●</button>
+            <button title="next">›</button>
+          </div>
+        </div>
+        <div className="cal-grid">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <div key={'h' + i} className="cal-dow">{d}</div>)}
+          {cells.map((c, i) =>
+          <div key={i} className={`cal-cell ${c.muted ? 'muted' : ''} ${c.today ? 'today' : ''} ${c.event ? 'event' : ''}`}>
+              {c.n}
+            </div>
+          )}
+        </div>
+        <div className="cal-events">
+          {events.filter((e) => e.day === today).map((e, i) =>
+          <div className="cal-event" key={i}>
+              <span className="time">{e.time}</span>
+              <span className="pip" style={{ background: e.pip === 'acid' ? 'var(--acid)' : 'var(--rust)' }} />
+              <span className="what">{e.what}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+
+}
+
+// --- TASK (DAG node, layered under todo) ---
+function TaskNode({ node, onPortDown, onToggleDone, onSpawnPomo, pomoCount }) {
+  const d = node.data || {};
+  return (
+    <>
+      <div className="node-head" data-drag-handle>
+        <span className="dot" style={{ background: d.done ? 'var(--ink-3)' : 'var(--cyan)' }} />
+        <span className="title">task · #{String(d.num || 1).padStart(2, '0')}</span>
+        <span style={{ color: 'var(--ink-4)', marginLeft: 4 }}>L{d.layer ?? 0}</span>
+        {onSpawnPomo &&
+        <button
+          className="task-pomo-btn"
+          onClick={(e) => {e.stopPropagation();onSpawnPomo();}}
+          title="spawn a pomodoro for this task">
+          + pomo{pomoCount ? ` ·${pomoCount}` : ''}</button>
+        }
+      </div>
+      <div className="task-body">
+        <div className="task-row">
+          <div className="task-check" onClick={onToggleDone} />
+          <div className="task-text">{d.text || 'untitled task'}</div>
+        </div>
+        <div className="task-foot">
+          <span>{d.tag || 'work'}</span>
+          <span>{d.eta || 'eta —'}</span>
+        </div>
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+
+}
+
+// --- TEXT ---
+function TextNode({ node, onPortDown }) {
+  return (
+    <>
+      <NodeHead kind="txt" title="note" dotColor="var(--ink-4)" />
+      <div className="text-body" data-drag-handle>{node.data?.text}</div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+
+}
+
+// --- IMAGE (ASCII) ---
+const ASCII_IMAGES = {
+  mountain: `       /\\
+      /  \\        /\\
+     /    \\      /  \\
+    /      \\    /    \\___
+   /   /\\   \\__/         \\
+  /   /  \\                \\
+ /___/    \\________________\\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~`,
+  city: `      ▒▒    ░░    ▒▒
+   ░░ ██ ░░ ██ ░░ ██ ░░
+   ██ ██ ██ ██ ██ ██ ██
+   ██ ██ ██ ██ ██ ██ ██
+░░ ██ ██ ██ ██ ██ ██ ██ ░░
+██ ██ ██ ██ ██ ██ ██ ██ ██
+████████████████████████████`,
+  face: `      .─────────.
+     /  ◐     ◑  \\
+    │   ╲     ╱   │
+    │    \`───\`    │
+     \\    ───    /
+      \`─────────'`
+};
+function ImageNode({ node, onPortDown }) {
+  const art = ASCII_IMAGES[node.data?.kind || 'mountain'];
+  return (
+    <>
+      <div className="image-frame" data-drag-handle>
+        <div className="ascii-image">{art}</div>
+      </div>
+      <div className="image-cap" data-drag-handle>
+        <span className="name">{node.data?.name || 'untitled.ascii'}</span>
+        <span>240×160</span>
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+
+}
+
+// --- TERMINAL ---
+const SYSTEM_LOGO = `
+█   █ ████  █   █ █      █████
+█  █  █   █ ██  █ █      █   █
+███   ████  █ █ █ █      █   █
+█  █  █  █  █  ██ █      █   █
+█   █ █   █ █   █ █████  █████`;
+
+const INITIAL_TERM = [
+{ kind: 'ascii', text: SYSTEM_LOGO },
+{ kind: 'dim', text: 'krnl0 · v0.1.0 · claude code attached · tmux session "main"' },
+{ kind: 'dim', text: '─────────────────────────────────────────────────────────' },
+{ kind: 'prompt', cwd: '~/krnl0', cmd: 'krnl init --board "deep work"' },
+{ kind: 'acid', text: '✓ board created · 6 nodes · 4 connections' },
+{ kind: 'dim', text: '  → spawned: pomodoro, habits, todo, terminal' },
+{ kind: 'prompt', cwd: '~/krnl0', cmd: 'claude "wire pomodoro start → todo[0] focus"' },
+{ kind: 'rust', text: '◆ claude is thinking...' },
+{ kind: 'plain', text: '  Connecting pomo.025 ──► td.list' },
+{ kind: 'plain', text: '  When timer starts, the first incomplete' },
+{ kind: 'plain', text: '  task will be highlighted in your todo node.' },
+{ kind: 'acid', text: '✓ wired. try it: press START on the pomodoro.' },
+{ kind: 'prompt', cwd: '~/krnl0', cmd: 'vim journal/2026-05-03.md' },
+{ kind: 'dim', text: '  [opened in embedded vim · :w to save back]' }];
+
+
+function TerminalNode({ node, onPortDown }) {
+  const [lines, setLines] = useState(INITIAL_TERM);
+  const [input, setInput] = useState('');
+  const bodyRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+  }, [lines]);
+
+  const focusInput = (e) => {
+    // Don't focus when clicking the drag handle
+    if (e.target.closest('[data-drag-handle]')) return;
+    inputRef.current?.focus();
+  };
+
+  const submit = (e) => {
+    if (e.key !== 'Enter') return;
+    const cmd = input.trim();
+    if (!cmd) return;
+    const next = [...lines, { kind: 'prompt', cwd: '~/krnl0', cmd }];
+
+    if (cmd === 'help' || cmd === '?') {
+      next.push({ kind: 'dim', text: 'commands: help · clear · ls · claude <msg> · vim <file>' });
+    } else if (cmd === 'clear' || cmd === 'cls') {
+      setLines([INITIAL_TERM[0], INITIAL_TERM[1]]);
+      setInput('');return;
+    } else if (cmd === 'ls') {
+      next.push({ kind: 'plain', text: 'boards/  habits.json  pomo.log  todo.md  journal/' });
+    } else if (cmd.startsWith('claude ')) {
+      next.push({ kind: 'rust', text: '◆ claude is thinking...' });
+      next.push({ kind: 'plain', text: '  ' + (cmd.slice(7) || 'hello, what should we do?') });
+      next.push({ kind: 'acid', text: '✓ done.' });
+    } else if (cmd.startsWith('vim ') || cmd.startsWith('emacs ')) {
+      next.push({ kind: 'dim', text: `  [opened ${cmd.split(' ')[1]} in embedded editor]` });
+    } else {
+      next.push({ kind: 'plain', text: `${cmd}: `, append: <span style={{ color: 'var(--term-rust)' }}>command not found — try </span> });
+      next.push({ kind: 'dim', text: '  try: help · ls · claude <msg>' });
+    }
+
+    setLines(next);
+    setInput('');
+  };
+
+  return (
+    <>
+      <div className="term-head" data-drag-handle>
+        <div className="lights">
+          <div className="light r" /><div className="light y" /><div className="light g" />
+        </div>
+        <div className="label">claude-code · ~/krnl0 · zsh</div>
+        <div className="badge">●&nbsp;LIVE</div>
+      </div>
+      <div className="term-body" ref={bodyRef} onClick={focusInput}>
+        {lines.map((l, i) => {
+          if (l.kind === 'ascii') return <pre key={i} className="term-ascii">{l.text}</pre>;
+          if (l.kind === 'prompt') {
+            return (
+              <div key={i} className="term-line">
+                <span style={{ color: 'var(--term-acid)' }}>❯</span>{' '}
+                <span style={{ color: 'var(--term-rust)' }}>{l.cwd}</span>{' '}
+                <span style={{ opacity: 0.5 }}>·</span>{' '}
+                <span>{l.cmd}</span>
+              </div>);
+
+          }
+          return <div key={i} className={`term-line ${l.kind}`}>{l.text}</div>;
+        })}
+        <div className="term-prompt term-line">
+          <span className="sigil">❯</span>
+          <span className="path">~/krnl0</span>
+          <span className="arrow">·</span>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={submit}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="type a command — try `help`" />
+          
+        </div>
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+
+}
+
+// --- Dispatcher ---
+function NodeBody({ node, onPortDown, onAddTask, onToggleDone, onSpawnPomo, pomoCount }) {
+  switch (node.kind) {
+    case 'pomodoro':return <PomodoroNode node={node} onPortDown={onPortDown} />;
+    case 'habit':return <HabitNode node={node} onPortDown={onPortDown} />;
+    case 'todo':return <TodoNode node={node} onPortDown={onPortDown} onAddTask={onAddTask} />;
+    case 'calendar':return <CalendarNode node={node} onPortDown={onPortDown} />;
+    case 'task':return <TaskNode node={node} onPortDown={onPortDown} onToggleDone={onToggleDone} onSpawnPomo={onSpawnPomo} pomoCount={pomoCount} />;
+    case 'text':return <TextNode node={node} onPortDown={onPortDown} />;
+    case 'image':return <ImageNode node={node} onPortDown={onPortDown} />;
+    case 'terminal':return <TerminalNode node={node} onPortDown={onPortDown} />;
+    default:return null;
+  }
+}
+
+Object.assign(window, { NodeBody });
+
+
+// AI Assistant Blob — glowing liquid orb that listens
+
+function AIBlob() {
+  const { useState, useEffect, useRef } = React;
+  const [open, setOpen] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [thinking, setThinking] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [reply, setReply] = useState(null);
+  const [history, setHistory] = useState([]);
+  const inputRef = useRef(null);
+  const [pos, setPos] = useState(() => ({
+    left: 22,
+    bottom: 56
+  }));
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef(null);
+
+  // Pulse animation when listening — fake amplitude
+  const [pulse, setPulse] = useState(0);
+  useEffect(() => {
+    if (!listening) {setPulse(0);return;}
+    let raf;
+    const start = performance.now();
+    const tick = (t) => {
+      const dt = (t - start) / 1000;
+      setPulse(0.5 + 0.5 * Math.sin(dt * 5) * Math.sin(dt * 1.3));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [listening]);
+
+  // Drag the orb anywhere on screen
+  useEffect(() => {
+    const onMove = (e) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.sx;
+      const dy = e.clientY - d.sy;
+      const moved = Math.abs(dx) + Math.abs(dy);
+      if (moved > 4) d.didMove = true;
+      setPos({
+        left: Math.max(8, Math.min(window.innerWidth - 80, d.left + dx)),
+        bottom: Math.max(40, Math.min(window.innerHeight - 80, d.bottom - dy))
+      });
+    };
+    const onUp = () => {
+      const d = dragRef.current;
+      if (d) {
+        dragRef.current = null;
+        setDragging(false);
+        // If barely moved, treat as click → toggle panel
+        if (!d.didMove) setOpen((o) => !o);
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const onOrbDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+    dragRef.current = {
+      sx: e.clientX, sy: e.clientY,
+      left: pos.left, bottom: pos.bottom,
+      didMove: false
+    };
+  };
+
+  const toggleListen = () => {
+    if (listening) {
+      setListening(false);
+      // Submit whatever transcript we have
+      if (transcript.trim()) submit(transcript);
+    } else {
+      setListening(true);
+      setOpen(true);
+      setTranscript('');
+      setReply(null);
+      // Focus input so user can also type
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  };
+
+  const submit = async (text) => {
+    if (!text?.trim()) return;
+    setListening(false);
+    setThinking(true);
+    setHistory((h) => [...h, { role: 'user', text }]);
+    setTranscript('');
+    try {
+      const result = await window.claude.complete(
+        `You are KRNL0, an AI assistant embedded in a productivity whiteboard app. ` +
+        `The user is on a board with nodes: pomodoro, todos, habits, journal, terminal. ` +
+        `Be terse, warm, and a bit witty. 1-2 short sentences max. No markdown. ` +
+        `User: ${text}`
+      );
+      setReply(result);
+      setHistory((h) => [...h, { role: 'ai', text: result }]);
+    } catch (e) {
+      setReply('connection lost. retry?');
+    }
+    setThinking(false);
+  };
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    submit(transcript);
+  };
+
+  const blobClass = [
+  'ai-blob',
+  listening && 'listening',
+  thinking && 'thinking',
+  open && 'open',
+  dragging && 'dragging'].
+  filter(Boolean).join(' ');
+
+  const orbScale = 1 + (listening ? pulse * 0.18 : 0);
+
+  return (
+    <div className={blobClass} style={{ left: pos.left, bottom: pos.bottom, right: 'auto' }}>
+      {/* Panel */}
+      {open &&
+      <div className="ai-panel">
+          <div className="ai-panel-head">
+            <span className="ai-name">krnl0 · assistant</span>
+            <button className="ai-close" onClick={() => setOpen(false)}>×</button>
+          </div>
+
+          <div className="ai-history">
+            {history.length === 0 && !thinking && !listening &&
+          <div className="ai-hint">
+                <div className="ai-greet">how can i help?</div>
+                <div className="ai-suggest">
+                  <button onClick={() => submit('what should I work on next?')}>what should i work on next</button>
+                  <button onClick={() => submit('summarize my board')}>summarize my board</button>
+                  <button onClick={() => submit('start a 25 minute focus session')}>start a focus session</button>
+                </div>
+              </div>
+          }
+            {history.map((m, i) =>
+          <div key={i} className={`ai-msg ${m.role}`}>
+                {m.role === 'user' ? '› ' : '◆ '}{m.text}
+              </div>
+          )}
+            {thinking && <div className="ai-msg ai thinking-line">◆ <span className="dots"><span /><span /><span /></span></div>}
+            {listening &&
+          <div className="ai-listening">
+                <span className="lis-dot" /> listening{transcript ? `: "${transcript}"` : '…'}
+              </div>
+          }
+          </div>
+
+          <form className="ai-form" onSubmit={onSubmit}>
+            <span className="ai-prompt">›</span>
+            <input
+            ref={inputRef}
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+            placeholder={listening ? 'or type instead…' : 'ask anything · ⌘+J to listen'}
+            disabled={thinking} />
+          
+            <button type="button" className={`ai-mic ${listening ? 'on' : ''}`} onClick={toggleListen} title="listen">
+              {listening ? '■' : '◉'}
+            </button>
+          </form>
+        </div>
+      }
+
+      {/* The orb itself */}
+      <button
+        className="ai-orb"
+        onMouseDown={onOrbDown}
+        title="krnl0 assistant — drag to move"
+        style={{ transform: `scale(${orbScale})` }}>
+        
+        <svg viewBox="0 0 80 80" className="orb-svg">
+          <defs>
+            <radialGradient id="orbGrad" cx="35%" cy="35%" r="70%">
+              <stop offset="0%" stopColor="#f0ffb8" stopOpacity="1" />
+              <stop offset="35%" stopColor="#c9f158" stopOpacity="0.95" />
+              <stop offset="70%" stopColor="#7fa830" stopOpacity="0.9" />
+              <stop offset="100%" stopColor="#1a2f00" stopOpacity="1" />
+            </radialGradient>
+            <radialGradient id="orbHi" cx="32%" cy="28%" r="22%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </radialGradient>
+            <filter id="orbBlur" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="0.4" />
+            </filter>
+          </defs>
+          {/* outer glow halos */}
+          <circle cx="40" cy="40" r="38" fill="url(#orbGrad)" opacity="0.18" />
+          <circle cx="40" cy="40" r="32" fill="url(#orbGrad)" opacity="0.35" />
+          {/* main orb */}
+          <circle cx="40" cy="40" r="26" fill="url(#orbGrad)" filter="url(#orbBlur)" />
+          {/* liquid swirl — animated via CSS rotate */}
+          <g className="orb-swirl">
+            <ellipse cx="40" cy="36" rx="22" ry="7" fill="#c9f158" opacity="0.35" />
+            <ellipse cx="40" cy="44" rx="18" ry="5" fill="#7fa830" opacity="0.4" />
+          </g>
+          {/* highlight */}
+          <ellipse cx="32" cy="30" rx="9" ry="6" fill="url(#orbHi)" />
+          <circle cx="29" cy="27" r="2" fill="#ffffff" opacity="0.9" />
+        </svg>
+        {/* pulse rings when listening */}
+        {listening &&
+        <>
+            <span className="orb-ring r1" />
+            <span className="orb-ring r2" />
+            <span className="orb-ring r3" />
+          </>
+        }
+      </button>
+    </div>);
+
+}
+
+
+// LifeOS — Whiteboard canvas with pan/zoom, drag, connections
+
+// --- Default board content ---
+// Five anchored "modules" form the spine of the board (no connections,
+// only re-orderable left↔right). Free nodes (text / image / task) live
+// around them and CAN be connected — task chains flash light → next.
+const INITIAL_NODES = [
+{ id: 'm-pomo', kind: 'pomodoro', fixed: true, slot: 0, data: { seconds: 18 * 60 + 42, running: true } },
+{ id: 'm-todo', kind: 'todo', fixed: true, slot: 1, data: { title: 'Today', items: [
+    { text: 'Ship LifeOS v0.4 changelog', tag: 'work', done: false },
+    { text: 'Plan Q2 quarterly review', tag: 'work', done: false },
+    { text: 'Reply to Marta about the cabin', tag: 'life', done: true },
+    { text: 'Read DDIA ch.4', tag: 'read', done: false }]
+  } },
+{ id: 'm-cal', kind: 'calendar', fixed: true, slot: 2, data: {} },
+{ id: 'm-habit', kind: 'habit', fixed: true, slot: 3, data: {} },
+{ id: 'm-term', kind: 'terminal', fixed: true, slot: 4, data: {} },
+
+// free notes — text + ascii images
+{ id: 'n-note1', kind: 'text', x: -340, y: 120, data: { text: 'Today is a system day. Less doing, more shaping. Make the loops cleaner — then everything downstream gets easier.' } },
+{ id: 'n-img1', kind: 'image', x: -320, y: 380, data: { kind: 'mountain', name: 'morning.ascii' } },
+{ id: 'n-note2', kind: 'text', x: 1820, y: 480, data: { text: 'remember: the chain is the work — one task hands the next its baton.' } },
+
+// Layered task DAG anchored under todo. NO connection back to the todo node
+// — the chain is its own organism. Reordering todo's slot drags it along.
+{ id: 't-l0-0', kind: 'task', anchorTo: 'm-todo', layer: 0, row: 0, data: { text: 'Draft v0.4 changelog outline', tag: 'plan', done: true, num: 1, eta: '15m' } },
+{ id: 't-l1-0', kind: 'task', anchorTo: 'm-todo', layer: 1, row: 0, data: { text: 'Pull commits since v0.3.7', tag: 'code', done: false, num: 2, eta: '10m' } },
+{ id: 't-l1-1', kind: 'task', anchorTo: 'm-todo', layer: 1, row: 1, data: { text: 'Audit migration notes', tag: 'docs', done: false, num: 3, eta: '12m' } },
+{ id: 't-l2-0', kind: 'task', anchorTo: 'm-todo', layer: 2, row: 0, data: { text: 'Annotate breaking changes', tag: 'write', done: false, num: 4, eta: '20m' } }];
+
+const INITIAL_EDGES = [
+// task DAG only — no edge between todo and tasks
+{ id: 'e-l01a', from: 't-l0-0', to: 't-l1-0', kind: 'task' },
+{ id: 'e-l01b', from: 't-l0-0', to: 't-l1-1', kind: 'task' },
+{ id: 'e-l12a', from: 't-l1-0', to: 't-l2-0', kind: 'task' },
+{ id: 'e-l12b', from: 't-l1-1', to: 't-l2-0', kind: 'task' }];
+
+
+// approximate node sizes for edge endpoints — updated from actual rendered sizes
+// Fixed modules share a UNIFIED SIZE so the spine reads as one rigid row.
+const FIXED_W = 360;
+const FIXED_H = 460;
+const NODE_SIZE = {
+  pomodoro: { w: FIXED_W, h: FIXED_H },
+  todo: { w: FIXED_W, h: FIXED_H },
+  calendar: { w: FIXED_W, h: FIXED_H },
+  habit: { w: FIXED_W, h: FIXED_H },
+  terminal: { w: FIXED_W, h: FIXED_H },
+  text: { w: 260, h: 150 },
+  image: { w: 240, h: 210 },
+  task: { w: 220, h: 130 }
+};
+// task DAG layout (anchored below todo)
+const TASK_LAYER_GAP = 80; // horizontal between layers
+const TASK_ROW_GAP = 28; // vertical within a layer
+
+function getNodeSize(node) {
+  const base = NODE_SIZE[node.kind] || { w: 240, h: 200 };
+  return { w: node.w || base.w, h: node.h || base.h };
+}
+
+// Fixed-module spine: laid out in a horizontal row in the middle of the board.
+const FIXED_ROW_GAP = 28;
+const FIXED_ROW_CENTER_Y = 320;
+function layoutFixedNodes(nodes) {
+  const fixed = nodes.filter((n) => n.fixed).slice().sort((a, b) => a.slot - b.slot);
+  const free = nodes.filter((n) => !n.fixed);
+  // Force every fixed module to the same size so the spine is rigid.
+  const sizes = fixed.map(() => ({ w: FIXED_W, h: FIXED_H }));
+  const totalW = sizes.reduce((s, sz) => s + sz.w, 0) + FIXED_ROW_GAP * Math.max(0, fixed.length - 1);
+  let cursor = -totalW / 2;
+  const positioned = fixed.map((n, i) => {
+    const sz = sizes[i];
+    const x = cursor;
+    const y = FIXED_ROW_CENTER_Y - sz.h / 2;
+    cursor += sz.w + FIXED_ROW_GAP;
+    return { ...n, x, y, w: FIXED_W, h: FIXED_H };
+  });
+  // Resolve anchored free nodes — task DAG sits below todo and follows it.
+  const byId = Object.fromEntries(positioned.map((n) => [n.id, n]));
+  // Group anchored tasks by layer so we can center each layer vertically.
+  const anchoredTasks = free.filter((n) => n.kind === 'task' && n.anchorTo && byId[n.anchorTo] && n.layer != null);
+  const layers = {};
+  anchoredTasks.forEach((n) => {
+    const key = n.anchorTo + ':' + n.layer;
+    (layers[key] = layers[key] || []).push(n);
+  });
+  const resolved = free.map((n) => {
+    if (n.x != null && n.y != null) return n;
+    const anchor = n.anchorTo ? byId[n.anchorTo] : null;
+    if (!anchor) return { ...n, x: n.x ?? 0, y: n.y ?? 0 };
+    const sz = getNodeSize(n);
+    const aSz = getNodeSize(anchor);
+    if (n.kind === 'task' && n.layer != null) {
+      const peers = layers[n.anchorTo + ':' + n.layer] || [n];
+      const rows = peers.length;
+      const stackH = rows * sz.h + (rows - 1) * TASK_ROW_GAP;
+      const layerStartY = anchor.y + aSz.h + 90;
+      const row = n.row ?? 0;
+      const x = anchor.x + n.layer * (sz.w + TASK_LAYER_GAP);
+      const y = layerStartY + row * (sz.h + TASK_ROW_GAP);
+      return { ...n, x, y };
+    }
+    // Fallback to legacy anchorRow/anchorCol
+    const col = n.anchorCol ?? 0,row = n.anchorRow ?? 0;
+    const x = anchor.x + col * (sz.w + 30);
+    const y = anchor.y + aSz.h + 80 + row * (sz.h + 30);
+    return { ...n, x, y };
+  });
+  return [...positioned, ...resolved];
+}
+
+function Whiteboard() {
+  const [nodes, setNodes] = useState(INITIAL_NODES);
+  const [edges, setEdges] = useState(INITIAL_EDGES);
+  const [flashEdges, setFlashEdges] = useState({}); // edgeId -> true while flashing
+  const [freshNodes, setFreshNodes] = useState({}); // nodeId -> true while just-spawned
+  const [selected, setSelected] = useState(null);
+  const [view, setView] = useState({ x: 0, y: 0, k: 1 });
+  const [panning, setPanning] = useState(false);
+  const [pendingEdge, setPendingEdge] = useState(null); // {from, fromSide, x, y}
+  const [tweaksOpen, setTweaksOpen] = useState(false);
+  const [tweaks, setTweaks] = useState({ density: 'comfy', accent: 'acid', dots: 'on', theme: 'dark', timerStyle: 'ring', vibe: 'cyber' });
+  const [tool, setTool] = useState('select');
+  const [measuredSizes, setMeasuredSizes] = useState({});
+
+  const wrapRef = useRef(null);
+  const panState = useRef(null);
+  const dragState = useRef(null);
+  const resizeState = useRef(null);
+
+  // --- Coordinate helpers ---
+  const screenToWorld = useCallback((sx, sy) => {
+    const rect = wrapRef.current.getBoundingClientRect();
+    return {
+      x: (sx - rect.left - view.x) / view.k,
+      y: (sy - rect.top - view.y) / view.k
+    };
+  }, [view]);
+
+  // --- Pan / zoom ---
+  const onWrapMouseDown = (e) => {
+    if (e.target.closest('.node') || e.target.closest('.port')) return;
+    if (e.button !== 0 && e.button !== 1) return;
+    setSelected(null);
+    setPanning(true);
+    panState.current = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+  };
+  useEffect(() => {
+    const onMove = (e) => {
+      const ps = panState.current;
+      if (ps) {
+        const dx = e.clientX - ps.sx;
+        const dy = e.clientY - ps.sy;
+        setView((v) => ({ ...v, x: ps.vx + dx, y: ps.vy + dy }));
+      }
+      const rs = resizeState.current;
+      if (rs) {
+        const rdx = (e.clientX - rs.sx) / view.k;
+        const rdy = (e.clientY - rs.sy) / view.k;
+        const newW = Math.max(rs.minW, rs.ow + rdx);
+        const newH = Math.max(rs.minH, rs.oh + rdy);
+        setNodes((ns) => ns.map((n) => n.id === rs.id ? { ...n, w: newW, h: newH } : n));
+      }
+      const ds = dragState.current;
+      if (ds) {
+        const dx = (e.clientX - ds.sx) / view.k;
+        const dy = (e.clientY - ds.sy) / view.k;
+        setNodes((ns) => ns.map((n) => n.id === ds.id ? { ...n, x: ds.nx + dx, y: ds.ny + dy } : n));
+      }
+      if (pendingEdge) {
+        const w = screenToWorld(e.clientX, e.clientY);
+        setPendingEdge((p) => p ? { ...p, x: w.x, y: w.y } : p);
+      }
+    };
+    const onUp = (e) => {
+      if (panState.current) {panState.current = null;setPanning(false);}
+      if (resizeState.current) {resizeState.current = null;}
+      if (dragState.current) {dragState.current = null;}
+      if (pendingEdge) {
+        // Try to drop on a port
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const portEl = el?.closest('.port');
+        const nodeEl = portEl?.closest('.node');
+        if (nodeEl && nodeEl.dataset.id !== pendingEdge.from) {
+          setEdges((es) => [...es, {
+            id: 'e' + Date.now(),
+            from: pendingEdge.from,
+            to: nodeEl.dataset.id
+          }]);
+        }
+        setPendingEdge(null);
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {window.removeEventListener('mousemove', onMove);window.removeEventListener('mouseup', onUp);};
+  }, [view.k, pendingEdge, screenToWorld]);
+
+  const onWheel = (e) => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      // pinch-zoom
+      const rect = wrapRef.current.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const factor = Math.exp(-e.deltaY * 0.01);
+      const newK = Math.max(0.25, Math.min(2.5, view.k * factor));
+      const wx = (cx - view.x) / view.k;
+      const wy = (cy - view.y) / view.k;
+      setView({ k: newK, x: cx - wx * newK, y: cy - wy * newK });
+    } else {
+      setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+    }
+  };
+
+  // --- Node drag (fixed modules don't drag — use ‹ › to reorder slots) ---
+  const onNodeMouseDown = (e, node) => {
+    if (e.target.closest('.port')) return;
+    if (e.target.closest('input, textarea, button')) return;
+    if (e.target.closest('.resize-handle')) return;
+    if (!e.target.closest('[data-drag-handle]')) return;
+    e.stopPropagation();
+    setSelected(node.id);
+    if (node.fixed) return; // anchored — bail before staging a drag
+    dragState.current = { id: node.id, sx: e.clientX, sy: e.clientY, nx: node.x, ny: node.y };
+  };
+
+  // --- Reorder fixed slots (left/right) ---
+  const moveFixedSlot = (id, dir) => {
+    setNodes((ns) => {
+      const fixed = ns.filter((n) => n.fixed).slice().sort((a, b) => a.slot - b.slot);
+      const idx = fixed.findIndex((n) => n.id === id);
+      if (idx < 0) return ns;
+      const swapIdx = idx + dir;
+      if (swapIdx < 0 || swapIdx >= fixed.length) return ns;
+      const a = fixed[idx].slot;
+      const b = fixed[swapIdx].slot;
+      return ns.map((n) => n.id === fixed[idx].id ? { ...n, slot: b } :
+      n.id === fixed[swapIdx].id ? { ...n, slot: a } : n);
+    });
+  };
+
+  // --- Resize ---
+  const onResizeDown = (e, node) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const sz = getNodeSize(node);
+    const base = NODE_SIZE[node.kind] || { w: 180, h: 160 };
+    resizeState.current = {
+      id: node.id,
+      kind: node.kind,
+      sx: e.clientX, sy: e.clientY,
+      ow: sz.w, oh: sz.h,
+      minW: base.w * 0.6,
+      minH: base.h * 0.5
+    };
+  };
+
+  // --- Port drag (start connection) ---
+  const onPortDown = (e, nodeId, side) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const w = screenToWorld(e.clientX, e.clientY);
+    setPendingEdge({ from: nodeId, fromSide: side, x: w.x, y: w.y });
+  };
+
+  // --- Apply fixed-row layout ---
+  const laidOutNodes = useMemo(() => layoutFixedNodes(nodes), [nodes]);
+
+  // --- Edge geometry ---
+  const nodeMap = useMemo(() => Object.fromEntries(laidOutNodes.map((n) => [n.id, n])), [laidOutNodes]);
+  // Measure actual node DOM heights so edges land on port centres.
+  // Ports are positioned at top:50% of the *rendered* node — static NODE_SIZE
+  // estimates can be wrong for text/task nodes whose height depends on content.
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    setMeasuredSizes(prev => {
+      const next = { ...prev };
+      let changed = false;
+      wrap.querySelectorAll('.node[data-id]').forEach(el => {
+        const id = el.dataset.id;
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        if (!prev[id] || prev[id].w !== w || prev[id].h !== h) {
+          next[id] = { w, h };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [laidOutNodes]);
+
+  // Endpoints for an edge — returns {x1,y1,x2,y2} for both path + gradient.
+  // Uses measured DOM sizes (with NODE_SIZE fallback) so lines land on port circles.
+  const edgeEnds = useCallback((edge) => {
+    const a = nodeMap[edge.from];
+    const b = nodeMap[edge.to];
+    if (!a || !b) return null;
+    const aFb = getNodeSize(a); const bFb = getNodeSize(b);
+    const am = measuredSizes[a.id];  const bm = measuredSizes[b.id];
+    const aSize = { w: am?.w ?? aFb.w, h: am?.h ?? aFb.h };
+    const bSize = { w: bm?.w ?? bFb.w, h: bm?.h ?? bFb.h };
+    // Port centre is 1 px outside the node edge (.port.right { right:-7px } on 12 px circle)
+    const PX = 1;
+    // task DAG: source right port → target left port (horizontal flow)
+    if (edge.kind === 'task') {
+      return {
+        x1: a.x + aSize.w + PX, y1: a.y + aSize.h / 2,
+        x2: b.x - PX,           y2: b.y + bSize.h / 2
+      };
+    }
+    // pomo edges: from task right → pomo left
+    if (edge.kind === 'pomo') {
+      return {
+        x1: a.x + aSize.w + PX, y1: a.y + aSize.h / 2,
+        x2: b.x - PX,           y2: b.y + bSize.h / 2
+      };
+    }
+    // generic: pick nearest sides
+    if (b.x > a.x + aSize.w / 2) {
+      return {
+        x1: a.x + aSize.w + PX, y1: a.y + aSize.h / 2,
+        x2: b.x - PX,           y2: b.y + bSize.h / 2
+      };
+    }
+    return {
+      x1: a.x - PX,           y1: a.y + aSize.h / 2,
+      x2: b.x + bSize.w + PX, y2: b.y + bSize.h / 2
+    };
+  }, [nodeMap, measuredSizes]);
+  const edgePath = useCallback((edge) => {
+    const e = edgeEnds(edge);
+    if (!e) return '';
+    const dx = Math.max(40, Math.abs(e.x2 - e.x1) * 0.45);
+    const sign = e.x2 >= e.x1 ? 1 : -1;
+    return `M ${e.x1} ${e.y1} C ${e.x1 + sign * dx} ${e.y1}, ${e.x2 - sign * dx} ${e.y2}, ${e.x2} ${e.y2}`;
+  }, [edgeEnds]);
+
+  // --- Add node from dock ---
+  const addNode = (kind) => {
+    const id = 'n' + Date.now();
+    const center = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+    setNodes((ns) => [...ns, { id, kind, x: center.x - 100, y: center.y - 80, data: {} }]);
+    setSelected(id);
+  };
+
+  // --- Spawn task node from a todo entry, chained off the last task ---
+  const flashEdge = (edgeId) => {
+    setFlashEdges((f) => ({ ...f, [edgeId]: true }));
+    setTimeout(() => setFlashEdges((f) => {const n = { ...f };delete n[edgeId];return n;}), 1100);
+  };
+  const flashChainAhead = (startNodeId) => {
+    // Walk forward through task edges from startNodeId, flashing each in sequence.
+    setEdges((currentEdges) => {
+      let cur = startNodeId;
+      let step = 0;
+      const visited = new Set();
+      while (cur && !visited.has(cur)) {
+        visited.add(cur);
+        const e = currentEdges.find((ed) => ed.from === cur && (ed.kind === 'task' || nodes.find((n) => n.id === ed.to)?.kind === 'task'));
+        if (!e) break;
+        const eid = e.id;
+        setTimeout(() => flashEdge(eid), 180 * step);
+        cur = e.to;
+        step++;
+      }
+      return currentEdges; // no mutation
+    });
+  };
+  const addTaskFromTodo = ({ text, tag }) => {
+    const id = 't-' + Date.now();
+    // Anchored task DAG: find max layer + a tail to wire from.
+    const anchored = nodes.filter((n) => n.kind === 'task' && n.anchorTo === 'm-todo' && n.layer != null);
+    const maxLayer = anchored.length ? Math.max(...anchored.map((n) => n.layer)) : -1;
+    const tailLayer = maxLayer >= 0 ? anchored.filter((n) => n.layer === maxLayer) : [];
+    const newLayer = maxLayer + 1;
+    const num = anchored.length + 1;
+    const newNode = {
+      id, kind: 'task', anchorTo: 'm-todo', layer: newLayer, row: 0,
+      data: { text, tag, done: false, num, eta: '15m' }
+    };
+    const newEdges = tailLayer.map((t) => ({
+      id: 'e-' + Date.now() + '-' + t.id,
+      from: t.id, to: id, kind: 'task'
+    }));
+    setNodes((ns) => [...ns, newNode]);
+    if (newEdges.length) {
+      setEdges((es) => [...es, ...newEdges]);
+      newEdges.forEach((e, i) => setTimeout(() => flashEdge(e.id), 80 * i));
+    }
+    setFreshNodes((f) => ({ ...f, [id]: true }));
+    setTimeout(() => setFreshNodes((f) => {const n = { ...f };delete n[id];return n;}), 600);
+  };
+
+  // Spawn a pomodoro for a specific task. Multiple pomos can attach per task.
+  const addPomoForTask = (taskId) => {
+    const task = laidOutNodes.find((n) => n.id === taskId);
+    if (!task) return;
+    const sz = getNodeSize(task);
+    const existing = edges.filter((e) => e.from === taskId && e.kind === 'pomo').length;
+    const id = 'p-' + Date.now();
+    const w = 200,h = 240;
+    const x = task.x + sz.w + 60 + existing * 30;
+    const y = task.y + existing * 32;
+    setNodes((ns) => [...ns, { id, kind: 'pomodoro', x, y, w, h, data: { seconds: 25 * 60, running: false } }]);
+    setEdges((es) => [...es, { id: 'ep-' + Date.now(), from: taskId, to: id, kind: 'pomo' }]);
+    setFreshNodes((f) => ({ ...f, [id]: true }));
+    setTimeout(() => setFreshNodes((f) => {const n = { ...f };delete n[id];return n;}), 600);
+  };
+
+  const toggleTaskDone = (id) => {
+    setNodes((ns) => ns.map((n) => n.id === id ?
+    { ...n, data: { ...n.data, done: !n.data?.done } } :
+    n));
+    // when a task is checked, flash the chain ahead so users see the baton pass
+    const node = nodes.find((n) => n.id === id);
+    if (node && !node.data?.done) flashChainAhead(id);
+  };
+
+  const removeNode = (id) => {
+    setNodes((ns) => ns.filter((n) => n.id !== id));
+    setEdges((es) => es.filter((e) => e.from !== id && e.to !== id));
+  };
+
+  // --- Pending edge endpoint (anchored at source port) ---
+  const pendingPath = useMemo(() => {
+    if (!pendingEdge) return '';
+    const a = nodeMap[pendingEdge.from];
+    if (!a) return '';
+    const fb = getNodeSize(a);
+    const m  = measuredSizes[a.id];
+    const aSize = { w: m?.w ?? fb.w, h: m?.h ?? fb.h };
+    const PX = 1;
+    const x1 = pendingEdge.fromSide === 'right' ? a.x + aSize.w + PX : a.x - PX;
+    const y1 = a.y + aSize.h / 2;
+    const x2 = pendingEdge.x; const y2 = pendingEdge.y;
+    const dx = Math.max(40, Math.abs(x2 - x1) * 0.4);
+    const sign = x2 >= x1 ? 1 : -1;
+    return `M ${x1} ${y1} C ${x1 + sign * dx} ${y1}, ${x2 - sign * dx} ${y2}, ${x2} ${y2}`;
+  }, [pendingEdge, nodeMap, measuredSizes]);
+
+  // Reset / fit \u2014 centers the fixed-module spine in the viewport at a comfy zoom.
+  const fit = useCallback(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const vw = wrap.clientWidth,vh = wrap.clientHeight;
+    const fixed = laidOutNodes.filter((n) => n.fixed);
+    if (!fixed.length) {setView({ x: vw / 2, y: vh / 2, k: 0.85 });return;}
+    let minX = Infinity,minY = Infinity,maxX = -Infinity,maxY = -Infinity;
+    fixed.forEach((n) => {
+      const sz = getNodeSize(n);
+      minX = Math.min(minX, n.x);minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + sz.w);maxY = Math.max(maxY, n.y + sz.h);
+    });
+    const padX = 120,padY = 200;
+    const k = Math.min((vw - padX * 2) / (maxX - minX), (vh - padY * 2) / (maxY - minY), 0.9);
+    const cx = (minX + maxX) / 2,cy = (minY + maxY) / 2;
+    setView({ x: vw / 2 - cx * k, y: vh / 2 - cy * k, k });
+  }, [laidOutNodes]);
+
+  // Center on first mount once the wrap has measured.
+  const didFit = useRef(false);
+  useEffect(() => {
+    if (didFit.current) return;
+    if (!wrapRef.current) return;
+    didFit.current = true;
+    fit();
+  }, [fit]);
+
+  // Background grid offset
+  const bgStyle = {
+    backgroundPosition: `${view.x}px ${view.y}px, ${view.x}px ${view.y}px`,
+    backgroundSize: `${160 * view.k}px ${160 * view.k}px, ${32 * view.k}px ${32 * view.k}px`,
+    opacity: tweaks.dots === 'off' ? 0 : 1
+  };
+
+  // Tweaks: accent color, density, theme
+  useEffect(() => {
+    const root = document.documentElement;
+    const palette = {
+      acid: { acid: '#c9f158', glow: '#d8ff6e' },
+      cyan: { acid: '#7fe6f0', glow: '#a8f5ff' },
+      plum: { acid: '#c8a4ff', glow: '#dec0ff' }
+    };
+    const p = palette[tweaks.accent] || palette.acid;
+    root.style.setProperty('--acid', p.acid);
+    root.style.setProperty('--acid-glow', p.glow);
+  }, [tweaks.accent]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', tweaks.theme);
+  }, [tweaks.theme]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-density', tweaks.density);
+  }, [tweaks.density]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-timer', tweaks.timerStyle);
+  }, [tweaks.timerStyle]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-vibe', tweaks.vibe);
+  }, [tweaks.vibe]);
+  const toggleTheme = () => setTweaks((t) => ({ ...t, theme: t.theme === 'dark' ? 'light' : 'dark' }));
+
+  return (
+    <div className="app">
+      {/* Top bar */}
+      <div className="topbar">
+        <div className="brand">
+          <div className="brand-mark">■</div>
+          <div className="brand-name">KRNL<span className="dim">0</span></div>
+        </div>
+        <div className="crumb">
+          <span>∷</span>
+          <span>~/krnl0</span><span style={{ opacity: .4 }}>/</span><span>boards</span><span style={{ opacity: .4 }}>/</span><span style={{ color: 'var(--ink)' }}>deep-work</span>
+          <span style={{ opacity: .4 }}>·</span>
+          <span className="live">◆ live</span>
+        </div>
+        <div className="topbar-spacer" />
+        <div className="top-actions">
+          <button className="btn" onClick={fit}>FIT <span className="kbd">⇧F</span></button>
+          <button className="btn" onClick={toggleTheme} title="Toggle theme">
+            {tweaks.theme === 'dark' ? '☾ DARK' : '☀ LIGHT'}
+          </button>
+          <button className="btn" onClick={() => setTweaksOpen((o) => !o)}>
+            TWEAKS
+          </button>
+          <button className="btn primary">SHARE</button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div
+        ref={wrapRef}
+        className={`canvas-wrap ${panning ? 'panning' : ''} ${pendingEdge ? 'connecting' : ''}`}
+        onMouseDown={onWrapMouseDown}
+        onWheel={onWheel}>
+        
+        <div className="canvas-bg" style={bgStyle} />
+        <div className="canvas" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})` }}>
+          <svg className="connections" style={{ overflow: 'visible' }}>
+            <defs>
+              {edges.filter((e) => e.kind === 'task').map((edge) => {
+                const ee = edgeEnds(edge);
+                if (!ee) return null;
+                return (
+                  <linearGradient key={'g-' + edge.id} id={'g-' + edge.id} gradientUnits="userSpaceOnUse"
+                  x1={ee.x1} y1={ee.y1} x2={ee.x2} y2={ee.y2}>
+                    <stop offset="0%" stopColor="#1b5b63" stopOpacity="0.55" />
+                    <stop offset="45%" stopColor="#4ea8b0" stopOpacity="0.95" />
+                    <stop offset="100%" stopColor="#a5edf6" stopOpacity="1" />
+                  </linearGradient>);
+
+              })}
+            </defs>
+            {edges.map((edge) => {
+              const cls = [];
+              if (edge.kind === 'task') cls.push('task-edge');
+              if (edge.kind === 'pomo') cls.push('pomo-edge');
+              if (flashEdges[edge.id]) cls.push('flashing');
+              if (edge.active) cls.push('active');
+              const style = edge.kind === 'task' ? { stroke: `url(#g-${edge.id})` } : undefined;
+              return (
+                <path
+                  key={edge.id}
+                  d={edgePath(edge)}
+                  className={cls.join(' ')}
+                  style={style} />);
+
+
+            })}
+            {pendingEdge && <path d={pendingPath} className="pending" />}
+          </svg>
+          {laidOutNodes.map((node) => {
+            const fixedSiblings = laidOutNodes.filter((n) => n.fixed).sort((a, b) => a.slot - b.slot);
+            const fixedIdx = node.fixed ? fixedSiblings.findIndex((n) => n.id === node.id) : -1;
+            const isFreshTask = !!freshNodes[node.id];
+            return (
+              <div
+                key={node.id}
+                data-id={node.id}
+                className={`node ${node.kind} ${selected === node.id ? 'selected' : ''} ${node.fixed ? 'fixed' : ''} ${node.data?.done ? 'done' : ''} ${isFreshTask ? 'fresh' : ''}`}
+                style={{ left: node.x, top: node.y, width: node.w || undefined, height: node.h || undefined }}
+                onMouseDown={(e) => onNodeMouseDown(e, node)}
+                onClick={(e) => {e.stopPropagation();setSelected(node.id);}}>
+                
+                {node.fixed &&
+                <>
+                    <div className="fixed-corners"><span className="tl" /><span className="tr" /><span className="bl" /><span className="br" /></div>
+                    <div className="fixed-slot-tag"><span className="num">{String(fixedIdx + 1).padStart(2, '0')}</span> · spine · {String(fixedSiblings.length).padStart(2, '0')}</div>
+                    <button className="fixed-reorder left" disabled={fixedIdx <= 0}
+                  onClick={(e) => {e.stopPropagation();moveFixedSlot(node.id, -1);}}
+                  title="move left">‹</button>
+                    <button className="fixed-reorder right" disabled={fixedIdx >= fixedSiblings.length - 1}
+                  onClick={(e) => {e.stopPropagation();moveFixedSlot(node.id, +1);}}
+                  title="move right">›</button>
+                  </>
+                }
+                <NodeBody
+                  node={node}
+                  onPortDown={node.fixed && node.kind !== 'todo' ? null : onPortDown}
+                  onAddTask={node.kind === 'todo' ? addTaskFromTodo : null}
+                  onToggleDone={node.kind === 'task' ? () => toggleTaskDone(node.id) : null}
+                  onSpawnPomo={node.kind === 'task' ? () => addPomoForTask(node.id) : null}
+                  pomoCount={node.kind === 'task' ? edges.filter((e) => e.from === node.id && e.kind === 'pomo').length : 0} />
+                
+                {selected === node.id && !node.fixed &&
+                <div className="resize-handle" onMouseDown={(e) => onResizeDown(e, node)} />
+                }
+              </div>);
+
+          })}
+        </div>
+      </div>
+
+      {/* Left dock */}
+      <div className="dock">
+        <button className={`dock-btn ${tool === 'select' ? 'active' : ''}`} data-tip="Select · V" onClick={() => setTool('select')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 3l14 9-7 1-3 7L5 3z" /></svg>
+        </button>
+        <div className="dock-divider" />
+        <button className="dock-btn" data-tip="Text note" onClick={() => addNode('text')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 4h14M12 4v16M8 20h8" /></svg>
+        </button>
+        <button className="dock-btn" data-tip="Image / ASCII" onClick={() => addNode('image')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="1" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-9 9" /></svg>
+        </button>
+        <div className="dock-divider" />
+        <button className="dock-btn" data-tip="Connect">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="6" cy="12" r="2" /><circle cx="18" cy="12" r="2" /><path d="M8 12h8" /></svg>
+        </button>
+      </div>
+
+      {/* Tweaks */}
+      <div className={`tweaks ${tweaksOpen ? 'open' : ''}`}>
+        <div className="tweaks-head">
+          <span>tweaks · /board</span>
+          <button className="x" onClick={() => setTweaksOpen(false)}>×</button>
+        </div>
+        <div className="tweaks-body">
+          <div className="tweak-row">
+            <div className="label">vibe</div>
+            <div className="opts">
+              {['cyber', 'paper', 'noir', 'solar'].map((v) =>
+              <button key={v} className={`tweak-opt ${tweaks.vibe === v ? 'active' : ''}`}
+              onClick={() => setTweaks((s) => ({ ...s, vibe: v }))}>{v}</button>
+              )}
+            </div>
+          </div>
+          <div className="tweak-row">
+            <div className="label">timer</div>
+            <div className="opts">
+              {['ring', 'ascii', 'lcd', 'blocks', 'vapor'].map((t) =>
+              <button key={t} className={`tweak-opt ${tweaks.timerStyle === t ? 'active' : ''}`}
+              onClick={() => setTweaks((s) => ({ ...s, timerStyle: t }))}>{t}</button>
+              )}
+            </div>
+          </div>
+          <div className="tweak-row">
+            <div className="label">theme</div>
+            <div className="opts">
+              {['light', 'dark'].map((t) =>
+              <button key={t} className={`tweak-opt ${tweaks.theme === t ? 'active' : ''}`}
+              onClick={() => setTweaks((s) => ({ ...s, theme: t }))}>{t}</button>
+              )}
+            </div>
+          </div>
+          <div className="tweak-row">
+            <div className="label">accent</div>
+            <div className="opts">
+              {['acid', 'cyan', 'plum'].map((a) =>
+              <button key={a} className={`tweak-opt ${tweaks.accent === a ? 'active' : ''}`}
+              onClick={() => setTweaks((t) => ({ ...t, accent: a }))}>{a}</button>
+              )}
+            </div>
+          </div>
+          <div className="tweak-row">
+            <div className="label">density</div>
+            <div className="opts">
+              {['compact', 'comfy', 'spacious'].map((d) =>
+              <button key={d} className={`tweak-opt ${tweaks.density === d ? 'active' : ''}`}
+              onClick={() => setTweaks((t) => ({ ...t, density: d }))}>{d}</button>
+              )}
+            </div>
+          </div>
+          <div className="tweak-row">
+            <div className="label">grid dots</div>
+            <div className="opts">
+              {['on', 'off'].map((d) =>
+              <button key={d} className={`tweak-opt ${tweaks.dots === d ? 'active' : ''}`}
+              onClick={() => setTweaks((t) => ({ ...t, dots: d }))}>{d}</button>
+              )}
+            </div>
+          </div>
+          <div className="tweak-row">
+            <div className="label" style={{ marginTop: 4, color: 'var(--ink-4)', fontSize: 9.5, lineHeight: 1.5 }}>
+              drag from any port (●) to connect nodes ·<br />
+              ⌘/ctrl + scroll to zoom · drag canvas to pan
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Minimap */}
+      <div className="minimap">
+        <div className="minimap-label">map</div>
+        <div className="minimap-canvas">
+          {laidOutNodes.map((n) => {
+            const sz = getNodeSize(n);
+            return (
+              <div key={n.id}
+              className={`minimap-node ${n.kind} ${n.fixed ? 'fixed' : ''}`}
+              style={{
+                left: 100 + n.x * 0.06,
+                top: 30 + n.y * 0.06,
+                width: sz.w * 0.06,
+                height: sz.h * 0.06
+              }} />);
+
+
+          })}
+        </div>
+      </div>
+
+      {/* AI Assistant Blob */}
+      <AIBlob />
+
+      {/* Status bar */}
+      <div className="statusbar">
+        <div className="status-item"><span className="label">workspace</span><span className="val">~/krnl0/deep-work</span></div>
+        <div className="status-item acid"><span className="label">claude</span><span className="val">● connected</span></div>
+        <div className="status-item rust"><span className="label">pomo</span><span className="val">18:42 / 25:00</span></div>
+        <div className="status-item"><span className="label">nodes</span><span className="val">{nodes.length}</span></div>
+        <div className="status-item"><span className="label">edges</span><span className="val">{edges.length}</span></div>
+        <div className="status-spacer" />
+        <div className="status-item"><span className="label">zoom</span><span className="val">{Math.round(view.k * 100)}%</span></div>
+        <div className="status-item"><span className="label">v0.1.0</span></div>
+      </div>
+
+      <div className="hint">
+        <span>drag from <span style={{ color: 'var(--acid)' }}>●</span> ports to connect</span>
+        <span><span className="kbd">⌘</span> + scroll to zoom</span>
+        <span>click <span className="kbd">+</span> in dock to add a node</span>
+      </div>
+    </div>);
+
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<Whiteboard />);
+</script></body></html>

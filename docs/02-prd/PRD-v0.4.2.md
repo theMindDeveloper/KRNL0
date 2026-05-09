@@ -4,7 +4,7 @@
 
 ## What it is
 
-**THE SYSTEM** is an infinite whiteboard OS for your life.
+**krnl0** is an infinite whiteboard OS for your life.
 
 It merges four tools that productive people keep open in separate windows — a Pomodoro timer, a habit tracker, a to-do list, and a terminal — into one connected, programmable canvas. Nodes talk to each other. When the Pomodoro starts, the first open task highlights. When a habit streak breaks, the terminal can log it. Every widget is a node; every node can be wired to another.
 
@@ -20,7 +20,7 @@ The canvas is the operating system. The terminal is the power layer. Claude Code
 | **Edges** | Directed connections between nodes — data flows, triggers, visual relations |
 | **Boards** | Named workspaces (`deep-work`, `morning-routine`, `project-x`) — infinite canvases |
 | **The Terminal** | First-class node. Run `claude "..."` to wire, configure, or automate any node via natural language |
-| **THE SYSTEM** | The product name + the philosophy: your life as an intentionally designed system |
+| **krnl0** | The product name + the philosophy: your life as an intentionally designed system |
 
 ---
 
@@ -28,11 +28,11 @@ The canvas is the operating system. The terminal is the power layer. Claude Code
 
 > *Less doing, more shaping. Make the loops cleaner — then everything downstream gets easier.*
 
-THE SYSTEM is built on three convictions:
+krnl0 is built on three convictions:
 
 1. **Visible systems beat invisible ones.** When your habits, focus sessions, and tasks share a canvas, you see how they relate. Friction becomes visible. Flow becomes designable.
 
-2. **The terminal belongs in productivity.** Power users live in their shells. THE SYSTEM gives the terminal a home on the canvas, first-class, not an afterthought.
+2. **The terminal belongs in productivity.** Power users live in their shells. krnl0 gives the terminal a home on the canvas, first-class, not an afterthought.
 
 3. **AI should wire, not replace.** Claude Code doesn't do your work. It connects your nodes, scaffolds your setup, and lets you describe automation in plain English. You stay in control.
 

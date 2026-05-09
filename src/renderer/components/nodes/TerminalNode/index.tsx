@@ -62,7 +62,7 @@ export function TerminalNode() {
         >
           {/* ASCII boot art */}
           <pre style={{ margin: 0, color: 'var(--acid)' }}>
-{`▙ THE SYSTEM v0.1.0
+{`▙ krnl0 v0.1.0
 ──────────────────
 Type 'help' for commands.
 `}

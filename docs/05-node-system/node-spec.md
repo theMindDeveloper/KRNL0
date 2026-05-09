@@ -1,4 +1,4 @@
-# THE SYSTEM — Node System Specification
+# krnl0 — Node System Specification
 
 *Extracted from PRD v0.6.0 §7*
 

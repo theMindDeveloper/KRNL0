@@ -30,7 +30,7 @@ export class SysFacade {
 }
 
 const HELP_TEXT = `
-THE SYSTEM — sys CLI v0.1.0
+krnl0 — sys CLI v0.1.0
 Usage: sys <subcommand> [args] [--json]
 
 Board:

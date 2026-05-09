@@ -1,20 +1,24 @@
-# THE SYSTEM — Product Description & Requirements
+# krnl0 — Product Description & Requirements
 *April 26, 2026 · Pre-architecture draft*
 
 ---
 
-## What is THE SYSTEM?
+## What is krnl0?
 
-THE SYSTEM is an all-in-one personal operating system for people who want to
+krnl0 is an all-in-one personal operating system for people who want to
 manage their entire life — tasks, focus, habits, projects, journaling, and
 automation — from a single, beautiful, spatial workspace.
 
-It is best understood as the intersection of three products that have never
+It is best understood as the intersection of products that have never
 been properly combined:
 
 - **Obsidian** — depth, local-first, extensible, yours to own
 - **Miro** — infinite canvas, spatial thinking, visual organization
 - **A terminal** — programmable, AI-native, automatable
+- **Habit tracker** — rolling 7-day grid, streaks, momentum
+- **To-do list** — fast, taggable, connected to other nodes
+- **Pomodoro timer** — native, event-emitting, connectable to other nodes
+- **AI agent** — a helpful assistant that can talk to all the nodes and operate the system by voice or text commands
 
 The result is a whiteboard where every widget is a living tool, every tool
 can talk to every other tool, and the whole thing can be driven by AI agents
@@ -40,7 +44,7 @@ momentum. Your journal reflects on your goals. Keeping them in separate
 apps is an artificial constraint imposed by how software has been built,
 not by how human productivity actually works.
 
-THE SYSTEM removes that constraint. Everything lives on one canvas.
+krnl0 removes that constraint. Everything lives on one canvas.
 Everything can connect to everything else.
 
 ---
@@ -104,7 +108,7 @@ to any shell. Create boards, add nodes, wire connections, query state.
 
 ### What makes it different
 
-| | THE SYSTEM | Notion | Obsidian | Miro |
+| | krnl0 | Notion | Obsidian | Miro |
 |---|---|---|---|---|
 | Infinite canvas | ✓ | — | — | ✓ |
 | Native Pomodoro | ✓ | — | plugin | — |

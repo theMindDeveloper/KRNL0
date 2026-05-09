@@ -1,4 +1,4 @@
-# THE SYSTEM — Visual System
+# krnl0 — Visual System
 
 *Extracted from PRD v0.6.0 §11*
 

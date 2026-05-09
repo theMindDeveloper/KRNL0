@@ -1,4 +1,4 @@
-# THE SYSTEM — Functional Requirements
+# krnl0 — Functional Requirements
 
 *Extracted from PRD v0.6.0 §13*
 *Course: HTW Berlin · Natural User Interfaces · Inclusive Design*

@@ -1,4 +1,4 @@
-# THE SYSTEM — Three-Layer Architecture Overview
+# krnl0 — Three-Layer Architecture Overview
 
 *Extracted from PRD v0.6.0 §4*
 
