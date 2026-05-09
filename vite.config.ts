@@ -1,0 +1,19 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@shared': resolve(__dirname, 'src/shared'),
+      '@brain': resolve(__dirname, 'src/brain'),
+      '@voice': resolve(__dirname, 'src/voice'),
+    },
+  },
+  root: 'src/renderer',
+  build: {
+    outDir: '../../dist/renderer',
+    emptyOutDir: true,
+  },
+});

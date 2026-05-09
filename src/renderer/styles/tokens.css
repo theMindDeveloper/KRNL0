@@ -1,0 +1,104 @@
+/* ── THE SYSTEM — Design Tokens ───────────────────────────────────────
+   Source of truth: docs/04-visual-system/design-tokens.md
+   PRD reference:   §11.1 Tokens, §11.2 Typography, §11.3 Layout
+   ─────────────────────────────────────────────────────────────────── */
+
+/* ── Light theme (default) ─────────────────────────────────────────── */
+:root {
+  /* Color */
+  --paper:   #f5f1e8;
+  --paper-2: #ede7d6;
+  --paper-3: #e3dcc7;
+  --ink:     #1a1814;
+  --ink-3:   #6b6354;
+  --acid:    #c9f158;  /* same in both themes — it's a signal, not a semantic */
+  --rust:    #c8553d;
+  --term-bg: #0c0a08;  /* always dark, both themes */
+
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-body: 'Geist', system-ui, sans-serif;
+  --font-prose: 'Instrument Serif', Georgia, serif;
+
+  /* Sizing — monospace grid: 32px minor, 160px major */
+  --grid-minor: 32px;
+  --grid-major: 160px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 32px;
+
+  /* Node */
+  --node-radius: 4px;
+  --node-border: 1px solid var(--paper-3);
+  --node-shadow: none;
+
+  /* Orb */
+  --orb-size: 56px;
+
+  /* Animation */
+  --edge-pulse-duration: 600ms;
+  --orb-breathe-duration: 3s;
+  --spawn-duration: 200ms;
+}
+
+/* ── Dark theme ─────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --paper:   #0e0d0b;
+  --paper-2: #1a1814;
+  --paper-3: #2a2620;
+  --ink:     #f0ebdd;
+  --ink-3:   #8a8270;
+  /* --acid unchanged */
+  --rust:    #e87a5f;
+  /* --term-bg unchanged */
+}
+
+/* ── High contrast variant ──────────────────────────────────────────── */
+[data-theme="dark"][data-contrast="high"] {
+  --paper:   #000000;
+  --paper-2: #111111;
+  --paper-3: #333333;
+  --ink:     #ffffff;
+  --ink-3:   #cccccc;
+}
+:root[data-contrast="high"] {
+  --paper:   #ffffff;
+  --paper-2: #f0f0f0;
+  --paper-3: #cccccc;
+  --ink:     #000000;
+  --ink-3:   #333333;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --edge-pulse-duration: 0ms;
+    --orb-breathe-duration: 0ms;
+    --spawn-duration: 0ms;
+  }
+}
+[data-motion="reduced"] {
+  --edge-pulse-duration: 0ms;
+  --orb-breathe-duration: 0ms;
+  --spawn-duration: 0ms;
+}
+
+/* ── Base reset ─────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+}

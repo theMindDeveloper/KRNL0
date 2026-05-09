@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+release/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Claude Code internal
+.claude/
+.agents/
+skills-lock.json
+
+# Env
+.env
+.env.local
+
+# Whisper / Piper model files (large binaries — user downloads separately)
+*.bin
+*.onnx
