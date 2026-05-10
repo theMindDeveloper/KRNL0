@@ -4,6 +4,8 @@ import { FitAddon } from '@xterm/addon-fit';
 import type { NodeProps } from '../types';
 import type { TermState, TermConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+import { HEADER_LABEL, LIVE_BADGE_TEXT } from './constants';
+import { startTerminalSession } from './session';
 
 const SLOT_INDEX = 4;
 
@@ -11,8 +13,6 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
-  const cleanupDataRef = useRef<(() => void) | null>(null);
-  const cleanupExitRef = useRef<(() => void) | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
   const [hovered, setHovered] = useState(false);
@@ -41,45 +41,26 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
     fitRef.current = fit;
 
     let cancelled = false;
+    let sessionCleanup: (() => void) | null = null;
 
     // Defer initial fit + pty creation until the container has real dimensions.
     // On absolute-positioned nodes, layout may not be measured synchronously.
-    const startSession = () => {
-      if (cancelled) return;
-      try { fit.fit(); } catch { /* container not yet sized */ }
-      const cols = term.cols || 80;
-      const rows = term.rows || 24;
-
-      // Boot art before pty connects
-      term.write('\x1b[38;2;201;241;88m▙ krnl0 · v0.2.0 · claude code attached · tmux session "main"\x1b[0m\r\n');
-      term.write('\x1b[2m─────────────────────────────────────────────\x1b[0m\r\n');
-
-      window.krnl?.ptyCreate(cols, rows).then((sid) => {
-        if (cancelled) return;
-        sessionIdRef.current = sid;
-        onCommand('term.sessionStart', { sessionId: sid });
-
-        cleanupDataRef.current = window.krnl?.onPtyData(sid, (data) => {
-          term.write(data);
-        }) ?? null;
-
-        cleanupExitRef.current = window.krnl?.onPtyExit(sid, () => {
-          term.write('\r\n[Process exited]\r\n');
-          onCommand('term.sessionEnd', { sessionId: sid });
-        }) ?? null;
-
-        // Stream xterm input → pty
-        term.onData((data) => {
-          window.krnl?.ptyWrite(sid, data);
-        });
-
-        // Focus the terminal so the user can type immediately
-        term.focus();
+    const raf = requestAnimationFrame(() => {
+      startTerminalSession({
+        term,
+        fit,
+        krnl: window.krnl,
+        onCommand,
+        setSessionId: (id) => { sessionIdRef.current = id; },
+        isCancelled: () => cancelled,
+      }).then((cleanup) => {
+        if (cancelled) {
+          cleanup();
+        } else {
+          sessionCleanup = cleanup;
+        }
       });
-    };
-
-    // Wait one rAF tick for layout, then session-start
-    const raf = requestAnimationFrame(startSession);
+    });
 
     const ro = new ResizeObserver(() => {
       try { fitRef.current?.fit(); } catch { /* ignore */ }
@@ -92,14 +73,11 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      cleanupDataRef.current?.();
-      cleanupExitRef.current?.();
+      sessionCleanup?.();
       ro.disconnect();
       term.dispose();
       termRef.current = null;
       fitRef.current = null;
-      cleanupDataRef.current = null;
-      cleanupExitRef.current = null;
       sessionIdRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -128,8 +106,9 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
         onClick={focusTerm}
         style={{ borderRadius: 5, overflow: 'hidden' }}
       >
-        {/* Header */}
+        {/* Header — .term-head */}
         <div
+          className="term-head"
           style={{
             background: 'var(--term-bg-2)',
             padding: '8px 12px',
@@ -139,14 +118,15 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
             borderBottom: '1px solid #2a241c',
           }}
         >
-          {/* Traffic lights */}
-          <div style={{ display: 'flex', gap: 5 }}>
-            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#c8553d' }} />
-            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#c9a455' }} />
-            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#7ba87b' }} />
+          {/* Traffic lights — .lights */}
+          <div className="lights" style={{ display: 'flex', gap: 5 }}>
+            <span className="light r" style={{ width: 9, height: 9, borderRadius: '50%', background: '#c8553d', display: 'inline-block' }} />
+            <span className="light y" style={{ width: 9, height: 9, borderRadius: '50%', background: '#c9a455', display: 'inline-block' }} />
+            <span className="light g" style={{ width: 9, height: 9, borderRadius: '50%', background: '#7ba87b', display: 'inline-block' }} />
           </div>
-          {/* Center label */}
+          {/* Centre label */}
           <span
+            className="label"
             style={{
               flex: 1,
               textAlign: 'center',
@@ -156,10 +136,11 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
               letterSpacing: '0.04em',
             }}
           >
-            claude-code · ~/krnl0 · zsh
+            {HEADER_LABEL}
           </span>
           {/* LIVE badge */}
           <div
+            className="badge"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -181,13 +162,14 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
                 background: 'var(--term-bg)', flexShrink: 0,
               }}
             />
-            LIVE
+            {LIVE_BADGE_TEXT}
           </div>
         </div>
 
-        {/* xterm mount — clicking anywhere in here focuses the terminal */}
+        {/* xterm mount — .term-body — clicking anywhere in here focuses the terminal */}
         <div
           ref={containerRef}
+          className="term-body"
           onPointerDown={(e) => { e.stopPropagation(); focusTerm(); }}
           onClick={(e) => { e.stopPropagation(); focusTerm(); }}
           style={{ width: '100%', height: 280, background: 'var(--term-bg)' }}
