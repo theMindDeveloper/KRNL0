@@ -33,9 +33,13 @@
 
 /* ── MiniMap ─────────────────────────────────────────────────────────────── */
 .react-flow__minimap {
+  width: 160px;
+  height: 120px;
   background: var(--paper-2);
+  opacity: 0.94;
   border: 1px solid var(--paper-3);
-  border-radius: var(--radius);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 /* ── Controls ────────────────────────────────────────────────────────────── */
