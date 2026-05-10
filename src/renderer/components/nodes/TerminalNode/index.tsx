@@ -81,9 +81,16 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Defer focus to a microtask so it runs AFTER React Flow's pointer handler
-  // (which can otherwise re-claim focus on the canvas).
+  // (which can otherwise re-claim focus on the canvas). Belt-and-suspenders:
+  // also focus the xterm helper textarea directly — under Electron + RF,
+  // term.focus() alone sometimes does not actually focus the textarea
+  // (regression after the PR #58 revert).
   const focusTerm = () => {
-    queueMicrotask(() => termRef.current?.focus());
+    queueMicrotask(() => {
+      termRef.current?.focus();
+      const ta = containerRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+      ta?.focus();
+    });
   };
 
   return (
