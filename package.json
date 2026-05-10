@@ -7,7 +7,9 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json"
+    "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
+    "reset": "node scripts/reset-board.mjs",
+    "reset:hard": "node scripts/reset-board.mjs --hard"
   },
   "bin": {
     "sys": "dist/sys/index.js"
