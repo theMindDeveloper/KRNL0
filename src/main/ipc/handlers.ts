@@ -17,12 +17,12 @@ function seedBoard() {
     version: 1,
     schemaVersion: 1,
     savedAt: new Date().toISOString(),
-    viewport: { x: 0, y: 160, zoom: 1 },
+    viewport: { x: 0, y: 220, zoom: 1 },
     nodes: [
       {
         id: 'mother-pomo',
         kind: 'pomo',
-        position: { x: 0, y: 0 },
+        position: { x: -688, y: 0 },
         isMother: true,
         state: { status: 'idle', startedAt: null, durationMin: 25, label: '', sessionsCompleted: 0, history: [] },
         config: { shortBreakMin: 5, longBreakMin: 15, sessionsUntilLongBreak: 4 },
@@ -30,7 +30,7 @@ function seedBoard() {
       {
         id: 'mother-todo',
         kind: 'todo',
-        position: { x: -480, y: 0 },
+        position: { x: -336, y: 0 },
         isMother: true,
         state: { items: [] },
         config: { showCompleted: true, maxVisible: 50 },
@@ -38,7 +38,7 @@ function seedBoard() {
       {
         id: 'mother-habit',
         kind: 'habit',
-        position: { x: 480, y: 0 },
+        position: { x: 16, y: 0 },
         isMother: true,
         state: { habits: [] },
         config: { maxHabits: 5, weekStartsOn: 'monday' },
@@ -46,7 +46,7 @@ function seedBoard() {
       {
         id: 'mother-term',
         kind: 'term',
-        position: { x: 0, y: 320 },
+        position: { x: 368, y: 0 },
         isMother: true,
         state: { sessionId: null, title: 'Terminal' },
         config: { shell: 'default', fontSize: 13 },
@@ -56,11 +56,49 @@ function seedBoard() {
   };
 }
 
+const NEW_MOTHER_POSITIONS: Record<string, { x: number; y: number }> = {
+  'mother-pomo':  { x: -688, y: 0 },
+  'mother-todo':  { x: -336, y: 0 },
+  'mother-habit': { x:   16, y: 0 },
+  'mother-term':  { x:  368, y: 0 },
+};
+
+function migrateMotherPositions(board: unknown): Record<string, unknown> {
+  if (
+    typeof board !== 'object' ||
+    board === null ||
+    !('nodes' in board) ||
+    !Array.isArray((board as { nodes: unknown }).nodes)
+  ) {
+    return typeof board === 'object' && board !== null
+      ? (board as Record<string, unknown>)
+      : {};
+  }
+  const b = board as {
+    nodes: unknown[];
+    viewport?: { x: number; y: number; zoom: number };
+  };
+  b.nodes = b.nodes.map((n) => {
+    if (typeof n !== 'object' || n === null || !('id' in n)) return n;
+    const node = n as { id: string; position?: { x: number; y: number }; isMother?: boolean };
+    const newPos = NEW_MOTHER_POSITIONS[node.id];
+    if (newPos) {
+      return { ...node, position: newPos, isMother: true };
+    }
+    return node;
+  });
+  if (b.viewport) {
+    b.viewport = { ...b.viewport, x: 0, y: 220, zoom: 1 };
+  }
+  return b as Record<string, unknown>;
+}
+
 function loadBoard() {
   try {
     if (existsSync(BOARD_PATH)) {
       const raw = readFileSync(BOARD_PATH, 'utf-8');
-      return JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
+      return migrateMotherPositions(parsed);
     }
   } catch {
     // fall through to seed
