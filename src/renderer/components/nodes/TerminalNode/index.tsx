@@ -166,13 +166,14 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
           </div>
         </div>
 
-        {/* xterm mount — .nodrag .nopan tells React Flow to leave pointer events
-            alone so xterm receives clicks/keys. Otherwise RF eats them. */}
+        {/* xterm mount — nodrag/nopan/nowheel/nokey prevent RF from consuming
+            pointer and keyboard events so xterm receives them instead. */}
         <div
           ref={containerRef}
-          className="term-body nodrag nopan nowheel"
+          className="term-body nodrag nopan nowheel nokey"
           onPointerDown={(e) => { e.stopPropagation(); focusTerm(); }}
           onClick={(e) => { e.stopPropagation(); focusTerm(); }}
+          onKeyDown={(e) => e.stopPropagation()}
           style={{ width: '100%', height: 280, background: 'var(--term-bg)' }}
         />
       </div>

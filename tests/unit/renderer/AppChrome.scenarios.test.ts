@@ -32,6 +32,9 @@ vi.mock('@xyflow/react', () => ({
     fitView: mockFitView,
     getViewport: mockGetViewport,
   }),
+  // useStore reads RF's internal transform; return a fixed 1.0 zoom in tests.
+  useStore: (selector: (s: { transform: [number, number, number] }) => unknown) =>
+    selector({ transform: [0, 0, 1] }),
   ReactFlowProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
   Panel: ({ children }: { children: React.ReactNode }) => React.createElement('div', { 'data-testid': 'rf-panel' }, children),
 }));

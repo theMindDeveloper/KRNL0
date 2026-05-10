@@ -222,8 +222,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // no-op for v1
   }, []);
 
-  // ── onMove — write viewport to store; debounced writer persists to disk ───
-  const onMove = useCallback(
+  // ── onMoveEnd — sync viewport to store only when pan/zoom gesture ends ──
+  // onMove fires at 60fps and was causing Zustand updates + StatusBar re-renders
+  // on every frame. onMoveEnd fires once per gesture (mouse-up / touch-end).
+  const onMoveEnd = useCallback(
     (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
       setViewport({ x: viewport.x, y: viewport.y, zoom: viewport.zoom });
     },
@@ -247,7 +249,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       defaultViewport={initialViewport}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onMove={onMove}
+      onMoveEnd={onMoveEnd}
       onSelectionChange={onSelectionChange}
       deleteKeyCode={null}
       fitView={false}
