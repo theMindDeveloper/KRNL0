@@ -3,12 +3,11 @@ import { useBoardStore } from '../../store/boardStore';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { resolveNodeComponent } from '../nodes/registry';
 import { makeCommandHandler } from './commandDispatch';
+import type { NodeKind } from '../../../shared/types/node';
 
 const PAN_BUTTON_MIDDLE = 1;
 const PAN_BUTTON_LEFT = 0;
 const ZOOM_SENSITIVITY = 0.001;
-
-const noop = (): void => {};
 
 // Dot-grid background using radial-gradient.
 const GRID_STYLE: React.CSSProperties = {
@@ -19,16 +18,53 @@ const GRID_STYLE: React.CSSProperties = {
   backgroundSize: `var(--grid-major) var(--grid-major), var(--grid-minor) var(--grid-minor)`,
 };
 
+// Approximate dimensions per node kind for edge port positioning.
+const NODE_WIDTHS: Record<NodeKind, number> = {
+  pomo: 240,
+  todo: 300,
+  habit: 320,
+  term: 460,
+  'pomo.session': 200,
+  'todo.task': 240,
+  'habit.day': 240,
+};
+const NODE_HEIGHTS: Record<NodeKind, number> = {
+  pomo: 290,
+  todo: 350,
+  habit: 300,
+  term: 340,
+  'pomo.session': 120,
+  'todo.task': 60,
+  'habit.day': 60,
+};
+
+function getNodeWidth(kind: string): number {
+  return (NODE_WIDTHS as Record<string, number>)[kind] ?? 240;
+}
+function getNodeHeight(kind: string): number {
+  return (NODE_HEIGHTS as Record<string, number>)[kind] ?? 240;
+}
+
+interface DragState {
+  nodeId: string;
+  pointerId: number;
+  startPointer: { x: number; y: number };
+  startNodePos: { x: number; y: number };
+}
+
 export function Canvas() {
   const board = useBoardStore((s) => s.board);
   const viewport = useBoardStore((s) => s.viewport);
   const panBy = useBoardStore((s) => s.panBy);
   const zoomAt = useBoardStore((s) => s.zoomAt);
   const resetViewport = useBoardStore((s) => s.resetViewport);
+  const updateNode = useBoardStore((s) => s.updateNode);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const panState = useRef<{ pointerId: number } | null>(null);
+  const dragState = useRef<DragState | null>(null);
   const [spaceHeld, setSpaceHeld] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useViewportPersistence();
 
@@ -42,11 +78,13 @@ export function Canvas() {
   }, [board?.nodes.map((n) => n.id).join(',')]); // re-memoize only when node list changes
 
   // Space key as pan modifier (space + left-drag, mirroring Figma/tldraw).
+  // Escape to deselect.
   useEffect(() => {
     const target = document.body;
     const onDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat) setSpaceHeld(true);
       if (e.code === 'Home') resetViewport();
+      if (e.code === 'Escape') setSelectedId(null);
     };
     const onUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') setSpaceHeld(false);
@@ -97,6 +135,58 @@ export function Canvas() {
     [zoomAt],
   );
 
+  // Node drag handlers (child nodes only).
+  const onNodePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>, nodeId: string, nodeX: number, nodeY: number, isMother: boolean) => {
+      if (isMother) return;
+      if (e.button !== PAN_BUTTON_LEFT) return;
+      if (spaceHeld) return; // space+left is canvas pan
+
+      e.stopPropagation();
+      setSelectedId(nodeId);
+
+      e.currentTarget.setPointerCapture(e.pointerId);
+      dragState.current = {
+        nodeId,
+        pointerId: e.pointerId,
+        startPointer: { x: e.clientX, y: e.clientY },
+        startNodePos: { x: nodeX, y: nodeY },
+      };
+    },
+    [spaceHeld],
+  );
+
+  const onNodePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const ds = dragState.current;
+      if (!ds || ds.pointerId !== e.pointerId) return;
+
+      const deltaX = (e.clientX - ds.startPointer.x) / viewport.zoom;
+      const deltaY = (e.clientY - ds.startPointer.y) / viewport.zoom;
+      const newX = ds.startNodePos.x + deltaX;
+      const newY = ds.startNodePos.y + deltaY;
+
+      updateNode(ds.nodeId, { position: { x: newX, y: newY } });
+    },
+    [viewport.zoom, updateNode],
+  );
+
+  const onNodePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const ds = dragState.current;
+      if (!ds || ds.pointerId !== e.pointerId) return;
+
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      dragState.current = null;
+
+      // Persist the board after drag.
+      if (board) {
+        void window.krnl?.boardSave(board);
+      }
+    },
+    [board],
+  );
+
   const cursor = panState.current ? 'grabbing' : spaceHeld ? 'grab' : 'default';
 
   return (
@@ -107,6 +197,7 @@ export function Canvas() {
       onPointerUp={endPan}
       onPointerCancel={endPan}
       onWheel={onWheel}
+      onClick={() => setSelectedId(null)}
       style={{
         width: '100%',
         height: '100%',
@@ -130,7 +221,35 @@ export function Canvas() {
         <svg
           style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
         >
-          {/* Week 3: Edge[] rendered here as SVG paths */}
+          <defs>
+            <filter id="acid-glow">
+              <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#c9f158" floodOpacity="0.7" />
+            </filter>
+          </defs>
+          {board?.edges.map((edge) => {
+            const srcNode = board.nodes.find((n) => n.id === edge.from.nodeId);
+            const tgtNode = board.nodes.find((n) => n.id === edge.to.nodeId);
+            if (!srcNode || !tgtNode) return null;
+
+            const sx = srcNode.position.x + getNodeWidth(srcNode.kind);
+            const sy = srcNode.position.y + getNodeHeight(srcNode.kind) / 2;
+            const tx = tgtNode.position.x;
+            const ty = tgtNode.position.y + getNodeHeight(tgtNode.kind) / 2;
+            const d = `M ${sx} ${sy} C ${sx + 80} ${sy} ${tx - 80} ${ty} ${tx} ${ty}`;
+
+            return (
+              <path
+                key={edge.id}
+                d={d}
+                fill="none"
+                stroke={edge.enabled ? 'var(--acid)' : 'var(--ink-3)'}
+                strokeWidth={edge.enabled ? 1.5 : 1}
+                strokeDasharray={edge.enabled ? undefined : '4 3'}
+                opacity={edge.enabled ? 1 : 0.6}
+                filter={edge.enabled ? 'url(#acid-glow)' : undefined}
+              />
+            );
+          })}
         </svg>
 
         {board === null ? (
@@ -148,21 +267,32 @@ export function Canvas() {
         ) : (
           board.nodes.map((node) => {
             const Component = resolveNodeComponent(node.kind);
-            const onCommand = commandHandlers[node.id] ?? noop;
+            const onCommand = commandHandlers[node.id] ?? (() => {});
+            const isSelected = selectedId === node.id;
+
             return (
               <div
                 key={node.id}
+                onPointerDown={(e) =>
+                  onNodePointerDown(e, node.id, node.position.x, node.position.y, node.isMother)
+                }
+                onPointerMove={onNodePointerMove}
+                onPointerUp={onNodePointerUp}
+                onPointerCancel={onNodePointerUp}
                 style={{
                   position: 'absolute',
                   left: node.position.x,
                   top: node.position.y,
+                  outline: isSelected ? '1px solid var(--acid)' : undefined,
+                  boxShadow: isSelected ? 'var(--shadow-glow)' : undefined,
+                  cursor: node.isMother ? 'default' : 'grab',
                 }}
               >
                 <Component
                   node={node}
-                  selected={false}
+                  selected={isSelected}
                   onCommand={onCommand}
-                  onSelect={noop}
+                  onSelect={() => setSelectedId(node.id)}
                 />
               </div>
             );
