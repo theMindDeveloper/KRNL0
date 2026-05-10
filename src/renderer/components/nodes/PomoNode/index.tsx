@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
@@ -14,11 +14,45 @@ function formatRemaining(ms: number): string {
   return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
 }
 
+/** Derive the pct of remaining time (0–100), used for liquid fill height (F1). */
+export function calcRemainingPct(
+  status: PomoState['status'],
+  remainingMs: number,
+  totalMs: number,
+): number {
+  if (status === 'running' || status === 'break') {
+    return Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
+  }
+  return status === 'idle' ? 100 : 0;
+}
+
+/** Label for the primary action button (F5). */
+export function primaryButtonLabel(status: PomoState['status']): string {
+  switch (status) {
+    case 'running': return 'PAUSE';
+    case 'break':   return 'SKIP BREAK';
+    case 'done':    return 'START';
+    default:        return 'START'; // 'idle'
+  }
+}
+
+/** Pip state for session pip at index i (F6). */
+export function pipState(
+  i: number,
+  completedDots: number,
+  status: PomoState['status'],
+): 'done' | 'active' | 'empty' {
+  if (i < completedDots) return 'done';
+  if (i === completedDots && status === 'running') return 'active';
+  return 'empty';
+}
+
 export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) {
   const { state, config } = node;
   const [, setTick] = useState(0);
 
   // Visual tick — state mutations go through onCommand (Decision #9)
+  // NF1: setInterval at TICK_MS (500ms) drives the visual refresh.
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'break') return;
     const id = setInterval(() => setTick((t) => t + 1), TICK_MS);
@@ -38,6 +72,7 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
       : 0;
   const remainingMs = totalMs - elapsedMs;
 
+  // F7 — auto-dispatch pomo.complete when timer hits zero
   useEffect(() => {
     if (state.status === 'running' && remainingMs <= 0) onCommand('pomo.complete');
   }, [state.status, remainingMs, onCommand]);
@@ -45,29 +80,40 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
   const sessionsTarget = config?.longBreakEvery ?? 4;
   const completedDots = state.sessionsCompleted % sessionsTarget;
 
+  // F5 — context-driven primary button
   const handlePrimary = () => {
     if (state.status === 'idle' || state.status === 'done') onCommand('pomo.start');
     else if (state.status === 'running') onCommand('pomo.cancel');
     else if (state.status === 'break') onCommand('pomo.skipBreak');
   };
+  // F4 — RESET always dispatches pomo.cancel (FSM guards the actual transition)
   const handleReset = () => onCommand('pomo.cancel');
 
-  const buttonLabel =
-    state.status === 'running' ? 'PAUSE' : state.status === 'break' ? 'SKIP BREAK' : 'START';
+  const buttonLabel = primaryButtonLabel(state.status);
 
-  // Vapor reservoir percentage of remaining time (drains over session)
-  const remainingPct = state.status === 'running' || state.status === 'break'
-    ? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100))
-    : state.status === 'idle' ? 100 : 0;
+  // F1 — liquid fill height tracks remaining time
+  const remainingPct = calcRemainingPct(state.status, remainingMs, totalMs);
 
   const clockText = state.status === 'idle' || state.status === 'done'
     ? formatRemaining(state.durationMin * 60_000)
     : formatRemaining(remainingMs);
-  const [mm, ss] = clockText.split(':');
+  const [mm, ss] = clockText.split(':') as [string, string];
+
+  // F2 — bubble positions are stable across renders (NF2: pure CSS animation)
+  const bubbles = useMemo(() => [0, 1, 2, 3].map((i) => ({
+    left: 8 + i * 14,
+    animationDuration: `${3.2 + (i % 2) * 1.4}s`,
+    animationDelay: `${i * 0.7}s`,
+  })), []);
+
+  // F3 — colon blinks at 1 Hz ONLY while running
+  const colonAnimation = state.status === 'running'
+    ? 'pomo-blink 1s steps(2) infinite'
+    : 'none';
 
   return (
     <MotherFrame slotIndex={SLOT_INDEX} slotTotal={MOTHER_TOTAL} width={MOTHER_WIDTH}>
-      {/* Bubble keyframes scoped to this node */}
+      {/* NF2: Bubble keyframes are pure CSS — no JS drives them */}
       <style>{`
         @keyframes vapor-rise {
           0%   { transform: translateY(0) scale(1); opacity: 0; }
@@ -111,32 +157,38 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
 
       {/* Body — vapor tube + info */}
       <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', minHeight: 240 }}>
-          {/* Vapor tube */}
+        <div
+          className="pomo-vapor"
+          style={{ display: 'flex', gap: 16, alignItems: 'stretch', minHeight: 240 }}
+        >
+          {/* F2 — Vapor tube with six tick marks (25/20/15/10/05/00) */}
           <div
+            className="tube"
             style={{
               position: 'relative',
-              width: 70,
+              width: 64,
               flexShrink: 0,
               background: 'rgba(0,0,0,0.5)',
               border: '1.5px solid var(--paper-3)',
-              borderRadius: 35,
+              borderRadius: 32,
               overflow: 'hidden',
               boxShadow: 'inset 2px 0 0 rgba(255,255,255,0.04), inset -2px 0 0 rgba(0,0,0,0.12)',
             }}
           >
-            {/* Liquid fill */}
+            {/* F1 — Liquid fill: height = remainingPct% */}
             <div
+              className="liquid"
+              data-testid="pomo-liquid"
               style={{
                 position: 'absolute',
                 left: 0, right: 0, bottom: 0,
                 height: `${remainingPct}%`,
-                background: 'linear-gradient(180deg, var(--acid-glow) 0%, var(--acid) 40%, #6e8a1f 100%)',
+                background: 'linear-gradient(180deg, var(--acid-glow) 0%, var(--acid) 40%, var(--spine) 100%)',
                 transition: 'height 0.6s linear',
                 boxShadow: '0 0 24px var(--acid), inset 0 -8px 16px rgba(0,0,0,0.25)',
               }}
             >
-              {/* Meniscus on top */}
+              {/* Meniscus — top glow on liquid surface */}
               <div style={{
                 position: 'absolute',
                 top: -3, left: 0, right: 0,
@@ -146,23 +198,28 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
               }} />
             </div>
 
-            {/* Bubbles */}
-            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-              {[0, 1, 2, 3].map((i) => (
+            {/* NF2 — Bubbles: pure CSS animation, positions memoised */}
+            <div
+              className="bubbles"
+              style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}
+            >
+              {bubbles.map((b, i) => (
                 <span
                   key={i}
                   className="pomo-bubble"
                   style={{
-                    left: 8 + i * 14,
-                    animationDuration: `${3.2 + (i % 2) * 1.4}s`,
-                    animationDelay: `${i * 0.7}s`,
+                    left: b.left,
+                    animationDuration: b.animationDuration,
+                    animationDelay: b.animationDelay,
                   }}
                 />
               ))}
             </div>
 
-            {/* Tick marks on the right side of tube */}
+            {/* F2 — Tick marks: 25 / 20 / 15 / 10 / 05 / 00 on tube right edge */}
             <div
+              className="ticks"
+              data-testid="pomo-ticks"
               style={{
                 position: 'absolute',
                 top: 0, bottom: 0, right: 6,
@@ -177,12 +234,18 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
                 pointerEvents: 'none',
               }}
             >
-              <span>25</span><span>20</span><span>15</span><span>10</span><span>05</span><span>00</span>
+              <span>25</span>
+              <span>20</span>
+              <span>15</span>
+              <span>10</span>
+              <span>05</span>
+              <span>00</span>
             </div>
           </div>
 
-          {/* Info column */}
+          {/* Info column — big clock + phase label + reserve % */}
           <div
+            className="info"
             style={{
               flex: 1,
               display: 'flex',
@@ -192,49 +255,76 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
               fontFamily: 'var(--font-mono)',
             }}
           >
-            <div style={{
-              fontSize: 44,
-              letterSpacing: '-0.04em',
-              color: 'var(--ink)',
-              fontVariantNumeric: 'tabular-nums',
-              lineHeight: 1,
-              fontWeight: 300,
-            }}>
-              {mm}<span style={{ color: 'var(--rust)', animation: 'pomo-blink 1s steps(2) infinite' }}>:</span>{ss}
+            {/* F3 — Clock display: MM:SS; colon blinks at 1 Hz ONLY while running */}
+            <div
+              className="num"
+              data-testid="pomo-clock"
+              style={{
+                fontSize: 44,
+                letterSpacing: '-0.04em',
+                color: 'var(--ink)',
+                fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1,
+                fontWeight: 300,
+              }}
+            >
+              {mm}
+              <span
+                className="colon"
+                data-testid="pomo-colon"
+                data-running={state.status === 'running'}
+                style={{
+                  color: 'var(--rust)',
+                  animation: colonAnimation,
+                }}
+              >:</span>
+              {ss}
             </div>
-            <div style={{
-              fontSize: 9.5,
-              color: 'var(--ink-3)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-            }}>
-              deep work · phase 03
+            <div
+              className="label"
+              style={{
+                fontSize: 9.5,
+                color: 'var(--ink-3)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+              }}
+            >
+              {state.label ? state.label : 'deep work'} · phase 03
             </div>
-            <div style={{
-              fontSize: 11,
-              color: 'var(--acid)',
-              marginTop: 4,
-              textShadow: '0 0 8px rgba(201,241,88,0.45)',
-            }}>
+            <div
+              className="pct"
+              style={{
+                fontSize: 11,
+                color: 'var(--acid)',
+                marginTop: 4,
+                textShadow: '0 0 8px rgba(201,241,88,0.45)',
+              }}
+            >
               {state.status === 'idle' ? 'ready' : `${Math.round(remainingPct)}% reserve`}
             </div>
           </div>
         </div>
 
-        {/* Session pips */}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-start' }}>
+        {/* F6 — Session pips: highlight pip at index (sessionsCompleted % longBreakEvery) */}
+        <div
+          className="pomo-pips"
+          data-testid="pomo-pips"
+          style={{ display: 'flex', gap: 8, justifyContent: 'flex-start' }}
+        >
           {Array.from({ length: sessionsTarget }).map((_, i) => {
-            const done = i < completedDots;
-            const active = i === completedDots && state.status === 'running';
+            const ps = pipState(i, completedDots, state.status);
             return (
               <span
                 key={i}
+                className={`pip ${ps}`}
+                data-pip-index={i}
+                data-pip-state={ps}
                 style={{
                   width: 9, height: 9, borderRadius: '50%',
                   border: '1.5px solid',
-                  borderColor: done || active ? 'var(--rust)' : 'var(--ink-4)',
-                  background: done ? 'var(--rust)' : 'transparent',
-                  boxShadow: active ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
+                  borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
+                  background: ps === 'done' ? 'var(--rust)' : 'transparent',
+                  boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
                   position: 'relative',
                 }}
               />
@@ -252,11 +342,17 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
           </span>
         </div>
 
-        {/* Controls — RESET + PAUSE/START */}
-        <div style={{ display: 'flex', gap: 6 }}>
+        {/* F4/F5 — Controls: RESET ghost + primary acid-filled */}
+        <div
+          className="pomo-controls"
+          style={{ display: 'flex', gap: 6 }}
+        >
+          {/* F4 — RESET dispatches pomo.cancel */}
           <button
             type="button"
+            data-testid="pomo-reset"
             onClick={handleReset}
+            className="pomo-btn ghost"
             style={{
               flex: 1,
               padding: '10px 8px',
@@ -273,9 +369,12 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
           >
             RESET
           </button>
+          {/* F5 — Primary: START / PAUSE / SKIP BREAK */}
           <button
             type="button"
+            data-testid="pomo-primary"
             onClick={handlePrimary}
+            className="pomo-btn"
             style={{
               flex: 1,
               padding: '10px 8px',
