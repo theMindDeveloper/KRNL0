@@ -9,7 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Phase 2 work in progress: infinite canvas, four mother nodes (Pomodoro, Todos, Habits, Terminal), and edge-ready node contract.
+- Infinite canvas with pan (middle-mouse + space+drag) and zoom (focal-point wheel) — Issue #3
+- NODE_REGISTRY dispatch pattern routing node.kind to typed React components — Issue #4
+- PomoNode: 25-min FSM timer (idle/running/break), session persistence via startedAt, history log — Issue #5
+- TodoNode: flat item list with add/toggle/delete, render-time sort (undone first), completedAt tracking — Issue #6
+- HabitNode: sparse YYYY-MM-DD log, Mon-Sun grid, streak calculation (safe from yesterday), archiving — Issue #7
+- TerminalNode: xterm.js + node-pty wired via sessionId-keyed IPC channels — Issue #8
+- electron.vite.config.ts + contextBridge preload — npm run dev now functional
+
+### Infrastructure
+
+- vitest.config.ts, PR template, GitHub labels, milestones (week-2-canvas-nodes, week-3-edges-children)
+- 116 unit tests covering all Phase 2 node logic
 
 ## [0.1.0] - 2026-05-09
 
