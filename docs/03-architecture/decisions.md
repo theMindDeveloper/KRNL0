@@ -644,3 +644,52 @@ export interface PtyExitEvent   { sessionId: string; exitCode: number; signal: s
 - Enables: multiple terminals on one canvas, hosting `claude` inside any of them, clean shutdown.
 - Forecloses: running ptys in renderer (by design — native modules stay in main).
 - Native-module pain (rebuilds for Electron version) is concentrated in one place; `electron-rebuild` runs in postinstall.
+
+---
+
+## Decision 17 — Per-Instance Board Isolation
+
+**Date:** 2026-05-10
+**Status:** Accepted
+**Author:** architect
+
+### Context
+
+The build is now developed across multiple **git worktrees** in parallel — `main` plus one or more feature worktrees (e.g. `feat/new-features`). Each worktree runs its own Electron dev server via `npm run dev`. They share the same source tree of `~/Documents/krnl0/`.
+
+Two problems surfaced:
+
+1. **Single shared `board.json`.** `BOARD_DIR` was hard-coded to `~/Documents/krnl0/`. Both worktrees read and wrote the same file. When `feat/new-features` (which knows the `calendar` / `text` / `image` node kinds) seeded those nodes into the board, then `main` was launched (which does **not** know those kinds), the heal-on-load path in `handlers.ts` (PR #63) silently dropped the unknown nodes and persisted a stripped board. Re-launching the feature worktree found a board with its new nodes already gone — and the seed gate did not re-fire because the file still existed. The user's work appeared to vanish.
+2. **Single shared Electron `userData`.** Both worktrees declare `name: "krnl0"` in `package.json`, so Electron's `app.getPath('userData')` resolved to the same `%APPDATA%\krnl0\` (and equivalent on macOS/Linux). LocalStorage, IndexedDB, GPU cache, and crash dumps were shared, compounding cross-worktree pollution.
+
+A truly isolated dev workflow requires both surfaces to split per running instance.
+
+### Decision
+
+Board state is isolated per Electron app instance. The `BOARD_DIR` is derived as:
+
+```ts
+const BOARD_DIR = process.env.KRNL0_BOARD_DIR
+  ?? join(homedir(), 'Documents', app.getName());
+```
+
+Two layers of isolation:
+
+1. **Default — by `app.getName()`.** Electron returns the `name` field from `package.json`. Production main stays `krnl0`, so the default board path remains `~/Documents/krnl0/board.json` — **no breaking change for end-users**. Feature worktrees override `package.json#name` (e.g. `krnl0-newfeatures`), which automatically:
+   - Routes the board to `~/Documents/krnl0-newfeatures/board.json`.
+   - Splits Electron's `userData` to `%APPDATA%\krnl0-newfeatures\` (Electron uses `app.getName()` by default).
+2. **Explicit — `KRNL0_BOARD_DIR` env var.** Highest precedence. Lets a developer point an arbitrary instance at any directory (e.g. `KRNL0_BOARD_DIR=D:\krnl0-experiment npm run dev`) without touching `package.json`. Useful for ad-hoc spikes, integration tests, or migration rehearsals.
+
+### Conventions
+
+- The `name` in `package.json` on `main` is **always** `krnl0`. End-user board path is locked to `~/Documents/krnl0/`.
+- Long-lived feature branches that introduce schema-breaking node kinds **must** rename `package.json#name` (e.g. `krnl0-newfeatures`) so they cannot stomp on a developer's main board.
+- Short-lived fix branches that don't add node kinds do **not** need to rename; their schema is identical to main, so sharing the board is safe.
+- Tests and CI should set `KRNL0_BOARD_DIR` to a temp directory, never touching the user's real board.
+
+### Consequences
+
+- Enables: parallel development across worktrees without cross-contamination of board state, localStorage, or caches; safe coexistence of schema-incompatible branches.
+- Forecloses: the simplification of "one board file per machine, period." A user running both `krnl0` (production) and a `krnl0-*` dev build will see two separate boards in `~/Documents/`. This is a feature for developers, but worth noting if a packaged variant ever ships.
+- Existing user boards at `~/Documents/krnl0/board.json` continue to work unchanged on production builds.
+- Renaming `package.json#name` on a feature branch is a one-line change but it **must** be reverted (or merged carefully) before that branch ships to users — otherwise the released build would silently look at a different board path.
