@@ -81,6 +81,10 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
 
   // F5b: pty:data → xterm.write
   const cleanupData = krnl.onPtyData(sid, (data) => {
+    // DEBUG #72 — log shell→renderer traffic so we can diagnose Backspace
+    // behavior. Remove once issue #72 is resolved.
+    // eslint-disable-next-line no-console
+    console.log('[KRNL0 ←pty]', JSON.stringify(data).slice(0, 200));
     term.write(data);
   });
 
@@ -120,6 +124,15 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
   // POSIX/PowerShell convention. cmd.exe wants 0x08; users on cmd.exe must
   // set KRNL0_SHELL explicitly and accept this trade-off (issue #72).
   const { dispose: disposeOnData } = term.onData((data) => {
+    // DEBUG #72 — log every byte the renderer is sending to the PTY so we
+    // can diagnose Backspace. Each char is logged as a hex code. Remove
+    // once issue #72 is resolved.
+    // eslint-disable-next-line no-console
+    console.log(
+      '[KRNL0 →pty]',
+      JSON.stringify(data),
+      [...data].map((c) => '0x' + c.charCodeAt(0).toString(16)).join(' '),
+    );
     krnl.ptyWrite(sid, data);
   });
 
