@@ -16,6 +16,7 @@ import {
   Panel,
   BaseEdge,
   getBezierPath,
+  useReactFlow,
   type NodeChange,
   type EdgeChange,
   type Viewport,
@@ -156,27 +157,82 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const selectNode = useBoardStore((s) => s.selectNode);
   const updateNode = useBoardStore((s) => s.updateNode);
   const setViewport = useBoardStore((s) => s.setViewport);
+  const addNode = useBoardStore((s) => s.addNode);
+  const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
+  const { screenToFlowPosition } = useReactFlow();
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
 
-  // ── Dock add-node handler (Phase 5 placeholder) ───────────────────────────
+  // ── Dock add-node handler — creates text/image nodes at canvas center ─────
   const handleAddNode = useCallback((args: { kind: NodeKind }) => {
-    console.log('[dock] addNode', args.kind);
-    // Phase 6: wire dock to create child node kinds (pomo.session / todo.task /
-    // habit.day) once those node bodies exist.
-  }, []);
+    const center = screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+    const newNode: KrnlNode = {
+      id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: args.kind,
+      position: { x: center.x, y: center.y },
+      state: args.kind === 'text' ? { text: '' } : { src: null },
+      config: {},
+      isMother: false,
+    };
+    addNode(newNode);
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+  }, [addNode, screenToFlowPosition]);
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
   const rfNodes = useMemo(() => {
     if (!board) return [];
+
+    // Compute slot ordering for mother nodes (sorted by position.x)
+    const motherNodes = board.nodes
+      .filter((n: KrnlNode) => n.isMother)
+      .slice()
+      .sort((a: KrnlNode, b: KrnlNode) => a.position.x - b.position.x);
+    const slotTotal = motherNodes.length;
+    const slotIndexMap = new Map<string, number>(
+      motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
+    );
+
     return board.nodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
       const onSelect = getSelectHandler(node.id, selectNode);
-      return getMemoizedRfNode(node, { onCommand, onSelect });
+
+      if (!node.isMother) {
+        return getMemoizedRfNode(node, { onCommand, onSelect });
+      }
+
+      // Mother node: compute slot context and reorder handlers
+      const slotIndex = slotIndexMap.get(node.id) ?? 1;
+      const onMoveLeft = slotIndex > 1
+        ? () => {
+            const prevMother = motherNodes[slotIndex - 2];
+            if (prevMother) {
+              swapMotherSlots(node.id, prevMother.id);
+              const updated = useBoardStore.getState().board;
+              if (updated) void window.krnl?.boardSave(updated);
+            }
+          }
+        : undefined;
+      const onMoveRight = slotIndex < slotTotal
+        ? () => {
+            const nextMother = motherNodes[slotIndex];
+            if (nextMother) {
+              swapMotherSlots(node.id, nextMother.id);
+              const updated = useBoardStore.getState().board;
+              if (updated) void window.krnl?.boardSave(updated);
+            }
+          }
+        : undefined;
+
+      // For mother nodes we bypass the rfNodeCache since slot context changes
+      return toRfNode(node, { onCommand, onSelect, slotIndex, slotTotal, onMoveLeft, onMoveRight });
     });
-  }, [board, selectNode]);
+  }, [board, selectNode, swapMotherSlots]);
 
   // ── Derive RF edges from boardStore ──────────────────────────────────────
   const rfEdges = useMemo(() => {

@@ -7,9 +7,7 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HEADER_LABEL, LIVE_BADGE_TEXT } from './constants';
 import { startTerminalSession } from './session';
 
-const SLOT_INDEX = 4;
-
-export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfig>) {
+export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TermState, TermConfig>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -86,11 +84,13 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
 
   return (
     <MotherFrame
-      slotIndex={SLOT_INDEX}
-      slotTotal={MOTHER_TOTAL}
+      slotIndex={slotIndex}
+      slotTotal={slotTotal}
       width={MOTHER_WIDTH}
       background="var(--term-bg)"
       borderColor={hovered ? 'var(--acid)' : 'var(--paper-3)'}
+      onMoveLeft={onMoveLeft}
+      onMoveRight={onMoveRight}
     >
       <style>{`
         @keyframes term-live-pulse {

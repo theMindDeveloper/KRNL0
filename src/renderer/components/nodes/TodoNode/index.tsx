@@ -6,9 +6,7 @@ import { visibleItems } from './commands';
 import { defaultTodoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 
-const SLOT_INDEX = 2;
-
-export function TodoNode({ node, onCommand }: NodeProps<TodoState, TodoConfig>) {
+export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
   const config = rawConfig ?? defaultTodoConfig();
 
@@ -74,7 +72,7 @@ export function TodoNode({ node, onCommand }: NodeProps<TodoState, TodoConfig>) 
   };
 
   return (
-    <MotherFrame slotIndex={SLOT_INDEX} slotTotal={MOTHER_TOTAL} width={MOTHER_WIDTH}>
+    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         <div

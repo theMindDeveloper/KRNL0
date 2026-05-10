@@ -8,6 +8,7 @@ export interface Node<TState = unknown, TConfig = unknown> {
   state: TState;                       // serializable JSON — no functions, no DOM
   config: TConfig;                     // user-editable settings
   isMother: boolean;
+  slot?: number;                       // optional ordering slot for mother nodes
 }
 
 export interface RenderProps<TState, TConfig> {
@@ -30,7 +31,9 @@ export type NodeKind =
   | 'term'
   | 'pomo.session'
   | 'todo.task'
-  | 'habit.day';
+  | 'habit.day'
+  | 'text'
+  | 'image';
 
 // Spec a node-kind module exports to the kernel (commands, events, schema).
 // Renamed from `NodeKind` to avoid shadowing the literal union above.
