@@ -133,11 +133,15 @@ export function makeCommandHandler(nodeId: string) {
       const text = addedItem?.text ?? (args['text'] as string | undefined) ?? '';
       const tag = addedItem?.tag ?? (args['tag'] as string | undefined);
 
+      const durationMin = 20;
       const taskState: TaskState = {
         text,
         done: false,
         ...(tag !== undefined ? { tag } : {}),
-        durationMin: 20,
+        durationMin,
+        eta: `~${durationMin} min`,
+        sequenceNumber: n,       // 1-based ordinal (F1)
+        layer: 0,                // direct children of a mother are layer 0 (F1/NF4)
         createdAt: new Date().toISOString(),
         parentTodoId: todoNode.id,
       };
