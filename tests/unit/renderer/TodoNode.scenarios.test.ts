@@ -300,9 +300,11 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
     });
   });
 
-  // ── F8 — RF target handle rendered (via adapter) ──────────────────────────
-  describe('F8 — RF target handle is rendered by the adapter', () => {
-    it('adapter wraps TodoNode with a target-left handle', () => {
+  // ── F8 — Mother nodes do NOT render handles ──────────────────────────────
+  // Mothers don't connect to anything in v1 (Decision #13 §E + ux feedback).
+  // The adapter HOC skips Handle rendering when node.isMother === true.
+  describe('F8 — TodoNode (mother) renders no connection handles', () => {
+    it('adapter wraps TodoNode without left/right handles when isMother:true', () => {
       const AdaptedTodo = createNodeAdapter(TodoNode);
       const rfProps = {
         id: 'todo-1',
@@ -320,8 +322,10 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
         positionAbsoluteY: 0,
       };
       render(React.createElement(AdaptedTodo as React.ComponentType<typeof rfProps>, rfProps));
-      const handle = document.querySelector('[data-handle-type="target"][data-handle-position="left"]');
-      expect(handle).not.toBeNull();
+      const targetHandle = document.querySelector('[data-handle-type="target"]');
+      const sourceHandle = document.querySelector('[data-handle-type="source"]');
+      expect(targetHandle).toBeNull();
+      expect(sourceHandle).toBeNull();
     });
   });
 });
