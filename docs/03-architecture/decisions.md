@@ -817,3 +817,36 @@ If any of (1)–(5) cannot be met without breaking the contract, backend-dev esc
 - Forecloses: zero-toolchain installs. A developer on a locked-down corporate machine without C++ build tools cannot run KRNL0 from source. Acceptable tradeoff — the alternative (pipe-mode fallback) is what got us here.
 - Concentrates native-module risk in one dep (`node-pty`) and one tool (`@electron/rebuild`). Future native deps follow the same pattern by extending `-w node-pty` to `-w node-pty -w <new-dep>`.
 - pm-docs follow-up: normalise `nodeId` → `sessionId` in `docs/06-requirements/terminal-node.md` (F4, F4b, F5, F5b) so the requirements doc matches Decision 12's wire contract.
+
+---
+
+## Decision 19 — TerminalNode UX hardening (Backspace, Ctrl+C, cwd, GPU rendering)
+
+**Status:** Accepted — 2026-05-10
+**Closes:** #72, #73, #74, #75
+**Supersedes:** the `0x7f → 0x08` translation introduced in PR #70
+
+### Context
+
+Once Decision 12 + 18 landed and PowerShell became the default Windows shell (PR #71), four follow-on issues surfaced from real use of `claude` inside the terminal node:
+
+1. **Backspace stopped working.** PR #70 had translated xterm's `0x7f` (DEL) to `0x08` (BS) so cmd.exe would erase characters. PowerShell, bash, and zsh all expect `0x7f`; the translation made the new default unusable.
+2. **Claude Code TUI was visibly laggy** and dropped keystrokes. xterm's default DOM renderer thrashes layout under heavy ANSI redraws.
+3. **`cwd = USERPROFILE`** meant `claude` couldn't see `CLAUDE.md`, `board.json`, or any project file without a manual `cd`.
+4. **Ctrl+C did nothing.** Running processes (e.g. `Start-Sleep`, `claude`'s long operations) couldn't be interrupted.
+
+### Decision
+
+Four targeted changes, all narrow:
+
+1. **Remove the 0x7f → 0x08 translation.** The xterm `onData → ptyWrite` path passes bytes through verbatim. PowerShell/bash/zsh handle DEL natively. Users on `KRNL0_SHELL=cmd.exe` accept that Backspace will not work in cmd.exe — that is cmd.exe's own line-discipline limitation, and we no longer warp the byte stream to paper over it.
+2. **GPU-accelerated xterm renderer.** The renderer dynamically imports `@xterm/addon-webgl` (preferred) and falls back to `@xterm/addon-canvas` if WebGL context creation fails. DOM is the last-resort fallback. Dynamic import keeps these browser-only modules out of Node test environments.
+3. **PTY `cwd` defaults to `process.cwd()`** — the project root in dev (electron-vite is launched from there), the resources dir in a packaged build. `KRNL0_TERM_CWD` env var overrides. Falls back to `USERPROFILE` / `HOME` / `homedir()` only if the chosen path doesn't exist.
+4. **Explicit Ctrl+C handler via `term.attachCustomKeyEventHandler`.** With a selection: copy to clipboard via `navigator.clipboard.writeText`, clear selection, return `false`. Without a selection: write `\x03` to the PTY directly, return `false`. We do not rely on xterm's variable default behaviour, which can drop `0x03` when the helper textarea loses focus mid-press.
+
+### Consequences
+
+- **Enables:** real Backspace on the new default shell; smooth `claude` TUI rendering; CLAUDE.md / board.json reachable from the terminal without `cd`; interruptible processes.
+- **Forecloses:** Backspace inside cmd.exe (when explicitly opted into via `KRNL0_SHELL`). Acceptable — cmd.exe is no longer the default and the translation hack was always shell-conditional anyway.
+- **GPU dependency:** WebGL needs a working OpenGL/ANGLE context. On Windows under Electron this is provided by ANGLE; failure paths are fully covered by Canvas → DOM fallbacks, so there is no hard runtime dependency.
+- **`process.cwd()` semantics in packaged builds:** in a packaged Electron app `process.cwd()` is the install directory, not the project source. Users who want a stable cwd for `claude` set `KRNL0_TERM_CWD` explicitly. Documented in [docs/06-requirements/terminal-node.md](../06-requirements/terminal-node.md).

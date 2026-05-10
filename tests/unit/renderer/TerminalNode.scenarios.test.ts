@@ -406,6 +406,120 @@ describe('F6 — Resize sends pty:resize', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #72 — Backspace (0x7f) passes through unchanged in PowerShell/POSIX
+// ---------------------------------------------------------------------------
+
+describe('#72 — Backspace (0x7f) passes through unchanged', () => {
+  it('xterm 0x7f input is forwarded as 0x7f to the PTY (no 0x08 translation)', async () => {
+    const { deps, term, krnl } = makeDeps();
+    await startTerminalSession(deps);
+
+    term.simulateInput('\x7f');
+    expect(krnl.ptyWriteMock).toHaveBeenCalledWith('sid-test', '\x7f');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #75 — Ctrl+C handling
+// ---------------------------------------------------------------------------
+
+describe('#75 — Ctrl+C → SIGINT or copy', () => {
+  type TermWithKey = ReturnType<typeof makeTerm> & {
+    keyHandler: ((e: KeyboardEvent) => boolean) | null;
+    selection: string;
+    clearSelectionCalled: boolean;
+  };
+  function makeTermWithKeyHandler(): TermWithKey {
+    const t = makeTerm() as TermWithKey;
+    t.keyHandler = null;
+    t.selection = '';
+    t.clearSelectionCalled = false;
+    t.attachCustomKeyEventHandler = (h: (e: KeyboardEvent) => boolean) => {
+      t.keyHandler = h;
+    };
+    t.getSelection = () => t.selection;
+    t.clearSelection = () => { t.clearSelectionCalled = true; };
+    return t;
+  }
+
+  it('Ctrl+C with NO selection writes 0x03 to the PTY and returns false', async () => {
+    const term = makeTermWithKeyHandler();
+    const fit = makeFit();
+    const krnl = makeKrnl();
+    const deps: SessionDeps = {
+      term,
+      fit,
+      krnl: krnl.bridge,
+      onCommand: vi.fn(),
+      setSessionId: vi.fn(),
+      isCancelled: () => false,
+    };
+    await startTerminalSession(deps);
+
+    expect(term.keyHandler).toBeTypeOf('function');
+
+    const fakeEvent = { type: 'keydown', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false, key: 'c' } as KeyboardEvent;
+    const result = term.keyHandler!(fakeEvent);
+    expect(result).toBe(false);
+    expect(krnl.ptyWriteMock).toHaveBeenCalledWith('sid-test', '\x03');
+  });
+
+  it('Ctrl+C WITH a selection copies and clears, does NOT send 0x03', async () => {
+    const term = makeTermWithKeyHandler();
+    term.selection = 'hello';
+
+    // Stub navigator.clipboard so writeText doesn't blow up under Node.
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    const fit = makeFit();
+    const krnl = makeKrnl();
+    const deps: SessionDeps = {
+      term,
+      fit,
+      krnl: krnl.bridge,
+      onCommand: vi.fn(),
+      setSessionId: vi.fn(),
+      isCancelled: () => false,
+    };
+    await startTerminalSession(deps);
+
+    const fakeEvent = { type: 'keydown', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false, key: 'c' } as KeyboardEvent;
+    const result = term.keyHandler!(fakeEvent);
+
+    expect(result).toBe(false);
+    expect(writeText).toHaveBeenCalledWith('hello');
+    expect(term.clearSelectionCalled).toBe(true);
+    // Critical: must NOT have sent 0x03
+    const calls = krnl.ptyWriteMock.mock.calls.map((c) => c[1]);
+    expect(calls).not.toContain('\x03');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('non-Ctrl+C keys are passed through (handler returns true)', async () => {
+    const term = makeTermWithKeyHandler();
+    const fit = makeFit();
+    const krnl = makeKrnl();
+    const deps: SessionDeps = {
+      term,
+      fit,
+      krnl: krnl.bridge,
+      onCommand: vi.fn(),
+      setSessionId: vi.fn(),
+      isCancelled: () => false,
+    };
+    await startTerminalSession(deps);
+
+    const arrow = { type: 'keydown', ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, key: 'ArrowLeft' } as KeyboardEvent;
+    expect(term.keyHandler!(arrow)).toBe(true);
+
+    const ctrlD = { type: 'keydown', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false, key: 'd' } as KeyboardEvent;
+    expect(term.keyHandler!(ctrlD)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // F7 — sys command available (integration-level — skipped)
 // ---------------------------------------------------------------------------
 

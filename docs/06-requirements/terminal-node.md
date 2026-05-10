@@ -23,6 +23,10 @@
 | F13 | `pty:resize` updates the underlying PTY's `cols` / `rows` so the shell wraps and re-flows long output correctly (no longer a no-op) |
 | F14 | `claude` (Claude Code CLI) launches and runs interactively inside the terminal — closing the loop on Decision 3 |
 | F15 | Closing or unmounting the terminal node kills the PTY process cleanly (no orphaned shells in Task Manager / `ps`) |
+| F16 | Backspace (xterm `0x7f`) is forwarded to the PTY unchanged; PowerShell, bash, and zsh all delete the previous character. cmd.exe is unsupported for Backspace (issue #72) |
+| F17 | The PTY spawns with `cwd = process.cwd()` by default — the project root in dev mode — so `claude` and similar tools can read `CLAUDE.md` and `board.json` immediately. `KRNL0_TERM_CWD` overrides; falls back to `USERPROFILE`/`HOME` if the chosen path doesn't exist (issue #74) |
+| F18 | Ctrl+C with **no** selection sends `0x03` (SIGINT/ETX) to the PTY, interrupting the running process. Ctrl+C **with** a selection copies the selection to the clipboard and clears it without sending `0x03` (issue #75) |
+| F19 | The xterm renderer is GPU-accelerated (WebGL) with a 2D-canvas fallback, so TUI apps like `claude` render smoothly without dropped keystrokes (issue #73) |
 
 ---
 
@@ -158,6 +162,43 @@ Feature: TerminalNode IPC-backed terminal
     When the TerminalNode unmounts
     Then "pty:kill" is invoked with the session's id
     And process P is no longer listed by the OS process table within one second
+
+  Scenario: F16 — Backspace deletes characters
+    Given the default shell (PowerShell on Windows, $SHELL on POSIX)
+    And the user has typed "abc"
+    When the user presses Backspace
+    Then the xterm input line shows "ab"
+    And "pty:write" was called with the byte 0x7f
+
+  Scenario: F17 — PTY cwd defaults to project root
+    Given KRNL0 is launched in dev mode from the repo root
+    When a TerminalNode mounts
+    Then "pty:create" spawns the shell with cwd = process.cwd()
+    And running "ls CLAUDE.md" inside the terminal succeeds
+
+  Scenario: F17 — KRNL0_TERM_CWD override
+    Given env var KRNL0_TERM_CWD = "/tmp/somewhere" exists
+    When a TerminalNode mounts
+    Then the spawned PTY's cwd equals "/tmp/somewhere"
+
+  Scenario: F18 — Ctrl+C interrupts a running process
+    Given a long-running process is active in the PTY
+    And there is no text selected in xterm
+    When the user presses Ctrl+C
+    Then 0x03 is written to the PTY
+    And the process receives SIGINT and exits
+
+  Scenario: F18 — Ctrl+C copies when there is a selection
+    Given the user has selected the text "hello" in xterm
+    When the user presses Ctrl+C
+    Then "hello" is written to navigator.clipboard
+    And the selection is cleared
+    And 0x03 is NOT sent to the PTY
+
+  Scenario: F19 — GPU renderer used by default
+    When a TerminalNode mounts
+    Then the xterm instance loads the WebGL addon
+    And falls back to the canvas addon if WebGL context creation fails
 ```
 
 ---

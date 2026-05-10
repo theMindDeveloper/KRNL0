@@ -35,6 +35,42 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     term.loadAddon(fit);
     term.open(containerRef.current);
 
+    // Issue #73: switch to a GPU-accelerated renderer. The default DOM
+    // renderer thrashes layout when running TUI apps like `claude` (heavy
+    // ANSI redraws + frequent cursor moves), causing visible lag and lost
+    // keystrokes. WebGL is preferred; fall back to 2D canvas if the GL
+    // context can't be created. Dynamic import keeps these browser-only
+    // modules out of Node/SSR test environments.
+    void (async () => {
+      try {
+        const { WebglAddon } = await import('@xterm/addon-webgl');
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        term.loadAddon(webgl);
+      } catch {
+        try {
+          const { CanvasAddon } = await import('@xterm/addon-canvas');
+          term.loadAddon(new CanvasAddon());
+        } catch {
+          // last resort: stick with the DOM renderer
+        }
+      }
+      // WebGL/Canvas addons load async via dynamic import. The initial
+      // fit() ran on the DOM renderer's cell metrics; after the GPU
+      // renderer is in place we have to re-fit so its canvas dimensions
+      // match the container — otherwise the bottom of the node renders
+      // as an unstyled black gap below the last row. Also force a
+      // redraw so the new renderer paints every row immediately.
+      try {
+        fit.fit();
+        term.refresh(0, term.rows - 1);
+        const s = sessionIdRef.current;
+        if (s) window.krnl?.ptyResize(s, term.cols, term.rows);
+      } catch {
+        // container not yet sized — the ResizeObserver below will catch it
+      }
+    })();
+
     termRef.current = term;
     fitRef.current = fit;
 
@@ -179,8 +215,17 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
         {/* xterm mount — nodrag/nopan/nowheel keep RF from consuming pointer
             events. tabIndex=-1 + nodesFocusable={false} on <ReactFlow> stop RF
-            from grabbing focus from xterm's internal textarea. stopPropagation
-            on key events stops any bubbled handler from intercepting input. */}
+            from grabbing focus from xterm's internal textarea.
+
+            NO onKeyDownCapture — that runs in the capture phase, BEFORE the
+            event reaches xterm's helper textarea, and calling stopPropagation
+            there silently kills every special key (Backspace, arrows, Tab,
+            Home/End, Ctrl+key combos) because xterm handles those via a
+            keydown listener. Printable keys still worked because xterm reads
+            those from the `input` event, which capture-phase keydown doesn't
+            block. Bubble-phase onKeyDown/onKeyUp below is enough to stop
+            React Flow / app-level shortcuts from intercepting our input —
+            xterm has already consumed the event by then. (issue #72) */}
         <div
           ref={containerRef}
           tabIndex={-1}
@@ -188,7 +233,6 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           onPointerDownCapture={(e) => { e.stopPropagation(); focusTerm(); }}
           onMouseDownCapture={(e) => { e.stopPropagation(); focusTerm(); }}
           onClick={(e) => { e.stopPropagation(); focusTerm(); }}
-          onKeyDownCapture={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           onKeyUp={(e) => e.stopPropagation()}
           style={{ width: '100%', height: 280, background: 'var(--term-bg)' }}
