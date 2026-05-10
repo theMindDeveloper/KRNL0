@@ -52,7 +52,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             letterSpacing: '0.04em',
           }}
         >
-          <span style={{ color: 'var(--rust)' }}>●</span>
+          <span style={{ color: 'var(--cyan)' }}>●</span>
           {` task · #${seqNum} L${layer}`}
         </span>
 
@@ -65,8 +65,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 8.5,
-              color: 'var(--acid)',
-              border: '1px solid var(--acid)',
+              color: 'var(--cyan)',
+              border: '1px solid var(--cyan)',
               borderRadius: 3,
               padding: '2px 5px',
               textTransform: 'uppercase',

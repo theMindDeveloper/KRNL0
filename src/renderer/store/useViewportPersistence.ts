@@ -7,11 +7,15 @@ const DEBOUNCE_MS = 500;
 // does not thrash the disk (Decision #7).
 export function useViewportPersistence(): void {
   const viewport = useBoardStore((s) => s.viewport);
-  const board = useBoardStore((s) => s.board);
+  // Only depend on whether a board exists, not on its reference. Subscribing
+  // to s.board re-fired this effect every drag tick (board ref churns 60fps),
+  // thrashing setTimeout. The persistence target itself is fetched fresh
+  // inside the effect when the debounce actually fires.
+  const hasBoard = useBoardStore((s) => s.board !== null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!board) return;
+    if (!hasBoard) return;
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       window.krnl?.boardSaveViewport?.(viewport);
@@ -23,5 +27,5 @@ export function useViewportPersistence(): void {
         timer.current = null;
       }
     };
-  }, [viewport, board]);
+  }, [viewport, hasBoard]);
 }
