@@ -1,16 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { resolveNodeComponent } from '../nodes/registry';
+import { makeCommandHandler } from './commandDispatch';
 
 const PAN_BUTTON_MIDDLE = 1;
 const PAN_BUTTON_LEFT = 0;
 const ZOOM_SENSITIVITY = 0.001;
 
-// Selection + command-dispatch wiring lands with the kernel work; until then
-// each node receives no-op handlers so its prop contract is satisfied.
 const noop = (): void => {};
-const noopCommand = (_command: string, _args?: Record<string, unknown>): void => {};
+
+// Dot-grid background using radial-gradient.
+const GRID_STYLE: React.CSSProperties = {
+  backgroundImage: `
+    radial-gradient(circle, var(--grid-strong) 1.5px, transparent 1.5px),
+    radial-gradient(circle, var(--grid) 1px, transparent 1px)
+  `,
+  backgroundSize: `var(--grid-major) var(--grid-major), var(--grid-minor) var(--grid-minor)`,
+};
 
 export function Canvas() {
   const board = useBoardStore((s) => s.board);
@@ -25,7 +32,16 @@ export function Canvas() {
 
   useViewportPersistence();
 
-  // Space key as pan modifier (space + left-drag pans, mirroring Figma/tldraw).
+  // Build a stable map of nodeId → onCommand handler so each node gets a
+  // memoised reference and doesn't re-render on every canvas tick.
+  const commandHandlers = useMemo(() => {
+    if (!board) return {};
+    return Object.fromEntries(
+      board.nodes.map((n) => [n.id, makeCommandHandler(n.id)])
+    );
+  }, [board?.nodes.map((n) => n.id).join(',')]); // re-memoize only when node list changes
+
+  // Space key as pan modifier (space + left-drag, mirroring Figma/tldraw).
   useEffect(() => {
     const target = document.body;
     const onDown = (e: KeyboardEvent) => {
@@ -58,8 +74,6 @@ export function Canvas() {
   const onPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!panState.current || panState.current.pointerId !== e.pointerId) return;
-      // Pointer deltas are screen pixels; viewport translate is also in screen pixels,
-      // so we apply them 1:1 (no division by zoom — that would feel sluggish at high zoom).
       panBy(e.movementX, e.movementY);
     },
     [panBy],
@@ -75,8 +89,6 @@ export function Canvas() {
     (e: React.WheelEvent<HTMLDivElement>) => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      // Transform origin sits at the container's center (top:50%; left:50%).
-      // Express the cursor in that local frame so zoomAt's focal-point math works.
       const localX = e.clientX - rect.left - rect.width / 2;
       const localY = e.clientY - rect.top - rect.height / 2;
       const factor = Math.exp(-e.deltaY * ZOOM_SENSITIVITY);
@@ -103,6 +115,7 @@ export function Canvas() {
         overflow: 'hidden',
         cursor,
         touchAction: 'none',
+        ...GRID_STYLE,
       }}
     >
       <div
@@ -117,7 +130,7 @@ export function Canvas() {
         <svg
           style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
         >
-          {/* TODO (Week 3): render Edge[] as SVG paths with acid pulse animation */}
+          {/* Week 3: Edge[] rendered here as SVG paths */}
         </svg>
 
         {board === null ? (
@@ -135,6 +148,7 @@ export function Canvas() {
         ) : (
           board.nodes.map((node) => {
             const Component = resolveNodeComponent(node.kind);
+            const onCommand = commandHandlers[node.id] ?? noop;
             return (
               <div
                 key={node.id}
@@ -147,7 +161,7 @@ export function Canvas() {
                 <Component
                   node={node}
                   selected={false}
-                  onCommand={noopCommand}
+                  onCommand={onCommand}
                   onSelect={noop}
                 />
               </div>
