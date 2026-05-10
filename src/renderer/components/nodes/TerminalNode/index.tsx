@@ -1,14 +1,15 @@
 import { useEffect, useRef } from 'react';
+import type { NodeProps } from '../types';
 
-// TODO (Week 4): embed real xterm.js terminal with node-pty via IPC
-// The terminal node is always dark, regardless of the active theme
+// TODO (Issue #6): embed xterm.js with node-pty via session-keyed IPC (Decision #12).
+// The terminal node is always dark, regardless of the active theme.
 
-export function TerminalNode() {
+export function TerminalNode(_props: NodeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // TODO (Week 4): mount Terminal from @xterm/xterm here
-    // Connect to main process via IPC for PTY I/O
+    // TODO (Issue #6): mount Terminal from @xterm/xterm here.
+    // Connect to main process via pty:create / pty:write / pty:data / pty:exit.
   }, []);
 
   return (

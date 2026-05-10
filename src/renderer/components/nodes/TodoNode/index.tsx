@@ -1,8 +1,9 @@
-// TODO (Week 2): full Todo implementation.
-// State: tasks[] { id, text, tag, done, createdAt }.
-// Commands: add, check, uncheck, remove.
+// TODO (Issue #4): full Todo implementation per Decision #10.
+// State: items[] { id, text, done, createdAt, completedAt }.
+// Commands: add, toggle, edit, remove, clearDone.
+import type { NodeProps } from '../types';
 
-export function TodoNode() {
+export function TodoNode(_props: NodeProps) {
   return (
     <div
       style={{

@@ -1,10 +1,11 @@
-// TODO (Week 2): full Habit implementation.
-// State: habits[] { name, completions: Record<dateString, boolean> }.
-// Commands: add, done, undone. Streak is derived from completions.
+// TODO (Issue #5): full Habit implementation per Decision #11.
+// State: habits[] { id, name, log: YYYY-MM-DD[] (sorted desc), archived }.
+// Week grid + streak are derived at render time. ISO Monday-first week.
+import type { NodeProps } from '../types';
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-export function HabitNode() {
+export function HabitNode(_props: NodeProps) {
   return (
     <div
       style={{

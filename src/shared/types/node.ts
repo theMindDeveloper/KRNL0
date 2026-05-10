@@ -20,11 +20,25 @@ export type CommandHandler<TState> = (
   args: Record<string, unknown>
 ) => TState;
 
-export interface NodeKind<TState, TConfig> {
-  kind: string;
+// Built-in node kind identifiers (Decision #8). Mother kinds + child kinds.
+// Renderer dispatch uses the literal value; storage on `Node.kind` is kept as
+// `string` so unknown kinds round-trip through board.json without crashing.
+export type NodeKind =
+  | 'pomo'
+  | 'todo'
+  | 'habit'
+  | 'term'
+  | 'pomo.session'
+  | 'todo.task'
+  | 'habit.day';
+
+// Spec a node-kind module exports to the kernel (commands, events, schema).
+// Renamed from `NodeKind` to avoid shadowing the literal union above.
+export interface NodeKindSpec<TState, TConfig> {
+  kind: NodeKind;
   defaultState: () => TState;
   defaultConfig: () => TConfig;
-  render: (props: RenderProps<TState, TConfig>) => ReactElement; // must be pure
+  render: (props: RenderProps<TState, TConfig>) => ReactElement;
   commands: Record<string, CommandHandler<TState>>;
   events: readonly string[];
   schema: ZodSchema<TState>;

@@ -1,8 +1,9 @@
-// TODO (Week 2): full Pomodoro implementation.
+// TODO (Issue #3): full Pomodoro implementation per Decision #9.
 // State: currentSession { startedAt, durationMin, label, status } + history[].
 // Persistence rule: save startedAt; derive countdown from now() - startedAt.
+import type { NodeProps } from '../types';
 
-export function PomoNode() {
+export function PomoNode(_props: NodeProps) {
   return (
     <div
       style={{

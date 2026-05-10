@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
+import { resolveNodeComponent } from '../nodes/registry';
 
 const PAN_BUTTON_MIDDLE = 1;
 const PAN_BUTTON_LEFT = 0;
 const ZOOM_SENSITIVITY = 0.001;
+
+// Selection + command-dispatch wiring lands with the kernel work; until then
+// each node receives no-op handlers so its prop contract is satisfied.
+const noop = (): void => {};
+const noopCommand = (_command: string, _args?: Record<string, unknown>): void => {};
 
 export function Canvas() {
   const board = useBoardStore((s) => s.board);
@@ -127,34 +133,26 @@ export function Canvas() {
             LOADING BOARD...
           </div>
         ) : (
-          board.nodes.map((node) => (
-            <div
-              key={node.id}
-              style={{
-                position: 'absolute',
-                left: node.position.x,
-                top: node.position.y,
-              }}
-            >
-              {/* TODO (Issue #2): route node.kind through NODE_REGISTRY */}
+          board.nodes.map((node) => {
+            const Component = resolveNodeComponent(node.kind);
+            return (
               <div
+                key={node.id}
                 style={{
-                  border: '1px solid var(--paper-3)',
-                  borderRadius: 'var(--radius-lg)',
-                  background: 'var(--node-bg)',
-                  padding: '14px 16px',
-                  minWidth: 200,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 10.5,
-                  color: 'var(--ink-3)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
+                  position: 'absolute',
+                  left: node.position.x,
+                  top: node.position.y,
                 }}
               >
-                {node.isMother ? '▙ ' : '● '}{node.kind}
+                <Component
+                  node={node}
+                  selected={false}
+                  onCommand={noopCommand}
+                  onSelect={noop}
+                />
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
