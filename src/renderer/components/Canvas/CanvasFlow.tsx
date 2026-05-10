@@ -6,7 +6,7 @@
  * useMemo from board.nodes / board.edges. RF runs in controlled mode.
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -16,6 +16,7 @@ import {
   BaseEdge,
   getBezierPath,
   useReactFlow,
+  applyNodeChanges,
   type NodeChange,
   type EdgeChange,
   type Viewport,
@@ -26,11 +27,12 @@ import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
-import { toRfNode, toRfEdge } from './rfAdapters';
+import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
 import { makeCommandHandler } from './commandDispatch';
 import { Dock } from '../Dock';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
+import type { Edge as KrnlEdge } from '../../../shared/types/edge';
 
 // ── Edge components ───────────────────────────────────────────────────────────
 
@@ -51,16 +53,48 @@ function TaskFlowEdge({
     targetY,
     targetPosition,
   });
+  // Styling mirrors frontendref/LifeOS Whiteboard.html .connections path.task-edge
+  // (cyan, 3px, rounded caps, cyan drop-shadow glow) PLUS an opacity gradient
+  // along source→target so the trail reads as "energy flowing into the task":
+  // dim at the source side, full glow at the target side.
+  //
+  // gradientUnits=userSpaceOnUse means the gradient axis is anchored to the
+  // actual (sourceX,sourceY)→(targetX,targetY) coordinates rather than the
+  // path's bounding box — so the fade direction is correct for any edge
+  // orientation (horizontal, vertical, diagonal, curved).
+  //
+  // The seamless dash march comes from .react-flow__edge-task-flow.animated CSS
+  // in reactflow-theme.css — period-matched to dasharray "14 8" so no hitch.
+  const gradId = `krnl-task-flow-grad-${id}`;
   return (
-    <BaseEdge
-      id={id}
-      path={edgePath}
-      style={{
-        stroke: 'var(--cyan)',
-        strokeWidth: 2,
-        strokeDasharray: '14 8',
-      }}
-    />
+    <>
+      <defs>
+        <linearGradient
+          id={gradId}
+          gradientUnits="userSpaceOnUse"
+          x1={sourceX}
+          y1={sourceY}
+          x2={targetX}
+          y2={targetY}
+        >
+          <stop offset="0%" stopColor="var(--cyan)" stopOpacity="0.18" />
+          <stop offset="45%" stopColor="var(--cyan)" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="var(--cyan)" stopOpacity="1" />
+        </linearGradient>
+      </defs>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{
+          stroke: `url(#${gradId})`,
+          strokeWidth: 3,
+          strokeDasharray: '14 8',
+          strokeLinecap: 'round',
+          opacity: 1,
+          filter: 'drop-shadow(0 0 5px rgba(78, 168, 176, 0.45))',
+        }}
+      />
+    </>
   );
 }
 
@@ -108,6 +142,21 @@ const EDGE_TYPES = {
 const commandHandlerCache = new Map<string, ReturnType<typeof makeCommandHandler>>();
 const selectHandlerCache = new Map<string, () => void>();
 const rfNodeCache = new Map<string, { src: KrnlNode; rf: ReturnType<typeof toRfNode> }>();
+const rfEdgeCache = new Map<
+  string,
+  { src: KrnlEdge; srcKind: string; tgtKind: string; rf: ReturnType<typeof toRfEdge> }
+>();
+const rfMotherCache = new Map<
+  string,
+  {
+    src: KrnlNode;
+    slotIndex: number;
+    slotTotal: number;
+    hasLeft: boolean;
+    hasRight: boolean;
+    rf: ReturnType<typeof toRfNode>;
+  }
+>();
 
 function getCommandHandler(nodeId: string): ReturnType<typeof makeCommandHandler> {
   let handler = commandHandlerCache.get(nodeId);
@@ -139,6 +188,27 @@ function getMemoizedRfNode(
   if (cached && cached.src === node) return cached.rf;
   const rf = toRfNode(node, ctx);
   rfNodeCache.set(node.id, { src: node, rf });
+  return rf;
+}
+
+function getMemoizedRfEdge(
+  edge: KrnlEdge,
+  srcKind: string,
+  tgtKind: string
+): ReturnType<typeof toRfEdge> {
+  const cached = rfEdgeCache.get(edge.id);
+  // updateNode keeps board.edges reference stable → during a drag tick the
+  // edge ref + kinds are unchanged → cache hit → RF skips edge re-render.
+  if (
+    cached &&
+    cached.src === edge &&
+    cached.srcKind === srcKind &&
+    cached.tgtKind === tgtKind
+  ) {
+    return cached.rf;
+  }
+  const rf = toRfEdge(edge, srcKind, tgtKind);
+  rfEdgeCache.set(edge.id, { src: edge, srcKind, tgtKind, rf });
   return rf;
 }
 
@@ -183,7 +253,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
-  const rfNodes = useMemo(() => {
+  const derivedNodes = useMemo(() => {
     if (!board) return [];
 
     // Compute slot ordering for mother nodes (sorted by position.x)
@@ -204,9 +274,28 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         return getMemoizedRfNode(node, { onCommand, onSelect });
       }
 
-      // Mother node: compute slot context and reorder handlers
+      // Mother node: cache by (node ref, slotIndex, slotTotal, hasLeft, hasRight).
+      // Without this cache, every drag tick built a fresh RFNode for every
+      // mother — fresh `data` object with fresh `onMoveLeft`/`onMoveRight`
+      // closures — defeating React.memo on the adapter and forcing PomoNode /
+      // TodoNode / HabitNode / **TerminalNode (with its xterm instance)** to
+      // re-render 60fps. That was the dominant drag-lag cause.
       const slotIndex = slotIndexMap.get(node.id) ?? 1;
-      const onMoveLeft = slotIndex > 1
+      const hasLeft = slotIndex > 1;
+      const hasRight = slotIndex < slotTotal;
+      const cached = rfMotherCache.get(node.id);
+      if (
+        cached &&
+        cached.src === node &&
+        cached.slotIndex === slotIndex &&
+        cached.slotTotal === slotTotal &&
+        cached.hasLeft === hasLeft &&
+        cached.hasRight === hasRight
+      ) {
+        return cached.rf;
+      }
+
+      const onMoveLeft = hasLeft
         ? () => {
             const prevMother = motherNodes[slotIndex - 2];
             if (prevMother) {
@@ -216,7 +305,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
             }
           }
         : undefined;
-      const onMoveRight = slotIndex < slotTotal
+      const onMoveRight = hasRight
         ? () => {
             const nextMother = motherNodes[slotIndex];
             if (nextMother) {
@@ -227,45 +316,91 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
           }
         : undefined;
 
-      // For mother nodes we bypass the rfNodeCache since slot context changes
-      return toRfNode(node, { onCommand, onSelect, slotIndex, slotTotal, onMoveLeft, onMoveRight });
+      const rf = toRfNode(node, {
+        onCommand,
+        onSelect,
+        slotIndex,
+        slotTotal,
+        onMoveLeft,
+        onMoveRight,
+      });
+      rfMotherCache.set(node.id, { src: node, slotIndex, slotTotal, hasLeft, hasRight, rf });
+      return rf;
     });
   }, [board, selectNode, swapMotherSlots]);
 
+  // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
+  // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that
+  // it expects us to feed back via applyNodeChanges. Routing every drag tick
+  // through Zustand was making the whole render tree re-execute at 60fps
+  // (StatusBar, mother nodes, edges) and the dropped dimensions changes were
+  // causing RF to warn about "uninitialized" nodes and fall back to a slow
+  // drag path. Now Zustand is still the persisted source of truth, but RF
+  // owns the live working copy:
+  //   - When the store changes (commands, add, remove) → effect syncs into
+  //     local state, but ONLY when not currently dragging.
+  //   - During drag → onNodesChange mutates local state only. Zustand is
+  //     untouched. Zero re-renders outside RF's internal repositioning.
+  //   - On drag end → commit final position to Zustand once; the effect's
+  //     sync becomes a no-op because the new position already matches.
+  const [nodes, setNodes] = useState<KrnlRFNode[]>(derivedNodes);
+  const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isDraggingRef.current) {
+      setNodes(derivedNodes);
+    }
+  }, [derivedNodes]);
+
   // ── Derive RF edges from boardStore ──────────────────────────────────────
+  // Each edge is memoised by id; cache hits when edge ref + endpoint kinds are
+  // unchanged. During a node drag, board.edges keeps its reference and node
+  // kinds don't change → every edge returns its cached RFEdge → RF skips the
+  // edge component re-render. Only the dragged node's edges' bezier paths are
+  // recomputed by RF itself based on the new source/target positions.
   const rfEdges = useMemo(() => {
     if (!board) return [];
-    // Build id → kind map once for O(1) lookups per edge.
     const kindMap = new Map<string, string>(
       board.nodes.map((n: KrnlNode) => [n.id, n.kind])
     );
     return board.edges.map((edge) => {
       const srcKind = kindMap.get(edge.from.nodeId) ?? '';
       const tgtKind = kindMap.get(edge.to.nodeId) ?? '';
-      return toRfEdge(edge, srcKind, tgtKind);
+      return getMemoizedRfEdge(edge, srcKind, tgtKind);
     });
   }, [board]);
 
-  // ── onNodesChange — controlled mode per Decision #13 §C ──────────────────
+  // ── onNodesChange — apply every change locally; commit only on drag end ──
+  // Local-first: applyNodeChanges absorbs position/dimensions/select changes
+  // into the live RF nodes array without touching Zustand. This is what makes
+  // the drag smooth — no store cascade, no StatusBar re-render, no mother
+  // node re-render per frame. Zustand is touched only when:
+  //   - drag ends (commit final position + persist)
+  //   - selection changes (mirror to store for sys/CLI integration)
   const onNodesChange = useCallback(
-    (changes: NodeChange[]) => {
+    (changes: NodeChange<KrnlRFNode>[]) => {
+      setNodes((nds) => applyNodeChanges<KrnlRFNode>(changes, nds));
+
       for (const change of changes) {
         if (change.type === 'position') {
-          // Only commit when drag ends (dragging === false) to avoid 60fps writes.
-          if (!change.dragging && change.position) {
-            updateNode(change.id, { position: change.position });
-            // Persist after drag ends.
-            const updated = useBoardStore.getState().board;
-            if (updated) void window.krnl?.boardSave(updated);
+          // Track drag state so the store-sync effect doesn't clobber local
+          // nodes mid-drag.
+          if (change.dragging === true) {
+            isDraggingRef.current = true;
+          } else if (change.dragging === false) {
+            isDraggingRef.current = false;
+            if (change.position) {
+              updateNode(change.id, { position: change.position });
+              const updated = useBoardStore.getState().board;
+              if (updated) void window.krnl?.boardSave(updated);
+            }
           }
-          // While dragging === true: RF handles the internal preview, no store write.
-        } else if (change.type === 'select') {
-          // Mirror single-select to store (multi-select is not persisted in v1).
-          if (change.selected) {
-            selectNode(change.id);
-          }
+        } else if (change.type === 'select' && change.selected) {
+          selectNode(change.id);
         }
-        // 'remove', 'dimensions', 'add' — all ignored per §C.
+        // 'dimensions' — absorbed by applyNodeChanges above; this is what
+        // resolves RF error #015 ("trying to drag a node that is not
+        // initialized"). Without it RF takes a slow non-measured drag path.
       }
     },
     [updateNode, selectNode]
@@ -296,7 +431,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   return (
     <ReactFlow
-      nodes={rfNodes}
+      nodes={nodes}
       edges={rfEdges}
       nodeTypes={NODE_TYPES}
       edgeTypes={EDGE_TYPES}
@@ -346,11 +481,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
 export function CanvasFlow() {
   const viewport = useBoardStore((s) => s.viewport);
-  const board = useBoardStore((s) => s.board);
+  // Subscribe to a boolean, not the board reference, so this outer component
+  // doesn't re-render every drag tick. CanvasFlowInner subscribes to s.board
+  // internally — we only need the loaded/not-loaded gate here.
+  const hasBoard = useBoardStore((s) => s.board !== null);
 
-  // Show a minimal loading screen while board is fetched from disk.
-  // This replaces the pure-black void that appeared before the board loaded.
-  if (!board) {
+  if (!hasBoard) {
     return (
       <div style={{
         width: '100%',

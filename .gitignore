@@ -24,6 +24,8 @@ Thumbs.db
 .claude/
 .agents/
 skills-lock.json
+CLAUDE.md
+CLAUDE.local.md
 
 # Env
 .env

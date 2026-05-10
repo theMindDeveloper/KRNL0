@@ -284,3 +284,20 @@ New requirements F16–F19 + Gherkin scenarios. New ADR Decision 19. Test covera
 - **Defense in depth.** Added a scoped `.term-body { user-select: text }` override (overrides the global `body { user-select: none }` in `tokens.css` so the DOM-renderer fallback path can natively select). Added a right-click context menu (Copy / Paste / Select All) and Ctrl+Shift+C / Ctrl+Shift+V keybindings for discoverability. Plain Ctrl+C still SIGINTs (copy-on-selection handler from #75 unchanged).
 
 **Tests:** 291 passing, 0 typecheck errors. Live-verified in Electron: drag-select works, context menu works, terminal fills the full mother-frame height.
+
+---
+
+## [2026-05-11] — Drag stutter eliminated + task-flow edge visual parity with ref
+
+**Type:** Bug Fix / UX
+**Branch:** `main`
+**Files changed:** `src/renderer/components/Canvas/CanvasFlow.tsx`, `src/renderer/components/StatusBar/index.tsx`, `src/renderer/store/useViewportPersistence.ts`, `src/renderer/styles/reactflow-theme.css`, `src/renderer/styles/tokens.css`, `src/renderer/components/nodes/TaskNode/index.tsx`, `.gitignore`
+**Summary:** Two user-reported issues fixed in one pass.
+
+- **Task-flow edges now match the LifeOS Whiteboard reference.** Replaced the flat cyan stroke with a per-edge SVG `<linearGradient gradientUnits="userSpaceOnUse">` anchored to the actual `(sourceX,sourceY)→(targetX,targetY)` coords — stops `0.18 → 0.6 → 1.0` so the trail fades in at the source and lands at full intensity on the target task. Stroke is 3 px, rounded caps, cyan drop-shadow glow (`drop-shadow(0 0 5px rgba(78,168,176,0.45))`). Hover ramps to brighter cyan. The seamless dash march comes from a period-matched `@keyframes krnl-task-flow-dash` (sweeps `stroke-dashoffset 22 → 0`, matching the `14 8` dasharray sum) at 1.6 s linear infinite — replaces RF's built-in `dashdraw` keyframe which sweeps only 10 units and caused a visible 12-unit snap each loop. Added `--cyan-glow: #7dd6df` token. TaskNode accent dot + `+ POMO` button switched from rust/acid to cyan to match the design ref.
+
+- **Node drag stutter eliminated (RF warning #015 resolved).** Symptom: dragging an image/text/task node stuttered, and the console showed `[React Flow]: It seems that you are trying to drag a node that is not initialized`. Two root causes intertwined: (1) `onNodesChange` was ignoring `'dimensions'` changes, so RF never had measured node sizes and silently fell back to a slow uninstrumented drag path; (2) every drag tick was routing a position update through Zustand → `CanvasFlowInner` re-render → memos re-run → mother nodes (including TerminalNode with its xterm instance) re-render 60 fps. Fixed by switching to RF's recommended pattern: a local `useState<KrnlRFNode[]>` owns the live RF working copy and absorbs **every** change (position, dimensions, select) via `applyNodeChanges`. Zustand remains the persisted source of truth — a sync `useEffect` copies `derivedNodes → local nodes` from the store whenever it changes, but only when `isDraggingRef.current === false` so mid-drag ticks aren't clobbered. Drag end commits the final position to Zustand once and persists to disk. Result: zero re-renders outside RF's internal repositioning during drag, dimensions changes registered, fast measured drag path active.
+
+  Secondary perf wins kept from the iteration: `getMemoizedRfEdge` cache (non-dragged edges return cached refs → RF skips edge re-render); `getMemoizedRfNode` extended to mother nodes keyed on `(node ref, slotIndex, slotTotal, hasLeft, hasRight)`; StatusBar / `useViewportPersistence` / outer `CanvasFlow` switched from `useBoardStore((s) => s.board)` to primitive selectors so they no longer re-render on board-ref churn.
+
+**Tests:** 291 passing, 0 typecheck errors. Live-verified in Electron: smooth 60 fps drag with no stutter, no console warning, edges render with the source-to-target opacity fade matching the reference.
