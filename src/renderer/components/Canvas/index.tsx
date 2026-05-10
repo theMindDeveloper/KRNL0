@@ -1,50 +1,119 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBoardStore } from '../../store/boardStore';
+import { useViewportPersistence } from '../../store/useViewportPersistence';
 
-interface Transform {
-  x: number;
-  y: number;
-  zoom: number;
-}
+const PAN_BUTTON_MIDDLE = 1;
+const PAN_BUTTON_LEFT = 0;
+const ZOOM_SENSITIVITY = 0.001;
 
 export function Canvas() {
   const board = useBoardStore((s) => s.board);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [transform, setTransform] = useState<Transform>({ x: 0, y: -160, zoom: 1 });
+  const viewport = useBoardStore((s) => s.viewport);
+  const panBy = useBoardStore((s) => s.panBy);
+  const zoomAt = useBoardStore((s) => s.zoomAt);
+  const resetViewport = useBoardStore((s) => s.resetViewport);
 
-  // TODO (Week 2): implement full pan + zoom with pointer events
-  // Camera centers on (0, 160) by default so all four mothers are visible
+  const containerRef = useRef<HTMLDivElement>(null);
+  const panState = useRef<{ pointerId: number } | null>(null);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+
+  useViewportPersistence();
+
+  // Space key as pan modifier (space + left-drag pans, mirroring Figma/tldraw).
+  useEffect(() => {
+    const target = document.body;
+    const onDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) setSpaceHeld(true);
+      if (e.code === 'Home') resetViewport();
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceHeld(false);
+    };
+    target.addEventListener('keydown', onDown);
+    target.addEventListener('keyup', onUp);
+    return () => {
+      target.removeEventListener('keydown', onDown);
+      target.removeEventListener('keyup', onUp);
+    };
+  }, [resetViewport]);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const isMiddle = e.button === PAN_BUTTON_MIDDLE;
+      const isSpaceLeft = e.button === PAN_BUTTON_LEFT && spaceHeld;
+      if (!isMiddle && !isSpaceLeft) return;
+      e.currentTarget.setPointerCapture(e.pointerId);
+      panState.current = { pointerId: e.pointerId };
+      e.preventDefault();
+    },
+    [spaceHeld],
+  );
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!panState.current || panState.current.pointerId !== e.pointerId) return;
+      // Pointer deltas are screen pixels; viewport translate is also in screen pixels,
+      // so we apply them 1:1 (no division by zoom — that would feel sluggish at high zoom).
+      panBy(e.movementX, e.movementY);
+    },
+    [panBy],
+  );
+
+  const endPan = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!panState.current || panState.current.pointerId !== e.pointerId) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    panState.current = null;
+  }, []);
+
+  const onWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      // Transform origin sits at the container's center (top:50%; left:50%).
+      // Express the cursor in that local frame so zoomAt's focal-point math works.
+      const localX = e.clientX - rect.left - rect.width / 2;
+      const localY = e.clientY - rect.top - rect.height / 2;
+      const factor = Math.exp(-e.deltaY * ZOOM_SENSITIVITY);
+      zoomAt(localX, localY, factor);
+    },
+    [zoomAt],
+  );
+
+  const cursor = panState.current ? 'grabbing' : spaceHeld ? 'grab' : 'default';
 
   return (
     <div
       ref={containerRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endPan}
+      onPointerCancel={endPan}
+      onWheel={onWheel}
       style={{
         width: '100%',
         height: '100%',
         background: 'var(--paper)',
         position: 'relative',
         overflow: 'hidden',
-        cursor: 'grab',
+        cursor,
+        touchAction: 'none',
       }}
     >
-      {/* Canvas transform layer */}
       <div
         style={{
           position: 'absolute',
           top: '50%',
           left: '50%',
-          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
+          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
           transformOrigin: '0 0',
         }}
       >
-        {/* SVG edge layer — renders behind nodes */}
         <svg
           style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
         >
           {/* TODO (Week 3): render Edge[] as SVG paths with acid pulse animation */}
         </svg>
 
-        {/* Node layer */}
         {board === null ? (
           <div
             style={{
@@ -67,7 +136,7 @@ export function Canvas() {
                 top: node.position.y,
               }}
             >
-              {/* TODO (Week 2): route node.kind to the correct NodeKind.render() */}
+              {/* TODO (Issue #2): route node.kind through NODE_REGISTRY */}
               <div
                 style={{
                   border: '1px solid var(--paper-3)',
