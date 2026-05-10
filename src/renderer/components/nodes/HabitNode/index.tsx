@@ -9,285 +9,334 @@ import type { HabitConfig, HabitState } from './types';
 import { getWeekDays, todayLocal } from './types';
 import { calcStreak } from './commands';
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// Inline ISO week computation — no external dep needed.
+function getISOWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7; // ISO: Mon=1 ... Sun=7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
 
-const CELL_SIZE = 26;
+const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+const CELL_SIZE = 18;
 const CELL_GAP = 3;
+
+// Slot tag + corner bracket constants (shared spec)
+const SLOT_INDEX = 3;
+const SLOT_TOTAL = 4;
+
+const slotTagStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 9,
+  color: 'var(--ink-3)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.18em',
+  marginBottom: 6,
+  paddingLeft: 2,
+};
+
+const cornerStyle = (corner: 'tl' | 'tr' | 'bl' | 'br'): React.CSSProperties => {
+  const base: React.CSSProperties = {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    opacity: 0.35,
+    pointerEvents: 'none',
+  };
+  if (corner === 'tl')
+    return { ...base, top: -1, left: -1, borderTop: '1px solid var(--ink-3)', borderLeft: '1px solid var(--ink-3)' };
+  if (corner === 'tr')
+    return { ...base, top: -1, right: -1, borderTop: '1px solid var(--ink-3)', borderRight: '1px solid var(--ink-3)' };
+  if (corner === 'bl')
+    return { ...base, bottom: -1, left: -1, borderBottom: '1px solid var(--ink-3)', borderLeft: '1px solid var(--ink-3)' };
+  return { ...base, bottom: -1, right: -1, borderBottom: '1px solid var(--ink-3)', borderRight: '1px solid var(--ink-3)' };
+};
 
 export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig>) {
   const { state } = node;
   const [newName, setNewName] = useState('');
 
-  // Week days derived from current local clock — no stored weekStart (Decision #11).
   const today = todayLocal();
-  const weekDays = getWeekDays(new Date());
+  const now = new Date();
+  const weekDays = getWeekDays(now);
+  const weekNum = getISOWeek(now);
 
   const visibleHabits = state.habits.filter((h) => !h.archived);
 
-  const handleAddHabit = () => {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-    onCommand('habit.add', { name: trimmed });
-    setNewName('');
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const trimmed = newName.trim();
+      if (!trimmed) return;
+      onCommand('habit.add', { name: trimmed });
+      setNewName('');
+    }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleAddHabit();
-  };
+  // Grid dimensions: 7 cells × 18px + 6 gaps × 3px = 144px
+  const gridWidth = CELL_SIZE * 7 + CELL_GAP * 6;
 
   return (
-    <div
-      style={{
-        width: 320,
-        border: '1px solid var(--paper-3)',
-        borderRadius: 'var(--radius-lg)',
-        background: 'var(--node-bg)',
-        boxShadow: 'var(--shadow-1)',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          padding: '7px 10px 6px',
-          borderBottom: '1px solid var(--paper-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10.5,
-          color: 'var(--ink-3)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        {'▙ HABITS'}
+    <div style={{ position: 'relative' }}>
+      {/* Slot tag above card */}
+      <div style={slotTagStyle}>
+        {String(SLOT_INDEX).padStart(2, '0')} · SPINE · {String(SLOT_TOTAL).padStart(2, '0')}
       </div>
 
-      <div style={{ padding: '12px 14px' }}>
-        {/* Day labels header */}
+      {/* Card */}
+      <div
+        style={{
+          position: 'relative',
+          width: 320,
+          border: '1px solid var(--paper-3)',
+          borderRadius: 'var(--radius-lg)',
+          background: 'var(--node-bg)',
+          boxShadow: 'var(--shadow-1)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Corner brackets */}
+        <span style={cornerStyle('tl')} />
+        <span style={cornerStyle('tr')} />
+        <span style={cornerStyle('bl')} />
+        <span style={cornerStyle('br')} />
+
+        {/* Header */}
         <div
           style={{
+            padding: '7px 16px 6px',
+            borderBottom: '1px solid var(--paper-3)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10.5,
+            color: 'var(--ink-3)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
             display: 'flex',
             alignItems: 'center',
-            marginBottom: 6,
+            gap: 6,
           }}
         >
-          {/* Spacer for habit name + streak columns */}
-          <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', gap: CELL_GAP }}>
-            {DAY_LABELS.map((label, i) => {
-              const dayStr = weekDays[i];
-              const isToday = dayStr === today;
-              return (
-                <div
-                  key={i}
-                  style={{
-                    width: CELL_SIZE,
-                    textAlign: 'center',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 9,
-                    color: isToday ? 'var(--acid)' : 'var(--ink-3)',
-                    opacity: isToday ? 0.7 : 1,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  {label}
-                </div>
-              );
-            })}
-          </div>
-          {/* Spacer for delete button column */}
-          <div style={{ width: 22, marginLeft: 6 }} />
+          <span style={{ color: 'var(--rust)' }}>●</span>
+          {`HABITS — WEEK ${weekNum} · HBT.WEEK`}
         </div>
 
-        {/* Habit rows */}
-        {visibleHabits.length === 0 ? (
+        {/* Body */}
+        <div style={{ padding: '14px 16px' }}>
+          {/* Day labels row — right-aligned over the 7-cell grid */}
           <div
             style={{
-              color: 'var(--ink-3)',
-              fontSize: 12,
-              fontFamily: 'var(--font-sans)',
-              padding: '4px 0',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: 8,
             }}
           >
-            No habits yet.
+            <div style={{ display: 'flex', gap: CELL_GAP, width: gridWidth }}>
+              {DAY_LABELS.map((label, i) => {
+                const isToday = weekDays[i] === today;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      width: CELL_SIZE,
+                      textAlign: 'center',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 8.5,
+                      color: isToday ? 'var(--acid)' : 'var(--ink-4)',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {label}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        ) : (
-          visibleHabits.map((habit) => {
-            const streak = calcStreak(habit.log, today);
-            return (
-              <div
-                key={habit.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: 5,
-                }}
-              >
-                {/* Habit name + streak */}
-                <div style={{ flex: 1, minWidth: 0, marginRight: 6 }}>
+
+          {/* Habit rows */}
+          {visibleHabits.length === 0 ? (
+            <div
+              style={{
+                color: 'var(--ink-3)',
+                fontSize: 12,
+                fontFamily: 'var(--font-sans)',
+                padding: '4px 0',
+              }}
+            >
+              No habits yet.
+            </div>
+          ) : (
+            visibleHabits.map((habit) => {
+              const streak = calcStreak(habit.log, today);
+              return (
+                <div key={habit.id} style={{ marginBottom: 10 }}>
+                  {/* Row top: icon + name + grid */}
                   <div
                     style={{
-                      fontSize: 11.5,
-                      fontFamily: 'var(--font-sans)',
-                      color: 'var(--ink-2)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
-                    title={habit.name}
                   >
-                    {habit.name}
-                  </div>
-                  {streak > 0 && (
-                    <div
+                    {/* Icon */}
+                    <span
                       style={{
-                        fontSize: 9,
+                        width: 14,
+                        height: 14,
                         fontFamily: 'var(--font-mono)',
-                        color: 'var(--rust)',
-                        letterSpacing: '0.04em',
-                        marginTop: 1,
+                        fontSize: 10,
+                        color: 'var(--ink-3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
                       }}
                     >
-                      {streak}d
+                      {'●'}
+                    </span>
+
+                    {/* Name */}
+                    <div
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: 13,
+                        fontFamily: 'var(--font-sans)',
+                        color: 'var(--ink-2)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      title={habit.name}
+                    >
+                      {habit.name}
                     </div>
-                  )}
-                </div>
 
-                {/* 7-day grid cells */}
-                <div style={{ display: 'flex', gap: CELL_GAP }}>
-                  {weekDays.map((dayStr) => {
-                    const done = habit.log.includes(dayStr);
-                    const isToday = dayStr === today;
-                    const isPast = dayStr < today;
+                    {/* 7-day cell grid */}
+                    <div style={{ display: 'flex', gap: CELL_GAP, flexShrink: 0 }}>
+                      {weekDays.map((dayStr) => {
+                        const done = habit.log.includes(dayStr);
+                        const isToday = dayStr === today;
+                        const isPast = dayStr < today;
 
-                    // Cell appearance based on done/today/past state
-                    let cellBackground: string;
-                    let cellBorder: string;
-                    let cellOpacity: number | undefined;
+                        let cellBackground: string;
+                        let cellBorder: string;
 
-                    if (done && isToday) {
-                      cellBackground = 'var(--acid)';
-                      cellBorder = '1px solid transparent';
-                      cellOpacity = 0.85;
-                    } else if (done && isPast) {
-                      cellBackground = 'var(--spine)';
-                      cellBorder = '1px solid transparent';
-                      cellOpacity = 0.7;
-                    } else if (!done && isToday) {
-                      cellBackground = 'transparent';
-                      cellBorder = '1px solid var(--ink-3)';
-                      cellOpacity = undefined;
-                    } else {
-                      // past unchecked
-                      cellBackground = 'var(--paper-3)';
-                      cellBorder = '1px solid transparent';
-                      cellOpacity = 0.4;
-                    }
-
-                    return (
-                      <button
-                        key={dayStr}
-                        type="button"
-                        title={dayStr}
-                        onClick={() =>
-                          onCommand('habit.toggleDay', { id: habit.id, date: dayStr })
+                        if (done) {
+                          // Done state: acid fill, regardless of today/past
+                          cellBackground = 'var(--acid)';
+                          cellBorder = '1px solid transparent';
+                        } else if (isToday) {
+                          // Today, not done: slightly more visible border
+                          cellBackground = 'transparent';
+                          cellBorder = '1px solid var(--ink-3)';
+                        } else if (isPast) {
+                          // Past, not done: subtle border
+                          cellBackground = 'transparent';
+                          cellBorder = '1px solid var(--paper-3)';
+                        } else {
+                          // Future: subtle border
+                          cellBackground = 'transparent';
+                          cellBorder = '1px solid var(--paper-3)';
                         }
-                        style={{
-                          width: CELL_SIZE,
-                          height: CELL_SIZE,
-                          border: cellBorder,
-                          borderRadius: 4,
-                          background: cellBackground,
-                          opacity: cellOpacity,
-                          cursor: 'pointer',
-                          padding: 0,
-                          flexShrink: 0,
-                        }}
-                        aria-label={`${habit.name} ${dayStr} ${done ? 'done' : 'not done'}`}
-                        aria-pressed={done}
-                      />
-                    );
-                  })}
+
+                        // Today indicator: thin acid outline outside the cell
+                        const todayOutline = isToday
+                          ? { outline: '1px solid var(--acid)', outlineOffset: '1px' }
+                          : {};
+
+                        if (isToday) {
+                          // Today's cell: clickable, toggles done state
+                          return (
+                            <button
+                              key={dayStr}
+                              type="button"
+                              title={`${habit.name} ${dayStr} — click to toggle`}
+                              onClick={() =>
+                                onCommand('habit.toggleDay', { id: habit.id, date: dayStr })
+                              }
+                              style={{
+                                width: CELL_SIZE,
+                                height: CELL_SIZE,
+                                border: cellBorder,
+                                borderRadius: 3,
+                                background: cellBackground,
+                                cursor: 'pointer',
+                                padding: 0,
+                                flexShrink: 0,
+                                ...todayOutline,
+                              }}
+                              aria-label={`${habit.name} ${dayStr} ${done ? 'done' : 'not done'}`}
+                              aria-pressed={done}
+                            />
+                          );
+                        }
+
+                        // Non-today cells: read-only div
+                        return (
+                          <div
+                            key={dayStr}
+                            title={`${habit.name} ${dayStr} ${done ? 'done' : 'not done'}`}
+                            style={{
+                              width: CELL_SIZE,
+                              height: CELL_SIZE,
+                              border: cellBorder,
+                              borderRadius: 3,
+                              background: cellBackground,
+                              flexShrink: 0,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Row bottom: streak indicator, indented */}
+                  <div
+                    style={{
+                      marginTop: 3,
+                      paddingLeft: 20,
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 9.5,
+                      color: streak > 0 ? 'var(--acid)' : 'var(--rust)',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {`▲ ${streak} day streak`}
+                  </div>
                 </div>
+              );
+            })
+          )}
 
-                {/* Delete button */}
-                <button
-                  type="button"
-                  title={`Remove ${habit.name}`}
-                  onClick={() => onCommand('habit.remove', { id: habit.id })}
-                  style={{
-                    width: 16,
-                    height: 16,
-                    marginLeft: 6,
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    color: 'var(--ink-3)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    lineHeight: 1,
-                    padding: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                  aria-label={`Remove ${habit.name}`}
-                >
-                  {'×'}
-                </button>
-              </div>
-            );
-          })
-        )}
-
-        {/* Add habit input */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 6,
-            marginTop: 10,
-            borderTop: '1px solid var(--paper-3)',
-            paddingTop: 10,
-          }}
-        >
-          <input
-            type="text"
-            placeholder="New habit…"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={handleKeyDown}
+          {/* Add habit input */}
+          <div
             style={{
-              flex: 1,
-              padding: '4px 8px',
-              background: 'transparent',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 'var(--radius)',
-              fontFamily: 'var(--font-sans)',
-              fontSize: 11.5,
-              color: 'var(--ink-2)',
-              outline: 'none',
-              minWidth: 0,
-            }}
-          />
-          <button
-            type="button"
-            onClick={handleAddHabit}
-            style={{
-              padding: '4px 10px',
-              background: 'transparent',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 'var(--radius)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10.5,
-              letterSpacing: '0.04em',
-              color: 'var(--ink-2)',
-              cursor: 'pointer',
-              flexShrink: 0,
+              marginTop: 10,
+              borderTop: '1px solid var(--paper-3)',
+              paddingTop: 10,
             }}
           >
-            ADD
-          </button>
+            <input
+              type="text"
+              placeholder="+ add habit"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={{
+                width: '100%',
+                padding: '4px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid var(--paper-3)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                color: 'var(--ink-3)',
+                outline: 'none',
+                minWidth: 0,
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
