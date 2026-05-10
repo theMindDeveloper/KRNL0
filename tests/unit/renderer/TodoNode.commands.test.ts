@@ -63,6 +63,16 @@ describe('TodoNode commands (Decision #10)', () => {
       expect(s2.items[0]?.id).toBe('a');
       expect(s2.items[1]?.id).toBe('b');
     });
+
+    it('stores tag on the item when provided', () => {
+      const s = todoAdd(defaultTodoState(), { text: 'tagged task', tag: 'WORK' }, env(T0, 'id-1'));
+      expect(s.items[0]?.tag).toBe('WORK');
+    });
+
+    it('omits tag from item when not provided', () => {
+      const s = todoAdd(defaultTodoState(), { text: 'no tag' }, env(T0, 'id-1'));
+      expect(s.items[0]?.tag).toBeUndefined();
+    });
   });
 
   // ── todoToggle ───────────────────────────────────────────────────────────
