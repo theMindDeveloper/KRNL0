@@ -1,15 +1,44 @@
-// TODO (Issue #5): full Habit implementation per Decision #11.
-// State: habits[] { id, name, log: YYYY-MM-DD[] (sorted desc), archived }.
-// Week grid + streak are derived at render time. ISO Monday-first week.
+// Decision #11 — HabitNode component.
+// Week grid and streak are derived at render time from the sparse log.
+// weekStart is computed (not stored) as the most recent Monday in local time.
+// All state mutations go through onCommand.
+
+import { useState } from 'react';
 import type { NodeProps } from '../types';
+import type { HabitConfig, HabitState } from './types';
+import { getWeekDays, todayLocal } from './types';
+import { calcStreak } from './commands';
 
-const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function HabitNode(_props: NodeProps) {
+const CELL_SIZE = 26;
+const CELL_GAP = 3;
+
+export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig>) {
+  const { state } = node;
+  const [newName, setNewName] = useState('');
+
+  // Week days derived from current local clock — no stored weekStart (Decision #11).
+  const today = todayLocal();
+  const weekDays = getWeekDays(new Date());
+
+  const visibleHabits = state.habits.filter((h) => !h.archived);
+
+  const handleAddHabit = () => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    onCommand('habit.add', { name: trimmed });
+    setNewName('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleAddHabit();
+  };
+
   return (
     <div
       style={{
-        width: 320,
+        width: 340,
         border: '1px solid var(--paper-3)',
         borderRadius: 'var(--radius-lg)',
         background: 'var(--node-bg)',
@@ -17,6 +46,7 @@ export function HabitNode(_props: NodeProps) {
         overflow: 'hidden',
       }}
     >
+      {/* Header */}
       <div
         style={{
           padding: '7px 10px 6px',
@@ -28,27 +58,206 @@ export function HabitNode(_props: NodeProps) {
           letterSpacing: '0.04em',
         }}
       >
-        ▙ HABITS
+        {'▙ HABITS'}
       </div>
-      <div style={{ padding: '14px 16px' }}>
-        <div style={{ display: 'flex', gap: 4, marginBottom: 8, justifyContent: 'flex-end' }}>
-          {DAYS.map((d, i) => (
-            <div
-              key={i}
-              style={{
-                width: 28,
-                textAlign: 'center',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--ink-3)',
-              }}
-            >
-              {d}
-            </div>
-          ))}
+
+      <div style={{ padding: '12px 14px' }}>
+        {/* Day labels header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: 6,
+          }}
+        >
+          {/* Spacer for habit name + streak columns */}
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', gap: CELL_GAP }}>
+            {DAY_LABELS.map((label, i) => (
+              <div
+                key={i}
+                style={{
+                  width: CELL_SIZE,
+                  textAlign: 'center',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  color: 'var(--ink-3)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+          {/* Spacer for delete button column */}
+          <div style={{ width: 22, marginLeft: 6 }} />
         </div>
-        <div style={{ color: 'var(--ink-3)', fontSize: 13, fontFamily: 'var(--font-sans)' }}>
-          No habits yet.
+
+        {/* Habit rows */}
+        {visibleHabits.length === 0 ? (
+          <div
+            style={{
+              color: 'var(--ink-3)',
+              fontSize: 12,
+              fontFamily: 'var(--font-sans)',
+              padding: '4px 0',
+            }}
+          >
+            No habits yet.
+          </div>
+        ) : (
+          visibleHabits.map((habit) => {
+            const streak = calcStreak(habit.log, today);
+            return (
+              <div
+                key={habit.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: 5,
+                }}
+              >
+                {/* Habit name + streak */}
+                <div style={{ flex: 1, minWidth: 0, marginRight: 6 }}>
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      fontFamily: 'var(--font-sans)',
+                      color: 'var(--ink-1)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={habit.name}
+                  >
+                    {habit.name}
+                  </div>
+                  {streak > 0 && (
+                    <div
+                      style={{
+                        fontSize: 9,
+                        fontFamily: 'var(--font-mono)',
+                        color: 'var(--rust)',
+                        letterSpacing: '0.04em',
+                        marginTop: 1,
+                      }}
+                    >
+                      {streak}d
+                    </div>
+                  )}
+                </div>
+
+                {/* 7-day grid cells */}
+                <div style={{ display: 'flex', gap: CELL_GAP }}>
+                  {weekDays.map((dayStr) => {
+                    const done = habit.log.includes(dayStr);
+                    const isToday = dayStr === today;
+                    return (
+                      <button
+                        key={dayStr}
+                        type="button"
+                        title={dayStr}
+                        onClick={() =>
+                          onCommand('habit.toggleDay', { id: habit.id, date: dayStr })
+                        }
+                        style={{
+                          width: CELL_SIZE,
+                          height: CELL_SIZE,
+                          border: isToday
+                            ? '1px solid var(--rust)'
+                            : '1px solid var(--paper-3)',
+                          borderRadius: 'var(--radius-sm)',
+                          background: done ? 'var(--rust)' : 'transparent',
+                          cursor: 'pointer',
+                          padding: 0,
+                          flexShrink: 0,
+                        }}
+                        aria-label={`${habit.name} ${dayStr} ${done ? 'done' : 'not done'}`}
+                        aria-pressed={done}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Delete button */}
+                <button
+                  type="button"
+                  title={`Remove ${habit.name}`}
+                  onClick={() => onCommand('habit.remove', { id: habit.id })}
+                  style={{
+                    width: 16,
+                    height: 16,
+                    marginLeft: 6,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: 'var(--ink-3)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    lineHeight: 1,
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                  aria-label={`Remove ${habit.name}`}
+                >
+                  {'×'}
+                </button>
+              </div>
+            );
+          })
+        )}
+
+        {/* Add habit input */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            marginTop: 10,
+            borderTop: '1px solid var(--paper-3)',
+            paddingTop: 10,
+          }}
+        >
+          <input
+            type="text"
+            placeholder="New habit…"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            style={{
+              flex: 1,
+              padding: '4px 8px',
+              background: 'transparent',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 'var(--radius-md)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 11.5,
+              color: 'var(--ink-1)',
+              outline: 'none',
+              minWidth: 0,
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleAddHabit}
+            style={{
+              padding: '4px 10px',
+              background: 'transparent',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 'var(--radius-md)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10.5,
+              letterSpacing: '0.04em',
+              color: 'var(--ink-1)',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            ADD
+          </button>
         </div>
       </div>
     </div>
