@@ -32,3 +32,5 @@ skills-lock.json
 # Whisper / Piper model files (large binaries — user downloads separately)
 *.bin
 *.onnx
+
+out/
