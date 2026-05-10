@@ -253,4 +253,13 @@ export function registerHandlers(): void {
   ipcMain.handle('pty:resize', (_event, _sessionId: string, _cols: number, _rows: number) => {
     // TODO (Phase 3+): wire node-pty for full PTY resize support
   });
+
+  // pty:kill — terminate the shell process for a session (F4b)
+  ipcMain.handle('pty:kill', (_event, sessionId: string) => {
+    const proc = ptySessions.get(sessionId);
+    if (proc) {
+      proc.kill();
+      ptySessions.delete(sessionId);
+    }
+  });
 }
