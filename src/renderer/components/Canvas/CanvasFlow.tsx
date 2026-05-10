@@ -348,8 +348,27 @@ export function CanvasFlow() {
   const viewport = useBoardStore((s) => s.viewport);
   const board = useBoardStore((s) => s.board);
 
-  // Don't mount until board is loaded so defaultViewport has the persisted value.
-  if (!board) return null;
+  // Show a minimal loading screen while board is fetched from disk.
+  // This replaces the pure-black void that appeared before the board loaded.
+  if (!board) {
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--paper)',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11,
+        color: 'var(--ink-4)',
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+      }}>
+        loading…
+      </div>
+    );
+  }
 
   return <CanvasFlowInner initialViewport={viewport} />;
 }
