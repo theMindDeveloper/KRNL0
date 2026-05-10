@@ -151,6 +151,15 @@ A running log of every significant change, bug fix, and architectural decision t
 
 ---
 
+## [2026-05-10] — `npm run reset` script for clearing board state
+
+**Type:** Chore  
+**Branch:** `chore/reset-board-script`  
+**Files changed:** `scripts/reset-board.mjs`, `package.json`  
+**Summary:** Added a small Node script that deletes the per-instance `board.json` (and, with `--hard`, the Electron `userData` folder). The script reads `package.json#name` and computes the same path that `handlers.ts` uses, so it correctly targets `~/Documents/<app-name>/board.json` regardless of which worktree it runs in. Two npm scripts wire it up: `npm run reset` (board only) and `npm run reset:hard` (board + userData). Running either prints the resolved path before deleting, so the developer always sees what was removed. After a reset, the next `npm run dev` re-seeds a fresh board via `seedBoard()`.
+
+---
+
 ## [2026-05-10] — Worktree isolation: per-instance board path (Decision 17)
 
 **Type:** Bug Fix / Architecture  
