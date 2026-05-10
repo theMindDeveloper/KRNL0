@@ -3,6 +3,7 @@ import { PomoNode } from './PomoNode';
 import { TodoNode } from './TodoNode';
 import { HabitNode } from './HabitNode';
 import { TerminalNode } from './TerminalNode';
+import { TaskNode } from './TaskNode';
 import { UnknownNode } from './UnknownNode';
 import type { NodeProps } from './types';
 
@@ -20,6 +21,7 @@ export const NODE_REGISTRY: Record<string, AnyNodeComponent> = {
   todo: TodoNode,
   habit: HabitNode,
   term: TerminalNode,
+  'todo.task': TaskNode,
 };
 
 export function resolveNodeComponent(kind: string): AnyNodeComponent {

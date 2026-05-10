@@ -15,9 +15,10 @@ const defaultEnv: TodoEnv = {
 };
 
 // todo.add — append a new item; trims text; no-op on empty.
+// Optional `tag` arg is a short label (e.g. "WORK") stored on the item.
 export const todoAdd = (
   state: TodoState,
-  args: { text: string },
+  args: { text: string; tag?: string },
   env: TodoEnv = defaultEnv,
 ): TodoState => {
   const trimmed = args.text.trim();
@@ -26,6 +27,7 @@ export const todoAdd = (
     id: env.uuid(),
     text: trimmed,
     done: false,
+    ...(args.tag !== undefined ? { tag: args.tag } : {}),
     createdAt: env.now(),
     completedAt: null,
   };
