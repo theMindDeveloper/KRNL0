@@ -217,6 +217,35 @@ describe('F4 — pty:create', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #74 — pty:create cwd defaults to process.cwd(), KRNL0_TERM_CWD overrides
+// ---------------------------------------------------------------------------
+
+describe('#74 — pty:create cwd', () => {
+  it('defaults cwd to process.cwd() (project root in dev)', async () => {
+    delete process.env['KRNL0_TERM_CWD'];
+
+    const { spawn } = await import('node-pty');
+    await invoke('pty:create', makeEvent(), 80, 24);
+
+    const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(spawnCall[2].cwd).toBe(process.cwd());
+  });
+
+  it('honours KRNL0_TERM_CWD override when the path exists', async () => {
+    // Use process.cwd() — guaranteed to exist — as the override target
+    process.env['KRNL0_TERM_CWD'] = process.cwd();
+
+    const { spawn } = await import('node-pty');
+    await invoke('pty:create', makeEvent(), 80, 24);
+
+    const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(spawnCall[2].cwd).toBe(process.cwd());
+
+    delete process.env['KRNL0_TERM_CWD'];
+  });
+});
+
+// ---------------------------------------------------------------------------
 // F5 — pty:write routes to proc.write
 // ---------------------------------------------------------------------------
 

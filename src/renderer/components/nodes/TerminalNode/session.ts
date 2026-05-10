@@ -10,6 +10,10 @@ export interface TermSurface {
   write(data: string): void;
   onData(handler: (data: string) => void): { dispose(): void };
   focus(): void;
+  // Optional — only the real xterm Terminal exposes these. Tests can omit.
+  attachCustomKeyEventHandler?(handler: (event: KeyboardEvent) => boolean): void;
+  getSelection?(): string;
+  clearSelection?(): void;
 }
 
 /** Minimal FitAddon surface. */
@@ -85,13 +89,38 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
     onCommand('term.sessionEnd', { sessionId: sid });
   });
 
-  // F5: xterm input → pty:write
-  // xterm.js emits 0x7f (DEL) on Backspace; bash, zsh, PowerShell handle that
-  // fine, but Windows cmd.exe silently ignores it and waits for 0x08 (BS).
-  // Translate so Backspace works regardless of shell.
+  // Issue #75: Ctrl+C must always reach the PTY. With a selection, copy to
+  // clipboard. Without a selection, send 0x03 (SIGINT/ETX) so the running
+  // process is interrupted. We do this via attachCustomKeyEventHandler so
+  // we don't rely on xterm's variable default behaviour, which can drop
+  // 0x03 under Electron when the helper textarea loses focus mid-press.
+  term.attachCustomKeyEventHandler?.((event) => {
+    if (event.type !== 'keydown') return true;
+    const isCtrlC =
+      (event.ctrlKey || event.metaKey) &&
+      !event.shiftKey &&
+      !event.altKey &&
+      (event.key === 'c' || event.key === 'C');
+    if (!isCtrlC) return true;
+
+    const sel = term.getSelection?.() ?? '';
+    if (sel) {
+      // Copy and let the PTY keep running.
+      try { void navigator.clipboard.writeText(sel); } catch { /* ignore */ }
+      term.clearSelection?.();
+      return false;
+    }
+    // No selection — interrupt the running process.
+    void krnl.ptyWrite(sid, '\x03');
+    return false;
+  });
+
+  // F5: xterm input → pty:write.
+  // Pass keystrokes through unchanged. Backspace = 0x7f (DEL), which is the
+  // POSIX/PowerShell convention. cmd.exe wants 0x08; users on cmd.exe must
+  // set KRNL0_SHELL explicitly and accept this trade-off (issue #72).
   const { dispose: disposeOnData } = term.onData((data) => {
-    const translated = data.replace(/\x7f/g, '\x08');
-    krnl.ptyWrite(sid, translated);
+    krnl.ptyWrite(sid, data);
   });
 
   // Focus immediately so the user can type
