@@ -58,16 +58,18 @@ export function toRfNode(
 
 export function toRfEdge(
   edge: Edge,
-  srcKind: string,
-  tgtKind: string
+  _srcKind: string,
+  _tgtKind: string
 ): RFEdge {
-  const isTaskFlow = srcKind === 'todo.task' && tgtKind === 'todo.task';
+  // Decision #14: read edge.visual directly; no kind-based heuristic.
+  const visual = edge.visual ?? 'default';
+  const animated = visual === 'task-flow';
   return {
     id: edge.id,
     source: edge.from.nodeId,
     target: edge.to.nodeId,
-    type: isTaskFlow ? 'task-flow' : 'default',
-    animated: isTaskFlow,
+    type: visual,
+    animated,
     data: { edge },
   };
 }

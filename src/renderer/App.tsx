@@ -9,12 +9,13 @@
  * first paint — satisfying NF4 / Gherkin F6b.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
 import { Orb } from './components/Orb';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
+import { Tweaks } from './components/Tweaks';
 import { useBoardStore } from './store/boardStore';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
@@ -31,6 +32,7 @@ import { useBoardStore } from './store/boardStore';
 
 export function App() {
   const setBoard = useBoardStore((s) => s.setBoard);
+  const [tweaksOpen, setTweaksOpen] = useState(false);
 
   useEffect(() => {
     window.krnl?.boardLoad().then((data) => {
@@ -49,10 +51,11 @@ export function App() {
           position: 'relative',
         }}
       >
-        <TopBar />
+        <TopBar onTweaksToggle={() => setTweaksOpen((o) => !o)} />
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
           <Canvas />
           <Orb />
+          <Tweaks open={tweaksOpen} onClose={() => setTweaksOpen(false)} />
         </div>
         <StatusBar />
       </div>

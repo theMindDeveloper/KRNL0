@@ -30,7 +30,11 @@ function applyTheme(theme: Theme): void {
   }
 }
 
-export function TopBar() {
+interface TopBarProps {
+  onTweaksToggle?: () => void;
+}
+
+export function TopBar({ onTweaksToggle }: TopBarProps) {
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
   const rf = useReactFlow();
 
@@ -49,8 +53,8 @@ export function TopBar() {
   };
 
   const handleTweaks = () => {
-    console.log('[topbar] tweaks');
-    // TODO Phase 6: open tweaks panel
+    if (onTweaksToggle) onTweaksToggle();
+    else console.log('[topbar] tweaks');
   };
 
   const handleShare = () => {

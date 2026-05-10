@@ -116,21 +116,24 @@ describe('F2 — Topbar right buttons present', () => {
 
 // ── F3 — Left dock buttons ────────────────────────────────────────────────────
 
-describe('F3 — Left dock contains 4 icon buttons', () => {
-  it('renders a dock with 4 buttons', () => {
+describe('F3 — Left dock contains icon buttons', () => {
+  it('renders a dock with 7 buttons (4 mothers + 3 new kinds)', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     const buttons = screen.getByTestId('dock').querySelectorAll('button');
-    expect(buttons.length).toBe(4);
+    expect(buttons.length).toBe(7);
   });
 
-  it('renders buttons for pomo, todo, habit, term', () => {
+  it('renders buttons for pomo, todo, habit, term, calendar, text, image', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     expect(screen.getByTestId('dock-btn-pomo')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-todo')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-habit')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-term')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-calendar')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-text')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-image')).toBeTruthy();
   });
 });
 

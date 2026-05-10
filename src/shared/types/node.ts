@@ -30,7 +30,10 @@ export type NodeKind =
   | 'term'
   | 'pomo.session'
   | 'todo.task'
-  | 'habit.day';
+  | 'habit.day'
+  | 'calendar'
+  | 'text'
+  | 'image';
 
 // Spec a node-kind module exports to the kernel (commands, events, schema).
 // Renamed from `NodeKind` to avoid shadowing the literal union above.

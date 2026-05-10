@@ -4,4 +4,5 @@ export interface Edge {
   to:   { nodeId: string; command: string };
   args?: Record<string, unknown>;
   enabled: boolean;
+  visual?: 'default' | 'task-flow' | 'pomo-edge';
 }

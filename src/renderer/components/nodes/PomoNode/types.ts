@@ -27,6 +27,7 @@ export interface PomoConfig {
   defaultBreakMin: number;
   longBreakEvery: number;
   longBreakMin: number;
+  variant?: 'ring' | 'ascii' | 'lcd' | 'blocks' | 'vapor';
 }
 
 export const defaultPomoState = (): PomoState => ({

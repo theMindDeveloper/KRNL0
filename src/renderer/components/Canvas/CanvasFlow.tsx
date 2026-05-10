@@ -27,7 +27,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge } from './rfAdapters';
-import { makeCommandHandler } from './commandDispatch';
+import { makeCommandHandler, addNodeToBoard } from './commandDispatch';
 import { Dock } from '../Dock';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
@@ -98,8 +98,40 @@ function DefaultEdge({
   );
 }
 
+function PomoEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+}: EdgeProps) {
+  const [edgePath] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  return (
+    <BaseEdge
+      id={id}
+      path={edgePath}
+      style={{
+        stroke: 'var(--rust)',
+        strokeWidth: 1.5,
+        strokeDasharray: '4 4',
+        opacity: 0.7,
+      }}
+    />
+  );
+}
+
 const EDGE_TYPES = {
   'task-flow': TaskFlowEdge,
+  'pomo-edge': PomoEdge,
   default: DefaultEdge,
 };
 
@@ -160,11 +192,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
 
-  // ── Dock add-node handler (Phase 5 placeholder) ───────────────────────────
+  // ── Dock add-node handler ─────────────────────────────────────────────────
   const handleAddNode = useCallback((args: { kind: NodeKind }) => {
-    console.log('[dock] addNode', args.kind);
-    // Phase 6: wire dock to create child node kinds (pomo.session / todo.task /
-    // habit.day) once those node bodies exist.
+    addNodeToBoard(args.kind);
   }, []);
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────

@@ -25,10 +25,13 @@ interface DockButton {
 }
 
 const DOCK_BUTTONS: DockButton[] = [
-  { kind: 'pomo',  label: 'Pomodoro',  icon: '◎', shortcut: 'P' },
-  { kind: 'todo',  label: 'Todo',      icon: '☐', shortcut: 'T' },
-  { kind: 'habit', label: 'Habit',     icon: '◈', shortcut: 'H' },
-  { kind: 'term',  label: 'Terminal',  icon: '>_', shortcut: 'X' },
+  { kind: 'pomo',     label: 'Pomodoro', icon: '◎',  shortcut: 'P' },
+  { kind: 'todo',     label: 'Todo',     icon: '☐',  shortcut: 'T' },
+  { kind: 'habit',    label: 'Habit',    icon: '◈',  shortcut: 'H' },
+  { kind: 'term',     label: 'Terminal', icon: '>_', shortcut: 'X' },
+  { kind: 'calendar', label: 'Calendar', icon: '▦',  shortcut: 'C' },
+  { kind: 'text',     label: 'Text',     icon: 'A',  shortcut: 'N' },
+  { kind: 'image',    label: 'Image',    icon: '▣',  shortcut: 'I' },
 ];
 
 export function Dock({ activeKind, onAddNode }: DockProps) {

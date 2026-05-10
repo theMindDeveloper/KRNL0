@@ -4,6 +4,9 @@ import { TodoNode } from './TodoNode';
 import { HabitNode } from './HabitNode';
 import { TerminalNode } from './TerminalNode';
 import { TaskNode } from './TaskNode';
+import { CalendarNode } from './CalendarNode';
+import { TextNode } from './TextNode';
+import { ImageNode } from './ImageNode';
 import { UnknownNode } from './UnknownNode';
 import type { NodeProps } from './types';
 import { createNodeAdapter } from '../Canvas/rfAdapters';
@@ -21,6 +24,9 @@ const NODE_REGISTRY_RAW: Record<string, AnyNodeComponent> = {
   habit: HabitNode as AnyNodeComponent,
   term: TerminalNode as AnyNodeComponent,
   'todo.task': TaskNode as AnyNodeComponent,
+  calendar: CalendarNode as AnyNodeComponent,
+  text: TextNode as AnyNodeComponent,
+  image: ImageNode as AnyNodeComponent,
 };
 export const NODE_REGISTRY: Record<string, AnyNodeComponent> = Object.fromEntries(
   Object.entries(NODE_REGISTRY_RAW).map(([k, C]) => [k, memo(C)])
@@ -42,4 +48,7 @@ export const NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> 
   'todo.task':    createNodeAdapter(TaskNode as AnyNodeComponent),
   'pomo.session': createNodeAdapter(TaskNode as AnyNodeComponent),
   'habit.day':    createNodeAdapter(TaskNode as AnyNodeComponent),
+  calendar:       createNodeAdapter(CalendarNode as AnyNodeComponent),
+  text:           createNodeAdapter(TextNode as AnyNodeComponent),
+  image:          createNodeAdapter(ImageNode as AnyNodeComponent),
 };

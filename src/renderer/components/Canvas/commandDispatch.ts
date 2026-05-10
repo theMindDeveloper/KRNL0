@@ -7,8 +7,12 @@
  */
 
 import { useBoardStore } from '../../store/boardStore';
-import type { Node } from '@shared/types/node';
+import type { Node, NodeKind } from '@shared/types/node';
 import type { Edge } from '@shared/types/edge';
+import type { CalendarState } from '../nodes/CalendarNode/types';
+import { defaultCalendarState, defaultCalendarConfig } from '../nodes/CalendarNode/types';
+import { defaultTextState, defaultTextConfig } from '../nodes/TextNode/types';
+import { defaultImageState, defaultImageConfig } from '../nodes/ImageNode/types';
 
 // ── Pomo ──────────────────────────────────────────────────────────────
 import {
@@ -77,6 +81,32 @@ function applyCommand(node: Node, command: string, args: Args): Node['state'] | 
       }
       break;
     }
+    case 'calendar': {
+      switch (command) {
+        case 'calendar.prevMonth': {
+          const cal = s as unknown as CalendarState;
+          const newMonth = cal.month === 0 ? 11 : cal.month - 1;
+          const newYear = cal.month === 0 ? cal.year - 1 : cal.year;
+          return { ...cal, month: newMonth, year: newYear };
+        }
+        case 'calendar.nextMonth': {
+          const cal = s as unknown as CalendarState;
+          const newMonth = cal.month === 11 ? 0 : cal.month + 1;
+          const newYear = cal.month === 11 ? cal.year + 1 : cal.year;
+          return { ...cal, month: newMonth, year: newYear };
+        }
+      }
+      break;
+    }
+    case 'text': {
+      if (command === 'text.setContent') {
+        return { ...s, content: args['content'] as string };
+      }
+      if (command === 'text.setFontSize') {
+        return { ...s, fontSize: args['size'] as number };
+      }
+      break;
+    }
   }
   return null; // unknown command — no-op
 }
@@ -92,6 +122,17 @@ export function makeCommandHandler(nodeId: string) {
 
     const node = board.nodes.find((n) => n.id === nodeId);
     if (!node) return;
+
+    // ── node.setConfig: patch node.config for any node kind ─────────────────
+    if (command === 'node.setConfig') {
+      const patch = args['patch'] as Record<string, unknown> | undefined;
+      if (!patch) return;
+      const newConfig = { ...(node.config as Record<string, unknown>), ...patch };
+      updateNode(nodeId, { config: newConfig });
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
 
     const newState = applyCommand(node, command, args);
     if (newState === null) return;
@@ -186,4 +227,37 @@ export function makeCommandHandler(nodeId: string) {
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
   };
+}
+
+// ── board.addNode — create a new node of any kind on the canvas ───────────────
+// Called by the Dock buttons. Generates a ULID-style id via crypto.randomUUID,
+// places the node near viewport center with a small jitter.
+
+function makeDefaultNode(kind: NodeKind): Node {
+  const id = crypto.randomUUID();
+  const position = {
+    x: 200 + Math.random() * 40,
+    y: 200 + Math.random() * 40,
+  };
+  switch (kind) {
+    case 'calendar':
+      return { id, kind, position, isMother: false, state: defaultCalendarState(), config: defaultCalendarConfig() };
+    case 'text':
+      return { id, kind, position, isMother: false, state: defaultTextState(), config: defaultTextConfig() };
+    case 'image':
+      return { id, kind, position, isMother: false, state: defaultImageState(), config: defaultImageConfig() };
+    default:
+      // For other kinds, provide a minimal empty state/config — the node
+      // renders gracefully via UnknownNode if kind is not registered.
+      return { id, kind, position, isMother: false, state: {}, config: {} };
+  }
+}
+
+export function addNodeToBoard(kind: NodeKind): void {
+  const { board, addNode } = useBoardStore.getState();
+  if (!board) return;
+  const node = makeDefaultNode(kind);
+  addNode(node);
+  const updated = useBoardStore.getState().board;
+  if (updated) void window.krnl?.boardSave(updated);
 }
