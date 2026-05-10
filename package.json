@@ -1,7 +1,7 @@
 {
-  "name": "krnl0",
+  "name": "krnl0-newfeatures",
   "version": "0.1.0",
-  "description": "krnl0 — voice-driven canvas for personal planning",
+  "description": "krnl0 (new-features dev build) — voice-driven canvas for personal planning",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

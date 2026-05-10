@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -6,7 +6,12 @@ import { randomUUID } from 'crypto';
 import { spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'child_process';
 import { SysFacade } from '../../sys/SysFacade';
 
-const BOARD_DIR = join(homedir(), 'Documents', 'krnl0');
+// Board location — isolated per Electron app name so multiple worktrees
+// (e.g. main vs feat/new-features) don't share the same board.json.
+// Override with KRNL0_BOARD_DIR for explicit per-instance dev paths.
+// See docs/03-architecture/decisions.md — Decision 17.
+const BOARD_DIR = process.env.KRNL0_BOARD_DIR
+  ?? join(homedir(), 'Documents', app.getName());
 const BOARD_PATH = join(BOARD_DIR, 'board.json');
 
 // Active shell sessions keyed by sessionId (child_process — no native deps needed)
