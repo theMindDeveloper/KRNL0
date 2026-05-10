@@ -3,13 +3,13 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
-import * as pty from 'node-pty';
+import { spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'child_process';
 
 const BOARD_DIR = join(homedir(), 'Documents', 'krnl0');
 const BOARD_PATH = join(BOARD_DIR, 'board.json');
 
-// Active pty sessions keyed by sessionId
-const ptySessions = new Map<string, pty.IPty>();
+// Active shell sessions keyed by sessionId (child_process — no native deps needed)
+const ptySessions = new Map<string, ChildProcessWithoutNullStreams>();
 
 function seedBoard() {
   return {
@@ -116,32 +116,36 @@ export function registerHandlers(): void {
     void text;
   });
 
-  // pty:create — spawn a shell and return a sessionId
-  ipcMain.handle('pty:create', (event, cols: number, rows: number) => {
+  // pty:create — spawn a persistent shell using child_process (no native deps)
+  ipcMain.handle('pty:create', (event, _cols: number, _rows: number) => {
     const sessionId = randomUUID();
-    const shell =
-      process.platform === 'win32'
-        ? (process.env['COMSPEC'] ?? 'powershell.exe')
-        : (process.env['SHELL'] ?? '/bin/zsh');
+
+    const isWin = process.platform === 'win32';
+    const shell = isWin
+      ? (process.env['COMSPEC'] ?? 'powershell.exe')
+      : (process.env['SHELL'] ?? '/bin/bash');
+    const args = isWin ? ['-NoLogo', '-NoExit', '-Command', '-'] : ['-i'];
 
     const cwd =
-      process.env['HOME'] ??
       process.env['USERPROFILE'] ??
+      process.env['HOME'] ??
       process.cwd();
 
-    const proc = pty.spawn(shell, [], {
-      name: 'xterm-color',
-      cols,
-      rows,
+    const proc = spawnChild(shell, args, {
       cwd,
-      env: process.env as Record<string, string>,
+      env: { ...process.env, TERM: 'xterm-color' },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }) as ChildProcessWithoutNullStreams;
+
+    proc.stdout.on('data', (data: Buffer) => {
+      event.sender.send(`pty:data:${sessionId}`, data.toString());
     });
 
-    proc.onData((data) => {
-      event.sender.send(`pty:data:${sessionId}`, data);
+    proc.stderr.on('data', (data: Buffer) => {
+      event.sender.send(`pty:data:${sessionId}`, data.toString());
     });
 
-    proc.onExit(() => {
+    proc.on('exit', () => {
       ptySessions.delete(sessionId);
       event.sender.send(`pty:exit:${sessionId}`);
     });
@@ -150,13 +154,13 @@ export function registerHandlers(): void {
     return sessionId;
   });
 
-  // pty:write — send keystrokes to an active session
+  // pty:write — send keystrokes to the shell stdin
   ipcMain.handle('pty:write', (_event, sessionId: string, data: string) => {
-    ptySessions.get(sessionId)?.write(data);
+    ptySessions.get(sessionId)?.stdin.write(data);
   });
 
-  // pty:resize — resize an active session's pty dimensions
-  ipcMain.handle('pty:resize', (_event, sessionId: string, cols: number, rows: number) => {
-    ptySessions.get(sessionId)?.resize(cols, rows);
+  // pty:resize — no-op (resize supported when node-pty is wired in a future phase)
+  ipcMain.handle('pty:resize', (_event, _sessionId: string, _cols: number, _rows: number) => {
+    // TODO (Phase 3+): wire node-pty for full PTY resize support
   });
 }
