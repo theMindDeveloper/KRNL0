@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('krnl', {
     ipcRenderer.invoke('pty:write', sessionId, data),
   ptyResize: (sessionId: string, cols: number, rows: number) =>
     ipcRenderer.invoke('pty:resize', sessionId, cols, rows),
+  ptyKill: (sessionId: string) =>
+    ipcRenderer.invoke('pty:kill', sessionId),
   onPtyData: (sessionId: string, callback: (data: string) => void) => {
     const channel = `pty:data:${sessionId}`
     ipcRenderer.on(channel, (_event, data: string) => callback(data))
