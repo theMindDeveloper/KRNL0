@@ -86,8 +86,12 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
   });
 
   // F5: xterm input → pty:write
+  // xterm.js emits 0x7f (DEL) on Backspace; bash, zsh, PowerShell handle that
+  // fine, but Windows cmd.exe silently ignores it and waits for 0x08 (BS).
+  // Translate so Backspace works regardless of shell.
   const { dispose: disposeOnData } = term.onData((data) => {
-    krnl.ptyWrite(sid, data);
+    const translated = data.replace(/\x7f/g, '\x08');
+    krnl.ptyWrite(sid, translated);
   });
 
   // Focus immediately so the user can type
