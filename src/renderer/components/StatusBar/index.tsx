@@ -1,9 +1,12 @@
 /**
  * StatusBar — 28px chrome bar at bottom.
  * Requirement F5: "{n} node(s) · {m} edge(s) · {boardName}" + zoom level.
+ *
+ * Zoom comes from RF's internal useStore (transform[2]) — not boardStore —
+ * so it updates live during pan/zoom without triggering a Zustand cascade.
  */
 
-import { useReactFlow } from '@xyflow/react';
+import { useStore } from '@xyflow/react';
 import { useBoardStore } from '../../store/boardStore';
 
 function pluralize(count: number, singular: string): string {
@@ -12,22 +15,13 @@ function pluralize(count: number, singular: string): string {
 
 export function StatusBar() {
   const board = useBoardStore((s) => s.board);
-  const viewport = useBoardStore((s) => s.viewport);
-  const rf = useReactFlow();
+  // Read zoom directly from RF's internal transform — live, zero Zustand writes.
+  const zoomPct = useStore((s) => Math.round(s.transform[2] * 100));
 
   const nodeCount = board?.nodes.length ?? 0;
   const edgeCount = board?.edges.length ?? 0;
   // board.title does not exist in v1 — fall back to the constant per scope refinements.
   const boardName = (board as { title?: string } | null)?.title ?? 'deep-work';
-
-  // Prefer RF's live zoom when available; fall back to store viewport.
-  let zoomPct: number;
-  try {
-    const { zoom } = rf.getViewport();
-    zoomPct = Math.round(zoom * 100);
-  } catch {
-    zoomPct = Math.round(viewport.zoom * 100);
-  }
 
   const nodeStr = pluralize(nodeCount, 'node');
   const edgeStr = pluralize(edgeCount, 'edge');
