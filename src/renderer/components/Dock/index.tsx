@@ -7,7 +7,7 @@
  * and calls onAddNode({ kind }) so callers and tests can spy on intent.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { NodeKind } from '../../../shared/types/node';
 
 export interface DockProps {
@@ -32,24 +32,31 @@ const DOCK_BUTTONS: DockButton[] = [
 ];
 
 export function Dock({ activeKind, onAddNode }: DockProps) {
+  // Transient visual feedback when a button is clicked / shortcut fires.
+  const [pressed, setPressed] = useState<NodeKind | null>(null);
+  const fire = (kind: NodeKind) => {
+    setPressed(kind);
+    onAddNode({ kind });
+    setTimeout(() => setPressed(null), 600);
+  };
+
   // Register keyboard shortcuts (F8).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't steal keys when the user is typing in an input/textarea.
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
       }
       for (const btn of DOCK_BUTTONS) {
         if (e.key === btn.shortcut || e.key === btn.shortcut.toLowerCase()) {
-          console.log('[dock] addNode', btn.kind);
-          onAddNode({ kind: btn.kind });
+          fire(btn.kind);
           return;
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onAddNode]);
 
   return (
@@ -66,7 +73,7 @@ export function Dock({ activeKind, onAddNode }: DockProps) {
       }}
     >
       {DOCK_BUTTONS.map(({ kind, label, icon, shortcut }) => {
-        const isActive = kind === activeKind;
+        const isActive = kind === activeKind || kind === pressed;
         return (
           <button
             key={kind}
@@ -74,11 +81,7 @@ export function Dock({ activeKind, onAddNode }: DockProps) {
             data-testid={`dock-btn-${kind}`}
             title={`${label} [${shortcut}]`}
             aria-label={`Add ${label} node (${shortcut})`}
-            onClick={() => {
-              console.log('[dock] addNode', kind);
-              // Phase 6: wire dock to create child node kinds once those node bodies exist
-              onAddNode({ kind });
-            }}
+            onClick={() => fire(kind)}
             style={{
               width: 36,
               height: 36,
