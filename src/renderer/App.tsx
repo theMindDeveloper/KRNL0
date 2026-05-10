@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { Canvas } from './components/Canvas';
 import { Orb } from './components/Orb';
+import { TopBar } from './components/TopBar';
+import { StatusBar } from './components/StatusBar';
 import { useBoardStore } from './store/boardStore';
 
 export function App() {
@@ -13,9 +15,21 @@ export function App() {
   }, [setBoard]);
 
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
-      <Canvas />
-      <Orb />
+    <div
+      style={{
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+      }}
+    >
+      <TopBar />
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <Canvas />
+        <Orb />
+      </div>
+      <StatusBar />
     </div>
   );
 }
