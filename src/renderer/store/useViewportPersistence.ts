@@ -1,17 +1,7 @@
 import { useEffect, useRef } from 'react';
-import type { BoardViewport } from '../../shared/types';
 import { useBoardStore } from './boardStore';
 
 const DEBOUNCE_MS = 500;
-
-interface KrnlBridge {
-  boardSaveViewport?: (v: BoardViewport) => void | Promise<void>;
-}
-declare global {
-  interface Window {
-    krnl?: KrnlBridge;
-  }
-}
 
 // Mirrors viewport changes into board.json with a 500ms debounce so a pointer-drag
 // does not thrash the disk (Decision #7).
