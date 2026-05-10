@@ -15,6 +15,7 @@ interface BoardStore {
   addNode: (node: Node) => void;
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
+  swapMotherSlots: (idA: string, idB: string) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setViewport: (v: BoardViewport) => void;
   panBy: (dx: number, dy: number) => void;
@@ -63,6 +64,26 @@ export const useBoardStore = create<BoardStore>((set) => ({
     set((s) => {
       if (!s.board) return s;
       return { board: { ...s.board, edges: s.board.edges.filter((e) => e.id !== id) } };
+    }),
+
+  swapMotherSlots: (idA, idB) =>
+    set((s) => {
+      if (!s.board) return s;
+      const nodeA = s.board.nodes.find((n) => n.id === idA);
+      const nodeB = s.board.nodes.find((n) => n.id === idB);
+      if (!nodeA || !nodeB) return s;
+      const posA = nodeA.position;
+      const posB = nodeB.position;
+      return {
+        board: {
+          ...s.board,
+          nodes: s.board.nodes.map((n) => {
+            if (n.id === idA) return { ...n, position: posB };
+            if (n.id === idB) return { ...n, position: posA };
+            return n;
+          }),
+        },
+      };
     }),
 
   // NOTE: `theme` in the store is no longer the authoritative source of truth for
