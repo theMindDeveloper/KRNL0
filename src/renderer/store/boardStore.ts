@@ -9,6 +9,7 @@ interface BoardStore {
   board: Board | null;
   viewport: BoardViewport;
   theme: 'light' | 'dark';
+  selectedNodeId: string | null;
   setBoard: (board: Board) => void;
   updateNode: (id: string, patch: Partial<Node>) => void;
   addNode: (node: Node) => void;
@@ -19,6 +20,7 @@ interface BoardStore {
   panBy: (dx: number, dy: number) => void;
   zoomAt: (focalScreenX: number, focalScreenY: number, factor: number) => void;
   resetViewport: () => void;
+  selectNode: (id: string | null) => void;
 }
 
 function clampZoom(zoom: number): number {
@@ -29,6 +31,8 @@ export const useBoardStore = create<BoardStore>((set) => ({
   board: null,
   viewport: INITIAL_VIEWPORT,
   theme: 'light',
+  selectedNodeId: null,
+  selectNode: (id) => set({ selectedNodeId: id }),
 
   setBoard: (board) => set({ board, viewport: board.viewport }),
 
