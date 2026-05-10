@@ -103,9 +103,12 @@ const EDGE_TYPES = {
   default: DefaultEdge,
 };
 
-// ── Command handler cache so onCommand identity is stable per nodeId ──────────
-// A module-level map avoids rebuilding on every render cycle.
+// ── Per-id stable caches — keep RF/React.memo identity across renders ────────
+// Without these, every store update creates fresh closures → adapter memo
+// breaks → all nodes re-render every frame (the lag bug).
 const commandHandlerCache = new Map<string, ReturnType<typeof makeCommandHandler>>();
+const selectHandlerCache = new Map<string, () => void>();
+const rfNodeCache = new Map<string, { src: KrnlNode; rf: ReturnType<typeof toRfNode> }>();
 
 function getCommandHandler(nodeId: string): ReturnType<typeof makeCommandHandler> {
   let handler = commandHandlerCache.get(nodeId);
@@ -114,6 +117,30 @@ function getCommandHandler(nodeId: string): ReturnType<typeof makeCommandHandler
     commandHandlerCache.set(nodeId, handler);
   }
   return handler;
+}
+
+function getSelectHandler(
+  nodeId: string,
+  selectNode: (id: string | null) => void
+): () => void {
+  let handler = selectHandlerCache.get(nodeId);
+  if (!handler) {
+    handler = () => selectNode(nodeId);
+    selectHandlerCache.set(nodeId, handler);
+  }
+  return handler;
+}
+
+function getMemoizedRfNode(
+  node: KrnlNode,
+  ctx: { onCommand: ReturnType<typeof makeCommandHandler>; onSelect: () => void }
+) {
+  const cached = rfNodeCache.get(node.id);
+  // updateNode rewrites a single node ref on change; others stay identical.
+  if (cached && cached.src === node) return cached.rf;
+  const rf = toRfNode(node, ctx);
+  rfNodeCache.set(node.id, { src: node, rf });
+  return rf;
 }
 
 // ── Inner canvas (must be inside ReactFlowProvider) ───────────────────────────
@@ -140,13 +167,14 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // habit.day) once those node bodies exist.
   }, []);
 
-  // ── Derive RF nodes from boardStore ──────────────────────────────────────
+  // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
+  // Stable RFNode identity unless the underlying KrnlNode reference changes.
   const rfNodes = useMemo(() => {
     if (!board) return [];
     return board.nodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
-      const onSelect = () => selectNode(node.id);
-      return toRfNode(node, { onCommand, onSelect });
+      const onSelect = getSelectHandler(node.id, selectNode);
+      return getMemoizedRfNode(node, { onCommand, onSelect });
     });
   }, [board, selectNode]);
 
