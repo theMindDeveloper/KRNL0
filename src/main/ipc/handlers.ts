@@ -258,10 +258,19 @@ export function registerHandlers(): void {
     const shell = process.env['KRNL0_SHELL']
       ?? (isWin ? 'powershell.exe' : (process.env['SHELL'] ?? '/bin/zsh'));
 
-    const cwd =
-      process.env['USERPROFILE'] ??
-      process.env['HOME'] ??
-      homedir();
+    // Working directory (issue #74): default to the project root so
+    // `claude` and other CLIs can read CLAUDE.md and board.json without an
+    // explicit `cd`. process.cwd() is the repo root in dev (electron-vite
+    // is launched from there) and the resources/install dir in a packaged
+    // build. KRNL0_TERM_CWD overrides for users who want a fixed directory.
+    let cwd = process.env['KRNL0_TERM_CWD'] ?? process.cwd();
+    try {
+      if (!existsSync(cwd)) {
+        cwd = process.env['USERPROFILE'] ?? process.env['HOME'] ?? homedir();
+      }
+    } catch {
+      cwd = homedir();
+    }
 
     const proc = pty.spawn(shell, [], {
       cols,

@@ -35,6 +35,28 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     term.loadAddon(fit);
     term.open(containerRef.current);
 
+    // Issue #73: switch to a GPU-accelerated renderer. The default DOM
+    // renderer thrashes layout when running TUI apps like `claude` (heavy
+    // ANSI redraws + frequent cursor moves), causing visible lag and lost
+    // keystrokes. WebGL is preferred; fall back to 2D canvas if the GL
+    // context can't be created. Dynamic import keeps these browser-only
+    // modules out of Node/SSR test environments.
+    void (async () => {
+      try {
+        const { WebglAddon } = await import('@xterm/addon-webgl');
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        term.loadAddon(webgl);
+      } catch {
+        try {
+          const { CanvasAddon } = await import('@xterm/addon-canvas');
+          term.loadAddon(new CanvasAddon());
+        } catch {
+          // last resort: stick with the DOM renderer
+        }
+      }
+    })();
+
     termRef.current = term;
     fitRef.current = fit;
 
