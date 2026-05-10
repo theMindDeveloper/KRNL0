@@ -234,11 +234,15 @@ interface BoardStore {
 
 ### Context
 
-`Canvas` currently renders a placeholder `<div>` for every node regardless of `kind` (see `src/renderer/components/Canvas/index.tsx:70`). The node spec (§7.2) says every node type registers a `NodeKind` with a pure `render` function. We need a single dispatch point that maps `node.kind` → component, and a single `NodeProps` shape that every node component accepts. Rule 5 from §7.2 forbids cross-node imports, so the dispatch map must live outside any individual node module.
+`Canvas` currently renders a placeholder `<div>` for every node regardless of `kind` (see `src/renderer/components/Canvas/index.tsx:70`). The node spec (§7.2) says every node type registers a kernel-side spec with a pure `render` function. We need a single dispatch point that maps `node.kind` → component, and a single `NodeProps` shape that every node component accepts. Rule 5 from §7.2 forbids cross-node imports, so the dispatch map must live outside any individual node module.
+
+**Naming note (added 2026-05-10 during PR #2):** The kernel-side registration interface in `src/shared/types/node.ts` was originally named `NodeKind<TState, TConfig>`. This decision needs a *literal-union* name for the set of valid kind strings — and `NodeKind` is the natural name for that string type, since it describes what `node.kind` actually is. To resolve the collision: the existing interface is renamed to **`NodeKindSpec<TState, TConfig>`** (it is a *spec* describing how a kind behaves), and **`NodeKind`** is reserved for the literal union of kind strings. Rationale: in day-to-day code (commands, switches, registry keys, IPC payloads) the union is used 10× more often than the spec, so it deserves the shorter name. The spec is a once-per-kind registration; spelling it `NodeKindSpec` is fine.
 
 ### Decision
 
 A central registry module `src/renderer/components/nodes/registry.ts` exports a `Record<NodeKind, ComponentType<NodeProps>>`. Canvas iterates `board.nodes`, looks up the component by `node.kind`, and renders it with `NodeProps`. Unknown kinds render a fallback `<UnknownNode>` (do not throw — a future node `kind` should not crash the canvas).
+
+The kernel-side registration interface (formerly `NodeKind<T,C>`) is renamed to `NodeKindSpec<T,C>` to free the `NodeKind` name for the literal union below.
 
 ### Contract
 
@@ -246,6 +250,17 @@ A central registry module `src/renderer/components/nodes/registry.ts` exports a 
 // src/shared/types/node.ts — kind values are string literals
 export type NodeKind = 'pomo' | 'todo' | 'habit' | 'term'
                     | 'pomo.session' | 'todo.task' | 'habit.day';
+
+// src/shared/types/node.ts — kernel registration spec (renamed from NodeKind)
+export interface NodeKindSpec<TState, TConfig> {
+  kind: NodeKind;
+  defaultState: () => TState;
+  defaultConfig: () => TConfig;
+  render: (props: RenderProps<TState, TConfig>) => ReactElement; // pure
+  commands: Record<string, CommandHandler<TState>>;
+  events: readonly string[];
+  schema: ZodSchema<TState>;
+}
 
 // src/renderer/components/nodes/types.ts
 export interface NodeProps<TState = unknown, TConfig = unknown> {
