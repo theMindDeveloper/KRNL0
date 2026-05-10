@@ -81,12 +81,19 @@ export function Canvas() {
   // Escape to deselect.
   useEffect(() => {
     const target = document.body;
+    const isTypingTarget = (t: EventTarget | null): boolean => {
+      if (!(t instanceof HTMLElement)) return false;
+      const tag = t.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable;
+    };
     const onDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       if (e.code === 'Space' && !e.repeat) setSpaceHeld(true);
       if (e.code === 'Home') resetViewport();
       if (e.code === 'Escape') setSelectedId(null);
     };
     const onUp = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       if (e.code === 'Space') setSpaceHeld(false);
     };
     target.addEventListener('keydown', onDown);
@@ -236,6 +243,23 @@ export function Canvas() {
             const tx = tgtNode.position.x;
             const ty = tgtNode.position.y + getNodeHeight(tgtNode.kind) / 2;
             const d = `M ${sx} ${sy} C ${sx + 80} ${sy} ${tx - 80} ${ty} ${tx} ${ty}`;
+
+            // Task-flow edge: task → task chain renders as cyan marching ants
+            const isTaskFlow = srcNode.kind === 'todo.task' && tgtNode.kind === 'todo.task';
+            if (isTaskFlow) {
+              return (
+                <path
+                  key={edge.id}
+                  d={d}
+                  fill="none"
+                  stroke="var(--cyan)"
+                  strokeWidth={2}
+                  strokeDasharray="14 8"
+                  opacity={0.95}
+                  className="task-flow-edge"
+                />
+              );
+            }
 
             return (
               <path

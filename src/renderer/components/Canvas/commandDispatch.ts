@@ -151,22 +151,23 @@ export function makeCommandHandler(nodeId: string) {
         config: { showDuration: true },
       };
 
-      // Edge: previous task (or todo mother if first) → this task
-      const previousNodeId =
-        currentTaskCount === 0
-          ? todoNode.id
-          : (existingTaskNodes[existingTaskNodes.length - 1]?.id ?? todoNode.id);
-
-      const edge: Edge = {
-        id: `edge-${crypto.randomUUID()}`,
-        from: { nodeId: previousNodeId, event: 'task.next' },
-        to: { nodeId: taskNode.id, command: 'task.activate' },
-        enabled: true,
-      };
-
       const { addNode, addEdge } = useBoardStore.getState();
       addNode(taskNode);
-      addEdge(edge);
+
+      // Edge: ONLY chain previous task → this task. First task has no inbound
+      // edge — todo mother is config, not a task source.
+      if (currentTaskCount > 0) {
+        const previousTask = existingTaskNodes[existingTaskNodes.length - 1];
+        if (previousTask) {
+          const edge: Edge = {
+            id: `edge-${crypto.randomUUID()}`,
+            from: { nodeId: previousTask.id, event: 'task.next' },
+            to: { nodeId: taskNode.id, command: 'task.activate' },
+            enabled: true,
+          };
+          addEdge(edge);
+        }
+      }
 
       // Single persist that captures all three mutations
       const finalBoard = useBoardStore.getState().board;
