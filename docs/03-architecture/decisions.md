@@ -604,10 +604,19 @@ Terminal sessions are owned by the main process and identified by a `sessionId` 
 
 ```typescript
 // main process
-const defaultShell = process.platform === 'win32'
-  ? (process.env.COMSPEC ?? 'powershell.exe')
-  : (process.env.SHELL ?? '/bin/zsh');
+const defaultShell = process.env.KRNL0_SHELL
+  ?? (process.platform === 'win32'
+        ? 'powershell.exe'
+        : (process.env.SHELL ?? '/bin/zsh'));
 ```
+
+**Why PowerShell, not cmd.exe.** Earlier revisions of this contract listed `process.env.COMSPEC ?? 'powershell.exe'` on Windows — `COMSPEC` resolves to `cmd.exe` on every default Windows install, so the "fallback" never triggered. This was changed (PR #71) after cmd.exe demonstrated several TTY-semantics problems through node-pty's ConPTY backend:
+
+- cmd.exe ignores `0x7f` (DEL), forcing a renderer-side translation to `0x08` (PR #70). bash, zsh, and PowerShell all accept `0x7f` natively.
+- cmd.exe is a 1985-era line-oriented batch interpreter, not a TTY-aware shell. Tab completion, history, ANSI colour, and Unicode are all degraded.
+- `claude` and other modern CLIs assume a real shell environment.
+
+PowerShell ships preinstalled on every supported Windows version (`powershell.exe` is Windows PowerShell 5.1; the newer `pwsh.exe` is PowerShell 7+ if separately installed). The user can override either by setting `KRNL0_SHELL=cmd.exe` (or `pwsh.exe`, or any other path) in their environment before launching the app.
 
 `cwd` defaults to the user's home dir. Override allowed via `pty:create` args (used by the kernel when launching `claude` inside the codebase folder — see Decision 3).
 
