@@ -124,45 +124,49 @@ describe('F3 — Left dock contains 4 icon buttons', () => {
     expect(buttons.length).toBe(4);
   });
 
-  it('renders buttons for pomo, todo, habit, term', () => {
+  it('renders buttons for select, text, image, connect', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    expect(screen.getByTestId('dock-btn-pomo')).toBeTruthy();
-    expect(screen.getByTestId('dock-btn-todo')).toBeTruthy();
-    expect(screen.getByTestId('dock-btn-habit')).toBeTruthy();
-    expect(screen.getByTestId('dock-btn-term')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-select')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-text')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-image')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-connect')).toBeTruthy();
   });
 });
 
 // ── F4 — Dock button calls onAddNode with correct kind ────────────────────────
 
 describe('F4 — Dock button dispatches board.addNode intent', () => {
-  it('clicking pomo dock button calls onAddNode with { kind: "pomo" }', () => {
+  it('clicking text dock button calls onAddNode with { kind: "text" }', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.click(screen.getByTestId('dock-btn-pomo'));
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'pomo' });
+    fireEvent.click(screen.getByTestId('dock-btn-text'));
+    expect(onAddNode).toHaveBeenCalledWith({ kind: 'text' });
   });
 
-  it('clicking todo dock button calls onAddNode with { kind: "todo" }', () => {
+  it('clicking image dock button calls onAddNode with { kind: "image" }', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.click(screen.getByTestId('dock-btn-todo'));
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'todo' });
+    fireEvent.click(screen.getByTestId('dock-btn-image'));
+    expect(onAddNode).toHaveBeenCalledWith({ kind: 'image' });
   });
 
-  it('clicking habit dock button calls onAddNode with { kind: "habit" }', () => {
+  it('clicking select button calls onToolChange with "select"', () => {
     const onAddNode = vi.fn();
-    renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.click(screen.getByTestId('dock-btn-habit'));
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'habit' });
+    const onToolChange = vi.fn();
+    renderWithWrapper(React.createElement(Dock, { onAddNode, onToolChange }));
+    fireEvent.click(screen.getByTestId('dock-btn-select'));
+    expect(onToolChange).toHaveBeenCalledWith('select');
+    expect(onAddNode).not.toHaveBeenCalled();
   });
 
-  it('clicking term dock button calls onAddNode with { kind: "term" }', () => {
+  it('clicking connect button calls onToolChange with "connect"', () => {
     const onAddNode = vi.fn();
-    renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.click(screen.getByTestId('dock-btn-term'));
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'term' });
+    const onToolChange = vi.fn();
+    renderWithWrapper(React.createElement(Dock, { onAddNode, onToolChange }));
+    fireEvent.click(screen.getByTestId('dock-btn-connect'));
+    expect(onToolChange).toHaveBeenCalledWith('connect');
+    expect(onAddNode).not.toHaveBeenCalled();
   });
 });
 
@@ -268,38 +272,47 @@ describe('F7 — FIT button calls fitView', () => {
 // ── F8 — Dock keyboard shortcuts ─────────────────────────────────────────────
 
 describe('F8 — Dock keyboard shortcuts fire onAddNode', () => {
-  it('pressing "P" calls onAddNode with { kind: "pomo" }', () => {
+  it('pressing "N" calls onAddNode with { kind: "text" }', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.keyDown(window, { key: 'P' });
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'pomo' });
+    fireEvent.keyDown(window, { key: 'N' });
+    expect(onAddNode).toHaveBeenCalledWith({ kind: 'text' });
   });
 
-  it('pressing "T" calls onAddNode with { kind: "todo" }', () => {
+  it('pressing "n" (lowercase) calls onAddNode with { kind: "text" }', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.keyDown(window, { key: 'T' });
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'todo' });
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(onAddNode).toHaveBeenCalledWith({ kind: 'text' });
   });
 
-  it('pressing "H" calls onAddNode with { kind: "habit" }', () => {
+  it('pressing "I" calls onAddNode with { kind: "image" }', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.keyDown(window, { key: 'H' });
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'habit' });
+    fireEvent.keyDown(window, { key: 'I' });
+    expect(onAddNode).toHaveBeenCalledWith({ kind: 'image' });
   });
 
-  it('pressing "X" calls onAddNode with { kind: "term" }', () => {
+  it('pressing "i" (lowercase) calls onAddNode with { kind: "image" }', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.keyDown(window, { key: 'X' });
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'term' });
+    fireEvent.keyDown(window, { key: 'i' });
+    expect(onAddNode).toHaveBeenCalledWith({ kind: 'image' });
   });
 
-  it('shortcut key displayed in tooltip title', () => {
+  it('pressing "V" sets select tool, does not call onAddNode', () => {
+    const onAddNode = vi.fn();
+    const onToolChange = vi.fn();
+    renderWithWrapper(React.createElement(Dock, { onAddNode, onToolChange }));
+    fireEvent.keyDown(window, { key: 'V' });
+    expect(onToolChange).toHaveBeenCalledWith('select');
+    expect(onAddNode).not.toHaveBeenCalled();
+  });
+
+  it('shortcut key displayed in tooltip title for text button', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    const pomoBtn = screen.getByTestId('dock-btn-pomo');
-    expect(pomoBtn.getAttribute('title')).toContain('P');
+    const textBtn = screen.getByTestId('dock-btn-text');
+    expect(textBtn.getAttribute('title')).toContain('N');
   });
 });
