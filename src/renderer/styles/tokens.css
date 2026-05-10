@@ -29,6 +29,7 @@
   --rust-deep: #a83e2a;
   --plum:      #6b4ea8;
   --cyan:      #4ea8b0;
+  --cyan-glow: #7dd6df;
 
   /* Terminal — always dark */
   --term-bg:    #0c0a08;

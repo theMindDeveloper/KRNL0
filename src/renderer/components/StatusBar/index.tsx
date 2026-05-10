@@ -14,14 +14,16 @@ function pluralize(count: number, singular: string): string {
 }
 
 export function StatusBar() {
-  const board = useBoardStore((s) => s.board);
+  // Granular selectors — subscribing to s.board would re-render this row on
+  // every drag tick (board ref churns 60fps). Selecting primitives means
+  // Zustand only triggers a re-render when the actual count/name changes.
+  const nodeCount = useBoardStore((s) => s.board?.nodes.length ?? 0);
+  const edgeCount = useBoardStore((s) => s.board?.edges.length ?? 0);
+  const boardName = useBoardStore(
+    (s) => (s.board as { title?: string } | null)?.title ?? 'deep-work'
+  );
   // Read zoom directly from RF's internal transform — live, zero Zustand writes.
   const zoomPct = useStore((s) => Math.round(s.transform[2] * 100));
-
-  const nodeCount = board?.nodes.length ?? 0;
-  const edgeCount = board?.edges.length ?? 0;
-  // board.title does not exist in v1 — fall back to the constant per scope refinements.
-  const boardName = (board as { title?: string } | null)?.title ?? 'deep-work';
 
   const nodeStr = pluralize(nodeCount, 'node');
   const edgeStr = pluralize(edgeCount, 'edge');
