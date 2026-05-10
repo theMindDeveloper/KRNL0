@@ -14,6 +14,11 @@ export default defineConfig({
       '@xterm/xterm': resolve(__dirname, 'tests/__mocks__/@xterm/xterm.ts'),
       '@xterm/addon-fit': resolve(__dirname, 'tests/__mocks__/@xterm/addon-fit.ts'),
       '@xterm/xterm/css/xterm.css': resolve(__dirname, 'tests/__mocks__/@xterm/xterm.css.ts'),
+      // Stub @xyflow/react for all test environments (worktree resolves modules
+      // from the parent node_modules but ESM-only RF can't run in Node/jsdom).
+      // AppChrome tests also vi.mock it per-file for component isolation.
+      '@xyflow/react': resolve(__dirname, 'tests/__mocks__/@xyflow/react.ts'),
+      '@xyflow/react/dist/style.css': resolve(__dirname, 'tests/__mocks__/@xterm/xterm.css.ts'),
     },
   },
   test: {
