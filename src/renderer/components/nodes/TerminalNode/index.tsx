@@ -4,6 +4,33 @@ import { FitAddon } from '@xterm/addon-fit';
 import type { NodeProps } from '../types';
 import type { TermState, TermConfig } from './types';
 
+const SLOT_INDEX = 4;
+const SLOT_TOTAL = 4;
+
+const slotTagStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 9,
+  color: 'var(--ink-3)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.18em',
+  marginBottom: 6,
+  paddingLeft: 2,
+};
+
+const cornerStyle = (corner: 'tl' | 'tr' | 'bl' | 'br'): React.CSSProperties => {
+  const base: React.CSSProperties = {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    opacity: 0.35,
+    pointerEvents: 'none',
+  };
+  if (corner === 'tl') return { ...base, top: -1, left: -1, borderTop: '1px solid var(--ink-3)', borderLeft: '1px solid var(--ink-3)' };
+  if (corner === 'tr') return { ...base, top: -1, right: -1, borderTop: '1px solid var(--ink-3)', borderRight: '1px solid var(--ink-3)' };
+  if (corner === 'bl') return { ...base, bottom: -1, left: -1, borderBottom: '1px solid var(--ink-3)', borderLeft: '1px solid var(--ink-3)' };
+  return { ...base, bottom: -1, right: -1, borderBottom: '1px solid var(--ink-3)', borderRight: '1px solid var(--ink-3)' };
+};
+
 export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfig>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -36,9 +63,9 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
     fit.fit();
 
     // Boot art — written before shell connects
-    term.writeln('\x1b[38;2;201;241;88m▙ krnl0 v0.2.0\x1b[0m');
-    term.writeln('\x1b[2mtype \x1b[0mhelp\x1b[2m for commands\x1b[0m');
-    term.writeln('');
+    term.write('\x1b[38;2;201;241;88m▙ krnl0 · v0.2.0 · claude code attached · tmux session "main"\x1b[0m\r\n');
+    term.write('\x1b[2m─────────────────────────────────────────────\x1b[0m\r\n');
+    term.write('\r\n');
 
     termRef.current = term;
     fitRef.current = fit;
@@ -105,45 +132,108 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        width: 460,
-        background: 'var(--term-bg)',
-        border: hovered ? '1px solid var(--acid)' : '1px solid var(--paper-3)',
-        borderRadius: 'var(--radius-lg)',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-1)',
-        transition: 'border-color 0.15s ease',
-      }}
-    >
-      {/* Header */}
+    <div style={{ position: 'relative' }}>
+      <style>{`
+        @keyframes term-live-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.35; }
+        }
+        .term-live-dot {
+          animation: term-live-pulse 1.4s ease-in-out infinite;
+        }
+      `}</style>
+
+      {/* Slot tag above the card */}
+      <div style={slotTagStyle}>04 · SPINE · 04</div>
+
+      {/* Outer card */}
       <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
-          background: 'var(--term-bg-2)',
-          padding: '7px 10px 6px',
-          borderBottom: '1px solid rgba(201,241,88,0.12)',
+          position: 'relative',
+          width: 320,
+          background: 'var(--term-bg)',
+          border: hovered ? '1px solid var(--acid)' : '1px solid var(--paper-3)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          boxShadow: 'var(--shadow-1)',
+          transition: 'border-color 0.15s ease',
         }}
       >
-        <span
+        {/* Corner brackets */}
+        <span style={cornerStyle('tl')} />
+        <span style={cornerStyle('tr')} />
+        <span style={cornerStyle('bl')} />
+        <span style={cornerStyle('br')} />
+
+        {/* Header with traffic lights + label + LIVE badge */}
+        <div
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
-            color: 'var(--term-acid)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
+            background: 'var(--term-bg-2)',
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}
         >
-          ▙ TERM
-        </span>
-      </div>
+          {/* Traffic lights */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57', display: 'inline-block' }} />
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#febc2e', display: 'inline-block' }} />
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840', display: 'inline-block' }} />
+          </div>
 
-      {/* xterm.js mount point */}
-      <div
-        ref={containerRef}
-        style={{ width: '100%', height: 280 }}
-      />
+          {/* Center label */}
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              color: 'var(--ink-3)',
+              letterSpacing: '0.02em',
+            }}
+          >
+            claude-code · ~/krnl0 · zsh
+          </span>
+
+          {/* LIVE badge */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              textTransform: 'uppercase',
+              letterSpacing: '0.18em',
+              color: 'var(--acid)',
+              border: '1px solid var(--acid)',
+              borderRadius: 3,
+              padding: '2px 6px',
+              background: 'transparent',
+            }}
+          >
+            <span
+              className="term-live-dot"
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: '50%',
+                background: 'var(--acid)',
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+            />
+            LIVE
+          </div>
+        </div>
+
+        {/* xterm.js mount point */}
+        <div
+          ref={containerRef}
+          style={{ width: '100%', height: 280, background: 'var(--term-bg)' }}
+        />
+      </div>
     </div>
   );
 }
