@@ -94,24 +94,32 @@ export function createNodeAdapter<S = unknown, C = unknown>(
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
     const { node, onCommand, onSelect } = data;
+    // Mother nodes don't connect — render zero handles
+    const showHandles = !node.isMother;
     return (
       <>
-        <Handle
-          type="target"
-          position={Position.Left}
-          style={handleStyle}
-        />
+        {showHandles && (
+          <Handle
+            type="target"
+            position={Position.Left}
+            style={handleStyle}
+            isConnectable={false}
+          />
+        )}
         <Inner
           node={node as Node<S, C>}
           selected={selected === true}
           onCommand={onCommand}
           onSelect={onSelect}
         />
-        <Handle
-          type="source"
-          position={Position.Right}
-          style={handleStyle}
-        />
+        {showHandles && (
+          <Handle
+            type="source"
+            position={Position.Right}
+            style={handleStyle}
+            isConnectable={false}
+          />
+        )}
       </>
     );
   }

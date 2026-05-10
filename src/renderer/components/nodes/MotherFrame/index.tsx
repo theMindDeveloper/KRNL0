@@ -34,6 +34,9 @@ export function MotherFrame({
       style={{
         position: 'relative',
         width,
+        minHeight: 480,
+        display: 'flex',
+        flexDirection: 'column',
         background,
         border: `1px solid ${borderColor}`,
         borderRadius: 6,
