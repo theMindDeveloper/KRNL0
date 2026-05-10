@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs';
-import { join, tmpdir } from 'path';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { BoardSchema } from '../../../src/shared/schemas/board.schema';
 import type { Board } from '../../../src/shared/types';
 

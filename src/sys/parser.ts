@@ -1,10 +1,18 @@
 export type SysCommand =
-  | { kind: 'board'; sub: 'show' | 'save' | 'load'; path?: string }
-  | { kind: 'node'; sub: 'list' | 'add' | 'remove'; nodeKind?: string; id?: string; at?: { x: number; y: number } }
-  | { kind: 'pomo'; sub: 'start' | 'stop' | 'status'; label?: string; minutes?: number }
-  | { kind: 'todo'; sub: 'add' | 'check' | 'list'; text?: string; id?: string; tag?: string }
-  | { kind: 'habit'; sub: 'add' | 'done' | 'streak'; name?: string; date?: string }
-  | { kind: 'edge'; sub: 'add' | 'remove' | 'list'; from?: string; to?: string; id?: string; args?: Record<string, string> }
+  | { kind: 'board'; sub: 'show' | 'save' | 'load'; path: string | undefined }
+  | { kind: 'node'; sub: 'list' }
+  | { kind: 'node'; sub: 'remove'; id: string | undefined }
+  | { kind: 'node'; sub: 'add'; nodeKind: string | undefined; at: { x: number; y: number } | undefined }
+  | { kind: 'pomo'; sub: 'stop' | 'status' }
+  | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
+  | { kind: 'todo'; sub: 'list' }
+  | { kind: 'todo'; sub: 'check'; id: string | undefined }
+  | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
+  | { kind: 'habit'; sub: 'add' | 'streak'; name: string | undefined }
+  | { kind: 'habit'; sub: 'done'; name: string | undefined; date: string | undefined }
+  | { kind: 'edge'; sub: 'list' }
+  | { kind: 'edge'; sub: 'remove'; id: string | undefined }
+  | { kind: 'edge'; sub: 'add'; from: string | undefined; to: string | undefined }
   | { kind: 'say'; text: string }
   | { kind: 'hear' }
   | { kind: 'help' };
@@ -41,10 +49,11 @@ export class SysParser {
     if (cmd === 'pomo') {
       if (sub === 'stop' || sub === 'status') return { kind: 'pomo', sub };
       if (sub === 'start') {
+        const minutesRaw = flag(rest, 'minutes');
         return {
           kind: 'pomo', sub: 'start',
           label: flag(rest, 'label'),
-          minutes: flag(rest, 'minutes') !== undefined ? Number(flag(rest, 'minutes')) : undefined,
+          minutes: minutesRaw !== undefined ? Number(minutesRaw) : undefined,
         };
       }
     }
