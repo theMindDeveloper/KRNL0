@@ -22,6 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - vitest.config.ts, PR template, GitHub labels, milestones (week-2-canvas-nodes, week-3-edges-children)
 - 116 unit tests covering all Phase 2 node logic
 
+### Fixed
+- perf: replace `onMove` → `onMoveEnd` to stop 60fps Zustand viewport writes (#perf)
+- perf: StatusBar zoom now reads from RF internal store (`useStore`) not `boardStore` — eliminates 60fps re-render (#perf)
+- fix(terminal): add `nokey` class + `onKeyDown` `stopPropagation` so xterm receives keyboard input (#terminal)
+
+### Changed
+- feat(dock): redesign dock to spawn child nodes (text, image) instead of parent (mother) nodes
+- feat(nodes): add TextNode and ImageNode placeholder components
+- feat(canvas): implement actual node creation in `handleAddNode` (wired to `boardStore`)
+- feat(mother): add `‹`/`›` slot reorder arrows on fixed nodes (hover-revealed)
+
 ## [0.1.0] - 2026-05-09
 
 Initial scaffold. Week 1 of the 10-week build to live demo on 2026-07-20.
