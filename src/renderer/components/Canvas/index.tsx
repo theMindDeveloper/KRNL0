@@ -20,19 +20,19 @@ const GRID_STYLE: React.CSSProperties = {
 
 // Approximate dimensions per node kind for edge port positioning.
 const NODE_WIDTHS: Record<NodeKind, number> = {
-  pomo: 320,
-  todo: 320,
-  habit: 320,
-  term: 320,
+  pomo: 380,
+  todo: 380,
+  habit: 380,
+  term: 380,
   'pomo.session': 200,
   'todo.task': 220,
   'habit.day': 240,
 };
 const NODE_HEIGHTS: Record<NodeKind, number> = {
-  pomo: 380,
-  todo: 320,
-  habit: 320,
-  term: 340,
+  pomo: 460,
+  todo: 360,
+  habit: 360,
+  term: 360,
   'pomo.session': 120,
   'todo.task': 90,
   'habit.day': 60,
