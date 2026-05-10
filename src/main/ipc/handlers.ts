@@ -245,10 +245,18 @@ export function registerHandlers(): void {
   ipcMain.handle('pty:create', (event, cols: number, rows: number) => {
     const sessionId = randomUUID();
 
+    // Default shell selection (Decision 12 §Default shell):
+    //   Windows  — PowerShell (modern shell, proper TTY behaviour, ANSI colors,
+    //              history, tab completion). cmd.exe is intentionally NOT the
+    //              default — its TTY semantics are inferior and it requires
+    //              extra translation layers (see PR #70 for the 0x7f→0x08 hack
+    //              that was only needed because of cmd.exe).
+    //   POSIX    — $SHELL, falling back to /bin/zsh.
+    //   Override — KRNL0_SHELL env var wins on every platform; set it to
+    //              "cmd.exe", "pwsh.exe", "/bin/bash", etc. as needed.
     const isWin = process.platform === 'win32';
-    const shell = isWin
-      ? (process.env['COMSPEC'] ?? 'powershell.exe')
-      : (process.env['SHELL'] ?? '/bin/zsh');
+    const shell = process.env['KRNL0_SHELL']
+      ?? (isWin ? 'powershell.exe' : (process.env['SHELL'] ?? '/bin/zsh'));
 
     const cwd =
       process.env['USERPROFILE'] ??
