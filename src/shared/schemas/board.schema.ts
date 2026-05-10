@@ -7,6 +7,7 @@ export const NodeSchema = z.object({
   state: z.unknown(),
   config: z.unknown(),
   isMother: z.boolean(),
+  slot: z.number().optional(),
 });
 
 export const EdgeSchema = z.object({

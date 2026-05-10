@@ -26,6 +26,10 @@ export interface RFNodeData extends Record<string, unknown> {
   node: Node;
   onCommand: (command: string, args?: Record<string, unknown>) => void;
   onSelect: () => void;
+  slotIndex?: number | undefined;
+  slotTotal?: number | undefined;
+  onMoveLeft?: ((() => void) | undefined);
+  onMoveRight?: ((() => void) | undefined);
 }
 
 // Convenience alias for the full RF node type with our data.
@@ -38,6 +42,10 @@ export function toRfNode(
   ctx: {
     onCommand: (command: string, args?: Record<string, unknown>) => void;
     onSelect: () => void;
+    slotIndex?: number | undefined;
+    slotTotal?: number | undefined;
+    onMoveLeft?: ((() => void) | undefined);
+    onMoveRight?: ((() => void) | undefined);
   }
 ): KrnlRFNode {
   return {
@@ -50,6 +58,10 @@ export function toRfNode(
       node,
       onCommand: ctx.onCommand,
       onSelect: ctx.onSelect,
+      slotIndex: ctx.slotIndex,
+      slotTotal: ctx.slotTotal,
+      onMoveLeft: ctx.onMoveLeft,
+      onMoveRight: ctx.onMoveRight,
     },
   };
 }
@@ -93,7 +105,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
 ): ComponentType<RFNodeProps<KrnlRFNode>> {
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
-    const { node, onCommand, onSelect } = data;
+    const { node, onCommand, onSelect, slotIndex, slotTotal, onMoveLeft, onMoveRight } = data;
     // Mother nodes don't connect — render zero handles
     const showHandles = !node.isMother;
     return (
@@ -111,6 +123,10 @@ export function createNodeAdapter<S = unknown, C = unknown>(
           selected={selected === true}
           onCommand={onCommand}
           onSelect={onSelect}
+          slotIndex={slotIndex as number | undefined}
+          slotTotal={slotTotal as number | undefined}
+          onMoveLeft={onMoveLeft as (() => void) | undefined}
+          onMoveRight={onMoveRight as (() => void) | undefined}
         />
         {showHandles && (
           <Handle
