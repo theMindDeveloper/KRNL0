@@ -4,7 +4,6 @@ import type { PomoConfig, PomoState } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 
 const TICK_MS = 500;
-const SLOT_INDEX = 1;
 
 function formatRemaining(ms: number): string {
   const safe = Math.max(0, ms);
@@ -47,7 +46,7 @@ export function pipState(
   return 'empty';
 }
 
-export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) {
+export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<PomoState, PomoConfig>) {
   const { state, config } = node;
   const [, setTick] = useState(0);
 
@@ -112,7 +111,7 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
     : 'none';
 
   return (
-    <MotherFrame slotIndex={SLOT_INDEX} slotTotal={MOTHER_TOTAL} width={MOTHER_WIDTH}>
+    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
       {/* NF2: Bubble keyframes are pure CSS — no JS drives them */}
       <style>{`
         @keyframes vapor-rise {
