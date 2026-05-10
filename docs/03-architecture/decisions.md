@@ -643,7 +643,21 @@ export interface PtyExitEvent   { sessionId: string; exitCode: number; signal: s
 
 - Enables: multiple terminals on one canvas, hosting `claude` inside any of them, clean shutdown.
 - Forecloses: running ptys in renderer (by design — native modules stay in main).
-- Native-module pain (rebuilds for Electron version) is concentrated in one place; `electron-rebuild` runs in postinstall.
+- Native-module pain (rebuilds for Electron version) is concentrated in one place; the `@electron/rebuild` postinstall hook (Decision 18) absorbs it.
+
+### Status: Re-affirmed 2026-05-10
+
+**What happened.** Phase 2 implementation (commit `4fa99b63`) substituted Node's built-in `child_process.spawn` for `node-pty` in `src/main/ipc/handlers.ts`. The motivation was pragmatic: `node-pty` is a native module that needs a per-Electron-version rebuild, and at that moment the build pipeline did not have a postinstall hook wired up. `child_process` ships with Node and required no extra tooling, so it looked like a zero-risk shortcut to unblock the rest of Phase 2.
+
+**Why it produced an unusable terminal.** `child_process.spawn` with `stdio: ['pipe', 'pipe', 'pipe']` does not allocate a pseudo-terminal. On Windows specifically, `cmd.exe` and `powershell.exe` detect the absence of a console (no ConPTY, no `isatty`) and switch to **non-interactive pipe mode**: line-buffered, no character echo, no readline editing, no ANSI cursor handling, no job-control signal forwarding. Verified on this branch by instrumenting the IPC chain — `stdin.write` returns `true`, the byte reaches the child, but stdout produces nothing visible until a full line + newline is buffered, and even then the input is never echoed. The user sees a black rectangle that "eats" keystrokes. This violates F9 (echo), F10 (backspace edits the buffer), F11 (Enter submits), F12 (arrow-key history / cursor nav), and F14 (`claude` interactive prompt). It also defeats the entire reason a terminal node exists per Decision 3 — `claude` cannot run without a TTY.
+
+**Resolution.** Revert to the original Decision 12 contract: `node-pty` in main, `xterm.js` in renderer. Real ConPTY on Windows, real POSIX PTY on macOS / Linux. No pipe-mode fallback path — a fallback is what produced the bug, and "no terminal" is a clearer failure mode than "broken terminal."
+
+**Install / rebuild expectation.** `node-pty` is added to `dependencies` (runtime, not dev — it is required at app start). `@electron/rebuild` is added to `devDependencies` and wired to a `postinstall` script that targets `node-pty` against the installed Electron version's ABI. Full mechanics in Decision 18.
+
+**IPC contract — unchanged.** The channel names (`pty:create`, `pty:write`, `pty:resize`, `pty:kill`, `pty:data`, `pty:exit`) and their payload shapes as defined above are preserved verbatim. `node-pty` plugs in as a drop-in replacement for the `child_process` handlers because the data flow (write bytes / receive bytes / resize / kill) is identical at the IPC boundary. The renderer side does **not** change.
+
+**Canonical session-key field name: `sessionId`.** Decision 12's contract names this `sessionId`. The requirements doc `docs/06-requirements/terminal-node.md` (F4, F5, F4b scenarios) uses `nodeId` for the same field — that is a documentation drift, not a contract change. The wire format remains `sessionId` and its **value** remains `node.id`. Backend-dev implements `sessionId` per this ADR; pm-docs is responsible for normalising the requirements doc in the same PR cycle so the two sources agree. No code rename is owed to the renderer or preload.
 
 ---
 
@@ -693,3 +707,104 @@ Two layers of isolation:
 - Forecloses: the simplification of "one board file per machine, period." A user running both `krnl0` (production) and a `krnl0-*` dev build will see two separate boards in `~/Documents/`. This is a feature for developers, but worth noting if a packaged variant ever ships.
 - Existing user boards at `~/Documents/krnl0/board.json` continue to work unchanged on production builds.
 - Renaming `package.json#name` on a feature branch is a one-line change but it **must** be reverted (or merged carefully) before that branch ships to users — otherwise the released build would silently look at a different board path.
+
+---
+
+## Decision 18 — Native Module Rebuild Flow
+
+**Date:** 2026-05-10
+**Status:** Accepted
+**Author:** architect
+
+### Context
+
+Decision 12 commits us to `node-pty`, a native (C++) Node.js module. Native modules are compiled against a specific V8 / Node ABI, and Electron ships its own embedded Node with an ABI that drifts from the host system Node a developer used to run `npm install`. A module built against system Node will throw `NODE_MODULE_VERSION mismatch` the moment Electron tries to `require` it, and the renderer / main process crashes at startup.
+
+The Phase 2 deviation (`child_process` workaround, see Decision 12 Re-affirmation) was driven precisely by the absence of a rebuild story. We need a rebuild flow that is:
+
+1. **Automatic on `npm install`** — a fresh clone produces a working terminal with no manual step. This is the binding NF5 requirement.
+2. **Automatic on Electron version bumps** — `npm i electron@<new>` re-triggers a `node-pty` rebuild without the developer remembering to do anything. NF6.
+3. **Loud on failure** — a rebuild that cannot succeed (no toolchain installed) must fail the install with a legible error, not silently leave a stale `.node` binary that crashes at runtime.
+4. **Aligned with packaging** — `electron-builder`'s production pipeline already rebuilds native modules during `build`; the dev hook should not duplicate or fight that.
+
+Two tools exist:
+
+- **`electron-rebuild`** — the original package, now deprecated. The npm registry entry redirects users to the scoped fork.
+- **`@electron/rebuild`** — the actively-maintained scoped fork under the official `@electron/` org. Same API surface, current Electron versions tested.
+
+### Decision
+
+Use **`@electron/rebuild`**. Wire it in via a `postinstall` script in `package.json`. `node-pty` itself is a runtime dependency, not a dev dependency.
+
+Rationale for the tool choice:
+
+- `@electron/rebuild` is the supported package; `electron-rebuild` (unscoped) is deprecated and unmaintained. Picking the deprecated package now would create a known-future migration cost for zero present benefit.
+- Both packages expose the same CLI binary name (`electron-rebuild`) so existing scripts and docs that reference the binary remain valid.
+- `electron-builder` already depends on `@electron/rebuild` transitively for its own packaging step, so adding it as a direct dev-dep does not bloat the dep tree.
+
+Rationale for `dependencies` (not `devDependencies`) for `node-pty`:
+
+- The compiled `.node` binary is required at app runtime. `electron-builder` only packages modules listed under `dependencies`. A dev-deps placement would silently produce an installer that crashes on first launch.
+- `@electron/rebuild` is a build-time tool only — it stays in `devDependencies`.
+
+### Contract
+
+**`package.json` changes (binding for backend-dev):**
+
+```jsonc
+{
+  "scripts": {
+    // ...existing
+    "postinstall": "electron-rebuild -f -w node-pty"
+  },
+  "dependencies": {
+    // ...existing runtime deps
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    // ...existing dev deps
+    "@electron/rebuild": "^3.6.0"
+  }
+}
+```
+
+The `electron-rebuild` binary is supplied by the `@electron/rebuild` package. Flags:
+
+- `-f` (force) — rebuild even if a `.node` file is already present, so an Electron upgrade always re-compiles. This is what makes NF6 work without ceremony.
+- `-w node-pty` — scope the rebuild to `node-pty`. Avoids accidentally rebuilding unrelated native deps that may live deeper in the tree.
+
+**Behavioural rules:**
+
+- `npm install` triggers `postinstall`, which compiles `node-pty` against the currently-installed Electron's ABI. NF5 is satisfied.
+- `npm i electron@<new>` is treated by npm as an install operation — `postinstall` fires again, rebuild runs against the new ABI. NF6 is satisfied without a separate command.
+- `electron-builder build` runs its own internal rebuild during packaging. The `postinstall` hook is a dev-time convenience and does not interfere with the builder's pipeline; the builder is the source of truth for the shipped binary.
+- CI environments that run `npm ci` also fire `postinstall`. CI runners must have a C++ toolchain available (Visual Studio Build Tools on Windows, Xcode CLT on macOS, `build-essential` on Linux). This is a one-line documentation note in the README and a CI workflow concern; it is **not** grounds to add a fallback path.
+
+**Failure mode (intentional, do not paper over):**
+
+- If the C++ toolchain is missing, `postinstall` fails with a build error. `npm install` exits non-zero. The developer sees the failure immediately rather than at runtime. This is the correct behaviour: a compiled native dep cannot be substituted at runtime, and a `child_process` fallback is precisely the trap that produced the original bug. Document the toolchain prerequisites in `docs/05-node-system/node-spec.md` (per NF7) including Windows/Mac/Linux setup steps and the most common error signatures.
+
+**Out of scope (explicitly rejected):**
+
+- A pure-JS pty shim or a `child_process` fallback when native build fails. Rejected — degrades to pipe mode, fails F9–F14, reproduces the bug we are fixing.
+- Pre-built binaries via `prebuild-install` / `node-gyp-build`. Could be revisited later as an optimisation, but adds a hosting concern (where do the prebuilds live?) and `node-pty` upstream's prebuild coverage is incomplete for Electron ABIs. Default to source rebuild for v1.
+
+### Architect sign-off
+
+Backend-dev is cleared to proceed if and only if **all** of the following hold:
+
+1. Changes are confined to **`src/main/ipc/handlers.ts`** (replace `child_process.spawn` usage with `node-pty.spawn`, preserving the `pty:create` / `pty:write` / `pty:resize` / `pty:kill` / `pty:data` / `pty:exit` channel names and payload shapes from Decision 12 verbatim) and **`package.json`** (add `node-pty` to `dependencies`, `@electron/rebuild` to `devDependencies`, add the `postinstall` script per the contract above). A regenerated `package-lock.json` is expected.
+2. **No** changes to `src/renderer/**`, `src/preload/**`, `src/shared/types/ipc.ts`, or any IPC channel name. The wire field name remains `sessionId` (Decision 12); the renderer side is untouched.
+3. The session validation rule from Decision 12 ("main process **must** validate that `sessionId` is a known nodeId in the current board before honoring `pty:write` / `pty:resize` / `pty:kill`") is preserved — the existing `child_process`-based validation logic must port over, not be deleted.
+4. `before-quit` cleanup that iterates the pty Map and kills all sessions is preserved (Decision 12 Lifecycle step 7).
+5. The default-shell selection rule (Decision 12: `process.env.COMSPEC ?? 'powershell.exe'` on win32, else `process.env.SHELL ?? '/bin/zsh'`) is preserved. `cwd` defaults to home.
+6. After implementation, `npm install` from a clean clone on Windows (the developer's primary platform) produces a working terminal with no extra commands. `npm run typecheck` is zero errors. Tests added by tester for F9–F15 pass.
+
+If any of (1)–(5) cannot be met without breaking the contract, backend-dev escalates back to architect before merging — do not silently widen the surface.
+
+### Consequences
+
+- Enables: a native PTY on every supported platform, real interactive shells, `claude` running inside the terminal node (closing Decision 3's loop), and frictionless Electron version upgrades.
+- Forecloses: zero-toolchain installs. A developer on a locked-down corporate machine without C++ build tools cannot run KRNL0 from source. Acceptable tradeoff — the alternative (pipe-mode fallback) is what got us here.
+- Concentrates native-module risk in one dep (`node-pty`) and one tool (`@electron/rebuild`). Future native deps follow the same pattern by extending `-w node-pty` to `-w node-pty -w <new-dep>`.
+- pm-docs follow-up: normalise `nodeId` → `sessionId` in `docs/06-requirements/terminal-node.md` (F4, F4b, F5, F5b) so the requirements doc matches Decision 12's wire contract.
