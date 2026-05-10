@@ -228,9 +228,11 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
           </div>
         </div>
 
-        {/* xterm.js mount point */}
+        {/* xterm.js mount point — click anywhere to focus the terminal */}
         <div
           ref={containerRef}
+          onPointerDown={(e) => { e.stopPropagation(); termRef.current?.focus(); }}
+          onClick={(e) => { e.stopPropagation(); termRef.current?.focus(); }}
           style={{ width: '100%', height: 280, background: 'var(--term-bg)' }}
         />
       </div>

@@ -186,6 +186,14 @@
   100% { transform: scale(2.2); opacity: 0; }
 }
 
+/* ── Task-flow edge marching ants ───────────────────────────────────── */
+@keyframes marching-ants {
+  to { stroke-dashoffset: -22; }
+}
+.task-flow-edge {
+  animation: marching-ants 1.2s linear infinite;
+}
+
 /* ── Base reset ─────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;

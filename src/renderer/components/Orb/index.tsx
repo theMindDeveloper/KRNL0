@@ -6,9 +6,15 @@ export function Orb() {
   const [orbState, setOrbState] = useState<OrbState>('idle');
   const [caption, setCaption] = useState<string | null>(null);
 
-  // Push-to-talk on Space
+  // Push-to-talk on Space — never intercept when user is typing
   useEffect(() => {
+    const isTypingTarget = (t: EventTarget | null): boolean => {
+      if (!(t instanceof HTMLElement)) return false;
+      const tag = t.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable;
+    };
     const onKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       if (e.code === 'Space' && orbState === 'idle') {
         e.preventDefault();
         setOrbState('listening');
@@ -17,6 +23,7 @@ export function Orb() {
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       if (e.code === 'Space' && orbState === 'listening') {
         e.preventDefault();
         setOrbState('thinking');
