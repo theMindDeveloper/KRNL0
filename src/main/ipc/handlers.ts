@@ -144,12 +144,43 @@ function migrateTaskChain(board: Record<string, unknown>): Record<string, unknow
   return board;
 }
 
+// Heal nodes saved with empty / partial state (e.g. created via dock before
+// kind-aware spawn defaults landed). Without this, a TodoNode whose state was
+// persisted as `{}` crashes the renderer with "state.items is not iterable".
+const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
+  pomo: () => ({
+    status: 'idle',
+    startedAt: null,
+    durationMin: 25,
+    breakMin: 5,
+    label: '',
+    sessionsCompleted: 0,
+    history: [],
+  }),
+  todo: () => ({ items: [] }),
+  habit: () => ({ habits: [] }),
+  term: () => ({ sessionId: null, title: 'Terminal' }),
+};
+
+function migrateNodeStates(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null || !('kind' in n)) return n;
+    const node = n as { kind: string; state?: Record<string, unknown> };
+    const defaults = STATE_DEFAULTS[node.kind];
+    if (!defaults) return node;
+    return { ...node, state: { ...defaults(), ...(node.state ?? {}) } };
+  });
+  return board;
+}
+
 function loadBoard() {
   try {
     if (existsSync(BOARD_PATH)) {
       const raw = readFileSync(BOARD_PATH, 'utf-8');
       const parsed: unknown = JSON.parse(raw);
-      return migrateTaskChain(migrateMotherPositions(parsed));
+      return migrateNodeStates(migrateTaskChain(migrateMotherPositions(parsed)));
     }
   } catch {
     // fall through to seed
