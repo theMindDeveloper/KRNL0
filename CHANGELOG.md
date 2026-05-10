@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CalendarNode, TextNode, ImageNode as child node kinds (non-mother, draggable) — Decision 14
+- `Edge.visual` field (`'default' | 'task-flow' | 'pomo-edge'`) replacing kind-heuristic in `toRfEdge` — Decision 14
+- PomoNode: 5 display variants (ring/ascii/lcd/blocks/vapor) via `PomoConfig.variant` — Decision 15
+- `node.setConfig` universal command: patches any node's `config` via shallow merge — Decision 15
+- Tweaks panel: right-side slide-in with vibe/density controls and per-node config editing (pomo variant picker) — Decision 15
+- AI Orb split: `useOrbStore` Zustand slice + `OrbButton`, `OrbPanel`, `OrbHistory`, `OrbSuggestions`, `OrbForm` — Decision 16
+- Brain/STT/TTS wiring stubs in `useOrbStore` as integration points for Phase 5 — Decision 16
+- 70 new Vitest tests (341 total passing, 1 pre-existing skip)
+
+### Infrastructure
+
 - Infinite canvas with pan (middle-mouse + space+drag) and zoom (focal-point wheel) — Issue #3
 - NODE_REGISTRY dispatch pattern routing node.kind to typed React components — Issue #4
 - PomoNode: 25-min FSM timer (idle/running/break), session persistence via startedAt, history log — Issue #5

@@ -644,3 +644,210 @@ export interface PtyExitEvent   { sessionId: string; exitCode: number; signal: s
 - Enables: multiple terminals on one canvas, hosting `claude` inside any of them, clean shutdown.
 - Forecloses: running ptys in renderer (by design — native modules stay in main).
 - Native-module pain (rebuilds for Electron version) is concentrated in one place; `electron-rebuild` runs in postinstall.
+
+---
+
+## Decision 14 — Child Node Kinds and Edge.visual Field
+
+**Date:** 2026-05-10
+**Status:** Accepted
+**Author:** architect
+
+### Context
+
+Decision 8 defined the `NodeKind` literal union as `'pomo' | 'todo' | 'habit' | 'term' | 'pomo.session' | 'todo.task' | 'habit.day'`. Three additional child node kinds — `calendar`, `text`, and `image` — were needed as composable widgets that can appear on the canvas as non-mother nodes. They are children in the sense that they carry `isMother: false` and are draggable; they are not tied to a specific mother kind (unlike `todo.task`).
+
+Separately, `rfAdapters.toRfEdge` had been using a kind-based heuristic (inferring visual style from `_srcKind` / `_tgtKind`) to decide how edges were rendered in React Flow. This heuristic was fragile: it could not distinguish between two edges of the same kind pair that intentionally looked different, and it added implicit coupling between the adapter and node kind names.
+
+### Decision
+
+**Child nodes:** `calendar`, `text`, and `image` are added to the registry and `NodeKind` union. Each has its own `State`, `Config`, default factories, and `commandDispatch` entries. They are spawned via Dock buttons using `addNodeToBoard(kind)`. They do not emit events in v1 (no edges originate from them).
+
+**Edge.visual:** The `Edge` interface gains an optional `visual?: 'default' | 'task-flow' | 'pomo-edge'` field. `toRfEdge` reads this field directly and falls back to `'default'` when absent. The `_srcKind` and `_tgtKind` parameters are retained in the function signature (for future use) but are no longer read. The kind-heuristic path is removed.
+
+### Contract
+
+```typescript
+// src/shared/types/edge.ts
+export interface Edge {
+  id: string;
+  from: { nodeId: string; event: string };
+  to:   { nodeId: string; command: string };
+  args?: Record<string, unknown>;
+  enabled: boolean;
+  visual?: 'default' | 'task-flow' | 'pomo-edge';
+}
+
+// src/renderer/components/nodes/CalendarNode/types.ts
+export interface CalendarEvent { date: string; title: string; color?: string; }
+export interface CalendarState { month: number; year: number; events: CalendarEvent[]; }
+export interface CalendarConfig { firstDay?: 0 | 1; }
+
+// src/renderer/components/nodes/TextNode/types.ts
+export interface TextState { content: string; fontSize?: number; }
+export interface TextConfig { placeholder?: string; }
+
+// src/renderer/components/nodes/ImageNode/types.ts
+export interface ImageState { src: string; alt?: string; caption?: string; }
+export interface ImageConfig { fit?: 'contain' | 'cover' | 'fill'; }
+```
+
+**Commands added to `commandDispatch.applyCommand`:**
+
+| Kind | Command | Args | Effect |
+|---|---|---|---|
+| `calendar` | `calendar.prevMonth` | — | decrement month, wrap year |
+| `calendar` | `calendar.nextMonth` | — | increment month, wrap year |
+| `text` | `text.setContent` | `{ content }` | update text content |
+| `text` | `text.setFontSize` | `{ size }` | update font size |
+
+**Registry additions:**
+
+```typescript
+// src/renderer/components/nodes/registry.ts
+NODE_REGISTRY: { ..., calendar: CalendarNode, text: TextNode, image: ImageNode }
+NODE_TYPES:    { ..., calendar: createNodeAdapter(CalendarNode), text: createNodeAdapter(TextNode), image: createNodeAdapter(ImageNode) }
+```
+
+### Consequences
+
+- Enables: arbitrary canvas widgets without needing a mother relationship; explicit edge visual semantics per edge instance.
+- Forecloses: automatic edge style inference from node kinds (removed by design).
+- `calendar`, `text`, and `image` emit no events in v1; edges from them are deferred to a later phase.
+
+---
+
+## Decision 15 — PomoNode Display Variants and node.setConfig Command
+
+**Date:** 2026-05-10
+**Status:** Accepted
+**Author:** architect
+
+### Context
+
+The PomoNode's single visual (a circular ring countdown) was the only display option. The PRD's "local-first, yours to own" ethos implies users should be able to personalise their workspace. Five distinct display variants were designed: `ring` (default animated arc), `ascii` (text art), `lcd` (segmented digit display), `blocks` (block-progress bar), and `vapor` (vapourwave aesthetic). These are presentation differences only — they do not affect state or command surface.
+
+Separately, there was no generic mechanism for the UI to patch a node's `config` without routing through a kind-specific command. Adding per-kind config commands for every configurable field would create boilerplate and require updating `commandDispatch` for every new config option.
+
+### Decision
+
+**Variants:** `PomoConfig` gains an optional `variant?: 'ring' | 'ascii' | 'lcd' | 'blocks' | 'vapor'` field (defaults to `'ring'` when absent). `PomoNode/index.tsx` switches on this field to render one of five sub-components (`VariantRing`, `VariantAscii`, `VariantLcd`, `VariantBlocks`, `VariantVapor`). Each variant receives identical props (`remainingMs`, `totalMs`, `status`, `label`) — the variant is a pure visual transformation of the timer state.
+
+**node.setConfig:** A universal `node.setConfig` command is added to `commandDispatch`. When a node fires `onCommand('node.setConfig', { patch: { ... } })`, the dispatcher patches `node.config` with the provided object (shallow merge) and persists. This is intercepted before `applyCommand` so no kind-specific handler is needed. The Tweaks panel uses this to switch the PomoNode variant.
+
+### Contract
+
+```typescript
+// src/renderer/components/nodes/PomoNode/types.ts — addition to PomoConfig
+export interface PomoConfig {
+  defaultDurationMin: number;
+  defaultBreakMin: number;
+  longBreakEvery: number;
+  longBreakMin: number;
+  variant?: 'ring' | 'ascii' | 'lcd' | 'blocks' | 'vapor'; // added
+}
+
+// commandDispatch.ts — universal config patch (fires before applyCommand)
+if (command === 'node.setConfig') {
+  const patch = args['patch'] as Record<string, unknown> | undefined;
+  if (!patch) return;
+  const newConfig = { ...(node.config as Record<string, unknown>), ...patch };
+  updateNode(nodeId, { config: newConfig });
+  // persist
+  return;
+}
+```
+
+**Tweaks panel** reads `selectedNodeId` from `boardStore`. If the selected node is `kind === 'pomo'`, it renders a variant picker that fires `onCommand('node.setConfig', { patch: { variant } })`. The panel also exposes global vibe and density controls (CSS `data-vibe` / `data-density` attributes).
+
+**Variant sub-component contract:**
+
+```typescript
+interface PomoVariantProps {
+  remainingMs: number;
+  totalMs: number;
+  status: PomoStatus;
+  label: string;
+}
+// All five variants (VariantRing, VariantAscii, VariantLcd, VariantBlocks, VariantVapor)
+// implement this interface. They are pure functions — no store access, no onCommand.
+```
+
+### Consequences
+
+- Enables: per-node visual personalisation without touching state contracts; any future node kind can expose config via `node.setConfig` without changes to `commandDispatch`.
+- Forecloses: variant-specific state (e.g., a `vapor` variant cannot store extra data — variants are presentation only).
+- The `node.setConfig` pattern is intentionally generic; kind-specific validation of config values is deferred to v1.1 (Zod schemas per config type).
+
+---
+
+## Decision 16 — Full AI Orb Architecture
+
+**Date:** 2026-05-10
+**Status:** Accepted
+**Author:** architect
+
+### Context
+
+The AI Orb was previously a monolithic component (`Orb/index.tsx`) with all state co-located in local React state. This made it impossible to test the conversation history independently, access orb state from other components, or wire up Brain/STT/TTS providers in Phase 5 without restructuring.
+
+The orb needed a persistent position (survives panel open/close), an in-memory conversation history (cleared on session end, not persisted to `board.json`), and a surface for Brain/STT/TTS wiring in Phase 5.
+
+### Decision
+
+The Orb is split into four sub-components and a dedicated Zustand store:
+
+- **`useOrbStore`** — Zustand slice managing: `state` (idle/listening/thinking/speaking), `messages` (in-memory conversation history), `suggestions`, `caption`, `micActive`, `panelOpen`, and `position`. Only `position` and `panelOpen` are persisted (via `zustand/middleware/persist` with `partialize`). Messages are intentionally in-memory only.
+- **`OrbButton`** — the draggable floating button. Reads position and state from `useOrbStore`. Renders the pulsing orb SVG with state-driven glow filter.
+- **`OrbPanel`** — slide-in panel rendered when `panelOpen` is true. Composes `OrbHistory` and `OrbForm`.
+- **`OrbHistory`** — scrollable message list, reads `messages` from store.
+- **`OrbSuggestions`** — chip row of quick-action suggestions, reads `suggestions` from store.
+- **`OrbForm`** — text input for typed commands. Dispatches `addMessage` to store.
+
+Brain/STT/TTS wiring is stubbed: `useOrbStore` exposes `setState`, `setCaption`, and `setMicActive` as the integration points for Phase 5 providers. The actual `BrainProvider`, `STTProvider`, and `TTSProvider` are not implemented in this phase.
+
+### Contract
+
+```typescript
+// src/renderer/store/useOrbStore.ts
+export interface OrbMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+interface OrbStore {
+  state: 'idle' | 'listening' | 'thinking' | 'speaking';
+  messages: OrbMessage[];
+  suggestions: string[];
+  caption: string;
+  micActive: boolean;
+  panelOpen: boolean;
+  position: { x: number; y: number };
+
+  setState: (s: OrbStore['state']) => void;
+  addMessage: (m: OrbMessage) => void;
+  clearMessages: () => void;
+  setSuggestions: (s: string[]) => void;
+  setCaption: (c: string) => void;
+  togglePanel: () => void;
+  setMicActive: (active: boolean) => void;
+  setPosition: (pos: { x: number; y: number }) => void;
+}
+
+// Persistence: only position and panelOpen survive page reload.
+// messages, state, caption, micActive are always reset to defaults.
+partialize: (s) => ({ position: s.position, panelOpen: s.panelOpen })
+```
+
+**Phase 5 wiring points:**
+
+- `STTProvider` will call `setState('listening')`, write transcript chunks to `setCaption`, then call `addMessage({ role: 'user', content })`.
+- `BrainProvider` will call `setState('thinking')`, then `addMessage({ role: 'assistant', content })`.
+- `TTSProvider` will call `setState('speaking')`, then `setState('idle')` on completion.
+
+### Consequences
+
+- Enables: independent testing of `useOrbStore` (195 tests added), accessing orb state from any component, clean Phase 5 wiring without restructuring.
+- Forecloses: storing conversation history in `board.json` (by design — conversation is session-scoped, not board state).
+- The monolithic `Orb/index.tsx` becomes a thin re-export after the split; it is retained for backward import compatibility.
