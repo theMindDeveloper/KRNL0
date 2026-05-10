@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import { memo, type ComponentType } from 'react';
 import { PomoNode } from './PomoNode';
 import { TodoNode } from './TodoNode';
 import { HabitNode } from './HabitNode';
@@ -7,22 +7,22 @@ import { TaskNode } from './TaskNode';
 import { UnknownNode } from './UnknownNode';
 import type { NodeProps } from './types';
 
-// Each entry is a component specialized to its own TState/TConfig, so we
-// erase the generics at the registry boundary — Canvas hands every component
-// a Node<unknown, unknown> and trusts the kernel's schema check upstream.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyNodeComponent = ComponentType<NodeProps<any, any>>;
 
-// Central node-kind dispatch (Decision #8). Adding a new node kind is one
-// entry here plus one component file. Cross-node imports remain forbidden;
-// the registry is the only module that knows every kind by name.
-export const NODE_REGISTRY: Record<string, AnyNodeComponent> = {
-  pomo: PomoNode,
-  todo: TodoNode,
-  habit: HabitNode,
-  term: TerminalNode,
-  'todo.task': TaskNode,
+// Wrap each node in React.memo at the registry boundary. With Canvas using
+// per-id store subscription, this prevents unrelated store updates from
+// re-rendering all node bodies (the prior perf bug).
+const NODE_REGISTRY_RAW: Record<string, AnyNodeComponent> = {
+  pomo: PomoNode as AnyNodeComponent,
+  todo: TodoNode as AnyNodeComponent,
+  habit: HabitNode as AnyNodeComponent,
+  term: TerminalNode as AnyNodeComponent,
+  'todo.task': TaskNode as AnyNodeComponent,
 };
+export const NODE_REGISTRY: Record<string, AnyNodeComponent> = Object.fromEntries(
+  Object.entries(NODE_REGISTRY_RAW).map(([k, C]) => [k, memo(C)])
+);
 
 export function resolveNodeComponent(kind: string): AnyNodeComponent {
   return NODE_REGISTRY[kind] ?? UnknownNode;
