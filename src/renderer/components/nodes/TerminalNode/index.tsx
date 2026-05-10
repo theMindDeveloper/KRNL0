@@ -55,6 +55,18 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           // last resort: stick with the DOM renderer
         }
       }
+      // WebGL/Canvas addons load async via dynamic import. The initial
+      // fit() ran on the DOM renderer's cell metrics; after the GPU
+      // renderer is in place we have to re-fit so its canvas dimensions
+      // match the container — otherwise the bottom of the node renders
+      // as an unstyled black gap below the last row.
+      try {
+        fit.fit();
+        const s = sessionIdRef.current;
+        if (s) window.krnl?.ptyResize(s, term.cols, term.rows);
+      } catch {
+        // container not yet sized — the ResizeObserver below will catch it
+      }
     })();
 
     termRef.current = term;
