@@ -3,6 +3,8 @@ import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState } from './types';
 
 const TICK_MS = 500;
+const RING_RADIUS = 68;
+const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 function formatRemaining(ms: number): string {
   const safe = Math.max(0, ms);
@@ -60,7 +62,28 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
   const buttonLabel =
     state.status === 'running' ? 'CANCEL' : state.status === 'break' ? 'SKIP BREAK' : 'START';
 
-  const accent = state.status === 'break' ? 'var(--ink-3)' : 'var(--rust)';
+  // Ring stroke color
+  const ringStroke =
+    state.status === 'running'
+      ? 'var(--rust)'
+      : state.status === 'break'
+        ? 'var(--ink-3)'
+        : 'transparent';
+
+  // Clock text color
+  const clockColor =
+    state.status === 'running' ? 'var(--rust)' : 'var(--ink-3)';
+
+  // Progress: 1 = full ring, 0 = empty
+  const progress =
+    state.status === 'running' || state.status === 'break'
+      ? Math.max(0, Math.min(1, remainingMs / totalMs))
+      : 0;
+
+  const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
+
+  // Session dots — filled = completed in current longBreak cycle
+  const completedDots = state.sessionsCompleted % sessionsTarget;
 
   return (
     <div
@@ -73,6 +96,7 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
         overflow: 'hidden',
       }}
     >
+      {/* Header */}
       <div
         style={{
           padding: '7px 10px 6px',
@@ -86,24 +110,97 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
       >
         ▙ POMO{state.status === 'break' ? ' · BREAK' : ''}
       </div>
-      <div style={{ padding: '14px 16px' }}>
+
+      {/* Body */}
+      <div
+        style={{
+          padding: '14px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        {/* Ring + clock — 160×160 relative container, centered in 240px node */}
         <div
           style={{
-            fontSize: 64,
-            fontFamily: 'var(--font-mono)',
-            fontWeight: 300,
-            color: accent,
-            fontVariantNumeric: 'tabular-nums',
-            letterSpacing: '-0.02em',
+            position: 'relative',
+            width: 160,
+            height: 160,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {formatRemaining(remainingMs)}
+          <svg
+            width={160}
+            height={160}
+            style={{ position: 'absolute', top: 0, left: 0 }}
+          >
+            {/* Track circle */}
+            <circle
+              cx={80}
+              cy={80}
+              r={RING_RADIUS}
+              stroke="var(--paper-3)"
+              strokeWidth={3}
+              fill="none"
+              opacity={0.5}
+            />
+            {/* Progress circle */}
+            <circle
+              cx={80}
+              cy={80}
+              r={RING_RADIUS}
+              stroke={ringStroke}
+              strokeWidth={3}
+              fill="none"
+              strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              transform="rotate(-90 80 80)"
+              style={{ transition: 'stroke-dashoffset 0.5s linear' }}
+            />
+          </svg>
+
+          {/* Clock text — absolutely centered over SVG */}
+          <span
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              fontSize: 64,
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 300,
+              color: clockColor,
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-0.02em',
+              lineHeight: 1,
+            }}
+          >
+            {formatRemaining(remainingMs)}
+          </span>
         </div>
+
+        {/* Session dots */}
+        <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
+          {Array.from({ length: sessionsTarget }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: i < completedDots ? 'var(--acid)' : 'var(--paper-3)',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Session count label */}
         <div
           style={{
             fontSize: 10.5,
             color: 'var(--ink-3)',
-            marginTop: 4,
+            marginTop: 6,
             fontFamily: 'var(--font-mono)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
@@ -111,6 +208,8 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
         >
           SESSION {state.sessionsCompleted} / {sessionsTarget}
         </div>
+
+        {/* Action button */}
         <button
           type="button"
           onClick={handlePrimary}
@@ -120,11 +219,11 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
             padding: '6px 10px',
             background: 'transparent',
             border: '1px solid var(--paper-3)',
-            borderRadius: 'var(--radius-md)',
+            borderRadius: 'var(--radius)',
             fontFamily: 'var(--font-mono)',
             fontSize: 10.5,
             letterSpacing: '0.04em',
-            color: 'var(--ink-1)',
+            color: 'var(--ink-2)',
             cursor: 'pointer',
           }}
         >
