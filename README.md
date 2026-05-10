@@ -51,7 +51,7 @@ The assistant takes that, runs `sys` commands, and the canvas updates live.
 
 ## Demo
 
-> *Screenshots and demo video coming with the v0.1 release.*
+![Canvas with four mother nodes](docs/assets/ref1.png)
 
 ---
 
