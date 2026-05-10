@@ -8,7 +8,7 @@ function createWindow(): BrowserWindow {
     height: 900,
     backgroundColor: '#f5f1e8', // --paper light
     webPreferences: {
-      preload: join(__dirname, 'preload.js'),
+      preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
