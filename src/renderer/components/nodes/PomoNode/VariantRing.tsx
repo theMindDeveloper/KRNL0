@@ -17,7 +17,7 @@ export function VariantRing({ state, remainingPct, clockText, colonAnimation }: 
   const isBreak = state.status === 'break';
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+    <div data-testid="pomo-variant-ring" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
       <div style={{ position: 'relative', width: 220, height: 220, display: 'grid', placeItems: 'center' }}>
         {/* SVG ring */}
         <svg

@@ -47,7 +47,7 @@ import {
 
 type Args = Record<string, unknown>;
 
-function applyCommand(node: Node, command: string, args: Args): Node['state'] | null {
+export function applyCommand(node: Node, command: string, args: Args): Node['state'] | null {
   const s = node.state as Record<string, unknown>;
 
   switch (node.kind) {

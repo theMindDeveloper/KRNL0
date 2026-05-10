@@ -16,7 +16,7 @@ export function VariantBlocks({ state, remainingPct, clockText, colonAnimation }
   const onCount = Math.round((remainingPct / 100) * TOTAL_BLOCKS);
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+    <div data-testid="pomo-variant-blocks" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
       {/* Block grid */}
       <div
         style={{

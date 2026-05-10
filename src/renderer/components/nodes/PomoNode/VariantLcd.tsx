@@ -13,7 +13,7 @@ export function VariantLcd({ state, clockText, colonAnimation }: VariantLcdProps
   const phaseLabel = isBreak ? 'BREAK' : (state.label || 'DEEP WORK');
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+    <div data-testid="pomo-variant-lcd" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
       <div
         style={{
           background: 'linear-gradient(180deg, #1c1a14 0%, #0c0b08 100%)',

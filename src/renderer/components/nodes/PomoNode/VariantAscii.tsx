@@ -18,7 +18,7 @@ export function VariantAscii({ state, remainingPct, clockText, colonAnimation }:
   const phaseLabel = isBreak ? 'BREAK' : 'DEEP WORK';
 
   return (
-    <div style={{ width: '100%' }}>
+    <div data-testid="pomo-variant-ascii" style={{ width: '100%' }}>
       <div
         style={{
           width: '100%',

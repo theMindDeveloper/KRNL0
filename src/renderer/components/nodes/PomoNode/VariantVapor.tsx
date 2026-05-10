@@ -39,6 +39,7 @@ export function VariantVapor({ state, remainingPct, clockText, colonAnimation }:
 
       <div
         className="pomo-vapor"
+        data-testid="pomo-variant-vapor"
         style={{ display: 'flex', gap: 16, alignItems: 'stretch', minHeight: 240 }}
       >
         {/* Vapor tube */}
