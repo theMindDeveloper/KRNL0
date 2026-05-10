@@ -1,0 +1,86 @@
+// Decision #10 — TodoNode FSM. Each handler is pure: (state, args) => state.
+// Time and id sources are injected so tests can pin them; the kernel passes
+// real Date.now and crypto.randomUUID at runtime.
+
+import type { TodoConfig, TodoItem, TodoState } from './types';
+
+export interface TodoEnv {
+  uuid: () => string;
+  now: () => string; // ISO 8601 timestamp
+}
+
+const defaultEnv: TodoEnv = {
+  uuid: () => crypto.randomUUID(),
+  now: () => new Date().toISOString(),
+};
+
+// todo.add — append a new item; trims text; no-op on empty.
+export const todoAdd = (
+  state: TodoState,
+  args: { text: string },
+  env: TodoEnv = defaultEnv,
+): TodoState => {
+  const trimmed = args.text.trim();
+  if (!trimmed) return state;
+  const item: TodoItem = {
+    id: env.uuid(),
+    text: trimmed,
+    done: false,
+    createdAt: env.now(),
+    completedAt: null,
+  };
+  return { ...state, items: [...state.items, item] };
+};
+
+// todo.toggle — flip done; set completedAt = now() when going done, null when undoing.
+export const todoToggle = (
+  state: TodoState,
+  args: { id: string },
+  env: TodoEnv = defaultEnv,
+): TodoState => ({
+  ...state,
+  items: state.items.map((item) => {
+    if (item.id !== args.id) return item;
+    const done = !item.done;
+    return { ...item, done, completedAt: done ? env.now() : null };
+  }),
+});
+
+// todo.edit — update text; no-op if id is missing.
+export const todoEdit = (
+  state: TodoState,
+  args: { id: string; text: string },
+): TodoState => ({
+  ...state,
+  items: state.items.map((item) =>
+    item.id === args.id ? { ...item, text: args.text } : item,
+  ),
+});
+
+// todo.remove — filter out one item by id.
+export const todoRemove = (
+  state: TodoState,
+  args: { id: string },
+): TodoState => ({
+  ...state,
+  items: state.items.filter((item) => item.id !== args.id),
+});
+
+// todo.clearDone — remove all completed items.
+export const todoClearDone = (state: TodoState): TodoState => ({
+  ...state,
+  items: state.items.filter((item) => !item.done),
+});
+
+// Render helper (pure, applied to a copy — Decision #10):
+//   1. Filter by showCompleted if false
+//   2. Sort: undone first (ascending createdAt), done last (ascending createdAt)
+//   3. Slice to maxVisible
+export const visibleItems = (state: TodoState, config: TodoConfig): TodoItem[] =>
+  [...state.items]
+    .filter((i) => config.showCompleted || !i.done)
+    .sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return a.createdAt.localeCompare(b.createdAt);
+    })
+    .slice(0, config.maxVisible);
