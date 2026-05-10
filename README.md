@@ -18,7 +18,7 @@
 Pomodoro, todos, habits, kanban, notes, projects — all on one infinite whiteboard.
 Wire them together. Drive them with AI. Talk to them.
 
-[Docs](docs/) · [Architecture](docs/03-architecture/) · [Roadmap](docs/07-roadmap/build-roadmap.md) · [PRD](krnl0-PRD-v0.6.0.md)
+[Docs](docs/) · [Architecture](docs/03-architecture/) · [Roadmap](docs/07-roadmap/build-roadmap.md) · [PRD](docs/02-prd)
 
 </div>
 
