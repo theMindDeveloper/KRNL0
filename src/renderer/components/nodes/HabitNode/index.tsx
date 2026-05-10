@@ -20,6 +20,9 @@ function getISOWeek(date: Date): number {
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
+// Round-robin glyphs per habit index — cosmetic only, no schema change.
+const GLYPHS = ['✎', '↗', '◍', '⌬', '◆', '▷', '○'];
+
 const CELL_SIZE = 18;
 const CELL_GAP = 3;
 
@@ -83,24 +86,21 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
             }}
           >
             <div style={{ display: 'flex', gap: CELL_GAP, width: gridWidth }}>
-              {DAY_LABELS.map((label, i) => {
-                const isToday = weekDays[i] === today;
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      width: CELL_SIZE,
-                      textAlign: 'center',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 8.5,
-                      color: isToday ? 'var(--acid)' : 'var(--ink-4)',
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    {label}
-                  </div>
-                );
-              })}
+              {DAY_LABELS.map((label, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: CELL_SIZE,
+                    textAlign: 'center',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 8.5,
+                    color: 'var(--ink-4)',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {label}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -117,11 +117,21 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
               No habits yet.
             </div>
           ) : (
-            visibleHabits.map((habit) => {
+            visibleHabits.map((habit, habitIdx) => {
               const streak = calcStreak(habit.log, today);
+              const glyph = GLYPHS[habitIdx % GLYPHS.length] ?? '●';
+              const isLast = habitIdx === visibleHabits.length - 1;
+
               return (
-                <div key={habit.id} style={{ marginBottom: 10 }}>
-                  {/* Row top: icon + name + grid */}
+                <div
+                  key={habit.id}
+                  style={{
+                    paddingBottom: 8,
+                    paddingTop: habitIdx === 0 ? 0 : 8,
+                    borderBottom: isLast ? 'none' : '1px dashed var(--paper-2)',
+                  }}
+                >
+                  {/* Row top: glyph + name + grid */}
                   <div
                     style={{
                       display: 'flex',
@@ -129,21 +139,18 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
                       gap: 6,
                     }}
                   >
-                    {/* Icon */}
+                    {/* Glyph */}
                     <span
                       style={{
                         width: 14,
-                        height: 14,
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
+                        fontSize: 11,
                         color: 'var(--ink-3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
                         flexShrink: 0,
+                        lineHeight: 1,
                       }}
                     >
-                      {'●'}
+                      {glyph}
                     </span>
 
                     {/* Name */}
@@ -170,52 +177,74 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
                         const isToday = dayStr === today;
                         const isPast = dayStr < today;
 
-                        let cellBackground: string;
+                        // Cell style matrix per spec:
+                        // done + today:   acid bg, acid outline outside (box-shadow ring)
+                        // done + past:    acid bg at 0.85 opacity
+                        // today undone:   transparent bg, ink-3 border, acid box-shadow ring
+                        // past undone:    paper-3 bg, opacity 0.4
+                        // future:         paper-3 bg (non-interactive, no special styling)
+                        let cellBg: string;
+                        let cellOpacity: number | undefined;
                         let cellBorder: string;
+                        let cellBoxShadow: string | undefined;
+                        // outline is used for ink-3 ring on today-done; box-shadow handles acid ring
+                        let cellOutline: string | undefined;
+                        let cellOutlineOffset: string | undefined;
 
-                        if (done) {
-                          // Done state: acid fill, regardless of today/past
-                          cellBackground = 'var(--acid)';
+                        if (done && isToday) {
+                          cellBg = 'var(--acid)';
+                          cellBorder = '1px solid transparent';
+                          // acid outline outside via box-shadow (outline-offset 1px = gap of 1px)
+                          cellBoxShadow = '0 0 0 2px var(--acid)';
+                          cellOutline = undefined;
+                          cellOutlineOffset = undefined;
+                        } else if (done && isPast) {
+                          cellBg = 'var(--acid)';
+                          cellOpacity = 0.85;
                           cellBorder = '1px solid transparent';
                         } else if (isToday) {
-                          // Today, not done: slightly more visible border
-                          cellBackground = 'transparent';
+                          // today undone: ink-3 border + acid box-shadow ring outside
+                          cellBg = 'transparent';
                           cellBorder = '1px solid var(--ink-3)';
+                          cellBoxShadow = '0 0 0 2px var(--acid)';
                         } else if (isPast) {
-                          // Past, not done: subtle border
-                          cellBackground = 'transparent';
-                          cellBorder = '1px solid var(--paper-3)';
+                          cellBg = 'var(--paper-3)';
+                          cellOpacity = 0.4;
+                          cellBorder = '1px solid transparent';
                         } else {
-                          // Future: subtle border
-                          cellBackground = 'transparent';
-                          cellBorder = '1px solid var(--paper-3)';
+                          // future
+                          cellBg = 'var(--paper-3)';
+                          cellBorder = '1px solid transparent';
                         }
 
-                        // Today indicator: thin acid outline outside the cell
-                        const todayOutline = isToday
-                          ? { outline: '1px solid var(--acid)', outlineOffset: '1px' }
-                          : {};
+                        const cellStyle: React.CSSProperties = {
+                          width: CELL_SIZE,
+                          height: CELL_SIZE,
+                          border: cellBorder,
+                          borderRadius: 3,
+                          background: cellBg,
+                          flexShrink: 0,
+                          boxSizing: 'border-box',
+                          ...(cellOpacity !== undefined ? { opacity: cellOpacity } : {}),
+                          ...(cellBoxShadow ? { boxShadow: cellBoxShadow } : {}),
+                          ...(cellOutline ? { outline: cellOutline } : {}),
+                          ...(cellOutlineOffset ? { outlineOffset: cellOutlineOffset } : {}),
+                        };
 
                         if (isToday) {
-                          // Today's cell: clickable, toggles done state
                           return (
                             <button
                               key={dayStr}
                               type="button"
+                              data-cell-state={done ? 'done-today' : 'today'}
                               title={`${habit.name} ${dayStr} — click to toggle`}
                               onClick={() =>
                                 onCommand('habit.toggleDay', { id: habit.id, date: dayStr })
                               }
                               style={{
-                                width: CELL_SIZE,
-                                height: CELL_SIZE,
-                                border: cellBorder,
-                                borderRadius: 3,
-                                background: cellBackground,
+                                ...cellStyle,
                                 cursor: 'pointer',
                                 padding: 0,
-                                flexShrink: 0,
-                                ...todayOutline,
                               }}
                               aria-label={`${habit.name} ${dayStr} ${done ? 'done' : 'not done'}`}
                               aria-pressed={done}
@@ -223,18 +252,20 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
                           );
                         }
 
-                        // Non-today cells: read-only div
+                        // Non-today: read-only, non-interactive
+                        const pastState = done
+                          ? 'done-past'
+                          : isPast
+                            ? 'past'
+                            : 'future';
                         return (
                           <div
                             key={dayStr}
+                            data-cell-state={pastState}
                             title={`${habit.name} ${dayStr} ${done ? 'done' : 'not done'}`}
                             style={{
-                              width: CELL_SIZE,
-                              height: CELL_SIZE,
-                              border: cellBorder,
-                              borderRadius: 3,
-                              background: cellBackground,
-                              flexShrink: 0,
+                              ...cellStyle,
+                              cursor: 'default',
                             }}
                           />
                         );
@@ -242,7 +273,7 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
                     </div>
                   </div>
 
-                  {/* Row bottom: streak indicator, indented */}
+                  {/* Streak indicator */}
                   <div
                     style={{
                       marginTop: 3,
@@ -285,6 +316,7 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
                 color: 'var(--ink-3)',
                 outline: 'none',
                 minWidth: 0,
+                boxSizing: 'border-box',
               }}
             />
           </div>
