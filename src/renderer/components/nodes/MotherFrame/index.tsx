@@ -72,7 +72,9 @@ export function MotherFrame({
         // Lighter shadow + contain hint reduces compositor work on pan/drag.
         boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
         overflow: 'visible',
-        contain: 'layout paint',
+        // `contain: paint` clips slot tag (top:-11) and corner brackets
+        // (inset:-8) regardless of overflow:visible. `layout` alone is safe.
+        contain: 'layout',
       }}
     >
       {/* Left reorder arrow */}
