@@ -9,7 +9,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
     "reset": "node scripts/reset-board.mjs",
-    "reset:hard": "node scripts/reset-board.mjs --hard"
+    "reset:hard": "node scripts/reset-board.mjs --hard",
+    "postinstall": "electron-rebuild -f -w node-pty"
   },
   "bin": {
     "sys": "dist/sys/index.js"
@@ -19,12 +20,14 @@
     "@xterm/xterm": "^5.3.0",
     "@xyflow/react": "^12.10.2",
     "electron": "^30.0.0",
+    "node-pty": "^1.1.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "zod": "^3.23.0",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.2",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^20.12.0",
     "@types/react": "^18.3.0",

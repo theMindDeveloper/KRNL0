@@ -123,6 +123,26 @@
 | `tests/unit/renderer/nodeRegistry.test.ts` | `NODE_REGISTRY` maps all four mother kinds; `resolveNodeComponent` falls back to `UnknownNode` | Decision 8 |
 | `tests/unit/renderer/boardStore.viewport.test.ts` | Initial viewport, `panBy` screen-pixel math, `setViewport` zoom clamp, `zoomAt` focal-point invariant | Decision 7 |
 | `tests/unit/renderer/AppChrome.scenarios.test.ts` | F1–F8 chrome panel Gherkin scenarios: TopBar content, StatusBar counts, Dock button callbacks, theme toggle + localStorage persistence, FIT button → `fitView()` | Phase 5 chrome |
+| `tests/unit/main/handlers.pty.test.ts` | IPC-level coverage for node-pty migration (Issue #67 / Decision 12 / Decision 18): `pty:create` spawns proc + returns sessionId, `pty:write` routes to `proc.write`, `pty:resize` calls `proc.resize` (F13 no-op removed), `pty:kill` calls `proc.kill` and removes session, unknown sessionId paths are all silent no-ops. Covers **F4, F5, F13, F15** at the main-process IPC boundary. F9–F12 (live TTY echo, backspace, enter, arrow keys) remain manually verified — they require a compiled `node-pty` binary. | Decision 12, Decision 18 |
+
+---
+
+## TerminalNode IPC-level coverage (Issue #67)
+
+**File:** `tests/unit/main/handlers.pty.test.ts` (13 tests, added 2026-05-10)
+
+| F# | Criterion | Covered? | Notes |
+|---|---|---|---|
+| F4 | `pty:create` spawns PTY, returns sessionId, forwards `pty:data:*` / `pty:exit:*` | Yes | IPC handler test |
+| F5 | `pty:write` routes to `proc.write(data)` | Yes | IPC handler test |
+| F13 | `pty:resize` calls `proc.resize(cols, rows)` — no longer a no-op | Yes | IPC handler test |
+| F15 | `pty:kill` calls `proc.kill()`, removes session from map | Yes | IPC handler test |
+| F9 | Typed characters echo (real TTY echo from PTY) | Manual only | Requires compiled native binary |
+| F10 | Backspace deletes previous character | Manual only | Requires compiled native binary |
+| F11 | Enter submits line; shell executes command | Manual only | Requires compiled native binary |
+| F12 | Arrow keys navigate history / cursor | Manual only | Requires compiled native binary |
+| NF5 | `npm install` produces working terminal (postinstall hook) | Structural check | `package.json` postinstall script verified in audit |
+| NF6 | Electron version switch triggers node-pty rebuild | Structural check | `@electron/rebuild` in devDeps; postinstall targets `node-pty` |
 
 ---
 

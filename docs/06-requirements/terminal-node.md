@@ -16,6 +16,13 @@
 | F6 | Terminal resize (node resize or window resize) sends `pty:resize` with `{ cols, rows }` derived from the xterm `fit` addon |
 | F7 | The `sys` CLI is available inside the terminal; every GUI action documented in R4 has a `sys <command>` equivalent reachable from this node |
 | F8 | An RF `<Handle type="source" position="right">` and `<Handle type="target" position="left">` are rendered for edge connectivity |
+| F9 | Typed printable characters echo to the screen as the user types them (real TTY echo, not pipe-mode batch input) |
+| F10 | Backspace deletes the previous character on screen and in the shell input buffer |
+| F11 | Pressing Enter submits the current line; the shell executes the command and stdout/stderr render in the terminal |
+| F12 | Arrow keys navigate command history (up / down) and cursor position within the current line (left / right) |
+| F13 | `pty:resize` updates the underlying PTY's `cols` / `rows` so the shell wraps and re-flows long output correctly (no longer a no-op) |
+| F14 | `claude` (Claude Code CLI) launches and runs interactively inside the terminal — closing the loop on Decision 3 |
+| F15 | Closing or unmounting the terminal node kills the PTY process cleanly (no orphaned shells in Task Manager / `ps`) |
 
 ---
 
@@ -27,6 +34,9 @@
 | NF2 | The xterm instance is created once per `node.id` session; navigating away and back reconnects to the existing pty session without reset |
 | NF3 | `pty:data` events are batched using `requestAnimationFrame` before writing to xterm to avoid layout thrashing |
 | NF4 | Node minimum width is 480 px; minimum height is 300 px; the node is resizable |
+| NF5 | A fresh `npm install` produces a working terminal on Windows / macOS / Linux without any manual native-rebuild step (postinstall hook) |
+| NF6 | Switching Electron versions (e.g. `npm i electron@latest`) automatically triggers a node-pty rebuild against the new ABI |
+| NF7 | The native rebuild flow is documented in [docs/05-node-system/node-spec.md](../../05-node-system/node-spec.md) with troubleshooting steps for common failures |
 
 ---
 
@@ -105,6 +115,49 @@ Feature: TerminalNode IPC-backed terminal
     When the component renders
     Then a React Flow Handle with type "source" and position "right" is present
     And a React Flow Handle with type "target" and position "left" is present
+
+  Scenario: F9 — Local echo on typed input
+    Given the xterm instance has focus
+    When the user types "h"
+    Then the character "h" appears on the terminal screen within one frame
+    And no manual local-echo loop in the renderer is responsible for it (echo originates from the PTY)
+
+  Scenario: F10 — Backspace edits the input buffer
+    Given the xterm instance has focus and "echo hello" has been typed
+    When the user presses Backspace twice
+    Then the screen shows "echo hel"
+    And the shell's pending input buffer reflects the same content
+
+  Scenario: F11 — Enter submits the line
+    Given the xterm instance has focus and "echo hi" has been typed
+    When the user presses Enter
+    Then the shell executes the command
+    And the screen shows "hi" on the next line, followed by a fresh prompt
+
+  Scenario: F12 — Arrow keys navigate history
+    Given two prior commands "dir" and "echo hi" have been entered
+    When the user presses Up Arrow
+    Then the most recent command "echo hi" appears on the current input line
+    When the user presses Up Arrow again
+    Then "dir" appears on the current input line
+
+  Scenario: F13 — Resize is delivered to the PTY
+    When the node is resized so the xterm fit addon yields cols=120 rows=40
+    Then "pty:resize" is sent with { sessionId, cols: 120, rows: 40 }
+    And the PTY's reported size matches { cols: 120, rows: 40 }
+    And subsequent shell output wraps at the new width
+
+  Scenario: F14 — Claude Code runs in the terminal
+    Given the xterm instance has focus
+    When the user types "claude" and presses Enter
+    Then claude-code starts and renders its interactive prompt
+    And keystrokes including Ctrl+C are forwarded correctly
+
+  Scenario: F15 — PTY killed on unmount
+    Given a pty session with pid P is alive
+    When the TerminalNode unmounts
+    Then "pty:kill" is invoked with the session's id
+    And process P is no longer listed by the OS process table within one second
 ```
 
 ---
