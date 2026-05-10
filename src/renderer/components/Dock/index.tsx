@@ -45,6 +45,14 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
       }
+      // Bail when focus is inside any terminal node — xterm focus may live on
+      // a hidden helper textarea, but if focus has fallen to the body the
+      // tagName check above misses it. Treat anything inside .term-body /
+      // .xterm as "user is typing in the terminal."
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.closest('.term-body') || active?.closest('.xterm')) {
+        return;
+      }
       if (e.key === 'v' || e.key === 'V') {
         handleTool('select');
         return;

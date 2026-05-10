@@ -151,6 +151,20 @@ A running log of every significant change, bug fix, and architectural decision t
 
 ---
 
+## [2026-05-10] — Terminal keyboard input regression fix
+
+**Type:** Bug Fix  
+**Branch:** `fix/terminal-keyboard`  
+**Files changed:** `src/renderer/components/nodes/TerminalNode/index.tsx`, `src/renderer/components/Dock/index.tsx`, `src/renderer/components/Orb/index.tsx`  
+**Summary:** Keyboard input to the terminal stopped working. Two regressions stacked:
+
+1. The PR #58 revert (`3b9e57d`) accidentally removed the `.xterm-helper-textarea` direct-focus call that `ac542e1` had added. Under Electron + React Flow, `term.focus()` alone does not always focus the helper textarea, so keystrokes fell on the floor. Restored by querying `containerRef.current.querySelector('.xterm-helper-textarea')` and calling `.focus()` on it inside the same microtask.
+2. The `Dock` (n / i / v shortcuts) and `Orb` (Space push-to-talk) global `keydown` handlers checked `e.target.tagName === 'TEXTAREA'` to bail, but when xterm focus has fallen back to `<body>` (timing race with RF), the target is body, the check passes, and the shortcut fires instead of typing reaching the shell. Both handlers now also walk up from `document.activeElement` and bail when anything inside `.term-body` / `.xterm` is in scope.
+
+Same fix applied on `feat/new-features` via direct push (PR #61 carries it forward).
+
+---
+
 ## [2026-05-10] — `npm run reset` script for clearing board state
 
 **Type:** Chore  
