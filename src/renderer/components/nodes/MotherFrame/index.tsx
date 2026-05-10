@@ -69,8 +69,10 @@ export function MotherFrame({
         background,
         border: `1px solid ${borderColor}`,
         borderRadius: 6,
-        boxShadow: '0 14px 28px rgba(0,0,0,0.45)',
+        // Lighter shadow + contain hint reduces compositor work on pan/drag.
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
         overflow: 'visible',
+        contain: 'layout paint',
       }}
     >
       {/* Left reorder arrow */}

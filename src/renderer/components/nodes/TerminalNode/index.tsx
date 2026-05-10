@@ -80,7 +80,11 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const focusTerm = () => termRef.current?.focus();
+  // Defer focus to a microtask so it runs AFTER React Flow's pointer handler
+  // (which can otherwise re-claim focus on the canvas).
+  const focusTerm = () => {
+    queueMicrotask(() => termRef.current?.focus());
+  };
 
   return (
     <MotherFrame
@@ -166,14 +170,20 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           </div>
         </div>
 
-        {/* xterm mount — nodrag/nopan/nowheel/nokey prevent RF from consuming
-            pointer and keyboard events so xterm receives them instead. */}
+        {/* xterm mount — nodrag/nopan/nowheel keep RF from consuming pointer
+            events. tabIndex=-1 + nodesFocusable={false} on <ReactFlow> stop RF
+            from grabbing focus from xterm's internal textarea. stopPropagation
+            on key events stops any bubbled handler from intercepting input. */}
         <div
           ref={containerRef}
-          className="term-body nodrag nopan nowheel nokey"
-          onPointerDown={(e) => { e.stopPropagation(); focusTerm(); }}
+          tabIndex={-1}
+          className="term-body nodrag nopan nowheel"
+          onPointerDownCapture={(e) => { e.stopPropagation(); focusTerm(); }}
+          onMouseDownCapture={(e) => { e.stopPropagation(); focusTerm(); }}
           onClick={(e) => { e.stopPropagation(); focusTerm(); }}
+          onKeyDownCapture={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
+          onKeyUp={(e) => e.stopPropagation()}
           style={{ width: '100%', height: 280, background: 'var(--term-bg)' }}
         />
       </div>
