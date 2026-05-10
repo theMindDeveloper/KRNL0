@@ -3,8 +3,11 @@ import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState } from './types';
 
 const TICK_MS = 500;
-const RING_RADIUS = 68;
-const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const SLOT_INDEX = 1;
+const SLOT_TOTAL = 4;
+
+const PILL_HEIGHT = 200;
+const PILL_FILL_MAX = 196; // fill area (200 - 4px breathing room from rounded ends)
 
 function formatRemaining(ms: number): string {
   const safe = Math.max(0, ms);
@@ -13,6 +16,30 @@ function formatRemaining(ms: number): string {
   const ss = totalSec % 60;
   return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
 }
+
+const slotTagStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 9,
+  color: 'var(--ink-3)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.18em',
+  marginBottom: 6,
+  paddingLeft: 2,
+};
+
+const cornerStyle = (corner: 'tl' | 'tr' | 'bl' | 'br'): React.CSSProperties => {
+  const base: React.CSSProperties = {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    opacity: 0.35,
+    pointerEvents: 'none',
+  };
+  if (corner === 'tl') return { ...base, top: -1, left: -1, borderTop: '1px solid var(--ink-3)', borderLeft: '1px solid var(--ink-3)' };
+  if (corner === 'tr') return { ...base, top: -1, right: -1, borderTop: '1px solid var(--ink-3)', borderRight: '1px solid var(--ink-3)' };
+  if (corner === 'bl') return { ...base, bottom: -1, left: -1, borderBottom: '1px solid var(--ink-3)', borderLeft: '1px solid var(--ink-3)' };
+  return { ...base, bottom: -1, right: -1, borderBottom: '1px solid var(--ink-3)', borderRight: '1px solid var(--ink-3)' };
+};
 
 export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) {
   const { state, config } = node;
@@ -48,8 +75,53 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
   }, [state.status, remainingMs, onCommand]);
 
   const sessionsTarget = config?.longBreakEvery ?? 4;
+  const completedDots = state.sessionsCompleted % sessionsTarget;
 
-  const handlePrimary = () => {
+  // Progress: 1 = full battery (time remaining), 0 = empty (time elapsed)
+  const progress =
+    state.status === 'running' || state.status === 'break'
+      ? Math.max(0, Math.min(1, remainingMs / totalMs))
+      : 0;
+
+  const fillHeight = Math.round(progress * PILL_FILL_MAX);
+
+  const reservePercent = Math.round((remainingMs / totalMs) * 100);
+
+  // Derived display values
+  const headerBulletColor =
+    state.status === 'running' ? 'var(--rust)' : 'var(--ink-3)';
+
+  const clockColor = state.status === 'running' ? 'var(--rust)' : 'var(--ink-3)';
+
+  const headerLabel = state.label.trim().toUpperCase() || 'DEEP WORK';
+  const pomoDurationTag = `POMO.${state.durationMin.toString().padStart(3, '0')}`;
+
+  const phaseNum = (completedDots + 1).toString().padStart(2, '0');
+  const phaseLabel = `${headerLabel} · PHASE ${phaseNum}`;
+
+  // ▲ RUN text — reflects current status
+  const runLabel =
+    state.status === 'running'
+      ? '▲ RUN'
+      : state.status === 'break'
+        ? '▲ BREAK'
+        : state.status === 'done'
+          ? '▲ DONE'
+          : '▲ IDLE';
+
+  // PAUSE/START/SKIP BREAK button
+  const pauseButtonLabel =
+    state.status === 'running'
+      ? 'PAUSE'
+      : state.status === 'break'
+        ? 'SKIP BREAK'
+        : 'START';
+
+  const handleReset = () => {
+    onCommand('pomo.cancel');
+  };
+
+  const handlePause = () => {
     if (state.status === 'idle' || state.status === 'done') {
       onCommand('pomo.start');
     } else if (state.status === 'running') {
@@ -59,176 +131,227 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
     }
   };
 
-  const buttonLabel =
-    state.status === 'running' ? 'CANCEL' : state.status === 'break' ? 'SKIP BREAK' : 'START';
-
-  // Ring stroke color
-  const ringStroke =
-    state.status === 'running'
-      ? 'var(--rust)'
-      : state.status === 'break'
-        ? 'var(--ink-3)'
-        : 'transparent';
-
-  // Clock text color
-  const clockColor =
-    state.status === 'running' ? 'var(--rust)' : 'var(--ink-3)';
-
-  // Progress: 1 = full ring, 0 = empty
-  const progress =
-    state.status === 'running' || state.status === 'break'
-      ? Math.max(0, Math.min(1, remainingMs / totalMs))
-      : 0;
-
-  const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
-
-  // Session dots — filled = completed in current longBreak cycle
-  const completedDots = state.sessionsCompleted % sessionsTarget;
+  const clockDisplay =
+    state.status === 'idle' || state.status === 'done'
+      ? formatRemaining(state.durationMin * 60_000)
+      : formatRemaining(remainingMs);
 
   return (
-    <div
-      style={{
-        width: 240,
-        border: '1px solid var(--paper-3)',
-        borderRadius: 'var(--radius-lg)',
-        background: 'var(--node-bg)',
-        boxShadow: 'var(--shadow-1)',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          padding: '7px 10px 6px',
-          borderBottom: '1px solid var(--paper-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10.5,
-          color: 'var(--ink-3)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        ▙ POMO{state.status === 'break' ? ' · BREAK' : ''}
+    <div style={{ position: 'relative' }}>
+      {/* Slot tag above node */}
+      <div style={slotTagStyle}>
+        {String(SLOT_INDEX).padStart(2, '0')} · SPINE · {String(SLOT_TOTAL).padStart(2, '0')}
       </div>
 
-      {/* Body */}
+      {/* Node card */}
       <div
         style={{
-          padding: '14px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          position: 'relative',
+          width: 320,
+          border: '1px solid var(--paper-3)',
+          borderRadius: 'var(--radius-lg)',
+          background: 'var(--node-bg)',
+          boxShadow: 'var(--shadow-1)',
+          overflow: 'hidden',
         }}
       >
-        {/* Ring + clock — 160×160 relative container, centered in 240px node */}
+        {/* Corner brackets */}
+        <span style={cornerStyle('tl')} />
+        <span style={cornerStyle('tr')} />
+        <span style={cornerStyle('bl')} />
+        <span style={cornerStyle('br')} />
+
+        {/* Header */}
         <div
           style={{
-            position: 'relative',
-            width: 160,
-            height: 160,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <svg
-            width={160}
-            height={160}
-            style={{ position: 'absolute', top: 0, left: 0 }}
-          >
-            {/* Track circle */}
-            <circle
-              cx={80}
-              cy={80}
-              r={RING_RADIUS}
-              stroke="var(--paper-3)"
-              strokeWidth={3}
-              fill="none"
-              opacity={0.5}
-            />
-            {/* Progress circle */}
-            <circle
-              cx={80}
-              cy={80}
-              r={RING_RADIUS}
-              stroke={ringStroke}
-              strokeWidth={3}
-              fill="none"
-              strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              transform="rotate(-90 80 80)"
-              style={{ transition: 'stroke-dashoffset 0.5s linear' }}
-            />
-          </svg>
-
-          {/* Clock text — absolutely centered over SVG */}
-          <span
-            style={{
-              position: 'relative',
-              zIndex: 1,
-              fontSize: 64,
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 300,
-              color: clockColor,
-              fontVariantNumeric: 'tabular-nums',
-              letterSpacing: '-0.02em',
-              lineHeight: 1,
-            }}
-          >
-            {formatRemaining(remainingMs)}
-          </span>
-        </div>
-
-        {/* Session dots */}
-        <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
-          {Array.from({ length: sessionsTarget }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: i < completedDots ? 'var(--acid)' : 'var(--paper-3)',
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Session count label */}
-        <div
-          style={{
+            padding: '7px 10px 6px',
+            borderBottom: '1px solid var(--paper-3)',
+            fontFamily: 'var(--font-mono)',
             fontSize: 10.5,
             color: 'var(--ink-3)',
-            marginTop: 6,
-            fontFamily: 'var(--font-mono)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
           }}
         >
-          SESSION {state.sessionsCompleted} / {sessionsTarget}
+          <span style={{ color: headerBulletColor }}>●</span>
+          <span>{headerLabel} · {pomoDurationTag}</span>
         </div>
 
-        {/* Action button */}
-        <button
-          type="button"
-          onClick={handlePrimary}
+        {/* Body: 2 columns */}
+        <div
           style={{
-            marginTop: 12,
-            width: '100%',
-            padding: '6px 10px',
-            background: 'transparent',
-            border: '1px solid var(--paper-3)',
-            borderRadius: 'var(--radius)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
-            letterSpacing: '0.04em',
-            color: 'var(--ink-2)',
-            cursor: 'pointer',
+            padding: '14px 16px',
+            display: 'flex',
+            flexDirection: 'row',
+            gap: 16,
+            alignItems: 'flex-start',
           }}
         >
-          {buttonLabel}
-        </button>
+          {/* LEFT: vertical pill battery */}
+          <div
+            style={{
+              width: 60,
+              height: PILL_HEIGHT,
+              borderRadius: 30,
+              border: '1px solid var(--paper-3)',
+              position: 'relative',
+              overflow: 'hidden',
+              flexShrink: 0,
+            }}
+          >
+            {/* Fill from bottom up */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: fillHeight,
+                background: 'var(--acid)',
+                transition: 'height 0.5s linear',
+              }}
+            />
+          </div>
+
+          {/* RIGHT: clock + meta */}
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-start',
+              gap: 6,
+            }}
+          >
+            {/* Big clock */}
+            <div
+              style={{
+                fontSize: 36,
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 300,
+                color: clockColor,
+                fontVariantNumeric: 'tabular-nums',
+                lineHeight: 1,
+              }}
+            >
+              {clockDisplay}
+            </div>
+
+            {/* Phase label */}
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                color: 'var(--ink-3)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.18em',
+              }}
+            >
+              {phaseLabel}
+            </div>
+
+            {/* Reserve / ready */}
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                color: 'var(--acid)',
+              }}
+            >
+              {state.status === 'idle' ? 'ready' : `${reservePercent}% reserve`}
+            </div>
+
+            {/* Session dots + run label row */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginTop: 8,
+              }}
+            >
+              <div style={{ display: 'flex', gap: 4 }}>
+                {Array.from({ length: sessionsTarget }).map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: i < completedDots ? 'var(--acid)' : 'var(--paper-3)',
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  color: 'var(--ink-3)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {runLabel}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom button row */}
+        <div
+          style={{
+            padding: '0 16px 14px',
+            display: 'flex',
+            gap: 6,
+          }}
+        >
+          {/* RESET button */}
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{
+              flex: 1,
+              padding: '6px 10px',
+              background: 'transparent',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 'var(--radius)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10.5,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              color: 'var(--ink-2)',
+              cursor: 'pointer',
+            }}
+          >
+            RESET
+          </button>
+
+          {/* PAUSE / START / SKIP BREAK button — 60% width */}
+          <button
+            type="button"
+            onClick={handlePause}
+            style={{
+              flex: '0 0 60%',
+              padding: '6px 10px',
+              background: 'var(--acid)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 'var(--radius)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10.5,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              color: 'var(--paper)',
+              cursor: 'pointer',
+            }}
+          >
+            {pauseButtonLabel}
+          </button>
+        </div>
       </div>
     </div>
   );
