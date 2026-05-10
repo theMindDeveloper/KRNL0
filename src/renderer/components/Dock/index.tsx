@@ -101,8 +101,9 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
         flexDirection: 'column',
         gap: 4,
         padding: 6,
-        background: 'rgba(245,241,232,0.92)',
-        backdropFilter: 'blur(12px)',
+        // Theme-aware solid background. backdrop-filter blur was killing pan
+        // FPS — every node moving behind the dock forced a re-blur per frame.
+        background: 'var(--paper-2)',
         border: '1px solid var(--paper-3)',
         borderRadius: 8,
         boxShadow: 'var(--shadow-1)',
