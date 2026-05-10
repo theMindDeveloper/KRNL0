@@ -279,6 +279,7 @@ export function Canvas() {
                 onPointerMove={onNodePointerMove}
                 onPointerUp={onNodePointerUp}
                 onPointerCancel={onNodePointerUp}
+                onClick={(e) => { e.stopPropagation(); setSelectedId(node.id); }}
                 style={{
                   position: 'absolute',
                   left: node.position.x,
