@@ -82,7 +82,17 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const focusTerm = () => termRef.current?.focus();
+  // Defer to a microtask so focus runs after RF's pointer handler. Belt-and-
+  // suspenders: also focus the xterm helper textarea directly — under
+  // Electron + RF, term.focus() alone sometimes does not actually focus the
+  // textarea (regression after PR #58 revert).
+  const focusTerm = () => {
+    queueMicrotask(() => {
+      termRef.current?.focus();
+      const ta = containerRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+      ta?.focus();
+    });
+  };
 
   return (
     <MotherFrame
@@ -166,13 +176,20 @@ export function TerminalNode({ node, onCommand }: NodeProps<TermState, TermConfi
           </div>
         </div>
 
-        {/* xterm mount — .nodrag .nopan tells React Flow to leave pointer events
-            alone so xterm receives clicks/keys. Otherwise RF eats them. */}
+        {/* xterm mount — nodrag/nopan/nowheel keep RF from consuming pointer
+            events. tabIndex=-1 + nodesFocusable={false} on <ReactFlow> stop RF
+            from grabbing focus from xterm's internal textarea. stopPropagation
+            on key events stops any bubbled handler from intercepting input. */}
         <div
           ref={containerRef}
+          tabIndex={-1}
           className="term-body nodrag nopan nowheel"
-          onPointerDown={(e) => { e.stopPropagation(); focusTerm(); }}
+          onPointerDownCapture={(e) => { e.stopPropagation(); focusTerm(); }}
+          onMouseDownCapture={(e) => { e.stopPropagation(); focusTerm(); }}
           onClick={(e) => { e.stopPropagation(); focusTerm(); }}
+          onKeyDownCapture={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onKeyUp={(e) => e.stopPropagation()}
           style={{ width: '100%', height: 280, background: 'var(--term-bg)' }}
         />
       </div>

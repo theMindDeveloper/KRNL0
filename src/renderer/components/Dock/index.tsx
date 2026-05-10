@@ -50,6 +50,14 @@ export function Dock({ activeKind, onAddNode }: DockProps) {
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
       }
+      // xterm focuses a hidden helper textarea — but if focus has fallen back
+      // to body (timing race with RF), the tagName check above misses it.
+      // Treat anything inside .term-body / .xterm as "user is typing in the
+      // terminal" so dock shortcuts (n / i / etc.) don't hijack typing.
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.closest('.term-body') || active?.closest('.xterm')) {
+        return;
+      }
       for (const btn of DOCK_BUTTONS) {
         if (e.key === btn.shortcut || e.key === btn.shortcut.toLowerCase()) {
           fire(btn.kind);

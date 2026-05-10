@@ -38,7 +38,12 @@ export function OrbButton() {
     const isTypingTarget = (t: EventTarget | null): boolean => {
       if (!(t instanceof HTMLElement)) return false;
       const tag = t.tagName;
-      return tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable) return true;
+      // xterm focuses a hidden helper textarea; if focus has fallen back to
+      // body (timing race with RF), check the active element subtree too.
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.closest('.term-body') || active?.closest('.xterm')) return true;
+      return false;
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
