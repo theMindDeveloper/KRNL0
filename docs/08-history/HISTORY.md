@@ -233,3 +233,12 @@ Same fix applied on `feat/new-features` via direct push (PR #61 carries it forwa
 F9–F12 and F14 are structurally verified — the node-pty handlers are wired and correct — but live end-to-end confirmation is deferred until VS Build Tools are installed. A follow-up tracking issue is filed to close this gate.
 
 **Test count:** 285 passing (was 272), 1 todo. `npm run typecheck`: 0 errors. `npm run build`: clean.
+
+---
+
+## [2026-05-10] — Terminal Backspace on Windows (xterm DEL → cmd BS translation)
+
+**Type:** Bug Fix  
+**Branch:** `fix/terminal-backspace`  
+**Files changed:** `src/renderer/components/nodes/TerminalNode/session.ts`  
+**Summary:** After the node-pty migration (PR #68), typing in the terminal worked on Windows but Backspace did nothing. Root cause: xterm.js emits `0x7f` (DEL) on Backspace by default — `bash`, `zsh`, and PowerShell all accept that, but Windows `cmd.exe` only recognises `0x08` (BS) and silently drops `0x7f`. Fix is a one-line translation in the renderer's `term.onData` handler: replace any `\x7f` with `\x08` before forwarding to `pty:write`. Cross-platform safe — every shell on every OS treats `\x08` as an erase, so the translation never causes harm.
