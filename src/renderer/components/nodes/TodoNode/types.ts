@@ -5,6 +5,7 @@ export interface TodoItem {
   id: string;            // crypto.randomUUID()
   text: string;
   done: boolean;
+  tag?: string;          // optional 4-char label, e.g. "WORK"
   createdAt: string;     // ISO 8601
   completedAt: string | null; // ISO when done = true, null otherwise
 }

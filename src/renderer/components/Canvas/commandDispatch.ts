@@ -8,6 +8,7 @@
 
 import { useBoardStore } from '../../store/boardStore';
 import type { Node } from '@shared/types/node';
+import type { Edge } from '@shared/types/edge';
 
 // ── Pomo ──────────────────────────────────────────────────────────────
 import {
@@ -26,6 +27,8 @@ import {
   todoRemove,
   todoClearDone,
 } from '../nodes/TodoNode/commands';
+import type { TodoState } from '../nodes/TodoNode/types';
+import type { TaskState } from '../nodes/TaskNode/types';
 
 // ── Habit ─────────────────────────────────────────────────────────────
 import {
@@ -93,6 +96,85 @@ export function makeCommandHandler(nodeId: string) {
     const newState = applyCommand(node, command, args);
     if (newState === null) return;
 
+    // ── todo.add: also spawn a child task node + connecting edge ─────────
+    if (node.kind === 'todo' && command === 'todo.add') {
+      const prevState = node.state as TodoState;
+      const nextState = newState as TodoState;
+
+      // Guard: no spawn if todoAdd was a no-op (empty text)
+      if (nextState.items.length === prevState.items.length) {
+        // Still apply state (it's a no-op reference, but updateNode is safe)
+        updateNode(nodeId, { state: newState });
+        return;
+      }
+
+      // Apply todo state first
+      updateNode(nodeId, { state: newState });
+
+      // Re-read fresh board state after mutation
+      const fresh = useBoardStore.getState().board;
+      if (!fresh) return;
+
+      const todoNode = fresh.nodes.find((n) => n.id === nodeId);
+      if (!todoNode) return;
+
+      const existingTaskNodes = fresh.nodes.filter((n) => n.kind === 'todo.task');
+      const currentTaskCount = existingTaskNodes.length;
+      const n = currentTaskCount + 1;
+
+      // Compute position
+      const position =
+        currentTaskCount === 0
+          ? { x: todoNode.position.x, y: todoNode.position.y + 420 }
+          : { x: todoNode.position.x + (n - 1) * 252, y: todoNode.position.y + 420 };
+
+      // Retrieve the text and tag from the newly added item (last in insertion order)
+      const addedItem = nextState.items[nextState.items.length - 1];
+      const text = addedItem?.text ?? (args['text'] as string | undefined) ?? '';
+      const tag = addedItem?.tag ?? (args['tag'] as string | undefined);
+
+      const taskState: TaskState = {
+        text,
+        done: false,
+        ...(tag !== undefined ? { tag } : {}),
+        durationMin: 20,
+        createdAt: new Date().toISOString(),
+        parentTodoId: todoNode.id,
+      };
+
+      const taskNode: Node = {
+        id: `task-${crypto.randomUUID()}`,
+        kind: 'todo.task',
+        position,
+        isMother: false,
+        state: taskState,
+        config: { showDuration: true },
+      };
+
+      // Edge: previous task (or todo mother if first) → this task
+      const previousNodeId =
+        currentTaskCount === 0
+          ? todoNode.id
+          : (existingTaskNodes[existingTaskNodes.length - 1]?.id ?? todoNode.id);
+
+      const edge: Edge = {
+        id: `edge-${crypto.randomUUID()}`,
+        from: { nodeId: previousNodeId, event: 'task.next' },
+        to: { nodeId: taskNode.id, command: 'task.activate' },
+        enabled: true,
+      };
+
+      const { addNode, addEdge } = useBoardStore.getState();
+      addNode(taskNode);
+      addEdge(edge);
+
+      // Single persist that captures all three mutations
+      const finalBoard = useBoardStore.getState().board;
+      if (finalBoard) void window.krnl?.boardSave(finalBoard);
+      return;
+    }
+
+    // ── All other commands ────────────────────────────────────────────────
     updateNode(nodeId, { state: newState });
 
     // Persist to disk after every mutation (best-effort, non-blocking).

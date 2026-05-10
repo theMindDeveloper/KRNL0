@@ -11,6 +11,7 @@ interface BoardStore {
   theme: 'light' | 'dark';
   setBoard: (board: Board) => void;
   updateNode: (id: string, patch: Partial<Node>) => void;
+  addNode: (node: Node) => void;
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
   setTheme: (theme: 'light' | 'dark') => void;
@@ -40,6 +41,12 @@ export const useBoardStore = create<BoardStore>((set) => ({
           nodes: s.board.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
         },
       };
+    }),
+
+  addNode: (node) =>
+    set((s) => {
+      if (!s.board) return s;
+      return { board: { ...s.board, nodes: [...s.board.nodes, node] } };
     }),
 
   addEdge: (edge) =>
