@@ -65,6 +65,10 @@ export const useBoardStore = create<BoardStore>((set) => ({
       return { board: { ...s.board, edges: s.board.edges.filter((e) => e.id !== id) } };
     }),
 
+  // NOTE: `theme` in the store is no longer the authoritative source of truth for
+  // the active theme. TopBar owns the live theme value (reads/writes localStorage
+  // and sets data-theme on <html> directly). setTheme is kept here for backward
+  // compatibility and programmatic use; callers should prefer TopBar's toggle.
   setTheme: (theme) => {
     document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
     set({ theme });
