@@ -6,8 +6,8 @@ const TICK_MS = 500;
 const SLOT_INDEX = 1;
 const SLOT_TOTAL = 4;
 
-const PILL_HEIGHT = 200;
-const PILL_FILL_MAX = 196; // fill area (200 - 4px breathing room from rounded ends)
+const PILL_HEIGHT = 240;
+const PILL_FILL_MAX = 236; // fill area (240 - 4px breathing room from rounded ends)
 
 function formatRemaining(ms: number): string {
   const safe = Math.max(0, ms);
@@ -193,9 +193,9 @@ export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) 
           {/* LEFT: vertical pill battery */}
           <div
             style={{
-              width: 60,
+              width: 90,
               height: PILL_HEIGHT,
-              borderRadius: 30,
+              borderRadius: 45,
               border: '1px solid var(--paper-3)',
               position: 'relative',
               overflow: 'hidden',

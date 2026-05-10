@@ -93,12 +93,63 @@ function migrateMotherPositions(board: unknown): Record<string, unknown> {
   return b as Record<string, unknown>;
 }
 
+/**
+ * Re-chain task nodes by createdAt order. Removes any edge into a task
+ * (including illegal mother→task edges) and rebuilds task[i-1] → task[i].
+ * The first task has no inbound edge.
+ */
+function migrateTaskChain(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  const edges = board['edges'];
+  const edgeArr = Array.isArray(edges) ? edges : [];
+
+  type TaskNodeShape = { id: string; kind: string; state?: { createdAt?: string } };
+  const tasks = nodes.filter((n: unknown): n is TaskNodeShape => {
+    return typeof n === 'object' && n !== null && (n as { kind?: unknown }).kind === 'todo.task';
+  });
+  if (tasks.length === 0) {
+    // Still strip any orphan task-targeting edges (none expected, but defensive)
+    board['edges'] = edgeArr;
+    return board;
+  }
+
+  const taskIds = new Set(tasks.map((t) => t.id));
+
+  // Sort by createdAt ascending (oldest first)
+  const sorted = [...tasks].sort((a, b) => {
+    const ca = a.state?.createdAt ?? '';
+    const cb = b.state?.createdAt ?? '';
+    return ca < cb ? -1 : ca > cb ? 1 : 0;
+  });
+
+  // Drop ALL edges where target is a task — clean slate
+  type EdgeShape = { id: string; from: { nodeId: string; event: string }; to: { nodeId: string; command: string }; enabled?: boolean };
+  const cleaned = edgeArr.filter((e: unknown) => {
+    if (typeof e !== 'object' || e === null) return false;
+    const ed = e as { to?: { nodeId?: string } };
+    return !taskIds.has(ed.to?.nodeId ?? '');
+  }) as EdgeShape[];
+
+  // Add chain edges
+  for (let i = 1; i < sorted.length; i++) {
+    cleaned.push({
+      id: `edge-chain-${sorted[i]!.id}`,
+      from: { nodeId: sorted[i - 1]!.id, event: 'task.next' },
+      to: { nodeId: sorted[i]!.id, command: 'task.activate' },
+      enabled: true,
+    });
+  }
+  board['edges'] = cleaned;
+  return board;
+}
+
 function loadBoard() {
   try {
     if (existsSync(BOARD_PATH)) {
       const raw = readFileSync(BOARD_PATH, 'utf-8');
       const parsed: unknown = JSON.parse(raw);
-      return migrateMotherPositions(parsed);
+      return migrateTaskChain(migrateMotherPositions(parsed));
     }
   } catch {
     // fall through to seed
