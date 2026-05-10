@@ -14,6 +14,24 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
   const sessionIdRef = useRef<string | null>(null);
 
   const [hovered, setHovered] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const copySelection = () => {
+    const sel = termRef.current?.getSelection() ?? '';
+    if (sel) {
+      try { void navigator.clipboard.writeText(sel); } catch { /* ignore */ }
+      termRef.current?.clearSelection();
+    }
+  };
+  const pasteClipboard = async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) window.krnl?.ptyWrite(sid, text);
+    } catch { /* ignore */ }
+  };
+  const selectAll = () => termRef.current?.selectAll();
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -145,13 +163,24 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           50% { opacity: 0.35; }
         }
         .term-live-dot { animation: term-live-pulse 1.4s ease-in-out infinite; }
+        /* Override global body { user-select: none } so the DOM-renderer fallback
+           path can natively select text. WebGL/Canvas renderers use xterm's own
+           selection logic and ignore this, but it doesn't hurt them. */
+        .term-body, .term-body * { user-select: text; -webkit-user-select: text; }
       `}</style>
 
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         onClick={focusTerm}
-        style={{ borderRadius: 5, overflow: 'hidden' }}
+        style={{
+          borderRadius: 5,
+          overflow: 'hidden',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+        }}
       >
         {/* Header — .term-head */}
         <div
@@ -230,13 +259,102 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           ref={containerRef}
           tabIndex={-1}
           className="term-body nodrag nopan nowheel"
-          onPointerDownCapture={(e) => { e.stopPropagation(); focusTerm(); }}
-          onMouseDownCapture={(e) => { e.stopPropagation(); focusTerm(); }}
+          // BUBBLE phase, not capture. Capture-phase stopPropagation here kills
+          // xterm's own mousedown listener on the screen element (same trap as
+          // onKeyDownCapture in issue #72) — and that listener is what starts
+          // mouse selection. Bubble runs AFTER xterm has already seen the event,
+          // so selection drags start normally while React Flow is still blocked.
+          onPointerDown={(e) => {
+            if (e.button === 0) { e.stopPropagation(); focusTerm(); }
+          }}
+          onMouseDown={(e) => {
+            if (e.button === 0) { e.stopPropagation(); focusTerm(); }
+          }}
           onClick={(e) => { e.stopPropagation(); focusTerm(); }}
-          onKeyDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            // Standard terminal copy/paste — Ctrl+Shift+C / Ctrl+Shift+V.
+            // Ctrl+C alone is reserved for SIGINT (see session.ts).
+            const mod = e.ctrlKey || e.metaKey;
+            if (mod && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+              e.preventDefault();
+              copySelection();
+            } else if (mod && e.shiftKey && (e.key === 'V' || e.key === 'v')) {
+              e.preventDefault();
+              void pasteClipboard();
+            }
+          }}
           onKeyUp={(e) => e.stopPropagation()}
-          style={{ width: '100%', height: 280, background: 'var(--term-bg)' }}
+          style={{ width: '100%', flex: 1, minHeight: 0, background: 'var(--term-bg)', position: 'relative' }}
         />
+
+        {menu && (
+          <>
+            {/* Click-away blanket */}
+            <div
+              onClick={() => setMenu(null)}
+              onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}
+              style={{ position: 'fixed', inset: 0, zIndex: 10 }}
+            />
+            <div
+              className="nodrag nopan nowheel"
+              style={{
+                position: 'absolute',
+                left: menu.x,
+                top: menu.y + 30 /* offset for header height */,
+                zIndex: 11,
+                background: 'var(--paper)',
+                border: '1px solid var(--ink-3)',
+                borderRadius: 4,
+                padding: 4,
+                minWidth: 140,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              }}
+            >
+              {[
+                { label: 'Copy', action: copySelection, disabled: !termRef.current?.getSelection() },
+                { label: 'Paste', action: () => void pasteClipboard(), disabled: false },
+                { label: 'Select All', action: selectAll, disabled: false },
+              ].map((it) => (
+                <button
+                  key={it.label}
+                  type="button"
+                  disabled={it.disabled}
+                  onClick={(e) => { e.stopPropagation(); it.action(); setMenu(null); focusTerm(); }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '6px 10px',
+                    background: 'transparent',
+                    border: 0,
+                    color: it.disabled ? 'var(--ink-3)' : 'var(--ink)',
+                    cursor: it.disabled ? 'default' : 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: 'inherit',
+                    borderRadius: 2,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!it.disabled) (e.currentTarget as HTMLElement).style.background = 'var(--paper-2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }}
+                >
+                  {it.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </MotherFrame>
   );
