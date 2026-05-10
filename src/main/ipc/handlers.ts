@@ -4,6 +4,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import { spawn as spawnChild, type ChildProcessWithoutNullStreams } from 'child_process';
+import { SysFacade } from '../../sys/SysFacade';
 
 const BOARD_DIR = join(homedir(), 'Documents', 'krnl0');
 const BOARD_PATH = join(BOARD_DIR, 'board.json');
@@ -91,9 +92,9 @@ export function registerHandlers(): void {
   });
 
   ipcMain.handle('sys:run', async (_event, argv: string[]) => {
-    // TODO (Week 4): spawn sys CLI process, capture stdout, return SysResult
-    void argv;
-    return { ok: false, message: 'sys not yet implemented' };
+    const facade = new SysFacade();
+    const result = await facade.run(argv);
+    return { ok: result.ok, message: result.message ?? '' };
   });
 
   ipcMain.handle('brain:ask', async (_event, prompt: string) => {
