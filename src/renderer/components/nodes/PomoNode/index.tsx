@@ -1,9 +1,67 @@
-// TODO (Issue #3): full Pomodoro implementation per Decision #9.
-// State: currentSession { startedAt, durationMin, label, status } + history[].
-// Persistence rule: save startedAt; derive countdown from now() - startedAt.
+import { useEffect, useState } from 'react';
 import type { NodeProps } from '../types';
+import type { PomoConfig, PomoState } from './types';
 
-export function PomoNode(_props: NodeProps) {
+const TICK_MS = 500;
+
+function formatRemaining(ms: number): string {
+  const safe = Math.max(0, ms);
+  const totalSec = Math.ceil(safe / 1000);
+  const mm = Math.floor(totalSec / 60);
+  const ss = totalSec % 60;
+  return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+}
+
+export function PomoNode({ node, onCommand }: NodeProps<PomoState, PomoConfig>) {
+  const { state, config } = node;
+  const [, setTick] = useState(0);
+
+  // Visual tick only — state mutations go through onCommand (Decision #9).
+  useEffect(() => {
+    if (state.status !== 'running' && state.status !== 'break') return;
+    const id = setInterval(() => setTick((t) => t + 1), TICK_MS);
+    return () => clearInterval(id);
+  }, [state.status]);
+
+  const totalMs =
+    state.status === 'running'
+      ? state.durationMin * 60_000
+      : state.status === 'break'
+        ? state.breakMin * 60_000
+        : state.durationMin * 60_000;
+
+  const elapsedMs =
+    (state.status === 'running' || state.status === 'break') && state.startedAt !== null
+      ? Date.now() - Date.parse(state.startedAt)
+      : 0;
+
+  const remainingMs = totalMs - elapsedMs;
+
+  // When a running session reaches zero, request completion. The kernel
+  // validates the precondition and writes; the tick itself never writes.
+  useEffect(() => {
+    if (state.status === 'running' && remainingMs <= 0) {
+      onCommand('pomo.complete');
+    }
+  }, [state.status, remainingMs, onCommand]);
+
+  const sessionsTarget = config?.longBreakEvery ?? 4;
+
+  const handlePrimary = () => {
+    if (state.status === 'idle' || state.status === 'done') {
+      onCommand('pomo.start');
+    } else if (state.status === 'running') {
+      onCommand('pomo.cancel');
+    } else if (state.status === 'break') {
+      onCommand('pomo.skipBreak');
+    }
+  };
+
+  const buttonLabel =
+    state.status === 'running' ? 'CANCEL' : state.status === 'break' ? 'SKIP BREAK' : 'START';
+
+  const accent = state.status === 'break' ? 'var(--ink-3)' : 'var(--rust)';
+
   return (
     <div
       style={{
@@ -26,7 +84,7 @@ export function PomoNode(_props: NodeProps) {
           letterSpacing: '0.04em',
         }}
       >
-        ▙ POMO
+        ▙ POMO{state.status === 'break' ? ' · BREAK' : ''}
       </div>
       <div style={{ padding: '14px 16px' }}>
         <div
@@ -34,12 +92,12 @@ export function PomoNode(_props: NodeProps) {
             fontSize: 64,
             fontFamily: 'var(--font-mono)',
             fontWeight: 300,
-            color: 'var(--rust)',
+            color: accent,
             fontVariantNumeric: 'tabular-nums',
             letterSpacing: '-0.02em',
           }}
         >
-          25:00
+          {formatRemaining(remainingMs)}
         </div>
         <div
           style={{
@@ -51,8 +109,27 @@ export function PomoNode(_props: NodeProps) {
             letterSpacing: '0.04em',
           }}
         >
-          SESSION 0 / 4
+          SESSION {state.sessionsCompleted} / {sessionsTarget}
         </div>
+        <button
+          type="button"
+          onClick={handlePrimary}
+          style={{
+            marginTop: 12,
+            width: '100%',
+            padding: '6px 10px',
+            background: 'transparent',
+            border: '1px solid var(--paper-3)',
+            borderRadius: 'var(--radius-md)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10.5,
+            letterSpacing: '0.04em',
+            color: 'var(--ink-1)',
+            cursor: 'pointer',
+          }}
+        >
+          {buttonLabel}
+        </button>
       </div>
     </div>
   );
