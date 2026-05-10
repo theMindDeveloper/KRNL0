@@ -16,7 +16,6 @@ import {
   Panel,
   BaseEdge,
   getBezierPath,
-  ReactFlowProvider,
   type NodeChange,
   type EdgeChange,
   type Viewport,
@@ -29,7 +28,9 @@ import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge } from './rfAdapters';
 import { makeCommandHandler } from './commandDispatch';
+import { Dock } from '../Dock';
 import type { Node as KrnlNode } from '../../../shared/types/node';
+import type { NodeKind } from '../../../shared/types/node';
 
 // ── Edge components ───────────────────────────────────────────────────────────
 
@@ -131,6 +132,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
+
+  // ── Dock add-node handler (Phase 5 placeholder) ───────────────────────────
+  const handleAddNode = useCallback((args: { kind: NodeKind }) => {
+    console.log('[dock] addNode', args.kind);
+    // Phase 6: wire dock to create child node kinds (pomo.session / todo.task /
+    // habit.day) once those node bodies exist.
+  }, []);
 
   // ── Derive RF nodes from boardStore ──────────────────────────────────────
   const rfNodes = useMemo(() => {
@@ -255,13 +263,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         </defs>
       </svg>
 
-      {/* Panel placeholders — future chrome components mount here (Decision #13 §F) */}
-      {/* Left dock toolbar (cursor / text / image / link) */}
-      <Panel position="top-left"><></></Panel>
-      {/* Topbar breadcrumb */}
-      <Panel position="top-center"><></></Panel>
-      {/* Statusbar */}
-      <Panel position="bottom-left"><></></Panel>
+      {/* Left dock — Phase 6: wire to create child node kinds once bodies exist */}
+      <Panel position="top-left" style={{ margin: 0, padding: 0 }}>
+        <Dock onAddNode={handleAddNode} />
+      </Panel>
     </ReactFlow>
   );
 }
@@ -270,6 +275,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 // RF reads `defaultViewport` exactly once at mount. Mounting only after
 // setBoard() has run ensures the persisted viewport from board.json is applied
 // rather than the default {0, 160, 1} placeholder.
+//
+// NOTE: ReactFlowProvider is no longer here — it lives in App.tsx so that
+// TopBar (useReactFlow for fitView) and StatusBar (useReactFlow for zoom) share
+// the same RF instance context as CanvasFlowInner.
 
 export function CanvasFlow() {
   const viewport = useBoardStore((s) => s.viewport);
@@ -278,9 +287,5 @@ export function CanvasFlow() {
   // Don't mount until board is loaded so defaultViewport has the persisted value.
   if (!board) return null;
 
-  return (
-    <ReactFlowProvider>
-      <CanvasFlowInner initialViewport={viewport} />
-    </ReactFlowProvider>
-  );
+  return <CanvasFlowInner initialViewport={viewport} />;
 }
