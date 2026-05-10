@@ -12,7 +12,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   Panel,
   BaseEdge,
   getBezierPath,
@@ -93,7 +92,6 @@ function DefaultEdge({
         strokeWidth: active ? 1.5 : 1,
         strokeDasharray: active ? undefined : '4 4',
         opacity: active ? 1 : 0.6,
-        filter: active ? 'url(#acid-glow)' : undefined,
       }}
     />
   );
@@ -311,6 +309,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       fitView={false}
       minZoom={0.25}
       maxZoom={4}
+      // Perf + terminal-keyboard fix: stop RF from grabbing focus or arrow keys
+      // away from xterm/inputs inside nodes.
+      nodesFocusable={false}
+      disableKeyboardA11y
       proOptions={{ hideAttribution: true }}
       style={{ background: 'var(--paper)' }}
     >
@@ -325,31 +327,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       {/* Controls — zoom in/out, fit view */}
       <Controls position="bottom-right" showInteractive={false} />
 
-      {/* MiniMap — node colours keyed by kind per Decision #13 §A */}
-      <MiniMap
-        position="bottom-right"
-        nodeColor={(node) => {
-          if (node.type === 'term') return 'var(--ink)';
-          if (node.type === 'todo.task' || node.type === 'pomo.session' || node.type === 'habit.day') {
-            return 'var(--cyan)';
-          }
-          return 'var(--spine)';
-        }}
-        maskColor="rgba(14,13,11,0.7)"
-        pannable
-        zoomable
-      />
-
-      {/* SVG defs for the acid-glow filter used by active edges */}
-      <svg style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
-        <defs>
-          <filter id="acid-glow">
-            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#c9f158" floodOpacity="0.7" />
-          </filter>
-        </defs>
-      </svg>
-
-      {/* Left dock — Phase 6: wire to create child node kinds once bodies exist */}
+      {/* Left dock */}
       <Panel position="top-left" style={{ margin: 0, padding: 0 }}>
         <Dock onAddNode={handleAddNode} />
       </Panel>
