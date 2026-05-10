@@ -178,35 +178,36 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
                         const isPast = dayStr < today;
 
                         // Cell style matrix per spec:
-                        // done + today:   acid bg, acid outline outside (box-shadow ring)
+                        // done + today:   acid bg + 1px acid outline 1px outside the cell
                         // done + past:    acid bg at 0.85 opacity
-                        // today undone:   transparent bg, ink-3 border, acid box-shadow ring
+                        // today undone:   1px ink-3 border + 1px acid outline 1px outside
                         // past undone:    paper-3 bg, opacity 0.4
                         // future:         paper-3 bg (non-interactive, no special styling)
+                        //
+                        // "1px outline outside" is implemented as CSS `outline: 1px solid …`
+                        // with `outlineOffset: 1px` — this draws a 1px ring with a 1px gap
+                        // between it and the cell border.
                         let cellBg: string;
                         let cellOpacity: number | undefined;
                         let cellBorder: string;
-                        let cellBoxShadow: string | undefined;
-                        // outline is used for ink-3 ring on today-done; box-shadow handles acid ring
                         let cellOutline: string | undefined;
                         let cellOutlineOffset: string | undefined;
 
                         if (done && isToday) {
                           cellBg = 'var(--acid)';
                           cellBorder = '1px solid transparent';
-                          // acid outline outside via box-shadow (outline-offset 1px = gap of 1px)
-                          cellBoxShadow = '0 0 0 2px var(--acid)';
-                          cellOutline = undefined;
-                          cellOutlineOffset = undefined;
+                          cellOutline = '1px solid var(--acid)';
+                          cellOutlineOffset = '1px';
                         } else if (done && isPast) {
                           cellBg = 'var(--acid)';
                           cellOpacity = 0.85;
                           cellBorder = '1px solid transparent';
                         } else if (isToday) {
-                          // today undone: ink-3 border + acid box-shadow ring outside
+                          // today undone: ink-3 border + acid outline ring outside
                           cellBg = 'transparent';
                           cellBorder = '1px solid var(--ink-3)';
-                          cellBoxShadow = '0 0 0 2px var(--acid)';
+                          cellOutline = '1px solid var(--acid)';
+                          cellOutlineOffset = '1px';
                         } else if (isPast) {
                           cellBg = 'var(--paper-3)';
                           cellOpacity = 0.4;
@@ -226,7 +227,6 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
                           flexShrink: 0,
                           boxSizing: 'border-box',
                           ...(cellOpacity !== undefined ? { opacity: cellOpacity } : {}),
-                          ...(cellBoxShadow ? { boxShadow: cellBoxShadow } : {}),
                           ...(cellOutline ? { outline: cellOutline } : {}),
                           ...(cellOutlineOffset ? { outlineOffset: cellOutlineOffset } : {}),
                         };
