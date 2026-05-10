@@ -10,4 +10,9 @@ export interface NodeProps<TState = unknown, TConfig = unknown> {
   onSelect: () => void;
   // Drag is only enabled for child nodes; mothers ignore drag handlers.
   onDragStart?: (e: ReactPointerEvent) => void;
+  // Slot reorder props — only provided for mother nodes.
+  slotIndex?: number | undefined;
+  slotTotal?: number | undefined;
+  onMoveLeft?: ((() => void) | undefined);
+  onMoveRight?: ((() => void) | undefined);
 }

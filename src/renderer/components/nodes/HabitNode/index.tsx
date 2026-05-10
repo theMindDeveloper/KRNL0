@@ -28,9 +28,7 @@ const CELL_GAP = 3;
 
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 
-const SLOT_INDEX = 3;
-
-export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig>) {
+export function HabitNode({ node, onCommand, slotIndex = 3, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<HabitState, HabitConfig>) {
   const { state } = node;
   const [newName, setNewName] = useState('');
 
@@ -54,7 +52,7 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
   const gridWidth = CELL_SIZE * 7 + CELL_GAP * 6;
 
   return (
-    <MotherFrame slotIndex={SLOT_INDEX} slotTotal={MOTHER_TOTAL} width={MOTHER_WIDTH}>
+    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header */}
         <div
