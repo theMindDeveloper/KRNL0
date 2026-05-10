@@ -23,36 +23,9 @@ const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const CELL_SIZE = 18;
 const CELL_GAP = 3;
 
-// Slot tag + corner bracket constants (shared spec)
+import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+
 const SLOT_INDEX = 3;
-const SLOT_TOTAL = 4;
-
-const slotTagStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 9,
-  color: 'var(--ink-3)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.18em',
-  marginBottom: 6,
-  paddingLeft: 2,
-};
-
-const cornerStyle = (corner: 'tl' | 'tr' | 'bl' | 'br'): React.CSSProperties => {
-  const base: React.CSSProperties = {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    opacity: 0.35,
-    pointerEvents: 'none',
-  };
-  if (corner === 'tl')
-    return { ...base, top: -1, left: -1, borderTop: '1px solid var(--ink-3)', borderLeft: '1px solid var(--ink-3)' };
-  if (corner === 'tr')
-    return { ...base, top: -1, right: -1, borderTop: '1px solid var(--ink-3)', borderRight: '1px solid var(--ink-3)' };
-  if (corner === 'bl')
-    return { ...base, bottom: -1, left: -1, borderBottom: '1px solid var(--ink-3)', borderLeft: '1px solid var(--ink-3)' };
-  return { ...base, bottom: -1, right: -1, borderBottom: '1px solid var(--ink-3)', borderRight: '1px solid var(--ink-3)' };
-};
 
 export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig>) {
   const { state } = node;
@@ -78,30 +51,8 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
   const gridWidth = CELL_SIZE * 7 + CELL_GAP * 6;
 
   return (
-    <div style={{ position: 'relative' }}>
-      {/* Slot tag above card */}
-      <div style={slotTagStyle}>
-        {String(SLOT_INDEX).padStart(2, '0')} · SPINE · {String(SLOT_TOTAL).padStart(2, '0')}
-      </div>
-
-      {/* Card */}
-      <div
-        style={{
-          position: 'relative',
-          width: 320,
-          border: '1px solid var(--paper-3)',
-          borderRadius: 'var(--radius-lg)',
-          background: 'var(--node-bg)',
-          boxShadow: 'var(--shadow-1)',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Corner brackets */}
-        <span style={cornerStyle('tl')} />
-        <span style={cornerStyle('tr')} />
-        <span style={cornerStyle('bl')} />
-        <span style={cornerStyle('br')} />
-
+    <MotherFrame slotIndex={SLOT_INDEX} slotTotal={MOTHER_TOTAL} width={MOTHER_WIDTH}>
+      <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header */}
         <div
           style={{
@@ -339,6 +290,6 @@ export function HabitNode({ node, onCommand }: NodeProps<HabitState, HabitConfig
           </div>
         </div>
       </div>
-    </div>
+    </MotherFrame>
   );
 }
