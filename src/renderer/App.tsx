@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Canvas } from './components/Canvas';
+import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
 import { Orb } from './components/Orb';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
