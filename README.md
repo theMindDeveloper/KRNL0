@@ -135,6 +135,6 @@ Issues and PRs welcome once v0.1 ships. The architecture is locked in [PRD v0.6.
 
 <div align="center">
 
-*Built solo. Made in Berlin.*
+*Built solo. Made in Berlin. theminddev 2026*
 
 </div>
