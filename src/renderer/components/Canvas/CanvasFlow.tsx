@@ -246,24 +246,26 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     });
   }, [board]);
 
-  // ── onNodesChange — controlled mode (Decision #13 §C, REVISED) ──────────
-  // Controlled mode: RF does NOT auto-preview during drag. We must apply
-  // position changes every frame — otherwise the node only "snaps" on mouse-up.
-  // The per-id rfNodeCache + React.memo on adapters keeps cost minimal:
-  // only the dragged node's RFNode ref changes → only that node re-renders.
-  // Persist to disk only on drag END to avoid disk-thrash.
+  // ── onNodesChange — controlled mode per Decision #13 §C ──────────────────
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       for (const change of changes) {
-        if (change.type === 'position' && change.position) {
-          updateNode(change.id, { position: change.position });
-          if (!change.dragging) {
+        if (change.type === 'position') {
+          // Only commit when drag ends (dragging === false) to avoid 60fps writes.
+          if (!change.dragging && change.position) {
+            updateNode(change.id, { position: change.position });
+            // Persist after drag ends.
             const updated = useBoardStore.getState().board;
             if (updated) void window.krnl?.boardSave(updated);
           }
+          // While dragging === true: RF handles the internal preview, no store write.
         } else if (change.type === 'select') {
-          if (change.selected) selectNode(change.id);
+          // Mirror single-select to store (multi-select is not persisted in v1).
+          if (change.selected) {
+            selectNode(change.id);
+          }
         }
+        // 'remove', 'dimensions', 'add' — all ignored per §C.
       }
     },
     [updateNode, selectNode]
