@@ -62,6 +62,7 @@ import {
   habitArchive,
   habitRename,
   habitSetColor,
+  habitSetIcon,
   habitSetView,
 } from '../nodes/HabitNode/commands';
 
@@ -117,6 +118,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.archive':   return { state: habitArchive(s as never, args as never) };
         case 'habit.rename':    return { state: habitRename(s as never, args as never) };
         case 'habit.setColor':  return { state: habitSetColor(s as never, args as never) };
+        case 'habit.setIcon':   return { state: habitSetIcon(s as never, args as never) };
         case 'habit.setView':   return { config: habitSetView(c as never, args as never) };
       }
       break;

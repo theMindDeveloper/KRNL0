@@ -7,6 +7,7 @@ import {
   habitAdd,
   habitToggleDay,
   habitSetColor,
+  habitSetIcon,
   habitSetView,
   habitRemove,
   calcStreak,
@@ -75,8 +76,11 @@ describe('F11/F12 — habit color schema', () => {
     expect(out.habits[1]?.color).toBe('acid');
   });
 
-  it('HABIT_COLORS contains exactly the 6 cyber tokens', () => {
-    expect([...HABIT_COLORS]).toEqual(['acid', 'rust', 'cyan', 'plum', 'spine', 'ink']);
+  it('HABIT_COLORS contains the 12 tokens (6 cyber + 6 extended)', () => {
+    expect([...HABIT_COLORS]).toEqual([
+      'acid', 'rust', 'cyan', 'plum', 'spine', 'ink',
+      'amber', 'rose', 'teal', 'lilac', 'sand', 'moss',
+    ]);
   });
 
   it('isHabitColor narrows correctly', () => {
@@ -261,5 +265,41 @@ describe('F13 — habit remove', () => {
   it('habitRemove on unknown id is no-op', () => {
     const s = habitAdd(defaultHabitState(), { name: 'a' }, env(WED, 'h1'));
     expect(habitRemove(s, { id: 'unknown' })).toEqual(s);
+  });
+});
+
+// ── icon (v2.1) ─────────────────────────────────────────────────────────
+
+describe('v2.1 — habit icon', () => {
+  it('habitAdd produces a habit without icon (fallback at render)', () => {
+    const s = habitAdd(defaultHabitState(), { name: 'a' }, env(WED, 'h1'));
+    expect(s.habits[0]?.icon).toBeUndefined();
+  });
+
+  it('habitSetIcon stores a glyph', () => {
+    const s1 = habitAdd(defaultHabitState(), { name: 'a' }, env(WED, 'h1'));
+    const s2 = habitSetIcon(s1, { id: 'h1', icon: '🧘' });
+    expect(s2.habits[0]?.icon).toBe('🧘');
+  });
+
+  it('habitSetIcon trims whitespace', () => {
+    const s1 = habitAdd(defaultHabitState(), { name: 'a' }, env(WED, 'h1'));
+    const s2 = habitSetIcon(s1, { id: 'h1', icon: '  ✎  ' });
+    expect(s2.habits[0]?.icon).toBe('✎');
+  });
+
+  it('habitSetIcon with empty string clears the icon field', () => {
+    let s = habitAdd(defaultHabitState(), { name: 'a' }, env(WED, 'h1'));
+    s = habitSetIcon(s, { id: 'h1', icon: '🏃' });
+    s = habitSetIcon(s, { id: 'h1', icon: '' });
+    expect(s.habits[0]?.icon).toBeUndefined();
+  });
+
+  it('habitSetIcon only touches the matching habit', () => {
+    let s = habitAdd(defaultHabitState(), { name: 'a' }, env(WED, 'h1'));
+    s = habitAdd(s, { name: 'b' }, env(WED, 'h2'));
+    const out = habitSetIcon(s, { id: 'h1', icon: '📖' });
+    expect(out.habits[0]?.icon).toBe('📖');
+    expect(out.habits[1]?.icon).toBeUndefined();
   });
 });
