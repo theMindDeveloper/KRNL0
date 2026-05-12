@@ -275,9 +275,7 @@ export function HabitLaneNode({
       {menuOpen && (
         <HabitContextMenu
           habit={habit}
-          anchor={{ x: 8, y: 8 }}
-          bodyWidth={LANE_WIDTH - 16}
-          bodyHeight={Math.max(LANE_HEIGHT, 180)}
+          anchor={menuOpen}
           onRename={(name) => onCommand('habit.lane.rename', { name })}
           onSetColor={(color) => onCommand('habit.lane.setColor', { color })}
           onSetIcon={(icon) => onCommand('habit.lane.setIcon', { icon })}

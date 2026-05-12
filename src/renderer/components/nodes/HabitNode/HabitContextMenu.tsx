@@ -1,18 +1,21 @@
 // HabitNode right-click context menu — per-habit settings.
 // Rename inline, pick color from 12-token palette, pick icon from a curated
-// glyph/emoji set, or delete. Positioned by the parent at the click point
-// and clipped inside the node body so it does not overflow the card.
+// glyph/emoji set, or delete.
+//
+// v2.3 — Rendered via React Portal at document.body so subpixel positioning
+// is not inherited from the React Flow node's CSS transform. Anchor is
+// viewport (client) coords. Position is rounded → crisp text, no blur on
+// nested sub-pickers (color/icon grid).
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Habit, HabitColor } from './types';
 import { HABIT_COLORS, HABIT_ICONS } from './types';
 
 interface Props {
   habit: Habit;
-  // Position in body-local pixels (anchor under right-click).
+  // Viewport (clientX/clientY) coords of the right-click point.
   anchor: { x: number; y: number };
-  bodyWidth: number;
-  bodyHeight: number;
   onRename: (name: string) => void;
   onSetColor: (color: HabitColor) => void;
   onSetIcon: (icon: string) => void;
@@ -30,8 +33,6 @@ const MENU_WIDTH = 232;
 export function HabitContextMenu({
   habit,
   anchor,
-  bodyWidth,
-  bodyHeight,
   onRename,
   onSetColor,
   onSetIcon,
@@ -67,11 +68,14 @@ export function HabitContextMenu({
     if (renaming) inputRef.current?.select();
   }, [renaming]);
 
-  // Estimate menu height for clamp; cheap upper bound. Actual height
-  // adapts; we just keep the box inside the card.
+  // Estimate menu height for viewport clamp; cheap upper bound.
   const estHeight = pickerOpen === 'icon' ? 280 : pickerOpen === 'color' ? 200 : 168;
-  const clampedX = Math.min(Math.max(0, anchor.x), Math.max(0, bodyWidth - MENU_WIDTH));
-  const clampedY = Math.min(Math.max(0, anchor.y), Math.max(0, bodyHeight - estHeight));
+  // Clamp against viewport — Math.round prevents fractional positioning
+  // (root cause of nested-panel text blur).
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const clampedX = Math.round(Math.min(Math.max(0, anchor.x), Math.max(0, vw - MENU_WIDTH)));
+  const clampedY = Math.round(Math.min(Math.max(0, anchor.y), Math.max(0, vh - estHeight)));
 
   const commitRename = () => {
     const trimmed = draft.trim();
@@ -79,25 +83,25 @@ export function HabitContextMenu({
     setRenaming(false);
   };
 
-  return (
+  const menu = (
     <div
       ref={ref}
       data-habit-context-menu
       onMouseDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         left: clampedX,
         top: clampedY,
         width: MENU_WIDTH,
         background: 'var(--node-bg)',
         border: '1px solid var(--paper-3)',
         borderRadius: 6,
-        boxShadow: '0 6px 18px rgba(0,0,0,0.28)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
         padding: 8,
-        zIndex: 20,
+        zIndex: 9999,
         fontFamily: 'var(--font-sans)',
-        maxHeight: Math.max(80, bodyHeight - 16),
+        maxHeight: `calc(100vh - ${clampedY + 16}px)`,
         overflowY: 'auto',
       }}
     >
@@ -342,6 +346,11 @@ export function HabitContextMenu({
       />
     </div>
   );
+
+  // Render via portal so we escape the React Flow node's CSS transform
+  // (which is the cause of the nested-panel blur).
+  if (typeof document === 'undefined') return null;
+  return createPortal(menu, document.body);
 }
 
 function MenuItem({
