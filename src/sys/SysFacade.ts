@@ -1,4 +1,11 @@
-import { SysParser } from './parser';
+import { SysParser, type SysCommand } from './parser';
+import { textAdd, textSet, textResize } from './commands/text';
+import {
+  imageAdd,
+  imageReplace,
+  imageResize,
+  imageClear,
+} from './commands/image';
 
 export interface SysResult {
   ok: boolean;
@@ -20,17 +27,45 @@ export class SysFacade {
       };
     }
 
-    // TODO (Week 4): route to command handlers, load/mutate/save board.json
+    return this.dispatch(command);
+  }
+
+  private dispatch(c: SysCommand): SysResult {
+    switch (c.kind) {
+      case 'help':
+        return { ok: true, message: HELP_TEXT };
+
+      case 'text': {
+        if (c.sub === 'add')    return textAdd(c.text, c.at);
+        if (c.sub === 'set')    return textSet(c.id, c.text);
+        if (c.sub === 'resize') return textResize(c.id, c.w, c.h);
+        break;
+      }
+
+      case 'image': {
+        if (c.sub === 'add')     return imageAdd(c.path, c.at);
+        if (c.sub === 'replace') return imageReplace(c.id, c.path);
+        if (c.sub === 'resize')  return imageResize(c.id, c.w, c.h);
+        if (c.sub === 'clear')   return imageClear(c.id);
+        break;
+      }
+
+      // Other kinds are still stubs (Week 4 follow-up). Echo parsed command so
+      // callers / tests can verify the parser succeeded.
+      default:
+        break;
+    }
+
     return {
       ok: true,
-      message: `[stub] parsed: ${JSON.stringify(command)}`,
-      data: command,
+      message: `[stub] parsed: ${JSON.stringify(c)}`,
+      data: c,
     };
   }
 }
 
 const HELP_TEXT = `
-krnl0 — sys CLI v0.1.0
+krnl0 — sys CLI v0.2.0
 Usage: sys <subcommand> [args] [--json]
 
 Board:
@@ -42,6 +77,17 @@ Nodes:
   sys node list
   sys node add <kind> [--at x,y]
   sys node remove <id>
+
+Text:
+  sys text add [--text "..."] [--at x,y]
+  sys text set <id> --text "..."
+  sys text resize <id> --w N --h N
+
+Image:
+  sys image add <abs-path> [--at x,y]
+  sys image replace <id> <abs-path>
+  sys image resize <id> --w N --h N
+  sys image clear <id>
 
 Pomodoro:
   sys pomo start [--label "..."] [--minutes 25]

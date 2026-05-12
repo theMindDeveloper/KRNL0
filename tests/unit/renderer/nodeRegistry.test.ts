@@ -4,6 +4,8 @@ import { PomoNode } from '../../../src/renderer/components/nodes/PomoNode';
 import { TodoNode } from '../../../src/renderer/components/nodes/TodoNode';
 import { HabitNode } from '../../../src/renderer/components/nodes/HabitNode';
 import { TerminalNode } from '../../../src/renderer/components/nodes/TerminalNode';
+import { TextNode } from '../../../src/renderer/components/nodes/TextNode';
+import { ImageNode } from '../../../src/renderer/components/nodes/ImageNode';
 import { UnknownNode } from '../../../src/renderer/components/nodes/UnknownNode';
 
 // Components are wrapped in React.memo at the registry boundary (perf).
@@ -28,6 +30,13 @@ describe('node registry (Decision #8)', () => {
     expect(unwrap(resolveNodeComponent('todo'))).toBe(TodoNode);
     expect(unwrap(resolveNodeComponent('habit'))).toBe(HabitNode);
     expect(unwrap(resolveNodeComponent('term'))).toBe(TerminalNode);
+  });
+
+  it('registers text and image child kinds', () => {
+    expect(unwrap(NODE_REGISTRY['text'])).toBe(TextNode);
+    expect(unwrap(NODE_REGISTRY['image'])).toBe(ImageNode);
+    expect(unwrap(resolveNodeComponent('text'))).toBe(TextNode);
+    expect(unwrap(resolveNodeComponent('image'))).toBe(ImageNode);
   });
 
   it('resolveNodeComponent falls back to UnknownNode for unregistered kinds', () => {

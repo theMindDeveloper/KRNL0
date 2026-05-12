@@ -1,6 +1,26 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, protocol } from 'electron';
 import { join } from 'path';
 import { registerHandlers } from './ipc/handlers';
+import {
+  registerAssetHandlers,
+  registerAssetProtocol,
+} from './ipc/assets';
+
+// Privileged scheme registration MUST happen before app.whenReady() so
+// Chromium treats responses from krnl-asset:// as standard, secure-origin
+// content — required for <img src="krnl-asset://..."> under default CSP.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'krnl-asset',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: false,
+    },
+  },
+]);
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -26,6 +46,8 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   registerHandlers();
+  registerAssetHandlers();
+  registerAssetProtocol();
   createWindow();
 
   app.on('activate', () => {

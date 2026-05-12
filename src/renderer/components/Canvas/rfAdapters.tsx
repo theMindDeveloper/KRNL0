@@ -115,7 +115,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
             type="target"
             position={Position.Left}
             style={handleStyle}
-            isConnectable={false}
+            isConnectable={!node.isMother}
           />
         )}
         <Inner
@@ -133,7 +133,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
             type="source"
             position={Position.Right}
             style={handleStyle}
-            isConnectable={false}
+            isConnectable={!node.isMother}
           />
         )}
       </>

@@ -850,3 +850,46 @@ Four targeted changes, all narrow:
 - **Forecloses:** Backspace inside cmd.exe (when explicitly opted into via `KRNL0_SHELL`). Acceptable — cmd.exe is no longer the default and the translation hack was always shell-conditional anyway.
 - **GPU dependency:** WebGL needs a working OpenGL/ANGLE context. On Windows under Electron this is provided by ANGLE; failure paths are fully covered by Canvas → DOM fallbacks, so there is no hard runtime dependency.
 - **`process.cwd()` semantics in packaged builds:** in a packaged Electron app `process.cwd()` is the install directory, not the project source. Users who want a stable cwd for `claude` set `KRNL0_TERM_CWD` explicitly. Documented in [docs/06-requirements/terminal-node.md](../06-requirements/terminal-node.md).
+
+---
+
+## Decision 20 — Asset persistence and the `krnl-asset://` protocol
+
+**Status:** Accepted — 2026-05-12
+**Closes:** TextNode / ImageNode upgrade
+**Related:** Decision 5 (board.json as singleton source of truth), Decision 13 (RF + boardStore adapter)
+
+### Context
+
+The TextNode and ImageNode shipped as read-only placeholders. To make them honest first-class nodes — editable, resizable, connectable, and (for images) drag-droppable — we needed three new capabilities:
+
+1. **Per-node sizing.** Up to now every node had a fixed CSS width and no persisted height. Resizable nodes must round-trip their dimensions through `board.json`.
+2. **Real image persistence.** Embedding bytes as base64 inside `board.json` was rejected outright — it would bloat the file, make diffs unreadable, and violate the "no fake functionality" rule in CLAUDE.md. The honest design is files-on-disk.
+3. **A cheap way for `<img>` to fetch those bytes.** IPC-per-render would force every image to re-decode on every React render. A protocol handler is the canonical Electron pattern.
+
+### Decision
+
+**1) Width/height live in `state`.** New optional fields `state.width?: number` and `state.height?: number` for any resizable node (currently TextNode and ImageNode). Absent values render with kind-specific defaults. The kernel does NOT migrate or rewrite the absence on load — round-trip `load → save → byte-identical` (modulo `savedAt`) is preserved per Decision 5.
+
+**2) Assets live in `<BOARD_DIR>/assets/<ULID>.<ext>`.** `<BOARD_DIR>` defaults to `~/Documents/krnl0/` and is overridable via `KRNL0_BOARD_DIR` (parallel to Decision 17 / per-instance isolation). The ID is a 26-character Crockford-base32 random string (ULID-shaped). The on-disk filename carries the extension so the protocol handler can serve the correct `Content-Type` without re-sniffing bytes.
+
+**3) `asset:write` validates magic bytes per extension.** Whitelist: png, jpg/jpeg, webp, gif, svg. Magic-byte signatures are checked before the file is written. SVG additionally rejects any input containing `<script`, `onload=`, `onerror=`, or `onclick=` (case-insensitive) — this prevents JS execution under the privileged protocol origin. Maximum size: 25 MB.
+
+**4) The `krnl-asset://<assetId>` protocol is registered as a privileged scheme.** Registration happens in two phases:
+   - `protocol.registerSchemesAsPrivileged([{ scheme: 'krnl-asset', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: false } }])` is called **before** `app.whenReady()`. Chromium requires this ordering — privileges declared after whenReady are silently ignored.
+   - `protocol.handle('krnl-asset', ...)` is called inside `whenReady`. The handler streams the file body with the correct `Content-Type` header. Unknown / invalid ids return a 1×1 transparent PNG so `<img onError>` can swap to a placeholder visual without a render crash.
+
+**5) Edge semantics for visual connections.** Text and image nodes have no domain events or commands of their own, but the user wants to draw arrows between them. New convention: when the user drags a Handle between two non-mother nodes, the resulting edge carries `from.event = 'link'`, `to.command = 'link'`. The kernel does NOT dispatch anything on a `'link'` event — these edges are purely visual relations. Documented as the v1 default; richer typed connections are a follow-up.
+
+**6) `board:changed` IPC channel.** `sys` commands run in the main process and mutate `board.json` directly. So the renderer can reflect those mutations without a manual refresh, main emits `board:changed` to every BrowserWindow after every sys-driven write. The renderer's `useBoardChannel` hook re-runs `boardLoad` and pushes the result into the Zustand store.
+
+### Consequences
+
+- **board.json stays small and human-readable.** A board with twenty 4 MB photos is ~6 KB of JSON; the photos are 80 MB on disk in `assets/`. Diffs of board.json show layout and intent, not byte streams.
+- **Drag-drop is one of the most reachable features in the app.** Drop a PNG anywhere on the canvas → ImageNode appears at the drop position with the image rendered via `krnl-asset://<id>`. No clipboard dance, no upload UI, no fakery.
+- **Cross-platform without conditionals.** All paths route through Electron's `protocol` API — no `file://` URLs, no per-OS path normalisation in the renderer.
+- **Mother nodes remain non-connectable.** Handles are conditionally rendered based on `!isMother`; only non-mother↔non-mother visual edges are wireable in v1. Mother-as-target via Handle drag is a separate, larger PR (needs handle-id conventions per mother kind).
+- **Known limitations / followups:**
+  - No asset GC. Replacing an image leaves the old file on disk. Track as `image-asset-gc`.
+  - No paste-from-clipboard / drag-from-browser-URL. v1 is file-only.
+  - SVG sanitiser is a string scan, not a DOM parser. The four-pattern blocklist (`<script`, `onload=`, `onerror=`, `onclick=`) covers the obvious vectors; a future hardening pass could use DOMPurify or a real XML reader.
