@@ -30,9 +30,11 @@ import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
 import { makeCommandHandler } from './commandDispatch';
 import { Dock } from '../Dock';
+import { ingestImageFile, initialDisplaySize } from './dropImage';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
+import type { Connection } from '@xyflow/react';
 
 // ── Edge components ───────────────────────────────────────────────────────────
 
@@ -232,17 +234,31 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
 
+  const addEdge = useBoardStore((s) => s.addEdge);
+
   // ── Dock add-node handler — creates text/image nodes at canvas center ─────
   const handleAddNode = useCallback((args: { kind: NodeKind }) => {
     const center = screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
     });
+    const defaultState: Record<NodeKind, Record<string, unknown>> = {
+      pomo: {}, todo: {}, habit: {}, term: {},
+      'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
+      text: { text: '' },
+      image: {
+        assetId: null,
+        naturalWidth: null,
+        naturalHeight: null,
+        mimeType: null,
+        alt: '',
+      },
+    };
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       kind: args.kind,
       position: { x: center.x, y: center.y },
-      state: args.kind === 'text' ? { text: '' } : { src: null },
+      state: defaultState[args.kind],
       config: {},
       isMother: false,
     };
@@ -250,6 +266,64 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
   }, [addNode, screenToFlowPosition]);
+
+  // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer.types).includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const onDrop = useCallback(async (e: React.DragEvent) => {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    e.preventDefault();
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    for (const file of files) {
+      const result = await ingestImageFile(file);
+      if (!result) continue;
+      const { width, height } = initialDisplaySize(
+        result.naturalWidth,
+        result.naturalHeight,
+      );
+      const newNode: KrnlNode = {
+        id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: 'image',
+        position: { x: pos.x, y: pos.y },
+        state: {
+          assetId: result.assetId,
+          naturalWidth: result.naturalWidth,
+          naturalHeight: result.naturalHeight,
+          mimeType: result.mimeType,
+          alt: result.alt,
+          width,
+          height,
+        },
+        config: {},
+        isMother: false,
+      };
+      addNode(newNode);
+      pos.x += 24;
+      pos.y += 24;
+    }
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+  }, [addNode, screenToFlowPosition]);
+
+  // ── onConnect — wire a visual link edge between two non-mother nodes ──────
+  const onConnect = useCallback((conn: Connection) => {
+    if (!conn.source || !conn.target) return;
+    if (conn.source === conn.target) return;
+    const edge: KrnlEdge = {
+      id: `edge-${crypto.randomUUID()}`,
+      from: { nodeId: conn.source, event: 'link' },
+      to: { nodeId: conn.target, command: 'link' },
+      enabled: true,
+    };
+    addEdge(edge);
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+  }, [addEdge]);
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
@@ -438,6 +512,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       defaultViewport={initialViewport}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
       onMoveEnd={onMoveEnd}
       onSelectionChange={onSelectionChange}
       deleteKeyCode={null}

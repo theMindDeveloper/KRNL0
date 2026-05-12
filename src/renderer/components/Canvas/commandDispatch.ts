@@ -39,6 +39,15 @@ import {
   habitRename,
 } from '../nodes/HabitNode/commands';
 
+// ── Text + Image ──────────────────────────────────────────────────────
+import { textSetText, textSetSize } from '../nodes/TextNode/commands';
+import {
+  imageSetAsset,
+  imageSetSize,
+  imageSetAlt,
+  imageClear,
+} from '../nodes/ImageNode/commands';
+
 // ── dispatch ──────────────────────────────────────────────────────────
 
 type Args = Record<string, unknown>;
@@ -74,6 +83,22 @@ function applyCommand(node: Node, command: string, args: Args): Node['state'] | 
         case 'habit.remove':    return habitRemove(s as never, args as never);
         case 'habit.archive':   return habitArchive(s as never, args as never);
         case 'habit.rename':    return habitRename(s as never, args as never);
+      }
+      break;
+    }
+    case 'text': {
+      switch (command) {
+        case 'text.setText': return textSetText(s as never, args as never);
+        case 'text.setSize': return textSetSize(s as never, args as never);
+      }
+      break;
+    }
+    case 'image': {
+      switch (command) {
+        case 'image.setAsset': return imageSetAsset(s as never, args as never);
+        case 'image.setSize':  return imageSetSize(s as never, args as never);
+        case 'image.setAlt':   return imageSetAlt(s as never, args as never);
+        case 'image.clear':    return imageClear(s as never);
       }
       break;
     }

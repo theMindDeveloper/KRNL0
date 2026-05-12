@@ -164,6 +164,14 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
   todo: () => ({ items: [] }),
   habit: () => ({ habits: [] }),
   term: () => ({ sessionId: null, title: 'Terminal' }),
+  text: () => ({ text: '' }),
+  image: () => ({
+    assetId: null,
+    naturalWidth: null,
+    naturalHeight: null,
+    mimeType: null,
+    alt: '',
+  }),
 };
 
 function migrateNodeStates(board: Record<string, unknown>): Record<string, unknown> {

@@ -301,3 +301,28 @@ New requirements F16–F19 + Gherkin scenarios. New ADR Decision 19. Test covera
   Secondary perf wins kept from the iteration: `getMemoizedRfEdge` cache (non-dragged edges return cached refs → RF skips edge re-render); `getMemoizedRfNode` extended to mother nodes keyed on `(node ref, slotIndex, slotTotal, hasLeft, hasRight)`; StatusBar / `useViewportPersistence` / outer `CanvasFlow` switched from `useBoardStore((s) => s.board)` to primitive selectors so they no longer re-render on board-ref churn.
 
 **Tests:** 291 passing, 0 typecheck errors. Live-verified in Electron: smooth 60 fps drag with no stutter, no console warning, edges render with the source-to-target opacity fade matching the reference.
+
+---
+
+## [2026-05-12] — TextNode & ImageNode become real nodes (Decision 20)
+
+**Type:** Feature
+**Branch:** `feat/text-image-nodes`
+**Issues:** TextNode/ImageNode upgrade
+**Files changed:**
+- New requirements: `docs/06-requirements/text-node.md`, `docs/06-requirements/image-node.md`
+- New ADR: `docs/03-architecture/decisions.md` (Decision 20)
+- Main: `src/main/index.ts` (privileged scheme), `src/main/ipc/assets.ts` (new — pipeline + protocol handler), `src/main/ipc/handlers.ts` (STATE_DEFAULTS healers for text/image), `src/main/boardIo.ts` (new — shared load/save/notify), `src/main/preload.ts` (assetWrite/Read/Delete, onBoardChanged)
+- Renderer: `src/renderer/components/nodes/TextNode/{index.tsx, types.ts, commands.ts (new)}`, `src/renderer/components/nodes/ImageNode/{index.tsx, types.ts, commands.ts (new)}`, `src/renderer/components/Canvas/CanvasFlow.tsx` (drop, onConnect, default state for new kinds), `src/renderer/components/Canvas/rfAdapters.tsx` (handles connectable for non-mother nodes), `src/renderer/components/Canvas/commandDispatch.ts` (route text/image commands), `src/renderer/components/Canvas/dropImage.ts` (new — file ingestion helper), `src/renderer/store/useBoardChannel.ts` (new — board:changed listener), `src/renderer/App.tsx` (mount the channel), `src/renderer/env.d.ts` (extended KrnlBridge)
+- Sys: `src/sys/parser.ts` (text/image subcommands), `src/sys/SysFacade.ts` (real dispatch), `src/sys/commands/text.ts` (new), `src/sys/commands/image.ts` (new)
+- Tests: `tests/__mocks__/@xyflow/react.tsx` (NodeResizer stub), `tests/unit/renderer/{TextNode,ImageNode}.commands.test.ts`, `tests/unit/renderer/{TextNode,ImageNode}.scenarios.test.tsx`, `tests/unit/renderer/nodeRegistry.test.ts` (text/image assertions), `tests/unit/main/assets.test.ts` (new), `tests/unit/sys/parser.text-image.test.ts` (new), `tests/unit/sys/commands.text-image.test.ts` (new)
+
+**Summary:** TextNode and ImageNode were stubs — read-only displays with no state mutations and no persistence story. This PR makes both first-class:
+
+- **TextNode**: click to edit (textarea), 400 ms debounced autosave + commit-on-blur, Escape cancels, NodeResizer with min 180×80 / max 800×2000, persists width/height in state, visual matches LifeOS spec (Instrument Serif 18 px, dashed→solid border on hover).
+- **ImageNode**: real file-backed assets. Drop any PNG/JPG/WEBP/GIF/SVG onto the canvas → ImageNode created at the drop position with the bytes copied to `<BOARD_DIR>/assets/<ULID>.<ext>`. `<img src="krnl-asset://<id>">` serves the bytes through a privileged Electron protocol. NodeResizer with min 120×80 / max 1200×1200; Shift toggles aspect-ratio lock. Editable alt caption. Click-to-replace control swaps the asset.
+- **Asset pipeline**: `asset:write` validates magic bytes per extension (PNG/JPG/GIF/WEBP signatures; SVG must start with `<?xml`/`<svg` and is rejected if it contains `<script`/`onload=`/`onerror=`/`onclick=`). 25 MB hard cap. Privileged scheme registered before `whenReady` so `<img>` requests succeed under CSP.
+- **Connections**: non-mother nodes are now connectable. Dragging from a source Handle to a target Handle adds an edge with `from.event = 'link'`, `to.command = 'link'` — purely visual relations. Mother nodes remain non-connectable.
+- **`sys` CLI parity**: `sys text add/set/resize`, `sys image add/replace/resize/clear`. The main process mutates `board.json` and emits `board:changed` so the renderer re-loads automatically. No more "[stub] parsed" output for these subcommands.
+
+**Tests:** 345 passing, 1 todo, 0 typecheck errors. Test coverage: pure command handlers (TextNode, ImageNode), magic-byte validation + SVG XSS rejection (assets.ts), sys parser + sys end-to-end (`text add` round-trip in a temp board, `image add` with a real PNG written to a temp `assets/`), scenarios covering F1/F2/F4/F5/F6/F8 for TextNode and F3/F3b/F5/F7/F10/F11 for ImageNode.
