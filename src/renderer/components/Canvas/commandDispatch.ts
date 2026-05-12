@@ -153,6 +153,9 @@ export function makeCommandHandler(nodeId: string) {
         layer: 0,
         createdAt: new Date().toISOString(),
         parentTodoId: todoNode.id,
+        parentTaskId: null,
+        todoItemId: null,
+        pomoSessionsCompleted: 0,
       };
 
       const taskNode: Node = {

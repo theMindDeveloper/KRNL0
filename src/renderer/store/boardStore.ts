@@ -15,6 +15,7 @@ interface BoardStore {
   addNode: (node: Node) => void;
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
+  removeNode: (id: string) => void;
   swapMotherSlots: (idA: string, idB: string) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setViewport: (v: BoardViewport) => void;
@@ -64,6 +65,20 @@ export const useBoardStore = create<BoardStore>((set) => ({
     set((s) => {
       if (!s.board) return s;
       return { board: { ...s.board, edges: s.board.edges.filter((e) => e.id !== id) } };
+    }),
+
+  removeNode: (id) =>
+    set((s) => {
+      if (!s.board) return s;
+      return {
+        board: {
+          ...s.board,
+          nodes: s.board.nodes.filter((n) => n.id !== id),
+          edges: s.board.edges.filter(
+            (e) => e.from.nodeId !== id && e.to.nodeId !== id,
+          ),
+        },
+      };
     }),
 
   swapMotherSlots: (idA, idB) =>

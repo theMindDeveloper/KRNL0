@@ -8,6 +8,7 @@ export interface TodoItem {
   tag?: string;          // optional 4-char label, e.g. "WORK"
   createdAt: string;     // ISO 8601
   completedAt: string | null; // ISO when done = true, null otherwise
+  taskNodeId: string | null;  // Decision 20: back-link to spawned TaskNode.id
 }
 
 export interface TodoState {

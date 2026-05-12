@@ -30,6 +30,7 @@ export const todoAdd = (
     ...(args.tag !== undefined ? { tag: args.tag } : {}),
     createdAt: env.now(),
     completedAt: null,
+    taskNodeId: null,
   };
   return { ...state, items: [...state.items, item] };
 };
@@ -72,6 +73,17 @@ export const todoRemove = (
 export const todoClearDone = (state: TodoState): TodoState => ({
   ...state,
   items: state.items.filter((item) => !item.done),
+});
+
+// todo.linkTask — set taskNodeId on an item (called after task node is spawned).
+export const todoLinkTask = (
+  state: TodoState,
+  args: { itemId: string; taskNodeId: string },
+): TodoState => ({
+  ...state,
+  items: state.items.map((item) =>
+    item.id === args.itemId ? { ...item, taskNodeId: args.taskNodeId } : item,
+  ),
 });
 
 // Render helper (pure, applied to a copy — Decision #10):
