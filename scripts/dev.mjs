@@ -26,14 +26,23 @@ mkdirSync(dataDir, { recursive: true });
 process.env.KRNL0_BOARD_DIR ??= dataDir;
 process.env.KRNL0_USER_DATA ??= join(dataDir, 'electron');
 
+// Critical: ELECTRON_RUN_AS_NODE leaks from some shells (Claude Code sessions,
+// Anthropic helper scripts, manual exports). When set, Electron boots as a
+// plain Node process — `require('electron')` returns the binary path string,
+// `process.type` is undefined, and the main bundle crashes at top level on
+// `electron.app.X is undefined`. Always clear it before launching dev.
+delete process.env.ELECTRON_RUN_AS_NODE;
+
 console.log(`[dev] isolated for worktree "${slug}"`);
 console.log(`[dev] KRNL0_BOARD_DIR = ${process.env.KRNL0_BOARD_DIR}`);
 console.log(`[dev] KRNL0_USER_DATA = ${process.env.KRNL0_USER_DATA}`);
 
-const cmd = process.platform === 'win32' ? 'electron-vite.cmd' : 'electron-vite';
-const child = spawn(cmd, ['dev'], {
+// On Windows, electron-vite.cmd is a shell shim — spawn cannot exec .cmd
+// files directly under Node 22+ without shell:true (EINVAL otherwise).
+const isWin = process.platform === 'win32';
+const child = spawn('electron-vite', ['dev'], {
   stdio: 'inherit',
   env: process.env,
-  shell: false,
+  shell: isWin,
 });
 child.on('exit', (code) => process.exit(code ?? 0));
