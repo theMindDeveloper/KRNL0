@@ -8,6 +8,13 @@ export type SysCommand =
   | { kind: 'todo'; sub: 'list' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
   | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
+  | { kind: 'task'; sub: 'list'; todoId: string | undefined }
+  | { kind: 'task'; sub: 'add'; todoId: string | undefined; text: string | undefined; durationMin: number | undefined }
+  | { kind: 'task'; sub: 'edit'; id: string | undefined; text: string | undefined }
+  | { kind: 'task'; sub: 'toggle'; id: string | undefined }
+  | { kind: 'task'; sub: 'delete'; id: string | undefined }
+  | { kind: 'task'; sub: 'pomo'; id: string | undefined }
+  | { kind: 'task'; sub: 'subtask'; parentId: string | undefined; text: string | undefined }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
   | { kind: 'habit'; sub: 'done'; name: string | undefined; date: string | undefined }
   | { kind: 'habit'; sub: 'color'; name: string | undefined; color: string | undefined }
@@ -66,6 +73,37 @@ export class SysParser {
       if (sub === 'check') return { kind: 'todo', sub: 'check', id: rest[0] };
       if (sub === 'add') {
         return { kind: 'todo', sub: 'add', text: rest[0], tag: flag(rest, 'tag') };
+      }
+    }
+
+    if (cmd === 'task') {
+      if (sub === 'list') {
+        return { kind: 'task', sub: 'list', todoId: rest[0] };
+      }
+      if (sub === 'add') {
+        const durRaw = flag(rest, 'duration');
+        return {
+          kind: 'task',
+          sub: 'add',
+          todoId: flag(rest, 'todo'),
+          text: rest[0],
+          durationMin: durRaw !== undefined ? Number(durRaw) : undefined,
+        };
+      }
+      if (sub === 'edit') {
+        return { kind: 'task', sub: 'edit', id: rest[0], text: rest[1] };
+      }
+      if (sub === 'toggle') {
+        return { kind: 'task', sub: 'toggle', id: rest[0] };
+      }
+      if (sub === 'delete') {
+        return { kind: 'task', sub: 'delete', id: rest[0] };
+      }
+      if (sub === 'pomo') {
+        return { kind: 'task', sub: 'pomo', id: rest[0] };
+      }
+      if (sub === 'subtask') {
+        return { kind: 'task', sub: 'subtask', parentId: rest[0], text: rest[1] };
       }
     }
 
