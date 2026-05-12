@@ -18,6 +18,11 @@ interface Props {
   onSetIcon: (icon: string) => void;
   onDelete: () => void;
   onClose: () => void;
+  // v2.2 — only the parent HabitNode passes this; the lane's own menu omits
+  // it (the lane node itself can't pin another lane to its own habit).
+  onPinAsLane?: () => void;
+  // True when a lane already exists for this habit; disables the pin item.
+  laneExists?: boolean;
 }
 
 const MENU_WIDTH = 232;
@@ -32,6 +37,8 @@ export function HabitContextMenu({
   onSetIcon,
   onDelete,
   onClose,
+  onPinAsLane,
+  laneExists,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -299,6 +306,26 @@ export function HabitContextMenu({
         </div>
       )}
 
+      {onPinAsLane && (
+        <>
+          <div
+            style={{
+              margin: '4px -8px 0',
+              borderTop: '1px solid var(--paper-2)',
+            }}
+          />
+          <MenuItem
+            label={laneExists ? 'Lane already pinned' : 'Pin as lane'}
+            disabled={laneExists === true}
+            onClick={() => {
+              if (laneExists) return;
+              onPinAsLane();
+              onClose();
+            }}
+          />
+        </>
+      )}
+
       <div
         style={{
           margin: '4px -8px 0',
@@ -321,17 +348,20 @@ function MenuItem({
   label,
   trailing,
   destructive,
+  disabled,
   onClick,
 }: {
   label: string;
   trailing?: React.ReactNode;
   destructive?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -341,13 +371,19 @@ function MenuItem({
         background: 'transparent',
         border: 'none',
         borderRadius: 3,
-        cursor: 'pointer',
+        cursor: disabled ? 'default' : 'pointer',
         fontFamily: 'var(--font-sans)',
         fontSize: 12,
-        color: destructive ? 'var(--rust)' : 'var(--ink-2)',
+        color: disabled
+          ? 'var(--ink-4)'
+          : destructive
+            ? 'var(--rust)'
+            : 'var(--ink-2)',
         textAlign: 'left',
+        opacity: disabled ? 0.6 : 1,
       }}
       onMouseEnter={(e) => {
+        if (disabled) return;
         (e.currentTarget as HTMLButtonElement).style.background = 'var(--paper-2)';
       }}
       onMouseLeave={(e) => {

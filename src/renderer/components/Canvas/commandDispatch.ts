@@ -17,6 +17,9 @@
  *   - todo.startPomoForItem resolves item.taskNodeId and re-dispatches task.startPomo
  *   - task.addSubtask spawns a child TaskNode one layer deeper
  *   - todo.add sets bidirectional link: taskNode.todoItemId and item.taskNodeId
+ *
+ * Decision #14.1 (v2.2): habit.lane child nodes route mutations to the
+ * mother habit they point to.
  */
 
 import { useBoardStore } from '../../store/boardStore';
@@ -65,6 +68,8 @@ import {
   habitSetIcon,
   habitSetView,
 } from '../nodes/HabitNode/commands';
+import type { HabitState } from '../nodes/HabitNode/types';
+import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
 
 // ── dispatch ──────────────────────────────────────────────────────────
 
@@ -195,6 +200,37 @@ function renumberSiblings(parentTodoId: string, parentTaskId: string | null): vo
   });
 }
 
+/**
+ * Mutate the mother habit's state via a pure handler. Returns true if the
+ * mother was found and the patch persisted.
+ */
+function mutateMotherHabit(
+  motherId: string | null,
+  fn: (state: HabitState) => HabitState,
+): boolean {
+  const { board, updateNode } = useBoardStore.getState();
+  if (!board) return false;
+  const mother = motherId
+    ? board.nodes.find((n) => n.id === motherId)
+    : board.nodes.find((n) => n.kind === 'habit' && n.isMother);
+  if (!mother || mother.kind !== 'habit') return false;
+  const next = fn(mother.state as HabitState);
+  updateNode(mother.id, { state: next });
+  return true;
+}
+
+/** Find the mother habit node that owns a habit with the given id. */
+function findMotherForHabit(habitId: string): Node | null {
+  const { board } = useBoardStore.getState();
+  if (!board) return null;
+  for (const n of board.nodes) {
+    if (n.kind !== 'habit' || !n.isMother) continue;
+    const s = n.state as { habits?: Array<{ id: string }> } | null;
+    if (s?.habits?.some((h) => h.id === habitId)) return n;
+  }
+  return null;
+}
+
 // ── makeCommandHandler ─────────────────────────────────────────────────────
 
 /**
@@ -322,6 +358,84 @@ export function makeCommandHandler(nodeId: string) {
       const { addNode, addEdge } = useBoardStore.getState();
       addNode(childNode);
       addEdge(edge);
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
+    // ── habit.spawnLane (issued by the mother HabitNode context menu) ────
+    if (node.kind === 'habit' && command === 'habit.spawnLane') {
+      const habitId = args['habitId'];
+      if (typeof habitId !== 'string') return;
+      // Don't spawn duplicate lanes for the same habit.
+      const existing = board.nodes.find(
+        (n) => n.kind === 'habit.lane' && (n.state as HabitLaneState | null)?.habitId === habitId,
+      );
+      if (existing) return;
+
+      const laneCount = board.nodes.filter((n) => n.kind === 'habit.lane').length;
+      const position = {
+        x: node.position.x + (laneCount % 3) * 300,
+        y: node.position.y + 540 + Math.floor(laneCount / 3) * 160,
+      };
+      const lane: Node = {
+        id: `habit-lane-${crypto.randomUUID()}`,
+        kind: 'habit.lane',
+        position,
+        isMother: false,
+        state: { habitId },
+        config: { days: 28 },
+      };
+      const { addNode } = useBoardStore.getState();
+      addNode(lane);
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
+    // ── habit.lane.* — route to the mother habit referenced by the lane ─
+    if (node.kind === 'habit.lane') {
+      const laneState = node.state as HabitLaneState | null;
+      const habitId = laneState?.habitId;
+      if (!habitId) return;
+      const mother = findMotherForHabit(habitId);
+      if (!mother) return;
+
+      switch (command) {
+        case 'habit.lane.toggleToday': {
+          mutateMotherHabit(mother.id, (s) => habitToggleDay(s, { id: habitId }));
+          break;
+        }
+        // Edge target — same as toggleToday but idempotent.
+        case 'habit.markDone': {
+          mutateMotherHabit(mother.id, (s) => habitMarkDone(s, { id: habitId }));
+          break;
+        }
+        case 'habit.lane.rename': {
+          const name = args['name'];
+          if (typeof name !== 'string') return;
+          mutateMotherHabit(mother.id, (s) => habitRename(s, { id: habitId, name }));
+          break;
+        }
+        case 'habit.lane.setColor': {
+          const color = args['color'];
+          if (typeof color !== 'string') return;
+          mutateMotherHabit(mother.id, (s) => habitSetColor(s, { id: habitId, color: color as never }));
+          break;
+        }
+        case 'habit.lane.setIcon': {
+          const icon = args['icon'];
+          if (typeof icon !== 'string') return;
+          mutateMotherHabit(mother.id, (s) => habitSetIcon(s, { id: habitId, icon }));
+          break;
+        }
+        case 'habit.lane.removeHabit': {
+          mutateMotherHabit(mother.id, (s) => habitRemove(s, { id: habitId }));
+          break;
+        }
+        default:
+          return;
+      }
       const updated = useBoardStore.getState().board;
       if (updated) void window.krnl?.boardSave(updated);
       return;

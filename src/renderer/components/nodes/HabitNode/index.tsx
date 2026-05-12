@@ -14,6 +14,7 @@
 //   habit → 1 listener.
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { useBoardStore } from '../../../store/boardStore';
 import type { NodeProps } from '../types';
 import type {
   HabitColor,
@@ -97,6 +98,22 @@ export function HabitNode({
   const visibleHabits = useMemo(
     () => state.habits.filter((h) => !h.archived),
     [state.habits],
+  );
+
+  // Which habits already have a pinned lane? Used to disable the menu item.
+  const pinnedHabitIds = useBoardStore(
+    (s) => {
+      const board = s.board;
+      if (!board) return new Set<string>();
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'habit.lane') {
+          const id = (n.state as { habitId?: string } | null)?.habitId;
+          if (id) ids.add(id);
+        }
+      }
+      return ids;
+    },
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -270,6 +287,8 @@ export function HabitNode({
               onSetColor={(color) => onCommand('habit.setColor', { id: menu.habitId, color })}
               onSetIcon={(icon) => onCommand('habit.setIcon', { id: menu.habitId, icon })}
               onDelete={() => onCommand('habit.remove', { id: menu.habitId })}
+              onPinAsLane={() => onCommand('habit.spawnLane', { habitId: menu.habitId })}
+              laneExists={pinnedHabitIds.has(menu.habitId)}
               onClose={() => setMenu(null)}
             />
           )}
