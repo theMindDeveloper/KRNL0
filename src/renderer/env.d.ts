@@ -18,7 +18,7 @@ interface KrnlBridge {
   ptyKill: (sessionId: string) => Promise<void>
   onPtyData: (sessionId: string, callback: (data: string) => void) => () => void
   onPtyExit: (sessionId: string, callback: () => void) => () => void
-  // Asset persistence (Decision 20)
+  // Asset persistence (Decision 21)
   assetWrite: (ext: string, bytes: Uint8Array) => Promise<KrnlAssetWriteResult>
   assetRead: (assetId: string) => Promise<KrnlAssetReadResult | null>
   assetDelete: (assetId: string) => Promise<void>

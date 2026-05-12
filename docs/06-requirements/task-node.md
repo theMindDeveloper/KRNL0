@@ -15,6 +15,12 @@
 | F5 | The footer renders a tag pill and an ETA string (e.g., `"~45 min"`); both are derived from node data |
 | F6 | An RF `<Handle type="target" position="left">` receives signals from parent nodes |
 | F7 | An RF `<Handle type="source" position="right">` emits signals to downstream nodes |
+| F8 | When `done === true`, the node root's opacity is `0.4` (in addition to the existing strikethrough); cursor is `default` to signal non-interactivity |
+| F9 | Clicking the node body (not the checkbox, not the `+ pomo` button) dispatches `task.startPomo`; the dispatcher finds the single `kind === 'pomo'` mother and calls `pomoStart` with `{ label: task.text, minutes: task.durationMin }`; no-op if Pomo mother is absent; drag-safe (only fires if mouseup delta < 4 px) |
+| F10 | Right-clicking the node opens a context menu with three actions: "Edit text", "Add subtask" (disabled when done), "Delete" (danger colour `var(--rust)`) |
+| F11 | "Add subtask" in the context menu shows an inline `subtask…` input; pressing Enter dispatches `task.addSubtask` with the typed text, spawning a child TaskNode with `layer = parent.layer + 1`, `parentTaskId = parent.id`, and a `task.next → task.activate` chain edge |
+| F12 | "Delete" in the context menu dispatches `task.delete`; the dispatcher BFS-collects the node and all descendants (via `parentTaskId` chain), removes them all plus incident edges, removes the linked `TodoItem` (if `todoItemId !== null`), then renumbers siblings |
+| F13 | `TaskState` gains three persisted fields: `parentTaskId: string \| null` (null = root task), `todoItemId: string \| null` (back-link to spawning TodoItem), and `pomoSessionsCompleted: number` (default 0); these are backfilled on older `board.json` nodes at load time |
 
 ---
 
@@ -39,6 +45,21 @@ Actor clicks the task checkbox. Node gains `done` class. Downstream edges may tr
 
 **UC-K3 — Read task metadata**
 Actor reads the footer tag and ETA to understand task category and time estimate at a glance.
+
+**UC-K4 — Start pomo by clicking task body**
+Actor clicks the body of an undone TaskNode (not the checkbox or button). The Pomo mother begins a session labelled with the task text and using the task's `durationMin`. If the task is already done the click is a no-op.
+
+**UC-K5 — Task right-click context menu**
+Actor right-clicks a TaskNode. A context menu appears at the cursor with "Edit text", "Add subtask" (greyed-out when done), and "Delete" (styled in danger colour). Pressing ESC or clicking outside dismisses the menu.
+
+**UC-K6 — Edit task text inline**
+Actor selects "Edit text" from the context menu (or double-clicks the task text when not done). An inline input appears pre-filled with the current text. Actor edits and presses Enter — `task.edit` is dispatched with the new text. ESC cancels with no dispatch.
+
+**UC-K7 — Add subtask**
+Actor right-clicks a TaskNode and selects "Add subtask". A `subtask…` input appears below the footer. Actor types the subtask text and presses Enter. A child TaskNode is spawned with `layer = parent.layer + 1` and a `task.next → task.activate` edge connects parent to child.
+
+**UC-K8 — Delete task with cascade**
+Actor right-clicks a TaskNode and selects "Delete". The TaskNode, all descendant TaskNodes (BFS), all incident edges, and the linked TodoItem (if any) are removed from the board in a single store transaction. Remaining sibling tasks are renumbered.
 
 ---
 
@@ -94,8 +115,65 @@ Feature: TaskNode display and interaction
   Scenario: F7 — RF source handle rendered
     When the component renders
     Then a React Flow Handle with type "source" and position "right" is present
+
+  Scenario: F8 — Done card opacity
+    Given done is true
+    When the component renders
+    Then the node root's opacity style is "0.4"
+    And the node root's cursor style is "default"
+    Given done is false
+    When the component renders
+    Then the node root's opacity style is "1"
+    And the node root's cursor style is "pointer"
+
+  Scenario: F9 — Body click fires task.startPomo (drag-safe)
+    Given done is false
+    When the user performs a clean click (mousedown and click at same coordinates) on the node root
+    Then onCommand is called with { type: "task.startPomo" }
+    Given the user performs a drag (mousedown at (0,0), click at (10,0))
+    Then onCommand is NOT called with task.startPomo
+    Given done is true
+    When the user clicks the node root
+    Then onCommand is NOT called with task.startPomo
+    When the user clicks the checkbox
+    Then onCommand is called with task.toggle but NOT with task.startPomo
+
+  Scenario: F10 — Right-click opens context menu
+    When the user right-clicks the node root
+    Then a context menu appears with buttons "Edit text", "Add subtask", and "Delete"
+    And "Delete" has color var(--rust)
+    And "Add subtask" is disabled when done = true
+    And "Add subtask" is enabled when done = false
+    And pressing ESC dismisses the menu
+
+  Scenario: F11 — Add subtask inline input
+    When the user right-clicks and selects "Add subtask"
+    Then an input with placeholder "subtask…" appears
+    When the user types "child work" and presses Enter
+    Then onCommand is called with { type: "task.addSubtask", text: "child work" }
+    When the user types text and presses ESC
+    Then onCommand is NOT called with task.addSubtask
+    And the subtask input disappears
+
+  Scenario: F12 — Delete cascades via dispatcher
+    Given a board with a root TaskNode and a child TaskNode (parentTaskId = root) and a linked TodoItem
+    When the dispatcher handles task.delete for the root
+    Then the root TaskNode is removed from the board
+    And the child TaskNode is removed from the board
+    And all incident edges are removed
+    And the linked TodoItem is removed from the TodoNode
+    And remaining sibling TaskNodes are renumbered
+
+  Scenario: F13 — Persisted state fields
+    Given a TaskState without parentTaskId / todoItemId / pomoSessionsCompleted
+    When the board is loaded
+    Then parentTaskId defaults to null
+    And todoItemId defaults to null
+    And pomoSessionsCompleted defaults to 0
+    Given a new TaskState
+    Then parentTaskId, todoItemId, and pomoSessionsCompleted are present and persisted in board.json
 ```
 
 ---
 
-*Last updated: 2026-05-10*
+*Last updated: 2026-05-12*

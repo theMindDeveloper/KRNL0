@@ -113,7 +113,7 @@ User data folder:
 ```
 ~/Documents/krnl0/
 ├── board.json
-├── assets/                    ← image bytes (Decision 20)
+├── assets/                    ← image bytes (Decision 21)
 │   ├── 01HX....png
 │   └── 01HX....svg
 └── notes/                     ← markdown sidecars (Journal v1.5)
@@ -136,11 +136,11 @@ Image nodes reference assets by id only (`state.assetId`); bytes never appear in
 
 **Round-trip contract:** `load → save → byte-identical` (modulo `savedAt`). This is tested.
 
-### 7.5.1 Optional `state.width` / `state.height` (Decision 20)
+### 7.5.1 Optional `state.width` / `state.height` (Decision 21)
 
 Resizable nodes (TextNode, ImageNode) may persist `state.width` and `state.height`. When absent, the renderer applies kind-specific defaults — the kernel does NOT migrate absent values on load. This preserves the round-trip contract for older boards.
 
-### 7.5.2 The `link` edge convention (Decision 20)
+### 7.5.2 The `link` edge convention (Decision 21)
 
 When a non-mother node is connected to another non-mother node via Handle drag, the resulting edge carries `from.event = 'link'`, `to.command = 'link'`. These edges are purely visual; the kernel does not dispatch on `'link'`. Other edges (e.g. `task.next → task.activate`, `pomo.onComplete → habit.markDone`) keep their typed semantics.
 

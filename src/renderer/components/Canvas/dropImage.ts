@@ -1,9 +1,9 @@
 /**
- * dropImage.ts — drag-drop and replace image ingestion (Decision 20).
+ * dropImage.ts â€” drag-drop and replace image ingestion (Decision 21).
  *
  * Pipeline:
- *   File → validate MIME/size → measure natural dimensions in the renderer
- *   via `new Image()` → ship bytes to main as Uint8Array → main writes the
+ *   File â†’ validate MIME/size â†’ measure natural dimensions in the renderer
+ *   via `new Image()` â†’ ship bytes to main as Uint8Array â†’ main writes the
  *   asset to disk and returns the assetId. Caller decides whether to create
  *   a new node or dispatch image.setAsset on an existing one.
  *
@@ -39,7 +39,7 @@ export interface IngestedImage {
 
 /**
  * Measure natural width/height via an offscreen <img>. SVGs without an
- * intrinsic size report 0×0 in some browsers — we fall back to 300×300 in
+ * intrinsic size report 0Ã—0 in some browsers â€” we fall back to 300Ã—300 in
  * that case so the placeholder size is sensible.
  */
 function measureNatural(file: File): Promise<{ w: number; h: number }> {
@@ -83,7 +83,7 @@ export async function ingestImageFile(file: File): Promise<IngestedImage | null>
   const bytes = new Uint8Array(buf);
 
   if (!window.krnl?.assetWrite) {
-    console.warn('[image] krnl.assetWrite unavailable — cannot persist');
+    console.warn('[image] krnl.assetWrite unavailable â€” cannot persist');
     return null;
   }
   const { assetId } = await window.krnl.assetWrite(ext, bytes);

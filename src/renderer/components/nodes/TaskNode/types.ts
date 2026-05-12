@@ -8,6 +8,9 @@ export interface TaskState {
   layer: number;          // nesting depth; 0 = direct child of mother (F1)
   createdAt: string;      // ISO
   parentTodoId: string;   // mother-todo id
+  parentTaskId: string | null;   // Decision 20: null = root task, else parent task node id
+  todoItemId: string | null;     // Decision 20: back-link to TodoItem.id
+  pomoSessionsCompleted: number; // number of completed pomo sessions for this task
 }
 
 export interface TaskConfig {

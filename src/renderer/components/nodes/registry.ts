@@ -2,6 +2,7 @@ import { memo, type ComponentType } from 'react';
 import { PomoNode } from './PomoNode';
 import { TodoNode } from './TodoNode';
 import { HabitNode } from './HabitNode';
+import { HabitLaneNode } from './HabitLaneNode';
 import { TerminalNode } from './TerminalNode';
 import { TaskNode } from './TaskNode';
 import { TextNode } from './TextNode';
@@ -21,6 +22,7 @@ const NODE_REGISTRY_RAW: Record<string, AnyNodeComponent> = {
   pomo: PomoNode as AnyNodeComponent,
   todo: TodoNode as AnyNodeComponent,
   habit: HabitNode as AnyNodeComponent,
+  'habit.lane': HabitLaneNode as AnyNodeComponent,
   term: TerminalNode as AnyNodeComponent,
   'todo.task': TaskNode as AnyNodeComponent,
   text: TextNode as AnyNodeComponent,
@@ -42,6 +44,7 @@ export const NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> 
   pomo:           createNodeAdapter(PomoNode as AnyNodeComponent),
   todo:           createNodeAdapter(TodoNode as AnyNodeComponent),
   habit:          createNodeAdapter(HabitNode as AnyNodeComponent),
+  'habit.lane':   createNodeAdapter(HabitLaneNode as AnyNodeComponent),
   term:           createNodeAdapter(TerminalNode as AnyNodeComponent),
   'todo.task':    createNodeAdapter(TaskNode as AnyNodeComponent),
   'pomo.session': createNodeAdapter(TaskNode as AnyNodeComponent),

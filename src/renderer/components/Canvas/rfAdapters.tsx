@@ -97,8 +97,8 @@ const handleStyle: React.CSSProperties = {
   opacity: 0.7,
   // RF positions Handles at the absolute left/right edge of the node. Without
   // an explicit z-index, nodes whose body has `position: relative` content
-  // (e.g. ImageNode's image-frame) can paint over the handle and hide the
-  // connector dot. Lift handles to z-index 10 to keep them in front.
+  // (e.g. ImageNode's image-frame) create a new stacking context and bury
+  // default-z handles. Lift to z-index 10 to keep connector dots in front.
   zIndex: 10,
 };
 
@@ -114,7 +114,8 @@ export function createNodeAdapter<S = unknown, C = unknown>(
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
     const { node, onCommand, onSelect, slotIndex, slotTotal, onMoveLeft, onMoveRight } = data;
-    // Mother nodes don't connect — render zero handles
+    // Mother nodes don't connect — render zero handles. Children get
+    // interactive handles so users can wire edges between them.
     const showHandles = !node.isMother;
     return (
       <>
@@ -123,7 +124,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
             type="target"
             position={Position.Left}
             style={handleStyle}
-            isConnectable={!node.isMother}
+            isConnectable={true}
           />
         )}
         <Inner
@@ -141,7 +142,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
             type="source"
             position={Position.Right}
             style={handleStyle}
-            isConnectable={!node.isMother}
+            isConnectable={true}
           />
         )}
       </>
