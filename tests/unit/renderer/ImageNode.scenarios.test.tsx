@@ -107,29 +107,10 @@ describe('ImageNode — F5 resize dispatches image.setSize', () => {
   });
 });
 
-describe('ImageNode — F7 alt edit dispatches image.setAlt', () => {
-  it('clicking caption then blurring with new text dispatches setAlt', () => {
-    const onCommand = vi.fn();
-    render(
-      <ImageNode
-        node={fixture({
-          assetId: 'ABCDEFGHJKMNPQRSTVWXYZ0123',
-          alt: 'diagram',
-        })}
-        selected
-        onCommand={onCommand}
-        onSelect={noop}
-      />,
-    );
-    fireEvent.click(screen.getByTestId('image-node-caption'));
-    const input = screen.getByTestId('image-node-alt-input');
-    fireEvent.change(input, { target: { value: 'v2 diagram' } });
-    fireEvent.blur(input);
-    expect(onCommand).toHaveBeenCalledWith('image.setAlt', {
-      alt: 'v2 diagram',
-    });
-  });
-});
+// F7 (alt-text caption edit) was dropped per visual review — caption row
+// removed entirely from the node body. Alt text is still stored on state
+// for accessibility (img.alt) but is no longer user-editable inline.
+// `imageSetAlt` command remains and is covered by the pure-command tests.
 
 describe('ImageNode — F10 handles are connectable', () => {
   it('createNodeAdapter wraps ImageNode with connectable handles', () => {
