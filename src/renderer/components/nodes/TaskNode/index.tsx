@@ -1,13 +1,15 @@
+import { useState, useRef } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
+import { ContextMenu } from '../../ContextMenu';
 
 // TaskNode — child task card spawned when a todo item is added.
 // No slot tag, no corner brackets (those are mother-only, Decision #8).
 // Handles are added by the rfAdapters HOC — DO NOT import Handle here.
 export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) {
   const { state } = node;
-  // config read but not used for display — kept for future extension
   const _config = (node.config as TaskConfig | null) ?? defaultTaskConfig();
   void _config;
 
@@ -16,12 +18,111 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const eta = state.eta ?? `~${state.durationMin}M`;
   const tag = state.tag ?? '';
 
+  // ── inline edit ────────────────────────────────────────────────────────────
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const startEdit = () => {
+    setEditValue(state.text);
+    setIsEditing(true);
+  };
+
+  const commitEdit = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== state.text) {
+      onCommand('task.edit', { text: trimmed });
+    }
+    setIsEditing(false);
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+  };
+
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      commitEdit();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      cancelEdit();
+    }
+  };
+
+  // ── add-subtask row ────────────────────────────────────────────────────────
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const [subtaskValue, setSubtaskValue] = useState('');
+
+  const commitSubtask = () => {
+    const trimmed = subtaskValue.trim();
+    if (trimmed) {
+      onCommand('task.addSubtask', { text: trimmed });
+    }
+    setSubtaskValue('');
+    setIsAddingSubtask(false);
+  };
+
+  const handleSubtaskKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      commitSubtask();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      setSubtaskValue('');
+      setIsAddingSubtask(false);
+    }
+  };
+
+  // ── context menu ───────────────────────────────────────────────────────────
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleContextMenu = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const ctxItems = [
+    {
+      label: 'Edit text',
+      onSelect: startEdit,
+    },
+    {
+      label: 'Add subtask',
+      onSelect: () => setIsAddingSubtask(true),
+      disabled: state.done,
+    },
+    {
+      label: 'Delete',
+      danger: true,
+      onSelect: () => onCommand('task.delete'),
+    },
+  ];
+
+  // ── body click → start pomo (drag-safe) ───────────────────────────────────
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
+
+  const handleBodyMouseDown = (e: MouseEvent) => {
+    mouseDownPos.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleBodyClick = (e: MouseEvent) => {
+    if (!mouseDownPos.current) return;
+    const dx = e.clientX - mouseDownPos.current.x;
+    const dy = e.clientY - mouseDownPos.current.y;
+    mouseDownPos.current = null;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) return; // drag, not click
+    if (!state.done) {
+      onCommand('task.startPomo');
+    }
+  };
+
   return (
-    // data-done attribute drives the "done" class semantics tested by Gherkin F4
     <div
       data-testid="task-node-root"
       data-done={state.done ? 'true' : undefined}
       className={state.done ? 'done' : ''}
+      onContextMenu={handleContextMenu}
       style={{
         width: 220,
         border: '1px solid var(--paper-3)',
@@ -29,7 +130,12 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         background: 'var(--node-bg)',
         boxShadow: 'var(--shadow-1)',
         overflow: 'hidden',
+        opacity: state.done ? 0.4 : 1,
+        transition: 'opacity 0.15s',
+        cursor: state.done ? 'default' : 'pointer',
       }}
+      onMouseDown={handleBodyMouseDown}
+      onClick={handleBodyClick}
     >
       {/* Header row */}
       <div
@@ -61,7 +167,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           <button
             type="button"
             className="task-pomo-btn"
-            onClick={() => onCommand('task.spawnPomo')}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCommand('task.spawnPomo');
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 8.5,
@@ -88,7 +198,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           <button
             type="button"
             className="task-check"
-            onClick={() => onCommand('task.toggle')}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCommand('task.toggle');
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
             style={{
               flexShrink: 0,
               width: 15,
@@ -110,21 +224,52 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             )}
           </button>
 
-          {/* F4: done text styling */}
-          <span
-            className="task-text"
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: 13,
-              lineHeight: 1.4,
-              color: state.done ? 'var(--ink-4)' : 'var(--ink)',
-              textDecoration: state.done ? 'line-through' : 'none',
-              textDecorationColor: 'var(--ink-4)',
-              flex: 1,
-            }}
-          >
-            {state.text}
-          </span>
+          {/* F4: done text styling; double-click enters inline edit */}
+          {isEditing ? (
+            <input
+              type="text"
+              value={editValue}
+              autoFocus
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={handleEditKeyDown}
+              onBlur={commitEdit}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid var(--ink-3)',
+                outline: 'none',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 13,
+                lineHeight: 1.4,
+                color: 'var(--ink)',
+                caretColor: 'var(--acid)',
+                padding: '1px 0',
+              }}
+            />
+          ) : (
+            <span
+              className="task-text"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                if (!state.done) startEdit();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: 13,
+                lineHeight: 1.4,
+                color: state.done ? 'var(--ink-4)' : 'var(--ink)',
+                textDecoration: state.done ? 'line-through' : 'none',
+                textDecorationColor: 'var(--ink-4)',
+                flex: 1,
+              }}
+            >
+              {state.text}
+            </span>
+          )}
         </div>
 
         {/* F5: footer — tag + ETA */}
@@ -145,7 +290,44 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           <span className="task-tag">{tag}</span>
           <span className="task-eta">{eta}</span>
         </div>
+
+        {/* Add-subtask inline input */}
+        {isAddingSubtask && (
+          <input
+            type="text"
+            value={subtaskValue}
+            autoFocus
+            placeholder="subtask…"
+            onChange={(e) => setSubtaskValue(e.target.value)}
+            onKeyDown={handleSubtaskKeyDown}
+            onBlur={commitSubtask}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid var(--ink-4)',
+              outline: 'none',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 12,
+              color: 'var(--ink)',
+              caretColor: 'var(--acid)',
+              padding: '2px 0',
+              width: '100%',
+            }}
+          />
+        )}
       </div>
+
+      {/* Context menu */}
+      {ctxMenu !== null && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={ctxItems}
+          onDismiss={() => setCtxMenu(null)}
+        />
+      )}
     </div>
   );
 }
