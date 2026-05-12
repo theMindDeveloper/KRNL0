@@ -4,6 +4,24 @@ A running log of every significant change, bug fix, and architectural decision t
 
 ---
 
+## [2026-05-12] — Per-task Pomodoro, settings UI, long-break branching (Decision 9 Addendum)
+
+**Type:** Feature
+**Branch / PR:** `feat/pomo-perTask-v2` (PR pending)
+**Files changed:**
+- `src/renderer/components/nodes/PomoNode/{types.ts, commands.ts, index.tsx}`
+- `src/renderer/components/nodes/TaskNode/{types.ts, index.tsx}`
+- `src/renderer/components/Canvas/commandDispatch.ts`
+- `src/main/ipc/handlers.ts` (seed reconcile + idempotent migrations)
+- `src/sys/{parser.ts, SysFacade.ts, commands/pomo.ts}`
+- `docs/03-architecture/decisions.md` (Decision 9 Addendum 2026-05-12)
+- `docs/06-requirements/{pomo-node.md, task-node.md}`
+- `tests/unit/{renderer/PomoNode.commands.test.ts, renderer/PomoNode.addendum.test.tsx, renderer/TaskNode.scenarios.test.ts, sys/parser.test.ts, main/handlers.migration.test.ts}`
+
+**Summary:** Each `todo.task` now carries its own embedded pomodoro state (`state.pomo`) and the existing pure FSM handlers (`pomoStart / pomoCancel / pomoComplete / pomoSkipBreak / pomoEndBreak`) operate uniformly on both mother and task. The mother PomoNode is now (a) the **settings hub** — a gear icon in the header opens an inline panel with four numeric inputs (session, break, long break, long-break-every) and (b) a **live mirror** of whichever task's pomo is currently running (lowest `sequenceNumber` wins). `pomoComplete` accepts an optional `cfg: { breakMin, longBreakMin, longBreakEvery }` and branches to a long break when `(sessionsCompleted + 1) % longBreakEvery === 0` — the chosen duration is written into `state.breakMin` so `pomoEndBreak` can compare directly without recomputing. Seed config keys reconciled to `PomoConfig` (`shortBreakMin → defaultBreakMin`, `sessionsUntilLongBreak → longBreakEvery`); two idempotent migrations (`migratePomoConfig`, `migrateTaskPomo`) wired into `loadBoard` upgrade existing user boards transparently. `task.spawnPomo` is renamed to `task.startPomo` (contract change documented in `task-node.md` F2). `sys pomo config set [...]` and `sys pomo task start <id>` scaffolded in the parser + facade. **Tests:** 25 new cases (long-break branching, gear panel, FSM-guarded inputs, sys parser, migration); total 316 passing / 0 failing / 1 todo. Typecheck clean. Persistence stays in `board.json` — analytics event log (Decision 20, [analytics-persistence.md](../06-requirements/analytics-persistence.md)) explicitly **deferred** to v1.1.
+
+---
+
 ## [2026-05-09] — Initial scaffold
 
 **Type:** Feature  

@@ -49,7 +49,24 @@ export const pomoCancel = (state: PomoState, _args: object = {}, env: PomoEnv = 
   };
 };
 
-export const pomoComplete = (state: PomoState, _args: object = {}, env: PomoEnv = defaultEnv): PomoState => {
+// Decision 9 Addendum (2026-05-12) — long-break branching.
+// At completion time, decide whether the next break is long or short:
+//   isLongBreak = (sessionsCompleted + 1) % longBreakEvery === 0
+// The chosen duration is written into the resulting state's `breakMin` so
+// pomoEndBreak can compare against it without re-deriving (avoids off-by-one
+// risk when sessionsCompleted has already incremented).
+export interface PomoBreakCfg {
+  breakMin: number;
+  longBreakMin: number;
+  longBreakEvery: number;
+}
+
+export const pomoComplete = (
+  state: PomoState,
+  _args: object = {},
+  env: PomoEnv = defaultEnv,
+  cfg?: PomoBreakCfg,
+): PomoState => {
   if (state.status !== 'running' || state.startedAt === null) return state;
   const now = env.now();
   if (now - Date.parse(state.startedAt) < state.durationMin * 60_000) return state;
@@ -61,10 +78,19 @@ export const pomoComplete = (state: PomoState, _args: object = {}, env: PomoEnv 
     label: state.label,
     completed: true,
   };
+  const effectiveCfg: PomoBreakCfg = cfg ?? {
+    breakMin: state.breakMin,
+    longBreakMin: state.breakMin,
+    longBreakEvery: 4,
+  };
+  const isLongBreak =
+    (state.sessionsCompleted + 1) % effectiveCfg.longBreakEvery === 0;
+  const nextBreakMin = isLongBreak ? effectiveCfg.longBreakMin : effectiveCfg.breakMin;
   return {
     ...state,
     status: 'break',
     startedAt: toIso(now),
+    breakMin: nextBreakMin,
     sessionsCompleted: state.sessionsCompleted + 1,
     history: [...state.history, record],
   };

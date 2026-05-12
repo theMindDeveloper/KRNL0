@@ -17,7 +17,10 @@ import {
   pomoComplete,
   pomoSkipBreak,
   pomoEndBreak,
+  type PomoBreakCfg,
 } from '../nodes/PomoNode/commands';
+import type { PomoConfig, PomoState, EmbeddedPomoState } from '../nodes/PomoNode/types';
+import { defaultEmbeddedPomo, defaultPomoConfig } from '../nodes/PomoNode/types';
 
 // ── Todo ──────────────────────────────────────────────────────────────
 import {
@@ -43,6 +46,31 @@ import {
 
 type Args = Record<string, unknown>;
 
+// Read mother PomoNode's config (canonical PomoConfig). Falls back to defaults
+// if the mother is missing or has stale shape — the migration in handlers.ts
+// is supposed to keep this in good shape on disk.
+function readMotherPomoConfig(): PomoConfig {
+  const board = useBoardStore.getState().board;
+  if (!board) return defaultPomoConfig();
+  const mother = board.nodes.find((n) => n.kind === 'pomo' && n.isMother);
+  if (!mother) return defaultPomoConfig();
+  const cfg = mother.config as Partial<PomoConfig> | null;
+  return {
+    defaultDurationMin: cfg?.defaultDurationMin ?? 25,
+    defaultBreakMin: cfg?.defaultBreakMin ?? 5,
+    longBreakEvery: cfg?.longBreakEvery ?? 4,
+    longBreakMin: cfg?.longBreakMin ?? 15,
+  };
+}
+
+function breakCfgFromConfig(cfg: PomoConfig): PomoBreakCfg {
+  return {
+    breakMin: cfg.defaultBreakMin,
+    longBreakMin: cfg.longBreakMin,
+    longBreakEvery: cfg.longBreakEvery,
+  };
+}
+
 function applyCommand(node: Node, command: string, args: Args): Node['state'] | null {
   const s = node.state as Record<string, unknown>;
 
@@ -51,7 +79,10 @@ function applyCommand(node: Node, command: string, args: Args): Node['state'] | 
       switch (command) {
         case 'pomo.start':    return pomoStart(s as never, args as never);
         case 'pomo.cancel':   return pomoCancel(s as never);
-        case 'pomo.complete': return pomoComplete(s as never);
+        case 'pomo.complete': {
+          const cfg = readMotherPomoConfig();
+          return pomoComplete(s as unknown as PomoState, {}, undefined, breakCfgFromConfig(cfg));
+        }
         case 'pomo.skipBreak': return pomoSkipBreak(s as never);
         case 'pomo.endBreak': return pomoEndBreak(s as never);
       }
@@ -77,8 +108,81 @@ function applyCommand(node: Node, command: string, args: Args): Node['state'] | 
       }
       break;
     }
+    case 'todo.task': {
+      // Decision 9 Addendum (2026-05-12) — task pomo commands operate on the
+      // task's embedded `state.pomo` block; reuse the mother PomoNode FSM.
+      const ts = s as unknown as TaskState;
+      const pomo = ts.pomo ?? defaultEmbeddedPomo(defaultPomoConfig(), ts.text);
+      const motherCfg = readMotherPomoConfig();
+      switch (command) {
+        case 'task.startPomo': {
+          const next = pomoStart(pomo, args as never);
+          return { ...ts, pomo: next } as unknown as Node['state'];
+        }
+        case 'task.cancelPomo': {
+          const next = pomoCancel(pomo);
+          return { ...ts, pomo: next } as unknown as Node['state'];
+        }
+        case 'task.completePomo': {
+          const next = pomoComplete(pomo, {}, undefined, breakCfgFromConfig(motherCfg));
+          return { ...ts, pomo: next } as unknown as Node['state'];
+        }
+        case 'task.skipBreak': {
+          const next = pomoSkipBreak(pomo);
+          return { ...ts, pomo: next } as unknown as Node['state'];
+        }
+        case 'task.endBreak': {
+          const next = pomoEndBreak(pomo);
+          return { ...ts, pomo: next } as unknown as Node['state'];
+        }
+      }
+      break;
+    }
   }
   return null; // unknown command — no-op
+}
+
+// Decision 9 Addendum — mother-only config setters. These mutate
+// `node.config`, not state, so they go through their own path. FSM rule:
+// rejected if status === 'running' (consistent with pomoSetDuration).
+function applyMotherConfigCommand(
+  node: Node,
+  command: string,
+  args: Args,
+): { config: PomoConfig } | null {
+  if (node.kind !== 'pomo' || !node.isMother) return null;
+  const state = node.state as PomoState;
+  if (state.status === 'running') return null;
+  const cfg = node.config as Partial<PomoConfig> | null;
+  const current: PomoConfig = {
+    defaultDurationMin: cfg?.defaultDurationMin ?? 25,
+    defaultBreakMin: cfg?.defaultBreakMin ?? 5,
+    longBreakEvery: cfg?.longBreakEvery ?? 4,
+    longBreakMin: cfg?.longBreakMin ?? 15,
+  };
+  switch (command) {
+    case 'pomo.setDuration': {
+      const minutes = Number(args['minutes']);
+      if (!Number.isFinite(minutes) || minutes <= 0) return null;
+      return { config: { ...current, defaultDurationMin: minutes } };
+    }
+    case 'pomo.setBreak': {
+      const minutes = Number(args['minutes']);
+      if (!Number.isFinite(minutes) || minutes <= 0) return null;
+      return { config: { ...current, defaultBreakMin: minutes } };
+    }
+    case 'pomo.setLongBreak': {
+      const minutes = Number(args['minutes']);
+      if (!Number.isFinite(minutes) || minutes <= 0) return null;
+      return { config: { ...current, longBreakMin: minutes } };
+    }
+    case 'pomo.setLongBreakEvery': {
+      const count = Number(args['count']);
+      if (!Number.isFinite(count) || count < 1) return null;
+      return { config: { ...current, longBreakEvery: Math.floor(count) } };
+    }
+  }
+  return null;
 }
 
 /**
@@ -92,6 +196,15 @@ export function makeCommandHandler(nodeId: string) {
 
     const node = board.nodes.find((n) => n.id === nodeId);
     if (!node) return;
+
+    // ── Mother config writes (Decision 9 Addendum) — separate path ───────
+    const cfgPatch = applyMotherConfigCommand(node, command, args);
+    if (cfgPatch !== null) {
+      updateNode(nodeId, { config: cfgPatch.config });
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
 
     const newState = applyCommand(node, command, args);
     if (newState === null) return;
@@ -134,6 +247,11 @@ export function makeCommandHandler(nodeId: string) {
       const tag = addedItem?.tag ?? (args['tag'] as string | undefined);
 
       const durationMin = 20;
+      // Decision 9 Addendum — copy mother config into the new task's pomo
+      // block. duration/break are value-copied; longBreakEvery and longBreakMin
+      // are read live at completion time (via readMotherPomoConfig).
+      const motherCfg = readMotherPomoConfig();
+      const initialPomo: EmbeddedPomoState = defaultEmbeddedPomo(motherCfg, text);
       const taskState: TaskState = {
         text,
         done: false,
@@ -144,6 +262,7 @@ export function makeCommandHandler(nodeId: string) {
         layer: 0,                // direct children of a mother are layer 0 (F1/NF4)
         createdAt: new Date().toISOString(),
         parentTodoId: todoNode.id,
+        pomo: initialPomo,
       };
 
       const taskNode: Node = {

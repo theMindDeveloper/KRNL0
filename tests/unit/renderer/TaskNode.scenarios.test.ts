@@ -94,15 +94,15 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
     });
   });
 
-  // ── F2 — + pomo button spawns child ──────────────────────────────────────
-  describe('F2 — + pomo button dispatches task.spawnPomo', () => {
-    it('calls onCommand with task.spawnPomo when button clicked', () => {
+  // ── F2 (Decision 9 Addendum: contract change) — pomo button now dispatches task.startPomo
+  describe('F2 — + pomo button dispatches task.startPomo (Addendum)', () => {
+    it('calls onCommand with task.startPomo when button clicked from idle', () => {
       const onCommand = vi.fn();
       renderTaskNode(makeTaskState(), onCommand);
       const btn = document.querySelector('.task-pomo-btn') as HTMLElement;
       expect(btn).not.toBeNull();
       fireEvent.click(btn);
-      expect(onCommand).toHaveBeenCalledWith('task.spawnPomo');
+      expect(onCommand).toHaveBeenCalledWith('task.startPomo');
     });
   });
 
@@ -157,6 +157,71 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
       renderTaskNode(makeTaskState({ done: false }));
       const btn = document.querySelector('.task-pomo-btn');
       expect(btn).not.toBeNull();
+    });
+  });
+
+  // ── Decision 9 Addendum (2026-05-12) — F9/F10 button + mini timer ─────
+  describe('F9/F10 — pomo button label per status + mini timer', () => {
+    function withPomo(status: 'idle' | 'running' | 'break', sessionsCompleted = 0) {
+      return makeTaskState({
+        pomo: {
+          status,
+          startedAt: status === 'idle' ? null : new Date('2026-05-12T10:00:00.000Z').toISOString(),
+          durationMin: 25,
+          breakMin: 5,
+          label: 'test task',
+          sessionsCompleted,
+          history: [],
+        },
+      });
+    }
+
+    it('idle → button reads "+ pomo" and dispatches task.startPomo', () => {
+      const onCommand = vi.fn();
+      renderTaskNode(withPomo('idle'), onCommand);
+      const btn = document.querySelector('.task-pomo-btn') as HTMLElement;
+      expect(btn.textContent?.toLowerCase()).toContain('pomo');
+      fireEvent.click(btn);
+      expect(onCommand).toHaveBeenCalledWith('task.startPomo');
+    });
+
+    it('running → button reads "pause" and dispatches task.cancelPomo', () => {
+      const onCommand = vi.fn();
+      renderTaskNode(withPomo('running'), onCommand);
+      const btn = document.querySelector('.task-pomo-btn') as HTMLElement;
+      expect(btn.textContent?.toLowerCase()).toBe('pause');
+      fireEvent.click(btn);
+      expect(onCommand).toHaveBeenCalledWith('task.cancelPomo');
+    });
+
+    it('break → button reads "skip break" and dispatches task.skipBreak', () => {
+      const onCommand = vi.fn();
+      renderTaskNode(withPomo('break'), onCommand);
+      const btn = document.querySelector('.task-pomo-btn') as HTMLElement;
+      expect(btn.textContent?.toLowerCase()).toBe('skip break');
+      fireEvent.click(btn);
+      expect(onCommand).toHaveBeenCalledWith('task.skipBreak');
+    });
+
+    it('mini timer is hidden when idle, visible when running', () => {
+      const { unmount } = render(
+        React.createElement(TaskNode, {
+          node: makeTaskNode(withPomo('idle')),
+          selected: false,
+          onCommand: vi.fn(),
+          onSelect: vi.fn(),
+        }),
+      );
+      expect(document.querySelector('[data-testid="task-mini-timer"]')).toBeNull();
+      unmount();
+      renderTaskNode(withPomo('running'));
+      expect(document.querySelector('[data-testid="task-mini-timer"]')).not.toBeNull();
+    });
+
+    it('per-task pomo session count is rendered', () => {
+      renderTaskNode(withPomo('idle', 7));
+      const count = document.querySelector('[data-testid="task-pomo-count"]');
+      expect(count?.textContent).toContain('7');
     });
   });
 

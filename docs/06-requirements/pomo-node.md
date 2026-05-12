@@ -16,6 +16,12 @@
 | F6 | Four session pips below the tube show progress within the `longBreakEvery` cycle; the pip matching `sessionCount % longBreakEvery` is highlighted |
 | F7 | When `remainingMs ≤ 0` the component automatically dispatches `pomo.complete` without user interaction |
 | F8 | An RF `<Handle type="source" position="right">` is rendered at vertical center for downstream edge chaining |
+| F9 | A gear icon button in the PomoNode header opens an inline settings panel inside the node body with four numeric inputs: session minutes, break minutes, long-break minutes, sessions-until-long-break. Edits dispatch `pomo.setDuration` / `pomo.setBreak` / `pomo.setLongBreak` / `pomo.setLongBreakEvery` (Decision 9 Addendum 2026-05-12). |
+| F10 | Settings inputs are `disabled` while `state.status === 'running'`; setter commands are no-ops in that state (FSM guard). |
+| F11 | When `(state.sessionsCompleted + 1) % config.longBreakEvery === 0`, completing the current session transitions into a **long break** of `longBreakMin` minutes; otherwise into a short break of `defaultBreakMin` minutes. The chosen duration is written into `state.breakMin` for `pomoEndBreak` to compare against. |
+| F12 | `state.sessionsCompleted` is rendered prominently as `session N / target` and persists to `board.json` with no upper bound. |
+| F13 | Mother PomoNode's clock and pip strip mirror the active task's `state.pomo` (lowest `sequenceNumber` whose `state.pomo.status !== 'idle'`); when no task is active, mother displays its own state. |
+| F14 | `sys pomo config set [--session N] [--break N] [--longBreak N] [--longBreakEvery N]` and `sys pomo task start <id>` are exposed via the `sys` CLI per CLAUDE.md rule 8. |
 
 ---
 
@@ -117,8 +123,60 @@ Feature: PomoNode vapor timer
     When the component renders
     Then a React Flow Handle with type "source" and position "right" is present
     And its vertical position is at 50% of the node height
+
+  Scenario: F9 — Gear opens an inline settings panel
+    Given the component is mounted
+    When the user clicks the gear button in the header
+    Then an inline settings panel appears inside the node body
+    And the panel contains numeric inputs for "session min", "break min", "long break min", "long break every"
+    And each input is pre-filled from the current PomoConfig values
+
+  Scenario: F9b — Setting commit dispatches the matching command
+    Given the settings panel is open
+    When the user types "7" into the "break min" input and presses Enter
+    Then onCommand is called with { type: "pomo.setBreak", minutes: 7 }
+
+  Scenario: F10 — Inputs disabled while running
+    Given the session status is "running"
+    When the user opens the settings panel
+    Then every input has the disabled attribute
+
+  Scenario: F11 — Long-break branch every N sessions
+    Given longBreakEvery is 4 and sessionsCompleted is 3
+    When pomo.complete fires after the duration elapses
+    Then sessionsCompleted increments to 4
+    And the resulting state.breakMin equals config.longBreakMin
+
+  Scenario: F11b — Short break otherwise
+    Given longBreakEvery is 4 and sessionsCompleted is 1
+    When pomo.complete fires after the duration elapses
+    Then sessionsCompleted increments to 2
+    And the resulting state.breakMin equals config.defaultBreakMin
+
+  Scenario: F12 — Session counter is prominent and unbounded
+    Given sessionsCompleted is 17 and longBreakEvery is 4
+    When the component renders
+    Then a "session 17 / 4" element is present
+    And no upper-bound clamp is applied
+
+  Scenario: F13 — Mother mirrors the active task's pomo
+    Given the board contains one mother PomoNode with status "idle"
+    And one todo.task whose state.pomo.status is "running"
+    When the mother PomoNode renders
+    Then the displayed clock and pip strip reflect the task's state.pomo, not the mother's own state
+
+  Scenario: F13b — Lowest sequenceNumber wins when multiple tasks are running
+    Given two todo.task nodes both have state.pomo.status === "running"
+    When the mother PomoNode renders
+    Then the task with the lower sequenceNumber is mirrored
+
+  Scenario: F14 — sys CLI exposes config + task control
+    When the user types "sys pomo config set --break 7 --longBreakEvery 3"
+    Then the parser yields { kind: "pomo", sub: "configSet", breakMin: 7, longBreakEvery: 3 }
+    When the user types "sys pomo task start task-abc"
+    Then the parser yields { kind: "pomo", sub: "taskStart", id: "task-abc" }
 ```
 
 ---
 
-*Last updated: 2026-05-10*
+*Last updated: 2026-05-12*

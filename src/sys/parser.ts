@@ -5,6 +5,15 @@ export type SysCommand =
   | { kind: 'node'; sub: 'add'; nodeKind: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'pomo'; sub: 'stop' | 'status' }
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
+  | {
+      kind: 'pomo';
+      sub: 'configSet';
+      session: number | undefined;
+      breakMin: number | undefined;
+      longBreak: number | undefined;
+      longBreakEvery: number | undefined;
+    }
+  | { kind: 'pomo'; sub: 'taskStart'; id: string | undefined }
   | { kind: 'todo'; sub: 'list' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
   | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
@@ -55,6 +64,25 @@ export class SysParser {
           label: flag(rest, 'label'),
           minutes: minutesRaw !== undefined ? Number(minutesRaw) : undefined,
         };
+      }
+      // Decision 9 Addendum: `sys pomo config set [--session N] [--break N]
+      // [--longBreak N] [--longBreakEvery N]` and `sys pomo task start <id>`.
+      if (sub === 'config' && rest[0] === 'set') {
+        const opts = rest.slice(1);
+        const sess = flag(opts, 'session');
+        const brk = flag(opts, 'break');
+        const lb = flag(opts, 'longBreak');
+        const lbe = flag(opts, 'longBreakEvery');
+        return {
+          kind: 'pomo', sub: 'configSet',
+          session: sess !== undefined ? Number(sess) : undefined,
+          breakMin: brk !== undefined ? Number(brk) : undefined,
+          longBreak: lb !== undefined ? Number(lb) : undefined,
+          longBreakEvery: lbe !== undefined ? Number(lbe) : undefined,
+        };
+      }
+      if (sub === 'task' && rest[0] === 'start') {
+        return { kind: 'pomo', sub: 'taskStart', id: rest[1] };
       }
     }
 

@@ -35,6 +35,35 @@ describe('SysParser', () => {
     it('parses pomo status', () => {
       expect(SysParser.parse(['pomo', 'status'])).toEqual({ kind: 'pomo', sub: 'status' });
     });
+
+    // Decision 9 Addendum (2026-05-12) — pomo config / pomo task subcommands
+    it('parses pomo config set with all four flags', () => {
+      expect(
+        SysParser.parse([
+          'pomo', 'config', 'set',
+          '--session', '50',
+          '--break', '10',
+          '--longBreak', '25',
+          '--longBreakEvery', '3',
+        ]),
+      ).toEqual({
+        kind: 'pomo', sub: 'configSet',
+        session: 50, breakMin: 10, longBreak: 25, longBreakEvery: 3,
+      });
+    });
+    it('parses pomo config set with a subset of flags', () => {
+      expect(
+        SysParser.parse(['pomo', 'config', 'set', '--break', '7']),
+      ).toEqual({
+        kind: 'pomo', sub: 'configSet',
+        session: undefined, breakMin: 7, longBreak: undefined, longBreakEvery: undefined,
+      });
+    });
+    it('parses pomo task start with id', () => {
+      expect(
+        SysParser.parse(['pomo', 'task', 'start', 'task-abc']),
+      ).toEqual({ kind: 'pomo', sub: 'taskStart', id: 'task-abc' });
+    });
   });
 
   describe('todo commands', () => {

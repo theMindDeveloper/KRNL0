@@ -28,8 +28,11 @@ function seedBoard() {
         kind: 'pomo',
         position: { x: -808, y: 0 },
         isMother: true,
-        state: { status: 'idle', startedAt: null, durationMin: 25, label: '', sessionsCompleted: 0, history: [] },
-        config: { shortBreakMin: 5, longBreakMin: 15, sessionsUntilLongBreak: 4 },
+        // Decision 9 Addendum (2026-05-12): seed state matches PomoState shape
+        // (breakMin needed for long-break branching) and config matches
+        // PomoConfig (was previously drifted with shortBreakMin/sessionsUntilLongBreak).
+        state: { status: 'idle', startedAt: null, durationMin: 25, breakMin: 5, label: '', sessionsCompleted: 0, history: [] },
+        config: { defaultDurationMin: 25, defaultBreakMin: 5, longBreakEvery: 4, longBreakMin: 15 },
       },
       {
         id: 'mother-todo',
@@ -179,12 +182,92 @@ function migrateNodeStates(board: Record<string, unknown>): Record<string, unkno
   return board;
 }
 
+// Decision 9 Addendum (2026-05-12) — reconcile pre-addendum pomo config keys.
+// Old shape: { shortBreakMin, longBreakMin, sessionsUntilLongBreak }
+// New shape: { defaultDurationMin, defaultBreakMin, longBreakEvery, longBreakMin }
+// Idempotent: re-running on a migrated board is a no-op.
+export function migratePomoConfig(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null || !('kind' in n)) return n;
+    const node = n as {
+      kind: string;
+      isMother?: boolean;
+      config?: Record<string, unknown>;
+    };
+    if (node.kind !== 'pomo') return node;
+    const cfg = node.config ?? {};
+    const next: Record<string, unknown> = { ...cfg };
+    if (next['defaultBreakMin'] === undefined && next['shortBreakMin'] !== undefined) {
+      next['defaultBreakMin'] = next['shortBreakMin'];
+    }
+    if (next['longBreakEvery'] === undefined && next['sessionsUntilLongBreak'] !== undefined) {
+      next['longBreakEvery'] = next['sessionsUntilLongBreak'];
+    }
+    if (next['defaultDurationMin'] === undefined) next['defaultDurationMin'] = 25;
+    if (next['defaultBreakMin'] === undefined) next['defaultBreakMin'] = 5;
+    if (next['longBreakEvery'] === undefined) next['longBreakEvery'] = 4;
+    if (next['longBreakMin'] === undefined) next['longBreakMin'] = 15;
+    delete next['shortBreakMin'];
+    delete next['sessionsUntilLongBreak'];
+    return { ...node, config: next };
+  });
+  return board;
+}
+
+// Decision 9 Addendum — backfill `state.pomo` on existing todo.task nodes
+// so boards saved before the Addendum don't crash the renderer.
+export function migrateTaskPomo(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  // Read mother config (already migrated by migratePomoConfig).
+  const mother = nodes.find(
+    (n: unknown) =>
+      typeof n === 'object' && n !== null &&
+      (n as { kind?: string }).kind === 'pomo' &&
+      (n as { isMother?: boolean }).isMother === true,
+  ) as { config?: Record<string, unknown> } | undefined;
+  const cfg = mother?.config ?? {};
+  const dur = Number(cfg['defaultDurationMin'] ?? 25);
+  const brk = Number(cfg['defaultBreakMin'] ?? 5);
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null || !('kind' in n)) return n;
+    const node = n as {
+      kind: string;
+      state?: Record<string, unknown>;
+    };
+    if (node.kind !== 'todo.task') return node;
+    const st = node.state ?? {};
+    if (st['pomo'] !== undefined) return node;
+    const label = typeof st['text'] === 'string' ? (st['text'] as string) : '';
+    const seeded = {
+      ...st,
+      pomo: {
+        status: 'idle',
+        startedAt: null,
+        durationMin: dur,
+        breakMin: brk,
+        label,
+        sessionsCompleted: 0,
+        history: [],
+      },
+    };
+    return { ...node, state: seeded };
+  });
+  return board;
+}
+
 function loadBoard() {
   try {
     if (existsSync(BOARD_PATH)) {
       const raw = readFileSync(BOARD_PATH, 'utf-8');
       const parsed: unknown = JSON.parse(raw);
-      return migrateNodeStates(migrateTaskChain(migrateMotherPositions(parsed)));
+      return migrateTaskPomo(
+        migratePomoConfig(
+          migrateNodeStates(migrateTaskChain(migrateMotherPositions(parsed))),
+        ),
+      );
     }
   } catch {
     // fall through to seed

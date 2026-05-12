@@ -1,7 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import type { NodeProps } from '../types';
-import type { PomoConfig, PomoState } from './types';
+import type { PomoConfig, PomoState, EmbeddedPomoState } from './types';
+import { defaultPomoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+import { useBoardStore } from '../../../store/boardStore';
+import type { TaskState } from '../TaskNode/types';
+import { makeCommandHandler } from '../../Canvas/commandDispatch';
 
 const TICK_MS = 500;
 
@@ -47,46 +51,102 @@ export function pipState(
 }
 
 export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<PomoState, PomoConfig>) {
-  const { state, config } = node;
+  const motherState = node.state;
+  const cfg: PomoConfig = {
+    ...defaultPomoConfig(),
+    ...(node.config ?? {}),
+  };
   const [, setTick] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Decision 9 Addendum (F13) — mother mirrors active task's pomo if any.
+  // Lowest sequenceNumber wins for determinism. Falls back to mother's own
+  // state when no task is running/break.
+  const board = useBoardStore((s) => s.board);
+  const activeTask = useMemo(() => {
+    if (!board) return null;
+    const tasks = board.nodes.filter((n) => n.kind === 'todo.task');
+    const candidates = tasks
+      .map((t) => ({ task: t, ts: t.state as TaskState }))
+      .filter((x) => {
+        const p = x.ts.pomo;
+        return p && (p.status === 'running' || p.status === 'break');
+      })
+      .sort((a, b) => (a.ts.sequenceNumber ?? 0) - (b.ts.sequenceNumber ?? 0));
+    return candidates[0]?.task ?? null;
+  }, [board]);
+
+  const displayedState: PomoState | EmbeddedPomoState = activeTask
+    ? (activeTask.state as TaskState).pomo
+    : motherState;
+  const displayedLabel = activeTask
+    ? (activeTask.state as TaskState).text
+    : motherState.label;
 
   // Visual tick — state mutations go through onCommand (Decision #9)
   // NF1: setInterval at TICK_MS (500ms) drives the visual refresh.
   useEffect(() => {
-    if (state.status !== 'running' && state.status !== 'break') return;
+    if (displayedState.status !== 'running' && displayedState.status !== 'break') return;
     const id = setInterval(() => setTick((t) => t + 1), TICK_MS);
     return () => clearInterval(id);
-  }, [state.status]);
+  }, [displayedState.status]);
 
   const totalMs =
-    state.status === 'running'
-      ? state.durationMin * 60_000
-      : state.status === 'break'
-        ? state.breakMin * 60_000
-        : state.durationMin * 60_000;
+    displayedState.status === 'running'
+      ? displayedState.durationMin * 60_000
+      : displayedState.status === 'break'
+        ? displayedState.breakMin * 60_000
+        : displayedState.durationMin * 60_000;
 
   const elapsedMs =
-    (state.status === 'running' || state.status === 'break') && state.startedAt !== null
-      ? Date.now() - Date.parse(state.startedAt)
+    (displayedState.status === 'running' || displayedState.status === 'break') && displayedState.startedAt !== null
+      ? Date.now() - Date.parse(displayedState.startedAt)
       : 0;
   const remainingMs = totalMs - elapsedMs;
 
-  // F7 — auto-dispatch pomo.complete when timer hits zero
+  // F7 — auto-dispatch pomo.complete when timer hits zero. Only fires when
+  // the displayed pomo is the mother's own (the task pomo runs its own
+  // auto-complete inside TaskNode).
   useEffect(() => {
-    if (state.status === 'running' && remainingMs <= 0) onCommand('pomo.complete');
-  }, [state.status, remainingMs, onCommand]);
+    if (!activeTask && motherState.status === 'running' && remainingMs <= 0) {
+      onCommand('pomo.complete');
+    }
+  }, [activeTask, motherState.status, remainingMs, onCommand]);
 
-  const sessionsTarget = config?.longBreakEvery ?? 4;
-  const completedDots = state.sessionsCompleted % sessionsTarget;
+  const sessionsTarget = cfg.longBreakEvery;
+  const completedDots = displayedState.sessionsCompleted % sessionsTarget;
+  const state = displayedState; // alias used by existing JSX below
 
-  // F5 — context-driven primary button
+  // F5 — context-driven primary button. When an active task is being mirrored
+  // (Decision 9 Addendum F13), route controls to that task instead of the
+  // mother — clicking PAUSE on the mirrored display should pause the task.
+  const dispatchToActive = (motherCmd: string, taskCmd: string) => {
+    if (activeTask) {
+      const handler = makeCommandHandler(activeTask.id);
+      handler(taskCmd);
+    } else {
+      onCommand(motherCmd);
+    }
+  };
   const handlePrimary = () => {
-    if (state.status === 'idle' || state.status === 'done') onCommand('pomo.start');
-    else if (state.status === 'running') onCommand('pomo.cancel');
-    else if (state.status === 'break') onCommand('pomo.skipBreak');
+    if (state.status === 'idle' || state.status === 'done') {
+      // Mother's own start; no equivalent on tasks (start belongs on the task card).
+      onCommand('pomo.start');
+    } else if (state.status === 'running') {
+      dispatchToActive('pomo.cancel', 'task.cancelPomo');
+    } else if (state.status === 'break') {
+      dispatchToActive('pomo.skipBreak', 'task.skipBreak');
+    }
   };
   // F4 — RESET always dispatches pomo.cancel (FSM guards the actual transition)
-  const handleReset = () => onCommand('pomo.cancel');
+  const handleReset = () => dispatchToActive('pomo.cancel', 'task.cancelPomo');
+
+  // F9/F10 — settings handlers
+  const handleSettingNumber = (command: string, key: 'minutes' | 'count') => (value: number) => {
+    if (motherState.status === 'running') return;
+    if (!Number.isFinite(value) || value <= 0) return;
+    onCommand(command, { [key]: value });
+  };
 
   const buttonLabel = primaryButtonLabel(state.status);
 
@@ -132,7 +192,7 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
         }
       `}</style>
 
-      {/* Header — bullet + DEEP WORK · POMO.025 */}
+      {/* Header — bullet + DEEP WORK · POMO.025 + gear (F9) */}
       <div
         style={{
           padding: '7px 12px 6px',
@@ -151,8 +211,45 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
           background: state.status === 'running' ? 'var(--rust)' : 'var(--ink-4)',
         }} />
         <span style={{ color: 'var(--ink-2)', fontWeight: 500 }}>DEEP WORK</span>
-        <span style={{ color: 'var(--ink-3)' }}>· POMO.025</span>
+        <span style={{ color: 'var(--ink-3)' }}>
+          {`· POMO.${String(cfg.defaultDurationMin).padStart(3, '0')}`}
+        </span>
+        {activeTask && (
+          <span
+            data-testid="pomo-active-task"
+            style={{ color: 'var(--cyan)', marginLeft: 4 }}
+          >
+            ▸ TASK
+          </span>
+        )}
+        <button
+          type="button"
+          data-testid="pomo-gear"
+          onClick={() => setShowSettings((v) => !v)}
+          aria-label="Pomodoro settings"
+          aria-expanded={showSettings}
+          style={{
+            marginLeft: 'auto',
+            background: 'transparent',
+            border: 'none',
+            color: showSettings ? 'var(--rust)' : 'var(--ink-3)',
+            cursor: 'pointer',
+            fontSize: 13,
+            padding: '0 2px',
+            lineHeight: 1,
+          }}
+        >
+          ⚙
+        </button>
       </div>
+
+      {showSettings && (
+        <PomoSettingsPanel
+          cfg={cfg}
+          disabled={motherState.status === 'running'}
+          onChange={handleSettingNumber}
+        />
+      )}
 
       {/* Body — vapor tube + info */}
       <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -288,7 +385,7 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
                 letterSpacing: '0.1em',
               }}
             >
-              {state.label ? state.label : 'deep work'} · phase 03
+              {displayedLabel ? displayedLabel : 'deep work'} · phase 03
             </div>
             <div
               className="pct"
@@ -329,14 +426,20 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
               />
             );
           })}
-          <span style={{
-            marginLeft: 'auto',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
-            color: 'var(--ink-3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-          }}>
+          {/* F12 — prominent session counter; unlimited, persisted */}
+          <span
+            data-testid="pomo-session-counter"
+            style={{
+              marginLeft: 'auto',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              fontWeight: 600,
+              color: state.sessionsCompleted > 0 ? 'var(--rust)' : 'var(--ink-3)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
             session {state.sessionsCompleted} / {sessionsTarget}
           </span>
         </div>
@@ -393,6 +496,118 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
         </div>
       </div>
     </MotherFrame>
+  );
+}
+
+// F9 — inline settings panel; lives inside the PomoNode body, no modal.
+// Each numeric input commits on blur or Enter via the corresponding command.
+function PomoSettingsPanel({
+  cfg,
+  disabled,
+  onChange,
+}: {
+  cfg: PomoConfig;
+  disabled: boolean;
+  onChange: (command: string, key: 'minutes' | 'count') => (value: number) => void;
+}) {
+  const fieldStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 56px',
+    alignItems: 'center',
+    gap: 8,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10.5,
+    color: 'var(--ink-3)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  };
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--paper-2)',
+    border: '1px solid var(--paper-3)',
+    color: 'var(--ink)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    padding: '4px 6px',
+    borderRadius: 3,
+    width: '100%',
+    textAlign: 'right',
+    fontVariantNumeric: 'tabular-nums',
+  };
+
+  const commitOnEnterOrBlur =
+    (handler: (value: number) => void) =>
+    (e: React.KeyboardEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>) => {
+      if ('key' in e) {
+        if (e.key !== 'Enter') return;
+      }
+      const v = Number((e.currentTarget as HTMLInputElement).value);
+      handler(v);
+    };
+
+  return (
+    <div
+      data-testid="pomo-settings-panel"
+      style={{
+        padding: '10px 18px',
+        borderBottom: '1px solid var(--paper-2)',
+        display: 'grid',
+        gap: 8,
+        background: 'var(--paper)',
+      }}
+    >
+      <div style={fieldStyle}>
+        <span>session min</span>
+        <input
+          type="number"
+          min={1}
+          defaultValue={cfg.defaultDurationMin}
+          disabled={disabled}
+          data-testid="pomo-setting-session"
+          style={inputStyle}
+          onKeyDown={commitOnEnterOrBlur(onChange('pomo.setDuration', 'minutes'))}
+          onBlur={commitOnEnterOrBlur(onChange('pomo.setDuration', 'minutes'))}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span>break min</span>
+        <input
+          type="number"
+          min={1}
+          defaultValue={cfg.defaultBreakMin}
+          disabled={disabled}
+          data-testid="pomo-setting-break"
+          style={inputStyle}
+          onKeyDown={commitOnEnterOrBlur(onChange('pomo.setBreak', 'minutes'))}
+          onBlur={commitOnEnterOrBlur(onChange('pomo.setBreak', 'minutes'))}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span>long break min</span>
+        <input
+          type="number"
+          min={1}
+          defaultValue={cfg.longBreakMin}
+          disabled={disabled}
+          data-testid="pomo-setting-longBreak"
+          style={inputStyle}
+          onKeyDown={commitOnEnterOrBlur(onChange('pomo.setLongBreak', 'minutes'))}
+          onBlur={commitOnEnterOrBlur(onChange('pomo.setLongBreak', 'minutes'))}
+        />
+      </div>
+      <div style={fieldStyle}>
+        <span>long break every</span>
+        <input
+          type="number"
+          min={1}
+          defaultValue={cfg.longBreakEvery}
+          disabled={disabled}
+          data-testid="pomo-setting-longBreakEvery"
+          style={inputStyle}
+          onKeyDown={commitOnEnterOrBlur(onChange('pomo.setLongBreakEvery', 'count'))}
+          onBlur={commitOnEnterOrBlur(onChange('pomo.setLongBreakEvery', 'count'))}
+        />
+      </div>
+    </div>
   );
 }
 

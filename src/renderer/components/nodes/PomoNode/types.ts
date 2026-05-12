@@ -45,3 +45,21 @@ export const defaultPomoConfig = (): PomoConfig => ({
   longBreakEvery: 4,
   longBreakMin: 15,
 });
+
+// Decision 9 Addendum (2026-05-12) — embedded pomo block stored on each
+// todo.task. Same shape as PomoState (the FSM handlers operate uniformly).
+// Long break duration (longBreakMin) and cadence (longBreakEvery) are NOT
+// copied — they're read live from mother config at completion time, so
+// changing the cadence later affects every task. duration/short-break ARE
+// copied at spawn so editing mother defaults won't stretch in-flight pomos.
+export type EmbeddedPomoState = PomoState;
+
+export const defaultEmbeddedPomo = (cfg: PomoConfig, label = ''): EmbeddedPomoState => ({
+  status: 'idle',
+  startedAt: null,
+  durationMin: cfg.defaultDurationMin,
+  breakMin: cfg.defaultBreakMin,
+  label,
+  sessionsCompleted: 0,
+  history: [],
+});

@@ -47,6 +47,8 @@ Pomodoro:
   sys pomo start [--label "..."] [--minutes 25]
   sys pomo stop
   sys pomo status
+  sys pomo config set [--session N] [--break N] [--longBreak N] [--longBreakEvery N]
+  sys pomo task start <id>
 
 Todos:
   sys todo add "..." [--tag work]

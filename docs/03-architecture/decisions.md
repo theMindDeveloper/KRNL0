@@ -850,3 +850,176 @@ Four targeted changes, all narrow:
 - **Forecloses:** Backspace inside cmd.exe (when explicitly opted into via `KRNL0_SHELL`). Acceptable — cmd.exe is no longer the default and the translation hack was always shell-conditional anyway.
 - **GPU dependency:** WebGL needs a working OpenGL/ANGLE context. On Windows under Electron this is provided by ANGLE; failure paths are fully covered by Canvas → DOM fallbacks, so there is no hard runtime dependency.
 - **`process.cwd()` semantics in packaged builds:** in a packaged Electron app `process.cwd()` is the install directory, not the project source. Users who want a stable cwd for `claude` set `KRNL0_TERM_CWD` explicitly. Documented in [docs/06-requirements/terminal-node.md](../06-requirements/terminal-node.md).
+
+---
+
+## Decision 9 — Addendum (2026-05-12) — Per-task Pomodoro, long-break branching, settings command set
+
+**Status:** Accepted — extends Decision 9, does not supersede it.
+**Author:** architect
+**Decision 20 reservation:** unchanged — still held for the analytics event log
+([docs/06-requirements/analytics-persistence.md](../06-requirements/analytics-persistence.md)).
+This addendum touches per-task state and FSM math only; it does **not**
+introduce a new persistence layer or new IPC channels.
+
+### Context
+
+Decision 9 fixed the mother PomoNode FSM. After two months of use the user's
+need has shifted: a single ad-hoc timer is no longer enough. Each task on the
+canvas should remember its own pomodoro work — how many sessions ran, when,
+and how long the user focused on this task specifically. The mother PomoNode
+remains visible but becomes a settings hub plus a live mirror of whichever
+task is currently running. A long-break cycle (every N sessions) is also
+required, with both N and the long-break duration adjustable from a settings
+gear in the mother header.
+
+### Decision
+
+#### Per-task pomo embedding
+
+`TaskState` (kind `todo.task`) gains a `pomo: EmbeddedPomoState` block. The
+embedded shape **is** `PomoState` (alias) so the existing pure FSM handlers in
+`src/renderer/components/nodes/PomoNode/commands.ts` operate uniformly on
+both the mother's state and a task's `state.pomo` block — no duplication,
+zero new node kinds.
+
+Rationale vs spawning a child `pomo.session` node for each task:
+- single source of truth per task (no edge wiring overhead);
+- no new node kind, no registry change, no canvas position math for spawned children;
+- `board.json` diffs stay legible — one task = one record;
+- `PomoSessionRecord` shape is unchanged → trivial future migration to the
+  analytics event log when Decision 20 lands.
+
+#### Mother PomoNode role
+
+The mother becomes (a) the **settings hub** — its `node.config` holds the
+canonical `PomoConfig` — and (b) the **active session display**. It mirrors
+whichever task's `state.pomo.status !== 'idle'`; ties broken by the lowest
+`sequenceNumber`. When no task is running, mother displays its own state
+(legacy ad-hoc behaviour preserved for sessions started via `pomo.start`
+on the mother itself).
+
+#### Long-break branching contract
+
+`pomoComplete` now accepts an optional 4th arg `cfg: { breakMin, longBreakMin, longBreakEvery }`
+and decides break duration with:
+
+```
+isLongBreak = (state.sessionsCompleted + 1) % cfg.longBreakEvery === 0
+nextBreakMin = isLongBreak ? cfg.longBreakMin : cfg.breakMin
+```
+
+The chosen `nextBreakMin` is **written into the resulting state's `breakMin`
+field**. `pomoEndBreak` then compares `now - startedAt` to that stored
+`state.breakMin` directly — no off-by-one risk, no need to recompute the long
+vs short decision after `sessionsCompleted` has already incremented.
+
+Worked example with `longBreakEvery = 4`:
+
+| sessionsCompleted (before) | (sc+1) % 4 | break duration written |
+|---|---|---|
+| 0 | 1 | breakMin (short) |
+| 1 | 2 | breakMin (short) |
+| 2 | 3 | breakMin (short) |
+| 3 | 0 | longBreakMin (long) |
+| 4 | 1 | breakMin (short) |
+| 7 | 0 | longBreakMin (long) |
+
+The 3-arg call `pomoComplete(state, args, env)` still works — back-compat is
+preserved via a default cfg derived from `state.breakMin` and a 4-cycle.
+
+#### New mother-only setter commands
+
+Mutate `node.config`, not state. Rejected (no-op) if `state.status === 'running'`.
+
+| Command | Args | Effect |
+|---|---|---|
+| `pomo.setDuration` | `{ minutes }` | writes `config.defaultDurationMin` |
+| `pomo.setBreak` | `{ minutes }` | writes `config.defaultBreakMin` |
+| `pomo.setLongBreak` | `{ minutes }` | writes `config.longBreakMin` |
+| `pomo.setLongBreakEvery` | `{ count }` | writes `config.longBreakEvery` (count ≥ 1) |
+
+#### Task-side commands (rename `task.spawnPomo` → `task.startPomo`)
+
+| Command | Effect |
+|---|---|
+| `task.startPomo` | `pomoStart(state.pomo, args)` |
+| `task.cancelPomo` | `pomoCancel(state.pomo)` |
+| `task.completePomo` | `pomoComplete(state.pomo, {}, undefined, motherCfg)` |
+| `task.skipBreak` | `pomoSkipBreak(state.pomo)` |
+| `task.endBreak` | `pomoEndBreak(state.pomo)` |
+
+`task.spawnPomo` (Task-node F2) is **renamed** in spirit and on the wire to
+`task.startPomo`. There is no spawned node — the pomo state lives directly on
+the task.
+
+#### Spawn-time config copy (value, not reference)
+
+When `todo.add` spawns a new task, the task's `state.pomo` is initialised
+from the mother's `node.config` via `defaultEmbeddedPomo(motherCfg, label)`.
+**`durationMin` and `breakMin` are value-copied at this moment.** Later edits
+to the mother's `defaultDurationMin` / `defaultBreakMin` do **not**
+retroactively change in-flight per-task pomos — predictability over
+convenience.
+
+By contrast `longBreakEvery` and `longBreakMin` are **read live** from the
+mother config at completion time. This means changing the long-break cadence
+applies to the next completed session of every task immediately. Rationale:
+cadence is policy, duration is contract.
+
+#### Seed config drift fix + migration
+
+`src/main/ipc/handlers.ts` previously seeded the mother with
+`{ shortBreakMin, longBreakMin, sessionsUntilLongBreak }`, which never
+matched `PomoConfig`'s declared field names. Reconciled to
+`{ defaultDurationMin, defaultBreakMin, longBreakEvery, longBreakMin }`.
+
+Added `migratePomoConfig(board)` and `migrateTaskPomo(board)` — both
+idempotent — wired into `loadBoard()` after `migrateNodeStates`. Old user
+boards are upgraded transparently on first load post-merge:
+
+- `shortBreakMin` → `defaultBreakMin`
+- `sessionsUntilLongBreak` → `longBreakEvery`
+- missing keys default to `25 / 5 / 4 / 15`
+- `todo.task` nodes lacking `state.pomo` get a backfill from current mother config
+
+#### Persistence
+
+`board.json` only. No new files, no SQLite. `PomoSessionRecord` shape
+unchanged. All per-task pomo work serialises and restarts cleanly under the
+existing `commandDispatch.ts → boardSave` pipeline.
+
+#### sys CLI surface (CLAUDE.md hard rule 8)
+
+Two new subcommands scaffolded — write-paths still TODO (Week 4) per the
+existing `sys` stub status:
+
+```
+sys pomo config set [--session N] [--break N] [--longBreak N] [--longBreakEvery N]
+sys pomo task start <id>
+```
+
+### Architect sign-off (binding for backend-dev)
+
+This addendum is satisfied iff:
+
+1. Changes confined to `src/renderer/components/nodes/PomoNode/{types.ts,commands.ts,index.tsx}`,
+   `src/renderer/components/nodes/TaskNode/{types.ts,index.tsx}`,
+   `src/renderer/components/Canvas/commandDispatch.ts`, `src/main/ipc/handlers.ts`,
+   `src/sys/{parser.ts,SysFacade.ts,commands/pomo.ts}`, and matching tests/docs.
+2. `PomoSessionRecord` shape is unchanged.
+3. No new IPC channels, no new node kinds, no new edge kinds.
+4. Mother-config setters guarded by `state.status === 'running'` check.
+5. Spawn-time copy is value-copy (mother edits don't change in-flight tasks).
+6. Migrations are idempotent.
+7. Long-break formula matches the table above (the off-by-one is load-bearing).
+8. sys CLI surface scaffolded; full IO can stay stubbed pending Week 4.
+
+### Consequences
+
+- Enables: focused work tracked per task, group-cycle long breaks, in-place
+  settings, restart-resume of any task's running pomo.
+- Forecloses: a single shared mother-only timer (mother now mirrors
+  active task by default — ad-hoc still works when no task is active).
+- Concentrates pomo logic in one set of pure FSM handlers shared between
+  mother and tasks. No drift surface.

@@ -141,6 +141,85 @@ describe('PomoNode FSM (Decision #9)', () => {
     });
   });
 
+  // ── Decision 9 Addendum (2026-05-12) — long-break branching ──────────
+  describe('long-break branching (Addendum F11)', () => {
+    const cfg = { breakMin: 5, longBreakMin: 15, longBreakEvery: 4 };
+
+    it('first three completions yield short breaks (sessionsCompleted 1, 2, 3)', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const after = pomoComplete(running, {}, env(T0 + 25 * 60_000), cfg);
+      expect(after.status).toBe('break');
+      expect(after.sessionsCompleted).toBe(1);
+      expect(after.breakMin).toBe(5);
+
+      const next2 = pomoComplete(
+        { ...after, status: 'running', startedAt: new Date(T0 + 30 * 60_000).toISOString() },
+        {},
+        env(T0 + 60 * 60_000),
+        cfg,
+      );
+      expect(next2.sessionsCompleted).toBe(2);
+      expect(next2.breakMin).toBe(5);
+
+      const next3 = pomoComplete(
+        { ...next2, status: 'running', startedAt: new Date(T0 + 90 * 60_000).toISOString() },
+        {},
+        env(T0 + 120 * 60_000),
+        cfg,
+      );
+      expect(next3.sessionsCompleted).toBe(3);
+      expect(next3.breakMin).toBe(5);
+    });
+
+    it('fourth completion (sessionsCompleted 3 → 4) yields a LONG break', () => {
+      const base = { ...defaultPomoState(), sessionsCompleted: 3, status: 'running' as const, startedAt: new Date(T0).toISOString() };
+      const after = pomoComplete(base, {}, env(T0 + 25 * 60_000), cfg);
+      expect(after.sessionsCompleted).toBe(4);
+      expect(after.breakMin).toBe(15);
+    });
+
+    it('eighth completion (sessionsCompleted 7 → 8) also yields a LONG break', () => {
+      const base = { ...defaultPomoState(), sessionsCompleted: 7, status: 'running' as const, startedAt: new Date(T0).toISOString() };
+      const after = pomoComplete(base, {}, env(T0 + 25 * 60_000), cfg);
+      expect(after.sessionsCompleted).toBe(8);
+      expect(after.breakMin).toBe(15);
+    });
+
+    it('respects custom longBreakEvery=2 — every other completion is long', () => {
+      const c = { breakMin: 1, longBreakMin: 3, longBreakEvery: 2 };
+      const base = { ...defaultPomoState(), sessionsCompleted: 0, status: 'running' as const, startedAt: new Date(T0).toISOString() };
+      const a = pomoComplete(base, {}, env(T0 + 25 * 60_000), c);
+      expect(a.sessionsCompleted).toBe(1);
+      expect(a.breakMin).toBe(1); // short
+
+      const b = pomoComplete(
+        { ...a, status: 'running', startedAt: new Date(T0 + 30 * 60_000).toISOString() },
+        {},
+        env(T0 + 60 * 60_000),
+        c,
+      );
+      expect(b.sessionsCompleted).toBe(2);
+      expect(b.breakMin).toBe(3); // long
+    });
+
+    it('default cfg path is back-compat (3-arg call still works)', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const after = pomoComplete(running, {}, env(T0 + 25 * 60_000));
+      expect(after.status).toBe('break');
+    });
+
+    it('endBreak compares against the breakMin set by complete (long break needs 15 min)', () => {
+      const base = { ...defaultPomoState(), sessionsCompleted: 3, status: 'running' as const, startedAt: new Date(T0).toISOString() };
+      const onLongBreak = pomoComplete(base, {}, env(T0 + 25 * 60_000), cfg);
+      // 5 min after long break starts — still on break
+      const five = pomoEndBreak(onLongBreak, {}, env(T0 + 25 * 60_000 + 5 * 60_000));
+      expect(five).toBe(onLongBreak);
+      // 16 min after long break starts — break ends
+      const sixteen = pomoEndBreak(onLongBreak, {}, env(T0 + 25 * 60_000 + 16 * 60_000));
+      expect(sixteen.status).toBe('idle');
+    });
+  });
+
   describe('persistence rule (Decision #9)', () => {
     it('state never carries a derived countdown — only startedAt + durationMin', () => {
       const running = pomoStart(defaultPomoState(), {}, env(T0));
