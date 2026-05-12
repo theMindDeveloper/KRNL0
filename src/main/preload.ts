@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('krnl', {
     return () => ipcRenderer.removeAllListeners(channel)
   },
 
-  // Asset persistence (Decision 20). Bytes are sent as Uint8Array which
+  // Asset persistence (Decision 21). Bytes are sent as Uint8Array which
   // Electron structured-clones across the IPC bridge without base64.
   assetWrite: (ext: string, bytes: Uint8Array) =>
     ipcRenderer.invoke('asset:write', { ext, bytes }),
@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld('krnl', {
   assetDelete: (assetId: string) =>
     ipcRenderer.invoke('asset:delete', { assetId }),
 
-  // Live sync — main → renderer notification that board.json was mutated
+  // Live sync â€” main â†’ renderer notification that board.json was mutated
   // outside the renderer (e.g. via sys CLI). Renderer should re-load.
   onBoardChanged: (callback: () => void) => {
     const channel = 'board:changed'

@@ -851,17 +851,204 @@ Four targeted changes, all narrow:
 - **GPU dependency:** WebGL needs a working OpenGL/ANGLE context. On Windows under Electron this is provided by ANGLE; failure paths are fully covered by Canvas → DOM fallbacks, so there is no hard runtime dependency.
 - **`process.cwd()` semantics in packaged builds:** in a packaged Electron app `process.cwd()` is the install directory, not the project source. Users who want a stable cwd for `claude` set `KRNL0_TERM_CWD` explicitly. Documented in [docs/06-requirements/terminal-node.md](../06-requirements/terminal-node.md).
 
+
+## Decision 14 — HabitNode v2 (color, multi-view, past backfill, settings popover, sys wiring)
+
+**Date:** 2026-05-12
+**Status:** Accepted
+**Author:** architect
+**Supersedes:** §"Contract" of Decision 11 (schema additions); leaves Decision 11's
+sparse-log semantics, derived week grid, and streak rules unchanged.
+
+### Context
+
+Decision 11 fixed the data model but left v1 with: a single weekly view, no
+per-habit identity beyond name + glyph, no settings UX, and no UI affordance for
+back-dating completions. v2 (this decision) lands the full feature set the user
+asked for: add/delete habits, pin any past day, three views (week/month/year),
+a settings gear at top-right, per-habit color from the fixed cyber palette, and
+end-to-end persistence — through both the renderer and the sys CLI.
+
+### Decision
+
+Extend the habit schema with two additive fields and one config field. Every
+mutation routes through pure command handlers (renderer or sys CLI) into
+`board.json` via the shared persistence module. No fake state, no hidden
+ephemeral data.
+
+**Schema additions** (back-fill at render and at load, see Migration):
+
+```typescript
+export type HabitColor = 'acid' | 'rust' | 'cyan' | 'plum' | 'spine' | 'ink';
+export type HabitView  = 'week' | 'month' | 'year';
+
+export interface Habit {
+  id: string;
+  name: string;
+  createdAt: string;
+  log: string[];
+  archived: boolean;
+  color: HabitColor;          // NEW — default 'acid'
+}
+
+export interface HabitConfig {
+  weekStartsOn: 'monday';
+  view: HabitView;            // NEW — default 'week'
+  maxHabits?: number;         // tolerated legacy seed field; no enforcement
+}
+```
+
+**New commands:**
+
+| Command | Target | Args | Effect |
+|---|---|---|---|
+| `habit.setColor` | state | `{ id, color }` | set color (no-op on unknown color) |
+| `habit.setView`  | config | `{ view }`     | switch view (no-op on unknown view) |
+
+`habit.toggleDay` hardens its guard: **future dates are no-ops; past dates are
+always accepted** (including dates before `createdAt`, so users can back-fill
+habits they began tracking late — the user-stated rule "regardless if it's in
+the past, but the future is not allowed").
+
+**Dispatcher contract change:** `applyCommand` in
+`src/renderer/components/Canvas/commandDispatch.ts` returns
+`{ state?, config? } | null` instead of `Node['state'] | null`. `makeCommandHandler`
+applies whichever keys are present in a single `updateNode` call. This
+generalisation is node-agnostic; only Habit uses it today.
+
+**Settings popover (F9–F13):** a gear button in the node header toggles an
+inline popover absolutely-positioned inside the node body. The popover contains
+a segmented view toggle and a list of habits, each with a color swatch (click
+to open a 6-dot picker) and a delete (×) button. Click-outside-to-close via a
+`mousedown` listener on `document` filtered by the popover's container ref.
+No react-portal — the popover clips with the node card.
+
+**View layouts (F15):**
+
+| View | Layout | Cell size × gap | Total grid width |
+|---|---|---|---|
+| Week | inline glyph + name + 7-cell row + streak | 18px × 3px | 144px |
+| Month | name+streak header line + single-row month grid | 10px × 1px | 28–31 cells, ≤340px |
+| Year | name+streak header line + 53×7 contribution grid | 5px × 1px | 53 cols × 7 rows |
+
+Mother content width is 346px (`MOTHER_WIDTH 380` − 32 padding − 2 border).
+All views fit.
+
+**Sys CLI (F17):** `src/sys/commands/habit.ts` is wired end-to-end via the
+shared persistence module `src/main/persistence/board.ts`. Commands resolve
+habits by id (exact) or case-insensitive name; ambiguous names → error.
+Verbs: `add`, `done`, `streak`, `color`, `remove`, `view`, `list`. `SysFacade`
+takes a `{ boardPath, hasOpenRenderer, onBoardChanged }` deps bundle so the
+same code works from both `ipcMain.handle('sys:run')` (Electron renderer
+present → broadcast `board:reload`) and the standalone CLI entry
+(`src/sys/index.ts`, renderer absent → write disk only).
+
+### Migration
+
+Two-stage, render-time fallback + load-time back-fill:
+
+1. **Render-time fallback** — `habit.color ?? 'acid'` and `config.view ?? 'week'`
+   keep the v1 UI alive against an unmigrated `board.json`.
+2. **Load-time back-fill** — `loadBoardFrom()` in the shared persistence module
+   patches missing `color` on each habit (defaulting to `'acid'`) and missing
+   `view` on the habit mother config (defaulting to `'week'`). The first save
+   after a load writes the resolved defaults back to disk, so reads converge to
+   the schema.
+
+No imperative migration pass is required; this is consistent with how Decision
+17 handles per-instance isolation (write fresh, read tolerant).
+
+### Consequences
+
+- **Enables:** add/delete habits via UI and sys; back-fill any past day; persistent
+  per-habit colors used as the done-cell fill; per-node view selection that
+  survives reloads; full sys-CLI parity with the GUI (rule §8 in CLAUDE.md).
+- **Forecloses:** custom colors outside the 6-token palette (intentional — keeps
+  the visual system coherent). Per-day intensity is still ruled out by
+  Decision 11.
+- **Risks resolved:**
+  - View-vs-state dispatch — generalised dispatcher return type.
+  - Sys/renderer race — `onBoardChanged` broadcasts `board:reload` to open
+    renderers after a sys write.
+  - Popover clipping — popover lives inside the body, no portal.
+  - Future-date toggling via sys — blocked at the FSM level.
+  - Color-as-sole-signal — done cells retain the existing outline/ring;
+    selected swatch in the picker is identified by a paper inset border,
+    not by color alone.
+
 ---
 
-## Decision 20 — Asset persistence and the `krnl-asset://` protocol
+## Decision 20 — Todo/Task bidirectional linkage + TaskNode FSM
+
+**Date:** 2026-05-12
+**Status:** Accepted
+**Closes:** #80 (todo-task-nodes feature branch)
+
+### Context
+
+Tasks are spawned from TodoItems when a user adds a task in the TodoNode. Previously `TodoItem` had no back-link to the spawned `TaskNode`, and `TaskState` had no back-link to the `TodoItem`. This meant done-state mirroring, cascade-deletes, and pomo-triggering from the todo row all required scanning the full board — brittle and inconsistent.
+
+### Decision
+
+**Two new fields on `TodoItem`:**
+```typescript
+taskNodeId: string | null  // null until a task node is spawned
+```
+
+**Three new fields on `TaskState`:**
+```typescript
+parentTaskId: string | null      // null = root task; else parent task node id (for subtasks)
+todoItemId: string | null        // back-link to the TodoItem.id that spawned this task
+pomoSessionsCompleted: number    // count of completed pomo sessions for this task (default 0)
+```
+
+**Invariants (Decision 20 contract):**
+1. When `todo.add` spawns a TaskNode, `item.taskNodeId = taskNode.id` and `taskState.todoItemId = item.id` are set atomically in the same store transaction.
+2. `task.toggle` → if `todoItemId !== null`, mirror done state to the linked `TodoItem` (no loop: check `item.done !== nextTask.done` before mirroring).
+3. `todo.toggle` → if `item.taskNodeId !== null`, mirror done state to the linked `TaskNode`.
+4. `task.delete` BFS-collects the node + all descendants (via `parentTaskId` chain), removes them all + incident edges, then removes the linked `TodoItem` (if `todoItemId !== null`), then renumbers siblings.
+5. `todo.remove` cascades to the linked `TaskNode` + all descendants before removing the `TodoItem`.
+6. `todo.clearDone` cascades all done items' TaskNodes.
+7. `task.startPomo` / `task.spawnPomo` finds the single `kind === 'pomo'` mother node and calls `pomoStart` — never duplicates it.
+8. `todo.startPomoForItem` resolves `item.taskNodeId → taskNode → task.startPomo`.
+9. `task.addSubtask` spawns a child TaskNode with `parentTaskId = parentNodeId` and `layer = parent.layer + 1`; `todoItemId` is null for subtasks.
+10. Sibling sequence numbers are 1-based, sorted ascending by `createdAt`, scoped to `{parentTodoId, parentTaskId}`.
+
+**Pure FSM handlers added:**
+- `TaskNode/commands.ts`: `taskToggle`, `taskEdit`, `taskIncrementPomo`, `taskActivate`
+- `TodoNode/commands.ts`: `todoLinkTask(state, {itemId, taskNodeId}) => TodoState`
+
+**UI affordances:**
+- `TaskNode`: body click triggers `task.startPomo` (drag-safe: only fires if mouseup delta < 4px); right-click opens `ContextMenu` with Edit / Add subtask / Delete items; inline edit on double-click; add-subtask input below footer; opacity 0.4 when done.
+- `TodoNode`: row right-click opens `ContextMenu` with Edit / Start pomo (disabled when no linked task) / Delete; clicking the todo-text of a linked item dispatches `todo.startPomoForItem`.
+
+**sys CLI additions:**
+- `sys task add <text> [--todo <todoId>] [--duration <min>]`
+- `sys task edit <id> <text>`
+- `sys task toggle <id>`
+- `sys task delete <id>`
+- `sys task pomo <id>`
+- `sys task subtask <parentId> <text>`
+- `sys task list [<todoId>]`
+- `sys todo add/check/list` — replaced stubs with real board.json operations.
+
+### Consequences
+
+- **Enables:** bidirectional done mirroring; cascade-delete; per-task pomo sessions; subtask nesting; full CLI parity for tasks.
+- **Forecloses:** detached task nodes (every task with a `todoItemId` has a corresponding `TodoItem`; orphan cleanup is handled at delete time).
+- **Migration:** existing `board.json` task nodes missing `parentTaskId`/`todoItemId`/`pomoSessionsCompleted` are backfilled by the board load migration in `src/main/persistence/board.ts` (via `STATE_DEFAULTS['todo.task']` entry — to be added if needed). Runtime access on unmigrated nodes defaults gracefully via `?? null` / `?? 0` guards.
+
+---
+
+## Decision 21 — Asset persistence and the `krnl-asset://` protocol
 
 **Status:** Accepted — 2026-05-12
-**Closes:** TextNode / ImageNode upgrade
+**Closes:** TextNode / ImageNode upgrade (PR #88)
 **Related:** Decision 5 (board.json as singleton source of truth), Decision 13 (RF + boardStore adapter)
 
 ### Context
 
-The TextNode and ImageNode shipped as read-only placeholders. To make them honest first-class nodes — editable, resizable, connectable, and (for images) drag-droppable — we needed three new capabilities:
+The TextNode and ImageNode shipped as read-only placeholders. To make them honest first-class nodes — editable, resizable, connectable, and (for images) drag-droppable — three new capabilities were needed:
 
 1. **Per-node sizing.** Up to now every node had a fixed CSS width and no persisted height. Resizable nodes must round-trip their dimensions through `board.json`.
 2. **Real image persistence.** Embedding bytes as base64 inside `board.json` was rejected outright — it would bloat the file, make diffs unreadable, and violate the "no fake functionality" rule in CLAUDE.md. The honest design is files-on-disk.
@@ -888,8 +1075,10 @@ The TextNode and ImageNode shipped as read-only placeholders. To make them hones
 - **board.json stays small and human-readable.** A board with twenty 4 MB photos is ~6 KB of JSON; the photos are 80 MB on disk in `assets/`. Diffs of board.json show layout and intent, not byte streams.
 - **Drag-drop is one of the most reachable features in the app.** Drop a PNG anywhere on the canvas → ImageNode appears at the drop position with the image rendered via `krnl-asset://<id>`. No clipboard dance, no upload UI, no fakery.
 - **Cross-platform without conditionals.** All paths route through Electron's `protocol` API — no `file://` URLs, no per-OS path normalisation in the renderer.
-- **Mother nodes remain non-connectable.** Handles are conditionally rendered based on `!isMother`; only non-mother↔non-mother visual edges are wireable in v1. Mother-as-target via Handle drag is a separate, larger PR (needs handle-id conventions per mother kind).
+- **Mother nodes remain non-connectable.** Handles are conditionally rendered based on `!isMother`; only non-mother↔non-mother visual edges are wireable in v1.
 - **Known limitations / followups:**
   - No asset GC. Replacing an image leaves the old file on disk. Track as `image-asset-gc`.
   - No paste-from-clipboard / drag-from-browser-URL. v1 is file-only.
   - SVG sanitiser is a string scan, not a DOM parser. The four-pattern blocklist (`<script`, `onload=`, `onerror=`, `onclick=`) covers the obvious vectors; a future hardening pass could use DOMPurify or a real XML reader.
+
+> **Renumber note:** this ADR was authored as "Decision 20" on `feat/text-image-nodes`, which branched before `feat/todo-task-nodes` (also Decision 20) merged. Renumbered to 21 on merge — no design change.

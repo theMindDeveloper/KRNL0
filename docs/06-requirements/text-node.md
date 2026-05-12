@@ -1,6 +1,6 @@
-# TextNode — Component Requirements
+# TextNode â€” Component Requirements
 
-*Phase 5 · React Flow migration · Derived from PRD v0.6.0, Decision 4, Decision 13, Decision 20, and LifeOS Whiteboard reference*
+*Phase 5 Â· React Flow migration Â· Derived from PRD v0.6.0, Decision 4, Decision 13, Decision 21, and LifeOS Whiteboard reference*
 
 ---
 
@@ -24,32 +24,32 @@
 
 | # | Requirement |
 |---|---|
-| NF1 | Typing latency is <16 ms — persistence is debounced 400 ms so each keystroke does NOT trigger a board save |
+| NF1 | Typing latency is <16 ms â€” persistence is debounced 400 ms so each keystroke does NOT trigger a board save |
 | NF2 | Click-to-edit must not fire when the user clicks a React Flow `<Handle>` or a NodeResizer handle |
 | NF3 | All state mutations go through `onCommand`; the component does not write to the store directly |
 | NF4 | Pure command handlers in `TextNode/commands.ts` contain no `any` types and no side effects |
-| NF5 | The node round-trips: `load → save` produces byte-identical board.json (modulo `savedAt`) when no edit occurs |
+| NF5 | The node round-trips: `load â†’ save` produces byte-identical board.json (modulo `savedAt`) when no edit occurs |
 
 ---
 
 ## Use Cases
 
-**UC-X1 — Create a text note**
+**UC-X1 â€” Create a text note**
 Actor clicks the dock's Text button (or presses `N`). A new TextNode appears at the canvas center with placeholder visible.
 
-**UC-X2 — Write text**
+**UC-X2 â€” Write text**
 Actor clicks an empty TextNode body. A textarea appears. Actor types. After 400 ms (or blur) the text persists.
 
-**UC-X3 — Cancel an edit**
+**UC-X3 â€” Cancel an edit**
 Actor enters edit mode, types changes, then presses Escape. The text reverts to the pre-edit value.
 
-**UC-X4 — Resize a text note**
+**UC-X4 â€” Resize a text note**
 Actor selects the node, drags the bottom-right resize handle. On release, the new size persists.
 
-**UC-X5 — Connect a text note**
+**UC-X5 â€” Connect a text note**
 Actor drags from the right handle of a TextNode to the left handle of an ImageNode. A `link` edge is created and persisted.
 
-**UC-X6 — Create via CLI**
+**UC-X6 â€” Create via CLI**
 Actor runs `sys text add --text "hello" --at 100,200`. A new TextNode with that text appears on the canvas.
 
 ---
@@ -73,59 +73,59 @@ Feature: TextNode editable, resizable, connectable note
   Background:
     Given a TextNode is mounted with state { text: "" }
 
-  Scenario: F1 — Empty state shows placeholder
+  Scenario: F1 â€” Empty state shows placeholder
     When the component renders
     Then a body element with class "text-body" is present
     And it contains the text "write..."
     And the placeholder color is var(--ink-4)
 
-  Scenario: F2 — Click enters edit mode
+  Scenario: F2 â€” Click enters edit mode
     When the user clicks the ".text-body"
     Then a <textarea> is rendered in its place
     And the textarea has focus
     And the caret is at the end of the existing text
 
-  Scenario: F3 — Debounced autosave
+  Scenario: F3 â€” Debounced autosave
     Given the node is in edit mode with draft ""
     When the user types "hello"
     And 400 ms pass without further input
     Then onCommand is called once with { type: "text.setText", text: "hello" }
 
-  Scenario: F3b — Autosave on blur
+  Scenario: F3b â€” Autosave on blur
     Given the node is in edit mode with draft "draft text"
     When the textarea loses focus
     Then onCommand is called with { type: "text.setText", text: "draft text" }
     And edit mode exits
 
-  Scenario: F4 — Escape cancels
+  Scenario: F4 â€” Escape cancels
     Given the node is in edit mode with original text "before" and draft "modified"
     When the user presses Escape
     Then the textarea unmounts
     And the body shows "before"
     And onCommand is NOT called
 
-  Scenario: F5 — Resize dispatches text.setSize
+  Scenario: F5 â€” Resize dispatches text.setSize
     Given the node is selected with width 260 and height 120
     When the user resizes via NodeResizer to width 400 height 200
     Then onCommand is called with { type: "text.setSize", width: 400, height: 200 }
 
-  Scenario: F6 — Default size when state lacks width/height
+  Scenario: F6 â€” Default size when state lacks width/height
     Given the node renders with state { text: "" } and no width/height
     Then the root element computed width is 260 px
     And the root element computed min-height is at least 120 px
 
-  Scenario: F7 — Style at rest and on hover
+  Scenario: F7 â€” Style at rest and on hover
     When the component renders without hover
     Then the root border style is "dashed"
     When the user hovers
     Then the root border style is "solid"
 
-  Scenario: F8 — Handles are connectable
+  Scenario: F8 â€” Handles are connectable
     When the component renders
     Then a React Flow Handle with type "target" position "left" and isConnectable=true is present
     And a React Flow Handle with type "source" position "right" and isConnectable=true is present
 
-  Scenario: F9 — sys text add creates a node
+  Scenario: F9 â€” sys text add creates a node
     Given an empty board
     When `sys text add --text "from cli" --at 100,200` runs
     Then board.json has a node with kind "text", state.text "from cli", position { x: 100, y: 200 }

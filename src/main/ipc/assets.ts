@@ -1,11 +1,11 @@
 /**
- * assets.ts — image asset persistence (Decision 20).
+ * assets.ts â€” image asset persistence (Decision 21).
  *
  * On-disk layout (sibling to board.json):
  *   <BOARD_DIR>/assets/<ULID>.<ext>
  *
  * Renderer references an image only by its assetId (a 26-char ULID-like
- * Base32 string) — never by base64. Renderer fetches bytes via the
+ * Base32 string) â€” never by base64. Renderer fetches bytes via the
  * `krnl-asset://<assetId>` privileged protocol registered here.
  */
 
@@ -90,7 +90,7 @@ function normExt(ext: string): string {
  */
 function validateBytes(ext: string, buf: Uint8Array): void {
   if (buf.byteLength === 0 || buf.byteLength > MAX_BYTES) {
-    throw new Error('asset:write — invalid size');
+    throw new Error('asset:write â€” invalid size');
   }
   const b = buf;
   switch (ext) {
@@ -98,12 +98,12 @@ function validateBytes(ext: string, buf: Uint8Array): void {
       if (
         b[0] !== 0x89 || b[1] !== 0x50 ||
         b[2] !== 0x4e || b[3] !== 0x47
-      ) throw new Error('asset:write — PNG magic mismatch');
+      ) throw new Error('asset:write â€” PNG magic mismatch');
       return;
     }
     case 'jpg': {
       if (b[0] !== 0xff || b[1] !== 0xd8 || b[2] !== 0xff) {
-        throw new Error('asset:write — JPEG magic mismatch');
+        throw new Error('asset:write â€” JPEG magic mismatch');
       }
       return;
     }
@@ -111,14 +111,14 @@ function validateBytes(ext: string, buf: Uint8Array): void {
       if (
         b[0] !== 0x47 || b[1] !== 0x49 ||
         b[2] !== 0x46 || b[3] !== 0x38
-      ) throw new Error('asset:write — GIF magic mismatch');
+      ) throw new Error('asset:write â€” GIF magic mismatch');
       return;
     }
     case 'webp': {
       if (
         b[0] !== 0x52 || b[1] !== 0x49 || b[2] !== 0x46 || b[3] !== 0x46 ||
         b[8] !== 0x57 || b[9] !== 0x45 || b[10] !== 0x42 || b[11] !== 0x50
-      ) throw new Error('asset:write — WEBP magic mismatch');
+      ) throw new Error('asset:write â€” WEBP magic mismatch');
       return;
     }
     case 'svg': {
@@ -126,7 +126,7 @@ function validateBytes(ext: string, buf: Uint8Array): void {
         .decode(b.subarray(0, Math.min(b.byteLength, 4096)))
         .trimStart();
       if (!head.startsWith('<?xml') && !head.startsWith('<svg')) {
-        throw new Error('asset:write — SVG must start with <?xml or <svg');
+        throw new Error('asset:write â€” SVG must start with <?xml or <svg');
       }
       const lower = new TextDecoder('utf-8', { fatal: false })
         .decode(b)
@@ -137,12 +137,12 @@ function validateBytes(ext: string, buf: Uint8Array): void {
         lower.includes('onerror=') ||
         lower.includes('onclick=')
       ) {
-        throw new Error('asset:write — SVG contains script/event handler');
+        throw new Error('asset:write â€” SVG contains script/event handler');
       }
       return;
     }
     default:
-      throw new Error(`asset:write — unsupported ext "${ext}"`);
+      throw new Error(`asset:write â€” unsupported ext "${ext}"`);
   }
 }
 
@@ -153,12 +153,12 @@ export interface AssetWriteResult {
 
 /**
  * Write bytes to disk under a new ULID-shaped assetId. Returns the id.
- * Pure file IO — no IPC dependency.
+ * Pure file IO â€” no IPC dependency.
  */
 export function writeAsset(rawExt: string, buf: Uint8Array): AssetWriteResult {
   const ext = normExt(rawExt);
   if (!ALLOWED_EXT.has(ext)) {
-    throw new Error(`asset:write — unsupported ext "${ext}"`);
+    throw new Error(`asset:write â€” unsupported ext "${ext}"`);
   }
   validateBytes(ext, buf);
   ensureDir();
@@ -198,7 +198,7 @@ export function deleteAsset(assetId: string): void {
   assetExt.delete(assetId);
 }
 
-// 1×1 transparent PNG used as the "asset missing" fallback so the <img>
+// 1Ã—1 transparent PNG used as the "asset missing" fallback so the <img>
 // element doesn't fire onError into an infinite loop.
 const TRANSPARENT_PNG = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
@@ -242,7 +242,7 @@ export function registerAssetProtocol(): void {
   }
 }
 
-/** Emit board:changed to every renderer window — used by sys commands. */
+/** Emit board:changed to every renderer window â€” used by sys commands. */
 export function notifyBoardChanged(getWindows: () => BrowserWindow[]): void {
   for (const w of getWindows()) {
     if (!w.isDestroyed()) w.webContents.send('board:changed');

@@ -36,6 +36,7 @@ describe('TodoNode commands (Decision #10)', () => {
         done: false,
         createdAt: T0,
         completedAt: null,
+        taskNodeId: null,
       });
     });
 

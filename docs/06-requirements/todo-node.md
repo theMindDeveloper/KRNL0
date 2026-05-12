@@ -16,6 +16,12 @@
 | F6 | A "clear done" action dispatches `todo.clearDone`, removing all items where `done === true` |
 | F7 | The node header shows the count of undone items as `"Todos (N)"` updating reactively |
 | F8 | An RF `<Handle type="target" position="left">` is rendered for receiving edge signals |
+| F9 | Right-clicking a todo row opens a context menu with three actions: "Edit text", "Delete", "Start pomo" |
+| F10 | Clicking the text body of a linked, undone row dispatches `todo.startPomoForItem` with the item id; no-op if item has no linked TaskNode or if the item is done |
+| F11 | "Delete" in the row context menu dispatches `todo.remove`; the dispatcher cascades to remove the linked TaskNode, all its descendants, and all referencing edges |
+| F12 | `todo.clearDone` cascades — every removed done item also removes its linked TaskNode, all descendants of that TaskNode, and all referencing edges |
+| F13 | `todo.toggle` mirrors done state to the linked TaskNode (if `taskNodeId !== null`); `task.toggle` mirrors done state back to the linked TodoItem (if `todoItemId !== null`) |
+| F14 | Each `TodoItem` stores `taskNodeId: string \| null`; `todo.add` initialises it as `null`; `todoLinkTask` sets it atomically when the TaskNode is spawned |
 
 ---
 
@@ -43,6 +49,18 @@ Actor double-clicks item text. Inline input appears. Actor edits, presses Enter.
 
 **UC-T4 — Clear completed**
 Actor activates "clear done". All done items are removed from the list.
+
+**UC-T5 — Start pomo from todo row**
+Actor clicks the text of an undone, linked todo row. The Pomo mother starts a session labelled with the task text and the task's `durationMin`. No-op if the item has no linked TaskNode.
+
+**UC-T6 — Row context menu: Start pomo**
+Actor right-clicks a todo row. A context menu appears. Actor selects "Start pomo" (enabled only when the row has a linked TaskNode). The Pomo mother begins a session for that task.
+
+**UC-T7 — Row context menu: Delete with cascade**
+Actor right-clicks a todo row and selects "Delete". The todo item is removed from the list, the linked TaskNode is removed from the canvas, all descendant TaskNodes are removed, and all referencing edges are removed.
+
+**UC-T8 — Bidirectional done mirroring**
+Actor toggles a todo row checkbox to done. The linked TaskNode opacity drops to 0.4 and its text gains strikethrough (done state mirrored). Conversely, toggling the TaskNode's checkbox marks the todo row done.
 
 ---
 
@@ -111,8 +129,61 @@ Feature: TodoNode task list
   Scenario: F8 — RF target handle is rendered
     When the component renders
     Then a React Flow Handle with type "target" and position "left" is present
+
+  Scenario: F9 — Row right-click context menu
+    Given a TodoNode with one item
+    When the user right-clicks the item row
+    Then a context menu appears with buttons "Edit text", "Start pomo", and "Delete"
+    And "Start pomo" is disabled when the item has no linked taskNodeId
+    And "Start pomo" is enabled when the item has a linked taskNodeId
+    And clicking "Delete" dispatches todo.remove with the item id
+    And clicking "Start pomo" (when enabled) dispatches todo.startPomoForItem with the item id
+    And pressing ESC dismisses the menu
+
+  Scenario: F10 — Row body click fires todo.startPomoForItem when linked
+    Given a TodoNode with a linked undone item (taskNodeId set)
+    When the user clicks the ".todo-text" element of that item
+    Then onCommand is called with { type: "todo.startPomoForItem", itemId: "<item-id>" }
+    Given the same item is done
+    When the user clicks the ".todo-text" element
+    Then onCommand is NOT called with todo.startPomoForItem
+    Given an unlinked item (taskNodeId is null)
+    When the user clicks the ".todo-text" element
+    Then onCommand is NOT called with todo.startPomoForItem
+
+  Scenario: F11 — todo.remove cascades to linked TaskNode and descendants
+    Given a board with a TodoNode, a root TaskNode, and a child TaskNode (parentTaskId = root)
+    And an edge referencing the root TaskNode
+    When the dispatcher handles todo.remove for the linked TodoItem
+    Then the TodoItem is removed from the list
+    And the root TaskNode is removed from the board
+    And the child TaskNode is removed from the board
+    And the referencing edge is removed from the board
+
+  Scenario: F12 — todo.clearDone cascades all done items' TaskNodes
+    Given a TodoNode with one done item (taskNodeId set) and one undone item
+    When the dispatcher handles todo.clearDone
+    Then the done TodoItem is removed from the list
+    And the linked TaskNode for the done item is removed from the board
+    And the undone item and its linked TaskNode remain
+
+  Scenario: F13 — Bidirectional done mirroring
+    Given a TodoNode item linked to a TaskNode, both done = false
+    When the dispatcher handles todo.toggle for the item
+    Then the linked TaskNode done becomes true
+    Given the same setup with done = true
+    When the dispatcher handles task.toggle for the TaskNode
+    Then the linked TodoItem done becomes false
+
+  Scenario: F14 — TodoItem taskNodeId field
+    Given an empty TodoNode state
+    When todoAdd is called with text "my task"
+    Then the new TodoItem has taskNodeId = null
+    When todoLinkTask is called with { itemId, taskNodeId: "task-abc" }
+    Then the matching item has taskNodeId = "task-abc"
+    And all other items are unchanged
 ```
 
 ---
 
-*Last updated: 2026-05-10*
+*Last updated: 2026-05-12*
