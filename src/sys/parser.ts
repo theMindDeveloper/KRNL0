@@ -23,6 +23,13 @@ export type SysCommand =
   | { kind: 'edge'; sub: 'list' }
   | { kind: 'edge'; sub: 'remove'; id: string | undefined }
   | { kind: 'edge'; sub: 'add'; from: string | undefined; to: string | undefined }
+  | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined }
+  | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
+  | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
+  | { kind: 'image'; sub: 'add'; path: string | undefined; at: { x: number; y: number } | undefined }
+  | { kind: 'image'; sub: 'replace'; id: string | undefined; path: string | undefined }
+  | { kind: 'image'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
+  | { kind: 'image'; sub: 'clear'; id: string | undefined }
   | { kind: 'say'; text: string }
   | { kind: 'hear' }
   | { kind: 'help' };
@@ -30,6 +37,13 @@ export type SysCommand =
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : undefined;
+}
+
+function numFlag(args: string[], name: string): number | undefined {
+  const v = flag(args, name);
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  return isNaN(n) ? undefined : n;
 }
 
 export class SysParser {
@@ -132,6 +146,53 @@ export class SysParser {
           from: flag(rest, 'from'),
           to: flag(rest, 'to'),
         };
+      }
+    }
+
+    if (cmd === 'text') {
+      if (sub === 'add') {
+        const atStr = flag(rest, 'at');
+        return {
+          kind: 'text', sub: 'add',
+          text: flag(rest, 'text'),
+          at: atStr ? parseAt(atStr) : undefined,
+        };
+      }
+      if (sub === 'set') {
+        return { kind: 'text', sub: 'set', id: rest[0], text: flag(rest, 'text') };
+      }
+      if (sub === 'resize') {
+        return {
+          kind: 'text', sub: 'resize',
+          id: rest[0],
+          w: numFlag(rest, 'w'),
+          h: numFlag(rest, 'h'),
+        };
+      }
+    }
+
+    if (cmd === 'image') {
+      if (sub === 'add') {
+        const atStr = flag(rest, 'at');
+        return {
+          kind: 'image', sub: 'add',
+          path: rest[0],
+          at: atStr ? parseAt(atStr) : undefined,
+        };
+      }
+      if (sub === 'replace') {
+        return { kind: 'image', sub: 'replace', id: rest[0], path: rest[1] };
+      }
+      if (sub === 'resize') {
+        return {
+          kind: 'image', sub: 'resize',
+          id: rest[0],
+          w: numFlag(rest, 'w'),
+          h: numFlag(rest, 'h'),
+        };
+      }
+      if (sub === 'clear') {
+        return { kind: 'image', sub: 'clear', id: rest[0] };
       }
     }
 

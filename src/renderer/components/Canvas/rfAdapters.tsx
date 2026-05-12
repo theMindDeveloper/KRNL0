@@ -79,7 +79,10 @@ export function toRfEdge(
     source: edge.from.nodeId,
     target: edge.to.nodeId,
     type: isTaskFlow ? 'task-flow' : 'default',
-    animated: isTaskFlow,
+    // The dasharray "march" via CSS keyframe escaped the node bezels and
+    // looked noisy under the cyan glow filter. Keep dashed cyan styling but
+    // freeze the animation.
+    animated: false,
     data: { edge },
   };
 }
@@ -92,8 +95,10 @@ const handleStyle: React.CSSProperties = {
   background: 'var(--paper)',
   border: '1.5px solid var(--ink-3)',
   opacity: 0.7,
-  // Raise above node body — body may use position:relative which creates
-  // a new stacking context and buries default-z handles.
+  // RF positions Handles at the absolute left/right edge of the node. Without
+  // an explicit z-index, nodes whose body has `position: relative` content
+  // (e.g. ImageNode's image-frame) create a new stacking context and bury
+  // default-z handles. Lift to z-index 10 to keep connector dots in front.
   zIndex: 10,
 };
 

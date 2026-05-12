@@ -100,3 +100,38 @@ export function useNodesState(initial: Node[]) {
 export function useEdgesState(initial: Edge[]) {
   return [initial, () => undefined, () => undefined] as const;
 }
+
+export interface NodeResizerProps {
+  nodeId?: string;
+  isVisible?: boolean;
+  minWidth?: number;
+  minHeight?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  keepAspectRatio?: boolean;
+  color?: string;
+  handleStyle?: React.CSSProperties;
+  lineStyle?: React.CSSProperties;
+  onResizeStart?: (e: unknown, params?: unknown) => void;
+  onResize?: (e: unknown, params: { width: number; height: number }) => void;
+  onResizeEnd?: (e: unknown, params: { width: number; height: number }) => void;
+}
+
+export function NodeResizer(props: NodeResizerProps): React.ReactElement | null {
+  return (
+    <div
+      data-testid="rf-node-resizer"
+      data-visible={props.isVisible ? 'true' : 'false'}
+      data-min-width={props.minWidth}
+      data-min-height={props.minHeight}
+      data-max-width={props.maxWidth}
+      data-max-height={props.maxHeight}
+      data-keep-aspect={props.keepAspectRatio ? 'true' : 'false'}
+      onClick={() => {
+        // Test hook — fire onResizeEnd with a deterministic size so node
+        // commands can be exercised without RF mouse choreography.
+        props.onResizeEnd?.(null, { width: 400, height: 200 });
+      }}
+    />
+  );
+}

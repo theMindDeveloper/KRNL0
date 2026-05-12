@@ -2,6 +2,13 @@ import { SysParser } from './parser';
 import * as habit from './commands/habit';
 import * as todo from './commands/todo';
 import * as task from './commands/task';
+import { textAdd, textSet, textResize } from './commands/text';
+import {
+  imageAdd,
+  imageReplace,
+  imageResize,
+  imageClear,
+} from './commands/image';
 
 export interface SysResult {
   ok: boolean;
@@ -90,6 +97,26 @@ export class SysFacade {
       }
     }
 
+    // text + image commands route through main/boardIo.ts directly via the
+    // KRNL0_BOARD_DIR env (set by handlers.ts at module load). Convergence
+    // with the habit/todo/task ctx-passing pattern is a future refactor.
+    if (command.kind === 'text') {
+      switch (command.sub) {
+        case 'add':    return textAdd(command.text, command.at);
+        case 'set':    return textSet(command.id, command.text);
+        case 'resize': return textResize(command.id, command.w, command.h);
+      }
+    }
+
+    if (command.kind === 'image') {
+      switch (command.sub) {
+        case 'add':     return imageAdd(command.path, command.at);
+        case 'replace': return imageReplace(command.id, command.path);
+        case 'resize':  return imageResize(command.id, command.w, command.h);
+        case 'clear':   return imageClear(command.id);
+      }
+    }
+
     return {
       ok: true,
       message: `[stub] parsed: ${JSON.stringify(command)}`,
@@ -111,6 +138,17 @@ Nodes:
   sys node list
   sys node add <kind> [--at x,y]
   sys node remove <id>
+
+Text:
+  sys text add [--text "..."] [--at x,y]
+  sys text set <id> --text "..."
+  sys text resize <id> --w N --h N
+
+Image:
+  sys image add <abs-path> [--at x,y]
+  sys image replace <id> <abs-path>
+  sys image resize <id> --w N --h N
+  sys image clear <id>
 
 Pomodoro:
   sys pomo start [--label "..."] [--minutes 25]
