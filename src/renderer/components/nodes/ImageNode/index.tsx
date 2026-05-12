@@ -5,8 +5,9 @@
  * Bytes live at <BOARD_DIR>/assets/<assetId>.<ext> and are served via the
  * krnl-asset:// privileged protocol (Decision 20). No base64 in board.json.
  *
- * Selectable replace control swaps the asset. NodeResizer respects Shift
- * for aspect-ratio-locked resize. Caption is the editable alt text.
+ * The node body is the image itself — no header, no caption row. Selectable
+ * replace control swaps the asset. NodeResizer respects Shift for
+ * aspect-ratio-locked resize.
  */
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -41,8 +42,6 @@ export function ImageNode({
       : DEFAULT_PLACEHOLDER_HEIGHT);
 
   const [hover, setHover] = useState(false);
-  const [editingAlt, setEditingAlt] = useState(false);
-  const [altDraft, setAltDraft] = useState(state.alt ?? '');
   const [imgFailed, setImgFailed] = useState(false);
   const [shiftHeld, setShiftHeld] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -84,19 +83,14 @@ export function ImageNode({
     }
   };
 
-  const commitAlt = () => {
-    if (altDraft !== (state.alt ?? '')) {
-      onCommand('image.setAlt', { alt: altDraft });
-    }
-    setEditingAlt(false);
-  };
-
   const onResizeEnd = (
     _e: unknown,
     p: { width: number; height: number },
   ): void => {
     onCommand('image.setSize', { width: p.width, height: p.height });
   };
+
+  const hasAsset = Boolean(assetId) && !imgFailed;
 
   return (
     <div
@@ -106,34 +100,38 @@ export function ImageNode({
       onMouseLeave={() => setHover(false)}
       style={{
         width,
-        background: 'var(--paper-2)',
-        border: '1px solid var(--paper-3)',
-        borderRadius: 'var(--radius-lg, 10px)',
-        overflow: 'hidden',
+        height,
+        // overflow visible so the React Flow Handles, which RF positions a few
+        // pixels outside the node bounds, don't get clipped on the left/right
+        // edges. Inner image-frame clips the actual <img> bytes.
+        overflow: 'visible',
+        boxSizing: 'border-box',
+        position: 'relative',
         boxShadow:
           hover || selected
             ? '0 2px 0 rgba(26,24,20,.04), 0 8px 24px rgba(26,24,20,.10)'
             : '0 1px 0 rgba(26,24,20,.04), 0 2px 6px rgba(26,24,20,.06)',
-        boxSizing: 'border-box',
-        position: 'relative',
+        borderRadius: 'var(--radius-lg, 10px)',
       }}
     >
       <NodeResizer
         isVisible={selected === true}
         minWidth={120}
         minHeight={80}
-        maxWidth={1200}
-        maxHeight={1200}
+        maxWidth={1600}
+        maxHeight={1600}
         keepAspectRatio={shiftHeld}
         onResizeEnd={onResizeEnd}
         handleStyle={{
-          width: 8,
-          height: 8,
-          background: 'var(--ink-3)',
-          borderRadius: 2,
-          border: 'none',
+          width: 14,
+          height: 14,
+          background: 'var(--acid)',
+          border: '1.5px solid var(--ink)',
+          borderRadius: 3,
+          // Extra hit area without resizing the visible glyph.
+          boxShadow: '0 0 0 6px rgba(0,0,0,0)',
         }}
-        lineStyle={{ borderColor: 'var(--ink-3)' }}
+        lineStyle={{ borderColor: 'var(--acid)', borderWidth: 1.5 }}
       />
 
       <input
@@ -150,16 +148,17 @@ export function ImageNode({
         data-testid="image-node-frame"
         style={{
           width: '100%',
-          height,
+          height: '100%',
           position: 'relative',
-          background:
-            assetId && !imgFailed
-              ? 'transparent'
-              : 'linear-gradient(135deg, #2a3441 0%, #1a2030 60%, #0f1420 100%)',
           overflow: 'hidden',
+          borderRadius: 'var(--radius-lg, 10px)',
+          background: hasAsset
+            ? 'transparent'
+            : 'rgba(255,255,255,0.02)',
+          border: hasAsset ? 'none' : '1px dashed var(--paper-3)',
         }}
       >
-        {assetId && !imgFailed ? (
+        {hasAsset ? (
           <img
             data-testid="image-node-img"
             src={`krnl-asset://${assetId}`}
@@ -170,31 +169,33 @@ export function ImageNode({
               height: '100%',
               objectFit: 'contain',
               display: 'block',
+              userSelect: 'none',
+              pointerEvents: 'none',
             }}
           />
         ) : (
-          <div
+          <button
+            type="button"
             data-testid="image-node-placeholder"
-            className="ascii-image"
+            onClick={handleReplaceClick}
             style={{
               position: 'absolute',
               inset: 0,
-              display: 'grid',
-              placeItems: 'center',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--ink-3)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 9,
-              lineHeight: 1,
-              color: 'var(--acid)',
-              whiteSpace: 'pre',
-              opacity: 0.85,
-              letterSpacing: '-0.05em',
+              fontSize: 11,
+              cursor: 'pointer',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
             }}
           >
-            {`▲△  ▲  △\n   ▲▲△▲\n  ▲△▲△▲△`}
-          </div>
+            click to pick image
+          </button>
         )}
 
-        {selected && (
+        {hasAsset && selected && (
           <button
             type="button"
             onClick={handleReplaceClick}
@@ -215,74 +216,8 @@ export function ImageNode({
               textTransform: 'uppercase',
             }}
           >
-            {assetId ? 'replace' : 'pick file'}
+            replace
           </button>
-        )}
-      </div>
-
-      <div
-        className="image-cap"
-        style={{
-          padding: '8px 12px 10px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10.5,
-          color: 'var(--ink-3)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 8,
-        }}
-      >
-        {editingAlt ? (
-          <input
-            data-testid="image-node-alt-input"
-            value={altDraft}
-            autoFocus
-            onChange={(e) => setAltDraft(e.target.value)}
-            onBlur={commitAlt}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                commitAlt();
-              } else if (e.key === 'Escape') {
-                setAltDraft(state.alt ?? '');
-                setEditingAlt(false);
-              }
-            }}
-            style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              color: 'var(--ink-2)',
-              padding: 0,
-            }}
-          />
-        ) : (
-          <span
-            data-testid="image-node-caption"
-            onClick={() => {
-              setAltDraft(state.alt ?? '');
-              setEditingAlt(true);
-            }}
-            style={{
-              color: 'var(--ink-2)',
-              cursor: 'text',
-              flex: 1,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {state.alt && state.alt.length > 0 ? state.alt : 'image / ascii'}
-          </span>
-        )}
-        {state.naturalWidth && state.naturalHeight && (
-          <span style={{ color: 'var(--ink-4)' }}>
-            {state.naturalWidth}×{state.naturalHeight}
-          </span>
         )}
       </div>
     </div>

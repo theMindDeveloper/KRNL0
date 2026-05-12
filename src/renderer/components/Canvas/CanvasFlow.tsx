@@ -236,8 +236,62 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   const addEdge = useBoardStore((s) => s.addEdge);
 
-  // ── Dock add-node handler — creates text/image nodes at canvas center ─────
+  // Hidden file input used when the dock's "image" button is clicked — opens
+  // the OS file picker and spawns a fully-formed ImageNode (with assetId)
+  // rather than an empty placeholder node.
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingImageDropPos = useRef<{ x: number; y: number } | null>(null);
+
+  const spawnImageNodeFromFile = useCallback(async (
+    file: File,
+    pos: { x: number; y: number },
+  ) => {
+    const result = await ingestImageFile(file);
+    if (!result) return;
+    const { width, height } = initialDisplaySize(
+      result.naturalWidth,
+      result.naturalHeight,
+    );
+    const newNode: KrnlNode = {
+      id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: 'image',
+      position: { x: pos.x, y: pos.y },
+      state: {
+        assetId: result.assetId,
+        naturalWidth: result.naturalWidth,
+        naturalHeight: result.naturalHeight,
+        mimeType: result.mimeType,
+        alt: result.alt,
+        width,
+        height,
+      },
+      config: {},
+      isMother: false,
+    };
+    addNode(newNode);
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+  }, [addNode]);
+
+  const onPickImageFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const pos = pendingImageDropPos.current ?? screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+    pendingImageDropPos.current = null;
+    await spawnImageNodeFromFile(file, pos);
+  }, [screenToFlowPosition, spawnImageNodeFromFile]);
+
+  // ── Dock add-node handler — text spawns at canvas center; image opens
+  //   the OS file picker. No empty placeholder nodes for images.
   const handleAddNode = useCallback((args: { kind: NodeKind }) => {
+    if (args.kind === 'image') {
+      imageFileInputRef.current?.click();
+      return;
+    }
     const center = screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
@@ -246,13 +300,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       pomo: {}, todo: {}, habit: {}, term: {},
       'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
       text: { text: '' },
-      image: {
-        assetId: null,
-        naturalWidth: null,
-        naturalHeight: null,
-        mimeType: null,
-        alt: '',
-      },
+      image: {},
     };
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -280,35 +328,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     e.preventDefault();
     const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
     for (const file of files) {
-      const result = await ingestImageFile(file);
-      if (!result) continue;
-      const { width, height } = initialDisplaySize(
-        result.naturalWidth,
-        result.naturalHeight,
-      );
-      const newNode: KrnlNode = {
-        id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        kind: 'image',
-        position: { x: pos.x, y: pos.y },
-        state: {
-          assetId: result.assetId,
-          naturalWidth: result.naturalWidth,
-          naturalHeight: result.naturalHeight,
-          mimeType: result.mimeType,
-          alt: result.alt,
-          width,
-          height,
-        },
-        config: {},
-        isMother: false,
-      };
-      addNode(newNode);
+      await spawnImageNodeFromFile(file, pos);
       pos.x += 24;
       pos.y += 24;
     }
-    const updated = useBoardStore.getState().board;
-    if (updated) void window.krnl?.boardSave(updated);
-  }, [addNode, screenToFlowPosition]);
+  }, [screenToFlowPosition, spawnImageNodeFromFile]);
 
   // ── onConnect — wire a visual link edge between two non-mother nodes ──────
   const onConnect = useCallback((conn: Connection) => {
@@ -543,6 +567,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       <Panel position="top-left" style={{ margin: 0, padding: 0 }}>
         <Dock onAddNode={handleAddNode} />
       </Panel>
+
+      {/* Hidden file picker for the dock's "image" button (no placeholder
+          node is ever created — the picker spawns a real ImageNode with an
+          assetId in one step). */}
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+        onChange={onPickImageFile}
+        style={{ display: 'none' }}
+        data-testid="canvas-image-file-input"
+      />
     </ReactFlow>
   );
 }
