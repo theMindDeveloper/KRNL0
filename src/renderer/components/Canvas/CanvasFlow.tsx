@@ -30,9 +30,11 @@ import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
 import { makeCommandHandler } from './commandDispatch';
 import { Dock } from '../Dock';
+import { ingestImageFile, initialDisplaySize } from './dropImage';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
+import type { Connection } from '@xyflow/react';
 
 // ── Edge components ───────────────────────────────────────────────────────────
 
@@ -232,17 +234,131 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
 
-  // ── Dock add-node handler — creates text/image nodes at canvas center ─────
+  const addEdge = useBoardStore((s) => s.addEdge);
+  const removeNode = useBoardStore((s) => s.removeNode);
+
+  // Right-click context menu state. Pinned to the screen position of the
+  // event; cleared on outside click / Escape / window blur. Only opened for
+  // non-mother nodes — mothers handle right-click internally (HabitNode per
+  // habit-row menu, TodoNode per-row menu, etc.).
+  const [ctxMenu, setCtxMenu] = useState<
+    { x: number; y: number; nodeId: string; isMother: false } | null
+  >(null);
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, rfNode: KrnlRFNode) => {
+      event.preventDefault();
+      const inner = rfNode.data.node;
+      // Mother nodes (pomo / todo / habit / term) own their own right-click
+      // UX. The canvas-level delete menu is meaningless on them (mothers are
+      // pinned) and previously showed when right-clicking empty mother-body
+      // areas (header, padding) where no inner handler ran — visually
+      // suppressing the per-row menu. Skip entirely.
+      if (inner.isMother) return;
+      setCtxMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: inner.id,
+        isMother: false,
+      });
+    },
+    [],
+  );
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCtxMenu();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('blur', closeCtxMenu);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('blur', closeCtxMenu);
+    };
+  }, [ctxMenu, closeCtxMenu]);
+
+  const deleteFromCtxMenu = useCallback(() => {
+    if (!ctxMenu) return;
+    removeNode(ctxMenu.nodeId);
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+    closeCtxMenu();
+  }, [ctxMenu, removeNode, closeCtxMenu]);
+
+  // Hidden file input used when the dock's "image" button is clicked — opens
+  // the OS file picker and spawns a fully-formed ImageNode (with assetId)
+  // rather than an empty placeholder node.
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingImageDropPos = useRef<{ x: number; y: number } | null>(null);
+
+  const spawnImageNodeFromFile = useCallback(async (
+    file: File,
+    pos: { x: number; y: number },
+  ) => {
+    const result = await ingestImageFile(file);
+    if (!result) return;
+    const { width, height } = initialDisplaySize(
+      result.naturalWidth,
+      result.naturalHeight,
+    );
+    const newNode: KrnlNode = {
+      id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: 'image',
+      position: { x: pos.x, y: pos.y },
+      state: {
+        assetId: result.assetId,
+        naturalWidth: result.naturalWidth,
+        naturalHeight: result.naturalHeight,
+        mimeType: result.mimeType,
+        alt: result.alt,
+        width,
+        height,
+      },
+      config: {},
+      isMother: false,
+    };
+    addNode(newNode);
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+  }, [addNode]);
+
+  const onPickImageFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const pos = pendingImageDropPos.current ?? screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+    pendingImageDropPos.current = null;
+    await spawnImageNodeFromFile(file, pos);
+  }, [screenToFlowPosition, spawnImageNodeFromFile]);
+
+  // ── Dock add-node handler — text spawns at canvas center; image opens
+  //   the OS file picker. No empty placeholder nodes for images.
   const handleAddNode = useCallback((args: { kind: NodeKind }) => {
+    if (args.kind === 'image') {
+      imageFileInputRef.current?.click();
+      return;
+    }
     const center = screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
     });
+    const defaultState: Record<NodeKind, Record<string, unknown>> = {
+      pomo: {}, todo: {}, habit: {}, term: {},
+      'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
+      text: { text: '' },
+      image: {},
+    };
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       kind: args.kind,
       position: { x: center.x, y: center.y },
-      state: args.kind === 'text' ? { text: '' } : { src: null },
+      state: defaultState[args.kind],
       config: {},
       isMother: false,
     };
@@ -250,6 +366,40 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
   }, [addNode, screenToFlowPosition]);
+
+  // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer.types).includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const onDrop = useCallback(async (e: React.DragEvent) => {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    e.preventDefault();
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    for (const file of files) {
+      await spawnImageNodeFromFile(file, pos);
+      pos.x += 24;
+      pos.y += 24;
+    }
+  }, [screenToFlowPosition, spawnImageNodeFromFile]);
+
+  // ── onConnect — wire a visual link edge between two non-mother nodes ──────
+  const onConnect = useCallback((conn: Connection) => {
+    if (!conn.source || !conn.target) return;
+    if (conn.source === conn.target) return;
+    const edge: KrnlEdge = {
+      id: `edge-${crypto.randomUUID()}`,
+      from: { nodeId: conn.source, event: 'link' },
+      to: { nodeId: conn.target, command: 'link' },
+      enabled: true,
+    };
+    addEdge(edge);
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+  }, [addEdge]);
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
@@ -438,6 +588,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       defaultViewport={initialViewport}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onNodeContextMenu={onNodeContextMenu}
+      onPaneClick={closeCtxMenu}
+      onPaneContextMenu={closeCtxMenu}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
       onMoveEnd={onMoveEnd}
       onSelectionChange={onSelectionChange}
       deleteKeyCode={null}
@@ -466,6 +622,70 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       <Panel position="top-left" style={{ margin: 0, padding: 0 }}>
         <Dock onAddNode={handleAddNode} />
       </Panel>
+
+      {/* Hidden file picker for the dock's "image" button (no placeholder
+          node is ever created — the picker spawns a real ImageNode with an
+          assetId in one step). */}
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+        onChange={onPickImageFile}
+        style={{ display: 'none' }}
+        data-testid="canvas-image-file-input"
+      />
+
+      {ctxMenu && (
+        <div
+          data-testid="node-ctx-menu"
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: 'fixed',
+            top: ctxMenu.y,
+            left: ctxMenu.x,
+            background: 'var(--node-bg, #18160f)',
+            border: '1px solid var(--paper-3)',
+            borderRadius: 6,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            padding: 4,
+            zIndex: 1000,
+            minWidth: 140,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          <button
+            type="button"
+            data-testid="node-ctx-menu-delete"
+            onClick={deleteFromCtxMenu}
+            title="delete node"
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              padding: '6px 10px',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--rust)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              letterSpacing: 'inherit',
+              textTransform: 'inherit',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(200,85,61,0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            delete
+          </button>
+        </div>
+      )}
     </ReactFlow>
   );
 }

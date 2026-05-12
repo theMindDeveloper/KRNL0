@@ -13,9 +13,9 @@ interface BoardStore {
   setBoard: (board: Board) => void;
   updateNode: (id: string, patch: Partial<Node>) => void;
   addNode: (node: Node) => void;
+  removeNode: (id: string) => void;
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
-  removeNode: (id: string) => void;
   swapMotherSlots: (idA: string, idB: string) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setViewport: (v: BoardViewport) => void;
@@ -55,6 +55,27 @@ export const useBoardStore = create<BoardStore>((set) => ({
       return { board: { ...s.board, nodes: [...s.board.nodes, node] } };
     }),
 
+  // Remove a non-mother node and any edge that references it from either
+  // endpoint. Mother nodes (isMother === true) are protected — call is a
+  // no-op so an accidental sys/CLI invocation can't delete pomo/todo/habit/term.
+  removeNode: (id) =>
+    set((s) => {
+      if (!s.board) return s;
+      const target = s.board.nodes.find((n) => n.id === id);
+      if (!target || target.isMother) return s;
+      return {
+        board: {
+          ...s.board,
+          nodes: s.board.nodes.filter((n) => n.id !== id),
+          edges: s.board.edges.filter(
+            (e) => e.from.nodeId !== id && e.to.nodeId !== id,
+          ),
+        },
+        selectedNodeId:
+          s.selectedNodeId === id ? null : s.selectedNodeId,
+      };
+    }),
+
   addEdge: (edge) =>
     set((s) => {
       if (!s.board) return s;
@@ -65,20 +86,6 @@ export const useBoardStore = create<BoardStore>((set) => ({
     set((s) => {
       if (!s.board) return s;
       return { board: { ...s.board, edges: s.board.edges.filter((e) => e.id !== id) } };
-    }),
-
-  removeNode: (id) =>
-    set((s) => {
-      if (!s.board) return s;
-      return {
-        board: {
-          ...s.board,
-          nodes: s.board.nodes.filter((n) => n.id !== id),
-          edges: s.board.edges.filter(
-            (e) => e.from.nodeId !== id && e.to.nodeId !== id,
-          ),
-        },
-      };
     }),
 
   swapMotherSlots: (idA, idB) =>

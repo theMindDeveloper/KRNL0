@@ -35,4 +35,7 @@ CLAUDE.local.md
 *.bin
 *.onnx
 
+# Per-worktree user data (scripts/dev.mjs writes here for isolated dev)
+.krnl0-data/
+
 out/

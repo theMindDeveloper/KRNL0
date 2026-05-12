@@ -156,6 +156,15 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     todoItemId: null,
     pomoSessionsCompleted: 0,
   }),
+  // Decision 21: heal text/image child nodes saved with partial state.
+  text: () => ({ text: '' }),
+  image: () => ({
+    assetId: null,
+    naturalWidth: null,
+    naturalHeight: null,
+    mimeType: null,
+    alt: '',
+  }),
 };
 
 // Decision #14 — back-fill v2 config defaults on existing habit mother nodes

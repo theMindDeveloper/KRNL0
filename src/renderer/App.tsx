@@ -16,6 +16,7 @@ import { Orb } from './components/Orb';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
 import { useBoardStore } from './store/boardStore';
+import { useBoardChannel } from './store/useBoardChannel';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
 // This is the only code path that satisfies "before first paint" for F6b.
@@ -82,6 +83,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 
 export function App() {
   const setBoard = useBoardStore((s) => s.setBoard);
+  useBoardChannel();
 
   useEffect(() => {
     // window.krnl?.boardLoad() returns undefined when krnl bridge is absent;

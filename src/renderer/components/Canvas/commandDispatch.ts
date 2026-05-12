@@ -71,6 +71,15 @@ import {
 import type { HabitState } from '../nodes/HabitNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
 
+// ── Text + Image ──────────────────────────────────────────────────────
+import { textSetText, textSetSize } from '../nodes/TextNode/commands';
+import {
+  imageSetAsset,
+  imageSetSize,
+  imageSetAlt,
+  imageClear,
+} from '../nodes/ImageNode/commands';
+
 // ── dispatch ──────────────────────────────────────────────────────────
 
 type Args = Record<string, unknown>;
@@ -125,6 +134,22 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.setColor':  return { state: habitSetColor(s as never, args as never) };
         case 'habit.setIcon':   return { state: habitSetIcon(s as never, args as never) };
         case 'habit.setView':   return { config: habitSetView(c as never, args as never) };
+      }
+      break;
+    }
+    case 'text': {
+      switch (command) {
+        case 'text.setText': return { state: textSetText(s as never, args as never) };
+        case 'text.setSize': return { state: textSetSize(s as never, args as never) };
+      }
+      break;
+    }
+    case 'image': {
+      switch (command) {
+        case 'image.setAsset': return { state: imageSetAsset(s as never, args as never) };
+        case 'image.setSize':  return { state: imageSetSize(s as never, args as never) };
+        case 'image.setAlt':   return { state: imageSetAlt(s as never, args as never) };
+        case 'image.clear':    return { state: imageClear(s as never) };
       }
       break;
     }
