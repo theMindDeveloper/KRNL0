@@ -8,8 +8,11 @@ export type SysCommand =
   | { kind: 'todo'; sub: 'list' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
   | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
-  | { kind: 'habit'; sub: 'add' | 'streak'; name: string | undefined }
+  | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
   | { kind: 'habit'; sub: 'done'; name: string | undefined; date: string | undefined }
+  | { kind: 'habit'; sub: 'color'; name: string | undefined; color: string | undefined }
+  | { kind: 'habit'; sub: 'view'; view: string | undefined }
+  | { kind: 'habit'; sub: 'list' }
   | { kind: 'edge'; sub: 'list' }
   | { kind: 'edge'; sub: 'remove'; id: string | undefined }
   | { kind: 'edge'; sub: 'add'; from: string | undefined; to: string | undefined }
@@ -67,10 +70,18 @@ export class SysParser {
     }
 
     if (cmd === 'habit') {
-      if (sub === 'add')    return { kind: 'habit', sub: 'add', name: rest[0] };
+      if (sub === 'add')    return { kind: 'habit', sub: 'add',    name: rest[0] };
       if (sub === 'streak') return { kind: 'habit', sub: 'streak', name: rest[0] };
+      if (sub === 'remove') return { kind: 'habit', sub: 'remove', name: rest[0] };
+      if (sub === 'list')   return { kind: 'habit', sub: 'list' };
       if (sub === 'done') {
         return { kind: 'habit', sub: 'done', name: rest[0], date: flag(rest, 'date') };
+      }
+      if (sub === 'color') {
+        return { kind: 'habit', sub: 'color', name: rest[0], color: rest[1] };
+      }
+      if (sub === 'view') {
+        return { kind: 'habit', sub: 'view', view: rest[0] };
       }
     }
 

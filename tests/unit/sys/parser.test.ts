@@ -74,6 +74,26 @@ describe('SysParser', () => {
         kind: 'habit', sub: 'streak', name: 'meditation',
       });
     });
+    it('parses habit color', () => {
+      expect(SysParser.parse(['habit', 'color', 'meditation', 'rust'])).toEqual({
+        kind: 'habit', sub: 'color', name: 'meditation', color: 'rust',
+      });
+    });
+    it('parses habit remove', () => {
+      expect(SysParser.parse(['habit', 'remove', 'meditation'])).toEqual({
+        kind: 'habit', sub: 'remove', name: 'meditation',
+      });
+    });
+    it('parses habit view', () => {
+      expect(SysParser.parse(['habit', 'view', 'month'])).toEqual({
+        kind: 'habit', sub: 'view', view: 'month',
+      });
+    });
+    it('parses habit list', () => {
+      expect(SysParser.parse(['habit', 'list'])).toEqual({
+        kind: 'habit', sub: 'list',
+      });
+    });
   });
 
   describe('edge commands', () => {
