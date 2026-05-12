@@ -150,6 +150,12 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
   todo: () => ({ items: [] }),
   habit: () => ({ habits: [] }),
   term: () => ({ sessionId: null, title: 'Terminal' }),
+  // Decision 20: backfill new fields on existing task nodes at load time
+  'todo.task': () => ({
+    parentTaskId: null,
+    todoItemId: null,
+    pomoSessionsCompleted: 0,
+  }),
 };
 
 // Decision #14 — back-fill v2 config defaults on existing habit mother nodes
@@ -197,14 +203,37 @@ function migrateNodeStates(board: Record<string, unknown>): Record<string, unkno
   return board;
 }
 
+/** Decision 20: backfill taskNodeId on TodoItems that are missing it. */
+function migrateTodoItemFields(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return n;
+    const node = n as { kind?: string; state?: { items?: unknown[] } };
+    if (node.kind !== 'todo') return n;
+    const items = node.state?.items;
+    if (!Array.isArray(items)) return n;
+    const patched = items.map((item: unknown) => {
+      if (typeof item !== 'object' || item === null) return item;
+      const it = item as { taskNodeId?: unknown };
+      if ('taskNodeId' in it) return it;
+      return { ...it, taskNodeId: null };
+    });
+    return { ...node, state: { ...(node.state ?? {}), items: patched } };
+  });
+  return board;
+}
+
 export function loadBoardFrom(boardPath: string): unknown {
   try {
     if (existsSync(boardPath)) {
       const raw = readFileSync(boardPath, 'utf-8');
       const parsed: unknown = JSON.parse(raw);
-      return migrateHabitFields(
-        migrateNodeStates(
-          migrateTaskChain(migrateMotherPositions(parsed)),
+      return migrateTodoItemFields(
+        migrateHabitFields(
+          migrateNodeStates(
+            migrateTaskChain(migrateMotherPositions(parsed)),
+          ),
         ),
       );
     }

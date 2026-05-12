@@ -977,3 +977,65 @@ No imperative migration pass is required; this is consistent with how Decision
     not by color alone.
 
 ---
+
+## Decision 20 — Todo/Task bidirectional linkage + TaskNode FSM
+
+**Date:** 2026-05-12
+**Status:** Accepted
+**Closes:** #80 (todo-task-nodes feature branch)
+
+### Context
+
+Tasks are spawned from TodoItems when a user adds a task in the TodoNode. Previously `TodoItem` had no back-link to the spawned `TaskNode`, and `TaskState` had no back-link to the `TodoItem`. This meant done-state mirroring, cascade-deletes, and pomo-triggering from the todo row all required scanning the full board — brittle and inconsistent.
+
+### Decision
+
+**Two new fields on `TodoItem`:**
+```typescript
+taskNodeId: string | null  // null until a task node is spawned
+```
+
+**Three new fields on `TaskState`:**
+```typescript
+parentTaskId: string | null      // null = root task; else parent task node id (for subtasks)
+todoItemId: string | null        // back-link to the TodoItem.id that spawned this task
+pomoSessionsCompleted: number    // count of completed pomo sessions for this task (default 0)
+```
+
+**Invariants (Decision 20 contract):**
+1. When `todo.add` spawns a TaskNode, `item.taskNodeId = taskNode.id` and `taskState.todoItemId = item.id` are set atomically in the same store transaction.
+2. `task.toggle` → if `todoItemId !== null`, mirror done state to the linked `TodoItem` (no loop: check `item.done !== nextTask.done` before mirroring).
+3. `todo.toggle` → if `item.taskNodeId !== null`, mirror done state to the linked `TaskNode`.
+4. `task.delete` BFS-collects the node + all descendants (via `parentTaskId` chain), removes them all + incident edges, then removes the linked `TodoItem` (if `todoItemId !== null`), then renumbers siblings.
+5. `todo.remove` cascades to the linked `TaskNode` + all descendants before removing the `TodoItem`.
+6. `todo.clearDone` cascades all done items' TaskNodes.
+7. `task.startPomo` / `task.spawnPomo` finds the single `kind === 'pomo'` mother node and calls `pomoStart` — never duplicates it.
+8. `todo.startPomoForItem` resolves `item.taskNodeId → taskNode → task.startPomo`.
+9. `task.addSubtask` spawns a child TaskNode with `parentTaskId = parentNodeId` and `layer = parent.layer + 1`; `todoItemId` is null for subtasks.
+10. Sibling sequence numbers are 1-based, sorted ascending by `createdAt`, scoped to `{parentTodoId, parentTaskId}`.
+
+**Pure FSM handlers added:**
+- `TaskNode/commands.ts`: `taskToggle`, `taskEdit`, `taskIncrementPomo`, `taskActivate`
+- `TodoNode/commands.ts`: `todoLinkTask(state, {itemId, taskNodeId}) => TodoState`
+
+**UI affordances:**
+- `TaskNode`: body click triggers `task.startPomo` (drag-safe: only fires if mouseup delta < 4px); right-click opens `ContextMenu` with Edit / Add subtask / Delete items; inline edit on double-click; add-subtask input below footer; opacity 0.4 when done.
+- `TodoNode`: row right-click opens `ContextMenu` with Edit / Start pomo (disabled when no linked task) / Delete; clicking the todo-text of a linked item dispatches `todo.startPomoForItem`.
+
+**sys CLI additions:**
+- `sys task add <text> [--todo <todoId>] [--duration <min>]`
+- `sys task edit <id> <text>`
+- `sys task toggle <id>`
+- `sys task delete <id>`
+- `sys task pomo <id>`
+- `sys task subtask <parentId> <text>`
+- `sys task list [<todoId>]`
+- `sys todo add/check/list` — replaced stubs with real board.json operations.
+
+### Consequences
+
+- **Enables:** bidirectional done mirroring; cascade-delete; per-task pomo sessions; subtask nesting; full CLI parity for tasks.
+- **Forecloses:** detached task nodes (every task with a `todoItemId` has a corresponding `TodoItem`; orphan cleanup is handled at delete time).
+- **Migration:** existing `board.json` task nodes missing `parentTaskId`/`todoItemId`/`pomoSessionsCompleted` are backfilled by the board load migration in `src/main/persistence/board.ts` (via `STATE_DEFAULTS['todo.task']` entry — to be added if needed). Runtime access on unmigrated nodes defaults gracefully via `?? null` / `?? 0` guards.
+
+---
