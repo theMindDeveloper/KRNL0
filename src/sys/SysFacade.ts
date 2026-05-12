@@ -1,4 +1,7 @@
 import { SysParser } from './parser';
+import * as habit from './commands/habit';
+import * as todo from './commands/todo';
+import * as task from './commands/task';
 
 export interface SysResult {
   ok: boolean;
@@ -6,7 +9,30 @@ export interface SysResult {
   data?: unknown;
 }
 
+export interface SysFacadeDeps {
+  boardPath: string;
+  hasOpenRenderer: () => boolean;
+  onBoardChanged?: () => void;
+}
+
+function defaultBoardPath(): string {
+  if (process.env['KRNL0_BOARD_PATH']) return process.env['KRNL0_BOARD_PATH'];
+  const dir = process.env['KRNL0_BOARD_DIR']
+    ?? `${process.env['USERPROFILE'] ?? process.env['HOME'] ?? '.'}/Documents/krnl0`;
+  return `${dir}/board.json`;
+}
+
 export class SysFacade {
+  private readonly deps: SysFacadeDeps;
+
+  constructor(deps?: Partial<SysFacadeDeps>) {
+    this.deps = {
+      boardPath: deps?.boardPath ?? defaultBoardPath(),
+      hasOpenRenderer: deps?.hasOpenRenderer ?? (() => false),
+      ...(deps?.onBoardChanged ? { onBoardChanged: deps.onBoardChanged } : {}),
+    };
+  }
+
   async run(argv: string[]): Promise<SysResult> {
     if (argv.length === 0 || argv[0] === 'help') {
       return { ok: true, message: HELP_TEXT };
@@ -20,7 +46,50 @@ export class SysFacade {
       };
     }
 
-    // TODO (Week 4): route to command handlers, load/mutate/save board.json
+    if (command.kind === 'habit') {
+      const ctx: habit.HabitCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'add':    return habit.cliAdd(ctx, command.name);
+        case 'done':   return habit.cliDone(ctx, command.name, command.date);
+        case 'streak': return habit.cliStreak(ctx, command.name);
+        case 'color':  return habit.cliColor(ctx, command.name, command.color);
+        case 'remove': return habit.cliRemove(ctx, command.name);
+        case 'view':   return habit.cliView(ctx, command.view);
+        case 'list':   return habit.cliList(ctx);
+      }
+    }
+
+    if (command.kind === 'todo') {
+      const ctx: todo.TodoCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'add':   return todo.todoAdd(ctx, command.text, command.tag);
+        case 'check': return todo.todoCheck(ctx, command.id);
+        case 'list':  return todo.todoList(ctx);
+      }
+    }
+
+    if (command.kind === 'task') {
+      const ctx: task.TaskCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'list':    return task.taskList(ctx, command.todoId);
+        case 'add':     return task.taskAdd(ctx, command.todoId, command.text, command.durationMin);
+        case 'edit':    return task.taskEdit(ctx, command.id, command.text);
+        case 'toggle':  return task.taskToggle(ctx, command.id);
+        case 'delete':  return task.taskDelete(ctx, command.id);
+        case 'pomo':    return task.taskStartPomo(ctx, command.id);
+        case 'subtask': return task.taskSubtask(ctx, command.parentId, command.text);
+      }
+    }
+
     return {
       ok: true,
       message: `[stub] parsed: ${JSON.stringify(command)}`,
@@ -53,10 +122,23 @@ Todos:
   sys todo check <id>
   sys todo list
 
+Tasks:
+  sys task add "<text>" [--todo <todoId>] [--duration <min>]
+  sys task edit <id> "<text>"
+  sys task toggle <id>
+  sys task delete <id>
+  sys task pomo <id>
+  sys task subtask <parentId> "<text>"
+  sys task list [<todoId>]
+
 Habits:
   sys habit add "<name>"
-  sys habit done <name> [--date YYYY-MM-DD]
-  sys habit streak <name>
+  sys habit done <id|name> [--date YYYY-MM-DD]
+  sys habit streak <id|name>
+  sys habit color <id|name> <acid|rust|cyan|plum|spine|ink>
+  sys habit remove <id|name>
+  sys habit view <week|month|year>
+  sys habit list
 
 Edges:
   sys edge add --from <node:event> --to <node:command> [--args k=v]

@@ -1,10 +1,12 @@
 import { useState, useRef } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TodoConfig, TodoState } from './types';
 import { visibleItems } from './commands';
 import { defaultTodoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+import { ContextMenu } from '../../ContextMenu';
+import type { ContextMenuItem } from '../../ContextMenu';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -18,6 +20,14 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   // F5: inline edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+
+  // Row context menu state
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number;
+    y: number;
+    itemId: string;
+    hasTaskNode: boolean;
+  } | null>(null);
 
   const items = visibleItems(state, config);
   const undoneCount = state.items.filter((i) => !i.done).length;
@@ -69,6 +79,42 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     } else if (e.key === 'Escape') {
       cancelEdit();
     }
+  };
+
+  const handleRowContextMenu = (
+    e: MouseEvent,
+    itemId: string,
+    hasTaskNode: boolean,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ x: e.clientX, y: e.clientY, itemId, hasTaskNode });
+  };
+
+  const buildRowMenuItems = (itemId: string, hasTaskNode: boolean): ContextMenuItem[] => {
+    const item = state.items.find((i) => i.id === itemId);
+    return [
+      {
+        label: 'Edit text',
+        onSelect: () => {
+          if (item) startEdit(itemId, item.text);
+        },
+      },
+      {
+        label: 'Start pomo',
+        disabled: !hasTaskNode,
+        onSelect: () => {
+          onCommand('todo.startPomoForItem', { itemId });
+        },
+      },
+      {
+        label: 'Delete',
+        danger: true,
+        onSelect: () => {
+          onCommand('todo.remove', { id: itemId });
+        },
+      },
+    ];
   };
 
   return (
@@ -134,6 +180,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               <div
                 key={item.id}
                 className={`todo-item${item.done ? ' done' : ''}`}
+                onContextMenu={(e) =>
+                  handleRowContextMenu(e, item.id, item.taskNodeId !== null)
+                }
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -146,7 +195,10 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 <button
                   type="button"
                   className="todo-check"
-                  onClick={() => onCommand('todo.toggle', { id: item.id })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCommand('todo.toggle', { id: item.id });
+                  }}
                   style={{
                     flexShrink: 0,
                     width: 14,
@@ -195,6 +247,13 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   <span
                     className="todo-text"
                     onDoubleClick={() => !item.done && startEdit(item.id, item.text)}
+                    onClick={(e) => {
+                      // body click → start pomo for the linked task (if any)
+                      e.stopPropagation();
+                      if (item.taskNodeId !== null && !item.done) {
+                        onCommand('todo.startPomoForItem', { itemId: item.id });
+                      }
+                    }}
                     style={{
                       flex: 1,
                       fontFamily: 'var(--font-sans)',
@@ -205,7 +264,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
-                      cursor: item.done ? 'default' : 'text',
+                      cursor: item.done ? 'default' : item.taskNodeId !== null ? 'pointer' : 'text',
                     }}
                   >
                     {item.text}
@@ -238,7 +297,10 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 {/* Delete — hover-revealed */}
                 <button
                   type="button"
-                  onClick={() => onCommand('todo.remove', { id: item.id })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCommand('todo.remove', { id: item.id });
+                  }}
                   style={{
                     flexShrink: 0,
                     background: 'transparent',
@@ -337,6 +399,16 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           </span>
         </div>
       </div>
+
+      {/* Row context menu — rendered outside item list so it escapes overflow:hidden */}
+      {ctxMenu !== null && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={buildRowMenuItems(ctxMenu.itemId, ctxMenu.hasTaskNode)}
+          onDismiss={() => setCtxMenu(null)}
+        />
+      )}
     </MotherFrame>
   );
 }

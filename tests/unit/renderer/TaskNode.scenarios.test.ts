@@ -36,6 +36,9 @@ function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
     layer: 1,
     createdAt: '2026-05-10T10:00:00.000Z',
     parentTodoId: 'todo-1',
+    parentTaskId: null,
+    todoItemId: null,
+    pomoSessionsCompleted: 0,
     ...overrides,
   };
 }
