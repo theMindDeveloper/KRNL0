@@ -850,3 +850,130 @@ Four targeted changes, all narrow:
 - **Forecloses:** Backspace inside cmd.exe (when explicitly opted into via `KRNL0_SHELL`). Acceptable — cmd.exe is no longer the default and the translation hack was always shell-conditional anyway.
 - **GPU dependency:** WebGL needs a working OpenGL/ANGLE context. On Windows under Electron this is provided by ANGLE; failure paths are fully covered by Canvas → DOM fallbacks, so there is no hard runtime dependency.
 - **`process.cwd()` semantics in packaged builds:** in a packaged Electron app `process.cwd()` is the install directory, not the project source. Users who want a stable cwd for `claude` set `KRNL0_TERM_CWD` explicitly. Documented in [docs/06-requirements/terminal-node.md](../06-requirements/terminal-node.md).
+
+
+## Decision 14 — HabitNode v2 (color, multi-view, past backfill, settings popover, sys wiring)
+
+**Date:** 2026-05-12
+**Status:** Accepted
+**Author:** architect
+**Supersedes:** §"Contract" of Decision 11 (schema additions); leaves Decision 11's
+sparse-log semantics, derived week grid, and streak rules unchanged.
+
+### Context
+
+Decision 11 fixed the data model but left v1 with: a single weekly view, no
+per-habit identity beyond name + glyph, no settings UX, and no UI affordance for
+back-dating completions. v2 (this decision) lands the full feature set the user
+asked for: add/delete habits, pin any past day, three views (week/month/year),
+a settings gear at top-right, per-habit color from the fixed cyber palette, and
+end-to-end persistence — through both the renderer and the sys CLI.
+
+### Decision
+
+Extend the habit schema with two additive fields and one config field. Every
+mutation routes through pure command handlers (renderer or sys CLI) into
+`board.json` via the shared persistence module. No fake state, no hidden
+ephemeral data.
+
+**Schema additions** (back-fill at render and at load, see Migration):
+
+```typescript
+export type HabitColor = 'acid' | 'rust' | 'cyan' | 'plum' | 'spine' | 'ink';
+export type HabitView  = 'week' | 'month' | 'year';
+
+export interface Habit {
+  id: string;
+  name: string;
+  createdAt: string;
+  log: string[];
+  archived: boolean;
+  color: HabitColor;          // NEW — default 'acid'
+}
+
+export interface HabitConfig {
+  weekStartsOn: 'monday';
+  view: HabitView;            // NEW — default 'week'
+  maxHabits?: number;         // tolerated legacy seed field; no enforcement
+}
+```
+
+**New commands:**
+
+| Command | Target | Args | Effect |
+|---|---|---|---|
+| `habit.setColor` | state | `{ id, color }` | set color (no-op on unknown color) |
+| `habit.setView`  | config | `{ view }`     | switch view (no-op on unknown view) |
+
+`habit.toggleDay` hardens its guard: **future dates are no-ops; past dates are
+always accepted** (including dates before `createdAt`, so users can back-fill
+habits they began tracking late — the user-stated rule "regardless if it's in
+the past, but the future is not allowed").
+
+**Dispatcher contract change:** `applyCommand` in
+`src/renderer/components/Canvas/commandDispatch.ts` returns
+`{ state?, config? } | null` instead of `Node['state'] | null`. `makeCommandHandler`
+applies whichever keys are present in a single `updateNode` call. This
+generalisation is node-agnostic; only Habit uses it today.
+
+**Settings popover (F9–F13):** a gear button in the node header toggles an
+inline popover absolutely-positioned inside the node body. The popover contains
+a segmented view toggle and a list of habits, each with a color swatch (click
+to open a 6-dot picker) and a delete (×) button. Click-outside-to-close via a
+`mousedown` listener on `document` filtered by the popover's container ref.
+No react-portal — the popover clips with the node card.
+
+**View layouts (F15):**
+
+| View | Layout | Cell size × gap | Total grid width |
+|---|---|---|---|
+| Week | inline glyph + name + 7-cell row + streak | 18px × 3px | 144px |
+| Month | name+streak header line + single-row month grid | 10px × 1px | 28–31 cells, ≤340px |
+| Year | name+streak header line + 53×7 contribution grid | 5px × 1px | 53 cols × 7 rows |
+
+Mother content width is 346px (`MOTHER_WIDTH 380` − 32 padding − 2 border).
+All views fit.
+
+**Sys CLI (F17):** `src/sys/commands/habit.ts` is wired end-to-end via the
+shared persistence module `src/main/persistence/board.ts`. Commands resolve
+habits by id (exact) or case-insensitive name; ambiguous names → error.
+Verbs: `add`, `done`, `streak`, `color`, `remove`, `view`, `list`. `SysFacade`
+takes a `{ boardPath, hasOpenRenderer, onBoardChanged }` deps bundle so the
+same code works from both `ipcMain.handle('sys:run')` (Electron renderer
+present → broadcast `board:reload`) and the standalone CLI entry
+(`src/sys/index.ts`, renderer absent → write disk only).
+
+### Migration
+
+Two-stage, render-time fallback + load-time back-fill:
+
+1. **Render-time fallback** — `habit.color ?? 'acid'` and `config.view ?? 'week'`
+   keep the v1 UI alive against an unmigrated `board.json`.
+2. **Load-time back-fill** — `loadBoardFrom()` in the shared persistence module
+   patches missing `color` on each habit (defaulting to `'acid'`) and missing
+   `view` on the habit mother config (defaulting to `'week'`). The first save
+   after a load writes the resolved defaults back to disk, so reads converge to
+   the schema.
+
+No imperative migration pass is required; this is consistent with how Decision
+17 handles per-instance isolation (write fresh, read tolerant).
+
+### Consequences
+
+- **Enables:** add/delete habits via UI and sys; back-fill any past day; persistent
+  per-habit colors used as the done-cell fill; per-node view selection that
+  survives reloads; full sys-CLI parity with the GUI (rule §8 in CLAUDE.md).
+- **Forecloses:** custom colors outside the 6-token palette (intentional — keeps
+  the visual system coherent). Per-day intensity is still ruled out by
+  Decision 11.
+- **Risks resolved:**
+  - View-vs-state dispatch — generalised dispatcher return type.
+  - Sys/renderer race — `onBoardChanged` broadcasts `board:reload` to open
+    renderers after a sys write.
+  - Popover clipping — popover lives inside the body, no portal.
+  - Future-date toggling via sys — blocked at the FSM level.
+  - Color-as-sole-signal — done cells retain the existing outline/ring;
+    selected swatch in the picker is identified by a paper inset border,
+    not by color alone.
+
+---

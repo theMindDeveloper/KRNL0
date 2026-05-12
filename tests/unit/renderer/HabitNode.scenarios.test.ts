@@ -307,14 +307,13 @@ describe('F8 — Future cells are non-interactive (cell-state derivation)', () =
     expect(todayCells).toHaveLength(1);
   });
 
-  it('habitToggleDay with a future date can toggle it (FSM allows back-date/forward-date by args)', () => {
-    // The UI blocks clicking future cells; the FSM itself is date-agnostic.
-    // This confirms only today's UI button triggers the command.
+  it('habitToggleDay with a future date is a no-op (Decision #14)', () => {
+    // Decision #14 hardened the guard: the FSM rejects future dates. User
+    // requirement: "future is not allowed". UI also does not render a button.
     const base = defaultHabitState();
     const s1 = habitAdd(base, { name: 'Test' }, env(WEDNESDAY, 'h1'));
     const futureDate = '2026-05-15'; // Friday — in the future relative to Wed
     const next = habitToggleDay(s1, { id: 'h1', date: futureDate }, env(WEDNESDAY));
-    // FSM allows it; UI does not render a button for it.
-    expect(next.habits[0]?.log).toContain(futureDate);
+    expect(next.habits[0]?.log).not.toContain(futureDate);
   });
 });
