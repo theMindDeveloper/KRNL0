@@ -235,6 +235,53 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   useViewportPersistence();
 
   const addEdge = useBoardStore((s) => s.addEdge);
+  const removeNode = useBoardStore((s) => s.removeNode);
+
+  // Right-click context menu state. Pinned to the screen position of the
+  // event; cleared on outside click / Escape / window blur.
+  const [ctxMenu, setCtxMenu] = useState<
+    { x: number; y: number; nodeId: string; isMother: boolean } | null
+  >(null);
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, rfNode: KrnlRFNode) => {
+      event.preventDefault();
+      const inner = rfNode.data.node;
+      setCtxMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: inner.id,
+        isMother: inner.isMother,
+      });
+    },
+    [],
+  );
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCtxMenu();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('blur', closeCtxMenu);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('blur', closeCtxMenu);
+    };
+  }, [ctxMenu, closeCtxMenu]);
+
+  const deleteFromCtxMenu = useCallback(() => {
+    if (!ctxMenu || ctxMenu.isMother) {
+      closeCtxMenu();
+      return;
+    }
+    removeNode(ctxMenu.nodeId);
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+    closeCtxMenu();
+  }, [ctxMenu, removeNode, closeCtxMenu]);
 
   // Hidden file input used when the dock's "image" button is clicked — opens
   // the OS file picker and spawns a fully-formed ImageNode (with assetId)
@@ -537,6 +584,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      onNodeContextMenu={onNodeContextMenu}
+      onPaneClick={closeCtxMenu}
+      onPaneContextMenu={closeCtxMenu}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onMoveEnd={onMoveEnd}
@@ -579,6 +629,61 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         style={{ display: 'none' }}
         data-testid="canvas-image-file-input"
       />
+
+      {ctxMenu && (
+        <div
+          data-testid="node-ctx-menu"
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: 'fixed',
+            top: ctxMenu.y,
+            left: ctxMenu.x,
+            background: 'var(--node-bg, #18160f)',
+            border: '1px solid var(--paper-3)',
+            borderRadius: 6,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            padding: 4,
+            zIndex: 1000,
+            minWidth: 140,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          <button
+            type="button"
+            data-testid="node-ctx-menu-delete"
+            disabled={ctxMenu.isMother}
+            onClick={deleteFromCtxMenu}
+            title={ctxMenu.isMother ? 'mother nodes are pinned' : 'delete node'}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              padding: '6px 10px',
+              background: 'transparent',
+              border: 'none',
+              color: ctxMenu.isMother ? 'var(--ink-4)' : 'var(--rust)',
+              cursor: ctxMenu.isMother ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              letterSpacing: 'inherit',
+              textTransform: 'inherit',
+            }}
+            onMouseEnter={(e) => {
+              if (!ctxMenu.isMother) {
+                e.currentTarget.style.background = 'rgba(200,85,61,0.12)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            delete
+          </button>
+        </div>
+      )}
     </ReactFlow>
   );
 }
