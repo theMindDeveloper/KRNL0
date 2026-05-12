@@ -92,6 +92,9 @@ const handleStyle: React.CSSProperties = {
   background: 'var(--paper)',
   border: '1.5px solid var(--ink-3)',
   opacity: 0.7,
+  // Raise above node body — body may use position:relative which creates
+  // a new stacking context and buries default-z handles.
+  zIndex: 10,
 };
 
 /**
@@ -106,7 +109,8 @@ export function createNodeAdapter<S = unknown, C = unknown>(
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
     const { node, onCommand, onSelect, slotIndex, slotTotal, onMoveLeft, onMoveRight } = data;
-    // Mother nodes don't connect — render zero handles
+    // Mother nodes don't connect — render zero handles. Children get
+    // interactive handles so users can wire edges between them.
     const showHandles = !node.isMother;
     return (
       <>
@@ -115,7 +119,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
             type="target"
             position={Position.Left}
             style={handleStyle}
-            isConnectable={false}
+            isConnectable={true}
           />
         )}
         <Inner
@@ -133,7 +137,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
             type="source"
             position={Position.Right}
             style={handleStyle}
-            isConnectable={false}
+            isConnectable={true}
           />
         )}
       </>

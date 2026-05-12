@@ -15,6 +15,7 @@
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { NodeProps } from '../types';
 import type {
   HabitColor,
@@ -101,19 +102,26 @@ export function HabitNode({
   );
 
   // Which habits already have a pinned lane? Used to disable the menu item.
-  const pinnedHabitIds = useBoardStore(
-    (s) => {
+  // Return a sorted array via useShallow so identity is stable when contents
+  // don't change → no re-renders on unrelated boardStore mutations.
+  const pinnedHabitIdsArray = useBoardStore(
+    useShallow((s) => {
       const board = s.board;
-      if (!board) return new Set<string>();
-      const ids = new Set<string>();
+      if (!board) return [] as string[];
+      const ids: string[] = [];
       for (const n of board.nodes) {
         if (n.kind === 'habit.lane') {
           const id = (n.state as { habitId?: string } | null)?.habitId;
-          if (id) ids.add(id);
+          if (id) ids.push(id);
         }
       }
+      ids.sort();
       return ids;
-    },
+    }),
+  );
+  const pinnedHabitIds = useMemo(
+    () => new Set(pinnedHabitIdsArray),
+    [pinnedHabitIdsArray],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -136,11 +144,9 @@ export function HabitNode({
     (e: React.MouseEvent, habitId: string) => {
       e.preventDefault();
       e.stopPropagation();
-      const body = bodyRef.current;
-      const rect = body?.getBoundingClientRect();
-      const x = rect ? e.clientX - rect.left : e.clientX;
-      const y = rect ? e.clientY - rect.top : e.clientY;
-      setMenu({ habitId, anchor: { x, y } });
+      // v2.3 — viewport coords; menu portals to body so RF transform does
+      // not propagate fractional positioning into the menu.
+      setMenu({ habitId, anchor: { x: e.clientX, y: e.clientY } });
     },
     [],
   );
@@ -281,8 +287,6 @@ export function HabitNode({
             <HabitContextMenu
               habit={menuHabit}
               anchor={menu.anchor}
-              bodyWidth={bodyRef.current?.clientWidth ?? 320}
-              bodyHeight={bodyRef.current?.clientHeight ?? 400}
               onRename={(name) => onCommand('habit.rename', { id: menu.habitId, name })}
               onSetColor={(color) => onCommand('habit.setColor', { id: menu.habitId, color })}
               onSetIcon={(icon) => onCommand('habit.setIcon', { id: menu.habitId, icon })}
@@ -735,6 +739,7 @@ const YearRow = memo(function YearRow({
       </div>
 
       <div
+        className="habit-year-grid"
         onClick={onGridClick}
         style={{
           display: 'flex',
@@ -743,7 +748,7 @@ const YearRow = memo(function YearRow({
         }}
       >
         {yearGrid.map((row, rIdx) => (
-          <div key={rIdx} style={{ display: 'flex', gap: YEAR_CELL_GAP }}>
+          <div key={rIdx} className="habit-year-row" style={{ display: 'flex', gap: YEAR_CELL_GAP }}>
             {row.map((dayStr, cIdx) => {
               if (dayStr === null) {
                 return <div key={cIdx} style={emptyCellStyle} />;
