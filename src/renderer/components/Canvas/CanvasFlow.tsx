@@ -238,20 +238,28 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const removeNode = useBoardStore((s) => s.removeNode);
 
   // Right-click context menu state. Pinned to the screen position of the
-  // event; cleared on outside click / Escape / window blur.
+  // event; cleared on outside click / Escape / window blur. Only opened for
+  // non-mother nodes — mothers handle right-click internally (HabitNode per
+  // habit-row menu, TodoNode per-row menu, etc.).
   const [ctxMenu, setCtxMenu] = useState<
-    { x: number; y: number; nodeId: string; isMother: boolean } | null
+    { x: number; y: number; nodeId: string; isMother: false } | null
   >(null);
 
   const onNodeContextMenu = useCallback(
     (event: React.MouseEvent, rfNode: KrnlRFNode) => {
       event.preventDefault();
       const inner = rfNode.data.node;
+      // Mother nodes (pomo / todo / habit / term) own their own right-click
+      // UX. The canvas-level delete menu is meaningless on them (mothers are
+      // pinned) and previously showed when right-clicking empty mother-body
+      // areas (header, padding) where no inner handler ran — visually
+      // suppressing the per-row menu. Skip entirely.
+      if (inner.isMother) return;
       setCtxMenu({
         x: event.clientX,
         y: event.clientY,
         nodeId: inner.id,
-        isMother: inner.isMother,
+        isMother: false,
       });
     },
     [],
@@ -273,10 +281,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   }, [ctxMenu, closeCtxMenu]);
 
   const deleteFromCtxMenu = useCallback(() => {
-    if (!ctxMenu || ctxMenu.isMother) {
-      closeCtxMenu();
-      return;
-    }
+    if (!ctxMenu) return;
     removeNode(ctxMenu.nodeId);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
@@ -654,9 +659,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
           <button
             type="button"
             data-testid="node-ctx-menu-delete"
-            disabled={ctxMenu.isMother}
             onClick={deleteFromCtxMenu}
-            title={ctxMenu.isMother ? 'mother nodes are pinned' : 'delete node'}
+            title="delete node"
             style={{
               display: 'block',
               width: '100%',
@@ -664,17 +668,15 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
               padding: '6px 10px',
               background: 'transparent',
               border: 'none',
-              color: ctxMenu.isMother ? 'var(--ink-4)' : 'var(--rust)',
-              cursor: ctxMenu.isMother ? 'not-allowed' : 'pointer',
+              color: 'var(--rust)',
+              cursor: 'pointer',
               fontFamily: 'inherit',
               fontSize: 'inherit',
               letterSpacing: 'inherit',
               textTransform: 'inherit',
             }}
             onMouseEnter={(e) => {
-              if (!ctxMenu.isMother) {
-                e.currentTarget.style.background = 'rgba(200,85,61,0.12)';
-              }
+              e.currentTarget.style.background = 'rgba(200,85,61,0.12)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent';
