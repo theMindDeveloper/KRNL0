@@ -6,6 +6,14 @@ import {
   registerAssetProtocol,
 } from './ipc/assets';
 
+// Per-worktree user-data isolation (scripts/dev.mjs sets this). Without it,
+// multiple worktrees of KRNL0 fight over the default `%APPDATA%/krnl0/`
+// Chromium cache → "Unable to move the cache: Access is denied" + GPU disk
+// cache failures. Must run before any other Electron API.
+if (process.env['KRNL0_USER_DATA']) {
+  app.setPath('userData', process.env['KRNL0_USER_DATA']);
+}
+
 // Privileged scheme registration MUST happen before app.whenReady() so
 // Chromium treats responses from krnl-asset:// as standard, secure-origin
 // content — required for <img src="krnl-asset://..."> under default CSP.
