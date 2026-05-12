@@ -58,6 +58,54 @@ describe('SysParser', () => {
     });
   });
 
+  describe('task commands', () => {
+    it('parses task list', () => {
+      expect(SysParser.parse(['task', 'list'])).toEqual({
+        kind: 'task', sub: 'list', todoId: undefined,
+      });
+    });
+    it('parses task list with todoId filter', () => {
+      expect(SysParser.parse(['task', 'list', 'mother-todo'])).toEqual({
+        kind: 'task', sub: 'list', todoId: 'mother-todo',
+      });
+    });
+    it('parses task add with text', () => {
+      expect(SysParser.parse(['task', 'add', 'write tests'])).toMatchObject({
+        kind: 'task', sub: 'add', text: 'write tests', todoId: undefined, durationMin: undefined,
+      });
+    });
+    it('parses task add with --todo and --duration flags', () => {
+      expect(SysParser.parse(['task', 'add', 'write tests', '--todo', 'mother-todo', '--duration', '30'])).toMatchObject({
+        kind: 'task', sub: 'add', text: 'write tests', todoId: 'mother-todo', durationMin: 30,
+      });
+    });
+    it('parses task edit', () => {
+      expect(SysParser.parse(['task', 'edit', 'task-id-1', 'new text'])).toEqual({
+        kind: 'task', sub: 'edit', id: 'task-id-1', text: 'new text',
+      });
+    });
+    it('parses task toggle', () => {
+      expect(SysParser.parse(['task', 'toggle', 'task-id-1'])).toEqual({
+        kind: 'task', sub: 'toggle', id: 'task-id-1',
+      });
+    });
+    it('parses task delete', () => {
+      expect(SysParser.parse(['task', 'delete', 'task-id-1'])).toEqual({
+        kind: 'task', sub: 'delete', id: 'task-id-1',
+      });
+    });
+    it('parses task pomo', () => {
+      expect(SysParser.parse(['task', 'pomo', 'task-id-1'])).toEqual({
+        kind: 'task', sub: 'pomo', id: 'task-id-1',
+      });
+    });
+    it('parses task subtask', () => {
+      expect(SysParser.parse(['task', 'subtask', 'task-id-1', 'sub item text'])).toEqual({
+        kind: 'task', sub: 'subtask', parentId: 'task-id-1', text: 'sub item text',
+      });
+    });
+  });
+
   describe('habit commands', () => {
     it('parses habit add', () => {
       expect(SysParser.parse(['habit', 'add', 'meditation'])).toEqual({
