@@ -141,6 +141,26 @@ export function habitSetView(
   return { ...config, view: args.view };
 }
 
+// v2.1 — set per-habit icon (glyph or emoji). Empty/whitespace clears it
+// (falls back to the round-robin glyph at render time).
+export function habitSetIcon(
+  state: HabitState,
+  args: { id: string; icon: string },
+): HabitState {
+  const trimmed = args.icon.trim();
+  return {
+    ...state,
+    habits: state.habits.map((h) => {
+      if (h.id !== args.id) return h;
+      if (trimmed === '') {
+        const { icon: _ignored, ...rest } = h;
+        return rest as typeof h;
+      }
+      return { ...h, icon: trimmed };
+    }),
+  };
+}
+
 // Streak = consecutive days in log ending at today (if present) or yesterday.
 // If today is not yet marked, start from yesterday so the user doesn't see 0
 // prematurely (Decision #11).

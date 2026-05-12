@@ -5,7 +5,9 @@
 // lives on each Habit. Past-day backfill is bounded by [habit.createdAt,
 // today]; future dates remain non-interactive.
 
-export type HabitColor = 'acid' | 'rust' | 'cyan' | 'plum' | 'spine' | 'ink';
+export type HabitColor =
+  | 'acid' | 'rust' | 'cyan' | 'plum' | 'spine' | 'ink'
+  | 'amber' | 'rose' | 'teal' | 'lilac' | 'sand' | 'moss';
 
 export const HABIT_COLORS: readonly HabitColor[] = [
   'acid',
@@ -14,6 +16,12 @@ export const HABIT_COLORS: readonly HabitColor[] = [
   'plum',
   'spine',
   'ink',
+  'amber',
+  'rose',
+  'teal',
+  'lilac',
+  'sand',
+  'moss',
 ] as const;
 
 export function isHabitColor(value: unknown): value is HabitColor {
@@ -29,13 +37,22 @@ export function isHabitView(value: unknown): value is HabitView {
 }
 
 export interface Habit {
-  id: string;          // crypto.randomUUID()
+  id: string;           // crypto.randomUUID()
   name: string;
-  createdAt: string;   // ISO 8601
-  log: string[];       // ['2026-05-10', '2026-05-09', ...] — sorted desc, unique, local YYYY-MM-DD
-  archived: boolean;   // default false; archived habits hidden from grid
-  color: HabitColor;   // v2 — default 'acid'
+  createdAt: string;    // ISO 8601
+  log: string[];        // ['2026-05-10', ...] — sorted desc, unique, local YYYY-MM-DD
+  archived: boolean;    // default false; archived habits hidden from grid
+  color: HabitColor;    // v2 — default 'acid'
+  icon?: string;        // v2.1 — optional glyph/emoji; falls back to round-robin glyph
 }
+
+// Built-in icon palette presented in the context menu. Mix of mono glyphs
+// and emoji so users can pick something representational. Single grapheme.
+export const HABIT_ICONS: readonly string[] = [
+  '✎', '↗', '◍', '⌬', '◆', '▷', '○', '✦',
+  '🧘', '🏃', '📖', '💧', '🛌', '🥗', '🧠', '💪',
+  '☕', '🎯', '🌱', '🎵', '🧹', '✍️', '☀️', '🌙',
+];
 
 export interface HabitState {
   habits: Habit[];

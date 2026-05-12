@@ -31,6 +31,14 @@
   --cyan:      #4ea8b0;
   --cyan-glow: #7dd6df;
 
+  /* Extended palette (habit colors v2.1) — muted-cyber tones */
+  --amber: #d9a55a;
+  --rose:  #c87080;
+  --teal:  #5fa3a8;
+  --lilac: #9c8ec4;
+  --sand:  #b8a17a;
+  --moss:  #7a8f5a;
+
   /* Terminal — always dark */
   --term-bg:    #0c0a08;
   --term-bg-2:  #15110d;
@@ -210,4 +218,73 @@ body {
   line-height: 1.5;
   overflow: hidden;
   user-select: none;
+}
+
+/* ── Minimal scrollbars (app-wide) ──────────────────────────────────── */
+/* WebKit: thin, near-invisible track, dim thumb that brightens on hover. */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--paper-3);
+  border-radius: 3px;
+  transition: background 0.12s;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--paper-3) transparent;
+}
+/* Terminal keeps its own dark scrollbar styling — opt-out via [data-term] */
+.term-body *::-webkit-scrollbar-thumb,
+[data-term] *::-webkit-scrollbar-thumb {
+  background: var(--term-dim);
+}
+.term-body *::-webkit-scrollbar-thumb:hover,
+[data-term] *::-webkit-scrollbar-thumb:hover {
+  background: var(--term-fg);
+}
+
+/* ── HabitNode cell classes (perf — avoid per-cell inline styles) ───── */
+.habit-cell {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--paper-3);
+  cursor: default;
+}
+.habit-cell--year   { border-radius: 1px; }
+.habit-cell--past   { opacity: 0.4; }
+.habit-cell--future { /* no extra */ }
+.habit-cell--done {
+  background: var(--habit-color, var(--acid));
+  opacity: 0.85;
+}
+.habit-cell--today {
+  background: transparent;
+  border-color: var(--ink-3);
+  outline: 1px solid var(--habit-color, var(--acid));
+  outline-offset: 1px;
+}
+.habit-cell--done.habit-cell--today {
+  background: var(--habit-color, var(--acid));
+  border-color: transparent;
+  opacity: 1;
+}
+.habit-cell--interactive { cursor: pointer; }
+button.habit-cell {
+  appearance: none;
+  outline-color: var(--habit-color, var(--acid));
 }
