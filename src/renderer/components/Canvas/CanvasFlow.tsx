@@ -408,6 +408,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     });
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
+      // clock is a permanent mother — never spawnable via handleAddNode.
+      // Entry required only for Record<NodeKind, ...> type completeness.
+      clock: {},
       'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
       text: { text: '' },
       image: {},
