@@ -358,3 +358,13 @@ Three changes, in priority order:
 - **Dev isolation**: `npm run dev` now goes through `scripts/dev.mjs` which points `KRNL0_BOARD_DIR` + `KRNL0_USER_DATA` at `.krnl0-data/` inside the current worktree, and clears `ELECTRON_RUN_AS_NODE` so Electron boots as the main process. Sibling worktrees no longer fight over `~/Documents/krnl0/board.json` or `%APPDATA%/krnl0/` Chromium cache.
 
 **Tests:** 550+ passing, 0 typecheck errors after merge with origin/main.
+
+---
+
+## [2026-05-13] — Worktree isolation: per-instance Vite dev-server port
+
+**Type:** Bug Fix / Isolation
+**Branch:** `fix/worktree-port-isolation`
+**PR:** #TBD
+**Files changed:** `scripts/dev-port.mjs` (new), `scripts/dev-port.d.mts` (new), `scripts/dev.mjs`, `electron.vite.config.ts`, `src/main/index.ts`, `tests/unit/dev-port.test.ts` (new), `docs/03-architecture/decisions.md` (ADR 17 amendment)
+**Summary:** Closed the final gap in the worktree isolation story established by ADR 17 and PR `fix/worktree-isolation`. Board JSON, the assets folder, and Electron `userData` were already isolated per worktree. The missing surface was the Vite dev-server port. Vite defaults to `5173` and, when a second worktree starts `npm run dev`, silently falls back to `5174` — but `src/main/index.ts` had the URL hardcoded to `http://localhost:5173`. The result was that worktree B's Electron window loaded worktree A's renderer bundle: both windows showed identical UI even though each was reading its own separate `board.json`, making the isolation appear completely broken from the developer's seat. The fix introduces a new `scripts/dev-port.mjs` helper that derives a deterministic port from a SHA-1 hash of the absolute worktree root path, mapped into the range `[5174, 5273]`. `scripts/dev.mjs` sets `KRNL0_DEV_PORT` from this helper (honoring a pre-set value as an escape hatch). `electron.vite.config.ts` reads `KRNL0_DEV_PORT` into `renderer.server.port` with `strictPort: true` — the strict flag is non-negotiable: without it Vite would silently fall back and reintroduce the exact bug. `src/main/index.ts` reads the same env var when constructing the dev URL, falling back to `5173` so single-instance launches without `scripts/dev.mjs` remain unaffected. Five Vitest tests cover determinism, range, spread across distinct paths, and edge cases. ADR 17 amended with a `### Update — 2026-05-13: Dev server port` subsection documenting the symptom, root cause, decision, and conventions. Tests: 555 passed, 0 failed. `npm run typecheck`: 0 errors.
