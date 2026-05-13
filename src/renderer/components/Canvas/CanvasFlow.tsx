@@ -433,12 +433,24 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (!conn.source || !conn.target) return;
     if (conn.source === conn.target) return;
 
-    // Bug 1 fix: if both endpoints are task nodes, create a task.next edge so
-    // the chain index (which only counts from.event === 'task.next') picks it up.
-    const nodes = useBoardStore.getState().board?.nodes ?? [];
+    const board = useBoardStore.getState().board;
+    const nodes = board?.nodes ?? [];
+    const existingEdges = board?.edges ?? [];
     const sourceNode = nodes.find((n) => n.id === conn.source);
     const targetNode = nodes.find((n) => n.id === conn.target);
     const bothTasks = sourceNode?.kind === 'todo.task' && targetNode?.kind === 'todo.task';
+    const event = bothTasks ? 'task.next' : 'link';
+
+    // Dedup: refuse to add a second edge with the same (source, target, event).
+    // Drag-to-connect is easy to fire twice; the canvas should not accumulate
+    // duplicates that visually overlap and break the chain index counters.
+    const duplicate = existingEdges.some(
+      (e) =>
+        e.from.nodeId === conn.source &&
+        e.to.nodeId === conn.target &&
+        e.from.event === event,
+    );
+    if (duplicate) return;
 
     const edge: KrnlEdge = bothTasks
       ? {

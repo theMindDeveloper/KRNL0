@@ -63,7 +63,9 @@ export function MotherFrame({
       style={{
         position: 'relative',
         width,
-        minHeight: 480,
+        // Auto-size to content. Previously a hard 480px floor padded a tall
+        // empty zone below short todo lists, which the cyan selection ring
+        // then wrapped — looking like a stretched second highlight.
         display: 'flex',
         flexDirection: 'column',
         background,
