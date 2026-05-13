@@ -209,7 +209,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   return (
-    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} borderColor="var(--cyan-glow)" onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
+    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         <div
