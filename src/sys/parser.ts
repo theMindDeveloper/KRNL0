@@ -37,6 +37,13 @@ export type SysCommand =
   | { kind: 'term'; sub: 'setFontSize'; fontSize: number | undefined }
   | { kind: 'term'; sub: 'clear' }
   | { kind: 'term'; sub: 'setShell'; shell: string | undefined }
+  | { kind: 'node'; sub: 'move'; id: string | undefined; to: { x: number; y: number } | undefined }
+  | { kind: 'viewport'; sub: 'pan'; dx: number | undefined; dy: number | undefined }
+  | { kind: 'viewport'; sub: 'zoom'; factor: number | undefined }
+  | { kind: 'undo' }
+  | { kind: 'redo' }
+  | { kind: 'marquee'; rect: { x1: number; y1: number; x2: number; y2: number } | undefined; delete: boolean }
+  | { kind: 'theme'; sub: 'set'; value: string | undefined }
   | { kind: 'version' }
   | { kind: 'whoami' }
   | { kind: 'say'; text: string }
@@ -78,6 +85,11 @@ export class SysParser {
         const atStr = flag(rest, 'at');
         const at = atStr ? parseAt(atStr) : undefined;
         return { kind: 'node', sub: 'add', nodeKind: rest[0], at };
+      }
+      if (sub === 'move') {
+        const toStr = flag(rest, 'to');
+        const to = toStr ? parseAt(toStr) : undefined;
+        return { kind: 'node', sub: 'move', id: rest[0], to };
       }
     }
 
@@ -230,6 +242,39 @@ export class SysParser {
       }
       if (sub === 'clear') return { kind: 'term', sub: 'clear' };
       if (sub === 'setShell') return { kind: 'term', sub: 'setShell', shell: rest[0] };
+    }
+
+    if (cmd === 'viewport') {
+      if (sub === 'pan') {
+        return { kind: 'viewport', sub: 'pan', dx: numFlag(rest, 'dx'), dy: numFlag(rest, 'dy') };
+      }
+      if (sub === 'zoom') {
+        return { kind: 'viewport', sub: 'zoom', factor: numFlag(rest, 'factor') };
+      }
+    }
+
+    if (cmd === 'undo') return { kind: 'undo' };
+    if (cmd === 'redo') return { kind: 'redo' };
+
+    if (cmd === 'marquee') {
+      const marqueeArgs: string[] = [...(sub !== undefined ? [sub] : []), ...rest];
+      const rectStr = flag(marqueeArgs, 'rect');
+      let rect: { x1: number; y1: number; x2: number; y2: number } | undefined;
+      if (rectStr) {
+        const parts = rectStr.split(',').map(Number);
+        if (parts.length === 4 && parts.every((n) => !isNaN(n))) {
+          const [x1, y1, x2, y2] = parts as [number, number, number, number];
+          rect = { x1, y1, x2, y2 };
+        }
+      }
+      const del = marqueeArgs.includes('--delete');
+      return { kind: 'marquee', rect, delete: del };
+    }
+
+    if (cmd === 'theme') {
+      if (sub === 'set') {
+        return { kind: 'theme', sub: 'set', value: rest[0] };
+      }
     }
 
     return null;

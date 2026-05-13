@@ -8,6 +8,7 @@ import * as net from 'net';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { SysFacade } from '../../sys/SysFacade';
+import type { CliDispatchFn } from '../../sys/SysFacade';
 
 export interface RpcServer {
   socketPath: string;
@@ -48,7 +49,7 @@ function writeFrame(socket: net.Socket, frame: RpcFrame): void {
 // written concurrently. Promise chain — each request waits for the previous.
 let chain: Promise<void> = Promise.resolve();
 
-export function createRpcServer(boardPath: string): RpcServer {
+export function createRpcServer(boardPath: string, getDispatch?: () => CliDispatchFn | null): RpcServer {
   const socketPath = makeSockPath();
   // TNF2: token never persists to disk
   const token = crypto.randomBytes(32).toString('hex');
@@ -85,7 +86,11 @@ export function createRpcServer(boardPath: string): RpcServer {
         const argv = req.argv;
 
         chain = chain.then(async () => {
-          const facade = new SysFacade({ boardPath });
+          const dispatch = getDispatch?.() ?? null;
+          const facade = new SysFacade({
+            boardPath,
+            ...(dispatch ? { cliDispatch: dispatch } : {}),
+          });
           let result: { ok: boolean; message?: string };
           try {
             result = await facade.run(argv);

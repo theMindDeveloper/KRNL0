@@ -15,6 +15,12 @@ import {
   generateSubHelp,
 } from '../shared/cli/commandRegistry';
 
+/** Function type for renderer-coupled CLI dispatch (Phase 2). */
+export type CliDispatchFn = (
+  command: string,
+  args: Record<string, unknown>,
+) => Promise<{ ok: boolean; message: string; exitCode?: number }>;
+
 export interface SysResult {
   ok: boolean;
   message?: string;
@@ -25,6 +31,8 @@ export interface SysFacadeDeps {
   boardPath: string;
   hasOpenRenderer: () => boolean;
   onBoardChanged?: () => void;
+  /** Phase 2: renderer-coupled dispatch for viewport/undo/redo/theme commands. */
+  cliDispatch?: CliDispatchFn;
 }
 
 function defaultBoardPath(): string {
@@ -55,6 +63,7 @@ export class SysFacade {
       boardPath: deps?.boardPath ?? defaultBoardPath(),
       hasOpenRenderer: deps?.hasOpenRenderer ?? (() => false),
       ...(deps?.onBoardChanged ? { onBoardChanged: deps.onBoardChanged } : {}),
+      ...(deps?.cliDispatch ? { cliDispatch: deps.cliDispatch } : {}),
     };
     this.version = readVersion();
   }
@@ -117,10 +126,75 @@ export class SysFacade {
         };
       }
       // Renderer-side dispatch is wired in commandDispatch.ts via cli:dispatch IPC (Phase 2).
-      return {
-        ok: true,
-        message: `[stub] term.${command.sub} — will route via cli:dispatch in Phase 2.`,
-      };
+      if (!this.deps.cliDispatch) {
+        return {
+          ok: false,
+          message: `term.${command.sub} requires cli:dispatch (no renderer coupled)`,
+          data: { exitCode: 2 },
+        };
+      }
+      return this.deps.cliDispatch(`term.${command.sub}`, command as unknown as Record<string, unknown>);
+    }
+
+    // ── Phase 2 commands — renderer-coupled via cli:dispatch ──────────────────
+
+    if (command.kind === 'node' && command.sub === 'move') {
+      if (!command.id) return { ok: false, message: 'node move requires <id>' };
+      if (!command.to) return { ok: false, message: 'node move requires --to x,y' };
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'node move requires an open renderer window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('node.move', { id: command.id, x: command.to.x, y: command.to.y });
+    }
+
+    if (command.kind === 'viewport') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: `viewport.${command.sub} requires an open renderer window`, data: { exitCode: 2 } };
+      }
+      if (command.sub === 'pan') {
+        if (command.dx === undefined || command.dy === undefined) {
+          return { ok: false, message: 'viewport pan requires --dx and --dy' };
+        }
+        return this.deps.cliDispatch('viewport.pan', { dx: command.dx, dy: command.dy });
+      }
+      if (command.sub === 'zoom') {
+        if (command.factor === undefined) {
+          return { ok: false, message: 'viewport zoom requires --factor' };
+        }
+        return this.deps.cliDispatch('viewport.zoom', { factor: command.factor });
+      }
+    }
+
+    if (command.kind === 'undo') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'undo requires an open renderer window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('undo', {});
+    }
+
+    if (command.kind === 'redo') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'redo requires an open renderer window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('redo', {});
+    }
+
+    if (command.kind === 'marquee') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'marquee requires an open renderer window', data: { exitCode: 2 } };
+      }
+      if (!command.rect) return { ok: false, message: 'marquee requires --rect x1,y1,x2,y2' };
+      return this.deps.cliDispatch('marquee.delete', command.rect as unknown as Record<string, unknown>);
+    }
+
+    if (command.kind === 'theme') {
+      if (!command.value || !['light', 'dark'].includes(command.value)) {
+        return { ok: false, message: 'theme set requires <light|dark>' };
+      }
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'theme set requires an open renderer window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('theme.set', { value: command.value });
     }
 
     if (command.kind === 'habit') {
