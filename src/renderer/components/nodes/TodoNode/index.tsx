@@ -124,7 +124,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   return (
-    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
+    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} borderColor="var(--cyan-glow)" onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         <div
@@ -142,7 +142,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           }}
         >
           <span data-testid="todo-header">
-            <span style={{ color: 'var(--rust)' }}>●</span>
+            <span style={{ color: 'var(--cyan)' }}>●</span>
             {` Todos (${undoneCount})`}
           </span>
           {/* F6: clear done button — visible when ≥1 done item */}
@@ -399,14 +399,14 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   }
                 }}
                 style={{
-                  width: 36,
+                  width: 52,
                   background: 'transparent',
                   border: '1px solid var(--paper-3)',
                   borderRadius: 3,
                   outline: 'none',
                   padding: '1px 4px',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
+                  fontSize: 11.5,
                   color: 'var(--ink-2)',
                   caretColor: 'var(--acid)',
                   textAlign: 'right',

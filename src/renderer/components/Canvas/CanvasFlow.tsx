@@ -93,7 +93,7 @@ function TaskFlowEdge({
           strokeDasharray: '14 8',
           strokeLinecap: 'round',
           opacity: 1,
-          filter: 'drop-shadow(0 0 5px rgba(78, 168, 176, 0.45))',
+          filter: 'drop-shadow(0 0 3px rgba(78, 168, 176, 0.30))',
         }}
       />
     </>

@@ -302,33 +302,64 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           {` task · #${seqNum} L${layer}`}
         </span>
 
-        {/* F2/NF3: + pomo button — hidden when done */}
-        {!state.done && (
-          <button
-            type="button"
-            className="task-pomo-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCommand('task.spawnPomo');
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 8.5,
-              color: 'var(--cyan)',
-              border: '1px solid var(--cyan)',
-              borderRadius: 3,
-              padding: '2px 5px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              opacity: 0.85,
-              cursor: 'pointer',
-              background: 'transparent',
-            }}
-          >
-            + pomo
-          </button>
-        )}
+        {/* Header right slot: START (when not done + not active) or STOP (when active).
+            Never show both at once — STOP takes precedence when this task is the
+            pomo's active task. START dispatches task.startPomo (auto-start path).
+            STOP dispatches task.stopPomo (cancel + commit elapsed). */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {!state.done && !isActive && (
+            <button
+              type="button"
+              data-testid="task-start-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCommand('task.startPomo');
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8.5,
+                color: 'var(--acid)',
+                border: '1px solid var(--acid)',
+                borderRadius: 3,
+                padding: '2px 5px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                opacity: 0.85,
+                cursor: 'pointer',
+                background: 'transparent',
+              }}
+            >
+              START
+            </button>
+          )}
+          {isActive && (
+            <button
+              type="button"
+              data-testid="task-stop-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCommand('task.stopPomo');
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8.5,
+                color: 'var(--rust)',
+                border: '1px solid var(--rust)',
+                borderRadius: 3,
+                padding: '2px 5px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                opacity: 0.85,
+                cursor: 'pointer',
+                background: 'transparent',
+              }}
+            >
+              STOP
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Body */}
