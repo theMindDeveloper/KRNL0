@@ -15,6 +15,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   // Add-task input local UI state (NF4: no item state held in component)
   const [inputValue, setInputValue] = useState('');
   const [inputFocused, setInputFocused] = useState(false);
+  // Decision 22 F15 — minutes input next to task text. Empty string = use default
+  // (parsed from text or from pomoConfig.sessionMin in the dispatcher).
+  const [minutesValue, setMinutesValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   // F5: inline edit state
@@ -36,8 +39,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const commitAdd = () => {
     const text = inputValue.trim();
     if (text) {
-      onCommand('todo.add', { text });
+      const minutes = Number.parseInt(minutesValue, 10);
+      const plannedMin = Number.isFinite(minutes) && minutes > 0 ? minutes : undefined;
+      onCommand('todo.add', plannedMin !== undefined ? { text, plannedMin } : { text });
       setInputValue('');
+      setMinutesValue('');
       // NF3: re-focus after submit so successive entries require no click
       setInputFocused(true);
     }
@@ -118,7 +124,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   return (
-    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
+    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} borderColor="var(--cyan-glow)" onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         <div
@@ -136,7 +142,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           }}
         >
           <span data-testid="todo-header">
-            <span style={{ color: 'var(--rust)' }}>●</span>
+            <span style={{ color: 'var(--cyan)' }}>●</span>
             {` Todos (${undoneCount})`}
           </span>
           {/* F6: clear done button — visible when ≥1 done item */}
@@ -248,10 +254,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                     className="todo-text"
                     onDoubleClick={() => !item.done && startEdit(item.id, item.text)}
                     onClick={(e) => {
-                      // body click → start pomo for the linked task (if any)
                       e.stopPropagation();
                       if (item.taskNodeId !== null && !item.done) {
-                        onCommand('todo.startPomoForItem', { itemId: item.id });
+                        onCommand('todo.loadTaskForItem', { itemId: item.id });
                       }
                     }}
                     style={{
@@ -259,7 +264,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                       fontFamily: 'var(--font-sans)',
                       fontSize: 12.5,
                       color: item.done ? 'var(--ink-4)' : 'var(--ink)',
-                      textDecoration: item.done ? 'line-through' : 'none',
+                      textDecorationLine: item.done ? 'line-through' : 'none',
                       textDecorationColor: 'var(--ink-4)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -345,33 +350,69 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           }}
         >
           {inputFocused ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleAddKeyDown}
-              onBlur={() => {
-                // commit on blur if there's text, else collapse
-                if (inputValue.trim()) {
-                  commitAdd();
-                } else {
-                  setInputFocused(false);
-                }
-              }}
-              autoFocus
-              placeholder="task → spawns a node…"
-              style={{
-                flex: 1,
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                color: 'var(--ink)',
-                caretColor: 'var(--acid)',
-              }}
-            />
+            <>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleAddKeyDown}
+                onBlur={(e) => {
+                  // Don't collapse if focus moved to the minutes input
+                  const next = e.relatedTarget as HTMLElement | null;
+                  if (next?.dataset?.['testid'] === 'add-task-minutes') return;
+                  if (inputValue.trim()) {
+                    commitAdd();
+                  } else {
+                    setInputFocused(false);
+                  }
+                }}
+                autoFocus
+                placeholder="task → spawns a node…"
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  color: 'var(--ink)',
+                  caretColor: 'var(--acid)',
+                }}
+              />
+              <input
+                type="number"
+                min={1}
+                placeholder="min"
+                data-testid="add-task-minutes"
+                value={minutesValue}
+                onChange={(e) => setMinutesValue(e.target.value)}
+                onKeyDown={handleAddKeyDown}
+                onBlur={(e) => {
+                  const next = e.relatedTarget as HTMLElement | null;
+                  if (next === inputRef.current) return;
+                  if (inputValue.trim()) {
+                    commitAdd();
+                  } else {
+                    setInputFocused(false);
+                  }
+                }}
+                style={{
+                  width: 52,
+                  background: 'transparent',
+                  border: '1px solid var(--paper-3)',
+                  borderRadius: 3,
+                  outline: 'none',
+                  padding: '1px 4px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11.5,
+                  color: 'var(--ink-2)',
+                  caretColor: 'var(--acid)',
+                  textAlign: 'right',
+                  flexShrink: 0,
+                }}
+              />
+            </>
           ) : (
             <span
               data-testid="add-task-placeholder"

@@ -1,7 +1,9 @@
-// Decision #9 — PomoNode state contract.
+// Decision #9 / Decision #22 — PomoNode state contract.
 // Persistence rule: store `startedAt`; derive countdown from `now - startedAt`.
+// Decision 22 adds `activeTaskId` to state and canonicalises PomoConfig fields
+// to `{ sessionMin, shortBreakMin, longBreakMin, longBreakEvery }`.
 
-export type PomoStatus = 'idle' | 'running' | 'break' | 'done';
+export type PomoStatus = 'idle' | 'running' | 'paused' | 'break' | 'done';
 
 export interface PomoSessionRecord {
   id: string;
@@ -10,6 +12,7 @@ export interface PomoSessionRecord {
   durationMin: number;
   label: string;
   completed: boolean;
+  taskId?: string | null;
 }
 
 export interface PomoState {
@@ -19,14 +22,17 @@ export interface PomoState {
   breakMin: number;
   label: string;
   sessionsCompleted: number;
+  activeTaskId: string | null;
   history: PomoSessionRecord[];
+  pausedAt: string | null;
+  pausedElapsedMs: number;
 }
 
 export interface PomoConfig {
-  defaultDurationMin: number;
-  defaultBreakMin: number;
-  longBreakEvery: number;
+  sessionMin: number;
+  shortBreakMin: number;
   longBreakMin: number;
+  longBreakEvery: number;
 }
 
 export const defaultPomoState = (): PomoState => ({
@@ -36,12 +42,15 @@ export const defaultPomoState = (): PomoState => ({
   breakMin: 5,
   label: '',
   sessionsCompleted: 0,
+  activeTaskId: null,
   history: [],
+  pausedAt: null,
+  pausedElapsedMs: 0,
 });
 
 export const defaultPomoConfig = (): PomoConfig => ({
-  defaultDurationMin: 25,
-  defaultBreakMin: 5,
-  longBreakEvery: 4,
+  sessionMin: 25,
+  shortBreakMin: 5,
   longBreakMin: 15,
+  longBreakEvery: 4,
 });

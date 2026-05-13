@@ -315,8 +315,10 @@ return <Component key={node.id} node={node} selected={...} onCommand={...} onSel
 ## Decision 9 — PomoNode State Contract
 
 **Date:** 2026-05-10
-**Status:** Accepted
+**Status:** Accepted (superseded in part by Decision 22 — see below)
 **Author:** architect
+
+> **Update 2026-05-13:** Decision 22 adds `activeTaskId: string | null` to `PomoState`, canonicalises `PomoConfig` to `{ sessionMin, shortBreakMin, longBreakMin, longBreakEvery }`, and changes `pomoComplete` to branch break length on `(sessionsCompleted + 1) % longBreakEvery`. The FSM, transitions, and persistence rule below are otherwise unchanged.
 
 ### Context
 
@@ -1080,6 +1082,172 @@ pomoSessionsCompleted: number    // count of completed pomo sessions for this ta
 
 ---
 
+## Decision 22 — Pomodoro v2: gear settings, active-task mode, per-task time tracking
+
+**Status:** Accepted — 2026-05-13
+**Closes:** Pomodoro feature spec (this PR)
+**Related:** Decision 9 (PomoNode v1 FSM), Decision 20 (Todo/Task linkage)
+
+### Context
+
+The v1 PomoNode (Decision 9) is a global, label-driven timer with no concept of which task it is for. Configuration values exist on `PomoConfig` but have no UI to edit them — and the seed in `seedBoard()` writes a *different* config shape (`{ shortBreakMin, longBreakMin, sessionsUntilLongBreak }`) than `defaultPomoConfig()` produces (`{ defaultDurationMin, defaultBreakMin, longBreakEvery, longBreakMin }`). Long-break branching is also missing: `pomoComplete` ignores `longBreakEvery` and always uses `breakMin`.
+
+The user wants three things:
+
+1. A **gear settings panel** on the PomoNode for editing session length, short break, long break, and long-break cadence.
+2. **Per-task pomodoro mode**: when a task is clicked, the PomoNode adopts that task's `plannedMin`, derives the session count from `ceil(plannedMin / sessionMin)`, and visualises the relationship via a circular highlight on the active task plus a corner timer showing time-on-task.
+3. A **default mode** when no task is active — same node, same FSM, just no `activeTaskId` and no derived plan.
+
+### Decision
+
+#### 1. Single `PomoConfig` schema (canonical)
+
+```typescript
+export interface PomoConfig {
+  sessionMin: number;       // length of one focus session (default 25)
+  shortBreakMin: number;    // default 5
+  longBreakMin: number;     // default 15
+  longBreakEvery: number;   // long break after every N completed sessions (default 4)
+}
+```
+
+`board.ts` `CONFIG_DEFAULTS['pomo']` is added so older boards (with either the seed shape or the v1 `defaultPomoConfig` shape) are healed at load:
+
+- `shortBreakMin ← shortBreakMin ?? defaultBreakMin ?? 5`
+- `longBreakMin ← longBreakMin ?? 15`
+- `longBreakEvery ← longBreakEvery ?? sessionsUntilLongBreak ?? 4`
+- `sessionMin ← sessionMin ?? defaultDurationMin ?? 25`
+
+The legacy field names are not re-written on save (Decision 5 lossless round-trip), but they are *also* not consulted at runtime once the canonical fields are present.
+
+#### 2. `PomoState` adds one field
+
+```typescript
+export interface PomoState {
+  status: 'idle' | 'running' | 'break' | 'done';
+  startedAt: string | null;
+  durationMin: number;             // length of the *current* session; written on start
+  breakMin: number;                // length of the *current* break; written on complete
+  label: string;
+  sessionsCompleted: number;
+  activeTaskId: string | null;     // NEW — which task this session belongs to (null = default mode)
+  history: PomoSessionRecord[];
+}
+```
+
+`activeTaskId` is the **only** new persisted field on PomoState. It lives on PomoState (not on boardStore) because the pomo node is the sole consumer and storing it elsewhere creates stale-reference bugs across reloads.
+
+#### 3. `TaskState` adds two fields
+
+```typescript
+export interface TaskState {
+  // ...existing fields...
+  plannedMin: number;              // NEW — total minutes the user budgeted for this task
+  secondsAccumulated: number;      // NEW — total seconds spent on this task across sessions (persisted)
+}
+```
+
+`durationMin` already exists on TaskState; it now means "default per-session minutes used when this task is loaded into the pomo." On task creation it is initialised from `pomoConfig.sessionMin`. `plannedMin` is parsed from the user's input (see §6) or defaulted to `sessionMin`.
+
+`pomoSessionsCompleted` (Decision 20) remains and is incremented only when a session for this task completes.
+
+#### 4. Derived (NOT stored) values
+
+- `plannedSessions = max(1, ceil(plannedMin / sessionMin))`  — recomputed at render time. Survives gear-setting changes with no migration.
+- `nextBreakIsLong = (sessionsCompleted + 1) % longBreakEvery === 0` — drives which break length `pomoComplete` writes into `state.breakMin`.
+
+#### 5. Activation flow (clicking a task)
+
+Click on a task (body click) or on a linked todo row dispatches `task.startPomo` / `todo.startPomoForItem`. The dispatcher follows this state-change order:
+
+1. If `pomoState.activeTaskId !== null` and `pomoState.status === 'running'`, **commit elapsed** to the old active task's `secondsAccumulated`. The old session is recorded in `history` as cancelled.
+2. Set `pomoState.activeTaskId = newTaskId`.
+3. Load task settings into pomo: `label = task.text`, `durationMin = task.durationMin`, `breakMin = pomoConfig.shortBreakMin`.
+4. If the caller is a *click-to-activate* (no `--start` flag), pomo goes to `status: 'idle'` with the task loaded — user still has to press START. If the caller is `task.startPomo` (body click on task), it goes straight to `running`.
+5. Pomo node header updates to show task label and `session N/M` where M = `plannedSessions`.
+
+Clicking the gear icon or the pomo background clears `activeTaskId` to `null` ("default mode").
+
+#### 6. Time input on task creation
+
+The TodoNode add-task row gains a small minutes input adjacent to the text input:
+
+```
+[ task text...... ] [  m ]  ↵
+```
+
+The minutes input defaults to `pomoConfig.sessionMin`. On `Enter`, the dispatcher passes `{ text, plannedMin }` to `todo.add`, and `commandDispatch` spawns the TaskNode with that `plannedMin`. As a fallback, free-form text matching `/,\s*time:\s*(\d+)\s*(min|m|minutes)?/i` is also parsed (so the user can type `"homework, time: 40"` in the text-only field). The structured input takes precedence.
+
+#### 7. Long-break branching in `pomoComplete`
+
+When `pomoComplete` fires:
+
+- `sessionsCompleted++`
+- If `sessionsCompleted % longBreakEvery === 0`, write `breakMin = longBreakMin`. Otherwise `breakMin = shortBreakMin`.
+- If `activeTaskId !== null`, the task's `secondsAccumulated += durationMin * 60` and `pomoSessionsCompleted++`.
+
+#### 8. UI affordances
+
+- **Gear icon**: top-left of the PomoNode header, opens an inline panel inside the node body (replacing the vapor tube while open). Panel fields: session, short break, long break, long-break-every. Save persists via `pomo.setConfig`. Cancel restores.
+- **Active-task circular highlight**: when `pomoState.activeTaskId === task.id`, the TaskNode root gains `class="active"`, which renders an animated 1.5px acid-coloured ring (`box-shadow: 0 0 0 2px var(--acid), 0 0 24px var(--acid-glow)`).
+- **Corner timer**: top-left of TaskNode body. Shows `formatHMS(secondsAccumulated + liveDelta)` where `liveDelta` is `(now - pomo.startedAt) / 1000` when this task is the active running one, else `0`. One `setInterval` lives inside the TaskNode (only mounted when active or has accumulated time > 0); the rest of the time it's a static derived value.
+
+### Consequences
+
+- **Enables**: editable gear settings, automatic long breaks, per-task time accounting, dynamic pomo refresh on task click, derived session count without state writes.
+- **Forecloses**: a global "pause" state (pause is still cancel-and-resume).
+- **Migration**: covered by `STATE_DEFAULTS['pomo']` (adds `activeTaskId: null` if absent), `CONFIG_DEFAULTS['pomo']` (unifies the config shape), and `STATE_DEFAULTS['todo.task']` (adds `plannedMin` defaulted to `durationMin`, and `secondsAccumulated: 0`).
+- **Tick rule preserved**: pomo state is still derived from `now - startedAt`. The corner timer adds *one* `setInterval` per active task — bounded by `activeTaskId === 1` invariant.
+- **R9 (lossless restart) preserved**: a running session restored from disk re-derives the timer and the active task label as before. `secondsAccumulated` is committed on cancel/complete only, so a crash mid-session loses only the in-flight delta — same as v1.
+
+---
+
+## Decision 22.1 — Pomodoro v2 bug-fix pass (pause status + per-task checkpoint)
+
+**Status:** Accepted — 2026-05-13
+**Closes:** Follow-up to PR #90 (Decision 22). 9 user-reported bugs + 3 audit-discovered adjacencies.
+**Related:** Decision 22 (Pomodoro v2 baseline), Decision 9 (PomoNode FSM).
+
+### Context
+
+PR #90 shipped Decision 22 (gear settings, active-task mode, per-task time tracking). The user ran `npm run dev` against the worktree and filed 9 bugs, all confirmed by audit, plus 3 adjacent defects bundled into the same pass. Most are corrected behaviour of features that shipped half-formed in Decision 22 — the task body click that auto-started instead of loading, the PAUSE button that cancelled instead of pausing, the pip count that overflowed, the ETA badge that was not editable, and the session-length that ignored the task's `plannedMin`. One defect (pause status) is genuinely new FSM territory: Decision 22 explicitly foreclosed a global pause state; this amendment reverses that decision by introducing `'paused'` as a first-class FSM status with `pausedAt` / `pausedElapsedMs` so the clock can freeze without writing a history record. The 4-agent team (FSM → dispatcher → UI → tester → pm-docs) executed the full pass on the same branch as PR #90. All 9 user-reported stories are now Gherkin scenarios in CI.
+
+### Decision
+
+1. **`PomoStatus` adds `'paused'`.** `PomoState` gains `pausedAt: string | null` and `pausedElapsedMs: number`. `pomoPause` snapshots elapsed; `pomoResume` offsets `startedAt` so the existing `now - startedAt` derivation continues to work without code change. `pomoCancel` accepts both `running` and `paused`; for paused, `endedAt` in the history record is `pausedAt` (truthful — moment activity stopped).
+2. **`TaskState` adds `currentSessionElapsedSec: number`.** Per-task in-flight session checkpoint. Written when a task is swapped out (live elapsed → checkpoint). Restored when re-activating that task (checkpoint → pomo `pausedElapsedMs` and offset `startedAt`). Cleared on `pomo.cancel` / `pomo.complete` after the final commit to `secondsAccumulated` (the no-double-count invariant).
+3. **New commands:** `pomo.pause`, `pomo.resume`, `task.loadIntoPomo` (no auto-start), `task.setCurrentSessionElapsedSec`, `task.clearCurrentSessionElapsedSec`.
+4. **`loadTaskIntoPomo(taskId, { autoStart })`** in dispatcher unifies activation. `task.startPomo` / `task.spawnPomo` / `todo.startPomoForItem` use `autoStart: true`; the new `task.loadIntoPomo` (dispatched on TaskNode body-click) uses `autoStart: false`.
+5. **Session-length clamp.** Per-session `durationMin = max(1, min(plannedMin - pomoSessionsCompleted * sessionMin, sessionMin))`. So `plannedMin=1, sessionMin=10` → one 1-min session; `plannedMin=35, sessionMin=10` after 3 sessions → 5-min final session.
+6. **Cascades extended:** `task.toggle` cancels the active session when a running task is marked done AND commits the elapsed time inline into `secondsAccumulated` (the dispatcher branch that normally does this is bypassed when `pomoCancel` is called directly from the toggle path). `task.delete` clears `activeTaskId` and cancels pomo when the deleted task was active.
+7. **UI:** Gear icon top-right and disabled while busy; PAUSE/RESUME wiring; pip count capped at 8 (with "+N more"); per-active-task session counter; TaskNode body-click loads without starting; double-click ETA opens inline `task.setPlannedMin` input.
+
+### Consequences
+
+- Restores the user's intuitive flow: click loads, START starts, PAUSE pauses (no data loss), task switches preserve per-task progress.
+- Forecloses: auto-completing a paused session (must resume first).
+- Migration: `STATE_DEFAULTS` extensions for `pomo` (`pausedAt: null, pausedElapsedMs: 0`) and `todo.task` (`currentSessionElapsedSec: 0`) — pre-v2.1 boards backfill via the existing `migrateNodeStates` spread.
+- No double-counting invariant pinned by test: `start → run 60s → cancel` produces `secondsAccumulated === 60` and `currentSessionElapsedSec === 0`.
+
+### Bug table (9 user-reported + 3 adjacencies)
+
+| # | Bug | Root cause | Fix file |
+|---|---|---|---|
+| 1 | Gear icon top-left instead of top-right | Gear was the first flex child with no `marginLeft: auto` | `PomoNode/index.tsx` |
+| 2 | Clicking a task auto-starts the pomo | Body click dispatched `task.startPomo` → `pomoStart()` with no "load only" path | `TaskNode/index.tsx`, `commandDispatch.ts` |
+| 3 | Marking active running task done does not stop the timer | `task.toggle` cascade never inspected `pomo.activeTaskId` | `commandDispatch.ts` |
+| 4 | PAUSE button resets instead of pausing | No `'paused'` FSM status; button dispatched `pomo.cancel` | `PomoNode/commands.ts`, `PomoNode/index.tsx` |
+| 5 | `plannedMin` not editable after creation | `task.setPlannedMin` handler existed but no UI invoked it | `TaskNode/index.tsx` |
+| 6 | State does not refresh on task click | Same root cause as #2 | `TaskNode/index.tsx`, `commandDispatch.ts` |
+| 7 | 1-min task gets a 10-min session | `durationMin` hardcoded to `cfg.sessionMin`; activation never consulted `plannedMin` | `commandDispatch.ts` |
+| 8 | Switching tasks resets the timer | No per-task in-flight checkpoint; clock always restarts from full `durationMin` | `PomoNode/types.ts`, `TaskNode/types.ts`, `commandDispatch.ts` |
+| 9 | Pip overflow at high `pipCount` | No cap, no wrap; 40 pips rendered off-screen | `PomoNode/index.tsx` |
+| A | `task.delete` does not clear `pomo.activeTaskId` | Delete cascade omitted the pomo clear step | `commandDispatch.ts` |
+| F | Gear panel openable mid-session; saving corrupts in-flight derivation | No disable guard on the gear button | `PomoNode/index.tsx` |
+| H | Session counter showed global `sessionsCompleted` instead of per-task | Counter read `state.sessionsCompleted` regardless of `activeTaskId` | `PomoNode/index.tsx` |
+
+---
+
 ## Decision 21 — Asset persistence and the `krnl-asset://` protocol
 
 **Status:** Accepted — 2026-05-12
@@ -1122,3 +1290,144 @@ The TextNode and ImageNode shipped as read-only placeholders. To make them hones
   - SVG sanitiser is a string scan, not a DOM parser. The four-pattern blocklist (`<script`, `onload=`, `onerror=`, `onclick=`) covers the obvious vectors; a future hardening pass could use DOMPurify or a real XML reader.
 
 > **Renumber note:** this ADR was authored as "Decision 20" on `feat/text-image-nodes`, which branched before `feat/todo-task-nodes` (also Decision 20) merged. Renumbered to 21 on merge — no design change.
+
+---
+
+## Decision 22.2 — Todo-family theming, animated edges, per-task start/stop, subtask backfill (2026-05-13)
+
+**Status:** Accepted — 2026-05-13
+**Closes:** 6 follow-up reports on PR #90 after Decision 22 + 22.1 shipped.
+**Related:** Decision 20 (Todo/Task linkage), Decision 22 (Pomodoro v2 baseline), Decision 22.1 (pause + per-task checkpoint).
+
+### Context
+
+PR #90 reached the user with the gear panel, pause/resume, per-task checkpoint, and clamp logic of 22 + 22.1 in place. Hands-on testing surfaced six issues — five UX, one missed cascade. None of them require new persisted fields: every fix sits on top of state shapes that 20 and 22.1 already locked in. This amendment is purely UI + dispatcher rewiring + one CSS pass on the selection ring and animated edge.
+
+### Decision
+
+**No schema changes.** Walked one-sentence-each, the 6 fixes consume only existing fields:
+
+1. Per-task Start/Stop uses `pomo.activeTaskId`, `task.startPomo`, and `pomo.cancel` — all extant.
+2. "Click loads, does not start" is `task.loadIntoPomo` shipped in 22.1 — verification only.
+3. Minutes parsing extends the existing `parseMinutesFromText` helper in `commandDispatch.ts:102`; the renderer minutes input keeps its existing state.
+4. Subtask TodoItem backfill consumes `TodoItem.taskNodeId` and `TaskState.todoItemId` from Decision 20 — both already there.
+5. Selection-ring CSS, MotherFrame `borderColor` prop, and TodoNode header bullet color are all rendering knobs.
+6. Animated-edges flip is a single boolean in `rfAdapters.tsx` plus filter-strength tuning.
+
+Backend-dev: do not add fields. If you reach for one, stop and re-read this paragraph.
+
+#### Fix 1 — Per-task Start (green) / Stop (red) shortcut on TaskNode
+
+**Problem.** The `+ POMO` button on the TaskNode header (TaskNode/index.tsx:307-330) currently dispatches `task.spawnPomo`, which routes through `loadTaskIntoPomo({ autoStart: true })` and starts the timer immediately. The user wants START/STOP to live only on the parent PomoNode for the global pause/reset semantics; the per-task button should be a *shortcut* into the pomo, not a hidden third controller.
+
+**Decision.** Replace the single `+ POMO` button with a pair:
+- **START** (green, `var(--acid)`): always visible when `!state.done`. Dispatches `task.startPomo` (existing — loads this task and auto-starts; routes through `loadTaskIntoPomo({ autoStart: true })`).
+- **STOP** (red, `var(--rust)`): visible *only* when `pomo.activeTaskId === thisTaskId` (regardless of running/paused). Dispatches a **new** command `task.stopPomo`.
+
+`task.stopPomo` is added so the verb matches the surface. Dispatcher routes it through `pomoCancel(pomoState)` + the elapsed-commit branch already used by `task.delete` when an active task is removed (commandDispatch.ts:481-489) + `pomoClearActiveTask`. Pause is **not** a verb on the TaskNode — pause stays on the PomoNode.
+
+**Contract.**
+- File: `src/renderer/components/nodes/TaskNode/index.tsx` — remove the `+ POMO` button block at lines 305-331; render a flex row with two buttons. START is hidden when `state.done`; STOP is hidden unless `isActive` (the existing variable at line 59).
+- Styles: START — `color: var(--acid); border: 1px solid var(--acid)`; STOP — `color: var(--rust); border: 1px solid var(--rust)`. Same 8.5px uppercase mono as the existing button. Both `onMouseDown={(e) => e.stopPropagation()}` to stay drag-safe.
+- New command: `task.stopPomo` in the `case 'todo.task'` block of `commandDispatch.applyCommand`. Branch sequence:
+  1. Resolve the single pomo node (kind === 'pomo').
+  2. If `pomo.activeTaskId !== thisTaskId`, no-op.
+  3. If running: commit `floor((now - startedAt) / 1000 + currentSessionElapsedSec)` into this task's `secondsAccumulated`; call `pomoCancel` (history record gets the cancel marker).
+  4. If paused: commit `pausedElapsedMs / 1000 + currentSessionElapsedSec` and call `pomoCancel`.
+  5. Clear `task.currentSessionElapsedSec = 0`. Call `pomoClearActiveTask` so `activeTaskId` returns to `null`.
+  6. Persist via the existing tail-save pattern.
+- `task.spawnPomo` stays in the dispatcher (sys CLI still uses it); the UI just stops referencing it.
+
+#### Fix 2 — Click task body = load only, no auto-start (verification)
+
+**Problem.** Decision 22.1 introduced `task.loadIntoPomo` and the UI was meant to switch to it for body clicks. We need to confirm this is what shipped on PR #90 and document it.
+
+**Decision.** Verification-only. Body-click handler in `TaskNode/index.tsx` must dispatch `task.loadIntoPomo` (not `task.startPomo` or `task.spawnPomo`). The drag-safe guard (mouseup delta < 4px) from Decision 20 invariant 7 stays.
+
+**Contract.** Tester should add a Gherkin scenario: *"Given a task is not active, when I click its body, then pomo.activeTaskId becomes this task AND pomo.status remains 'idle'."* If the body-click handler currently calls `task.startPomo` instead of `task.loadIntoPomo`, flip it; that's the only code change.
+
+#### Fix 3 — Trailing-suffix minutes parser + wider minutes input
+
+**Problem.** Quick-add minutes is too click-heavy: the user has to tab from the text input into a 36px field that reads as a "small place." A power-user shortcut (`"groceries 25m"`) would let them never leave the text input.
+
+**Decision.** Two complementary tweaks:
+
+(a) **Extend `parseMinutesFromText` in `commandDispatch.ts:102` to also match a trailing suffix.** New combined regex returns `{ plannedMin, strippedText }`:
+- Trailing suffix: `/\s+(\d+)\s*(?:min|minutes?|m)\s*$/i` (whitespace-anchored, end-of-string).
+- Existing inline `, time:`: `/,\s*time:\s*(\d+)\s*(?:min|m|minutes?)?/i` — kept for back-compat (Decision 22 §6).
+- Precedence: trailing suffix > inline `, time:` > structured `plannedMin` argument from the UI. (Rationale: typing `"foo 25m"` is the user's explicit intent and should override a stale minutes input.)
+- Signature change: `parseMinutesFromText(text) → { plannedMin: number | null, strippedText: string }`. Caller in `todo.add` uses `strippedText` as the saved task text.
+
+(b) **Widen the minutes input.** TodoNode/index.tsx:402 — change `width: 36` to `width: 52`. No other layout changes.
+
+**Tab from text → minutes already works** via the `data-testid="add-task-minutes"` onBlur guard at TodoNode/index.tsx:362-365. Do not refactor that guard. Document the behaviour in a code comment so future authors don't trip it.
+
+**Contract.**
+- File: `src/renderer/components/Canvas/commandDispatch.ts` — replace `parseMinutesFromText`; update the `todo.add` branch to use `strippedText` as the canonical text and resolve `plannedMin` with the precedence rule above.
+- File: `src/renderer/components/nodes/TodoNode/index.tsx` — line 402 width change only. Renderer does **not** strip the suffix; it sends raw `text` and the dispatcher handles it. (Single source of truth for parsing.)
+- Tester: cover `"foo 25m"` / `"foo 25 min"` / `"foo 25minutes"` / `"foo, time: 25"` / `"foo 25m, time: 40"` (trailing suffix wins → 25) / `"foo"` (no match → undefined).
+
+#### Fix 4 — `task.addSubtask` must backfill a TodoItem on the parent TodoNode
+
+**Problem.** At commandDispatch.ts:537 the new child TaskNode is spawned with `todoItemId: null`. That violates Decision 20 invariant 1 (bidirectional linkage) and means subtasks never appear in the parent TodoNode list. Right-click → Add subtask therefore looks like a silent failure to the user. Symmetric bug: `task.delete` cascade at commandDispatch.ts:471-507 only removes the **root** task's linked TodoItem — once subtasks have TodoItems, the cascade must remove every descendant's TodoItem too.
+
+**Decision.** `task.addSubtask` appends a new TodoItem to the parent TodoNode (resolved via `parentTask.parentTodoId`) and writes the bidirectional links atomically in the same store transaction. Sub-subtasks (layer ≥ 3) keep appending to the *same* parent TodoNode — there is no per-task TodoNode. UI indentation of nested items on the parent TodoNode is **out of scope** for v2.2; it lands flat. The user has accepted this consequence ("UI indentation comes later").
+
+`task.delete` cascade is extended: after `collectDescendants`, iterate every descendant whose state has `todoItemId !== null` and call `todoRemove` on the resolved parent TodoNode for each. One `updateNode` per descendant with a backlink is acceptable (the operation is bounded by tree depth × siblings, and avoids a more invasive batch API). Then `removeNodeSet` removes the task nodes themselves. The root removal already at line 491-503 stays as-is — but make sure it runs **after** the descendant pass so renumbering is correct.
+
+**Contract.**
+- File: `src/renderer/components/Canvas/commandDispatch.ts` — the `task.addSubtask` branch (lines 511-569):
+  1. Build the child TaskNode as today, but **leave `todoItemId: null` only momentarily**.
+  2. Resolve the parent TodoNode via `parentTask.parentTodoId`. (It always exists by invariant.)
+  3. Generate a new TodoItem `id` (use the same id-shape as `TodoNode/commands.ts` already uses for items) with `text: childState.text`, `done: false`, `taskNodeId: childNode.id`.
+  4. Update `childState.todoItemId = newItem.id`.
+  5. Append the item to the parent TodoNode's state via the existing `todoLinkTask` + `todoAdd` (whichever maps cleanest — backend-dev may add a single `todoAttachTask({ text, taskNodeId, itemId? })` if neither composes cleanly; check `TodoNode/commands.ts` first).
+  6. `addNode(childNode)`, `addEdge(edge)`, `updateNode(todoNode.id, { state: newTodoState })`, then one `boardSave`.
+- File: same file — `task.delete` branch (lines 471-507):
+  - After `collectDescendants` returns the list, before `removeNodeSet`, build a map of `parentTodoId → TodoItem.id[]` from descendants where `todoItemId !== null`, then for each parent TodoNode dispatch successive `todoRemove` calls (single `updateNode` per parent is fine — batch the items in one reducer pass if the existing `todoRemove` signature supports it; otherwise loop). Renumbering at line 504 still runs once at the end.
+- Tester: Gherkin — *"Given a TaskNode with two subtasks each with one sub-subtask, when I delete the root, then the parent TodoNode has zero items linked to that subtree AND four task nodes are removed."*
+
+#### Fix 5 — Todo-family selection ring is rounded + cyan (todo-family only)
+
+**Problem.** RF's default selection ring (`reactflow-theme.css:48-53`) is `outline: 1px solid var(--acid)` — non-rounded, acid-green, applied globally. The user wants the todo family to be visibly cyan, with the selection ring rounded to match the card. Pomo/Habit/AI mothers should keep their acid-green selection (they are not in the todo family).
+
+**Decision.** Scope the cyan ring to nodes that belong to the todo family — TodoNode mother, TaskNode children. Acid-green selection survives for everything else. Achieved via a class-scoped CSS rule, not by editing every node's inline style.
+
+**Contract.**
+- File: `src/renderer/styles/reactflow-theme.css` — keep the existing global rule (`var(--acid)` outline) as the default for non-todo nodes, but add a more specific rule that targets the todo family. Two approaches; pick the simpler one when wiring:
+  - Add `data-node-kind` attribute on the wrapper that `rfAdapters.tsx` emits, then write `.react-flow__node[data-node-kind="todo"].selected, .react-flow__node[data-node-kind="todo.task"].selected { outline: none; box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78,168,176,0.35); border-radius: var(--radius-lg); }`.
+  - Or class-tag in the wrapper element directly (`className="krnl-node-todo"` etc.) and key off that.
+- TodoNode (`src/renderer/components/nodes/TodoNode/index.tsx`): change the header bullet at line 145 from `var(--rust)` to `var(--cyan)`; pass `borderColor="var(--cyan-glow)"` to MotherFrame at line 127. MotherFrame already accepts `borderColor` (MotherFrame/index.tsx:16). No new prop.
+- TaskNode header bullet at line 301 is **already** `--cyan`; do **not** touch it.
+- TaskNode's active-ring (`isActiveRunning`/`isActivePaused` at lines 218-225) stays acid-green. "Currently being timed" is a different concept from "selected."
+
+#### Fix 6 — Re-enable animated task-flow edges, softer cyan glow
+
+**Problem.** The dash march keyframe (`reactflow-theme.css:32-37`) is wired and period-matched, but `rfAdapters.tsx:85` sets `animated: false` because the original cyan drop-shadow read as "noisy." With the softer values below, the march is back on.
+
+**Decision.** Flip `animated: true` for `task-flow` edges and soften the BaseEdge cyan drop-shadow. Concrete values (not "soften"):
+
+**Contract.**
+- File: `src/renderer/components/Canvas/rfAdapters.tsx:85` — change `animated: false` to `animated: srcKind === 'todo.task' && tgtKind === 'todo.task'` (only task-flow edges march; default-typed edges stay still).
+- File: `src/renderer/components/edges/TaskFlowEdge` (or wherever the BaseEdge style for task-flow is set — Grep for `drop-shadow` near `task-flow`): drop the blur from `5px` to `3px`, and the alpha from `0.45` to `0.30` in the cyan `rgba(...)`. Hover state at `reactflow-theme.css:39-41` retains its existing `9px / 0.85` punch.
+- Tester: visual check in `npm run dev` with two TaskNodes linked. Confirm the dash march is visible but the glow does not bleed across other nodes.
+
+### Styling philosophy (codified)
+
+Re-stated here as the single source of truth for v2.2 onward. Backend-dev: when adding a new node or affordance, pick the color whose role matches your concept; do not invent new hues.
+
+- **Blue (cyan family) — todo-family kinship.** Used by: TodoNode mother (header bullet, MotherFrame border via `--cyan-glow`), TaskNode children (header bullet), the *selection ring* on todo-family nodes (rounded box-shadow), task-flow edges, animated dash march on those edges. Tokens: `--cyan`, `--cyan-glow`.
+- **Acid green — active-focus signal.** Used by: pomo running and paused rings on TaskNode, primary call-to-action buttons (e.g. the new START), the global RF selection ring on **non-todo** families (Pomo, Habit, AI mothers and their children). Token: `--acid` (+ glow values for shadow).
+- **Rust — danger / cancel / destructive.** Used by: STOP button on TaskNode, RESET on PomoNode, hover-tinted delete affordances. Token: `--rust`.
+- **Spine — identity / slot tags.** Used by: MotherFrame slot badges. Do not extend to other surfaces.
+
+If a future affordance does not fit any of these four, that is a signal to challenge the affordance — not invent a fifth color.
+
+### Consequences
+
+- **Enables.** A clear per-task entry/exit pair (START/STOP); a power-user quick-add (`"foo 25m"`); honest todo-tree state (every subtask shows up on its TodoNode); a visually distinct todo family without per-component overrides; the animated edge the user originally specified, at a softer intensity.
+- **Forecloses.** Sub-subtask items on the parent TodoNode are flat (no indentation in v2.2). Custom selection ring colors per non-todo node kind (everything non-todo is acid-green; intentional). A pause verb on the TaskNode (pause stays on the PomoNode, always).
+- **No migration.** No schema additions; existing boards load and save unchanged. New `task.stopPomo` command is dispatcher-only and never persisted.
+- **Cascade invariant pinned.** Decision 20 invariant 1 (bidirectional linkage at creation) and invariant 4 (delete cascade clears all linked TodoItems) are now enforced for subtasks as well, not only root tasks. Add a Gherkin scenario for the multi-level case.
+
+---

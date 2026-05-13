@@ -1,7 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
+import type { ChangeEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState } from './types';
+import { defaultPomoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+import { useBoardStore } from '../../../store/boardStore';
+import { useShallow } from 'zustand/react/shallow';
+import type { TaskState } from '../TaskNode/types';
 
 const TICK_MS = 500;
 
@@ -19,7 +24,7 @@ export function calcRemainingPct(
   remainingMs: number,
   totalMs: number,
 ): number {
-  if (status === 'running' || status === 'break') {
+  if (status === 'running' || status === 'break' || status === 'paused') {
     return Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
   }
   return status === 'idle' ? 100 : 0;
@@ -29,13 +34,14 @@ export function calcRemainingPct(
 export function primaryButtonLabel(status: PomoState['status']): string {
   switch (status) {
     case 'running': return 'PAUSE';
+    case 'paused':  return 'RESUME';
     case 'break':   return 'SKIP BREAK';
     case 'done':    return 'START';
     default:        return 'START'; // 'idle'
   }
 }
 
-/** Pip state for session pip at index i (F6). */
+/** Pip state for session pip at index i (F6 + Decision 22 derived plannedSessions). */
 export function pipState(
   i: number,
   completedDots: number,
@@ -46,12 +52,28 @@ export function pipState(
   return 'empty';
 }
 
-export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<PomoState, PomoConfig>) {
-  const { state, config } = node;
+export function PomoNode({
+  node,
+  onCommand,
+  slotIndex = 1,
+  slotTotal = MOTHER_TOTAL,
+  onMoveLeft,
+  onMoveRight,
+}: NodeProps<PomoState, PomoConfig>) {
+  const { state } = node;
+  const config = node.config ?? defaultPomoConfig();
   const [, setTick] = useState(0);
 
+  // Gear panel local UI state (Decision 22 F9).
+  const [gearOpen, setGearOpen] = useState(false);
+  const [draftConfig, setDraftConfig] = useState<PomoConfig>(config);
+
+  useEffect(() => {
+    if (!gearOpen) setDraftConfig(config);
+  }, [config, gearOpen]);
+
   // Visual tick — state mutations go through onCommand (Decision #9)
-  // NF1: setInterval at TICK_MS (500ms) drives the visual refresh.
+  // Only runs while running or break — NOT while paused (frozen display).
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'break') return;
     const id = setInterval(() => setTick((t) => t + 1), TICK_MS);
@@ -65,10 +87,13 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
         ? state.breakMin * 60_000
         : state.durationMin * 60_000;
 
+  // A.4 — paused: elapsedMs reads from the frozen checkpoint
   const elapsedMs =
-    (state.status === 'running' || state.status === 'break') && state.startedAt !== null
-      ? Date.now() - Date.parse(state.startedAt)
-      : 0;
+    state.status === 'paused'
+      ? state.pausedElapsedMs
+      : (state.status === 'running' || state.status === 'break') && state.startedAt !== null
+        ? Date.now() - Date.parse(state.startedAt)
+        : 0;
   const remainingMs = totalMs - elapsedMs;
 
   // F7 — auto-dispatch pomo.complete when timer hits zero
@@ -76,13 +101,41 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
     if (state.status === 'running' && remainingMs <= 0) onCommand('pomo.complete');
   }, [state.status, remainingMs, onCommand]);
 
-  const sessionsTarget = config?.longBreakEvery ?? 4;
-  const completedDots = state.sessionsCompleted % sessionsTarget;
+  const isTaskMode = state.activeTaskId !== null;
 
-  // F5 — context-driven primary button
+  // Decision 22 §4 + F10 + A.6 — derive plannedSessions from the active task's
+  // plannedMin, and also read that task's pomoSessionsCompleted for the per-task counter.
+  const { activeTaskPlannedMin, activeTaskPomoSessionsCompleted } = useBoardStore(
+    useShallow((s) => {
+      const id = state.activeTaskId;
+      if (!id || !s.board) {
+        return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
+      }
+      const t = s.board.nodes.find((n) => n.id === id);
+      if (!t) return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
+      const ts = t.state as TaskState;
+      return {
+        activeTaskPlannedMin: ts.plannedMin ?? null,
+        activeTaskPomoSessionsCompleted: ts.pomoSessionsCompleted ?? 0,
+      };
+    }),
+  );
+
+  const pipCount = isTaskMode && activeTaskPlannedMin
+    ? Math.max(1, Math.ceil(activeTaskPlannedMin / config.sessionMin))
+    : config.longBreakEvery;
+
+  // A.6 — when in task mode, use the per-task session counter
+  const sessionsForDisplay = isTaskMode
+    ? activeTaskPomoSessionsCompleted
+    : state.sessionsCompleted;
+  const completedDots = sessionsForDisplay % pipCount;
+
+  // F5 — context-driven primary button (A.3)
   const handlePrimary = () => {
     if (state.status === 'idle' || state.status === 'done') onCommand('pomo.start');
-    else if (state.status === 'running') onCommand('pomo.cancel');
+    else if (state.status === 'running') onCommand('pomo.pause');
+    else if (state.status === 'paused') onCommand('pomo.resume');
     else if (state.status === 'break') onCommand('pomo.skipBreak');
   };
   // F4 — RESET always dispatches pomo.cancel (FSM guards the actual transition)
@@ -105,14 +158,50 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
     animationDelay: `${i * 0.7}s`,
   })), []);
 
-  // F3 — colon blinks at 1 Hz ONLY while running
+  // F3 — colon blinks at 1 Hz ONLY while running (halted during paused)
   const colonAnimation = state.status === 'running'
     ? 'pomo-blink 1s steps(2) infinite'
     : 'none';
 
+  const headerLeft = isTaskMode
+    ? `TASK · ${truncate(state.label || 'task', 18)}`
+    : 'DEEP WORK';
+  const headerRight = isTaskMode ? '· ACTIVE' : '· POMO.025';
+
+  // A.2 — gear disabled while session is in-flight (running, paused, break)
+  const gearDisabled = state.status !== 'idle' && state.status !== 'done';
+
+  const openGear = () => {
+    setDraftConfig(config);
+    setGearOpen(true);
+  };
+  const closeGear = () => setGearOpen(false);
+
+  // Decision 22 F11 — close + clear active task.
+  const closeGearAndClearActive = () => {
+    setGearOpen(false);
+    if (isTaskMode) onCommand('pomo.clearActiveTask');
+  };
+
+  const saveGear = () => {
+    onCommand('pomo.setConfig', { config: draftConfig });
+    setGearOpen(false);
+  };
+
+  const updateDraft = (key: keyof PomoConfig) =>
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const raw = Number(e.target.value);
+      const clamped = Number.isFinite(raw) ? Math.max(1, Math.round(raw)) : draftConfig[key];
+      setDraftConfig((d) => ({ ...d, [key]: clamped }));
+    };
+
+  // A.5 — pip cap: show at most 8 pips; append "+N more" when pipCount > 8
+  const MAX_PIPS = 8;
+  const visiblePipCount = Math.min(pipCount, MAX_PIPS);
+  const overflowPips = pipCount > MAX_PIPS ? pipCount - MAX_PIPS : 0;
+
   return (
     <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
-      {/* NF2: Bubble keyframes are pure CSS — no JS drives them */}
       <style>{`
         @keyframes vapor-rise {
           0%   { transform: translateY(0) scale(1); opacity: 0; }
@@ -130,9 +219,59 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
           border-radius: 50%;
           animation: vapor-rise linear infinite;
         }
+        .pomo-gear-btn {
+          background: transparent;
+          border: 1px solid var(--paper-3);
+          color: var(--ink-3);
+          width: 18px;
+          height: 18px;
+          border-radius: 4px;
+          cursor: pointer;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          line-height: 1;
+        }
+        .pomo-gear-btn:hover:not(:disabled) {
+          color: var(--acid);
+          border-color: var(--acid);
+        }
+        .pomo-gear-btn:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
+        }
+        .pomo-settings-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          padding: 6px 0;
+        }
+        .pomo-settings-label {
+          font-family: var(--font-mono);
+          font-size: 10.5px;
+          color: var(--ink-2);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .pomo-settings-input {
+          width: 56px;
+          padding: 4px 6px;
+          background: var(--paper);
+          border: 1px solid var(--paper-3);
+          border-radius: 4px;
+          font-family: var(--font-mono);
+          font-size: 12px;
+          color: var(--ink);
+          text-align: right;
+          outline: none;
+        }
+        .pomo-settings-input:focus {
+          border-color: var(--acid);
+        }
       `}</style>
 
-      {/* Header — bullet + DEEP WORK · POMO.025 */}
+      {/* Header — title + bullet + gear (A.1: gear is last flex child = right side) */}
       <div
         style={{
           padding: '7px 12px 6px',
@@ -148,252 +287,387 @@ export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TO
       >
         <span style={{
           width: 6, height: 6, borderRadius: '50%',
-          background: state.status === 'running' ? 'var(--rust)' : 'var(--ink-4)',
+          background: state.status === 'running'
+            ? (isTaskMode ? 'var(--acid)' : 'var(--rust)')
+            : 'var(--ink-4)',
         }} />
-        <span style={{ color: 'var(--ink-2)', fontWeight: 500 }}>DEEP WORK</span>
-        <span style={{ color: 'var(--ink-3)' }}>· POMO.025</span>
+        <span
+          data-testid="pomo-header-label"
+          style={{
+            color: isTaskMode ? 'var(--acid)' : 'var(--ink-2)',
+            fontWeight: 500,
+          }}
+        >
+          {headerLeft}
+        </span>
+        <span style={{ color: 'var(--ink-3)' }}>{headerRight}</span>
+        {/* A.1 — spacer pushes gear to the right */}
+        <span style={{ flex: 1 }} />
+        {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight */}
+        <button
+          type="button"
+          className="pomo-gear-btn"
+          data-testid="pomo-gear"
+          aria-label={gearOpen ? 'Close settings' : 'Open settings'}
+          title={gearDisabled ? 'Stop session to edit settings' : undefined}
+          disabled={gearDisabled}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (gearOpen) closeGearAndClearActive();
+            else openGear();
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ fontSize: 11 }}
+        >
+          {gearOpen ? '✕' : '⚙'}
+        </button>
       </div>
 
-      {/* Body — vapor tube + info */}
-      <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Body — either settings panel OR vapor tube */}
+      {gearOpen ? (
         <div
-          className="pomo-vapor"
-          style={{ display: 'flex', gap: 16, alignItems: 'stretch', minHeight: 240 }}
+          data-testid="pomo-settings-panel"
+          style={{
+            padding: '14px 16px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+            minHeight: 240,
+          }}
         >
-          {/* F2 — Vapor tube with six tick marks (25/20/15/10/05/00) */}
-          <div
-            className="tube"
-            style={{
-              position: 'relative',
-              width: 64,
-              flexShrink: 0,
-              background: 'rgba(0,0,0,0.5)',
-              border: '1.5px solid var(--paper-3)',
-              borderRadius: 32,
-              overflow: 'hidden',
-              boxShadow: 'inset 2px 0 0 rgba(255,255,255,0.04), inset -2px 0 0 rgba(0,0,0,0.12)',
-            }}
-          >
-            {/* F1 — Liquid fill: height = remainingPct% */}
-            <div
-              className="liquid"
-              data-testid="pomo-liquid"
-              style={{
-                position: 'absolute',
-                left: 0, right: 0, bottom: 0,
-                height: `${remainingPct}%`,
-                background: 'linear-gradient(180deg, var(--acid-glow) 0%, var(--acid) 40%, var(--spine) 100%)',
-                transition: 'height 0.6s linear',
-                boxShadow: '0 0 24px var(--acid), inset 0 -8px 16px rgba(0,0,0,0.25)',
-              }}
-            >
-              {/* Meniscus — top glow on liquid surface */}
-              <div style={{
-                position: 'absolute',
-                top: -3, left: 0, right: 0,
-                height: 6,
-                background: 'linear-gradient(180deg, var(--acid-glow), transparent)',
-                filter: 'blur(2px)',
-              }} />
-            </div>
-
-            {/* NF2 — Bubbles: pure CSS animation, positions memoised */}
-            <div
-              className="bubbles"
-              style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}
-            >
-              {bubbles.map((b, i) => (
-                <span
-                  key={i}
-                  className="pomo-bubble"
-                  style={{
-                    left: b.left,
-                    animationDuration: b.animationDuration,
-                    animationDelay: b.animationDelay,
-                  }}
-                />
-              ))}
-            </div>
-
-            {/* F2 — Tick marks: 25 / 20 / 15 / 10 / 05 / 00 on tube right edge */}
-            <div
-              className="ticks"
-              data-testid="pomo-ticks"
-              style={{
-                position: 'absolute',
-                top: 0, bottom: 0, right: 6,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                padding: '8px 0',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 7.5,
-                color: 'var(--ink-3)',
-                letterSpacing: '0.06em',
-                pointerEvents: 'none',
-              }}
-            >
-              <span>25</span>
-              <span>20</span>
-              <span>15</span>
-              <span>10</span>
-              <span>05</span>
-              <span>00</span>
-            </div>
-          </div>
-
-          {/* Info column — big clock + phase label + reserve % */}
-          <div
-            className="info"
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              gap: 6,
-              fontFamily: 'var(--font-mono)',
-            }}
-          >
-            {/* F3 — Clock display: MM:SS; colon blinks at 1 Hz ONLY while running */}
-            <div
-              className="num"
-              data-testid="pomo-clock"
-              style={{
-                fontSize: 44,
-                letterSpacing: '-0.04em',
-                color: 'var(--ink)',
-                fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1,
-                fontWeight: 300,
-              }}
-            >
-              {mm}
-              <span
-                className="colon"
-                data-testid="pomo-colon"
-                data-running={state.status === 'running'}
-                style={{
-                  color: 'var(--rust)',
-                  animation: colonAnimation,
-                }}
-              >:</span>
-              {ss}
-            </div>
-            <div
-              className="label"
-              style={{
-                fontSize: 9.5,
-                color: 'var(--ink-3)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-              }}
-            >
-              {state.label ? state.label : 'deep work'} · phase 03
-            </div>
-            <div
-              className="pct"
-              style={{
-                fontSize: 11,
-                color: 'var(--acid)',
-                marginTop: 4,
-                textShadow: '0 0 8px rgba(201,241,88,0.45)',
-              }}
-            >
-              {state.status === 'idle' ? 'ready' : `${Math.round(remainingPct)}% reserve`}
-            </div>
-          </div>
-        </div>
-
-        {/* F6 — Session pips: highlight pip at index (sessionsCompleted % longBreakEvery) */}
-        <div
-          className="pomo-pips"
-          data-testid="pomo-pips"
-          style={{ display: 'flex', gap: 8, justifyContent: 'flex-start' }}
-        >
-          {Array.from({ length: sessionsTarget }).map((_, i) => {
-            const ps = pipState(i, completedDots, state.status);
-            return (
-              <span
-                key={i}
-                className={`pip ${ps}`}
-                data-pip-index={i}
-                data-pip-state={ps}
-                style={{
-                  width: 9, height: 9, borderRadius: '50%',
-                  border: '1.5px solid',
-                  borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
-                  background: ps === 'done' ? 'var(--rust)' : 'transparent',
-                  boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
-                  position: 'relative',
-                }}
-              />
-            );
-          })}
-          <span style={{
-            marginLeft: 'auto',
+          <div style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 9.5,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
-            letterSpacing: '0.1em',
+            letterSpacing: '0.08em',
+            paddingBottom: 8,
+            borderBottom: '1px dashed var(--paper-3)',
           }}>
-            session {state.sessionsCompleted} / {sessionsTarget}
-          </span>
-        </div>
+            settings
+          </div>
 
-        {/* F4/F5 — Controls: RESET ghost + primary acid-filled */}
-        <div
-          className="pomo-controls"
-          style={{ display: 'flex', gap: 6 }}
-        >
-          {/* F4 — RESET dispatches pomo.cancel */}
-          <button
-            type="button"
-            data-testid="pomo-reset"
-            onClick={handleReset}
-            className="pomo-btn ghost"
-            style={{
-              flex: 1,
-              padding: '10px 8px',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 5,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              cursor: 'pointer',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            RESET
-          </button>
-          {/* F5 — Primary: START / PAUSE / SKIP BREAK */}
-          <button
-            type="button"
-            data-testid="pomo-primary"
-            onClick={handlePrimary}
-            className="pomo-btn"
-            style={{
-              flex: 1,
-              padding: '10px 8px',
-              background: 'var(--acid)',
-              color: 'var(--paper)',
-              border: 'none',
-              borderRadius: 5,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              cursor: 'pointer',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {buttonLabel}
-          </button>
+          {([
+            ['sessionMin', 'Session (min)'],
+            ['shortBreakMin', 'Short break (min)'],
+            ['longBreakMin', 'Long break (min)'],
+            ['longBreakEvery', 'Long break every'],
+          ] as Array<[keyof PomoConfig, string]>).map(([key, label]) => (
+            <div key={key} className="pomo-settings-row">
+              <span className="pomo-settings-label">{label}</span>
+              <input
+                type="number"
+                min={1}
+                className="pomo-settings-input"
+                data-testid={`pomo-settings-${key}`}
+                value={draftConfig[key]}
+                onChange={updateDraft(key)}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </div>
+          ))}
+
+          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+            <button
+              type="button"
+              data-testid="pomo-settings-cancel"
+              onClick={(e) => { e.stopPropagation(); closeGear(); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                flex: 1,
+                padding: '8px',
+                background: 'transparent',
+                color: 'var(--ink-2)',
+                border: '1px solid var(--paper-3)',
+                borderRadius: 5,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              CANCEL
+            </button>
+            <button
+              type="button"
+              data-testid="pomo-settings-save"
+              onClick={(e) => { e.stopPropagation(); saveGear(); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                flex: 1,
+                padding: '8px',
+                background: 'var(--acid)',
+                color: 'var(--paper)',
+                border: 'none',
+                borderRadius: 5,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              SAVE
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div
+            className="pomo-vapor"
+            style={{ display: 'flex', gap: 16, alignItems: 'stretch', minHeight: 240 }}
+          >
+            {/* Vapor tube */}
+            <div
+              className="tube"
+              style={{
+                position: 'relative',
+                width: 64,
+                flexShrink: 0,
+                background: 'rgba(0,0,0,0.5)',
+                border: '1.5px solid var(--paper-3)',
+                borderRadius: 32,
+                overflow: 'hidden',
+                boxShadow: 'inset 2px 0 0 rgba(255,255,255,0.04), inset -2px 0 0 rgba(0,0,0,0.12)',
+              }}
+            >
+              <div
+                className="liquid"
+                data-testid="pomo-liquid"
+                style={{
+                  position: 'absolute',
+                  left: 0, right: 0, bottom: 0,
+                  height: `${remainingPct}%`,
+                  background: 'linear-gradient(180deg, var(--acid-glow) 0%, var(--acid) 40%, var(--spine) 100%)',
+                  transition: 'height 0.6s linear',
+                  boxShadow: '0 0 24px var(--acid), inset 0 -8px 16px rgba(0,0,0,0.25)',
+                }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: -3, left: 0, right: 0,
+                  height: 6,
+                  background: 'linear-gradient(180deg, var(--acid-glow), transparent)',
+                  filter: 'blur(2px)',
+                }} />
+              </div>
+              <div
+                className="bubbles"
+                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}
+              >
+                {bubbles.map((b, i) => (
+                  <span
+                    key={i}
+                    className="pomo-bubble"
+                    style={{
+                      left: b.left,
+                      animationDuration: b.animationDuration,
+                      animationDelay: b.animationDelay,
+                    }}
+                  />
+                ))}
+              </div>
+              <div
+                className="ticks"
+                data-testid="pomo-ticks"
+                style={{
+                  position: 'absolute',
+                  top: 0, bottom: 0, right: 6,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  padding: '8px 0',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 7.5,
+                  color: 'var(--ink-3)',
+                  letterSpacing: '0.06em',
+                  pointerEvents: 'none',
+                }}
+              >
+                <span>25</span>
+                <span>20</span>
+                <span>15</span>
+                <span>10</span>
+                <span>05</span>
+                <span>00</span>
+              </div>
+            </div>
+
+            <div
+              className="info"
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                gap: 6,
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              <div
+                className="num"
+                data-testid="pomo-clock"
+                style={{
+                  fontSize: 44,
+                  letterSpacing: '-0.04em',
+                  color: 'var(--ink)',
+                  fontVariantNumeric: 'tabular-nums',
+                  lineHeight: 1,
+                  fontWeight: 300,
+                }}
+              >
+                {mm}
+                <span
+                  className="colon"
+                  data-testid="pomo-colon"
+                  data-running={state.status === 'running'}
+                  style={{
+                    color: 'var(--rust)',
+                    animation: colonAnimation,
+                  }}
+                >:</span>
+                {ss}
+              </div>
+              <div
+                className="label"
+                style={{
+                  fontSize: 9.5,
+                  color: 'var(--ink-3)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                }}
+              >
+                {isTaskMode
+                  ? `${truncate(state.label || 'task', 18)} · phase ${String(sessionsForDisplay + 1).padStart(2, '0')}`
+                  : `${state.label || 'deep work'} · phase 03`}
+              </div>
+              <div
+                className="pct"
+                style={{
+                  fontSize: 11,
+                  color: 'var(--acid)',
+                  marginTop: 4,
+                  textShadow: '0 0 8px rgba(201,241,88,0.45)',
+                }}
+              >
+                {state.status === 'idle' ? 'ready' : `${Math.round(remainingPct)}% reserve`}
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="pomo-pips"
+            data-testid="pomo-pips"
+            style={{ display: 'flex', gap: 8, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap' }}
+          >
+            {/* A.5 — render at most 8 pips */}
+            {Array.from({ length: visiblePipCount }).map((_, i) => {
+              const ps = pipState(i, completedDots, state.status);
+              return (
+                <span
+                  key={i}
+                  className={`pip ${ps}`}
+                  data-pip-index={i}
+                  data-pip-state={ps}
+                  style={{
+                    width: 9, height: 9, borderRadius: '50%',
+                    border: '1.5px solid',
+                    borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
+                    background: ps === 'done' ? 'var(--rust)' : 'transparent',
+                    boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
+                    position: 'relative',
+                    flexShrink: 0,
+                  }}
+                />
+              );
+            })}
+            {/* A.5 — overflow indicator */}
+            {overflowPips > 0 && (
+              <span
+                data-testid="pomo-pips-overflow"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9.5,
+                  color: 'var(--ink-3)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  flexShrink: 0,
+                }}
+              >
+                +{overflowPips} more
+              </span>
+            )}
+            <span style={{
+              marginLeft: 'auto',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9.5,
+              color: 'var(--ink-3)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+            }}>
+              session {sessionsForDisplay} / {pipCount}
+            </span>
+          </div>
+
+          <div
+            className="pomo-controls"
+            style={{ display: 'flex', gap: 6 }}
+          >
+            <button
+              type="button"
+              data-testid="pomo-reset"
+              onClick={handleReset}
+              className="pomo-btn ghost"
+              style={{
+                flex: 1,
+                padding: '10px 8px',
+                background: 'transparent',
+                color: 'var(--ink-2)',
+                border: '1px solid var(--paper-3)',
+                borderRadius: 5,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              RESET
+            </button>
+            <button
+              type="button"
+              data-testid="pomo-primary"
+              onClick={handlePrimary}
+              className="pomo-btn"
+              style={{
+                flex: 1,
+                padding: '10px 8px',
+                background: 'var(--acid)',
+                color: 'var(--paper)',
+                border: 'none',
+                borderRadius: 5,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {buttonLabel}
+            </button>
+          </div>
+        </div>
+      )}
     </MotherFrame>
   );
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + '…';
 }
 
 export default PomoNode;

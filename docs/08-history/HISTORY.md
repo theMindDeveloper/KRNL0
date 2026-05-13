@@ -368,3 +368,75 @@ Three changes, in priority order:
 **PR:** #89
 **Files changed:** `scripts/dev-port.mjs` (new), `scripts/dev-port.d.mts` (new), `scripts/dev.mjs`, `electron.vite.config.ts`, `src/main/index.ts`, `tests/unit/dev-port.test.ts` (new), `docs/03-architecture/decisions.md` (ADR 17 amendment)
 **Summary:** Closed the final gap in the worktree isolation story established by ADR 17 and PR `fix/worktree-isolation`. Board JSON, the assets folder, and Electron `userData` were already isolated per worktree. The missing surface was the Vite dev-server port. Vite defaults to `5173` and, when a second worktree starts `npm run dev`, silently falls back to `5174` — but `src/main/index.ts` had the URL hardcoded to `http://localhost:5173`. The result was that worktree B's Electron window loaded worktree A's renderer bundle: both windows showed identical UI even though each was reading its own separate `board.json`, making the isolation appear completely broken from the developer's seat. The fix introduces a new `scripts/dev-port.mjs` helper that derives a deterministic port from a SHA-1 hash of the absolute worktree root path, mapped into the range `[5174, 5273]`. `scripts/dev.mjs` sets `KRNL0_DEV_PORT` from this helper (honoring a pre-set value as an escape hatch). `electron.vite.config.ts` reads `KRNL0_DEV_PORT` into `renderer.server.port` with `strictPort: true` — the strict flag is non-negotiable: without it Vite would silently fall back and reintroduce the exact bug. `src/main/index.ts` reads the same env var when constructing the dev URL, falling back to `5173` so single-instance launches without `scripts/dev.mjs` remain unaffected. Five Vitest tests cover determinism, range, spread across distinct paths, and edge cases. ADR 17 amended with a `### Update — 2026-05-13: Dev server port` subsection documenting the symptom, root cause, decision, and conventions. Tests: 555 passed, 0 failed. `npm run typecheck`: 0 errors.
+
+---
+
+## [2026-05-13] — Pomodoro v2: gear settings, active-task mode, per-task time tracking
+
+**Type:** Feature
+**Branch:** `claude/objective-montalcini-ae7bb0`
+**Files changed:**
+- New ADR: `docs/03-architecture/decisions.md` (Decision 22 — supersedes Decision 9 PomoConfig fields)
+- Requirements: `docs/06-requirements/pomo-node.md` (F9–F13), `docs/06-requirements/todo-node.md` (F15), `docs/06-requirements/task-node.md` (F14–F17)
+- Renderer types: `src/renderer/components/nodes/PomoNode/types.ts` (canonical `PomoConfig` + `activeTaskId`), `src/renderer/components/nodes/TaskNode/types.ts` (`plannedMin`, `secondsAccumulated`)
+- Renderer FSM: `src/renderer/components/nodes/PomoNode/commands.ts` (long-break branching, `pomoSetConfig`, `pomoClearActiveTask`), `src/renderer/components/nodes/TaskNode/commands.ts` (`taskAccumulateSeconds`, `taskSetPlannedMin`)
+- Renderer UI: `src/renderer/components/nodes/PomoNode/index.tsx` (gear panel + active-task header), `src/renderer/components/nodes/TodoNode/index.tsx` (minutes input), `src/renderer/components/nodes/TaskNode/index.tsx` (corner timer + active highlight)
+- Dispatcher: `src/renderer/components/Canvas/commandDispatch.ts` (activation flow with commit-elapsed-then-load, side-effects of cancel/complete onto active task)
+- Persistence: `src/main/persistence/board.ts` (`migratePomoConfig`, `migrateTaskPlannedMin`, CONFIG_DEFAULTS for `pomo`, STATE_DEFAULTS updated for both kinds, canonical seed)
+- Sys CLI: `src/sys/commands/task.ts` (initialise new fields when spawning tasks/subtasks)
+- Tests: `tests/unit/renderer/PomoNode.commands.test.ts` (taskId on history record, activeTaskId in state shape), `tests/unit/renderer/PomoNode.decision22.test.ts` (new — 13 tests), `tests/unit/main/board.decision22-migration.test.ts` (new — 4 tests)
+
+**Summary:** Pomodoro got three connected upgrades. (1) A **gear icon** in the PomoNode header opens an inline settings panel with `Session / Short break / Long break / Long break every` fields; SAVE persists via `pomo.setConfig`. (2) **Active-task mode**: clicking any TaskNode (or a linked todo row) now atomically commits the prior session's elapsed time to the previous active task, swaps `pomoState.activeTaskId`, loads the new task's per-session length, and starts running. The PomoNode header switches to `TASK · <text>` in acid colour, and the active TaskNode gains a 2-px acid ring + `0 0 24px` glow. (3) A **corner timer** in the top-left of each TaskNode shows `secondsAccumulated + live delta`, formatted `H:MM:SS` or `MM:SS`. The timer is rendered statically except when this task is the active running one — then a single 500 ms `setInterval` is mounted locally (one ticker per app, gated by `isActiveRunning`), so the dock/perf regression that PR #56 fixed is not reintroduced.
+
+The PomoNode FSM gains long-break branching: `pomoComplete` now reads `(sessionsCompleted + 1) % longBreakEvery === 0` and writes either `shortBreakMin` or `longBreakMin` into `state.breakMin`. The legacy `PomoConfig` schemas (the seed's `{ shortBreakMin, longBreakMin, sessionsUntilLongBreak }` and v1 `defaultPomoConfig`'s `{ defaultDurationMin, defaultBreakMin, longBreakEvery, longBreakMin }`) are healed at load time by `migratePomoConfig` into the canonical `{ sessionMin, shortBreakMin, longBreakMin, longBreakEvery }` — this migration runs *before* `migrateNodeStates` so CONFIG_DEFAULTS doesn't clobber legacy-derived values. Tests pin the migration and the FSM. TodoNode's add-task row gains a small minutes input; the regex `/,\s*time:\s*(\d+)/i` is a fallback when the dedicated input is empty.
+
+**Tests:** 572 passed (+17 new), 0 typecheck errors.
+
+---
+
+## [2026-05-13] — Pomodoro v2 bug-fix pass (PR #90 follow-up)
+
+**Type:** Bug fix / hardening
+**Branch:** `claude/objective-montalcini-ae7bb0` (PR #90 picks up the additional commit)
+**Files changed:**
+- ADR: `docs/03-architecture/decisions.md` (Decision 22.1)
+- Requirements: `docs/06-requirements/{pomo,task}-node.md` (F-rows added)
+- Renderer types/FSM: `PomoNode/types.ts` (paused status, pausedAt, pausedElapsedMs), `PomoNode/commands.ts` (pomoPause, pomoResume; pomoCancel loosened), `TaskNode/types.ts` (currentSessionElapsedSec), `TaskNode/commands.ts` (taskSetCurrentSessionElapsedSec, taskClearCurrentSessionElapsedSec)
+- Dispatcher: `commandDispatch.ts` (loadTaskIntoPomo, checkpointActiveTaskElapsed, extended task.toggle/task.delete cascades, secondsAccumulated commit on toggle-done)
+- Renderer UI: `PomoNode/index.tsx`, `TaskNode/index.tsx`
+- Persistence: `src/main/persistence/board.ts` (STATE_DEFAULTS extensions, seed updated)
+- Tests: `tests/unit/renderer/PomoNode.decision22.test.ts` (+pause/resume), `tests/unit/renderer/TaskNode.commands.test.ts` (+ checkpoint), `tests/unit/main/board.decision22-migration.test.ts` (+migration), `tests/unit/renderer/commandDispatch.decision22-bugs.test.ts` (new — 15), `tests/unit/renderer/PomoNode.bugs.test.tsx` (new — 15), `tests/unit/renderer/TaskNode.bugs.test.tsx` (new — 13), `tests/integration/PomoNode.decision22-bugs.scenarios.test.ts` (new — 25 Gherkin)
+
+**Summary:** User ran `npm run dev` on the v0.6.1 worktree and filed 9 bugs against the Pomodoro v2 feature. An audit confirmed all 9 plus 3 adjacent defects. A 4-agent team (FSM → dispatcher → UI → tester → pm-docs) executed the bug-fix pass on the same branch. Highlights: (1) real PAUSE/RESUME via a new `'paused'` FSM status with `pausedAt`/`pausedElapsedMs`; (2) per-task in-flight session checkpoint (`currentSessionElapsedSec`) so task A retains its progress when the user switches to task B and back; (3) `task.loadIntoPomo` separates "load settings" from "start session" so clicking a task no longer auto-starts the timer; (4) session-length clamp so a 1-min task gets a 1-min session, not 10; (5) gear UI moved top-right and disabled while busy; (6) pip count capped at 8 with overflow text. The 9 user stories the user manually tested are now Gherkin scenarios in `tests/integration/PomoNode.decision22-bugs.scenarios.test.ts`, ensuring CI catches any regression.
+
+**Tests:** 662 passing (+53 since PR #90 base), 0 typecheck errors, build clean.
+
+---
+
+## [2026-05-13] — Pomodoro / Todo family v2.2 — UI polish, animated edges, subtask backfill
+
+**Type:** Bug fix / UX polish
+**Branch:** `claude/objective-montalcini-ae7bb0` (PR #90 second follow-up pass)
+**ADR:** Decision 22.2
+**Commits:** `0705d71` (feat), `734933b` (fix), `8f6e3c5` (test)
+**Files changed:**
+- ADR: `docs/03-architecture/decisions.md` (Decision 22.2)
+- Docs: `docs/03-architecture/styling-philosophy.md` (new — color-family contract)
+- Renderer UI: `TaskNode/index.tsx` (START/STOP buttons replace `+ POMO`), `TodoNode/index.tsx` (header bullet `--cyan`, MotherFrame `borderColor="var(--cyan-glow)"`, minutes input wider)
+- Dispatcher: `commandDispatch.ts` (`task.stopPomo` command, `parseMinutesFromText` trailing-suffix parser, `task.addSubtask` bidirectional backfill, `task.delete` subtask cascade)
+- Canvas: `rfAdapters.tsx` (animated task-flow edges `animated: true` for `todo.task → todo.task`; `krnl-kind-<kind>` className emitted for CSS-scoped selection ring)
+- Styles: `reactflow-theme.css` (cyan selection ring for `.krnl-kind-todo` / `.krnl-kind-todo--task`, softer drop-shadow `3px / 0.30`)
+- Tests: `tests/integration/PomoNode.decision22-2-stories.test.ts` (new — 30 Gherkin scenarios across 6 user stories)
+
+**What happened.** User ran `npm run dev` on the Decision 22.1 worktree and filed 6 follow-up issues. None required schema changes — every fix reuses existing state fields:
+
+- **Issue 1 — Blue `+ POMO` button auto-starts pomo.** Replace single `+ POMO` with per-task START (green, `--acid`) and STOP (red, `--rust`). START dispatches `task.startPomo`; STOP dispatches new `task.stopPomo` command which commits elapsed seconds, cancels the pomo, and clears `activeTaskId`. STOP only visible when this task is the active one. `task.spawnPomo` stays in dispatcher for sys CLI.
+- **Issue 2 — Task body click should load only, not start.** Verified: body-click dispatches `task.loadIntoPomo` (Decision 22.1). No code change needed; documented in Decision 22.2 as a contract invariant.
+- **Issue 3 — TodoNode quick-add: typing time in text field should work without a mouse click.** Extended `parseMinutesFromText` to also match a trailing suffix (`"foo 25m"`, `"foo 25 min"`, `"foo 25minutes"`). Returns `{ plannedMin, strippedText }`. Trailing suffix takes precedence over inline `, time: N` and over UI minutes input. Minutes input widened from 36 px to 52 px.
+- **Issue 4 — Subtask via right-click didn't appear in parent TodoList.** `task.addSubtask` now appends a new TodoItem to the parent TodoNode (resolved via `parentTask.parentTodoId`) and writes bidirectional links atomically. `task.delete` cascade extended to remove every descendant's linked TodoItem before removing task nodes.
+- **Issue 5 — Selection highlight: rounded blue ring for todo family.** `rfAdapters.tsx` emits `krnl-kind-<kind>` className per node. A more-specific CSS rule in `reactflow-theme.css` overrides the global acid-green ring for `.krnl-kind-todo` and `.krnl-kind-todo--task`: rounded `box-shadow: 0 0 0 2px var(--cyan)`. TodoNode header bullet changed from `--rust` to `--cyan`; MotherFrame receives `borderColor="var(--cyan-glow)"`.
+- **Issue 6 — Animated edge lines not visible.** `rfAdapters.tsx` sets `animated: true` only when `srcKind === 'todo.task' && tgtKind === 'todo.task'`. Cyan drop-shadow softened from `5px / 0.45` to `3px / 0.30`; hover retains `9px / 0.85`.
+
+**Why.** Concrete UX problems that blocked daily use: the auto-starting `+ POMO` button hijacked the timer unintentionally; subtasks silently vanished from the todo list; the selection ring gave no visual indication of todo-family membership; the dash-march animation the user originally spec'd was disabled.
+
+**Tests:** 694 passing (+32 since Decision 22.1 pass), 1 todo, 0 failed. Typecheck clean.

@@ -1,6 +1,6 @@
 # PomoNode — Component Requirements
 
-*Phase 5 · React Flow migration · Derived from PRD v0.6.0, Decision 9, Decision 13, and LifeOS Whiteboard reference*
+*Phase 5 · React Flow migration · Derived from PRD v0.6.0, Decision 9, Decision 13, Decision 22, and LifeOS Whiteboard reference*
 
 ---
 
@@ -16,6 +16,16 @@
 | F6 | Four session pips below the tube show progress within the `longBreakEvery` cycle; the pip matching `sessionCount % longBreakEvery` is highlighted |
 | F7 | When `remainingMs ≤ 0` the component automatically dispatches `pomo.complete` without user interaction |
 | F8 | An RF `<Handle type="source" position="right">` is rendered at vertical center for downstream edge chaining |
+| F9 | A **gear icon** in the top-left of the header opens an inline settings panel inside the node body. Panel fields: `Session (min)`, `Short break (min)`, `Long break (min)`, `Long break every (sessions)`. SAVE dispatches `pomo.setConfig` with the new `PomoConfig`; CANCEL restores prior values. While the panel is open the vapor tube is hidden. |
+| F10 | When `state.activeTaskId !== null` the header label switches from `DEEP WORK · POMO.025` to `TASK · <task.text>` (truncated to 24 chars). The `session N / M` line below the pips shows `M = max(1, ceil(task.plannedMin / config.sessionMin))` — the *derived* session count, not a stored one. |
+| F11 | Clicking the gear icon, or pressing ESC inside the settings panel, also clears `state.activeTaskId` if a task was active — returning the node to default mode. |
+| F12 | `pomoComplete` selects break length using `longBreakEvery`: when `(sessionsCompleted + 1) % longBreakEvery === 0` the next break uses `config.longBreakMin`, otherwise `config.shortBreakMin`. The chosen value is written into `state.breakMin` at the transition. |
+| F13 | When a session for an `activeTaskId` completes or is cancelled, the dispatcher commits `floor((endedAt - startedAt) / 1000)` seconds to the linked task's `secondsAccumulated` and, on completion only, increments `pomoSessionsCompleted` on that task. |
+| F14 | Gear button is rendered at the top-right of the header (after the title with `flex: 1` spacer) and is disabled — greyed out, pointer-events none — when `state.status` is not `idle` or `done`. Tooltip reads "Stop session to edit settings". (Supersedes the top-left position in F9 — Decision 22.1) |
+| F15 | Primary button mapping: `running → PAUSE`, `paused → RESUME`. Pressing PAUSE writes `pausedAt` and `pausedElapsedMs` without writing a history record. The tick interval is disabled while paused; the clock displays the frozen elapsed value. RESET still dispatches `pomo.cancel` from any status including `paused`. (Supersedes implicit cancel-on-PAUSE from Decision 22 — Decision 22.1) |
+| F16 | When `pipCount > 8`, exactly 8 pips render plus a `+N more` text element where N = `pipCount - 8`; the `session N / pipCount` counter label carries the full count. |
+| F17 | Session counter shows the active task's `pomoSessionsCompleted` when `activeTaskId !== null`, else the global `state.sessionsCompleted`. |
+| F18 | Pressing PAUSE freezes the visible clock at the current elapsed and disables the tick interval. Auto-complete (`pomo.complete`) does not fire while `status === 'paused'`. |
 
 ---
 
@@ -121,4 +131,4 @@ Feature: PomoNode vapor timer
 
 ---
 
-*Last updated: 2026-05-10*
+*Last updated: 2026-05-13 — Decision 22.1 (pause status, pip cap, per-task counter)*

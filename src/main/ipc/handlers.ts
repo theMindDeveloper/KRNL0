@@ -159,13 +159,26 @@ export function registerHandlers(): void {
       throw new Error(diag);
     }
 
+    // Guard every send against a destroyed sender — during app quit the PTY
+    // can emit one last chunk after the BrowserWindow's webContents has been
+    // torn down, raising "Object has been destroyed" in node-pty's emitter
+    // and crashing the main process with an Uncaught Exception dialog.
+    const safeSend = (channel: string, ...args: unknown[]): void => {
+      if (event.sender.isDestroyed()) return;
+      try {
+        event.sender.send(channel, ...args);
+      } catch {
+        // Race: sender destroyed between isDestroyed check and send.
+      }
+    };
+
     proc.onData((data: string) => {
-      event.sender.send(`pty:data:${sessionId}`, data);
+      safeSend(`pty:data:${sessionId}`, data);
     });
 
     proc.onExit(() => {
       ptySessions.delete(sessionId);
-      event.sender.send(`pty:exit:${sessionId}`);
+      safeSend(`pty:exit:${sessionId}`);
     });
 
     ptySessions.set(sessionId, proc);

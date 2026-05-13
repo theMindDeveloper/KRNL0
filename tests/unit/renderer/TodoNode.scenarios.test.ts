@@ -169,7 +169,7 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
       renderTodoNode(state);
       const doneText = document.querySelector('.todo-item.done .todo-text') as HTMLElement;
       expect(doneText).not.toBeNull();
-      expect(doneText.style.textDecoration).toContain('line-through');
+      expect(doneText.style.textDecorationLine).toBe('line-through');
     });
 
     it('done item text color is var(--ink-4)', () => {

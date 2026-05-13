@@ -20,6 +20,9 @@
  *
  * Decision #14.1 (v2.2): habit.lane child nodes route mutations to the
  * mother habit they point to.
+ *
+ * Decision #22.1: loadTaskIntoPomo, checkpointActiveTaskElapsed, pause/resume,
+ * per-task session checkpoint, extended task.toggle and task.delete cascades.
  */
 
 import { useBoardStore } from '../../store/boardStore';
@@ -29,12 +32,17 @@ import type { Edge } from '@shared/types/edge';
 // ── Pomo ──────────────────────────────────────────────────────────────
 import {
   pomoStart,
+  pomoPause,
+  pomoResume,
   pomoCancel,
   pomoComplete,
   pomoSkipBreak,
   pomoEndBreak,
+  pomoSetConfig,
+  pomoClearActiveTask,
 } from '../nodes/PomoNode/commands';
-import type { PomoState } from '../nodes/PomoNode/types';
+import type { PomoConfig, PomoState } from '../nodes/PomoNode/types';
+import { defaultPomoConfig } from '../nodes/PomoNode/types';
 
 // ── Todo ──────────────────────────────────────────────────────────────
 import {
@@ -53,6 +61,10 @@ import {
   taskEdit,
   taskIncrementPomo,
   taskActivate,
+  taskAccumulateSeconds,
+  taskSetPlannedMin,
+  taskSetCurrentSessionElapsedSec,
+  taskClearCurrentSessionElapsedSec,
 } from '../nodes/TaskNode/commands';
 import type { TaskState } from '../nodes/TaskNode/types';
 
@@ -82,6 +94,35 @@ import {
 
 // ── dispatch ──────────────────────────────────────────────────────────
 
+/**
+ * Decision 22 / 22.2 — extract minutes from free-form task text.
+ *
+ * Priority:
+ *   1. Trailing suffix: "25m", "25 min", "25 minutes" (whitespace-anchored, end-of-string).
+ *      When matched, the suffix is stripped from the returned strippedText so the
+ *      saved item text is clean (e.g. "groceries 25m" → "groceries").
+ *   2. Legacy inline pattern: ", time: 25" — kept for back-compat (Decision 22 §6).
+ *      strippedText is the original text (no stripping for legacy form).
+ *   3. Neither matches → plannedMin: null, strippedText unchanged.
+ */
+export function parseMinutesFromText(text: string): { plannedMin: number | null; strippedText: string } {
+  // 1. Trailing suffix: " 25m" / "25 min" / "25 minutes"
+  const trailing = /\s+(\d+)\s*(?:min|minutes?|m)\s*$/i.exec(text);
+  if (trailing && trailing[1]) {
+    const n = Number.parseInt(trailing[1], 10);
+    if (Number.isFinite(n) && n > 0) {
+      return { plannedMin: n, strippedText: text.slice(0, trailing.index).trimEnd() };
+    }
+  }
+  // 2. Legacy: ", time: 25"
+  const legacy = /,\s*time:\s*(\d+)\s*(?:min|m|minutes?)?/i.exec(text);
+  if (legacy && legacy[1]) {
+    const n = Number.parseInt(legacy[1], 10);
+    if (Number.isFinite(n) && n > 0) return { plannedMin: n, strippedText: text };
+  }
+  return { plannedMin: null, strippedText: text };
+}
+
 type Args = Record<string, unknown>;
 
 interface DispatchResult {
@@ -95,12 +136,17 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
 
   switch (node.kind) {
     case 'pomo': {
+      const pomoCfg = (c as unknown as PomoConfig | null) ?? defaultPomoConfig();
       switch (command) {
         case 'pomo.start':    return { state: pomoStart(s as never, args as never) };
+        case 'pomo.pause':    return { state: pomoPause(s as never) };
+        case 'pomo.resume':   return { state: pomoResume(s as never) };
         case 'pomo.cancel':   return { state: pomoCancel(s as never) };
-        case 'pomo.complete': return { state: pomoComplete(s as never) };
+        case 'pomo.complete': return { state: pomoComplete(s as never, { config: pomoCfg }) };
         case 'pomo.skipBreak': return { state: pomoSkipBreak(s as never) };
         case 'pomo.endBreak': return { state: pomoEndBreak(s as never) };
+        case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
+        case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never) };
       }
       break;
     }
@@ -116,10 +162,16 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
     }
     case 'todo.task': {
       switch (command) {
-        case 'task.toggle':        return { state: taskToggle(s as never) };
-        case 'task.edit':          return { state: taskEdit(s as never, args as never) };
-        case 'task.incrementPomo': return { state: taskIncrementPomo(s as never) };
-        case 'task.activate':      return { state: taskActivate(s as never) };
+        case 'task.toggle':            return { state: taskToggle(s as never) };
+        case 'task.edit':              return { state: taskEdit(s as never, args as never) };
+        case 'task.incrementPomo':     return { state: taskIncrementPomo(s as never) };
+        case 'task.activate':          return { state: taskActivate(s as never) };
+        case 'task.accumulateSeconds': return { state: taskAccumulateSeconds(s as never, args as never) };
+        case 'task.setPlannedMin':     return { state: taskSetPlannedMin(s as never, args as never) };
+        case 'task.setCurrentSessionElapsedSec':
+          return { state: taskSetCurrentSessionElapsedSec(s as never, args as never) };
+        case 'task.clearCurrentSessionElapsedSec':
+          return { state: taskClearCurrentSessionElapsedSec(s as never) };
       }
       break;
     }
@@ -256,7 +308,165 @@ function findMotherForHabit(habitId: string): Node | null {
   return null;
 }
 
-// ── makeCommandHandler ─────────────────────────────────────────────────────
+// ── Decision 22.1 helpers ──────────────────────────────────────────────────
+
+const toIso = (ms: number): string => new Date(ms).toISOString();
+
+/**
+ * Write the in-flight running session's elapsed time into the active task's
+ * `currentSessionElapsedSec` (checkpoint only — NOT secondsAccumulated).
+ * Returns the elapsed seconds written (0 if nothing was written).
+ */
+function checkpointActiveTaskElapsed(): number {
+  const { board, updateNode } = useBoardStore.getState();
+  if (!board) return 0;
+  const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
+  if (!pomoNode) return 0;
+  const ps = pomoNode.state as PomoState;
+  if (ps.status !== 'running' || ps.startedAt === null) return 0;
+  if (ps.activeTaskId === null) return 0;
+  const elapsedSec = Math.max(0, Math.floor((Date.now() - Date.parse(ps.startedAt)) / 1000));
+  if (elapsedSec === 0) return 0;
+  const taskNode = board.nodes.find((n) => n.id === ps.activeTaskId);
+  if (!taskNode || taskNode.kind !== 'todo.task') return elapsedSec;
+  const ts = taskNode.state as TaskState;
+  updateNode(taskNode.id, {
+    state: taskSetCurrentSessionElapsedSec(ts, { seconds: elapsedSec }),
+  });
+  return elapsedSec;
+}
+
+/**
+ * Decision 22.1 §4 — unified activation helper.
+ * Loads a task into the pomo with optional auto-start.
+ *
+ * autoStart=true   → FSM becomes 'running' with offset startedAt honouring checkpoint.
+ * autoStart=false  → FSM becomes 'paused' with pausedElapsedMs = checkpoint.
+ * protectRunning=true → if a DIFFERENT task is currently running, no-op. Used by
+ *   passive click-driven loads (task body click, todo-row click) so that the
+ *   user can click around to select / connect / move tasks without disturbing
+ *   the live session. Explicit START / Start-pomo paths pass protectRunning=false
+ *   to force-switch.
+ *
+ * Idempotent guards:
+ *   - same task + running → no-op (B6).
+ *   - same task + paused  → no-op (avoids silently resetting checkpoint).
+ */
+function loadTaskIntoPomo(
+  taskNodeId: string,
+  opts: { autoStart: boolean; protectRunning?: boolean },
+): void {
+  const { board, updateNode } = useBoardStore.getState();
+  if (!board) return;
+
+  const taskNode = board.nodes.find((n) => n.id === taskNodeId);
+  if (!taskNode || taskNode.kind !== 'todo.task') return;
+
+  const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
+  if (!pomoNode) return;
+
+  const ps = pomoNode.state as PomoState;
+  const cfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
+
+  // Idempotent guard: same task already running or paused — do nothing.
+  if (
+    ps.activeTaskId === taskNodeId &&
+    (ps.status === 'running' || ps.status === 'paused')
+  ) {
+    return;
+  }
+
+  // Protect-running guard: a different task is currently RUNNING and the caller
+  // is a passive load (click/selection). Refuse to disturb the live session.
+  if (
+    opts.protectRunning === true &&
+    ps.activeTaskId !== null &&
+    ps.activeTaskId !== taskNodeId &&
+    ps.status === 'running'
+  ) {
+    return;
+  }
+
+  // Step 3: checkpoint the prior active task's elapsed before we cancel.
+  if (ps.activeTaskId !== null && ps.activeTaskId !== taskNodeId) {
+    if (ps.status === 'running') {
+      checkpointActiveTaskElapsed();
+    } else if (ps.status === 'paused') {
+      // Paused: derive elapsed from pausedElapsedMs rather than wall-clock.
+      const priorTaskNode = useBoardStore
+        .getState()
+        .board?.nodes.find((n) => n.id === ps.activeTaskId);
+      if (priorTaskNode && priorTaskNode.kind === 'todo.task') {
+        const elapsedSec = Math.floor(ps.pausedElapsedMs / 1000);
+        if (elapsedSec > 0) {
+          const priorTs = priorTaskNode.state as TaskState;
+          updateNode(priorTaskNode.id, {
+            state: taskSetCurrentSessionElapsedSec(priorTs, { seconds: elapsedSec }),
+          });
+        }
+      }
+    }
+  }
+
+  // Step 4: cancel/skip-break the in-flight FSM so it's clean for the new load.
+  const freshBoard = useBoardStore.getState().board;
+  const freshPomo = freshBoard?.nodes.find((n) => n.id === pomoNode.id);
+  let workingState = (freshPomo?.state as PomoState | undefined) ?? ps;
+  if (workingState.status === 'running' || workingState.status === 'paused') {
+    workingState = pomoCancel(workingState);
+  } else if (workingState.status === 'break') {
+    workingState = pomoSkipBreak(workingState);
+  }
+
+  // Step 5: compute current session minutes using the clamp rule.
+  // min(plannedMin - pomoSessionsCompleted * sessionMin, sessionMin), never < 1.
+  // If remainder <= 0 (over budget), fall back to sessionMin.
+  const taskState = taskNode.state as TaskState;
+  const sessionMin = cfg.sessionMin;
+  const completed = taskState.pomoSessionsCompleted ?? 0;
+  const remainder = taskState.plannedMin - completed * sessionMin;
+  const currentSessionMin = Math.max(
+    1,
+    Math.min(remainder > 0 ? remainder : sessionMin, sessionMin),
+  );
+
+  // Step 6: read the checkpoint (in-flight elapsed) from the new task.
+  const checkpointMs = (taskState.currentSessionElapsedSec ?? 0) * 1000;
+
+  // Step 7: build the next PomoState.
+  const now = Date.now();
+  let nextPomoState: PomoState;
+  if (opts.autoStart) {
+    nextPomoState = {
+      ...workingState,
+      activeTaskId: taskNodeId,
+      label: taskState.text,
+      durationMin: currentSessionMin,
+      status: 'running',
+      startedAt: toIso(now - checkpointMs),
+      pausedAt: null,
+      pausedElapsedMs: 0,
+    };
+  } else {
+    nextPomoState = {
+      ...workingState,
+      activeTaskId: taskNodeId,
+      label: taskState.text,
+      durationMin: currentSessionMin,
+      status: 'paused',
+      startedAt: toIso(now - checkpointMs),
+      pausedAt: toIso(now),
+      pausedElapsedMs: checkpointMs,
+    };
+  }
+
+  // Step 8: persist.
+  updateNode(pomoNode.id, { state: nextPomoState });
+  const updated = useBoardStore.getState().board;
+  if (updated) void window.krnl?.boardSave(updated);
+}
+
+// ── makeCommandHandler ─────────────────────────────────────────────────────────
 
 /**
  * Returns an onCommand handler bound to a specific node id.
@@ -270,60 +480,155 @@ export function makeCommandHandler(nodeId: string) {
     const node = board.nodes.find((n) => n.id === nodeId);
     if (!node) return;
 
-    // ── task.startPomo: find the pomo mother node, start it ────────────────
+    // ── task.startPomo / task.spawnPomo: auto-start (Decision 22 §5, legacy path)
+    // If this task is already loaded-paused (the new click-to-load flow), START
+    // means RESUME — transition straight to running, preserving the checkpoint.
+    // loadTaskIntoPomo's idempotent guard would otherwise no-op the same-task
+    // paused case.
     if (command === 'task.startPomo' || command === 'task.spawnPomo') {
-      const taskState = node.state as TaskState;
       const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
-      if (!pomoNode) return;
-      const nextPomoState = pomoStart(pomoNode.state as PomoState, {
-        label: taskState.text,
-        durationMin: taskState.durationMin,
-      });
-      updateNode(pomoNode.id, { state: nextPomoState });
-      const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (pomoNode) {
+        const ps = pomoNode.state as PomoState;
+        if (ps.activeTaskId === nodeId && ps.status === 'paused') {
+          updateNode(pomoNode.id, { state: pomoResume(ps) });
+          const updated = useBoardStore.getState().board;
+          if (updated) void window.krnl?.boardSave(updated);
+          return;
+        }
+      }
+      loadTaskIntoPomo(nodeId, { autoStart: true });
       return;
     }
 
-    // ── todo.startPomoForItem: resolve itemId → taskNodeId → task.startPomo ─
+    // ── task.loadIntoPomo: load without auto-start (Bug #2 fix) ───────────
+    // Passive (click/selection driven) — protect a different running session.
+    if (command === 'task.loadIntoPomo') {
+      loadTaskIntoPomo(nodeId, { autoStart: false, protectRunning: true });
+      return;
+    }
+
+    // ── task.pausePomo: pause the live session for this task ─────────────
+    // The TaskNode's per-task PAUSE button (previously labelled STOP) is a
+    // shortcut to the parent PomoNode's PAUSE — it suspends the timer but
+    // keeps the task loaded as the active task, so START can resume from
+    // the same elapsed checkpoint. To fully abandon a session, the user
+    // presses RESET on the PomoNode (which dispatches pomo.cancel).
+    //
+    // We also mirror the pomo's new pausedElapsedMs into the task's
+    // currentSessionElapsedSec so the corner timer on the TaskNode reads
+    // the correct frozen value immediately on pause — without this, the
+    // corner timer shows a stale checkpoint until the user clicks another
+    // task and the load-task-into-pomo path writes the checkpoint.
+    if (command === 'task.pausePomo') {
+      const freshBoard = useBoardStore.getState().board;
+      if (!freshBoard) return;
+      const pomoNode = freshBoard.nodes.find((n) => n.kind === 'pomo');
+      if (!pomoNode) return;
+      const ps = pomoNode.state as PomoState;
+      // No-op unless this task is the running active one.
+      if (ps.activeTaskId !== nodeId) return;
+      if (ps.status !== 'running') return;
+      const pausedState = pomoPause(ps);
+      updateNode(pomoNode.id, { state: pausedState });
+
+      // Mirror pausedElapsedMs into the task's checkpoint so the corner timer
+      // shows the correct frozen value as soon as PAUSE fires.
+      const taskNode = useBoardStore
+        .getState()
+        .board?.nodes.find((n) => n.id === nodeId);
+      if (taskNode && taskNode.kind === 'todo.task') {
+        const ts = taskNode.state as TaskState;
+        updateNode(nodeId, {
+          state: taskSetCurrentSessionElapsedSec(ts, {
+            seconds: Math.floor(pausedState.pausedElapsedMs / 1000),
+          }),
+        });
+      }
+
+      const saved = useBoardStore.getState().board;
+      if (saved) void window.krnl?.boardSave(saved);
+      return;
+    }
+
+    // ── todo.startPomoForItem: resolve itemId → taskNodeId → auto-start ───
     if (command === 'todo.startPomoForItem') {
       const todoState = node.state as TodoState;
       const itemId = args['itemId'] as string | undefined;
       if (!itemId) return;
       const item = todoState.items.find((i) => i.id === itemId);
       if (!item?.taskNodeId) return;
-      const taskNode = board.nodes.find((n) => n.id === item.taskNodeId);
-      if (!taskNode) return;
-      const taskState = taskNode.state as TaskState;
-      const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
-      if (!pomoNode) return;
-      const nextPomoState = pomoStart(pomoNode.state as PomoState, {
-        label: taskState.text,
-        durationMin: taskState.durationMin,
-      });
-      updateNode(pomoNode.id, { state: nextPomoState });
-      const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      loadTaskIntoPomo(item.taskNodeId, { autoStart: true });
       return;
     }
 
-    // ── task.delete: cascade-delete task + descendants + linked TodoItem ────
+    // ── todo.loadTaskForItem: resolve itemId → taskNodeId → LOAD ONLY ─────
+    // Single-clicking a TodoItem row refreshes the pomo with the task's saved
+    // state (label, durationMin, checkpoint elapsed) without auto-starting.
+    // The user must press START on the pomo to begin the session.
+    // Passive click — protect a different running session.
+    if (command === 'todo.loadTaskForItem') {
+      const todoState = node.state as TodoState;
+      const itemId = args['itemId'] as string | undefined;
+      if (!itemId) return;
+      const item = todoState.items.find((i) => i.id === itemId);
+      if (!item?.taskNodeId) return;
+      loadTaskIntoPomo(item.taskNodeId, { autoStart: false, protectRunning: true });
+      return;
+    }
+
+    // ── task.delete: cascade-delete task + descendants + linked TodoItems ───
+    // Decision 22.2: cascade now removes per-descendant TodoItems (subtasks are
+    // tracked in the TodoList as of Decision 22.2, so every descendant may have
+    // a linked TodoItem that must be unlinked before the nodes are removed).
     if (command === 'task.delete') {
       const taskState = node.state as TaskState;
       const descendants = collectDescendants(nodeId, board.nodes);
-      removeNodeSet(descendants);
-      // Remove linked TodoItem
-      if (taskState.todoItemId !== null) {
-        const todoNode = useBoardStore
-          .getState()
-          .board?.nodes.find((n) => n.id === taskState.parentTodoId);
-        if (todoNode) {
-          const newTodoState = todoRemove(todoNode.state as TodoState, {
-            id: taskState.todoItemId,
-          });
+      const descendantSet = new Set(descendants);
+
+      // Defect A: clear pomo if the deleted task (or any descendant) is active.
+      const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
+      if (pomoNode) {
+        const ps = pomoNode.state as PomoState;
+        if (ps.activeTaskId !== null && descendantSet.has(ps.activeTaskId)) {
+          let cancelledState = ps;
+          if (ps.status !== 'idle') {
+            cancelledState = pomoCancel(ps);
+          }
+          const clearedState = pomoClearActiveTask(cancelledState);
+          updateNode(pomoNode.id, { state: clearedState });
+        }
+      }
+
+      // Collect {parentTodoId → itemIds[]} from ALL descendants (root included)
+      // that have a linked TodoItem. One updateNode per parent TodoNode.
+      const todoItemsByParent = new Map<string, string[]>();
+      for (const descId of descendants) {
+        const descNode = board.nodes.find((n) => n.id === descId);
+        if (!descNode || descNode.kind !== 'todo.task') continue;
+        const ts = descNode.state as TaskState;
+        if (ts.todoItemId === null) continue;
+        const existing = todoItemsByParent.get(ts.parentTodoId);
+        if (existing) {
+          existing.push(ts.todoItemId);
+        } else {
+          todoItemsByParent.set(ts.parentTodoId, [ts.todoItemId]);
+        }
+      }
+      const currentBoard = useBoardStore.getState().board;
+      if (currentBoard) {
+        for (const [parentTodoId, itemIds] of todoItemsByParent) {
+          const todoNode = currentBoard.nodes.find((n) => n.id === parentTodoId);
+          if (!todoNode) continue;
+          // Reduce all item removals in a single pass so we emit one updateNode.
+          let newTodoState = todoNode.state as TodoState;
+          for (const itemId of itemIds) {
+            newTodoState = todoRemove(newTodoState, { id: itemId });
+          }
           updateNode(todoNode.id, { state: newTodoState });
         }
       }
+
+      removeNodeSet(descendants);
       renumberSiblings(taskState.parentTodoId, taskState.parentTaskId);
       const final = useBoardStore.getState().board;
       if (final) void window.krnl?.boardSave(final);
@@ -331,6 +636,8 @@ export function makeCommandHandler(nodeId: string) {
     }
 
     // ── task.addSubtask: spawn a child TaskNode one layer deeper ────────────
+    // Decision 22.2 Fix 4: backfills a TodoItem on the parent TodoNode so the
+    // subtask is visible in the todo list (bidirectional linkage invariant).
     if (command === 'task.addSubtask') {
       const parentTask = node.state as TaskState;
       const text = (args['text'] as string | undefined) ?? '';
@@ -347,6 +654,27 @@ export function makeCommandHandler(nodeId: string) {
       });
       const seq = siblings.length + 1;
 
+      const childNodeId = `task-${crypto.randomUUID()}`;
+
+      // Step 1: resolve the parent TodoNode and append a new TodoItem.
+      const todoNode = freshBoard.nodes.find((n) => n.id === parentTask.parentTodoId);
+      const prevTodoState = todoNode ? (todoNode.state as TodoState) : null;
+      let newTodoState: TodoState | null = null;
+      let itemId: string = '';
+      if (prevTodoState) {
+        newTodoState = todoAdd(prevTodoState, { text: text.trim() });
+        // The new item is always the last one.
+        const newItem = newTodoState.items[newTodoState.items.length - 1];
+        if (newItem) {
+          itemId = newItem.id;
+          // Step 5: set taskNodeId on the item (bidirectional link).
+          newTodoState = todoLinkTask(newTodoState, { itemId, taskNodeId: childNodeId });
+        }
+        if (todoNode) {
+          updateNode(todoNode.id, { state: newTodoState });
+        }
+      }
+
       const childState: TaskState = {
         text: text.trim(),
         done: false,
@@ -357,12 +685,15 @@ export function makeCommandHandler(nodeId: string) {
         createdAt: new Date().toISOString(),
         parentTodoId: parentTask.parentTodoId,
         parentTaskId: nodeId,
-        todoItemId: null,
+        todoItemId: itemId !== '' ? itemId : null,
         pomoSessionsCompleted: 0,
+        plannedMin: parentTask.plannedMin ?? parentTask.durationMin,
+        secondsAccumulated: 0,
+        currentSessionElapsedSec: 0,
       };
 
       const childNode: Node = {
-        id: `task-${crypto.randomUUID()}`,
+        id: childNodeId,
         kind: 'todo.task',
         position: {
           x: node.position.x + (seq - 1) * 252,
@@ -466,7 +797,26 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
-    const result = applyCommand(node, command, args);
+    // ── todo.add pre-processing: strip trailing-suffix minutes from the text
+    //    before todoAdd runs, so the stored TodoItem.text is already clean.
+    //    Decision 22.2 Fix 3: dispatcher is the single source of truth for parsing.
+    let effectiveArgs = args;
+    if (node.kind === 'todo' && command === 'todo.add') {
+      const rawText = (args['text'] as string | undefined) ?? '';
+      const { plannedMin: parsedMin, strippedText } = parseMinutesFromText(rawText);
+      if (strippedText !== rawText || parsedMin !== null) {
+        // Rebuild args with stripped text. Parsed trailing/legacy minutes take precedence
+        // over the UI minutes input (decisions.md: "trailing suffix > structured plannedMin
+        // from the UI — typing 'foo 25m' is the user's explicit intent").
+        effectiveArgs = {
+          ...args,
+          text: strippedText,
+          ...(parsedMin !== null ? { plannedMin: parsedMin } : {}),
+        };
+      }
+    }
+
+    const result = applyCommand(node, command, effectiveArgs);
     if (result === null) return;
 
     // ── todo.add: spawn a child task node + bidirectional link ────────────
@@ -502,17 +852,28 @@ export function makeCommandHandler(nodeId: string) {
           : { x: todoNode.position.x + (n - 1) * 252, y: todoNode.position.y + 420 };
 
       const addedItem = nextState.items[nextState.items.length - 1];
-      const text = addedItem?.text ?? (args['text'] as string | undefined) ?? '';
-      const tag = addedItem?.tag ?? (args['tag'] as string | undefined);
+      // Use stripped text from the item (todoAdd already received the stripped text).
+      const text = addedItem?.text ?? (effectiveArgs['text'] as string | undefined) ?? '';
+      const tag = addedItem?.tag ?? (effectiveArgs['tag'] as string | undefined);
       const itemId = addedItem?.id ?? '';
 
-      const durationMin = 20;
+      // Decision 22 / 22.2 — read the pomo mother's config to seed per-session minutes.
+      // Argument precedence: explicit args.plannedMin > trailing/legacy suffix parse > sessionMin.
+      const pomoMother = fresh.nodes.find((nd) => nd.kind === 'pomo');
+      const cfg = (pomoMother?.config as PomoConfig | null) ?? defaultPomoConfig();
+      const sessionMin = cfg.sessionMin;
+      const argPlanned = effectiveArgs['plannedMin'];
+      const parsedPlanned = typeof argPlanned === 'number' && Number.isFinite(argPlanned)
+        ? Math.max(1, Math.round(argPlanned as number))
+        : sessionMin;
+
+      const durationMin = sessionMin;
       const taskState: TaskState = {
         text,
         done: false,
         ...(tag !== undefined ? { tag } : {}),
         durationMin,
-        eta: `~${durationMin} min`,
+        eta: `~${parsedPlanned} min`,
         sequenceNumber: n,
         layer: 0,
         createdAt: new Date().toISOString(),
@@ -520,6 +881,9 @@ export function makeCommandHandler(nodeId: string) {
         parentTaskId: null,
         todoItemId: itemId,
         pomoSessionsCompleted: 0,
+        plannedMin: parsedPlanned,
+        secondsAccumulated: 0,
+        currentSessionElapsedSec: 0,
       };
 
       const taskNodeId = `task-${crypto.randomUUID()}`;
@@ -648,7 +1012,7 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
-    // ── task.toggle: mirror done state to linked TodoItem ─────────────────
+    // ── task.toggle: mirror done state to linked TodoItem (+ pomo cancel if active)
     if (node.kind === 'todo.task' && command === 'task.toggle' && result.state !== undefined) {
       const prevTask = node.state as TaskState;
       const nextTask = result.state as TaskState;
@@ -665,6 +1029,103 @@ export function makeCommandHandler(nodeId: string) {
             const newTodoState = todoToggle(todoState, { id: prevTask.todoItemId });
             updateNode(todoNode.id, { state: newTodoState });
           }
+        }
+      }
+
+      // Bug #3: if task is now done AND it's the active pomo task, cancel the session.
+      // We bypass the pomo.cancel dispatcher branch (which writes secondsAccumulated),
+      // so do the same commit inline so the in-flight elapsed time is not lost.
+      if (nextTask.done === true) {
+        const freshBoard = useBoardStore.getState().board;
+        const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
+        if (pomoNode) {
+          const ps = pomoNode.state as PomoState;
+          if (ps.activeTaskId === nodeId && ps.status !== 'idle') {
+            let cancelledState = pomoCancel(ps);
+            cancelledState = pomoClearActiveTask(cancelledState);
+            updateNode(pomoNode.id, { state: cancelledState });
+
+            // Commit the just-cancelled session's elapsed time into the task.
+            const newest = cancelledState.history[cancelledState.history.length - 1];
+            if (newest) {
+              const elapsedSec = Math.max(
+                0,
+                Math.floor((Date.parse(newest.endedAt) - Date.parse(newest.startedAt)) / 1000),
+              );
+              const freshTask = useBoardStore
+                .getState()
+                .board?.nodes.find((n) => n.id === nodeId);
+              if (freshTask && freshTask.kind === 'todo.task') {
+                const ts = freshTask.state as TaskState;
+                updateNode(nodeId, {
+                  state: {
+                    ...ts,
+                    secondsAccumulated: (ts.secondsAccumulated ?? 0) + elapsedSec,
+                    currentSessionElapsedSec: 0,
+                  },
+                });
+              }
+            }
+          }
+        }
+      }
+
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
+    // ── pomo.cancel / pomo.complete: Decision 22 §7 + F13 — credit seconds
+    //    onto the active task ONLY on completion (not cancel — RESET means
+    //    abandoned), bump pomoSessionsCompleted on completion only, and
+    //    always clear currentSessionElapsedSec (no-double-count invariant).
+    //
+    //    User-facing rule (per Decision 22.3): RESET on the PomoNode discards
+    //    the in-flight time. If the user wants to preserve elapsed mid-session
+    //    they press PAUSE instead. Marking a task done while running still
+    //    credits the time — that's handled by the task.toggle cascade above.
+    if (
+      node.kind === 'pomo' &&
+      (command === 'pomo.cancel' || command === 'pomo.complete') &&
+      result.state !== undefined
+    ) {
+      const prevPomo = node.state as PomoState;
+      const nextPomo = result.state as PomoState;
+      // FSM was a no-op (e.g. cancel from idle, complete before deadline) — skip.
+      if (prevPomo.history.length === nextPomo.history.length) {
+        updateNode(nodeId, { state: nextPomo });
+        const u = useBoardStore.getState().board;
+        if (u) void window.krnl?.boardSave(u);
+        return;
+      }
+      updateNode(nodeId, { state: nextPomo });
+
+      const justCompleted = command === 'pomo.complete';
+      const newest = nextPomo.history[nextPomo.history.length - 1];
+      const activeTaskId = newest?.taskId ?? prevPomo.activeTaskId;
+      if (newest && activeTaskId) {
+        const elapsedSec = Math.max(
+          0,
+          Math.floor((Date.parse(newest.endedAt) - Date.parse(newest.startedAt)) / 1000),
+        );
+        const taskNode = useBoardStore
+          .getState()
+          .board?.nodes.find((n) => n.id === activeTaskId);
+        if (taskNode && taskNode.kind === 'todo.task') {
+          const ts = taskNode.state as TaskState;
+          const patchedTask: TaskState = {
+            ...ts,
+            // Only completed sessions credit elapsed. Cancel = abandoned.
+            secondsAccumulated: justCompleted
+              ? (ts.secondsAccumulated ?? 0) + elapsedSec
+              : (ts.secondsAccumulated ?? 0),
+            pomoSessionsCompleted: justCompleted
+              ? (ts.pomoSessionsCompleted ?? 0) + 1
+              : (ts.pomoSessionsCompleted ?? 0),
+            // Always clear the checkpoint — the session is over either way.
+            currentSessionElapsedSec: 0,
+          };
+          updateNode(taskNode.id, { state: patchedTask });
         }
       }
 
