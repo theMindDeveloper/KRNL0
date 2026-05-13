@@ -101,6 +101,7 @@ function makeEvent() {
   return {
     sender: {
       send: vi.fn(),
+      isDestroyed: vi.fn(() => false),
     },
   };
 }

@@ -37,6 +37,22 @@ export type KrnlRFNode = RFNode<RFNodeData>;
 
 // ── toRfNode ──────────────────────────────────────────────────────────────────
 
+// Pre-seeded width/height so RF doesn't fire warning #015 ("trying to drag a
+// node that is not initialized") when a freshly-added node is dragged before
+// the ResizeObserver has fired its first measurement. These are approximate
+// — RF replaces them with measured values once the ResizeObserver delivers.
+const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = {
+  'todo.task':   { width: 220, height: 120 },
+  'todo':        { width: 380, height: 600 },
+  'pomo':        { width: 380, height: 600 },
+  'ai':          { width: 380, height: 600 },
+  'habit':       { width: 380, height: 600 },
+  'terminal':    { width: 380, height: 600 },
+  'habit.lane':  { width: 280, height: 140 },
+  'text':        { width: 240, height: 120 },
+  'image':       { width: 240, height: 200 },
+};
+
 export function toRfNode(
   node: Node,
   ctx: {
@@ -52,6 +68,7 @@ export function toRfNode(
   // selection ring can be scoped in reactflow-theme.css without inline style overrides.
   // node.kind may contain "." (e.g. "todo.task") — replace with "--" for a valid class name.
   const kindClass = `krnl-kind-${node.kind.replace('.', '--')}`;
+  const initialDims = INITIAL_DIMS_BY_KIND[node.kind];
   return {
     id: node.id,
     type: node.kind,
@@ -59,6 +76,13 @@ export function toRfNode(
     draggable: !node.isMother,
     selectable: true,
     className: kindClass,
+    ...(initialDims !== undefined
+      ? {
+          width: initialDims.width,
+          height: initialDims.height,
+          measured: { width: initialDims.width, height: initialDims.height },
+        }
+      : {}),
     data: {
       node,
       onCommand: ctx.onCommand,

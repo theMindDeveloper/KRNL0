@@ -445,7 +445,7 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
                 fontSize: 13,
                 lineHeight: 1.4,
                 color: state.done ? 'var(--ink-4)' : 'var(--ink)',
-                textDecoration: state.done ? 'line-through' : 'none',
+                textDecorationLine: state.done ? 'line-through' : 'none',
                 textDecorationColor: 'var(--ink-4)',
                 flex: 1,
               }}
