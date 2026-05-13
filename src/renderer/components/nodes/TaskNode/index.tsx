@@ -6,6 +6,7 @@ import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
+import { useTick } from '../../../hooks/useTick';
 import type { PomoState } from '../PomoNode/types';
 
 /**
@@ -19,6 +20,66 @@ export function formatElapsed(totalSec: number): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
   if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
   return `${pad(m)}:${pad(s)}`;
+}
+
+/**
+ * TaskPomoBar — progress bar at the bottom of a task card.
+ *
+ * Shown when the task has at least one completed pomo session.
+ * Only this subcomponent subscribes to useTick(), so inactive tasks never
+ * mount a tick subscription.
+ *
+ * Progress = pomoSessionsCompleted / plannedSessions where
+ * plannedSessions is derived from durationMin / 25 (default session length).
+ * When no PomoState is available we fall back to a single-session denominator.
+ */
+function TaskPomoBar({ state, taskId }: { state: TaskState; taskId: string }) {
+  // Subscribe to the pomo node's runtime so we can detect the active task.
+  const pomoRuntime = useBoardStore(
+    useShallow((s) => {
+      const pomo = s.board?.nodes.find((n) => n.kind === 'pomo');
+      if (!pomo) return { status: null as PomoState['status'] | null, startedAt: null };
+      const ps = pomo.state as PomoState;
+      return { status: ps.status, startedAt: ps.startedAt };
+    }),
+  );
+
+  // Tick drives live re-renders while the pomo is running.
+  const _tick = useTick();
+  void _tick;
+
+  const completedSessions = state.pomoSessionsCompleted;
+
+  // Estimate planned sessions from durationMin rounded up to 25-min blocks.
+  const sessionMin = 25;
+  const plannedSessions = Math.max(1, Math.ceil((state.durationMin ?? sessionMin) / sessionMin));
+  const progress = Math.min(1, completedSessions / plannedSessions);
+
+  if (completedSessions === 0) return null;
+
+  void taskId;
+  const isRunning = pomoRuntime.status === 'running';
+
+  return (
+    <div
+      data-testid="task-pomo-bar"
+      style={{
+        height: 4,
+        background: 'var(--paper-3)',
+        borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          height: '100%',
+          width: `${progress * 100}%`,
+          background: isRunning ? 'var(--acid)' : 'var(--ink-4)',
+          transition: isRunning ? 'none' : undefined,
+        }}
+      />
+    </div>
+  );
 }
 
 // TaskNode — child task card spawned when a todo item is added.
@@ -588,6 +649,11 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
           items={ctxItems}
           onDismiss={() => setCtxMenu(null)}
         />
+      )}
+
+      {/* Pomo progress bar — only rendered when at least one session is done */}
+      {state.pomoSessionsCompleted > 0 && (
+        <TaskPomoBar state={state} taskId={node.id} />
       )}
     </div>
   );
