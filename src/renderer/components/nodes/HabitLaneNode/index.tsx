@@ -10,6 +10,7 @@
 //   source right →  emits 'habit.markedDone' on the round-trip in commandDispatch
 
 import { useMemo, useState } from 'react';
+import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
 import type { Habit, HabitColor } from '../HabitNode/types';
@@ -108,7 +109,12 @@ export function HabitLaneNode({
   const circumference = 2 * Math.PI * (RING_SIZE / 2 - RING_STROKE);
   const offset = circumference * (1 - monthlyPct / 100);
 
+  const { getNodes } = useReactFlow();
   const onContextMenu = (e: React.MouseEvent) => {
+    // Defer to canvas-level batch menu when multi-selected (only Delete makes
+    // sense on a batch of mixed nodes).
+    const selectedCount = getNodes().filter((n) => n.selected).length;
+    if (selectedCount > 1) return;
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen({ x: e.clientX, y: e.clientY });
