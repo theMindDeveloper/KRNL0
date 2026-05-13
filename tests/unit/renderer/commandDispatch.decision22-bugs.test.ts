@@ -512,8 +512,8 @@ describe('G1 — delete active running task cancels pomo and removes task', () =
 
 // ── Invariant: start → run 60s → cancel → secondsAccumulated=60, checkpoint=0 ─
 
-describe('Invariant — start → run 60s → cancel: secondsAccumulated===60, currentSessionElapsedSec===0', () => {
-  it('no double-counting after cancel', () => {
+describe('Invariant (Decision 22.3) — start → run 60s → cancel: secondsAccumulated UNCHANGED, currentSessionElapsedSec===0', () => {
+  it('cancel discards in-flight time (RESET = abandoned)', () => {
     // Set startedAt to 60s ago
     const startedAt = new Date(Date.now() - 60_000).toISOString();
     const board = makeBoardWithTasks({
@@ -531,11 +531,34 @@ describe('Invariant — start → run 60s → cancel: secondsAccumulated===60, c
 
     const ts = getTaskState('task-a');
 
-    // secondsAccumulated should be ~60 (allow ±2 for timing jitter)
-    expect(ts.secondsAccumulated).toBeGreaterThanOrEqual(58);
-    expect(ts.secondsAccumulated).toBeLessThanOrEqual(62);
+    // secondsAccumulated should remain 0 — cancel does NOT credit the session.
+    expect(ts.secondsAccumulated).toBe(0);
 
     // Checkpoint must be cleared
     expect(ts.currentSessionElapsedSec).toBe(0);
+  });
+
+  it('complete credits the session (full session → secondsAccumulated bumped, checkpoint cleared)', () => {
+    // pomoComplete requires now - startedAt >= durationMin*60_000.
+    // Use durationMin=1 + startedAt 61s ago so elapsed crosses the threshold.
+    const startedAt = new Date(Date.now() - 61_000).toISOString();
+    const board = makeBoardWithTasks({
+      pomoState: {
+        status: 'running',
+        startedAt,
+        activeTaskId: 'task-a',
+        label: 'Task A',
+        durationMin: 1,
+      },
+    });
+    useBoardStore.getState().setBoard(board);
+
+    makeCommandHandler('pomo-mother')('pomo.complete');
+
+    const ts = getTaskState('task-a');
+    expect(ts.secondsAccumulated).toBeGreaterThanOrEqual(59);
+    expect(ts.secondsAccumulated).toBeLessThanOrEqual(63);
+    expect(ts.currentSessionElapsedSec).toBe(0);
+    expect(ts.pomoSessionsCompleted).toBe(1);
   });
 });

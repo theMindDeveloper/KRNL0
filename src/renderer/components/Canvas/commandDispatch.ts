@@ -513,6 +513,12 @@ export function makeCommandHandler(nodeId: string) {
     // keeps the task loaded as the active task, so START can resume from
     // the same elapsed checkpoint. To fully abandon a session, the user
     // presses RESET on the PomoNode (which dispatches pomo.cancel).
+    //
+    // We also mirror the pomo's new pausedElapsedMs into the task's
+    // currentSessionElapsedSec so the corner timer on the TaskNode reads
+    // the correct frozen value immediately on pause — without this, the
+    // corner timer shows a stale checkpoint until the user clicks another
+    // task and the load-task-into-pomo path writes the checkpoint.
     if (command === 'task.pausePomo') {
       const freshBoard = useBoardStore.getState().board;
       if (!freshBoard) return;
@@ -522,7 +528,23 @@ export function makeCommandHandler(nodeId: string) {
       // No-op unless this task is the running active one.
       if (ps.activeTaskId !== nodeId) return;
       if (ps.status !== 'running') return;
-      updateNode(pomoNode.id, { state: pomoPause(ps) });
+      const pausedState = pomoPause(ps);
+      updateNode(pomoNode.id, { state: pausedState });
+
+      // Mirror pausedElapsedMs into the task's checkpoint so the corner timer
+      // shows the correct frozen value as soon as PAUSE fires.
+      const taskNode = useBoardStore
+        .getState()
+        .board?.nodes.find((n) => n.id === nodeId);
+      if (taskNode && taskNode.kind === 'todo.task') {
+        const ts = taskNode.state as TaskState;
+        updateNode(nodeId, {
+          state: taskSetCurrentSessionElapsedSec(ts, {
+            seconds: Math.floor(pausedState.pausedElapsedMs / 1000),
+          }),
+        });
+      }
+
       const saved = useBoardStore.getState().board;
       if (saved) void window.krnl?.boardSave(saved);
       return;
@@ -1053,9 +1075,15 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
-    // ── pomo.cancel / pomo.complete: Decision 22 §7 + F13 — accumulate seconds
-    //    onto the active task, bump pomoSessionsCompleted on completion only,
-    //    and clear currentSessionElapsedSec (no-double-count invariant).
+    // ── pomo.cancel / pomo.complete: Decision 22 §7 + F13 — credit seconds
+    //    onto the active task ONLY on completion (not cancel — RESET means
+    //    abandoned), bump pomoSessionsCompleted on completion only, and
+    //    always clear currentSessionElapsedSec (no-double-count invariant).
+    //
+    //    User-facing rule (per Decision 22.3): RESET on the PomoNode discards
+    //    the in-flight time. If the user wants to preserve elapsed mid-session
+    //    they press PAUSE instead. Marking a task done while running still
+    //    credits the time — that's handled by the task.toggle cascade above.
     if (
       node.kind === 'pomo' &&
       (command === 'pomo.cancel' || command === 'pomo.complete') &&
@@ -1087,11 +1115,14 @@ export function makeCommandHandler(nodeId: string) {
           const ts = taskNode.state as TaskState;
           const patchedTask: TaskState = {
             ...ts,
-            secondsAccumulated: (ts.secondsAccumulated ?? 0) + elapsedSec,
+            // Only completed sessions credit elapsed. Cancel = abandoned.
+            secondsAccumulated: justCompleted
+              ? (ts.secondsAccumulated ?? 0) + elapsedSec
+              : (ts.secondsAccumulated ?? 0),
             pomoSessionsCompleted: justCompleted
               ? (ts.pomoSessionsCompleted ?? 0) + 1
               : (ts.pomoSessionsCompleted ?? 0),
-            // §8: clear the checkpoint now that it's committed to secondsAccumulated.
+            // Always clear the checkpoint — the session is over either way.
             currentSessionElapsedSec: 0,
           };
           updateNode(taskNode.id, { state: patchedTask });
