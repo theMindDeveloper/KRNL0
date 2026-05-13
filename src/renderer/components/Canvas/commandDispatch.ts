@@ -52,6 +52,7 @@ import {
   todoRemove,
   todoClearDone,
   todoLinkTask,
+  todoSetItemSchedule,
 } from '../nodes/TodoNode/commands';
 import type { TodoState } from '../nodes/TodoNode/types';
 
@@ -66,6 +67,7 @@ import {
   taskSetCurrentSessionElapsedSec,
   taskClearCurrentSessionElapsedSec,
   taskSetDuration,
+  taskSetSchedule,
 } from '../nodes/TaskNode/commands';
 import type { TaskState } from '../nodes/TaskNode/types';
 
@@ -83,6 +85,14 @@ import {
 } from '../nodes/HabitNode/commands';
 import type { HabitState } from '../nodes/HabitNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
+
+// ── Calendar ──────────────────────────────────────────────────────────
+import {
+  calendarSetView,
+  calendarSelectDate,
+  calendarSetAnchor,
+} from '../nodes/CalendarNode/commands';
+import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types';
 
 // ── Text + Image ──────────────────────────────────────────────────────
 import { textSetText, textSetSize } from '../nodes/TextNode/commands';
@@ -153,11 +163,14 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
     }
     case 'todo': {
       switch (command) {
-        case 'todo.add':       return { state: todoAdd(s as never, args as never) };
-        case 'todo.toggle':    return { state: todoToggle(s as never, args as never) };
-        case 'todo.edit':      return { state: todoEdit(s as never, args as never) };
-        case 'todo.remove':    return { state: todoRemove(s as never, args as never) };
-        case 'todo.clearDone': return { state: todoClearDone(s as never) };
+        case 'todo.add':            return { state: todoAdd(s as never, args as never) };
+        case 'todo.toggle':         return { state: todoToggle(s as never, args as never) };
+        case 'todo.edit':           return { state: todoEdit(s as never, args as never) };
+        case 'todo.remove':         return { state: todoRemove(s as never, args as never) };
+        case 'todo.clearDone':      return { state: todoClearDone(s as never) };
+        // ADR 0001 — calendar integration: set/clear schedule on a TodoItem
+        // (for items that haven't yet spawned a TaskNode).
+        case 'task.setSchedule':    return { state: todoSetItemSchedule(s as never, args as never) };
       }
       break;
     }
@@ -174,6 +187,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'task.clearCurrentSessionElapsedSec':
           return { state: taskClearCurrentSessionElapsedSec(s as never) };
         case 'task.setDuration':       return { state: taskSetDuration(s as never, args as never) };
+        // ADR 0001 — calendar integration: set/clear schedule on a task.
+        case 'task.setSchedule':       return { state: taskSetSchedule(s as never, args as never) };
       }
       break;
     }
@@ -188,6 +203,23 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.setColor':  return { state: habitSetColor(s as never, args as never) };
         case 'habit.setIcon':   return { state: habitSetIcon(s as never, args as never) };
         case 'habit.setView':   return { config: habitSetView(c as never, args as never) };
+      }
+      break;
+    }
+    // ADR 0001 — CalendarNode command handlers.
+    case 'calendar': {
+      const calState = s as unknown as CalendarState;
+      const calConfig = c as unknown as CalendarConfig;
+      switch (command) {
+        case 'calendar.setView':
+          return { config: calendarSetView(calConfig, args as never) };
+        case 'calendar.selectDate':
+          return { state: calendarSelectDate(calState, args as never) };
+        case 'calendar.setAnchor':
+          return { state: calendarSetAnchor(calState, args as never) };
+        // calendar.schedule: cross-node router (handled in makeCommandHandler).
+        // applyCommand returns null here so the router path intercepts it and
+        // dispatches task.setSchedule to the target task node.
       }
       break;
     }
@@ -1115,6 +1147,71 @@ export function makeCommandHandler(nodeId: string) {
         }
       }
 
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
+    // ── task.setSchedule (on todo.task): bidirectional mirror to linked TodoItem ─
+    // ADR 0001: same cascade pattern as task.toggle.
+    if (node.kind === 'todo.task' && command === 'task.setSchedule' && result.state !== undefined) {
+      const prevTask = node.state as TaskState;
+      updateNode(nodeId, { state: result.state });
+      // Mirror scheduledFor to the linked TodoItem if one exists.
+      if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
+        const schedArgs = args as { scheduledFor: string | null; scheduledDurationMin?: number };
+        const currentBoard = useBoardStore.getState().board;
+        if (currentBoard) {
+          const todoNode = currentBoard.nodes.find((n) => n.id === prevTask.parentTodoId);
+          if (todoNode && todoNode.kind === 'todo') {
+            const newTodoState = todoSetItemSchedule(todoNode.state as TodoState, {
+              itemId: prevTask.todoItemId,
+              scheduledFor: schedArgs.scheduledFor ?? null,
+            });
+            updateNode(todoNode.id, { state: newTodoState });
+          }
+        }
+      }
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
+    // ── calendar.schedule: cross-node router — dispatch task.setSchedule to target ─
+    // ADR 0001 §4: calendar.schedule looks up the target task and dispatches
+    // task.setSchedule. Cosmetic edge creation is the drop handler's responsibility
+    // (Slice 5). Returns early before applyCommand's generic patch fallback.
+    if (node.kind === 'calendar' && command === 'calendar.schedule') {
+      const scheduleArgs = args as {
+        taskId: string;
+        scheduledFor: string;
+        scheduledDurationMin?: number;
+      };
+      if (!scheduleArgs.taskId || !scheduleArgs.scheduledFor) return;
+      const currentBoard = useBoardStore.getState().board;
+      if (!currentBoard) return;
+      const targetTask = currentBoard.nodes.find((n) => n.id === scheduleArgs.taskId);
+      if (!targetTask || targetTask.kind !== 'todo.task') return;
+      const prevTask = targetTask.state as TaskState;
+      const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
+        scheduledFor: scheduleArgs.scheduledFor,
+      };
+      if (typeof scheduleArgs.scheduledDurationMin === 'number') {
+        schedPatch.scheduledDurationMin = scheduleArgs.scheduledDurationMin;
+      }
+      const nextTaskState = taskSetSchedule(prevTask, schedPatch);
+      updateNode(scheduleArgs.taskId, { state: nextTaskState });
+      // Mirror to linked TodoItem.
+      if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
+        const todoNode = currentBoard.nodes.find((n) => n.id === prevTask.parentTodoId);
+        if (todoNode && todoNode.kind === 'todo') {
+          const newTodoState = todoSetItemSchedule(todoNode.state as TodoState, {
+            itemId: prevTask.todoItemId,
+            scheduledFor: scheduleArgs.scheduledFor,
+          });
+          updateNode(todoNode.id, { state: newTodoState });
+        }
+      }
       const updated = useBoardStore.getState().board;
       if (updated) void window.krnl?.boardSave(updated);
       return;
