@@ -65,6 +65,10 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
         fireNode('image');
         return;
       }
+      if (e.key === 'c' || e.key === 'C') {
+        fireNode('clock');
+        return;
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -162,6 +166,21 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
           <rect x="3" y="4" width="18" height="16" rx="1" />
           <circle cx="9" cy="10" r="2" />
           <path d="M21 16l-5-5-9 9" />
+        </svg>
+      </button>
+
+      {/* Clock — C */}
+      <button
+        type="button"
+        data-testid="dock-btn-clock"
+        title="Clock [C]"
+        aria-label="Add clock node (C)"
+        onClick={() => fireNode('clock')}
+        style={pressed === 'clock' ? { ...btnBase, background: 'var(--paper-2)', color: 'var(--ink)' } : btnBase}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 3" />
         </svg>
       </button>
 
