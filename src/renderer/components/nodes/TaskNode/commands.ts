@@ -91,3 +91,23 @@ export const taskSetDuration = (
   const min = Math.max(1, Math.min(480, Math.round(args.durationMin)));
   return { ...state, durationMin: min, eta: `~${min} min` };
 };
+
+// task.setSchedule — ADR 0001: set or clear the scheduled datetime for a task.
+// Passing scheduledFor: null clears the schedule. Optional scheduledDurationMin
+// overrides the calendar block height; absence leaves the field unchanged.
+export const taskSetSchedule = (
+  state: TaskState,
+  args: { scheduledFor: string | null; scheduledDurationMin?: number },
+): TaskState => {
+  if (args.scheduledFor === null) {
+    // Clear the schedule — remove both optional fields.
+    const { scheduledFor: _sf, scheduledDurationMin: _sdm, ...rest } = state;
+    void _sf; void _sdm;
+    return rest;
+  }
+  const patch: Partial<TaskState> = { scheduledFor: args.scheduledFor };
+  if (typeof args.scheduledDurationMin === 'number' && Number.isFinite(args.scheduledDurationMin)) {
+    patch.scheduledDurationMin = Math.max(1, Math.round(args.scheduledDurationMin));
+  }
+  return { ...state, ...patch };
+};

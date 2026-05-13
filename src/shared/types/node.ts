@@ -29,6 +29,7 @@ export type NodeKind =
   | 'todo'
   | 'habit'
   | 'term'
+  | 'calendar'
   | 'pomo.session'
   | 'todo.task'
   | 'habit.day'
