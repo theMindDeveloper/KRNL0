@@ -17,6 +17,7 @@
 import { spawn } from 'node:child_process';
 import { join, basename } from 'node:path';
 import { mkdirSync } from 'node:fs';
+import { portFor } from './dev-port.mjs';
 
 const root = process.cwd();
 const slug = basename(root);
@@ -25,6 +26,12 @@ mkdirSync(dataDir, { recursive: true });
 
 process.env.KRNL0_BOARD_DIR ??= dataDir;
 process.env.KRNL0_USER_DATA ??= join(dataDir, 'electron');
+
+// Per-worktree Vite dev-server port. Deterministic hash of the absolute
+// worktree root so the same worktree always boots on the same port (stable
+// URLs across restarts). Range 5174–5273; 5173 stays reserved as the
+// no-isolation fallback default.
+process.env.KRNL0_DEV_PORT ??= String(portFor(root));
 
 // Critical: ELECTRON_RUN_AS_NODE leaks from some shells (Claude Code sessions,
 // Anthropic helper scripts, manual exports). When set, Electron boots as a
@@ -36,6 +43,7 @@ delete process.env.ELECTRON_RUN_AS_NODE;
 console.log(`[dev] isolated for worktree "${slug}"`);
 console.log(`[dev] KRNL0_BOARD_DIR = ${process.env.KRNL0_BOARD_DIR}`);
 console.log(`[dev] KRNL0_USER_DATA = ${process.env.KRNL0_USER_DATA}`);
+console.log(`[dev] KRNL0_DEV_PORT  = ${process.env.KRNL0_DEV_PORT}`);
 
 // On Windows, electron-vite.cmd is a shell shim — spawn cannot exec .cmd
 // files directly under Node 22+ without shell:true (EINVAL otherwise).

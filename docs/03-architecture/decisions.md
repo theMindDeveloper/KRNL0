@@ -717,6 +717,46 @@ Two layers of isolation:
 - Existing user boards at `~/Documents/krnl0/board.json` continue to work unchanged on production builds.
 - Renaming `package.json#name` on a feature branch is a one-line change but it **must** be reverted (or merged carefully) before that branch ships to users — otherwise the released build would silently look at a different board path.
 
+### Update — 2026-05-13: Dev server port
+
+The original decision isolated `board.json`, the assets folder, and Electron's `userData` per worktree, but missed a fourth surface: **the Vite dev-server port**. The gap manifested as a confusing developer-experience bug.
+
+**Symptom.** A developer running `npm run dev` in two worktrees simultaneously saw identical UI in both Electron windows — same nodes, same layout, same edits reflected in both — and concluded the worktrees were sharing everything despite Decision 17. The board state on disk was in fact correctly isolated; the UI was not.
+
+**Real cause.** Vite's dev server defaults to port `5173`. When a second `npm run dev` boots, Vite detects the port is busy and silently falls back to `5174`. But `src/main/index.ts` hard-codes `mainWindow.loadURL('http://localhost:5173')`. So worktree B's Electron main process loaded worktree A's renderer bundle. Two windows, one renderer, identical UI — even though each was reading/writing its own `board.json`. From the developer's seat this was indistinguishable from "they share state."
+
+**Decision.** The dev-server port is also isolated per worktree, on the same model as `KRNL0_BOARD_DIR`.
+
+- `scripts/dev.mjs` derives a deterministic port from the absolute worktree root:
+
+  ```js
+  const port = process.env.KRNL0_DEV_PORT
+    ?? (5174 + (parseInt(sha1(worktreeRoot).slice(0, 8), 16) % 100));
+  process.env.KRNL0_DEV_PORT = String(port);
+  ```
+
+  The hash makes the port stable across restarts of the same worktree (so DevTools, breakpoints, and bookmarks survive), and distinct across different worktrees (so two `npm run dev` invocations don't collide). A pre-set `KRNL0_DEV_PORT` wins — escape hatch for CI or manual overrides.
+
+- `electron.vite.config.ts` reads `KRNL0_DEV_PORT` into `renderer.server.port` and sets **`strictPort: true`**. The strict flag is non-negotiable: without it Vite silently falls back to the next free port and reintroduces the exact bug this update fixes. A startup failure is the correct outcome if the chosen port is taken.
+
+- `src/main/index.ts` reads the same env var when constructing the dev URL, falling back to `5173`:
+
+  ```ts
+  const devPort = process.env.KRNL0_DEV_PORT ?? '5173';
+  mainWindow.loadURL(`http://localhost:${devPort}`);
+  ```
+
+### Conventions (port)
+
+- Production builds and any `npm run dev` launched without `scripts/dev.mjs` continue to use port `5173`. No breaking change.
+- The derived port range is `[5174, 5273]`. `5173` is intentionally reserved as the unisolated default so a bare `vite` invocation stays predictable.
+- 100 slots over a typical working set of ~10 simultaneous worktrees yields ~1% collision probability per pair — acceptable. On a collision, `strictPort: true` will fail loudly at startup; rename the worktree directory or set `KRNL0_DEV_PORT` explicitly.
+
+### Consequences (port)
+
+- Enables: truly parallel `npm run dev` across worktrees. Each Electron window loads its own renderer bundle, matching the isolation guarantee already in place for `board.json` and `userData`.
+- Forecloses: nothing. The change is purely additive — env-var-driven, with `5173` preserved as the default.
+
 ---
 
 ## Decision 18 — Native Module Rebuild Flow

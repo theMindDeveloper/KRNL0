@@ -42,7 +42,8 @@ function createWindow(): BrowserWindow {
   });
 
   if (process.env['NODE_ENV'] === 'development') {
-    void win.loadURL('http://localhost:5173');
+    const devPort = process.env['KRNL0_DEV_PORT'] ?? '5173';
+    void win.loadURL(`http://localhost:${devPort}`);
     win.webContents.openDevTools();
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'));
