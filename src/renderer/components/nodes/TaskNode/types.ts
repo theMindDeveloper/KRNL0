@@ -14,6 +14,7 @@ export interface TaskState {
   // Decision 22 — per-task pomodoro accounting:
   plannedMin: number;            // total minutes budgeted for this task (default = pomo.sessionMin)
   secondsAccumulated: number;    // total seconds spent across all pomo sessions for this task
+  currentSessionElapsedSec: number; // in-flight session checkpoint (cleared on session end)
 }
 
 export interface TaskConfig {

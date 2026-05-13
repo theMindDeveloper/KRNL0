@@ -3,7 +3,7 @@
 // Decision 22 adds `activeTaskId` to state and canonicalises PomoConfig fields
 // to `{ sessionMin, shortBreakMin, longBreakMin, longBreakEvery }`.
 
-export type PomoStatus = 'idle' | 'running' | 'break' | 'done';
+export type PomoStatus = 'idle' | 'running' | 'paused' | 'break' | 'done';
 
 export interface PomoSessionRecord {
   id: string;
@@ -24,6 +24,8 @@ export interface PomoState {
   sessionsCompleted: number;
   activeTaskId: string | null;
   history: PomoSessionRecord[];
+  pausedAt: string | null;
+  pausedElapsedMs: number;
 }
 
 export interface PomoConfig {
@@ -42,6 +44,8 @@ export const defaultPomoState = (): PomoState => ({
   sessionsCompleted: 0,
   activeTaskId: null,
   history: [],
+  pausedAt: null,
+  pausedElapsedMs: 0,
 });
 
 export const defaultPomoConfig = (): PomoConfig => ({

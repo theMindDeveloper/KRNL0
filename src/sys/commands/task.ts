@@ -195,6 +195,7 @@ export async function taskAdd(
     pomoSessionsCompleted: 0,
     plannedMin: durationMin,
     secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
   };
 
   // Link taskNodeId on the TodoItem
@@ -389,6 +390,7 @@ export async function taskSubtask(
     pomoSessionsCompleted: 0,
     plannedMin: parentTs.plannedMin ?? parentTs.durationMin,
     secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
   };
 
   const childNode: AnyNode = {

@@ -14,6 +14,8 @@ import {
   pomoStart,
   pomoCancel,
   pomoComplete,
+  pomoPause,
+  pomoResume,
   pomoSetConfig,
   pomoClearActiveTask,
   type PomoEnv,
@@ -134,6 +136,126 @@ describe('Decision 22 — Pomodoro v2', () => {
       const seed = defaultPomoState();
       const next = pomoClearActiveTask(seed);
       expect(next).toBe(seed);
+    });
+  });
+});
+
+describe('Decision 22.1 — pause/resume', () => {
+  const T0 = Date.parse('2026-05-13T10:00:00.000Z');
+  const env = (nowMs: number, uuid = 'rec'): PomoEnv => ({ now: () => nowMs, uuid: () => uuid });
+
+  // ── pomoPause ──────────────────────────────────────────────────────────────
+
+  describe('pomoPause', () => {
+    it('running → paused: sets status, pausedAt, and pausedElapsedMs', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const paused = pomoPause(running, {}, env(T0 + 10_000));
+      expect(paused.status).toBe('paused');
+      expect(paused.pausedElapsedMs).toBeCloseTo(10_000, -1);
+      expect(paused.pausedAt).toBe(new Date(T0 + 10_000).toISOString());
+      // startedAt stays populated (UI ignores it while paused)
+      expect(paused.startedAt).toBe(new Date(T0).toISOString());
+    });
+
+    it('no history record is written when pausing', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const paused = pomoPause(running, {}, env(T0 + 10_000));
+      expect(paused.history).toHaveLength(0);
+    });
+
+    it('is a no-op when already paused (idempotent)', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const paused = pomoPause(running, {}, env(T0 + 10_000));
+      const again = pomoPause(paused, {}, env(T0 + 20_000));
+      expect(again).toBe(paused);
+    });
+
+    it('is a no-op when idle', () => {
+      const s = defaultPomoState();
+      expect(pomoPause(s, {}, env(T0))).toBe(s);
+    });
+  });
+
+  // ── pomoResume ─────────────────────────────────────────────────────────────
+
+  describe('pomoResume', () => {
+    it('paused → running: offsets startedAt to honour pausedElapsedMs', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const paused = pomoPause(running, {}, env(T0 + 10_000));
+      // Resume 60 seconds after start (50s after pause)
+      const resumed = pomoResume(paused, {}, env(T0 + 60_000));
+      expect(resumed.status).toBe('running');
+      // startedAt should be T0+60_000 - 10_000 = T0+50_000
+      expect(resumed.startedAt).toBe(new Date(T0 + 50_000).toISOString());
+      // now - startedAt === pausedElapsedMs
+      expect(Date.parse(resumed.startedAt!) - T0).toBe(50_000);
+      expect(resumed.pausedAt).toBeNull();
+      expect(resumed.pausedElapsedMs).toBe(0);
+    });
+
+    it('is a no-op when already running', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const next = pomoResume(running, {}, env(T0 + 1_000));
+      expect(next).toBe(running);
+    });
+
+    it('is a no-op when idle', () => {
+      const s = defaultPomoState();
+      expect(pomoResume(s, {}, env(T0))).toBe(s);
+    });
+  });
+
+  // ── pomoCancel from paused ─────────────────────────────────────────────────
+
+  describe('pomoCancel from paused', () => {
+    it('writes history record with endedAt = pausedAt (not env.now)', () => {
+      const running = pomoStart(defaultPomoState(), { label: 'focused' }, env(T0));
+      const paused = pomoPause(running, {}, env(T0 + 10_000));
+      // Cancel well after pausedAt
+      const cancelled = pomoCancel(paused, {}, env(T0 + 120_000, 'hist-1'));
+      expect(cancelled.status).toBe('idle');
+      expect(cancelled.history).toHaveLength(1);
+      const rec = cancelled.history[0]!;
+      expect(rec.endedAt).toBe(new Date(T0 + 10_000).toISOString());
+      expect(rec.completed).toBe(false);
+      expect(rec.label).toBe('focused');
+    });
+
+    it('clears pausedAt and pausedElapsedMs after cancel from paused', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const paused = pomoPause(running, {}, env(T0 + 10_000));
+      const cancelled = pomoCancel(paused, {}, env(T0 + 60_000));
+      expect(cancelled.pausedAt).toBeNull();
+      expect(cancelled.pausedElapsedMs).toBe(0);
+      expect(cancelled.startedAt).toBeNull();
+    });
+  });
+
+  // ── pomoCancel from running still clears pause fields ─────────────────────
+
+  describe('pomoCancel from running', () => {
+    it('clears pausedAt and pausedElapsedMs (already null/0, but explicit)', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const cancelled = pomoCancel(running, {}, env(T0 + 60_000));
+      expect(cancelled.pausedAt).toBeNull();
+      expect(cancelled.pausedElapsedMs).toBe(0);
+    });
+  });
+
+  // ── Invariant: start → pause → resume → cancel ────────────────────────────
+
+  describe('invariant: start → pause → resume → cancel', () => {
+    it('produces exactly one history record marked completed: false', () => {
+      const s0 = defaultPomoState();
+      const started = pomoStart(s0, { label: 'work' }, env(T0));
+      const paused = pomoPause(started, {}, env(T0 + 5_000));
+      const resumed = pomoResume(paused, {}, env(T0 + 30_000));
+      const cancelled = pomoCancel(resumed, {}, env(T0 + 60_000, 'final'));
+      expect(cancelled.history).toHaveLength(1);
+      expect(cancelled.history[0]!.completed).toBe(false);
+      expect(cancelled.status).toBe('idle');
+      expect(cancelled.pausedAt).toBeNull();
+      expect(cancelled.pausedElapsedMs).toBe(0);
     });
   });
 });

@@ -65,3 +65,20 @@ export const taskSetPlannedMin = (
   const plannedMin = Math.max(1, Math.round(args.minutes));
   return { ...state, plannedMin };
 };
+
+// task.setCurrentSessionElapsedSec — Decision 22.1: write the in-flight session
+// checkpoint. Clamped to >= 0, integer floor.
+export const taskSetCurrentSessionElapsedSec = (
+  state: TaskState,
+  args: { seconds: number },
+): TaskState => {
+  const seconds = Math.floor(Math.max(0, args.seconds));
+  return { ...state, currentSessionElapsedSec: seconds };
+};
+
+// task.clearCurrentSessionElapsedSec — Decision 22.1: reset checkpoint to 0.
+// Returns the same reference when already 0 (no-op).
+export const taskClearCurrentSessionElapsedSec = (state: TaskState): TaskState => {
+  if (state.currentSessionElapsedSec === 0) return state;
+  return { ...state, currentSessionElapsedSec: 0 };
+};

@@ -140,6 +140,67 @@ describe('Decision 22 — board migration', () => {
     });
   });
 
+  it('backfills pausedAt / pausedElapsedMs / currentSessionElapsedSec on a pre-v2.1 board', () => {
+    const legacy = {
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-12T00:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        {
+          id: 'mother-pomo',
+          kind: 'pomo',
+          position: { x: -808, y: 0 },
+          isMother: true,
+          // Pre-v2.1: no pausedAt, no pausedElapsedMs
+          state: {
+            status: 'idle',
+            startedAt: null,
+            durationMin: 25,
+            breakMin: 5,
+            label: '',
+            sessionsCompleted: 0,
+            activeTaskId: null,
+            history: [],
+          },
+          config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
+        },
+        {
+          id: 'task-legacy',
+          kind: 'todo.task',
+          position: { x: 0, y: 0 },
+          isMother: false,
+          // Pre-v2.1: no currentSessionElapsedSec
+          state: {
+            text: 'legacy task',
+            done: false,
+            durationMin: 25,
+            eta: '~25 min',
+            sequenceNumber: 1,
+            layer: 0,
+            createdAt: '2026-05-12T10:00:00.000Z',
+            parentTodoId: 'mother-todo',
+            parentTaskId: null,
+            todoItemId: null,
+            pomoSessionsCompleted: 0,
+            plannedMin: 25,
+            secondsAccumulated: 0,
+          },
+          config: { showDuration: true },
+        },
+      ],
+      edges: [],
+    };
+    writeFileSync(path, JSON.stringify(legacy), 'utf-8');
+    const loaded = loadBoardFrom(path) as LoadedBoard;
+
+    const pomo = loaded.nodes.find((n) => n.kind === 'pomo')!;
+    expect(pomo.state).toMatchObject({ pausedAt: null, pausedElapsedMs: 0 });
+
+    const task = loaded.nodes.find((n) => n.kind === 'todo.task')!;
+    expect(task.state).toMatchObject({ currentSessionElapsedSec: 0 });
+  });
+
   it('preserves an already-canonical config on round-trip', () => {
     const canonical = {
       version: 1,

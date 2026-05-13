@@ -153,6 +153,8 @@ describe('PomoNode FSM (Decision #9)', () => {
         'durationMin',
         'history',
         'label',
+        'pausedAt',
+        'pausedElapsedMs',
         'sessionsCompleted',
         'startedAt',
         'status',

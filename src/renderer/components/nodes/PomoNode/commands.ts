@@ -37,16 +37,53 @@ export const pomoStart = (
   };
 };
 
-export const pomoCancel = (
+export const pomoPause = (
   state: PomoState,
   _args: object = {},
   env: PomoEnv = defaultEnv,
 ): PomoState => {
   if (state.status !== 'running' || state.startedAt === null) return state;
+  const elapsedMs = env.now() - Date.parse(state.startedAt);
+  return {
+    ...state,
+    status: 'paused',
+    pausedAt: toIso(env.now()),
+    pausedElapsedMs: elapsedMs,
+  };
+};
+
+export const pomoResume = (
+  state: PomoState,
+  _args: object = {},
+  env: PomoEnv = defaultEnv,
+): PomoState => {
+  if (state.status !== 'paused') return state;
+  const startedAt = toIso(env.now() - state.pausedElapsedMs);
+  return {
+    ...state,
+    status: 'running',
+    startedAt,
+    pausedAt: null,
+    pausedElapsedMs: 0,
+  };
+};
+
+export const pomoCancel = (
+  state: PomoState,
+  _args: object = {},
+  env: PomoEnv = defaultEnv,
+): PomoState => {
+  if (state.status !== 'running' && state.status !== 'paused') return state;
+  if (state.startedAt === null) return state;
+  // For a paused cancel, use pausedAt as the truthful endedAt (moment activity stopped).
+  const endedAt =
+    state.status === 'paused' && state.pausedAt !== null
+      ? state.pausedAt
+      : toIso(env.now());
   const record: PomoSessionRecord = {
     id: env.uuid(),
     startedAt: state.startedAt,
-    endedAt: toIso(env.now()),
+    endedAt,
     durationMin: state.durationMin,
     label: state.label,
     completed: false,
@@ -56,6 +93,8 @@ export const pomoCancel = (
     ...state,
     status: 'idle',
     startedAt: null,
+    pausedAt: null,
+    pausedElapsedMs: 0,
     history: [...state.history, record],
   };
 };

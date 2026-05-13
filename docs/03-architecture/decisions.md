@@ -1202,6 +1202,52 @@ When `pomoComplete` fires:
 
 ---
 
+## Decision 22.1 — Pomodoro v2 bug-fix pass (pause status + per-task checkpoint)
+
+**Status:** Accepted — 2026-05-13
+**Closes:** Follow-up to PR #90 (Decision 22). 9 user-reported bugs + 3 audit-discovered adjacencies.
+**Related:** Decision 22 (Pomodoro v2 baseline), Decision 9 (PomoNode FSM).
+
+### Context
+
+PR #90 shipped Decision 22 (gear settings, active-task mode, per-task time tracking). The user ran `npm run dev` against the worktree and filed 9 bugs, all confirmed by audit, plus 3 adjacent defects bundled into the same pass. Most are corrected behaviour of features that shipped half-formed in Decision 22 — the task body click that auto-started instead of loading, the PAUSE button that cancelled instead of pausing, the pip count that overflowed, the ETA badge that was not editable, and the session-length that ignored the task's `plannedMin`. One defect (pause status) is genuinely new FSM territory: Decision 22 explicitly foreclosed a global pause state; this amendment reverses that decision by introducing `'paused'` as a first-class FSM status with `pausedAt` / `pausedElapsedMs` so the clock can freeze without writing a history record. The 4-agent team (FSM → dispatcher → UI → tester → pm-docs) executed the full pass on the same branch as PR #90. All 9 user-reported stories are now Gherkin scenarios in CI.
+
+### Decision
+
+1. **`PomoStatus` adds `'paused'`.** `PomoState` gains `pausedAt: string | null` and `pausedElapsedMs: number`. `pomoPause` snapshots elapsed; `pomoResume` offsets `startedAt` so the existing `now - startedAt` derivation continues to work without code change. `pomoCancel` accepts both `running` and `paused`; for paused, `endedAt` in the history record is `pausedAt` (truthful — moment activity stopped).
+2. **`TaskState` adds `currentSessionElapsedSec: number`.** Per-task in-flight session checkpoint. Written when a task is swapped out (live elapsed → checkpoint). Restored when re-activating that task (checkpoint → pomo `pausedElapsedMs` and offset `startedAt`). Cleared on `pomo.cancel` / `pomo.complete` after the final commit to `secondsAccumulated` (the no-double-count invariant).
+3. **New commands:** `pomo.pause`, `pomo.resume`, `task.loadIntoPomo` (no auto-start), `task.setCurrentSessionElapsedSec`, `task.clearCurrentSessionElapsedSec`.
+4. **`loadTaskIntoPomo(taskId, { autoStart })`** in dispatcher unifies activation. `task.startPomo` / `task.spawnPomo` / `todo.startPomoForItem` use `autoStart: true`; the new `task.loadIntoPomo` (dispatched on TaskNode body-click) uses `autoStart: false`.
+5. **Session-length clamp.** Per-session `durationMin = max(1, min(plannedMin - pomoSessionsCompleted * sessionMin, sessionMin))`. So `plannedMin=1, sessionMin=10` → one 1-min session; `plannedMin=35, sessionMin=10` after 3 sessions → 5-min final session.
+6. **Cascades extended:** `task.toggle` cancels the active session when a running task is marked done AND commits the elapsed time inline into `secondsAccumulated` (the dispatcher branch that normally does this is bypassed when `pomoCancel` is called directly from the toggle path). `task.delete` clears `activeTaskId` and cancels pomo when the deleted task was active.
+7. **UI:** Gear icon top-right and disabled while busy; PAUSE/RESUME wiring; pip count capped at 8 (with "+N more"); per-active-task session counter; TaskNode body-click loads without starting; double-click ETA opens inline `task.setPlannedMin` input.
+
+### Consequences
+
+- Restores the user's intuitive flow: click loads, START starts, PAUSE pauses (no data loss), task switches preserve per-task progress.
+- Forecloses: auto-completing a paused session (must resume first).
+- Migration: `STATE_DEFAULTS` extensions for `pomo` (`pausedAt: null, pausedElapsedMs: 0`) and `todo.task` (`currentSessionElapsedSec: 0`) — pre-v2.1 boards backfill via the existing `migrateNodeStates` spread.
+- No double-counting invariant pinned by test: `start → run 60s → cancel` produces `secondsAccumulated === 60` and `currentSessionElapsedSec === 0`.
+
+### Bug table (9 user-reported + 3 adjacencies)
+
+| # | Bug | Root cause | Fix file |
+|---|---|---|---|
+| 1 | Gear icon top-left instead of top-right | Gear was the first flex child with no `marginLeft: auto` | `PomoNode/index.tsx` |
+| 2 | Clicking a task auto-starts the pomo | Body click dispatched `task.startPomo` → `pomoStart()` with no "load only" path | `TaskNode/index.tsx`, `commandDispatch.ts` |
+| 3 | Marking active running task done does not stop the timer | `task.toggle` cascade never inspected `pomo.activeTaskId` | `commandDispatch.ts` |
+| 4 | PAUSE button resets instead of pausing | No `'paused'` FSM status; button dispatched `pomo.cancel` | `PomoNode/commands.ts`, `PomoNode/index.tsx` |
+| 5 | `plannedMin` not editable after creation | `task.setPlannedMin` handler existed but no UI invoked it | `TaskNode/index.tsx` |
+| 6 | State does not refresh on task click | Same root cause as #2 | `TaskNode/index.tsx`, `commandDispatch.ts` |
+| 7 | 1-min task gets a 10-min session | `durationMin` hardcoded to `cfg.sessionMin`; activation never consulted `plannedMin` | `commandDispatch.ts` |
+| 8 | Switching tasks resets the timer | No per-task in-flight checkpoint; clock always restarts from full `durationMin` | `PomoNode/types.ts`, `TaskNode/types.ts`, `commandDispatch.ts` |
+| 9 | Pip overflow at high `pipCount` | No cap, no wrap; 40 pips rendered off-screen | `PomoNode/index.tsx` |
+| A | `task.delete` does not clear `pomo.activeTaskId` | Delete cascade omitted the pomo clear step | `commandDispatch.ts` |
+| F | Gear panel openable mid-session; saving corrupts in-flight derivation | No disable guard on the gear button | `PomoNode/index.tsx` |
+| H | Session counter showed global `sessionsCompleted` instead of per-task | Counter read `state.sessionsCompleted` regardless of `activeTaskId` | `PomoNode/index.tsx` |
+
+---
+
 ## Decision 21 — Asset persistence and the `krnl-asset://` protocol
 
 **Status:** Accepted — 2026-05-12
