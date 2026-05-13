@@ -82,3 +82,12 @@ export const taskClearCurrentSessionElapsedSec = (state: TaskState): TaskState =
   if (state.currentSessionElapsedSec === 0) return state;
   return { ...state, currentSessionElapsedSec: 0 };
 };
+
+// task.setDuration — update the estimated duration.
+export const taskSetDuration = (
+  state: TaskState,
+  args: { durationMin: number },
+): TaskState => {
+  const min = Math.max(1, Math.min(480, Math.round(args.durationMin)));
+  return { ...state, durationMin: min, eta: `~${min} min` };
+};
