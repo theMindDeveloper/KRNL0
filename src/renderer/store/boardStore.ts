@@ -56,7 +56,7 @@ interface BoardStore {
   history: Board[];
   future: Board[];
   setBoard: (board: Board) => void;
-  updateNode: (id: string, patch: Partial<Node>) => void;
+  updateNode: (id: string, patch: Partial<Node>, opts?: { skipHistory?: boolean }) => void;
   addNode: (node: Node) => void;
   removeNode: (id: string) => void;
   addEdge: (edge: Edge) => void;
@@ -107,7 +107,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
 
   setBoard: (board) => set({ board, viewport: board.viewport, history: [], future: [] }),
 
-  updateNode: (id, patch) =>
+  updateNode: (id, patch, opts) =>
     set((s) => {
       if (!s.board) return s;
       const existing = s.board.nodes.find((n) => n.id === id);
@@ -122,8 +122,9 @@ export const useBoardStore = create<BoardStore>((set) => ({
       ) {
         return s;
       }
+      const historyPatch = opts?.skipHistory ? {} : pushHistory(s);
       return {
-        ...pushHistory(s),
+        ...historyPatch,
         board: {
           ...s.board,
           nodes: s.board.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),

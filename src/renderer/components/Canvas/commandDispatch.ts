@@ -332,9 +332,11 @@ function checkpointActiveTaskElapsed(): number {
   const taskNode = board.nodes.find((n) => n.id === ps.activeTaskId);
   if (!taskNode || taskNode.kind !== 'todo.task') return elapsedSec;
   const ts = taskNode.state as TaskState;
-  updateNode(taskNode.id, {
-    state: taskSetCurrentSessionElapsedSec(ts, { seconds: elapsedSec }),
-  });
+  updateNode(
+    taskNode.id,
+    { state: taskSetCurrentSessionElapsedSec(ts, { seconds: elapsedSec }) },
+    { skipHistory: true },
+  );
   return elapsedSec;
 }
 
@@ -402,9 +404,11 @@ function loadTaskIntoPomo(
         const elapsedSec = Math.floor(ps.pausedElapsedMs / 1000);
         if (elapsedSec > 0) {
           const priorTs = priorTaskNode.state as TaskState;
-          updateNode(priorTaskNode.id, {
-            state: taskSetCurrentSessionElapsedSec(priorTs, { seconds: elapsedSec }),
-          });
+          updateNode(
+            priorTaskNode.id,
+            { state: taskSetCurrentSessionElapsedSec(priorTs, { seconds: elapsedSec }) },
+            { skipHistory: true },
+          );
         }
       }
     }
@@ -462,8 +466,9 @@ function loadTaskIntoPomo(
     };
   }
 
-  // Step 8: persist.
-  updateNode(pomoNode.id, { state: nextPomoState });
+  // Step 8: persist. Pomo-load is selection-driven, not a user edit — skip
+  // history so Ctrl+Z doesn't undo "I clicked on this task to see its timer".
+  updateNode(pomoNode.id, { state: nextPomoState }, { skipHistory: true });
   const updated = useBoardStore.getState().board;
   if (updated) void window.krnl?.boardSave(updated);
 }
