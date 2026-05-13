@@ -11,22 +11,39 @@ const ZOOM_MAX = 4;
 // Keyed by nodeId → { prev, next } for edges where from.event === 'task.next'.
 // The Map reference is stable when the edges array reference is unchanged,
 // so Zustand's Object.is equality avoids unnecessary re-renders.
-let _lastEdges: readonly Edge[] | null = null;
-let _cachedChainIndex: ReadonlyMap<string, { prev: string | null; next: string | null }> =
-  new Map();
+export interface ChainEntry {
+  prev: string | null;          // first incoming (insertion order) — kept for back-compat
+  next: string | null;          // first outgoing (insertion order) — kept for back-compat
+  prevs: readonly string[];     // all incoming task.next sources
+  nexts: readonly string[];     // all outgoing task.next targets
+}
 
-function buildChainIndex(
-  edges: readonly Edge[],
-): ReadonlyMap<string, { prev: string | null; next: string | null }> {
-  const map = new Map<string, { prev: string | null; next: string | null }>();
+let _lastEdges: readonly Edge[] | null = null;
+let _cachedChainIndex: ReadonlyMap<string, ChainEntry> = new Map();
+
+function buildChainIndex(edges: readonly Edge[]): ReadonlyMap<string, ChainEntry> {
+  const prevsMap = new Map<string, string[]>();
+  const nextsMap = new Map<string, string[]>();
   for (const e of edges) {
     if (e.from.event !== 'task.next') continue;
     const fromId = e.from.nodeId;
     const toId = e.to.nodeId;
-    const fromEntry = map.get(fromId) ?? { prev: null, next: null };
-    map.set(fromId, { ...fromEntry, next: toId });
-    const toEntry = map.get(toId) ?? { prev: null, next: null };
-    map.set(toId, { ...toEntry, prev: fromId });
+    if (!nextsMap.has(fromId)) nextsMap.set(fromId, []);
+    nextsMap.get(fromId)!.push(toId);
+    if (!prevsMap.has(toId)) prevsMap.set(toId, []);
+    prevsMap.get(toId)!.push(fromId);
+  }
+  const allIds = new Set<string>([...prevsMap.keys(), ...nextsMap.keys()]);
+  const map = new Map<string, ChainEntry>();
+  for (const id of allIds) {
+    const prevs = prevsMap.get(id) ?? [];
+    const nexts = nextsMap.get(id) ?? [];
+    map.set(id, {
+      prev: prevs[0] ?? null,
+      next: nexts[0] ?? null,
+      prevs,
+      nexts,
+    });
   }
   return map;
 }
@@ -49,7 +66,7 @@ interface BoardStore {
   zoomAt: (focalScreenX: number, focalScreenY: number, factor: number) => void;
   resetViewport: () => void;
   selectNode: (id: string | null) => void;
-  selectTaskChain: () => ReadonlyMap<string, { prev: string | null; next: string | null }>;
+  selectTaskChain: () => ReadonlyMap<string, ChainEntry>;
   insertSiblingTaskAfter: (taskNodeId: string, opts?: { text?: string; durationMin?: number }) => void;
 }
 
@@ -228,39 +245,32 @@ export const useBoardStore = create<BoardStore>((set) => ({
         config: { showDuration: true },
       };
 
-      // Bug 2: Walk the chain forward from taskNodeId (same layer only), collecting
-      // all downstream task node ids. Add an edge from newSibling to each.
-      // Do NOT remove or modify any existing edges (purely additive fork).
+      // Graph twin: replicate every DIRECT task.next edge incident on the source.
+      // For each X → source, add X → newSibling. For each source → Y, add newSibling → Y.
+      // Purely additive — source's existing edges are untouched.
       const edgesArr = s.board.edges;
-      const downstreamTargets: string[] = [];
-      const visited = new Set<string>();
-      let current: string | undefined = taskNodeId;
-      const cap = s.board.nodes.length + 1;
-      let steps = 0;
-      while (current !== undefined && steps < cap) {
-        steps++;
-        const nextEdge = edgesArr.find(
-          (e) => e.from.nodeId === current && e.from.event === 'task.next',
-        );
-        if (!nextEdge) break;
-        const nextId = nextEdge.to.nodeId;
-        if (visited.has(nextId)) break; // cycle guard
-        // Only follow at the same layer
-        const nextNode = s.board.nodes.find((n) => n.id === nextId);
-        if (!nextNode || nextNode.kind !== 'todo.task') break;
-        const nextTs = nextNode.state as TaskState;
-        if (nextTs.layer !== sourceTaskState.layer) break;
-        visited.add(nextId);
-        downstreamTargets.push(nextId);
-        current = nextId;
+      const incomingSources: string[] = [];
+      const outgoingTargets: string[] = [];
+      for (const e of edgesArr) {
+        if (e.from.event !== 'task.next') continue;
+        if (e.to.nodeId === taskNodeId) incomingSources.push(e.from.nodeId);
+        if (e.from.nodeId === taskNodeId) outgoingTargets.push(e.to.nodeId);
       }
 
-      const newEdges: Edge[] = downstreamTargets.map((targetId) => ({
-        id: `edge-${crypto.randomUUID()}`,
-        from: { nodeId: newNodeId, event: 'task.next' },
-        to: { nodeId: targetId, command: 'task.activate' },
-        enabled: true,
-      }));
+      const newEdges: Edge[] = [
+        ...incomingSources.map((srcId) => ({
+          id: `edge-${crypto.randomUUID()}`,
+          from: { nodeId: srcId, event: 'task.next' },
+          to: { nodeId: newNodeId, command: 'task.activate' },
+          enabled: true,
+        })),
+        ...outgoingTargets.map((tgtId) => ({
+          id: `edge-${crypto.randomUUID()}`,
+          from: { nodeId: newNodeId, event: 'task.next' },
+          to: { nodeId: tgtId, command: 'task.activate' },
+          enabled: true,
+        })),
+      ];
 
       // Bug 3: append a new TodoItem to the parent TodoNode (bidirectional link).
       const newTodoItem: TodoItem = {
