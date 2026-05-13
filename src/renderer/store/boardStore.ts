@@ -75,9 +75,18 @@ interface BoardStore {
 }
 
 const HISTORY_CAP = 50;
+// Coalesce mutations into a single history entry when they happen in the same
+// JS task — e.g. a multi-node drag commits `updateNode` once per node, but the
+// user perceives it as one action. We push the pre-mutation board the first
+// time pushHistory is called within a task, then suppress further pushes until
+// the microtask queue drains.
+let _coalescing = false;
 
 function pushHistory(s: BoardStore): { history: Board[]; future: Board[] } {
   if (!s.board) return { history: s.history, future: s.future };
+  if (_coalescing) return { history: s.history, future: s.future };
+  _coalescing = true;
+  queueMicrotask(() => { _coalescing = false; });
   const nextHistory = [...s.history, s.board];
   if (nextHistory.length > HISTORY_CAP) nextHistory.shift();
   return { history: nextHistory, future: [] };
@@ -101,6 +110,18 @@ export const useBoardStore = create<BoardStore>((set) => ({
   updateNode: (id, patch) =>
     set((s) => {
       if (!s.board) return s;
+      const existing = s.board.nodes.find((n) => n.id === id);
+      // No-op guard: a click without an actual drag can emit a position commit
+      // whose value equals the existing position. Don't waste a history slot.
+      if (
+        existing &&
+        patch.position !== undefined &&
+        Object.keys(patch).length === 1 &&
+        existing.position.x === patch.position.x &&
+        existing.position.y === patch.position.y
+      ) {
+        return s;
+      }
       return {
         ...pushHistory(s),
         board: {

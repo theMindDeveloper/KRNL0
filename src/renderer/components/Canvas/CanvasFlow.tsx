@@ -603,15 +603,16 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
               if (updated) void window.krnl?.boardSave(updated);
             }
           }
-        } else if (change.type === 'select' && change.selected) {
-          selectNode(change.id);
         }
+        // 'select' changes are handled by onSelectionChange below — calling
+        // selectNode per-change here would clobber multi-selection (last
+        // selected id wins, others lost from the store's point of view).
         // 'dimensions' — absorbed by applyNodeChanges above; this is what
         // resolves RF error #015 ("trying to drag a node that is not
         // initialized"). Without it RF takes a slow non-measured drag path.
       }
     },
-    [updateNode, selectNode]
+    [updateNode]
   );
 
   // ── onEdgesChange — ignored for v1 (no edge create/delete UX) ────────────
@@ -629,10 +630,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     [setViewport]
   );
 
-  // ── onSelectionChange — mirror first selected node to store ──────────────
+  // ── onSelectionChange — mirror to store only when a single node is picked.
+  // For marquee multi-select we leave the store's selectedNodeId as null so
+  // single-node-aware features (StatusBar, sys CLI) don't get a confusing
+  // "active" id while RF is showing many nodes selected.
   const onSelectionChange = useCallback(
     ({ nodes }: OnSelectionChangeParams) => {
-      selectNode(nodes[0]?.id ?? null);
+      selectNode(nodes.length === 1 ? nodes[0]!.id : null);
     },
     [selectNode]
   );
