@@ -279,11 +279,15 @@ describe('Idempotent guard — clicking same paused task does not reset checkpoi
   });
 });
 
-// ── D1: switch from running task A (120s elapsed) to task B ──────────────────
+// ── D1: switch from running task A to task B
+//
+// Updated for Decision 22.2 protect-running rule (PR #90 follow-up): passive
+// task.loadIntoPomo MUST NOT disturb a running session on a different task.
+// The user must press STOP (or explicit START on Task B) to switch. The
+// checkpoint test for the explicit-switch path is preserved as D1b.
 
-describe('D1 — switch from running task A to task B checkpoints A\'s elapsed', () => {
-  it('task A currentSessionElapsedSec is ~120 and pomo activeTaskId is task-b', () => {
-    // Set startedAt to 120s ago so elapsed = 120
+describe('D1 — passive task.loadIntoPomo on Task B preserves a running Task A', () => {
+  it('pomo stays on task A running; task B is NOT loaded', () => {
     const startedAt = new Date(Date.now() - 120_000).toISOString();
     const board = makeBoardWithTasks({
       taskB: {},
@@ -298,6 +302,30 @@ describe('D1 — switch from running task A to task B checkpoints A\'s elapsed',
     useBoardStore.getState().setBoard(board);
 
     makeCommandHandler('task-b')('task.loadIntoPomo');
+
+    const ps = getPomoState();
+    expect(ps.activeTaskId).toBe('task-a');
+    expect(ps.status).toBe('running');
+    expect(ps.label).toBe('Task A');
+  });
+});
+
+describe('D1b — explicit task.startPomo on Task B force-switches and checkpoints Task A', () => {
+  it('task A currentSessionElapsedSec is ~120 and pomo activeTaskId is task-b', () => {
+    const startedAt = new Date(Date.now() - 120_000).toISOString();
+    const board = makeBoardWithTasks({
+      taskB: {},
+      pomoState: {
+        status: 'running',
+        startedAt,
+        activeTaskId: 'task-a',
+        label: 'Task A',
+        durationMin: 25,
+      },
+    });
+    useBoardStore.getState().setBoard(board);
+
+    makeCommandHandler('task-b')('task.startPomo');
 
     const taskA = getTaskState('task-a');
     const ps = getPomoState();
