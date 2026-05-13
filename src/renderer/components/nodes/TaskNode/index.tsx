@@ -24,7 +24,7 @@ export function formatElapsed(totalSec: number): string {
 // TaskNode — child task card spawned when a todo item is added.
 // No slot tag, no corner brackets (those are mother-only, Decision #8).
 // Handles are added by the rfAdapters HOC — DO NOT import Handle here.
-export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) {
+export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, TaskConfig>) {
   const { state } = node;
   const _config = (node.config as TaskConfig | null) ?? defaultTaskConfig();
   void _config;
@@ -59,6 +59,19 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const isActive = pomoRuntime?.activeTaskId === taskId;
   const isActiveRunning = isActive && pomoRuntime?.status === 'running' && pomoRuntime?.startedAt !== null;
   const isActivePaused = isActive && pomoRuntime?.status === 'paused';
+
+  // When this task transitions from unselected → selected (RF click selection),
+  // refresh the pomo with this task's saved state. React Flow swallows the
+  // mousedown sequence for drag detection in the real browser, so the body
+  // onClick handler is unreliable; piggy-backing on RF's selection signal is
+  // the robust path. Idempotent in the dispatcher when already active.
+  const prevSelectedRef = useRef(false);
+  useEffect(() => {
+    if (selected && !prevSelectedRef.current && !state.done) {
+      onCommand('task.loadIntoPomo');
+    }
+    prevSelectedRef.current = selected;
+  }, [selected, state.done, onCommand]);
 
   // Local tick — only mount the interval when this task is actively running.
   const [, setTick] = useState(0);
@@ -302,12 +315,12 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           {` task · #${seqNum} L${layer}`}
         </span>
 
-        {/* Header right slot: START (when not done + not active) or STOP (when active).
-            Never show both at once — STOP takes precedence when this task is the
-            pomo's active task. START dispatches task.startPomo (auto-start path).
-            STOP dispatches task.stopPomo (cancel + commit elapsed). */}
+        {/* Header right slot: START (when not done + not running) or STOP (only
+            when the timer is actually running). A loaded-but-paused task still
+            shows START — pressing it resumes the timer. STOP is the abandon
+            affordance and only makes sense for a live session. */}
         <div style={{ display: 'flex', gap: 4 }}>
-          {!state.done && !isActive && (
+          {!state.done && !isActiveRunning && (
             <button
               type="button"
               data-testid="task-start-btn"
@@ -333,7 +346,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               START
             </button>
           )}
-          {isActive && (
+          {isActiveRunning && (
             <button
               type="button"
               data-testid="task-stop-btn"
