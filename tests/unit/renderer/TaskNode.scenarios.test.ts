@@ -151,7 +151,7 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
     it('task text has line-through styling when done', () => {
       renderTaskNode(makeTaskState({ done: true }));
       const text = document.querySelector('.task-text') as HTMLElement;
-      expect(text.style.textDecoration).toContain('line-through');
+      expect(text.style.textDecorationLine).toBe('line-through');
     });
 
     it('task text color is var(--ink-4) when done', () => {

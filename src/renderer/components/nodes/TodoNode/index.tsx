@@ -264,7 +264,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                       fontFamily: 'var(--font-sans)',
                       fontSize: 12.5,
                       color: item.done ? 'var(--ink-4)' : 'var(--ink)',
-                      textDecoration: item.done ? 'line-through' : 'none',
+                      textDecorationLine: item.done ? 'line-through' : 'none',
                       textDecorationColor: 'var(--ink-4)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
