@@ -92,6 +92,9 @@ import {
   imageClear,
 } from '../nodes/ImageNode/commands';
 
+// ── Clock ─────────────────────────────────────────────────────────────
+import { clockLinkTodo, clockSetWindowStart } from '../nodes/ClockNode/commands';
+
 // ── dispatch ──────────────────────────────────────────────────────────
 
 /**
@@ -202,6 +205,13 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'image.setSize':  return { state: imageSetSize(s as never, args as never) };
         case 'image.setAlt':   return { state: imageSetAlt(s as never, args as never) };
         case 'image.clear':    return { state: imageClear(s as never) };
+      }
+      break;
+    }
+    case 'clock': {
+      switch (command) {
+        case 'clock.linkTodo':       return { state: clockLinkTodo(s as never, args as never) };
+        case 'clock.setWindowStart': return { state: clockSetWindowStart(s as never, args as never) };
       }
       break;
     }
