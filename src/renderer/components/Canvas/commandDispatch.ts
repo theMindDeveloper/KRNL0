@@ -462,7 +462,21 @@ export function makeCommandHandler(nodeId: string) {
     if (!node) return;
 
     // ── task.startPomo / task.spawnPomo: auto-start (Decision 22 §5, legacy path)
+    // If this task is already loaded-paused (the new click-to-load flow), START
+    // means RESUME — transition straight to running, preserving the checkpoint.
+    // loadTaskIntoPomo's idempotent guard would otherwise no-op the same-task
+    // paused case.
     if (command === 'task.startPomo' || command === 'task.spawnPomo') {
+      const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
+      if (pomoNode) {
+        const ps = pomoNode.state as PomoState;
+        if (ps.activeTaskId === nodeId && ps.status === 'paused') {
+          updateNode(pomoNode.id, { state: pomoResume(ps) });
+          const updated = useBoardStore.getState().board;
+          if (updated) void window.krnl?.boardSave(updated);
+          return;
+        }
+      }
       loadTaskIntoPomo(nodeId, { autoStart: true });
       return;
     }
