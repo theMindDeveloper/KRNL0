@@ -1,7 +1,6 @@
 // TerminalNode session logic — extracted for unit-testability.
 // All side-effects (pty calls, terminal writes) are injected via deps.
-
-import { BOOT_LINE_ASCII, BOOT_LINE_SEPARATOR } from './constants';
+// MOTD is now emitted by main via pty:data before the shell prompt renders (T1).
 
 /** Minimal Terminal surface needed by startTerminalSession. */
 export interface TermSurface {
@@ -23,7 +22,7 @@ export interface FitSurface {
 
 /** The krnl preload bridge surface (subset used by the terminal). */
 export interface KrnlBridge {
-  ptyCreate(cols: number, rows: number): Promise<string>;
+  ptyCreate(cols: number, rows: number): Promise<{ sessionId: string; motd: string }>;
   ptyWrite(sessionId: string, data: string): void | Promise<void>;
   ptyResize(sessionId: string, cols: number, rows: number): void | Promise<void>;
   ptyKill(sessionId: string): void | Promise<void>;
@@ -63,14 +62,13 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
   const cols = term.cols || 80;
   const rows = term.rows || 24;
 
-  // F2: write boot lines
-  term.write(BOOT_LINE_ASCII);
-  term.write(BOOT_LINE_SEPARATOR);
-
   if (!krnl) return () => undefined;
 
-  // F4: pty:create
-  const sid = await krnl.ptyCreate(cols, rows);
+  // F4: pty:create — returns sessionId + motd.
+  // Write motd synchronously here (before subscribing to pty:data) so the
+  // banner appears before the shell prompt and there is no IPC race (T1).
+  const { sessionId: sid, motd } = await krnl.ptyCreate(cols, rows);
+  if (motd) term.write(motd);
   if (isCancelled()) {
     krnl.ptyKill(sid);
     return () => undefined;

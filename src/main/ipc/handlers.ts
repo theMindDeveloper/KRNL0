@@ -6,6 +6,20 @@ import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
 import { loadBoardFrom, saveBoardTo } from '../persistence/board';
+import { renderMotd } from '../rpc/motd';
+import type { RpcServer } from '../rpc/server';
+
+// Read version once at module load (package.json is bundled into resources).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const APP_VERSION: string = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pkg = require('../../../package.json') as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 // Board location — isolated per Electron app name so multiple worktrees
 // (e.g. main vs feat/new-features) don't share the same board.json.
@@ -39,7 +53,7 @@ function hasOpenRenderer(): boolean {
   return BrowserWindow.getAllWindows().length > 0;
 }
 
-export function registerHandlers(): void {
+export function registerHandlers(rpcServer?: RpcServer): void {
   ipcMain.handle('board:load', async () => {
     return loadBoard();
   });
@@ -128,13 +142,30 @@ export function registerHandlers(): void {
     let cwdExists = false;
     try { cwdExists = existsSync(cwd); } catch { /* ignore */ }
 
+    // Build child environment: inherit process.env, then prepend KRNL0_CLI_DIR
+    // to PATH so the krnl binary is reachable (T7), and inject RPC credentials.
+    const isWin32 = process.platform === 'win32';
+    const pathKey = isWin32 ? 'Path' : 'PATH';
+    const existingPath = (process.env[pathKey] ?? process.env['PATH'] ?? '');
+    const cliDir = process.env['KRNL0_CLI_DIR'] ?? '';
+    const newPath = cliDir ? `${cliDir}${isWin32 ? ';' : ':'}${existingPath}` : existingPath;
+    const childEnv: Record<string, string> = Object.fromEntries(
+      Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
+    );
+    if (cliDir) childEnv[pathKey] = newPath;
+    if (rpcServer) {
+      childEnv['KRNL0_RPC_SOCKET'] = rpcServer.socketPath;
+      childEnv['KRNL0_RPC_TOKEN']  = rpcServer.token;
+    }
+    childEnv['KRNL0_MAIN_PID'] = String(process.pid);
+
     let proc: pty.IPty;
     try {
       proc = pty.spawn(shell, [], {
         cols,
         rows,
         cwd,
-        env: process.env,
+        env: childEnv,
         name: 'xterm-color',
       });
     } catch (err) {
@@ -182,7 +213,13 @@ export function registerHandlers(): void {
     });
 
     ptySessions.set(sessionId, proc);
-    return sessionId;
+
+    // T1–T6: build MOTD and include in the reply so the renderer writes it
+    // synchronously before subscribing to pty:data (avoids any IPC race).
+    const motd = process.env['KRNL0_NO_MOTD'] === '1'
+      ? ''
+      : renderMotd({ version: APP_VERSION, sessionId, cols });
+    return { sessionId, motd };
   });
 
   // pty:write — send keystrokes directly to the PTY (not stdin.write)

@@ -12,7 +12,7 @@ interface KrnlBridge {
   boardLoad: () => Promise<unknown>
   boardSave: (data: unknown) => Promise<void>
   boardSaveViewport: (viewport: { x: number; y: number; zoom: number }) => Promise<void>
-  ptyCreate: (cols: number, rows: number) => Promise<string>
+  ptyCreate: (cols: number, rows: number) => Promise<{ sessionId: string; motd: string }>
   ptyWrite: (sessionId: string, data: string) => Promise<void>
   ptyResize: (sessionId: string, cols: number, rows: number) => Promise<void>
   ptyKill: (sessionId: string) => Promise<void>

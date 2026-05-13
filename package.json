@@ -1,6 +1,6 @@
 {
   "name": "krnl0",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "krnl0 — voice-driven canvas for personal planning",
   "main": "out/main/index.js",
   "scripts": {
@@ -14,7 +14,8 @@
     "postinstall": "electron-rebuild -f -w node-pty"
   },
   "bin": {
-    "sys": "dist/sys/index.js"
+    "krnl": "bin/krnl.js",
+    "sys": "bin/sys.js"
   },
   "dependencies": {
     "@xterm/addon-canvas": "^0.7.0",
