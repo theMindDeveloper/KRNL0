@@ -8,6 +8,7 @@ import { TaskNode } from './TaskNode';
 import { TextNode } from './TextNode';
 import { ImageNode } from './ImageNode';
 import { CalendarNode } from './CalendarNode';
+import { ClockNode } from './ClockNode';
 import { UnknownNode } from './UnknownNode';
 import type { NodeProps } from './types';
 import { createNodeAdapter } from '../Canvas/rfAdapters';
@@ -29,6 +30,7 @@ const NODE_REGISTRY_RAW: Record<string, AnyNodeComponent> = {
   text: TextNode as AnyNodeComponent,
   image: ImageNode as AnyNodeComponent,
   calendar: CalendarNode as AnyNodeComponent,
+  clock: ClockNode as AnyNodeComponent,
 };
 export const NODE_REGISTRY: Record<string, AnyNodeComponent> = Object.fromEntries(
   Object.entries(NODE_REGISTRY_RAW).map(([k, C]) => [k, memo(C)])
@@ -54,4 +56,5 @@ export const NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> 
   text:           createNodeAdapter(TextNode as AnyNodeComponent),
   image:          createNodeAdapter(ImageNode as AnyNodeComponent),
   calendar:       createNodeAdapter(CalendarNode as AnyNodeComponent),
+  clock:          createNodeAdapter(ClockNode as AnyNodeComponent),
 };
