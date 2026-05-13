@@ -67,17 +67,21 @@
   box-shadow: none !important;
 }
 
+/* The rfAdapters HOC renders <Handle> elements (which are <div>s) as siblings
+   of the node body for non-mother nodes, so `> div:first-of-type` would land
+   on the left handle, not the card. Exclude handles with :not(). */
+
 /* Acid ring for mother kinds (pomo / habit / terminal) and habit.lane child. */
-.react-flow__node.selected.krnl-kind-pomo > div:first-of-type,
-.react-flow__node.selected.krnl-kind-habit > div:first-of-type,
-.react-flow__node.selected.krnl-kind-terminal > div:first-of-type,
-.react-flow__node.selected.krnl-kind-habit--lane > div:first-of-type {
+.react-flow__node.selected.krnl-kind-pomo > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-habit > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-terminal > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-habit--lane > div:not(.react-flow__handle) {
   box-shadow: 0 0 0 2px var(--acid), 0 0 16px rgba(201, 241, 88, 0.35) !important;
 }
 
 /* Cyan ring for the Todo mother and Task children. */
-.react-flow__node.selected.krnl-kind-todo > div:first-of-type,
-.react-flow__node.selected.krnl-kind-todo--task > div:first-of-type {
+.react-flow__node.selected.krnl-kind-todo > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-todo--task > div:not(.react-flow__handle) {
   box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78, 168, 176, 0.35) !important;
 }
 
