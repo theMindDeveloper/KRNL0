@@ -52,6 +52,14 @@
   box-shadow: var(--shadow-glow);
 }
 
+/* Hide React Flow's group-selection bounding box. The user-facing selection
+   indicator is the per-node ring; the wrapping rect just adds visual noise
+   and lingers after a marquee drag completes. */
+.react-flow__nodesselection,
+.react-flow__nodesselection-rect {
+  display: none !important;
+}
+
 /* ── Todo-family: rounded blue ring overrides the global acid ring ───────── */
 /* Decision 22.2 Fix 5 — TodoNode mother and TaskNode children get a cyan
    rounded selection ring that matches the card shape. All other families
