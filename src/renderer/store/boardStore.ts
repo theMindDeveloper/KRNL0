@@ -197,7 +197,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
       const existingEdgeId = existingEdge?.id;
       const nextId = existingEdge?.to.nodeId;
 
-      // Build new task state — only include fields present in TaskState
+      // Build new task state — includes all required TaskState fields
       const newTaskState: TaskState = {
         text: 'New task',
         done: false,
@@ -210,6 +210,9 @@ export const useBoardStore = create<BoardStore>((set) => ({
         parentTaskId: sourceTaskState.parentTaskId,
         todoItemId: null,
         pomoSessionsCompleted: 0,
+        plannedMin: sourceTaskState.plannedMin ?? sourceTaskState.durationMin,
+        secondsAccumulated: 0,
+        currentSessionElapsedSec: 0,
       };
 
       const newNodeId = `task-${crypto.randomUUID()}`;

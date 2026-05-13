@@ -501,6 +501,9 @@ export async function taskSibling(
     parentTaskId: sourceTs.parentTaskId,
     todoItemId: null,
     pomoSessionsCompleted: 0,
+    plannedMin: sourceTs.plannedMin ?? sourceTs.durationMin,
+    secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
   };
 
   const newNode: AnyNode = {
