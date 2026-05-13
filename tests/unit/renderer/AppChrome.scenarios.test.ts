@@ -120,19 +120,20 @@ describe('F2 — Topbar right buttons present', () => {
 // ── F3 — Left dock buttons ────────────────────────────────────────────────────
 
 describe('F3 — Left dock contains 4 icon buttons', () => {
-  it('renders a dock with 4 buttons', () => {
+  it('renders a dock with 5 buttons', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     const buttons = screen.getByTestId('dock').querySelectorAll('button');
-    expect(buttons.length).toBe(4);
+    expect(buttons.length).toBe(5);
   });
 
-  it('renders buttons for select, text, image, connect', () => {
+  it('renders buttons for select, text, image, clock, connect', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     expect(screen.getByTestId('dock-btn-select')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-text')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-image')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-clock')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-connect')).toBeTruthy();
   });
 });
