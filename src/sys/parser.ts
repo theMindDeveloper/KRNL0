@@ -15,6 +15,9 @@ export type SysCommand =
   | { kind: 'task'; sub: 'delete'; id: string | undefined }
   | { kind: 'task'; sub: 'pomo'; id: string | undefined }
   | { kind: 'task'; sub: 'subtask'; parentId: string | undefined; text: string | undefined }
+  | { kind: 'task'; sub: 'duration'; id: string | undefined; minutes: number | undefined }
+  | { kind: 'task'; sub: 'sibling'; id: string | undefined }
+  | { kind: 'task'; sub: 'reset-pomo'; id: string | undefined }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
   | { kind: 'habit'; sub: 'done'; name: string | undefined; date: string | undefined }
   | { kind: 'habit'; sub: 'color'; name: string | undefined; color: string | undefined }
@@ -118,6 +121,21 @@ export class SysParser {
       }
       if (sub === 'subtask') {
         return { kind: 'task', sub: 'subtask', parentId: rest[0], text: rest[1] };
+      }
+      if (sub === 'duration') {
+        const mins = rest[1] !== undefined ? Number(rest[1]) : undefined;
+        return {
+          kind: 'task',
+          sub: 'duration',
+          id: rest[0],
+          minutes: mins !== undefined && !isNaN(mins) ? mins : undefined,
+        };
+      }
+      if (sub === 'sibling') {
+        return { kind: 'task', sub: 'sibling', id: rest[0] };
+      }
+      if (sub === 'reset-pomo') {
+        return { kind: 'task', sub: 'reset-pomo', id: rest[0] };
       }
     }
 

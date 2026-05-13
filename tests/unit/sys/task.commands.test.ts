@@ -25,6 +25,9 @@ import {
   taskStartPomo,
   taskSubtask,
   taskList,
+  taskDuration,
+  taskSibling,
+  taskResetPomo,
   type TaskCtx,
 } from '../../../src/sys/commands/task';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
@@ -415,6 +418,177 @@ describe('sys task subtask', () => {
     const parentRes = await taskAdd(ctx, TODO_MOTHER_ID, 'parent');
     const parentId = (parentRes.data as { id: string }).id;
     const res = await taskSubtask(ctx, parentId, undefined);
+    expect(res.ok).toBe(false);
+  });
+});
+
+// ── taskDuration ──────────────────────────────────────────────────────────────
+
+describe('sys task duration', () => {
+  it('sets durationMin and updates eta on the task', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'timed task', 20);
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskDuration(ctx, taskId, 45);
+    expect(res.ok).toBe(true);
+    const task = findTasks().find((t) => t.id === taskId)!;
+    expect((task.state as TaskState).durationMin).toBe(45);
+    expect((task.state as TaskState).eta).toBe('~45 min');
+  });
+
+  it('returns error when task id is missing', async () => {
+    const res = await taskDuration(ctx, undefined, 30);
+    expect(res.ok).toBe(false);
+  });
+
+  it('returns error when minutes is missing', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'task');
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskDuration(ctx, taskId, undefined);
+    expect(res.ok).toBe(false);
+  });
+
+  it('returns error when minutes is zero or negative', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'task');
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskDuration(ctx, taskId, 0);
+    expect(res.ok).toBe(false);
+  });
+
+  it('returns error when task id is unknown', async () => {
+    const res = await taskDuration(ctx, 'nonexistent', 30);
+    expect(res.ok).toBe(false);
+  });
+
+  it('refuses to change duration when pomo is running', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'focus task', 25);
+    const taskId = (addRes.data as { id: string }).id;
+    // Start the pomo
+    await taskStartPomo(ctx, taskId);
+    const res = await taskDuration(ctx, taskId, 50);
+    expect(res.ok).toBe(false);
+    expect(res.message).toMatch(/pomo session is running/i);
+    // Duration should be unchanged
+    const task = findTasks().find((t) => t.id === taskId)!;
+    expect((task.state as TaskState).durationMin).toBe(25);
+  });
+});
+
+// ── taskSibling ───────────────────────────────────────────────────────────────
+
+describe('sys task sibling', () => {
+  it('inserts a new sibling task node with text "New task"', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'original task');
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskSibling(ctx, taskId);
+    expect(res.ok).toBe(true);
+    const sibId = (res.data as { id: string }).id;
+    const sib = findTasks().find((t) => t.id === sibId)!;
+    expect((sib.state as TaskState).text).toBe('New task');
+  });
+
+  it('sibling inherits layer and parentTodoId from source', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'source');
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskSibling(ctx, taskId);
+    const sibId = (res.data as { id: string }).id;
+    const sib = findTasks().find((t) => t.id === sibId)!;
+    const sourceTask = findTasks().find((t) => t.id === taskId)!;
+    expect((sib.state as TaskState).layer).toBe((sourceTask.state as TaskState).layer);
+    expect((sib.state as TaskState).parentTodoId).toBe(
+      (sourceTask.state as TaskState).parentTodoId,
+    );
+  });
+
+  it('adds a chain edge from source to new sibling', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'source task');
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskSibling(ctx, taskId);
+    const sibId = (res.data as { id: string }).id;
+    const { edges } = readBoard();
+    const edge = edges.find(
+      (e) => e.from.nodeId === taskId && e.to.nodeId === sibId,
+    );
+    expect(edge).toBeDefined();
+  });
+
+  it('rewires existing next-edge through new sibling', async () => {
+    // Create task1 → task2 chain, then insert sibling after task1
+    const res1 = await taskAdd(ctx, TODO_MOTHER_ID, 'task 1');
+    const res2 = await taskAdd(ctx, TODO_MOTHER_ID, 'task 2');
+    const task1Id = (res1.data as { id: string }).id;
+    const task2Id = (res2.data as { id: string }).id;
+
+    const sibRes = await taskSibling(ctx, task1Id);
+    const sibId = (sibRes.data as { id: string }).id;
+
+    const { edges } = readBoard();
+    // Old task1 → task2 direct edge should be gone
+    const directEdge = edges.find(
+      (e) => e.from.nodeId === task1Id && e.to.nodeId === task2Id,
+    );
+    expect(directEdge).toBeUndefined();
+    // task1 → sib should exist
+    const firstEdge = edges.find(
+      (e) => e.from.nodeId === task1Id && e.to.nodeId === sibId,
+    );
+    expect(firstEdge).toBeDefined();
+    // sib → task2 should exist
+    const secondEdge = edges.find(
+      (e) => e.from.nodeId === sibId && e.to.nodeId === task2Id,
+    );
+    expect(secondEdge).toBeDefined();
+  });
+
+  it('returns error when task id is missing', async () => {
+    const res = await taskSibling(ctx, undefined);
+    expect(res.ok).toBe(false);
+  });
+
+  it('returns error when task id is unknown', async () => {
+    const res = await taskSibling(ctx, 'nonexistent');
+    expect(res.ok).toBe(false);
+  });
+});
+
+// ── taskResetPomo ─────────────────────────────────────────────────────────────
+
+describe('sys task reset-pomo', () => {
+  it('resets pomoSessionsCompleted to 0', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'productive task', 25);
+    const taskId = (addRes.data as { id: string }).id;
+    // Manually write a non-zero count
+    const board = JSON.parse(readFileSync(boardPath, 'utf-8')) as {
+      nodes: Array<{ id: string; state: TaskState }>;
+      edges: unknown[];
+    };
+    board.nodes = board.nodes.map((n) => {
+      if (n.id !== taskId) return n;
+      return { ...n, state: { ...n.state, pomoSessionsCompleted: 3 } };
+    });
+    writeFileSync(boardPath, JSON.stringify(board), 'utf-8');
+
+    const res = await taskResetPomo(ctx, taskId);
+    expect(res.ok).toBe(true);
+    const task = findTasks().find((t) => t.id === taskId)!;
+    expect((task.state as TaskState).pomoSessionsCompleted).toBe(0);
+  });
+
+  it('succeeds even when count was already 0', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'fresh task', 25);
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskResetPomo(ctx, taskId);
+    expect(res.ok).toBe(true);
+    const task = findTasks().find((t) => t.id === taskId)!;
+    expect((task.state as TaskState).pomoSessionsCompleted).toBe(0);
+  });
+
+  it('returns error when task id is missing', async () => {
+    const res = await taskResetPomo(ctx, undefined);
+    expect(res.ok).toBe(false);
+  });
+
+  it('returns error when task id is unknown', async () => {
+    const res = await taskResetPomo(ctx, 'nonexistent');
     expect(res.ok).toBe(false);
   });
 });
