@@ -44,8 +44,6 @@
   cursor: grabbing;
 }
 
-/* ── Selected node highlight ─────────────────────────────────────────────── */
-.react-flow__node.selected > div,
 /* Hide React Flow's group-selection bounding box. The user-facing selection
    indicator is the per-node ring; the wrapping rect just adds visual noise
    and lingers after a marquee drag completes. */
