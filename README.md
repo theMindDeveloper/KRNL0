@@ -1,5 +1,3 @@
-# 🧪 KRNL0 🧪
-
 <div align="center">
 
 # 🧪 KRNL0 🧪
