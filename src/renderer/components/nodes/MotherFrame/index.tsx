@@ -63,9 +63,12 @@ export function MotherFrame({
       style={{
         position: 'relative',
         width,
-        // Auto-size to content. Previously a hard 480px floor padded a tall
-        // empty zone below short todo lists, which the cyan selection ring
-        // then wrapped — looking like a stretched second highlight.
+        // Must match INITIAL_DIMS_BY_KIND mother heights in rfAdapters.tsx so
+        // the visible content fills the full RF-tracked node box. A mismatch
+        // (e.g. content 480 vs RF wrapper 600) makes the cyan selection ring
+        // sit on the RF wrapper while the bg fills only part of it — looking
+        // like a doubled / stretched highlight.
+        minHeight: 600,
         display: 'flex',
         flexDirection: 'column',
         background,
