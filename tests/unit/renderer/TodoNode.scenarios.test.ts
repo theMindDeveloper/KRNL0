@@ -182,17 +182,21 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
 
   // ── F4 — Add task on Enter ────────────────────────────────────────────────
   describe('F4 — Add task on Enter', () => {
-    it('dispatches todo.add with the typed text when Enter is pressed', () => {
+    it('dispatches todo.add with text and durationMin after two-phase Enter', () => {
       const onCommand = vi.fn();
       renderTodoNode(defaultTodoState(), onCommand);
-      // Click the placeholder to open the input
+      // Phase 1 — name
       const placeholder = screen.getByTestId('add-task-placeholder');
       fireEvent.click(placeholder);
       const input = document.querySelector('input[placeholder]') as HTMLInputElement;
       expect(input).not.toBeNull();
       fireEvent.change(input, { target: { value: 'buy oat milk' } });
-      fireEvent.keyDown(input, { key: 'Enter' });
-      expect(onCommand).toHaveBeenCalledWith('todo.add', { text: 'buy oat milk' });
+      fireEvent.keyDown(input, { key: 'Enter' }); // transitions to duration phase
+      expect(onCommand).not.toHaveBeenCalled(); // not yet dispatched
+      // Phase 2 — duration
+      fireEvent.change(input, { target: { value: '30' } });
+      fireEvent.keyDown(input, { key: 'Enter' }); // dispatches
+      expect(onCommand).toHaveBeenCalledWith('todo.add', { text: 'buy oat milk', durationMin: 30 });
     });
 
     it('clears the input after dispatch', () => {
@@ -201,9 +205,13 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
       const placeholder = screen.getByTestId('add-task-placeholder');
       fireEvent.click(placeholder);
       const input = document.querySelector('input[placeholder]') as HTMLInputElement;
+      // Phase 1
       fireEvent.change(input, { target: { value: 'my task' } });
       fireEvent.keyDown(input, { key: 'Enter' });
-      // After commit the input either keeps focus (NF3) or reverts to placeholder;
+      // Phase 2
+      fireEvent.change(input, { target: { value: '25' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      // After full commit the input either keeps focus (NF3) or reverts to placeholder;
       // either way the value should be empty
       expect(input.value).toBe('');
     });
