@@ -12,9 +12,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const { state, config: rawConfig } = node;
   const config = rawConfig ?? defaultTodoConfig();
 
-  // Add-task input local UI state (NF4: no item state held in component)
-  const [inputValue, setInputValue] = useState('');
+  // Add-task input — two-phase FSM (phase 'name' → 'duration' → dispatch)
+  const [inputPhase, setInputPhase] = useState<'name' | 'duration'>('name');
   const [inputFocused, setInputFocused] = useState(false);
+  const [pendingName, setPendingName] = useState('');
+  const [durationValue, setDurationValue] = useState('');
+  const [durationInvalid, setDurationInvalid] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // F5: inline edit state
@@ -33,22 +36,49 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const undoneCount = state.items.filter((i) => !i.done).length;
   const hasDone = state.items.some((i) => i.done);
 
-  const commitAdd = () => {
-    const text = inputValue.trim();
-    if (text) {
-      onCommand('todo.add', { text });
-      setInputValue('');
-      // NF3: re-focus after submit so successive entries require no click
-      setInputFocused(true);
-    }
+  const submitTask = (name: string, durationMin: number) => {
+    onCommand('todo.add', { text: name, durationMin });
+    setPendingName('');
+    setDurationValue('');
+    setDurationInvalid(false);
+    setInputPhase('name');
+    // NF3: re-focus after submit so successive entries require no click
+    setInputFocused(true);
   };
 
   const handleAddKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      commitAdd();
-    } else if (e.key === 'Escape') {
-      setInputValue('');
-      setInputFocused(false);
+    if (inputPhase === 'name') {
+      if (e.key === 'Enter') {
+        const name = pendingName.trim();
+        if (name) {
+          setInputPhase('duration');
+          setDurationValue('');
+          setDurationInvalid(false);
+          // focus is preserved on the same element since type changes
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+      } else if (e.key === 'Escape') {
+        setPendingName('');
+        setInputFocused(false);
+        setInputPhase('name');
+      }
+    } else {
+      // duration phase
+      if (e.key === 'Enter') {
+        const parsed = parseInt(durationValue, 10);
+        if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
+          setDurationInvalid(false);
+          submitTask(pendingName, parsed);
+        } else {
+          setDurationInvalid(true);
+        }
+      } else if (e.key === 'Escape') {
+        // go back to name phase, restoring pendingName
+        setInputPhase('name');
+        setDurationValue('');
+        setDurationInvalid(false);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
     }
   };
 
@@ -347,20 +377,34 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           {inputFocused ? (
             <input
               ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              type={inputPhase === 'duration' ? 'number' : 'text'}
+              min={inputPhase === 'duration' ? 1 : undefined}
+              max={inputPhase === 'duration' ? 480 : undefined}
+              value={inputPhase === 'name' ? pendingName : durationValue}
+              onChange={(e) => {
+                if (inputPhase === 'name') {
+                  setPendingName(e.target.value);
+                } else {
+                  setDurationValue(e.target.value);
+                  setDurationInvalid(false);
+                }
+              }}
               onKeyDown={handleAddKeyDown}
               onBlur={() => {
-                // commit on blur if there's text, else collapse
-                if (inputValue.trim()) {
-                  commitAdd();
+                if (inputPhase === 'duration') {
+                  // defensive: revert to name phase without submitting
+                  setInputPhase('name');
+                  setDurationValue('');
+                  setDurationInvalid(false);
                 } else {
-                  setInputFocused(false);
+                  // name phase: collapse if empty
+                  if (!pendingName.trim()) {
+                    setInputFocused(false);
+                  }
                 }
               }}
               autoFocus
-              placeholder="task → spawns a node…"
+              placeholder={inputPhase === 'name' ? 'task → spawns a node…' : 'how long? (min)'}
               style={{
                 flex: 1,
                 background: 'transparent',
@@ -370,6 +414,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 fontSize: 12,
                 color: 'var(--ink)',
                 caretColor: 'var(--acid)',
+                ...(durationInvalid ? { borderBottom: '1px solid var(--rust)' } : {}),
               }}
             />
           ) : (
