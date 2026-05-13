@@ -84,6 +84,7 @@ describe('PomoNode FSM (Decision #9)', () => {
           durationMin: 25,
           label: 'focus',
           completed: true,
+          taskId: null,
         },
       ]);
     });
@@ -145,7 +146,9 @@ describe('PomoNode FSM (Decision #9)', () => {
     it('state never carries a derived countdown — only startedAt + durationMin', () => {
       const running = pomoStart(defaultPomoState(), {}, env(T0));
       // Snapshot the state shape: no remaining/elapsed fields leak into state.
+      // Decision 22 adds `activeTaskId` (null in default mode).
       expect(Object.keys(running).sort()).toEqual([
+        'activeTaskId',
         'breakMin',
         'durationMin',
         'history',

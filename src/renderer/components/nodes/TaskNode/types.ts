@@ -11,6 +11,9 @@ export interface TaskState {
   parentTaskId: string | null;   // Decision 20: null = root task, else parent task node id
   todoItemId: string | null;     // Decision 20: back-link to TodoItem.id
   pomoSessionsCompleted: number; // number of completed pomo sessions for this task
+  // Decision 22 — per-task pomodoro accounting:
+  plannedMin: number;            // total minutes budgeted for this task (default = pomo.sessionMin)
+  secondsAccumulated: number;    // total seconds spent across all pomo sessions for this task
 }
 
 export interface TaskConfig {

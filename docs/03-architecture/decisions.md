@@ -315,8 +315,10 @@ return <Component key={node.id} node={node} selected={...} onCommand={...} onSel
 ## Decision 9 — PomoNode State Contract
 
 **Date:** 2026-05-10
-**Status:** Accepted
+**Status:** Accepted (superseded in part by Decision 22 — see below)
 **Author:** architect
+
+> **Update 2026-05-13:** Decision 22 adds `activeTaskId: string | null` to `PomoState`, canonicalises `PomoConfig` to `{ sessionMin, shortBreakMin, longBreakMin, longBreakEvery }`, and changes `pomoComplete` to branch break length on `(sessionsCompleted + 1) % longBreakEvery`. The FSM, transitions, and persistence rule below are otherwise unchanged.
 
 ### Context
 
@@ -1077,6 +1079,126 @@ pomoSessionsCompleted: number    // count of completed pomo sessions for this ta
 - **Enables:** bidirectional done mirroring; cascade-delete; per-task pomo sessions; subtask nesting; full CLI parity for tasks.
 - **Forecloses:** detached task nodes (every task with a `todoItemId` has a corresponding `TodoItem`; orphan cleanup is handled at delete time).
 - **Migration:** existing `board.json` task nodes missing `parentTaskId`/`todoItemId`/`pomoSessionsCompleted` are backfilled by the board load migration in `src/main/persistence/board.ts` (via `STATE_DEFAULTS['todo.task']` entry — to be added if needed). Runtime access on unmigrated nodes defaults gracefully via `?? null` / `?? 0` guards.
+
+---
+
+## Decision 22 — Pomodoro v2: gear settings, active-task mode, per-task time tracking
+
+**Status:** Accepted — 2026-05-13
+**Closes:** Pomodoro feature spec (this PR)
+**Related:** Decision 9 (PomoNode v1 FSM), Decision 20 (Todo/Task linkage)
+
+### Context
+
+The v1 PomoNode (Decision 9) is a global, label-driven timer with no concept of which task it is for. Configuration values exist on `PomoConfig` but have no UI to edit them — and the seed in `seedBoard()` writes a *different* config shape (`{ shortBreakMin, longBreakMin, sessionsUntilLongBreak }`) than `defaultPomoConfig()` produces (`{ defaultDurationMin, defaultBreakMin, longBreakEvery, longBreakMin }`). Long-break branching is also missing: `pomoComplete` ignores `longBreakEvery` and always uses `breakMin`.
+
+The user wants three things:
+
+1. A **gear settings panel** on the PomoNode for editing session length, short break, long break, and long-break cadence.
+2. **Per-task pomodoro mode**: when a task is clicked, the PomoNode adopts that task's `plannedMin`, derives the session count from `ceil(plannedMin / sessionMin)`, and visualises the relationship via a circular highlight on the active task plus a corner timer showing time-on-task.
+3. A **default mode** when no task is active — same node, same FSM, just no `activeTaskId` and no derived plan.
+
+### Decision
+
+#### 1. Single `PomoConfig` schema (canonical)
+
+```typescript
+export interface PomoConfig {
+  sessionMin: number;       // length of one focus session (default 25)
+  shortBreakMin: number;    // default 5
+  longBreakMin: number;     // default 15
+  longBreakEvery: number;   // long break after every N completed sessions (default 4)
+}
+```
+
+`board.ts` `CONFIG_DEFAULTS['pomo']` is added so older boards (with either the seed shape or the v1 `defaultPomoConfig` shape) are healed at load:
+
+- `shortBreakMin ← shortBreakMin ?? defaultBreakMin ?? 5`
+- `longBreakMin ← longBreakMin ?? 15`
+- `longBreakEvery ← longBreakEvery ?? sessionsUntilLongBreak ?? 4`
+- `sessionMin ← sessionMin ?? defaultDurationMin ?? 25`
+
+The legacy field names are not re-written on save (Decision 5 lossless round-trip), but they are *also* not consulted at runtime once the canonical fields are present.
+
+#### 2. `PomoState` adds one field
+
+```typescript
+export interface PomoState {
+  status: 'idle' | 'running' | 'break' | 'done';
+  startedAt: string | null;
+  durationMin: number;             // length of the *current* session; written on start
+  breakMin: number;                // length of the *current* break; written on complete
+  label: string;
+  sessionsCompleted: number;
+  activeTaskId: string | null;     // NEW — which task this session belongs to (null = default mode)
+  history: PomoSessionRecord[];
+}
+```
+
+`activeTaskId` is the **only** new persisted field on PomoState. It lives on PomoState (not on boardStore) because the pomo node is the sole consumer and storing it elsewhere creates stale-reference bugs across reloads.
+
+#### 3. `TaskState` adds two fields
+
+```typescript
+export interface TaskState {
+  // ...existing fields...
+  plannedMin: number;              // NEW — total minutes the user budgeted for this task
+  secondsAccumulated: number;      // NEW — total seconds spent on this task across sessions (persisted)
+}
+```
+
+`durationMin` already exists on TaskState; it now means "default per-session minutes used when this task is loaded into the pomo." On task creation it is initialised from `pomoConfig.sessionMin`. `plannedMin` is parsed from the user's input (see §6) or defaulted to `sessionMin`.
+
+`pomoSessionsCompleted` (Decision 20) remains and is incremented only when a session for this task completes.
+
+#### 4. Derived (NOT stored) values
+
+- `plannedSessions = max(1, ceil(plannedMin / sessionMin))`  — recomputed at render time. Survives gear-setting changes with no migration.
+- `nextBreakIsLong = (sessionsCompleted + 1) % longBreakEvery === 0` — drives which break length `pomoComplete` writes into `state.breakMin`.
+
+#### 5. Activation flow (clicking a task)
+
+Click on a task (body click) or on a linked todo row dispatches `task.startPomo` / `todo.startPomoForItem`. The dispatcher follows this state-change order:
+
+1. If `pomoState.activeTaskId !== null` and `pomoState.status === 'running'`, **commit elapsed** to the old active task's `secondsAccumulated`. The old session is recorded in `history` as cancelled.
+2. Set `pomoState.activeTaskId = newTaskId`.
+3. Load task settings into pomo: `label = task.text`, `durationMin = task.durationMin`, `breakMin = pomoConfig.shortBreakMin`.
+4. If the caller is a *click-to-activate* (no `--start` flag), pomo goes to `status: 'idle'` with the task loaded — user still has to press START. If the caller is `task.startPomo` (body click on task), it goes straight to `running`.
+5. Pomo node header updates to show task label and `session N/M` where M = `plannedSessions`.
+
+Clicking the gear icon or the pomo background clears `activeTaskId` to `null` ("default mode").
+
+#### 6. Time input on task creation
+
+The TodoNode add-task row gains a small minutes input adjacent to the text input:
+
+```
+[ task text...... ] [  m ]  ↵
+```
+
+The minutes input defaults to `pomoConfig.sessionMin`. On `Enter`, the dispatcher passes `{ text, plannedMin }` to `todo.add`, and `commandDispatch` spawns the TaskNode with that `plannedMin`. As a fallback, free-form text matching `/,\s*time:\s*(\d+)\s*(min|m|minutes)?/i` is also parsed (so the user can type `"homework, time: 40"` in the text-only field). The structured input takes precedence.
+
+#### 7. Long-break branching in `pomoComplete`
+
+When `pomoComplete` fires:
+
+- `sessionsCompleted++`
+- If `sessionsCompleted % longBreakEvery === 0`, write `breakMin = longBreakMin`. Otherwise `breakMin = shortBreakMin`.
+- If `activeTaskId !== null`, the task's `secondsAccumulated += durationMin * 60` and `pomoSessionsCompleted++`.
+
+#### 8. UI affordances
+
+- **Gear icon**: top-left of the PomoNode header, opens an inline panel inside the node body (replacing the vapor tube while open). Panel fields: session, short break, long break, long-break-every. Save persists via `pomo.setConfig`. Cancel restores.
+- **Active-task circular highlight**: when `pomoState.activeTaskId === task.id`, the TaskNode root gains `class="active"`, which renders an animated 1.5px acid-coloured ring (`box-shadow: 0 0 0 2px var(--acid), 0 0 24px var(--acid-glow)`).
+- **Corner timer**: top-left of TaskNode body. Shows `formatHMS(secondsAccumulated + liveDelta)` where `liveDelta` is `(now - pomo.startedAt) / 1000` when this task is the active running one, else `0`. One `setInterval` lives inside the TaskNode (only mounted when active or has accumulated time > 0); the rest of the time it's a static derived value.
+
+### Consequences
+
+- **Enables**: editable gear settings, automatic long breaks, per-task time accounting, dynamic pomo refresh on task click, derived session count without state writes.
+- **Forecloses**: a global "pause" state (pause is still cancel-and-resume).
+- **Migration**: covered by `STATE_DEFAULTS['pomo']` (adds `activeTaskId: null` if absent), `CONFIG_DEFAULTS['pomo']` (unifies the config shape), and `STATE_DEFAULTS['todo.task']` (adds `plannedMin` defaulted to `durationMin`, and `secondsAccumulated: 0`).
+- **Tick rule preserved**: pomo state is still derived from `now - startedAt`. The corner timer adds *one* `setInterval` per active task — bounded by `activeTaskId === 1` invariant.
+- **R9 (lossless restart) preserved**: a running session restored from disk re-derives the timer and the active task label as before. `secondsAccumulated` is committed on cancel/complete only, so a crash mid-session loses only the in-flight delta — same as v1.
 
 ---
 

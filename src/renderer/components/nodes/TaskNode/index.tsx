@@ -1,9 +1,25 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
+import { useBoardStore } from '../../../store/boardStore';
+import { useShallow } from 'zustand/react/shallow';
+import type { PomoState } from '../PomoNode/types';
+
+/**
+ * Decision 22 F16 — format seconds as `H:MM:SS` (≥1h) or `MM:SS` (<1h).
+ */
+export function formatElapsed(totalSec: number): string {
+  const safe = Math.max(0, Math.floor(totalSec));
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
+}
 
 // TaskNode — child task card spawned when a todo item is added.
 // No slot tag, no corner brackets (those are mother-only, Decision #8).
@@ -17,6 +33,42 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const layer = state.layer ?? 0;
   const eta = state.eta ?? `~${state.durationMin}M`;
   const tag = state.tag ?? '';
+  const taskId = node.id;
+
+  // Decision 22 F15 — subscribe to the pomo mother's runtime state. The
+  // selector returns a fresh object every call, so we use `useShallow` to
+  // gate re-renders on the actual field values (status / activeTaskId /
+  // startedAt) — without it every unrelated store mutation would trigger a
+  // full re-render for every TaskNode on the board (the dock/perf regression).
+  const pomoRuntime = useBoardStore(
+    useShallow((s) => {
+      const pomo = s.board?.nodes.find((n) => n.kind === 'pomo');
+      if (!pomo) return { status: null, activeTaskId: null, startedAt: null };
+      const ps = pomo.state as PomoState;
+      return {
+        status: ps.status,
+        activeTaskId: ps.activeTaskId,
+        startedAt: ps.startedAt,
+      };
+    }),
+  );
+
+  const isActive = pomoRuntime?.activeTaskId === taskId;
+  const isActiveRunning = isActive && pomoRuntime?.status === 'running' && pomoRuntime?.startedAt !== null;
+
+  // Local tick — only mount the interval when this task is actively running.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!isActiveRunning) return;
+    const id = setInterval(() => setTick((t) => t + 1), 500);
+    return () => clearInterval(id);
+  }, [isActiveRunning]);
+
+  const liveDelta = isActiveRunning && pomoRuntime?.startedAt
+    ? (Date.now() - Date.parse(pomoRuntime.startedAt)) / 1000
+    : 0;
+  const elapsedSec = (state.secondsAccumulated ?? 0) + liveDelta;
+  const showTimer = elapsedSec > 0 || isActive;
 
   // ── inline edit ────────────────────────────────────────────────────────────
   const [isEditing, setIsEditing] = useState(false);
@@ -121,22 +173,55 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     <div
       data-testid="task-node-root"
       data-done={state.done ? 'true' : undefined}
-      className={state.done ? 'done' : ''}
+      data-active={isActive ? 'true' : undefined}
+      className={`${state.done ? 'done' : ''}${isActive ? ' active' : ''}`.trim()}
       onContextMenu={handleContextMenu}
       style={{
+        position: 'relative',
         width: 220,
-        border: '1px solid var(--paper-3)',
+        border: `1px solid ${isActive ? 'var(--acid)' : 'var(--paper-3)'}`,
         borderRadius: 'var(--radius-lg)',
         background: 'var(--node-bg)',
-        boxShadow: 'var(--shadow-1)',
-        overflow: 'hidden',
+        boxShadow: isActive
+          ? '0 0 0 2px var(--acid), 0 0 24px rgba(201,241,88,0.45)'
+          : 'var(--shadow-1)',
+        overflow: 'visible',
         opacity: state.done ? 0.4 : 1,
-        transition: 'opacity 0.15s',
+        transition: 'opacity 0.15s, box-shadow 0.2s, border-color 0.2s',
         cursor: state.done ? 'default' : 'pointer',
       }}
       onMouseDown={handleBodyMouseDown}
       onClick={handleBodyClick}
     >
+      {/* Decision 22 F16 — corner timer (top-left) */}
+      {showTimer && (
+        <span
+          data-testid="task-corner-timer"
+          data-running={isActiveRunning ? 'true' : 'false'}
+          style={{
+            position: 'absolute',
+            top: -8,
+            left: -2,
+            padding: '1px 6px',
+            background: 'var(--paper)',
+            border: `1px solid ${isActiveRunning ? 'var(--acid)' : 'var(--paper-3)'}`,
+            borderRadius: 4,
+            fontFamily: 'var(--font-mono)',
+            fontVariantNumeric: 'tabular-nums',
+            fontSize: 9.5,
+            color: isActiveRunning ? 'var(--acid)' : 'var(--ink-3)',
+            letterSpacing: '0.04em',
+            pointerEvents: 'none',
+            boxShadow: isActiveRunning
+              ? '0 0 6px rgba(201,241,88,0.4)'
+              : '0 0 0 1px var(--paper-2)',
+            zIndex: 1,
+          }}
+        >
+          {formatElapsed(elapsedSec)}
+        </span>
+      )}
+
       {/* Header row */}
       <div
         style={{
