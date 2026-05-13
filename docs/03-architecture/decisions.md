@@ -1468,12 +1468,14 @@ See ADR-0014 §11 for the full file-by-file contract. Key invariants backend-dev
 
 ### Phasing
 
-| Phase | Scope | Effort |
-|---|---|---|
-| 1 | RPC server + `krnl` binary + MOTD + help + `term.*` FSM + shared dispatch for Phase-1 cascade commands (`task.delete`, `todo.remove`, etc.) | ~1 day |
-| 2 | UI-parity surface: `node.move/resize`, `viewport.*`, `undo/redo`, `marquee.*`, `edge.*`, `board.*`, `theme.*`; adds `cli:dispatch` IPC for renderer-coupled commands | ~1 day |
-| 3 | ANSI color in `krnl` output, `krnl init zsh` / `krnl init pwsh` shell-init snippets | ~½ day |
-| 4 | Streaming commands, autocomplete generation | defer-OK |
+| Phase | Scope | Effort | Status |
+|---|---|---|---|
+| 1 | RPC server + `krnl` binary + MOTD + help + `term.*` FSM + shared dispatch for Phase-1 cascade commands (`task.delete`, `todo.remove`, etc.) | ~1 day | Shipped in PR #108 |
+| 2 | UI-parity surface: `node.move/resize`, `viewport.*`, `undo/redo`, `marquee.*`, `edge.*`, `board.*`, `theme.*`; adds `cli:dispatch` IPC for renderer-coupled commands | ~1 day | Shipped in PR #108 |
+| 3 | ANSI color in `krnl` output, `krnl init zsh` / `krnl init pwsh` shell-init snippets | ~½ day | Deferred — tracked in #109 |
+| 4 | Streaming commands, autocomplete generation | defer-OK | Deferred — tracked in #110 |
+
+Open questions OQ2, OQ4, OQ5, OQ6 tracked in #111.
 
 ### Consequences
 
