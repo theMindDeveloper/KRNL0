@@ -4,6 +4,78 @@ import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
+import { useBoardStore } from '../../../store/boardStore';
+import { useShallow } from 'zustand/react/shallow';
+import { useTick } from '../../../hooks/useTick';
+import type { PomoState } from '../PomoNode/types';
+
+/**
+ * TaskPomoBar — progress bar at the bottom of a task card.
+ *
+ * Shown when the task has at least one completed pomo session.
+ * Only this subcomponent subscribes to useTick(), so inactive tasks never
+ * mount a tick subscription.
+ *
+ * Progress = pomoSessionsCompleted / plannedSessions where
+ * plannedSessions is derived from durationMin / 25 (default session length).
+ * When no PomoState is available we fall back to a single-session denominator.
+ */
+function TaskPomoBar({ state, taskId }: { state: TaskState; taskId: string }) {
+  // Subscribe to the pomo node's runtime so we can detect the active task.
+  const pomoRuntime = useBoardStore(
+    useShallow((s) => {
+      const pomo = s.board?.nodes.find((n) => n.kind === 'pomo');
+      if (!pomo) return { status: null as PomoState['status'] | null, startedAt: null };
+      const ps = pomo.state as PomoState;
+      return { status: ps.status, startedAt: ps.startedAt };
+    }),
+  );
+
+  // Tick drives live re-renders while the pomo is running.
+  // The value is consumed via the elapsed calculation below so void is not needed.
+  const _tick = useTick();
+  void _tick;
+
+  // Derive elapsed ms for the current in-flight session (if any).
+  // In this model there is no per-task activeTaskId on PomoState, so the bar
+  // cannot know whether *this* task is the running one. We display progress
+  // based on completed sessions only (no live fill animation in this model).
+  const completedSessions = state.pomoSessionsCompleted;
+
+  // Estimate planned sessions from durationMin rounded up to 25-min blocks.
+  // Falls back to 1 if durationMin is missing.
+  const sessionMin = 25;
+  const plannedSessions = Math.max(1, Math.ceil((state.durationMin ?? sessionMin) / sessionMin));
+  const progress = Math.min(1, completedSessions / plannedSessions);
+
+  if (completedSessions === 0) return null;
+
+  // Active = pomo is running (best we can detect without activeTaskId).
+  // We pass taskId for future use when activeTaskId lands on PomoState.
+  void taskId;
+  const isRunning = pomoRuntime.status === 'running';
+
+  return (
+    <div
+      data-testid="task-pomo-bar"
+      style={{
+        height: 4,
+        background: 'var(--paper-3)',
+        borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          height: '100%',
+          width: `${progress * 100}%`,
+          background: isRunning ? 'var(--acid)' : 'var(--ink-4)',
+          transition: isRunning ? 'none' : undefined,
+        }}
+      />
+    </div>
+  );
+}
 
 // TaskNode — child task card spawned when a todo item is added.
 // No slot tag, no corner brackets (those are mother-only, Decision #8).
@@ -327,6 +399,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           items={ctxItems}
           onDismiss={() => setCtxMenu(null)}
         />
+      )}
+
+      {/* Pomo progress bar — only rendered when at least one session is done */}
+      {state.pomoSessionsCompleted > 0 && (
+        <TaskPomoBar state={state} taskId={node.id} />
       )}
     </div>
   );

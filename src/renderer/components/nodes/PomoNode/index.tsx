@@ -1,9 +1,8 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
-
-const TICK_MS = 500;
+import { useTick } from '../../../hooks/useTick';
 
 function formatRemaining(ms: number): string {
   const safe = Math.max(0, ms);
@@ -48,15 +47,11 @@ export function pipState(
 
 export function PomoNode({ node, onCommand, slotIndex = 1, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<PomoState, PomoConfig>) {
   const { state, config } = node;
-  const [, setTick] = useState(0);
 
-  // Visual tick — state mutations go through onCommand (Decision #9)
-  // NF1: setInterval at TICK_MS (500ms) drives the visual refresh.
-  useEffect(() => {
-    if (state.status !== 'running' && state.status !== 'break') return;
-    const id = setInterval(() => setTick((t) => t + 1), TICK_MS);
-    return () => clearInterval(id);
-  }, [state.status]);
+  // Visual tick — drives 500ms re-renders while running/break (Decision #9).
+  // useTick() is a singleton interval shared across all consumers.
+  // The tick value is intentionally unused; it exists only to trigger re-render.
+  void useTick();
 
   const totalMs =
     state.status === 'running'
