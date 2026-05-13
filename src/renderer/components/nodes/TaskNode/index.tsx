@@ -165,7 +165,20 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         ids
           .map((id) => {
             const n = s.board?.nodes.find((nd) => nd.id === id);
-            const txt = (n?.state as { text?: string } | undefined)?.text ?? '';
+            if (!n) return '';
+            if (n.kind === 'habit.lane') {
+              const habitId = (n.state as { habitId?: string })?.habitId ?? '';
+              for (const mn of (s.board?.nodes ?? [])) {
+                if (mn.kind !== 'habit' || !mn.isMother) continue;
+                const ms = mn.state as { habits?: Array<{ id: string; name: string }> } | null;
+                const h = ms?.habits?.find((x) => x.id === habitId);
+                if (h) {
+                  return h.name.length > 14 ? h.name.slice(0, 12) + '…' : h.name;
+                }
+              }
+              return 'HBT';
+            }
+            const txt = (n.state as { text?: string } | undefined)?.text ?? '';
             return txt.length > 14 ? txt.slice(0, 12) + '…' : txt;
           })
           .filter((t) => t.length > 0);
