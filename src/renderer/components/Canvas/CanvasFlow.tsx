@@ -232,10 +232,40 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
-  const { screenToFlowPosition, getNodes } = useReactFlow();
+  const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
+
+  // ── Fit-view on first launch (Architect Amendment B) ──────────────────────
+  // When the persisted viewport equals the legacy seed sentinel {0, 220, 1},
+  // it means the user has never panned/zoomed (fresh board) — or the viewport
+  // was previously clobbered by the now-removed migrateMotherPositions bug.
+  // In that case we fire fitView once so all 5 mothers are visible in the
+  // initial view. The didFitRef guard ensures this runs at most once per session.
+  const didFitRef = useRef(false);
+  const rfNodes = useBoardStore((s) => s.board?.nodes ?? []);
+
+  useEffect(() => {
+    if (didFitRef.current) return;
+    if (rfNodes.length === 0) return;
+    if (
+      initialViewport.x !== 0 ||
+      initialViewport.y !== 220 ||
+      initialViewport.zoom !== 1
+    ) {
+      // User has a real persisted viewport — do not fit.
+      didFitRef.current = true;
+      return;
+    }
+    // Sentinel matched — fit to mother nodes.
+    const motherIds = rfNodes
+      .filter((n) => (n as { isMother?: boolean }).isMother === true)
+      .map((n) => ({ id: (n as { id: string }).id }));
+    if (motherIds.length === 0) return;
+    didFitRef.current = true;
+    fitView({ padding: 0.15, includeHiddenNodes: false, nodes: motherIds, duration: 0 });
+  }, [rfNodes.length, initialViewport, fitView]);
 
   const addEdge = useBoardStore((s) => s.addEdge);
   const removeNode = useBoardStore((s) => s.removeNode);
