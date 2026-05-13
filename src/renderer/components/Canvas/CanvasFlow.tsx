@@ -263,8 +263,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       .filter((n) => (n as { isMother?: boolean }).isMother === true)
       .map((n) => ({ id: (n as { id: string }).id }));
     if (motherIds.length === 0) return;
-    didFitRef.current = true;
     fitView({ padding: 0.15, includeHiddenNodes: false, nodes: motherIds, duration: 0 });
+    didFitRef.current = true;
   }, [rfNodes.length, initialViewport, fitView]);
 
   const addEdge = useBoardStore((s) => s.addEdge);
