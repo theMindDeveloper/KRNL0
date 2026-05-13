@@ -17,9 +17,6 @@ import { TerminalNode } from '../../../src/renderer/components/nodes/TerminalNod
 import {
   HEADER_LABEL,
   LIVE_BADGE_TEXT,
-  BOOT_LINE_ASCII,
-  BOOT_LINE_SEPARATOR,
-  BOOT_LINES,
 } from '../../../src/renderer/components/nodes/TerminalNode/constants';
 
 import {
@@ -90,7 +87,7 @@ function makeKrnl(sessionId = 'sid-test'): {
   let dataCallback: ((data: string) => void) | null = null;
   let exitCallback: (() => void) | null = null;
 
-  const ptyCreateMock = vi.fn().mockResolvedValue(sessionId);
+  const ptyCreateMock = vi.fn().mockResolvedValue({ sessionId, motd: '' });
   const ptyWriteMock = vi.fn();
   const ptyResizeMock = vi.fn();
   const ptyKillMock = vi.fn();
@@ -198,39 +195,68 @@ describe('F1 — Header anatomy', () => {
 });
 
 // ---------------------------------------------------------------------------
-// F2 — Welcome output on mount
+// F2 — Welcome output on mount (MOTD via pty:create return value — T1)
 // ---------------------------------------------------------------------------
 
 describe('F2 — Welcome output on mount', () => {
-  it('BOOT_LINE_ASCII starts with the acid ANSI escape and the krnl0 ASCII logo text', () => {
-    expect(BOOT_LINE_ASCII).toContain('▙ krnl0 · v0.2.0 · claude code attached · tmux session "main"');
+  it('startTerminalSession writes motd returned by ptyCreate to the terminal (T1)', async () => {
+    const MOCK_MOTD = '\x1b[38;2;201;241;88m  ██╗  ██╗██████╗\x1b[0m\r\n  krnl0 · v0.2.0\r\n';
+    // Override ptyCreate to return a non-empty motd
+    const term = (() => {
+      const writeCalls: string[] = [];
+      const _handlers: Array<(data: string) => void> = [];
+      return {
+        cols: 80, rows: 24,
+        writeCalls, _handlers,
+        write(data: string) { writeCalls.push(data); },
+        focus() { /* noop */ },
+        onData(handler: (data: string) => void) {
+          _handlers.push(handler);
+          return { dispose: () => { const i = _handlers.indexOf(handler); if (i !== -1) _handlers.splice(i, 1); } };
+        },
+        simulateInput(data: string) { for (const h of _handlers) h(data); },
+      };
+    })();
+    const fit = { fitCalled: false, fit() { this.fitCalled = true; } };
+    const onCommand = vi.fn();
+
+    let dataCallback: ((d: string) => void) | null = null;
+    let exitCallback: (() => void) | null = null;
+
+    const bridge: KrnlBridge = {
+      ptyCreate: vi.fn().mockResolvedValue({ sessionId: 'sid-f2', motd: MOCK_MOTD }),
+      ptyWrite: vi.fn(),
+      ptyResize: vi.fn(),
+      ptyKill: vi.fn(),
+      onPtyData: vi.fn((_: string, cb: (d: string) => void) => { dataCallback = cb; return vi.fn(); }),
+      onPtyExit: vi.fn((_: string, cb: () => void) => { exitCallback = cb; return vi.fn(); }),
+    };
+    void dataCallback; void exitCallback;
+
+    await startTerminalSession({
+      term,
+      fit,
+      krnl: bridge,
+      onCommand,
+      setSessionId: vi.fn(),
+      isCancelled: () => false,
+    });
+
+    // MOTD must have been written synchronously before pty:data subscription
+    expect(term.writeCalls).toContain(MOCK_MOTD);
+    // MOTD is written before any pty data arrives (it's the first write)
+    expect(term.writeCalls[0]).toBe(MOCK_MOTD);
   });
 
-  it('BOOT_LINE_ASCII begins with the acid colour escape (38;2;201;241;88)', () => {
-    expect(BOOT_LINE_ASCII).toContain('\x1b[38;2;201;241;88m');
-  });
-
-  it('BOOT_LINE_SEPARATOR is a dim-escape separator', () => {
-    expect(BOOT_LINE_SEPARATOR).toContain('\x1b[2m');
-    expect(BOOT_LINE_SEPARATOR).toContain('─');
-  });
-
-  it('BOOT_LINES exports both lines in correct order', () => {
-    expect(BOOT_LINES).toHaveLength(2);
-    expect(BOOT_LINES[0]).toBe(BOOT_LINE_ASCII);
-    expect(BOOT_LINES[1]).toBe(BOOT_LINE_SEPARATOR);
-  });
-
-  it('startTerminalSession writes both boot lines to the terminal', async () => {
-    const { deps, term } = makeDeps();
+  it('startTerminalSession does not write anything when motd is empty string (T6)', async () => {
+    const { deps, term } = makeDeps(); // ptyCreate returns motd: '' by default
     await startTerminalSession(deps);
 
-    expect(term.writeCalls).toContain(BOOT_LINE_ASCII);
-    expect(term.writeCalls).toContain(BOOT_LINE_SEPARATOR);
-    // ASCII line written first
-    const asciiIdx = term.writeCalls.indexOf(BOOT_LINE_ASCII);
-    const sepIdx = term.writeCalls.indexOf(BOOT_LINE_SEPARATOR);
-    expect(asciiIdx).toBeLessThan(sepIdx);
+    // No MOTD write — the only writes are pty data from fireData
+    const motdLikeWrite = term.writeCalls.find(
+      (s) => s.includes('\x1b[38;2;201;241;88m') || s.includes('krnl0'),
+    );
+    expect(motdLikeWrite).toBeUndefined();
   });
 });
 
@@ -301,8 +327,8 @@ describe('F4b — IPC pty:kill on unmount', () => {
   });
 
   it('no ptyKill if session was cancelled before ptyCreate resolved', async () => {
-    let resolvePtyCreate!: (id: string) => void;
-    const pendingCreate = new Promise<string>((res) => { resolvePtyCreate = res; });
+    let resolvePtyCreate!: (result: { sessionId: string; motd: string }) => void;
+    const pendingCreate = new Promise<{ sessionId: string; motd: string }>((res) => { resolvePtyCreate = res; });
 
     const ptyKillMock = vi.fn();
     const bridge: KrnlBridge = {
@@ -328,7 +354,7 @@ describe('F4b — IPC pty:kill on unmount', () => {
 
     // Mark cancelled BEFORE the promise resolves
     cancelled = true;
-    resolvePtyCreate('sid-cancelled');
+    resolvePtyCreate({ sessionId: 'sid-cancelled', motd: '' });
 
     await sessionPromise;
 

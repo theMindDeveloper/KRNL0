@@ -33,9 +33,15 @@ export type SysCommand =
   | { kind: 'image'; sub: 'replace'; id: string | undefined; path: string | undefined }
   | { kind: 'image'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
   | { kind: 'image'; sub: 'clear'; id: string | undefined }
+  | { kind: 'term'; sub: 'setTitle'; title: string | undefined }
+  | { kind: 'term'; sub: 'setFontSize'; fontSize: number | undefined }
+  | { kind: 'term'; sub: 'clear' }
+  | { kind: 'term'; sub: 'setShell'; shell: string | undefined }
+  | { kind: 'version' }
+  | { kind: 'whoami' }
   | { kind: 'say'; text: string }
   | { kind: 'hear' }
-  | { kind: 'help' };
+  | { kind: 'help'; group: string | undefined; sub: string | undefined };
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
@@ -53,7 +59,9 @@ export class SysParser {
   static parse(argv: string[]): SysCommand | null {
     const [cmd, sub, ...rest] = argv;
 
-    if (!cmd || cmd === 'help') return { kind: 'help' };
+    if (!cmd || cmd === 'help') return { kind: 'help', group: sub, sub: rest[0] };
+    if (cmd === 'version') return { kind: 'version' };
+    if (cmd === 'whoami')  return { kind: 'whoami' };
     if (cmd === 'say')  return { kind: 'say', text: [sub, ...rest].filter(Boolean).join(' ') };
     if (cmd === 'hear') return { kind: 'hear' };
 
@@ -212,6 +220,16 @@ export class SysParser {
       if (sub === 'clear') {
         return { kind: 'image', sub: 'clear', id: rest[0] };
       }
+    }
+
+    if (cmd === 'term') {
+      if (sub === 'setTitle') return { kind: 'term', sub: 'setTitle', title: rest[0] };
+      if (sub === 'setFontSize') {
+        const n = rest[0] !== undefined ? Number(rest[0]) : undefined;
+        return { kind: 'term', sub: 'setFontSize', fontSize: n !== undefined && !isNaN(n) ? n : undefined };
+      }
+      if (sub === 'clear') return { kind: 'term', sub: 'clear' };
+      if (sub === 'setShell') return { kind: 'term', sub: 'setShell', shell: rest[0] };
     }
 
     return null;

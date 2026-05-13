@@ -93,6 +93,17 @@ import {
   imageClear,
 } from '../nodes/ImageNode/commands';
 
+// ── Terminal ──────────────────────────────────────────────────────────
+import {
+  termSessionStart,
+  termSessionEnd,
+  termSetTitle,
+  termSetFontSize,
+  termClear,
+  termSetShell,
+} from '../nodes/TerminalNode/commands';
+import type { TermState, TermConfig } from '../nodes/TerminalNode/types';
+
 // ── dispatch ──────────────────────────────────────────────────────────
 
 /**
@@ -204,6 +215,43 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'image.setSize':  return { state: imageSetSize(s as never, args as never) };
         case 'image.setAlt':   return { state: imageSetAlt(s as never, args as never) };
         case 'image.clear':    return { state: imageClear(s as never) };
+      }
+      break;
+    }
+    case 'terminal': {
+      // T20: term.sessionStart / term.sessionEnd — update TermState.sessionId.
+      // T21: term.setTitle — update TermState.title.
+      // T22: term.setFontSize — update TermConfig.fontSize.
+      // T23: term.clear — side-effect written to PTY by the node's makeCommandHandler.
+      // T24: term.setShell — update TermConfig.shell.
+      const termState = s as unknown as TermState;
+      const termCfg = c as unknown as TermConfig;
+      switch (command) {
+        case 'term.sessionStart': {
+          const res = termSessionStart(termState, args as { sessionId: string });
+          return { state: res.state as Node['state'] };
+        }
+        case 'term.sessionEnd': {
+          const res = termSessionEnd(termState, args as { sessionId: string });
+          return { state: res.state as Node['state'] };
+        }
+        case 'term.setTitle': {
+          const res = termSetTitle(termState, args as { title: string });
+          return { state: res.state as Node['state'] };
+        }
+        case 'term.setFontSize': {
+          const res = termSetFontSize(termCfg, args as { fontSize: number });
+          return { config: res.config as Node['config'] };
+        }
+        case 'term.clear': {
+          // T23: ptyWrite side-effect — handled via cli:dispatch in Phase 2.
+          void termClear;
+          return null;
+        }
+        case 'term.setShell': {
+          const res = termSetShell(termCfg, args as { shell: string });
+          return { config: res.config as Node['config'] };
+        }
       }
       break;
     }
