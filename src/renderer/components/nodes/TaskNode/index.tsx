@@ -727,8 +727,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         />
       )}
 
-      {/* Pomo progress bar — only rendered when at least one session is done */}
-      {state.pomoSessionsCompleted > 0 && (
+      {/* Pomo progress bar — only visible while this task is actively running.
+          Idle cards (even those with completed sessions) stay clean. */}
+      {isActiveRunning && state.pomoSessionsCompleted > 0 && (
         <TaskPomoBar state={state} taskId={node.id} />
       )}
     </div>
