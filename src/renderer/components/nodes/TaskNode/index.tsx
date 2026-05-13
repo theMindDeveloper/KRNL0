@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
+import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
@@ -302,8 +303,15 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
 
   // ── context menu ───────────────────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const { getNodes } = useReactFlow();
 
   const handleContextMenu = (e: MouseEvent) => {
+    // When this task is part of a multi-selection, defer to the canvas-level
+    // batch menu (shows only actions that apply to the whole set — Delete).
+    // Per-task actions like Edit text / Add subtask / Add sibling don't make
+    // sense on a batch, so we don't stop the event in that case.
+    const selectedCount = getNodes().filter((n) => n.selected).length;
+    if (selectedCount > 1) return;
     e.preventDefault();
     e.stopPropagation();
     setCtxMenu({ x: e.clientX, y: e.clientY });
