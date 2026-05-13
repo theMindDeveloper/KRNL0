@@ -87,6 +87,25 @@ export const todoLinkTask = (
   ),
 });
 
+// todo.setItemSchedule — ADR 0001: set or clear scheduledFor on a TodoItem.
+// Mirrors task.setSchedule; used for items that haven't spawned a TaskNode yet,
+// and for the bidirectional invariant when task.setSchedule cascades to the item.
+export const todoSetItemSchedule = (
+  state: TodoState,
+  args: { itemId: string; scheduledFor: string | null },
+): TodoState => ({
+  ...state,
+  items: state.items.map((item) => {
+    if (item.id !== args.itemId) return item;
+    if (args.scheduledFor === null) {
+      const { scheduledFor: _sf, ...rest } = item;
+      void _sf;
+      return rest;
+    }
+    return { ...item, scheduledFor: args.scheduledFor };
+  }),
+});
+
 // Render helper (pure, applied to a copy — Decision #10):
 //   1. Filter by showCompleted if false
 //   2. Sort: undone first (ascending createdAt), done last (ascending createdAt)

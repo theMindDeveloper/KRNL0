@@ -48,6 +48,7 @@ const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = 
   'ai':          { width: 380, height: 600 },
   'habit':       { width: 380, height: 600 },
   'terminal':    { width: 380, height: 600 },
+  'calendar':    { width: 380, height: 600 },
   'habit.lane':  { width: 280, height: 140 },
   'text':        { width: 260, height: 120 },
   'image':       { width: 240, height: 180 },
