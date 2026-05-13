@@ -1431,3 +1431,190 @@ If a future affordance does not fit any of these four, that is a signal to chall
 - **Cascade invariant pinned.** Decision 20 invariant 1 (bidirectional linkage at creation) and invariant 4 (delete cascade clears all linked TodoItems) are now enforced for subtasks as well, not only root tasks. Add a Gherkin scenario for the multi-level case.
 
 ---
+
+## Decision 23 — ClockNode: 12-hour visualization mother for linked Todo tasks
+
+**Date:** 2026-05-13
+**Status:** Accepted
+**Author:** architect
+
+> **PRD note:** This decision adds a node kind beyond PRD-v0.6.0 scope. PRD remains locked; this is an additive architectural extension authorized by the architect. Future PRD revisions may absorb it, but v0.6.0 is unchanged.
+
+### Context
+
+The user wants a visual time-planning tool: a canvas mother node that renders a 12-hour clock face and overlays a linked Todo's tasks as colored arcs around the ring, sized by `plannedMin`. It mirrors how PomoNode reads from a Todo's child TaskNodes but visualizes time allocation instead of running a timer.
+
+Two design tradeoffs were considered before approval:
+
+1. **Auto-layout vs explicit per-task placement.** A hybrid (some tasks auto, some explicit) was underspecified — overlap rules, stale references, and gap-fill semantics were unclear. Decision: v1 is pure auto-layout. Explicit placement (`placeSession`/`removeSession`) is deferred to a follow-up ADR once the UX is exercised.
+
+2. **Overflow handling when sum(plannedMin) > 720.** Wrapping to a second ring complicates the visual model. Decision: clip arcs at the 720-min boundary and show a small "+N min" overflow badge.
+
+### Decision
+
+A new mother node kind `'clock'` is added. It:
+
+- Reads tasks from a single linked Todo via `useBoardStore` + `useShallow` (mirrors PomoNode pattern).
+- Renders SVG arcs via `strokeDasharray` + `strokeDashoffset` + `rotate(-90)` on per-task `<circle>` elements (mirrors HabitLaneNode pattern).
+- Wraps in `<MotherFrame>` and is pinned (`isMother: true`).
+- Is created via the dock with keyboard shortcut `C`.
+- Has only two commands: `clock.linkTodo` and `clock.setWindowStart`.
+- Uses pure auto-layout: tasks stack sequentially from minute 0 (= `windowStartHour` o'clock), in the order they appear in the linked Todo's task list.
+
+### Contract
+
+#### Types — `src/renderer/components/nodes/ClockNode/types.ts`
+
+```typescript
+export interface ClockState {
+  linkedTodoId: string | null;   // which Todo node to pull tasks from
+  windowStartHour: number;       // 0-23, hour at the 12-o'clock anchor; default 8
+}
+
+export type ClockConfig = Record<string, never>;
+
+export const defaultClockState = (): ClockState => ({
+  linkedTodoId: null,
+  windowStartHour: 8,
+});
+
+export const defaultClockConfig = (): ClockConfig => ({});
+```
+
+#### NodeKind union — `src/shared/types/node.ts:27`
+
+Add `| 'clock'` to the `NodeKind` union.
+
+#### Commands — `src/renderer/components/nodes/ClockNode/commands.ts`
+
+Pure FSM handlers. No side effects. No store access.
+
+| Command | Args | Effect |
+|---|---|---|
+| `clock.linkTodo` | `{ todoNodeId: string \| null }` | Sets `linkedTodoId` |
+| `clock.setWindowStart` | `{ hour: number }` | Sets `windowStartHour`, clamped to `[0, 23]` via `Math.max(0, Math.min(23, Math.round(hour)))` |
+
+```typescript
+export const clockLinkTodo = (s: ClockState, args: { todoNodeId: string | null }): ClockState =>
+  ({ ...s, linkedTodoId: args.todoNodeId });
+
+export const clockSetWindowStart = (s: ClockState, args: { hour: number }): ClockState =>
+  ({ ...s, windowStartHour: Math.max(0, Math.min(23, Math.round(args.hour))) });
+```
+
+#### Registry — `src/renderer/components/nodes/registry.ts`
+
+Add `clock: ClockNode as AnyNodeComponent` to BOTH `NODE_REGISTRY_RAW` AND `NODE_TYPES` (the `createNodeAdapter` wrapper for React Flow).
+
+#### Dispatcher — `src/renderer/components/Canvas/commandDispatch.ts`
+
+Add a `case 'clock':` block in the `applyCommand` switch:
+
+```typescript
+case 'clock': {
+  switch (command) {
+    case 'clock.linkTodo':       return { state: clockLinkTodo(s as never, args as never) };
+    case 'clock.setWindowStart': return { state: clockSetWindowStart(s as never, args as never) };
+  }
+  break;
+}
+```
+
+#### Dock entry — `src/renderer/components/Dock/index.tsx`
+
+Add a clock button calling `fireNode('clock')`. Bind keyboard shortcut `C` (or `c`) in the existing `keydown` handler block (lines 60-68 region), following the exact pattern used for `N` (text) and `I` (image). Verify `C` is not already bound elsewhere in the app before wiring.
+
+#### Mother wiring + default state — `src/renderer/components/Canvas/CanvasFlow.tsx`
+
+Two precise changes at the `handleAddNode` site (lines 395-417):
+
+1. **Line 404 `defaultState` map:** import `defaultClockState` from `ClockNode/types` and add:
+   ```typescript
+   clock: defaultClockState(),
+   ```
+   Inline `clock: {}` is FORBIDDEN — it would violate the state contract on first render.
+
+2. **Line 416 `isMother`:** replace the hardcoded `isMother: false` with a kind-aware check. If a `MOTHER_KINDS` set is already in scope, use it; otherwise inline:
+   ```typescript
+   isMother: ['pomo', 'todo', 'habit', 'term', 'clock'].includes(args.kind),
+   ```
+   This is the new general pattern for mother-via-dock kinds. Future mothers added through the dock must update this list.
+
+#### Cross-node read pattern (component)
+
+```typescript
+const tasks = useBoardStore(useShallow((s) => {
+  if (!linkedTodoId || !s.board) return [];
+  return s.board.nodes.filter(
+    (n) => n.kind === 'todo.task' && (n.state as TaskState).parentTodoId === linkedTodoId,
+  );
+}));
+```
+
+Order tasks by `(state as TaskState).sequenceNumber` ascending before computing arc positions, so auto-layout matches the user's todo-list order.
+
+#### Arc math (12h = 720 min = full circumference)
+
+Canvas: `300 × 300` px. Center `(150, 150)`. Two rings:
+- **Outer tick ring** (r = 130): 12 tick marks at 30° intervals. Hour labels reflect actual wall-clock hours starting at `windowStartHour`. When `windowStartHour = 8`, top tick = "8", going clockwise: 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7. Generic "12, 1, 2 …" labels are FORBIDDEN.
+- **Session ring** (r = 108, strokeWidth = 18): one `<circle>` per task arc.
+
+```
+circumference   = 2 * π * 108  ≈ 678.58
+arcLengthMin    = clamp(plannedMin, 0, 720 - startMin)   // CLIP at boundary
+arcLength       = (arcLengthMin / 720) * circumference
+startOffset     = (startMin    / 720) * circumference
+strokeDasharray  = `${arcLength} ${circumference}`
+strokeDashoffset = -startOffset
+transform        = `rotate(-90 150 150)`   // anchor at top
+```
+
+`startMin` for task `i` is the running sum of `plannedMin` for tasks `0..i-1`. Tasks whose `startMin >= 720` render as `arcLength = 0` (invisible).
+
+#### Overflow rule
+
+If `sum(plannedMin across all rendered tasks) > 720`, render a small overflow badge below the clock face: `+${overflowMin} min`. No second ring. No wrapping. The clipped tasks remain in the linked Todo and are still visible there — they just do not fit on this 12h face.
+
+#### Done-task rule
+
+`done: true` tasks contribute arcs at 40% opacity (e.g. `opacity: 0.4` on the `<circle>`). The day's spent time stays visible on the face. Do NOT filter them out.
+
+#### Color rule
+
+Cycle through CSS variables in this order: `--rose`, `--sky`, `--mint`, `--amber`, `--violet`. Index by task position in the ordered list, modulo 5.
+
+If a task has a `tag` field with a known color mapping, prefer that mapping. The tag-color lookup table is deferred to a follow-up decision; until then, always cycle.
+
+#### Files
+
+**New files**
+- `src/renderer/components/nodes/ClockNode/types.ts`
+- `src/renderer/components/nodes/ClockNode/commands.ts`
+- `src/renderer/components/nodes/ClockNode/index.tsx`
+
+**Modified files**
+- `src/shared/types/node.ts:27` — extend `NodeKind` union
+- `src/renderer/components/nodes/registry.ts` — register in BOTH `NODE_REGISTRY_RAW` and `NODE_TYPES`
+- `src/renderer/components/Canvas/CanvasFlow.tsx:404` — `clock: defaultClockState()`
+- `src/renderer/components/Canvas/CanvasFlow.tsx:416` — `isMother: ['pomo','todo','habit','term','clock'].includes(args.kind)`
+- `src/renderer/components/Canvas/commandDispatch.ts` — add `case 'clock':` block + import `clockLinkTodo`, `clockSetWindowStart`
+- `src/renderer/components/Dock/index.tsx` — add clock button + `C` shortcut
+
+### Consequences
+
+**Enables**
+- 12-hour time-budget visualization for the user's daily Todo.
+- Establishes the pattern for future mother nodes added via the dock (kind-aware `isMother` check + `defaultState()` factory).
+
+**Forecloses (in v1, may revisit)**
+- Multi-day or >12h views in this node — use a different node kind for that.
+- Drag-to-reposition of arcs (no explicit `sessions` placement in v1).
+- A second ring for overflow.
+- Wrapping past midnight onto the next day.
+
+**Cleanup debt acknowledged**
+- `CanvasFlow.tsx:404-417` carries hand-rolled inline default-state literals for every node kind. The `clock` entry sets the precedent for using per-kind `defaultXxxState()` factories. A future cleanup decision should refactor every other entry the same way.
+- The `useShallow` selector returns a fresh array on every board mutation. Acceptable for v1 (matches PomoNode); flag for memoization if perf degrades with 100+ tasks.
+- The mother-kinds list is duplicated between `CanvasFlow.tsx:416` and any other site that asks "is this a mother kind?". A single `MOTHER_KINDS` constant exported from `src/shared/types/node.ts` would be cleaner; that is a follow-up.
+
+---
