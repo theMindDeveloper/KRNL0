@@ -48,9 +48,10 @@ const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = 
   'ai':          { width: 380, height: 600 },
   'habit':       { width: 380, height: 600 },
   'terminal':    { width: 380, height: 600 },
+  'calendar':    { width: 380, height: 600 },
   'habit.lane':  { width: 200, height: 120 },
-  'text':        { width: 240, height: 120 },
-  'image':       { width: 240, height: 200 },
+  'text':        { width: 260, height: 120 },
+  'image':       { width: 240, height: 180 },
 };
 
 export function toRfNode(
@@ -69,6 +70,18 @@ export function toRfNode(
   // node.kind may contain "." (e.g. "todo.task") — replace with "--" for a valid class name.
   const kindClass = `krnl-kind-${node.kind.replace('.', '--')}`;
   const initialDims = INITIAL_DIMS_BY_KIND[node.kind];
+  // Prefer state.width/height when the node stores its own size (text, image)
+  // so the RF wrapper — and therefore the NodeResizer ring + left/right
+  // Handles — stays glued to the visible card edges across resizes. Falls
+  // back to the kind's initial-dims row to suppress RF warning #015 on the
+  // first paint before any resize has occurred.
+  const stateAny = node.state as { width?: number; height?: number };
+  const w = stateAny.width ?? initialDims?.width;
+  const h = stateAny.height ?? initialDims?.height;
+  const sizeFields =
+    w !== undefined && h !== undefined
+      ? { width: w, height: h, measured: { width: w, height: h } }
+      : {};
   return {
     id: node.id,
     type: node.kind,
@@ -76,13 +89,7 @@ export function toRfNode(
     draggable: !node.isMother,
     selectable: true,
     className: kindClass,
-    ...(initialDims !== undefined
-      ? {
-          width: initialDims.width,
-          height: initialDims.height,
-          measured: { width: initialDims.width, height: initialDims.height },
-        }
-      : {}),
+    ...sizeFields,
     data: {
       node,
       onCommand: ctx.onCommand,

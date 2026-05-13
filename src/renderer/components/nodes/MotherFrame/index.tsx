@@ -19,7 +19,7 @@ interface Props {
 }
 
 export const MOTHER_WIDTH = 380;
-export const MOTHER_TOTAL = 4;
+export const MOTHER_TOTAL = 5;
 
 export function MotherFrame({
   slotIndex,
