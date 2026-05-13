@@ -14,8 +14,6 @@ import { NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { TextState, TextConfig } from './types';
 
-const DEFAULT_WIDTH = 260;
-const DEFAULT_HEIGHT = 120;
 const AUTOSAVE_MS = 400;
 
 export function TextNode({
@@ -25,8 +23,6 @@ export function TextNode({
 }: NodeProps<TextState, TextConfig>) {
   const state = node.state as TextState;
   const text = state.text ?? '';
-  const width = state.width ?? DEFAULT_WIDTH;
-  const height = state.height ?? DEFAULT_HEIGHT;
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -91,9 +87,8 @@ export function TextNode({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width,
-        minHeight: height,
-        height,
+        width: '100%',
+        height: '100%',
         background: 'rgba(245,241,232,0.04)',
         border: `1px ${borderStyle} var(--paper-3)`,
         borderRadius: 'var(--radius-lg, 10px)',
