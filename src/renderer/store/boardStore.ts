@@ -53,6 +53,8 @@ interface BoardStore {
   viewport: BoardViewport;
   theme: 'light' | 'dark';
   selectedNodeId: string | null;
+  history: Board[];
+  future: Board[];
   setBoard: (board: Board) => void;
   updateNode: (id: string, patch: Partial<Node>) => void;
   addNode: (node: Node) => void;
@@ -68,6 +70,17 @@ interface BoardStore {
   selectNode: (id: string | null) => void;
   selectTaskChain: () => ReadonlyMap<string, ChainEntry>;
   insertSiblingTaskAfter: (taskNodeId: string, opts?: { text?: string; durationMin?: number }) => void;
+  undo: () => void;
+  redo: () => void;
+}
+
+const HISTORY_CAP = 50;
+
+function pushHistory(s: BoardStore): { history: Board[]; future: Board[] } {
+  if (!s.board) return { history: s.history, future: s.future };
+  const nextHistory = [...s.history, s.board];
+  if (nextHistory.length > HISTORY_CAP) nextHistory.shift();
+  return { history: nextHistory, future: [] };
 }
 
 function clampZoom(zoom: number): number {
@@ -79,14 +92,17 @@ export const useBoardStore = create<BoardStore>((set) => ({
   viewport: INITIAL_VIEWPORT,
   theme: 'light',
   selectedNodeId: null,
+  history: [],
+  future: [],
   selectNode: (id) => set({ selectedNodeId: id }),
 
-  setBoard: (board) => set({ board, viewport: board.viewport }),
+  setBoard: (board) => set({ board, viewport: board.viewport, history: [], future: [] }),
 
   updateNode: (id, patch) =>
     set((s) => {
       if (!s.board) return s;
       return {
+        ...pushHistory(s),
         board: {
           ...s.board,
           nodes: s.board.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
@@ -97,7 +113,10 @@ export const useBoardStore = create<BoardStore>((set) => ({
   addNode: (node) =>
     set((s) => {
       if (!s.board) return s;
-      return { board: { ...s.board, nodes: [...s.board.nodes, node] } };
+      return {
+        ...pushHistory(s),
+        board: { ...s.board, nodes: [...s.board.nodes, node] },
+      };
     }),
 
   // Remove a non-mother node and any edge that references it from either
@@ -109,6 +128,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
       const target = s.board.nodes.find((n) => n.id === id);
       if (!target || target.isMother) return s;
       return {
+        ...pushHistory(s),
         board: {
           ...s.board,
           nodes: s.board.nodes.filter((n) => n.id !== id),
@@ -124,13 +144,19 @@ export const useBoardStore = create<BoardStore>((set) => ({
   addEdge: (edge) =>
     set((s) => {
       if (!s.board) return s;
-      return { board: { ...s.board, edges: [...s.board.edges, edge] } };
+      return {
+        ...pushHistory(s),
+        board: { ...s.board, edges: [...s.board.edges, edge] },
+      };
     }),
 
   removeEdge: (id) =>
     set((s) => {
       if (!s.board) return s;
-      return { board: { ...s.board, edges: s.board.edges.filter((e) => e.id !== id) } };
+      return {
+        ...pushHistory(s),
+        board: { ...s.board, edges: s.board.edges.filter((e) => e.id !== id) },
+      };
     }),
 
   swapMotherSlots: (idA, idB) =>
@@ -142,6 +168,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
       const posA = nodeA.position;
       const posB = nodeB.position;
       return {
+        ...pushHistory(s),
         board: {
           ...s.board,
           nodes: s.board.nodes.map((n) => {
@@ -150,6 +177,28 @@ export const useBoardStore = create<BoardStore>((set) => ({
             return n;
           }),
         },
+      };
+    }),
+
+  undo: () =>
+    set((s) => {
+      if (!s.board || s.history.length === 0) return s;
+      const prev = s.history[s.history.length - 1]!;
+      return {
+        board: prev,
+        history: s.history.slice(0, -1),
+        future: [s.board, ...s.future].slice(0, HISTORY_CAP),
+      };
+    }),
+
+  redo: () =>
+    set((s) => {
+      if (!s.board || s.future.length === 0) return s;
+      const next = s.future[0]!;
+      return {
+        board: next,
+        history: [...s.history, s.board].slice(-HISTORY_CAP),
+        future: s.future.slice(1),
       };
     }),
 
@@ -325,6 +374,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
       });
 
       return {
+        ...pushHistory(s),
         board: {
           ...s.board,
           nodes: finalNodes,

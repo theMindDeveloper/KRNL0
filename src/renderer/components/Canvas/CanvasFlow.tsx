@@ -23,6 +23,7 @@ import {
   type Viewport,
   type EdgeProps,
   type OnSelectionChangeParams,
+  SelectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
@@ -302,6 +303,32 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (updated) void window.krnl?.boardSave(updated);
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
+
+  // Global undo/redo: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z = redo.
+  // Skipped when focus is on an editable surface so it doesn't fight inputs.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        useBoardStore.getState().undo();
+        const updated = useBoardStore.getState().board;
+        if (updated) void window.krnl?.boardSave(updated);
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        useBoardStore.getState().redo();
+        const updated = useBoardStore.getState().board;
+        if (updated) void window.krnl?.boardSave(updated);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Hidden file input used when the dock's "image" button is clicked — opens
   // the OS file picker and spawns a fully-formed ImageNode (with assetId)
@@ -629,6 +656,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onMoveEnd={onMoveEnd}
       onSelectionChange={onSelectionChange}
       deleteKeyCode={null}
+      // Marquee selection on left-drag (empty canvas); pan with middle/right-drag.
+      // Right-click on a node/edge still fires onNodeContextMenu / onEdgeContextMenu
+      // because that's a press-release event, not a drag.
+      selectionOnDrag
+      selectionMode={SelectionMode.Partial}
+      panOnDrag={[1, 2]}
+      multiSelectionKeyCode={['Control', 'Meta', 'Shift']}
       fitView={false}
       minZoom={0.25}
       maxZoom={4}
