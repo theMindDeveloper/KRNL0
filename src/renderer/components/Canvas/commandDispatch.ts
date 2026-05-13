@@ -65,6 +65,7 @@ import {
   taskSetPlannedMin,
   taskSetCurrentSessionElapsedSec,
   taskClearCurrentSessionElapsedSec,
+  taskSetDuration,
 } from '../nodes/TaskNode/commands';
 import type { TaskState } from '../nodes/TaskNode/types';
 
@@ -172,6 +173,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: taskSetCurrentSessionElapsedSec(s as never, args as never) };
         case 'task.clearCurrentSessionElapsedSec':
           return { state: taskClearCurrentSessionElapsedSec(s as never) };
+        case 'task.setDuration':       return { state: taskSetDuration(s as never, args as never) };
       }
       break;
     }
