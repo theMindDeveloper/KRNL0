@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
@@ -343,22 +343,15 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     },
   ];
 
-  // ── body click → load task into pomo, no auto-start (B.1 / Bug #2 fix) ────
-  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
-
-  const handleBodyMouseDown = (e: MouseEvent) => {
-    mouseDownPos.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handleBodyClick = (e: MouseEvent) => {
-    if (!mouseDownPos.current) return;
-    const dx = e.clientX - mouseDownPos.current.x;
-    const dy = e.clientY - mouseDownPos.current.y;
-    mouseDownPos.current = null;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) return; // drag, not click
-    if (!state.done) {
-      onCommand('task.loadIntoPomo');
-    }
+  // ── body double-click → refresh pomo with this task's info (no auto-start).
+  // Single click is reserved for RF selection (so users can move/connect/marquee
+  // freely). Double-click is the explicit "show me this task in the pomo" gesture.
+  const handleBodyDoubleClick = (e: MouseEvent) => {
+    // Children that handle their own dblclick (the editable task text) stop
+    // propagation, so this handler only fires on the surrounding card surface.
+    if (state.done) return;
+    e.stopPropagation();
+    onCommand('task.loadIntoPomo');
   };
 
   // B.4 — ring colour reacts to paused status (solid acid, no glow)
@@ -392,8 +385,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         transition: 'opacity 0.15s, box-shadow 0.2s, border-color 0.2s',
         cursor: state.done ? 'default' : 'pointer',
       }}
-      onMouseDown={handleBodyMouseDown}
-      onClick={handleBodyClick}
+      onDoubleClick={handleBodyDoubleClick}
     >
       {/* Decision 22 F16 — corner timer (top-left) */}
       {showTimer && (

@@ -398,14 +398,13 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
 // ── Story 2 — "Clicking on a task node should directly show its pomodoro on the parent
 //              pomodoro node (no auto start timer)." ──────────────────────────
 
-describe('Story 2 — Body click loads task into pomo (no auto-start) (Decision 22.2 Fix 2)', () => {
+describe('Story 2 — Body double-click loads task into pomo (no auto-start) (Decision 22.2 Fix 2)', () => {
 
-  it('T2.1: body click on a TaskNode dispatches task.loadIntoPomo (NOT task.startPomo)', () => {
+  it('T2.1: body double-click on a TaskNode dispatches task.loadIntoPomo (NOT task.startPomo)', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
-    fireEvent.mouseDown(root, { clientX: 10, clientY: 10 });
-    fireEvent.click(root, { clientX: 10, clientY: 10 });
+    fireEvent.doubleClick(root);
     expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
     expect(onCommand).not.toHaveBeenCalledWith('task.startPomo');
     expect(onCommand).not.toHaveBeenCalledWith('task.spawnPomo');
