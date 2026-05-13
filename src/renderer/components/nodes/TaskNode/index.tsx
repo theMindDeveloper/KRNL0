@@ -98,6 +98,24 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
   }
   const showTimer = elapsedSec > 0 || isActive;
 
+  // ── Task chain prev/next display ───────────────────────────────────────────
+  const { prevText, nextText } = useBoardStore(
+    useShallow((s) => {
+      const idx = s.selectTaskChain();
+      const entry = idx.get(node.id) ?? { prev: null, next: null };
+      const resolveText = (id: string | null): string | null => {
+        if (!id) return null;
+        const n = s.board?.nodes.find((nd) => nd.id === id);
+        const txt = (n?.state as { text?: string } | undefined)?.text ?? '';
+        return txt.length > 16 ? txt.slice(0, 14) + '…' : txt;
+      };
+      return {
+        prevText: resolveText(entry.prev),
+        nextText: resolveText(entry.next),
+      };
+    }),
+  );
+
   // ── inline edit ────────────────────────────────────────────────────────────
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -508,6 +526,24 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
             </span>
           )}
         </div>
+
+        {/* F5b: chain hint — prev/next task labels */}
+        {(prevText !== null || nextText !== null) && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              color: 'var(--ink-4)',
+              paddingTop: 3,
+              letterSpacing: '0.03em',
+            }}
+          >
+            <span>{prevText !== null ? `← ${prevText}` : ''}</span>
+            <span>{nextText !== null ? `${nextText} →` : ''}</span>
+          </div>
+        )}
 
         {/* Add-subtask inline input */}
         {isAddingSubtask && (
