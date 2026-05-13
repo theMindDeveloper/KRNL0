@@ -1431,3 +1431,28 @@ If a future affordance does not fit any of these four, that is a signal to chall
 - **Cascade invariant pinned.** Decision 20 invariant 1 (bidirectional linkage at creation) and invariant 4 (delete cascade clears all linked TodoItems) are now enforced for subtasks as well, not only root tasks. Add a Gherkin scenario for the multi-level case.
 
 ---
+
+## Decision 23.1 — ClockNode as Permanent 6th Mother (supersedes Decision 23)
+
+**Date:** 2026-05-14
+**Status:** Accepted
+**Supersedes:** Decision 23 (PR #105 — clock as user-spawned 6th node-kind)
+**Related:** ADR 0001 (CalendarNode), Decision 22 (TaskState plannedMin)
+
+ClockNode becomes a permanent mother at **slot 6** (`mother-clock`, `x=1252, y=0`), seeded by `seedBoard()` and back-filled by a new idempotent `migrateAddClockMother` migration. `MOTHER_TOTAL` becomes **6**. The dock button and `C` keyboard shortcut from PR #105 are removed — clock is never user-spawnable.
+
+**Role split with CalendarNode:** Calendar answers *when* at day-grain (multi-day view, owns `scheduledFor` write path). Clock answers *how it stacks* at minute-grain inside a single 12-hour window (sequential `plannedMin` arc layout, read-only in v1). Both share the same task data but render different projections.
+
+**State:** `{ linkedTodoId: string | null; windowStartHour: number }` (defaults: `null`, `8`).
+**Config:** `Record<string, never>` (empty — no `CONFIG_DEFAULTS` entry needed).
+**Commands:** `clock.linkTodo` — links/unlinks a Todo node. `clock.setWindowStart` — sets window anchor hour (0–23, clamped). No cross-node router commands.
+
+**Persistence changes:**
+- `seedBoard` appends the clock node entry after `mother-calendar`.
+- `NEW_MOTHER_POSITIONS` adds `'mother-clock': { x: 1252, y: 0 }`.
+- `STATE_DEFAULTS['clock']` supplies backfill defaults.
+- `migrateAddClockMother` injects the node into pre-23.1 boards (idempotent, runs before `migrateNodeStates`).
+
+**v2 deferred:** An opt-in `clock.alignMode: 'sequential' | 'scheduled'` mode that reads `TaskState.scheduledFor` for arc placement. Requires a separate ADR.
+
+---
