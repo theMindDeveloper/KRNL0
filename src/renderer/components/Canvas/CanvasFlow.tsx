@@ -232,7 +232,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getNodes } = useReactFlow();
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
@@ -245,8 +245,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // event; cleared on outside click / Escape / window blur. Only opened for
   // non-mother nodes — mothers handle right-click internally (HabitNode per
   // habit-row menu, TodoNode per-row menu, etc.).
+  // nodeIds holds the full batch when the right-click target is part of a
+  // multi-selection (marquee). For single-node right-click it's just `[id]`.
   const [ctxMenu, setCtxMenu] = useState<
-    { x: number; y: number; nodeId: string; isMother: false } | null
+    { x: number; y: number; nodeIds: string[] } | null
   >(null);
 
   const [edgeCtxMenu, setEdgeCtxMenu] = useState<{
@@ -259,20 +261,25 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     (event: React.MouseEvent, rfNode: KrnlRFNode) => {
       event.preventDefault();
       const inner = rfNode.data.node;
-      // Mother nodes (pomo / todo / habit / term) own their own right-click
-      // UX. The canvas-level delete menu is meaningless on them (mothers are
-      // pinned) and previously showed when right-clicking empty mother-body
-      // areas (header, padding) where no inner handler ran — visually
-      // suppressing the per-row menu. Skip entirely.
+      // Mother nodes own their own right-click UX. Mothers are pinned, so a
+      // canvas-level delete is meaningless on them and would visually suppress
+      // the per-row menus (HabitNode rows, TodoNode rows, etc.).
       if (inner.isMother) return;
-      setCtxMenu({
-        x: event.clientX,
-        y: event.clientY,
-        nodeId: inner.id,
-        isMother: false,
-      });
+
+      // Batch mode: if the right-clicked node is part of a multi-selection,
+      // operate on the whole selection. Otherwise just on the clicked node.
+      // Mothers are excluded from the batch (they're undeletable).
+      const selectedIds = (getNodes() as KrnlRFNode[])
+        .filter((n) => n.selected && !n.data.node.isMother)
+        .map((n) => n.id);
+      const nodeIds =
+        selectedIds.length > 1 && selectedIds.includes(inner.id)
+          ? selectedIds
+          : [inner.id];
+
+      setCtxMenu({ x: event.clientX, y: event.clientY, nodeIds });
     },
-    [],
+    [getNodes],
   );
 
   const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
@@ -298,7 +305,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   const deleteFromCtxMenu = useCallback(() => {
     if (!ctxMenu) return;
-    removeNode(ctxMenu.nodeId);
+    // Delete every node in the batch. removeNode is a no-op on mothers so the
+    // filter in onNodeContextMenu is belt-and-suspenders; both are kept.
+    for (const id of ctxMenu.nodeIds) {
+      removeNode(id);
+    }
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
     closeCtxMenu();
@@ -781,7 +792,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
               e.currentTarget.style.background = 'transparent';
             }}
           >
-            delete
+            {ctxMenu.nodeIds.length > 1 ? `delete (${ctxMenu.nodeIds.length})` : 'delete'}
           </button>
         </div>
       )}
