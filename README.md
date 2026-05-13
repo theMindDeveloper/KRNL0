@@ -10,6 +10,12 @@ Wire them together. Drive them with AI. Talk to them.
 [Docs](docs/) · [Architecture](docs/03-architecture/) · [Roadmap](docs/07-roadmap/build-roadmap.md) · [PRD](docs/02-prd)
 
 </div>
+---
+
+## Demo
+
+![Canvas with four mother nodes](docs/assets/ref1.png)
+
 
 ---
 
@@ -35,12 +41,6 @@ The assistant takes that, runs `sys` commands, and the canvas updates live.
 - **Local-first.** Your board is one human-readable JSON file in `~/Documents/krnl0/`. No cloud, no account.
 - **Programmable.** Every GUI action is reachable from `sys`. If you can click it, you can script it.
 - **Cross-platform.** macOS, Windows, Linux via Electron.
-
----
-
-## Demo
-
-![Canvas with four mother nodes](docs/assets/ref1.png)
 
 ---
 
