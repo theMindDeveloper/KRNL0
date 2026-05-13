@@ -15,6 +15,10 @@ export interface TaskState {
   plannedMin: number;            // total minutes budgeted for this task (default = pomo.sessionMin)
   secondsAccumulated: number;    // total seconds spent across all pomo sessions for this task
   currentSessionElapsedSec: number; // in-flight session checkpoint (cleared on session end)
+  // ADR 0001 — Calendar integration (Slice 1). Both fields are optional so
+  // existing boards load unchanged (absence = unscheduled).
+  scheduledFor?: string;         // ISO 8601 local datetime, e.g. "2026-05-20T14:30"
+  scheduledDurationMin?: number; // optional override for calendar block height
 }
 
 export interface TaskConfig {

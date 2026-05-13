@@ -5,9 +5,9 @@
  * Bytes live at <BOARD_DIR>/assets/<assetId>.<ext> and are served via the
  * krnl-asset:// privileged protocol (Decision 21). No base64 in board.json.
  *
- * The node body is the image itself â€” no header, no caption row. Selectable
- * replace control swaps the asset. NodeResizer respects Shift for
- * aspect-ratio-locked resize.
+ * The node body is the image itself — no header, no caption row. The empty
+ * placeholder opens a file picker on click; once an asset is set the card is
+ * read-only. NodeResizer respects Shift for aspect-ratio-locked resize.
  */
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -16,9 +16,6 @@ import type { NodeProps } from '../types';
 import type { ImageState, ImageConfig } from './types';
 import { ingestImageFile } from '../../Canvas/dropImage';
 
-const DEFAULT_PLACEHOLDER_WIDTH = 240;
-const DEFAULT_PLACEHOLDER_HEIGHT = 180;
-
 export function ImageNode({
   node,
   selected,
@@ -26,20 +23,6 @@ export function ImageNode({
 }: NodeProps<ImageState, ImageConfig>) {
   const state = node.state as ImageState;
   const { assetId } = state;
-
-  const width =
-    state.width ??
-    (assetId && state.naturalWidth
-      ? Math.min(480, state.naturalWidth)
-      : DEFAULT_PLACEHOLDER_WIDTH);
-  const height =
-    state.height ??
-    (assetId && state.naturalWidth && state.naturalHeight
-      ? Math.round(
-          (state.naturalHeight / state.naturalWidth) *
-            Math.min(480, state.naturalWidth),
-        )
-      : DEFAULT_PLACEHOLDER_HEIGHT);
 
   const [hover, setHover] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
@@ -99,8 +82,8 @@ export function ImageNode({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width,
-        height,
+        width: '100%',
+        height: '100%',
         // overflow visible so the React Flow Handles, which RF positions a few
         // pixels outside the node bounds, don't get clipped on the left/right
         // edges. Inner image-frame clips the actual <img> bytes.
@@ -195,30 +178,6 @@ export function ImageNode({
           </button>
         )}
 
-        {hasAsset && selected && (
-          <button
-            type="button"
-            onClick={handleReplaceClick}
-            data-testid="image-node-replace"
-            style={{
-              position: 'absolute',
-              top: 6,
-              right: 6,
-              padding: '4px 8px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              background: 'rgba(0,0,0,0.55)',
-              color: 'var(--paper)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: 4,
-              cursor: 'pointer',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            replace
-          </button>
-        )}
       </div>
     </div>
   );

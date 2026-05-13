@@ -407,7 +407,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       y: window.innerHeight / 2,
     });
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
-      pomo: {}, todo: {}, habit: {}, term: {},
+      pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
       'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
       text: { text: '' },
       image: {},
