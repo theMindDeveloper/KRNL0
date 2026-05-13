@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Board, BoardViewport, Node, Edge } from '../../shared/types';
+import type { TaskState } from '../components/nodes/TaskNode/types';
 
 const INITIAL_VIEWPORT: BoardViewport = { x: 0, y: 160, zoom: 1 };
 const ZOOM_MIN = 0.25;
@@ -48,6 +49,7 @@ interface BoardStore {
   resetViewport: () => void;
   selectNode: (id: string | null) => void;
   selectTaskChain: () => ReadonlyMap<string, { prev: string | null; next: string | null }>;
+  insertSiblingTaskAfter: (taskNodeId: string) => void;
 }
 
 function clampZoom(zoom: number): number {
@@ -177,5 +179,113 @@ export const useBoardStore = create<BoardStore>((set) => ({
     _lastEdges = edges;
     _cachedChainIndex = buildChainIndex(edges);
     return _cachedChainIndex;
+  },
+
+  insertSiblingTaskAfter: (taskNodeId: string) => {
+    set((s) => {
+      if (!s.board) return s;
+
+      const sourceNode = s.board.nodes.find((n) => n.id === taskNodeId);
+      if (!sourceNode || sourceNode.kind !== 'todo.task') return s;
+
+      const sourceTaskState = sourceNode.state as TaskState;
+
+      // Find any existing outgoing task.next edge from the source node
+      const existingEdge = s.board.edges.find(
+        (e) => e.from.nodeId === taskNodeId && e.from.event === 'task.next',
+      );
+      const existingEdgeId = existingEdge?.id;
+      const nextId = existingEdge?.to.nodeId;
+
+      // Build new task state — only include fields present in TaskState
+      const newTaskState: TaskState = {
+        text: 'New task',
+        done: false,
+        durationMin: sourceTaskState.durationMin,
+        eta: sourceTaskState.eta,
+        sequenceNumber: sourceTaskState.sequenceNumber + 1,
+        layer: sourceTaskState.layer,
+        createdAt: new Date().toISOString(),
+        parentTodoId: sourceTaskState.parentTodoId,
+        parentTaskId: sourceTaskState.parentTaskId,
+        todoItemId: null,
+        pomoSessionsCompleted: 0,
+      };
+
+      const newNodeId = `task-${crypto.randomUUID()}`;
+      const newNode: Node = {
+        id: newNodeId,
+        kind: 'todo.task',
+        position: { x: sourceNode.position.x + 252, y: sourceNode.position.y },
+        isMother: false,
+        state: newTaskState,
+        config: { showDuration: true },
+      };
+
+      // Build new edges
+      const edgeToNew: Edge = {
+        id: `edge-${crypto.randomUUID()}`,
+        from: { nodeId: taskNodeId, event: 'task.next' },
+        to: { nodeId: newNodeId, command: 'task.activate' },
+        enabled: true,
+      };
+      const additionalEdges: Edge[] = [];
+      if (nextId !== undefined) {
+        additionalEdges.push({
+          id: `edge-${crypto.randomUUID()}`,
+          from: { nodeId: newNodeId, event: 'task.next' },
+          to: { nodeId: nextId, command: 'task.activate' },
+          enabled: true,
+        });
+      }
+
+      // Inline renumber: find all siblings (same parentTodoId + parentTaskId),
+      // sort by createdAt, assign 1-based sequenceNumber
+      const allNodesWithNew = [...s.board.nodes, newNode];
+      const siblings = allNodesWithNew
+        .filter((n) => {
+          if (n.kind !== 'todo.task') return false;
+          const ts = n.state as TaskState;
+          return (
+            ts.parentTodoId === sourceTaskState.parentTodoId &&
+            ts.parentTaskId === sourceTaskState.parentTaskId
+          );
+        })
+        .slice()
+        .sort((a, b) => {
+          const aTs = a.state as TaskState;
+          const bTs = b.state as TaskState;
+          return aTs.createdAt < bTs.createdAt ? -1 : aTs.createdAt > bTs.createdAt ? 1 : 0;
+        });
+
+      const renumberMap = new Map<string, number>();
+      siblings.forEach((sib, idx) => {
+        renumberMap.set(sib.id, idx + 1);
+      });
+
+      const updatedNodes = allNodesWithNew.map((n) => {
+        const newSeq = renumberMap.get(n.id);
+        if (newSeq === undefined) return n;
+        return {
+          ...n,
+          state: { ...(n.state as TaskState), sequenceNumber: newSeq },
+        };
+      });
+
+      const filteredEdges = existingEdgeId
+        ? s.board.edges.filter((e) => e.id !== existingEdgeId)
+        : s.board.edges;
+
+      return {
+        board: {
+          ...s.board,
+          nodes: updatedNodes,
+          edges: [...filteredEdges, edgeToNew, ...additionalEdges],
+        },
+      };
+    });
+
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
   },
 }));

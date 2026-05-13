@@ -113,6 +113,13 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       disabled: state.done,
     },
     {
+      label: 'Add sibling task',
+      onSelect: () => {
+        useBoardStore.getState().insertSiblingTaskAfter(node.id);
+      },
+      disabled: state.done,
+    },
+    {
       label: 'Delete',
       danger: true,
       onSelect: () => onCommand('task.delete'),
