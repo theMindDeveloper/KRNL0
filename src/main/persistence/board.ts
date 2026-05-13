@@ -311,6 +311,45 @@ function migrateTodoItemFields(board: Record<string, unknown>): Record<string, u
   return board;
 }
 
+function validateBoardInvariants(board: unknown): unknown {
+  if (typeof board !== 'object' || board === null) return board;
+  const b = board as Record<string, unknown>;
+  const nodes = b['nodes'];
+  if (!Array.isArray(nodes)) return board;
+
+  // Collect all TaskNode ids present in the board.
+  const taskNodeIds = new Set<string>();
+  for (const n of nodes) {
+    if (typeof n !== 'object' || n === null) continue;
+    const node = n as { kind?: string; id?: string };
+    if (node.kind === 'todo.task' && typeof node.id === 'string') {
+      taskNodeIds.add(node.id);
+    }
+  }
+
+  // Strip TodoItems whose taskNodeId points to a TaskNode that no longer exists.
+  const healed = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return n;
+    const node = n as { kind?: string; state?: Record<string, unknown> };
+    if (node.kind !== 'todo') return n;
+    const items = node.state?.['items'];
+    if (!Array.isArray(items)) return n;
+    const before = items.length;
+    const after = items.filter((item: unknown) => {
+      if (typeof item !== 'object' || item === null) return true;
+      const it = item as Record<string, unknown>;
+      if (it['taskNodeId'] == null) return true;
+      return taskNodeIds.has(it['taskNodeId'] as string);
+    });
+    if (after.length < before) {
+      console.warn(`[board] dropped ${before - after.length} orphan TodoItem(s) on load`);
+    }
+    return { ...node, state: { ...(node.state ?? {}), items: after } };
+  });
+
+  return { ...b, nodes: healed };
+}
+
 export function loadBoardFrom(boardPath: string): unknown {
   try {
     if (existsSync(boardPath)) {
@@ -321,12 +360,16 @@ export function loadBoardFrom(boardPath: string): unknown {
       // `migrateNodeStates` so the canonical fields exist when STATE/CONFIG
       // DEFAULTS apply their baseline spread — otherwise the defaults clobber
       // legacy-derived values.
-      return migrateTodoItemFields(
-        migrateHabitFields(
-          migrateNodeStates(
-            migrateTaskPlannedMin(
-              migratePomoConfig(
-                migrateTaskChain(migrateMotherPositions(parsed)),
+      // validateBoardInvariants runs last to heal any orphaned TodoItems before
+      // the board is handed to the renderer.
+      return validateBoardInvariants(
+        migrateTodoItemFields(
+          migrateHabitFields(
+            migrateNodeStates(
+              migrateTaskPlannedMin(
+                migratePomoConfig(
+                  migrateTaskChain(migrateMotherPositions(parsed)),
+                ),
               ),
             ),
           ),
