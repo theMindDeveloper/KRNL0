@@ -15,7 +15,6 @@
 
 .react-flow__handle:hover {
   background: var(--acid);
-  transform: scale(1.3);
   opacity: 1;
 }
 
@@ -45,26 +44,53 @@
   cursor: grabbing;
 }
 
-/* ── Selected node highlight ─────────────────────────────────────────────── */
-.react-flow__node.selected > div,
-.react-flow__node.selected {
-  outline: 1px solid var(--acid);
-  box-shadow: var(--shadow-glow);
+/* Hide React Flow's group-selection bounding box. The user-facing selection
+   indicator is the per-node ring; the wrapping rect just adds visual noise
+   and lingers after a marquee drag completes. */
+.react-flow__nodesselection,
+.react-flow__nodesselection-rect {
+  display: none !important;
 }
 
-/* ── Todo-family: rounded blue ring overrides the global acid ring ───────── */
-/* Decision 22.2 Fix 5 — TodoNode mother and TaskNode children get a cyan
-   rounded selection ring that matches the card shape. All other families
-   (Pomo, Habit, AI, Terminal, Text, Image) keep the default acid-green ring. */
-.react-flow__node.selected.krnl-kind-todo,
-.react-flow__node.selected.krnl-kind-todo--task {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78, 168, 176, 0.35);
-  border-radius: var(--radius-lg);
+/* ── Selection ring strategy ────────────────────────────────────────────────
+   Every KRNL node renders its visible card as the FIRST child div of the RF
+   wrapper, with inline `boxShadow` for elevation/border glow. Inline styles
+   beat external CSS, so to paint the selection ring on the visible card we
+   need `!important` to override the inline shadow during selection.
+
+   We also hide the RF wrapper's own outline/shadow so no sharp-cornered ring
+   appears outside the rounded card. */
+
+/* Hide RF's default wrapper ring/shadow on ALL selected nodes. */
+.react-flow__node.selected {
+  outline: none !important;
+  box-shadow: none !important;
 }
-.react-flow__node.selected.krnl-kind-todo > div,
-.react-flow__node.selected.krnl-kind-todo--task > div {
-  outline: none;
+
+/* The rfAdapters HOC renders <Handle> elements (which are <div>s) as siblings
+   of the node body for non-mother nodes, so `> div:first-of-type` would land
+   on the left handle, not the card. Exclude handles with :not(). */
+
+/* Acid ring for mother kinds (pomo / habit / terminal) and habit.lane child. */
+.react-flow__node.selected.krnl-kind-pomo > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-habit > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-terminal > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-habit--lane > div:not(.react-flow__handle) {
+  box-shadow: 0 0 0 2px var(--acid), 0 0 16px rgba(201, 241, 88, 0.35) !important;
+}
+
+/* Cyan ring for the Todo mother and Task children. */
+.react-flow__node.selected.krnl-kind-todo > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-todo--task > div:not(.react-flow__handle) {
+  box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78, 168, 176, 0.35) !important;
+}
+
+/* Active-in-pomo task overrides the cyan selection ring with the acid one so
+   the green active ring and the blue selection ring never double up. The
+   active card already renders an inline acid box-shadow; we just need our
+   selection rule to use acid instead of cyan, with matching size/position. */
+.react-flow__node.selected.krnl-kind-todo--task > div[data-active="true"]:not(.react-flow__handle) {
+  box-shadow: 0 0 0 2px var(--acid), 0 0 16px rgba(201, 241, 88, 0.45) !important;
 }
 
 /* ── MiniMap ─────────────────────────────────────────────────────────────── */

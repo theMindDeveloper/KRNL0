@@ -93,7 +93,10 @@ export class SysFacade {
         case 'toggle':  return task.taskToggle(ctx, command.id);
         case 'delete':  return task.taskDelete(ctx, command.id);
         case 'pomo':    return task.taskStartPomo(ctx, command.id);
-        case 'subtask': return task.taskSubtask(ctx, command.parentId, command.text);
+        case 'subtask':    return task.taskSubtask(ctx, command.parentId, command.text);
+        case 'duration':   return task.taskDuration(ctx, command.id, command.minutes);
+        case 'sibling':    return task.taskSibling(ctx, command.id);
+        case 'reset-pomo': return task.taskResetPomo(ctx, command.id);
       }
     }
 
@@ -167,6 +170,9 @@ Tasks:
   sys task delete <id>
   sys task pomo <id>
   sys task subtask <parentId> "<text>"
+  sys task duration <id> <minutes>
+  sys task sibling <id>
+  sys task reset-pomo <id>
   sys task list [<todoId>]
 
 Habits:

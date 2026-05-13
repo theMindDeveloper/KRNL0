@@ -1,23 +1,25 @@
 import { useState, useRef } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
-import type { TodoConfig, TodoState } from './types';
+import type { TodoConfig, TodoItem, TodoState } from './types';
 import { visibleItems } from './commands';
 import { defaultTodoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { ContextMenu } from '../../ContextMenu';
 import type { ContextMenuItem } from '../../ContextMenu';
+import { useBoardStore } from '../../../store/boardStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
   const config = rawConfig ?? defaultTodoConfig();
 
-  // Add-task input local UI state (NF4: no item state held in component)
-  const [inputValue, setInputValue] = useState('');
+  // Add-task input — two-phase FSM (phase 'name' → 'duration' → dispatch)
+  const [inputPhase, setInputPhase] = useState<'name' | 'duration'>('name');
   const [inputFocused, setInputFocused] = useState(false);
-  // Decision 22 F15 — minutes input next to task text. Empty string = use default
-  // (parsed from text or from pomoConfig.sessionMin in the dispatcher).
-  const [minutesValue, setMinutesValue] = useState('');
+  const [pendingName, setPendingName] = useState('');
+  const [durationValue, setDurationValue] = useState('');
+  const [durationInvalid, setDurationInvalid] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // F5: inline edit state
@@ -32,29 +34,112 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     hasTaskNode: boolean;
   } | null>(null);
 
-  const items = visibleItems(state, config);
+  const rawItems = visibleItems(state, config);
+
+  // Bug 5: Sort items by chain order. Items are grouped into undone/done buckets
+  // first, then within each bucket sorted by their position in the task.next chain.
+  // Orphan items (no taskNodeId) go at the end of each bucket in insertion order.
+  const chainIndex = useBoardStore(useShallow((s) => s.selectTaskChain()));
+
+  const sortByChain = (bucket: TodoItem[]): TodoItem[] => {
+    // Build a task-nodeId → chain-position map by walking the chain index.
+    // A root is a task with no predecessor in the chain index.
+    const taskIds = bucket.map((i) => i.taskNodeId).filter((id): id is string => id !== null);
+    const taskIdSet = new Set(taskIds);
+
+    // Find roots: task nodes in our bucket that have no prev in the chain index,
+    // or whose prev is not also in our bucket.
+    const roots = taskIds.filter((id) => {
+      const entry = chainIndex.get(id);
+      return !entry || !entry.prev || !taskIdSet.has(entry.prev);
+    });
+
+    const visited = new Set<string>();
+    const ordered: TodoItem[] = [];
+
+    const emit = (taskNodeId: string) => {
+      if (visited.has(taskNodeId)) return;
+      visited.add(taskNodeId);
+      const item = bucket.find((i) => i.taskNodeId === taskNodeId);
+      if (item) ordered.push(item);
+      // Follow the next pointer within the same bucket
+      const entry = chainIndex.get(taskNodeId);
+      if (entry?.next && taskIdSet.has(entry.next)) {
+        emit(entry.next);
+      }
+    };
+
+    // Sort roots by their original bucket index for deterministic ordering
+    const rootsSorted = roots.slice().sort((a, b) => {
+      const ai = bucket.findIndex((i) => i.taskNodeId === a);
+      const bi = bucket.findIndex((i) => i.taskNodeId === b);
+      return ai - bi;
+    });
+
+    for (const root of rootsSorted) {
+      emit(root);
+    }
+
+    // Any remaining items not yet visited (orphans without taskNodeId, or disconnected)
+    for (const item of bucket) {
+      if (!item.taskNodeId || !visited.has(item.taskNodeId)) {
+        ordered.push(item);
+      }
+    }
+
+    return ordered;
+  };
+
+  const undoneBucket = rawItems.filter((i) => !i.done);
+  const doneBucket = rawItems.filter((i) => i.done);
+  const items = [...sortByChain(undoneBucket), ...sortByChain(doneBucket)];
+
   const undoneCount = state.items.filter((i) => !i.done).length;
   const hasDone = state.items.some((i) => i.done);
 
-  const commitAdd = () => {
-    const text = inputValue.trim();
-    if (text) {
-      const minutes = Number.parseInt(minutesValue, 10);
-      const plannedMin = Number.isFinite(minutes) && minutes > 0 ? minutes : undefined;
-      onCommand('todo.add', plannedMin !== undefined ? { text, plannedMin } : { text });
-      setInputValue('');
-      setMinutesValue('');
-      // NF3: re-focus after submit so successive entries require no click
-      setInputFocused(true);
-    }
+  const submitTask = (name: string, durationMin: number) => {
+    onCommand('todo.add', { text: name, durationMin });
+    setPendingName('');
+    setDurationValue('');
+    setDurationInvalid(false);
+    setInputPhase('name');
+    // NF3: re-focus after submit so successive entries require no click
+    setInputFocused(true);
   };
 
   const handleAddKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      commitAdd();
-    } else if (e.key === 'Escape') {
-      setInputValue('');
-      setInputFocused(false);
+    if (inputPhase === 'name') {
+      if (e.key === 'Enter') {
+        const name = pendingName.trim();
+        if (name) {
+          setInputPhase('duration');
+          setDurationValue('');
+          setDurationInvalid(false);
+          // focus is preserved on the same element since type changes
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }
+      } else if (e.key === 'Escape') {
+        setPendingName('');
+        setInputFocused(false);
+        setInputPhase('name');
+      }
+    } else {
+      // duration phase
+      if (e.key === 'Enter') {
+        const parsed = parseInt(durationValue, 10);
+        if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
+          setDurationInvalid(false);
+          submitTask(pendingName, parsed);
+        } else {
+          setDurationInvalid(true);
+        }
+      } else if (e.key === 'Escape') {
+        // go back to name phase, restoring pendingName
+        setInputPhase('name');
+        setDurationValue('');
+        setDurationInvalid(false);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
     }
   };
 
@@ -124,7 +209,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   return (
-    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} borderColor="var(--cyan-glow)" onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
+    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         <div
@@ -350,69 +435,48 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           }}
         >
           {inputFocused ? (
-            <>
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleAddKeyDown}
-                onBlur={(e) => {
-                  // Don't collapse if focus moved to the minutes input
-                  const next = e.relatedTarget as HTMLElement | null;
-                  if (next?.dataset?.['testid'] === 'add-task-minutes') return;
-                  if (inputValue.trim()) {
-                    commitAdd();
-                  } else {
+            <input
+              ref={inputRef}
+              type={inputPhase === 'duration' ? 'number' : 'text'}
+              min={inputPhase === 'duration' ? 1 : undefined}
+              max={inputPhase === 'duration' ? 480 : undefined}
+              value={inputPhase === 'name' ? pendingName : durationValue}
+              onChange={(e) => {
+                if (inputPhase === 'name') {
+                  setPendingName(e.target.value);
+                } else {
+                  setDurationValue(e.target.value);
+                  setDurationInvalid(false);
+                }
+              }}
+              onKeyDown={handleAddKeyDown}
+              onBlur={() => {
+                if (inputPhase === 'duration') {
+                  // defensive: revert to name phase without submitting
+                  setInputPhase('name');
+                  setDurationValue('');
+                  setDurationInvalid(false);
+                } else {
+                  // name phase: collapse if empty
+                  if (!pendingName.trim()) {
                     setInputFocused(false);
                   }
-                }}
-                autoFocus
-                placeholder="task → spawns a node…"
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  color: 'var(--ink)',
-                  caretColor: 'var(--acid)',
-                }}
-              />
-              <input
-                type="number"
-                min={1}
-                placeholder="min"
-                data-testid="add-task-minutes"
-                value={minutesValue}
-                onChange={(e) => setMinutesValue(e.target.value)}
-                onKeyDown={handleAddKeyDown}
-                onBlur={(e) => {
-                  const next = e.relatedTarget as HTMLElement | null;
-                  if (next === inputRef.current) return;
-                  if (inputValue.trim()) {
-                    commitAdd();
-                  } else {
-                    setInputFocused(false);
-                  }
-                }}
-                style={{
-                  width: 52,
-                  background: 'transparent',
-                  border: '1px solid var(--paper-3)',
-                  borderRadius: 3,
-                  outline: 'none',
-                  padding: '1px 4px',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11.5,
-                  color: 'var(--ink-2)',
-                  caretColor: 'var(--acid)',
-                  textAlign: 'right',
-                  flexShrink: 0,
-                }}
-              />
-            </>
+                }
+              }}
+              autoFocus
+              placeholder={inputPhase === 'name' ? 'task → spawns a node…' : 'how long? (min)'}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                color: 'var(--ink)',
+                caretColor: 'var(--acid)',
+                ...(durationInvalid ? { borderBottom: '1px solid var(--rust)' } : {}),
+              }}
+            />
           ) : (
             <span
               data-testid="add-task-placeholder"

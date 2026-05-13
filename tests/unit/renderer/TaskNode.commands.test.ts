@@ -21,6 +21,7 @@ import {
   taskActivate,
   taskSetCurrentSessionElapsedSec,
   taskClearCurrentSessionElapsedSec,
+  taskSetDuration,
 } from '../../../src/renderer/components/nodes/TaskNode/commands';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
 
@@ -245,5 +246,46 @@ describe('taskClearCurrentSessionElapsedSec', () => {
     const next = taskClearCurrentSessionElapsedSec({ ...s, currentSessionElapsedSec: 50 });
     expect(next.text).toBe('focus task');
     expect(next.secondsAccumulated).toBe(600);
+  });
+});
+
+// ── taskSetDuration ───────────────────────────────────────────────────────────
+
+describe('taskSetDuration', () => {
+  it('updates durationMin and eta', () => {
+    const s = makeTaskState({ durationMin: 20, eta: '~20 min' });
+    const next = taskSetDuration(s, { durationMin: 45 });
+    expect(next.durationMin).toBe(45);
+    expect(next.eta).toBe('~45 min');
+  });
+
+  it('clamps minimum to 1', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    expect(taskSetDuration(s, { durationMin: 0 }).durationMin).toBe(1);
+    expect(taskSetDuration(s, { durationMin: -5 }).durationMin).toBe(1);
+  });
+
+  it('clamps maximum to 480', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    expect(taskSetDuration(s, { durationMin: 600 }).durationMin).toBe(480);
+  });
+
+  it('rounds fractional input', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    expect(taskSetDuration(s, { durationMin: 22.6 }).durationMin).toBe(23);
+  });
+
+  it('preserves all other fields', () => {
+    const s = makeTaskState({ text: 'duration task', done: false, secondsAccumulated: 1000 });
+    const next = taskSetDuration(s, { durationMin: 30 });
+    expect(next.text).toBe('duration task');
+    expect(next.done).toBe(false);
+    expect(next.secondsAccumulated).toBe(1000);
+  });
+
+  it('does not mutate original state', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    taskSetDuration(s, { durationMin: 30 });
+    expect(s.durationMin).toBe(20);
   });
 });
