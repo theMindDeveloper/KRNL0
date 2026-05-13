@@ -59,6 +59,20 @@
   display: none !important;
 }
 
+/* habit.lane child node: RF wrapper is registered at 280×140 but actual lane
+   content can be shorter, so the default acid outline (sharp, on the wrapper)
+   sat below the visible card with rounded corners. Move the ring to the inner
+   content div, which is sized to actual content and already has border-radius. */
+.react-flow__node.selected.krnl-kind-habit--lane {
+  outline: none;
+  box-shadow: none;
+}
+.react-flow__node.selected.krnl-kind-habit--lane > div {
+  outline: 1px solid var(--acid);
+  box-shadow: var(--shadow-glow);
+  border-radius: var(--radius-lg);
+}
+
 /* ── Todo-family: rounded blue ring overrides the global acid ring ───────── */
 /* Decision 22.2 Fix 5 — TodoNode mother and TaskNode children get a cyan
    rounded selection ring that matches the card shape. All other families
