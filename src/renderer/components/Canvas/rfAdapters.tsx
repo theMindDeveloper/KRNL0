@@ -48,12 +48,17 @@ export function toRfNode(
     onMoveRight?: ((() => void) | undefined);
   }
 ): KrnlRFNode {
+  // Decision 22.2 Fix 5 — add a CSS class keyed on node.kind so the todo-family
+  // selection ring can be scoped in reactflow-theme.css without inline style overrides.
+  // node.kind may contain "." (e.g. "todo.task") — replace with "--" for a valid class name.
+  const kindClass = `krnl-kind-${node.kind.replace('.', '--')}`;
   return {
     id: node.id,
     type: node.kind,
     position: node.position,
     draggable: !node.isMother,
     selectable: true,
+    className: kindClass,
     data: {
       node,
       onCommand: ctx.onCommand,
@@ -79,10 +84,10 @@ export function toRfEdge(
     source: edge.from.nodeId,
     target: edge.to.nodeId,
     type: isTaskFlow ? 'task-flow' : 'default',
-    // The dasharray "march" via CSS keyframe escaped the node bezels and
-    // looked noisy under the cyan glow filter. Keep dashed cyan styling but
-    // freeze the animation.
-    animated: false,
+    // Decision 22.2 Fix 6 — re-enable the dash march for task-flow edges.
+    // The keyframe in reactflow-theme.css is period-matched (22 units) so the
+    // loop is seamless. Default-typed edges remain static.
+    animated: isTaskFlow,
     data: { edge },
   };
 }

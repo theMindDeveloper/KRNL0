@@ -95,16 +95,32 @@ import {
 // ── dispatch ──────────────────────────────────────────────────────────
 
 /**
- * Decision 22 — extract minutes from free-form task text using the pattern
- * `, time: <N>` (case-insensitive, optional unit suffix). Returns null when
- * the pattern doesn't match.
+ * Decision 22 / 22.2 — extract minutes from free-form task text.
+ *
+ * Priority:
+ *   1. Trailing suffix: "25m", "25 min", "25 minutes" (whitespace-anchored, end-of-string).
+ *      When matched, the suffix is stripped from the returned strippedText so the
+ *      saved item text is clean (e.g. "groceries 25m" → "groceries").
+ *   2. Legacy inline pattern: ", time: 25" — kept for back-compat (Decision 22 §6).
+ *      strippedText is the original text (no stripping for legacy form).
+ *   3. Neither matches → plannedMin: null, strippedText unchanged.
  */
-function parseMinutesFromText(text: string): number | null {
-  const match = /,\s*time:\s*(\d+)\s*(?:min|m|minutes?)?/i.exec(text);
-  if (!match || !match[1]) return null;
-  const n = Number.parseInt(match[1], 10);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return n;
+export function parseMinutesFromText(text: string): { plannedMin: number | null; strippedText: string } {
+  // 1. Trailing suffix: " 25m" / "25 min" / "25 minutes"
+  const trailing = /\s+(\d+)\s*(?:min|minutes?|m)\s*$/i.exec(text);
+  if (trailing && trailing[1]) {
+    const n = Number.parseInt(trailing[1], 10);
+    if (Number.isFinite(n) && n > 0) {
+      return { plannedMin: n, strippedText: text.slice(0, trailing.index).trimEnd() };
+    }
+  }
+  // 2. Legacy: ", time: 25"
+  const legacy = /,\s*time:\s*(\d+)\s*(?:min|m|minutes?)?/i.exec(text);
+  if (legacy && legacy[1]) {
+    const n = Number.parseInt(legacy[1], 10);
+    if (Number.isFinite(n) && n > 0) return { plannedMin: n, strippedText: text };
+  }
+  return { plannedMin: null, strippedText: text };
 }
 
 type Args = Record<string, unknown>;
@@ -457,6 +473,57 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
+    // ── task.stopPomo: cancel the active session for this task (Decision 22.2 Fix 1) ──
+    // Mirrors the cancel-commit cascade in task.toggle (lines below) and task.delete.
+    // loadTaskIntoPomo sets startedAt = now - checkpointMs, so the history record
+    // produced by pomoCancel already encodes the full elapsed time. Do NOT call
+    // checkpointActiveTaskElapsed() first — that would double-count the checkpoint.
+    if (command === 'task.stopPomo') {
+      const freshBoard = useBoardStore.getState().board;
+      if (!freshBoard) return;
+      const pomoNode = freshBoard.nodes.find((n) => n.kind === 'pomo');
+      if (!pomoNode) return;
+      const ps = pomoNode.state as PomoState;
+      // No-op if this task is not the active one.
+      if (ps.activeTaskId !== nodeId) return;
+      if (ps.status !== 'running' && ps.status !== 'paused') {
+        // Idle/done/break — just clear the active slot so UI stays consistent.
+        updateNode(pomoNode.id, { state: pomoClearActiveTask(ps) });
+        const saved = useBoardStore.getState().board;
+        if (saved) void window.krnl?.boardSave(saved);
+        return;
+      }
+      // Cancel the FSM — history record captures startedAt … now.
+      const cancelledState = pomoClearActiveTask(pomoCancel(ps));
+      updateNode(pomoNode.id, { state: cancelledState });
+
+      // Commit the elapsed seconds from the history record into secondsAccumulated.
+      const newest = cancelledState.history[cancelledState.history.length - 1];
+      if (newest) {
+        const elapsedSec = Math.max(
+          0,
+          Math.floor((Date.parse(newest.endedAt) - Date.parse(newest.startedAt)) / 1000),
+        );
+        const taskNode = useBoardStore
+          .getState()
+          .board?.nodes.find((n) => n.id === nodeId);
+        if (taskNode && taskNode.kind === 'todo.task') {
+          const ts = taskNode.state as TaskState;
+          updateNode(nodeId, {
+            state: {
+              ...ts,
+              secondsAccumulated: (ts.secondsAccumulated ?? 0) + elapsedSec,
+              currentSessionElapsedSec: 0,
+            },
+          });
+        }
+      }
+
+      const saved = useBoardStore.getState().board;
+      if (saved) void window.krnl?.boardSave(saved);
+      return;
+    }
+
     // ── todo.startPomoForItem: resolve itemId → taskNodeId → auto-start ───
     if (command === 'todo.startPomoForItem') {
       const todoState = node.state as TodoState;
@@ -468,7 +535,10 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
-    // ── task.delete: cascade-delete task + descendants + linked TodoItem ────
+    // ── task.delete: cascade-delete task + descendants + linked TodoItems ───
+    // Decision 22.2: cascade now removes per-descendant TodoItems (subtasks are
+    // tracked in the TodoList as of Decision 22.2, so every descendant may have
+    // a linked TodoItem that must be unlinked before the nodes are removed).
     if (command === 'task.delete') {
       const taskState = node.state as TaskState;
       const descendants = collectDescendants(nodeId, board.nodes);
@@ -488,19 +558,36 @@ export function makeCommandHandler(nodeId: string) {
         }
       }
 
-      removeNodeSet(descendants);
-      // Remove linked TodoItem
-      if (taskState.todoItemId !== null) {
-        const todoNode = useBoardStore
-          .getState()
-          .board?.nodes.find((n) => n.id === taskState.parentTodoId);
-        if (todoNode) {
-          const newTodoState = todoRemove(todoNode.state as TodoState, {
-            id: taskState.todoItemId,
-          });
+      // Collect {parentTodoId → itemIds[]} from ALL descendants (root included)
+      // that have a linked TodoItem. One updateNode per parent TodoNode.
+      const todoItemsByParent = new Map<string, string[]>();
+      for (const descId of descendants) {
+        const descNode = board.nodes.find((n) => n.id === descId);
+        if (!descNode || descNode.kind !== 'todo.task') continue;
+        const ts = descNode.state as TaskState;
+        if (ts.todoItemId === null) continue;
+        const existing = todoItemsByParent.get(ts.parentTodoId);
+        if (existing) {
+          existing.push(ts.todoItemId);
+        } else {
+          todoItemsByParent.set(ts.parentTodoId, [ts.todoItemId]);
+        }
+      }
+      const currentBoard = useBoardStore.getState().board;
+      if (currentBoard) {
+        for (const [parentTodoId, itemIds] of todoItemsByParent) {
+          const todoNode = currentBoard.nodes.find((n) => n.id === parentTodoId);
+          if (!todoNode) continue;
+          // Reduce all item removals in a single pass so we emit one updateNode.
+          let newTodoState = todoNode.state as TodoState;
+          for (const itemId of itemIds) {
+            newTodoState = todoRemove(newTodoState, { id: itemId });
+          }
           updateNode(todoNode.id, { state: newTodoState });
         }
       }
+
+      removeNodeSet(descendants);
       renumberSiblings(taskState.parentTodoId, taskState.parentTaskId);
       const final = useBoardStore.getState().board;
       if (final) void window.krnl?.boardSave(final);
@@ -508,6 +595,8 @@ export function makeCommandHandler(nodeId: string) {
     }
 
     // ── task.addSubtask: spawn a child TaskNode one layer deeper ────────────
+    // Decision 22.2 Fix 4: backfills a TodoItem on the parent TodoNode so the
+    // subtask is visible in the todo list (bidirectional linkage invariant).
     if (command === 'task.addSubtask') {
       const parentTask = node.state as TaskState;
       const text = (args['text'] as string | undefined) ?? '';
@@ -524,6 +613,27 @@ export function makeCommandHandler(nodeId: string) {
       });
       const seq = siblings.length + 1;
 
+      const childNodeId = `task-${crypto.randomUUID()}`;
+
+      // Step 1: resolve the parent TodoNode and append a new TodoItem.
+      const todoNode = freshBoard.nodes.find((n) => n.id === parentTask.parentTodoId);
+      const prevTodoState = todoNode ? (todoNode.state as TodoState) : null;
+      let newTodoState: TodoState | null = null;
+      let itemId: string = '';
+      if (prevTodoState) {
+        newTodoState = todoAdd(prevTodoState, { text: text.trim() });
+        // The new item is always the last one.
+        const newItem = newTodoState.items[newTodoState.items.length - 1];
+        if (newItem) {
+          itemId = newItem.id;
+          // Step 5: set taskNodeId on the item (bidirectional link).
+          newTodoState = todoLinkTask(newTodoState, { itemId, taskNodeId: childNodeId });
+        }
+        if (todoNode) {
+          updateNode(todoNode.id, { state: newTodoState });
+        }
+      }
+
       const childState: TaskState = {
         text: text.trim(),
         done: false,
@@ -534,7 +644,7 @@ export function makeCommandHandler(nodeId: string) {
         createdAt: new Date().toISOString(),
         parentTodoId: parentTask.parentTodoId,
         parentTaskId: nodeId,
-        todoItemId: null,
+        todoItemId: itemId !== '' ? itemId : null,
         pomoSessionsCompleted: 0,
         plannedMin: parentTask.plannedMin ?? parentTask.durationMin,
         secondsAccumulated: 0,
@@ -542,7 +652,7 @@ export function makeCommandHandler(nodeId: string) {
       };
 
       const childNode: Node = {
-        id: `task-${crypto.randomUUID()}`,
+        id: childNodeId,
         kind: 'todo.task',
         position: {
           x: node.position.x + (seq - 1) * 252,
@@ -646,7 +756,25 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
-    const result = applyCommand(node, command, args);
+    // ── todo.add pre-processing: strip trailing-suffix minutes from the text
+    //    before todoAdd runs, so the stored TodoItem.text is already clean.
+    //    Decision 22.2 Fix 3: dispatcher is the single source of truth for parsing.
+    let effectiveArgs = args;
+    if (node.kind === 'todo' && command === 'todo.add') {
+      const rawText = (args['text'] as string | undefined) ?? '';
+      const { plannedMin: parsedMin, strippedText } = parseMinutesFromText(rawText);
+      if (strippedText !== rawText || parsedMin !== null) {
+        // Rebuild args with stripped text and (if no explicit plannedMin) parsed minutes.
+        const hasExplicitPlanned = typeof args['plannedMin'] === 'number' && Number.isFinite(args['plannedMin'] as number);
+        effectiveArgs = {
+          ...args,
+          text: strippedText,
+          ...(parsedMin !== null && !hasExplicitPlanned ? { plannedMin: parsedMin } : {}),
+        };
+      }
+    }
+
+    const result = applyCommand(node, command, effectiveArgs);
     if (result === null) return;
 
     // ── todo.add: spawn a child task node + bidirectional link ────────────
@@ -682,19 +810,20 @@ export function makeCommandHandler(nodeId: string) {
           : { x: todoNode.position.x + (n - 1) * 252, y: todoNode.position.y + 420 };
 
       const addedItem = nextState.items[nextState.items.length - 1];
-      const text = addedItem?.text ?? (args['text'] as string | undefined) ?? '';
-      const tag = addedItem?.tag ?? (args['tag'] as string | undefined);
+      // Use stripped text from the item (todoAdd already received the stripped text).
+      const text = addedItem?.text ?? (effectiveArgs['text'] as string | undefined) ?? '';
+      const tag = addedItem?.tag ?? (effectiveArgs['tag'] as string | undefined);
       const itemId = addedItem?.id ?? '';
 
-      // Decision 22 — read the pomo mother's config to seed per-session minutes,
-      // and pick up `plannedMin` from args (structured input) or text-parse fallback.
+      // Decision 22 / 22.2 — read the pomo mother's config to seed per-session minutes.
+      // Argument precedence: explicit args.plannedMin > trailing/legacy suffix parse > sessionMin.
       const pomoMother = fresh.nodes.find((nd) => nd.kind === 'pomo');
       const cfg = (pomoMother?.config as PomoConfig | null) ?? defaultPomoConfig();
       const sessionMin = cfg.sessionMin;
-      const argPlanned = args['plannedMin'];
+      const argPlanned = effectiveArgs['plannedMin'];
       const parsedPlanned = typeof argPlanned === 'number' && Number.isFinite(argPlanned)
-        ? Math.max(1, Math.round(argPlanned))
-        : parseMinutesFromText(text) ?? sessionMin;
+        ? Math.max(1, Math.round(argPlanned as number))
+        : sessionMin;
 
       const durationMin = sessionMin;
       const taskState: TaskState = {

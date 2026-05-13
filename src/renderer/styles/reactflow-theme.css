@@ -52,6 +52,21 @@
   box-shadow: var(--shadow-glow);
 }
 
+/* ── Todo-family: rounded blue ring overrides the global acid ring ───────── */
+/* Decision 22.2 Fix 5 — TodoNode mother and TaskNode children get a cyan
+   rounded selection ring that matches the card shape. All other families
+   (Pomo, Habit, AI, Terminal, Text, Image) keep the default acid-green ring. */
+.react-flow__node.selected.krnl-kind-todo,
+.react-flow__node.selected.krnl-kind-todo--task {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78, 168, 176, 0.35);
+  border-radius: var(--radius-lg);
+}
+.react-flow__node.selected.krnl-kind-todo > div,
+.react-flow__node.selected.krnl-kind-todo--task > div {
+  outline: none;
+}
+
 /* ── MiniMap ─────────────────────────────────────────────────────────────── */
 .react-flow__minimap {
   width: 160px;
