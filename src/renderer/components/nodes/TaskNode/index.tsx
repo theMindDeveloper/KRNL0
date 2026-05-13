@@ -22,6 +22,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
+  // ── ETA / duration inline edit ─────────────────────────────────────────────
+  const [isEditingDuration, setIsEditingDuration] = useState(false);
+  const [durationEditValue, setDurationEditValue] = useState('');
+
   const startEdit = () => {
     setEditValue(state.text);
     setIsEditing(true);
@@ -46,6 +50,35 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     } else if (e.key === 'Escape') {
       e.stopPropagation();
       cancelEdit();
+    }
+  };
+
+  // ── ETA / duration edit handlers ───────────────────────────────────────────
+  const startDurationEdit = () => {
+    if (state.pomoStartedAt !== null) return; // blocked while pomo running
+    setDurationEditValue(String(state.durationMin));
+    setIsEditingDuration(true);
+  };
+
+  const commitDurationEdit = () => {
+    const parsed = parseInt(durationEditValue, 10);
+    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
+      onCommand('task.setDuration', { durationMin: parsed });
+    }
+    setIsEditingDuration(false);
+  };
+
+  const cancelDurationEdit = () => {
+    setIsEditingDuration(false);
+  };
+
+  const handleDurationEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      commitDurationEdit();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      cancelDurationEdit();
     }
   };
 
@@ -288,7 +321,47 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           }}
         >
           <span className="task-tag">{tag}</span>
-          <span className="task-eta">{eta}</span>
+          {isEditingDuration ? (
+            <input
+              type="number"
+              min={1}
+              max={480}
+              value={durationEditValue}
+              autoFocus
+              onChange={(e) => setDurationEditValue(e.target.value)}
+              onKeyDown={handleDurationEditKeyDown}
+              onBlur={commitDurationEdit}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                width: 52,
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid var(--ink-3)',
+                outline: 'none',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                color: 'var(--ink)',
+                caretColor: 'var(--acid)',
+                textAlign: 'right',
+                padding: '0 2px',
+              }}
+            />
+          ) : (
+            <span
+              className="task-eta"
+              onClick={(e) => {
+                e.stopPropagation();
+                startDurationEdit();
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                cursor: state.pomoStartedAt !== null || state.done ? 'default' : 'pointer',
+              }}
+            >
+              {eta}
+            </span>
+          )}
         </div>
 
         {/* Add-subtask inline input */}

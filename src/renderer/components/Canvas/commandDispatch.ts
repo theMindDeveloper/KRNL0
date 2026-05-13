@@ -517,7 +517,7 @@ export function makeCommandHandler(nodeId: string) {
       const tag = addedItem?.tag ?? (args['tag'] as string | undefined);
       const itemId = addedItem?.id ?? '';
 
-      const durationMin = 20;
+      const durationMin = (args['durationMin'] as number | undefined) ?? 20;
       const taskState: TaskState = {
         text,
         done: false,
