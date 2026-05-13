@@ -30,7 +30,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
-import { makeCommandHandler } from './commandDispatch';
+import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { ContextMenu } from '../ContextMenu';
 import { ingestImageFile, initialDisplaySize } from './dropImage';
@@ -305,11 +305,16 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   const deleteFromCtxMenu = useCallback(() => {
     if (!ctxMenu) return;
-    // Delete every node in the batch. removeNode is a no-op on mothers so the
-    // filter in onNodeContextMenu is belt-and-suspenders; both are kept.
+    const taskIds: string[] = [];
+    const otherIds: string[] = [];
+    const currentBoard = useBoardStore.getState().board;
     for (const id of ctxMenu.nodeIds) {
-      removeNode(id);
+      const node = currentBoard?.nodes.find((n) => n.id === id);
+      if (node?.kind === 'todo.task') taskIds.push(id);
+      else otherIds.push(id);
     }
+    if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
+    for (const id of otherIds) removeNode(id);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
     closeCtxMenu();
