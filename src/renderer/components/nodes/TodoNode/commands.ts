@@ -16,9 +16,10 @@ const defaultEnv: TodoEnv = {
 
 // todo.add — append a new item; trims text; no-op on empty.
 // Optional `tag` arg is a short label (e.g. "WORK") stored on the item.
+// Optional `durationMin` arg is forwarded to commandDispatch for TaskNode creation.
 export const todoAdd = (
   state: TodoState,
-  args: { text: string; tag?: string },
+  args: { text: string; tag?: string; durationMin?: number },
   env: TodoEnv = defaultEnv,
 ): TodoState => {
   const trimmed = args.text.trim();

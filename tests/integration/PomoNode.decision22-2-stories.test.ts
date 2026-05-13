@@ -398,14 +398,13 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
 // ── Story 2 — "Clicking on a task node should directly show its pomodoro on the parent
 //              pomodoro node (no auto start timer)." ──────────────────────────
 
-describe('Story 2 — Body click loads task into pomo (no auto-start) (Decision 22.2 Fix 2)', () => {
+describe('Story 2 — Body double-click loads task into pomo (no auto-start) (Decision 22.2 Fix 2)', () => {
 
-  it('T2.1: body click on a TaskNode dispatches task.loadIntoPomo (NOT task.startPomo)', () => {
+  it('T2.1: body double-click on a TaskNode dispatches task.loadIntoPomo (NOT task.startPomo)', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
-    fireEvent.mouseDown(root, { clientX: 10, clientY: 10 });
-    fireEvent.click(root, { clientX: 10, clientY: 10 });
+    fireEvent.doubleClick(root);
     expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
     expect(onCommand).not.toHaveBeenCalledWith('task.startPomo');
     expect(onCommand).not.toHaveBeenCalledWith('task.spawnPomo');
@@ -741,10 +740,13 @@ describe('Story 5 — Todo-family theming (Decision 22.2 Fix 5)', () => {
     expect(bullet!.style.color).not.toBe('var(--rust)');
   });
 
-  it('T5.5: TodoNode MotherFrame receives borderColor="var(--cyan-glow)"', () => {
-    // MotherFrame renders as a wrapper div; we check the rendered border-color inline
-    // style or find the outer wrapper. The MotherFrame applies borderColor to the
-    // outer rounded border.
+  it('T5.5: TodoNode MotherFrame uses the default border color (no always-on cyan)', () => {
+    // Previously TodoNode forced borderColor="var(--cyan-glow)" on its
+    // MotherFrame, which painted a visible cyan border at all times. The user
+    // wanted the cyan to indicate selection only (matching other mothers), so
+    // TodoNode now omits borderColor and inherits the default var(--paper-3).
+    // The cyan ring shows up via .react-flow__node.selected.krnl-kind-todo > div
+    // in reactflow-theme.css when the node is selected.
     const node: Node<TodoState> = {
       id: 'todo-1',
       kind: 'todo',
@@ -761,10 +763,8 @@ describe('Story 5 — Todo-family theming (Decision 22.2 Fix 5)', () => {
         onSelect: vi.fn(),
       }),
     );
-    // MotherFrame renders with borderColor as the border of the outer wrapper.
-    // Find the top-level element that has the cyan-glow border.
-    const allElements = document.querySelectorAll('[style*="cyan-glow"]');
-    expect(allElements.length).toBeGreaterThan(0);
+    const cyanBordered = document.querySelectorAll('[style*="cyan-glow"]');
+    expect(cyanBordered.length).toBe(0);
   });
 
 });

@@ -66,15 +66,16 @@ function renderTaskNode(
   );
 }
 
-// ── B1 — Body click dispatches task.loadIntoPomo ──────────────────────────────
+// ── B1 — Body double-click dispatches task.loadIntoPomo ──────────────────────
+// Single click is reserved for RF selection (so users can move / marquee /
+// connect freely). Pomo refresh is gated behind an explicit double-click.
 
-describe('B1 — Body click dispatches task.loadIntoPomo', () => {
-  it('clicking the root body fires task.loadIntoPomo when not done', () => {
+describe('B1 — Body double-click dispatches task.loadIntoPomo', () => {
+  it('double-clicking the root body fires task.loadIntoPomo when not done', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
-    fireEvent.mouseDown(root, { clientX: 10, clientY: 10 });
-    fireEvent.click(root, { clientX: 10, clientY: 10 });
+    fireEvent.doubleClick(root);
     expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
@@ -82,17 +83,15 @@ describe('B1 — Body click dispatches task.loadIntoPomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: true }), onCommand);
     const root = screen.getByTestId('task-node-root');
-    fireEvent.mouseDown(root, { clientX: 10, clientY: 10 });
-    fireEvent.click(root, { clientX: 10, clientY: 10 });
+    fireEvent.doubleClick(root);
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
-  it('does NOT fire task.loadIntoPomo when drag distance > 4px', () => {
+  it('single click does NOT fire task.loadIntoPomo (selection only)', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
-    fireEvent.mouseDown(root, { clientX: 0, clientY: 0 });
-    fireEvent.click(root, { clientX: 10, clientY: 0 });
+    fireEvent.click(root);
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 

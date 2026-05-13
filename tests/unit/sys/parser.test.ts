@@ -104,6 +104,21 @@ describe('SysParser', () => {
         kind: 'task', sub: 'subtask', parentId: 'task-id-1', text: 'sub item text',
       });
     });
+    it('parses task duration', () => {
+      expect(SysParser.parse(['task', 'duration', 'task-id-1', '45'])).toEqual({
+        kind: 'task', sub: 'duration', id: 'task-id-1', minutes: 45,
+      });
+    });
+    it('parses task sibling', () => {
+      expect(SysParser.parse(['task', 'sibling', 'task-id-1'])).toEqual({
+        kind: 'task', sub: 'sibling', id: 'task-id-1',
+      });
+    });
+    it('parses task reset-pomo', () => {
+      expect(SysParser.parse(['task', 'reset-pomo', 'task-id-1'])).toEqual({
+        kind: 'task', sub: 'reset-pomo', id: 'task-id-1',
+      });
+    });
   });
 
   describe('habit commands', () => {

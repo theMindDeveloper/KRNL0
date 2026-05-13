@@ -19,9 +19,11 @@ import {
   applyNodeChanges,
   type NodeChange,
   type EdgeChange,
+  type Edge as RFEdge,
   type Viewport,
   type EdgeProps,
   type OnSelectionChangeParams,
+  SelectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
@@ -30,6 +32,7 @@ import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
 import { makeCommandHandler } from './commandDispatch';
 import { Dock } from '../Dock';
+import { ContextMenu } from '../ContextMenu';
 import { ingestImageFile, initialDisplaySize } from './dropImage';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
@@ -229,43 +232,63 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getNodes } = useReactFlow();
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
 
   const addEdge = useBoardStore((s) => s.addEdge);
   const removeNode = useBoardStore((s) => s.removeNode);
+  const removeEdge = useBoardStore((s) => s.removeEdge);
 
   // Right-click context menu state. Pinned to the screen position of the
   // event; cleared on outside click / Escape / window blur. Only opened for
   // non-mother nodes — mothers handle right-click internally (HabitNode per
   // habit-row menu, TodoNode per-row menu, etc.).
+  // nodeIds holds the full batch when the right-click target is part of a
+  // multi-selection (marquee). For single-node right-click it's just `[id]`.
   const [ctxMenu, setCtxMenu] = useState<
-    { x: number; y: number; nodeId: string; isMother: false } | null
+    { x: number; y: number; nodeIds: string[] } | null
   >(null);
+
+  const [edgeCtxMenu, setEdgeCtxMenu] = useState<{
+    x: number;
+    y: number;
+    edgeId: string;
+  } | null>(null);
 
   const onNodeContextMenu = useCallback(
     (event: React.MouseEvent, rfNode: KrnlRFNode) => {
       event.preventDefault();
       const inner = rfNode.data.node;
-      // Mother nodes (pomo / todo / habit / term) own their own right-click
-      // UX. The canvas-level delete menu is meaningless on them (mothers are
-      // pinned) and previously showed when right-clicking empty mother-body
-      // areas (header, padding) where no inner handler ran — visually
-      // suppressing the per-row menu. Skip entirely.
+      // Mother nodes own their own right-click UX. Mothers are pinned, so a
+      // canvas-level delete is meaningless on them and would visually suppress
+      // the per-row menus (HabitNode rows, TodoNode rows, etc.).
       if (inner.isMother) return;
-      setCtxMenu({
-        x: event.clientX,
-        y: event.clientY,
-        nodeId: inner.id,
-        isMother: false,
-      });
+
+      // Batch mode: if the right-clicked node is part of a multi-selection,
+      // operate on the whole selection. Otherwise just on the clicked node.
+      // Mothers are excluded from the batch (they're undeletable).
+      const selectedIds = (getNodes() as KrnlRFNode[])
+        .filter((n) => n.selected && !n.data.node.isMother)
+        .map((n) => n.id);
+      const nodeIds =
+        selectedIds.length > 1 && selectedIds.includes(inner.id)
+          ? selectedIds
+          : [inner.id];
+
+      setCtxMenu({ x: event.clientX, y: event.clientY, nodeIds });
     },
-    [],
+    [getNodes],
   );
 
   const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  const handleEdgeContextMenu = useCallback((e: React.MouseEvent, edge: RFEdge) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEdgeCtxMenu({ x: e.clientX, y: e.clientY, edgeId: edge.id });
+  }, []);
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -282,11 +305,41 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   const deleteFromCtxMenu = useCallback(() => {
     if (!ctxMenu) return;
-    removeNode(ctxMenu.nodeId);
+    // Delete every node in the batch. removeNode is a no-op on mothers so the
+    // filter in onNodeContextMenu is belt-and-suspenders; both are kept.
+    for (const id of ctxMenu.nodeIds) {
+      removeNode(id);
+    }
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
+
+  // Global undo/redo: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z = redo.
+  // Skipped when focus is on an editable surface so it doesn't fight inputs.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        useBoardStore.getState().undo();
+        const updated = useBoardStore.getState().board;
+        if (updated) void window.krnl?.boardSave(updated);
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        useBoardStore.getState().redo();
+        const updated = useBoardStore.getState().board;
+        if (updated) void window.krnl?.boardSave(updated);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Hidden file input used when the dock's "image" button is clicked — opens
   // the OS file picker and spawns a fully-formed ImageNode (with assetId)
@@ -390,12 +443,40 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const onConnect = useCallback((conn: Connection) => {
     if (!conn.source || !conn.target) return;
     if (conn.source === conn.target) return;
-    const edge: KrnlEdge = {
-      id: `edge-${crypto.randomUUID()}`,
-      from: { nodeId: conn.source, event: 'link' },
-      to: { nodeId: conn.target, command: 'link' },
-      enabled: true,
-    };
+
+    const board = useBoardStore.getState().board;
+    const nodes = board?.nodes ?? [];
+    const existingEdges = board?.edges ?? [];
+    const sourceNode = nodes.find((n) => n.id === conn.source);
+    const targetNode = nodes.find((n) => n.id === conn.target);
+    const bothTasks = sourceNode?.kind === 'todo.task' && targetNode?.kind === 'todo.task';
+    const event = bothTasks ? 'task.next' : 'link';
+
+    // Dedup: refuse to add a second edge with the same (source, target, event).
+    // Drag-to-connect is easy to fire twice; the canvas should not accumulate
+    // duplicates that visually overlap and break the chain index counters.
+    const duplicate = existingEdges.some(
+      (e) =>
+        e.from.nodeId === conn.source &&
+        e.to.nodeId === conn.target &&
+        e.from.event === event,
+    );
+    if (duplicate) return;
+
+    const edge: KrnlEdge = bothTasks
+      ? {
+          id: `edge-${crypto.randomUUID()}`,
+          from: { nodeId: conn.source, event: 'task.next' },
+          to: { nodeId: conn.target, command: 'task.activate' },
+          enabled: true,
+        }
+      : {
+          id: `edge-${crypto.randomUUID()}`,
+          from: { nodeId: conn.source, event: 'link' },
+          to: { nodeId: conn.target, command: 'link' },
+          enabled: true,
+        };
+
     addEdge(edge);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
@@ -545,15 +626,16 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
               if (updated) void window.krnl?.boardSave(updated);
             }
           }
-        } else if (change.type === 'select' && change.selected) {
-          selectNode(change.id);
         }
+        // 'select' changes are handled by onSelectionChange below — calling
+        // selectNode per-change here would clobber multi-selection (last
+        // selected id wins, others lost from the store's point of view).
         // 'dimensions' — absorbed by applyNodeChanges above; this is what
         // resolves RF error #015 ("trying to drag a node that is not
         // initialized"). Without it RF takes a slow non-measured drag path.
       }
     },
-    [updateNode, selectNode]
+    [updateNode]
   );
 
   // ── onEdgesChange — ignored for v1 (no edge create/delete UX) ────────────
@@ -571,10 +653,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     [setViewport]
   );
 
-  // ── onSelectionChange — mirror first selected node to store ──────────────
+  // ── onSelectionChange — mirror to store only when a single node is picked.
+  // For marquee multi-select we leave the store's selectedNodeId as null so
+  // single-node-aware features (StatusBar, sys CLI) don't get a confusing
+  // "active" id while RF is showing many nodes selected.
   const onSelectionChange = useCallback(
     ({ nodes }: OnSelectionChangeParams) => {
-      selectNode(nodes[0]?.id ?? null);
+      selectNode(nodes.length === 1 ? nodes[0]!.id : null);
     },
     [selectNode]
   );
@@ -590,6 +675,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onNodeContextMenu={onNodeContextMenu}
+      onEdgeContextMenu={handleEdgeContextMenu}
       onPaneClick={closeCtxMenu}
       onPaneContextMenu={closeCtxMenu}
       onDrop={onDrop}
@@ -597,6 +683,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onMoveEnd={onMoveEnd}
       onSelectionChange={onSelectionChange}
       deleteKeyCode={null}
+      // Marquee selection on left-drag (empty canvas); pan with middle/right-drag.
+      // Right-click on a node/edge still fires onNodeContextMenu / onEdgeContextMenu
+      // because that's a press-release event, not a drag.
+      selectionOnDrag
+      selectionMode={SelectionMode.Partial}
+      panOnDrag={[1, 2]}
+      multiSelectionKeyCode={['Control', 'Meta', 'Shift']}
       fitView={false}
       minZoom={0.25}
       maxZoom={4}
@@ -634,6 +727,23 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         style={{ display: 'none' }}
         data-testid="canvas-image-file-input"
       />
+
+      {edgeCtxMenu !== null && (
+        <ContextMenu
+          x={edgeCtxMenu.x}
+          y={edgeCtxMenu.y}
+          items={[{
+            label: 'Disconnect',
+            danger: true,
+            onSelect: () => {
+              removeEdge(edgeCtxMenu.edgeId);
+              const updated = useBoardStore.getState().board;
+              if (updated) void window.krnl?.boardSave(updated);
+            },
+          }]}
+          onDismiss={() => setEdgeCtxMenu(null)}
+        />
+      )}
 
       {ctxMenu && (
         <div
@@ -682,7 +792,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
               e.currentTarget.style.background = 'transparent';
             }}
           >
-            delete
+            {ctxMenu.nodeIds.length > 1 ? `delete (${ctxMenu.nodeIds.length})` : 'delete'}
           </button>
         </div>
       )}

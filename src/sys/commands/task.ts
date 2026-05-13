@@ -424,6 +424,185 @@ export async function taskSubtask(
   };
 }
 
+export async function taskDuration(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+  minutes: number | undefined,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task duration requires a <taskId>' };
+  if (minutes === undefined || isNaN(minutes) || minutes <= 0) {
+    return { ok: false, message: 'task duration requires a positive <minutes> number' };
+  }
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, taskId);
+  if (!taskNode) return { ok: false, message: `No task node with id "${taskId}"` };
+
+  // Guard: if the pomo mother is actively running, refuse to change duration.
+  const pomoMother = findPomoMother(board);
+  if (pomoMother) {
+    const ps = pomoMother.state as import('../../renderer/components/nodes/PomoNode/types').PomoState;
+    if (ps.status === 'running' && ps.startedAt !== null) {
+      return {
+        ok: false,
+        message: 'Cannot change duration while a pomo session is running. Stop the pomo first.',
+      };
+    }
+  }
+
+  const ts = taskNode.state as TaskState;
+  const nextState: TaskState = {
+    ...ts,
+    durationMin: minutes,
+    eta: `~${minutes} min`,
+  };
+  updateNode(board, taskId, { ...taskNode, state: nextState });
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Task "${taskId.slice(0, 8)}" duration set to ${minutes} min.`,
+    data: { id: taskId, durationMin: minutes },
+  };
+}
+
+export async function taskSibling(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task sibling requires a <taskId>' };
+  const board = loadBoard(ctx);
+  const sourceNode = findTaskNode(board, taskId);
+  if (!sourceNode) return { ok: false, message: `No task node with id "${taskId}"` };
+
+  const sourceTs = sourceNode.state as TaskState;
+
+  const now = new Date().toISOString();
+  const newItemId = randomUUID();
+  const newNodeId = `task-${randomUUID()}`;
+  const plannedMin = sourceTs.plannedMin ?? sourceTs.durationMin;
+
+  const newTaskState: TaskState = {
+    text: 'New task',
+    done: false,
+    durationMin: sourceTs.durationMin,
+    eta: `~${plannedMin} min`,
+    sequenceNumber: sourceTs.sequenceNumber + 1,
+    layer: sourceTs.layer,
+    createdAt: now,
+    parentTodoId: sourceTs.parentTodoId,
+    parentTaskId: sourceTs.parentTaskId,
+    todoItemId: newItemId,
+    pomoSessionsCompleted: 0,
+    plannedMin,
+    secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
+  };
+
+  const newNode: AnyNode = {
+    id: newNodeId,
+    kind: 'todo.task',
+    isMother: false,
+    // Parallel fork: position below source, not beside it
+    position: {
+      x: sourceNode.position?.x ?? 0,
+      y: (sourceNode.position?.y ?? 0) + 240,
+    },
+    state: newTaskState,
+    config: { showDuration: true },
+  };
+
+  // Bug 2: Walk downstream chain from taskId at the same layer,
+  // collecting all reachable targets. Add fork edges from newNode to each.
+  // Do NOT remove any existing edges (purely additive parallel fork).
+  type RawEdge = {
+    id: string;
+    from: { nodeId: string; event: string };
+    to: { nodeId: string; command: string };
+    enabled: boolean;
+  };
+  const edgesArr = board.edges as RawEdge[];
+  const downstreamTargets: string[] = [];
+  const visited = new Set<string>();
+  let current: string | undefined = taskId;
+  const cap = board.nodes.length + 1;
+  let steps = 0;
+  while (current !== undefined && steps < cap) {
+    steps++;
+    const nextEdge = edgesArr.find(
+      (e) => e.from.nodeId === current && e.from.event === 'task.next',
+    );
+    if (!nextEdge) break;
+    const nextId = nextEdge.to.nodeId;
+    if (visited.has(nextId)) break; // cycle guard
+    const nextNode = findTaskNode(board, nextId);
+    if (!nextNode) break;
+    const nextTs = nextNode.state as TaskState;
+    if (nextTs.layer !== sourceTs.layer) break;
+    visited.add(nextId);
+    downstreamTargets.push(nextId);
+    current = nextId;
+  }
+
+  const forkEdges: RawEdge[] = downstreamTargets.map((targetId) => ({
+    id: `edge-${randomUUID()}`,
+    from: { nodeId: newNodeId, event: 'task.next' },
+    to: { nodeId: targetId, command: 'task.activate' },
+    enabled: true,
+  }));
+
+  // Bug 3: Append a new TodoItem to the parent TodoNode (bidirectional link).
+  const todoNode = (board.nodes as AnyNode[]).find(
+    (n) => n.id === sourceTs.parentTodoId && n.kind === 'todo',
+  );
+  if (todoNode) {
+    const todoState = todoNode.state as TodoState;
+    const newItem = {
+      id: newItemId,
+      text: 'New task',
+      done: false,
+      createdAt: now,
+      completedAt: null as string | null,
+      taskNodeId: newNodeId,
+    };
+    todoNode.state = { ...todoState, items: [...todoState.items, newItem] };
+  }
+
+  board.nodes = [...board.nodes, newNode];
+  board.edges = [...edgesArr, ...forkEdges];
+
+  // Renumber siblings (same parentTodoId + parentTaskId) by createdAt
+  renumberSiblings(board, sourceTs.parentTodoId, sourceTs.parentTaskId);
+
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Sibling task inserted after "${taskId.slice(0, 8)}…" (id: ${newNodeId.slice(0, 13)}…).`,
+    data: { id: newNodeId },
+  };
+}
+
+export async function taskResetPomo(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task reset-pomo requires a <taskId>' };
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, taskId);
+  if (!taskNode) return { ok: false, message: `No task node with id "${taskId}"` };
+
+  const ts = taskNode.state as TaskState;
+  const nextState: TaskState = {
+    ...ts,
+    pomoSessionsCompleted: 0,
+  };
+  updateNode(board, taskId, { ...taskNode, state: nextState });
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Pomo progress reset for task "${taskId.slice(0, 8)}".`,
+    data: { id: taskId, pomoSessionsCompleted: 0 },
+  };
+}
+
 export async function taskList(
   ctx: TaskCtx,
   todoId?: string,

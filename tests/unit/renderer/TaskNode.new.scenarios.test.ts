@@ -38,6 +38,9 @@ function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
     parentTaskId: null,
     todoItemId: 'item-1',
     pomoSessionsCompleted: 0,
+    plannedMin: 25,
+    secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
     ...overrides,
   };
 }
@@ -96,16 +99,14 @@ describe('F8 — TaskNode card opacity is 0.4 when done', () => {
   });
 });
 
-// ── F9 — Body click loads task into pomo (drag-safe) — Bug #2 fix ────────────
+// ── F9 — Body DOUBLE-click loads task into pomo (selection-decoupled) ─────────
 
-describe('F9 — Body click fires task.loadIntoPomo', () => {
-  it('clicking the root body fires task.loadIntoPomo when not done', () => {
+describe('F9 — Body double-click fires task.loadIntoPomo', () => {
+  it('double-clicking the root body fires task.loadIntoPomo when not done', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
-    // Simulate clean click (mousedown at same position as click)
-    fireEvent.mouseDown(root, { clientX: 10, clientY: 10 });
-    fireEvent.click(root, { clientX: 10, clientY: 10 });
+    fireEvent.doubleClick(root);
     expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
@@ -113,18 +114,15 @@ describe('F9 — Body click fires task.loadIntoPomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: true }), onCommand);
     const root = screen.getByTestId('task-node-root');
-    fireEvent.mouseDown(root, { clientX: 10, clientY: 10 });
-    fireEvent.click(root, { clientX: 10, clientY: 10 });
+    fireEvent.doubleClick(root);
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
-  it('does NOT fire task.loadIntoPomo when drag distance > 4px', () => {
+  it('single click does NOT fire task.loadIntoPomo (selection only)', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
-    // mousedown at (0,0), click at (10,0) → distance > 4px → drag
-    fireEvent.mouseDown(root, { clientX: 0, clientY: 0 });
-    fireEvent.click(root, { clientX: 10, clientY: 0 });
+    fireEvent.click(root);
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
@@ -132,10 +130,7 @@ describe('F9 — Body click fires task.loadIntoPomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const checkbox = document.querySelector('.task-check') as HTMLElement;
-    // Checkbox has stopPropagation on its onClick
-    fireEvent.mouseDown(checkbox, { clientX: 5, clientY: 5 });
-    fireEvent.click(checkbox, { clientX: 5, clientY: 5 });
-    // task.toggle should be called but not task.loadIntoPomo
+    fireEvent.click(checkbox);
     const calls = onCommand.mock.calls.map((c) => c[0]);
     expect(calls).toContain('task.toggle');
     expect(calls).not.toContain('task.loadIntoPomo');
@@ -273,21 +268,21 @@ describe('F11 — Inline edit', () => {
   });
 });
 
-// ── F12 — Add subtask ─────────────────────────────────────────────────────────
+// ── F12 — Add subtask (two-phase input) ──────────────────────────────────────
 
 describe('F12 — Add subtask inline input', () => {
-  it('clicking "Add subtask" shows a subtask input field', () => {
+  it('clicking "Add subtask" shows a subtask name input field', () => {
     renderTaskNode(makeTaskState({ done: false }));
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
     const addBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => b.textContent === 'Add subtask',
     )!;
     fireEvent.click(addBtn);
-    const input = document.querySelector('input[placeholder="subtask…"]') as HTMLInputElement;
+    const input = document.querySelector('input[placeholder="subtask name…"]') as HTMLInputElement;
     expect(input).not.toBeNull();
   });
 
-  it('typing in the subtask input and pressing Enter fires task.addSubtask', () => {
+  it('two-phase: Enter on name → duration input → Enter fires task.addSubtask with text and durationMin', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
@@ -295,13 +290,19 @@ describe('F12 — Add subtask inline input', () => {
       (b) => b.textContent === 'Add subtask',
     )!;
     fireEvent.click(addBtn);
-    const input = document.querySelector('input[placeholder="subtask…"]') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'subtask text' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onCommand).toHaveBeenCalledWith('task.addSubtask', { text: 'subtask text' });
+    // Phase 1: name
+    const nameInput = document.querySelector('input[placeholder="subtask name…"]') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'subtask text' } });
+    fireEvent.keyDown(nameInput, { key: 'Enter' });
+    // Phase 2: duration
+    const durInput = document.querySelector('input[placeholder="how long? (min)"]') as HTMLInputElement;
+    expect(durInput).not.toBeNull();
+    fireEvent.change(durInput, { target: { value: '20' } });
+    fireEvent.keyDown(durInput, { key: 'Enter' });
+    expect(onCommand).toHaveBeenCalledWith('task.addSubtask', { text: 'subtask text', durationMin: 20 });
   });
 
-  it('pressing Escape in subtask input dismisses it without dispatching', () => {
+  it('pressing Escape in name phase dismisses without dispatching', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
@@ -309,12 +310,12 @@ describe('F12 — Add subtask inline input', () => {
       (b) => b.textContent === 'Add subtask',
     )!;
     fireEvent.click(addBtn);
-    const input = document.querySelector('input[placeholder="subtask…"]') as HTMLInputElement;
+    const input = document.querySelector('input[placeholder="subtask name…"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'draft' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(onCommand).not.toHaveBeenCalledWith('task.addSubtask', expect.anything());
     // Input should be gone
-    expect(document.querySelector('input[placeholder="subtask…"]')).toBeNull();
+    expect(document.querySelector('input[placeholder="subtask name…"]')).toBeNull();
   });
 });
 

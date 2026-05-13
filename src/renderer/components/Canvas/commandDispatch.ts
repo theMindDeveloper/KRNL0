@@ -65,6 +65,7 @@ import {
   taskSetPlannedMin,
   taskSetCurrentSessionElapsedSec,
   taskClearCurrentSessionElapsedSec,
+  taskSetDuration,
 } from '../nodes/TaskNode/commands';
 import type { TaskState } from '../nodes/TaskNode/types';
 
@@ -172,6 +173,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: taskSetCurrentSessionElapsedSec(s as never, args as never) };
         case 'task.clearCurrentSessionElapsedSec':
           return { state: taskClearCurrentSessionElapsedSec(s as never) };
+        case 'task.setDuration':       return { state: taskSetDuration(s as never, args as never) };
       }
       break;
     }
@@ -330,9 +332,11 @@ function checkpointActiveTaskElapsed(): number {
   const taskNode = board.nodes.find((n) => n.id === ps.activeTaskId);
   if (!taskNode || taskNode.kind !== 'todo.task') return elapsedSec;
   const ts = taskNode.state as TaskState;
-  updateNode(taskNode.id, {
-    state: taskSetCurrentSessionElapsedSec(ts, { seconds: elapsedSec }),
-  });
+  updateNode(
+    taskNode.id,
+    { state: taskSetCurrentSessionElapsedSec(ts, { seconds: elapsedSec }) },
+    { skipHistory: true },
+  );
   return elapsedSec;
 }
 
@@ -400,9 +404,11 @@ function loadTaskIntoPomo(
         const elapsedSec = Math.floor(ps.pausedElapsedMs / 1000);
         if (elapsedSec > 0) {
           const priorTs = priorTaskNode.state as TaskState;
-          updateNode(priorTaskNode.id, {
-            state: taskSetCurrentSessionElapsedSec(priorTs, { seconds: elapsedSec }),
-          });
+          updateNode(
+            priorTaskNode.id,
+            { state: taskSetCurrentSessionElapsedSec(priorTs, { seconds: elapsedSec }) },
+            { skipHistory: true },
+          );
         }
       }
     }
@@ -460,8 +466,9 @@ function loadTaskIntoPomo(
     };
   }
 
-  // Step 8: persist.
-  updateNode(pomoNode.id, { state: nextPomoState });
+  // Step 8: persist. Pomo-load is selection-driven, not a user edit — skip
+  // history so Ctrl+Z doesn't undo "I clicked on this task to see its timer".
+  updateNode(pomoNode.id, { state: nextPomoState }, { skipHistory: true });
   const updated = useBoardStore.getState().board;
   if (updated) void window.krnl?.boardSave(updated);
 }
@@ -638,10 +645,22 @@ export function makeCommandHandler(nodeId: string) {
     // ── task.addSubtask: spawn a child TaskNode one layer deeper ────────────
     // Decision 22.2 Fix 4: backfills a TodoItem on the parent TodoNode so the
     // subtask is visible in the todo list (bidirectional linkage invariant).
+    // Bug 4: accepts optional durationMin arg from the two-phase inline input.
     if (command === 'task.addSubtask') {
       const parentTask = node.state as TaskState;
       const text = (args['text'] as string | undefined) ?? '';
       if (!text.trim()) return;
+
+      // Bug 4: use explicit durationMin arg if provided, fall back to parent's value.
+      const argDuration = args['durationMin'];
+      const childDurationMin =
+        typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1
+          ? Math.round(argDuration)
+          : parentTask.durationMin;
+      const childPlannedMin =
+        typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1
+          ? Math.round(argDuration)
+          : (parentTask.plannedMin ?? parentTask.durationMin);
 
       const freshBoard = useBoardStore.getState().board;
       if (!freshBoard) return;
@@ -678,8 +697,8 @@ export function makeCommandHandler(nodeId: string) {
       const childState: TaskState = {
         text: text.trim(),
         done: false,
-        durationMin: parentTask.durationMin,
-        eta: parentTask.eta,
+        durationMin: childDurationMin,
+        eta: `~${childPlannedMin} min`,
         sequenceNumber: seq,
         layer: parentTask.layer + 1,
         createdAt: new Date().toISOString(),
@@ -687,7 +706,7 @@ export function makeCommandHandler(nodeId: string) {
         parentTaskId: nodeId,
         todoItemId: itemId !== '' ? itemId : null,
         pomoSessionsCompleted: 0,
-        plannedMin: parentTask.plannedMin ?? parentTask.durationMin,
+        plannedMin: childPlannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
       };
@@ -804,14 +823,19 @@ export function makeCommandHandler(nodeId: string) {
     if (node.kind === 'todo' && command === 'todo.add') {
       const rawText = (args['text'] as string | undefined) ?? '';
       const { plannedMin: parsedMin, strippedText } = parseMinutesFromText(rawText);
-      if (strippedText !== rawText || parsedMin !== null) {
-        // Rebuild args with stripped text. Parsed trailing/legacy minutes take precedence
-        // over the UI minutes input (decisions.md: "trailing suffix > structured plannedMin
-        // from the UI — typing 'foo 25m' is the user's explicit intent").
+      // Two-phase input sends `durationMin`; map it to `plannedMin` if no
+      // trailing suffix overrode it. Trailing suffix still takes precedence.
+      const argDuration = args['durationMin'];
+      const durationAsPlanned =
+        typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1
+          ? Math.max(1, Math.round(argDuration))
+          : null;
+      const effectivePlanned = parsedMin ?? durationAsPlanned;
+      if (strippedText !== rawText || effectivePlanned !== null) {
         effectiveArgs = {
           ...args,
           text: strippedText,
-          ...(parsedMin !== null ? { plannedMin: parsedMin } : {}),
+          ...(effectivePlanned !== null ? { plannedMin: effectivePlanned } : {}),
         };
       }
     }
