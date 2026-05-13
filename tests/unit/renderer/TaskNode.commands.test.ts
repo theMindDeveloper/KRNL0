@@ -19,6 +19,8 @@ import {
   taskEdit,
   taskIncrementPomo,
   taskActivate,
+  taskSetCurrentSessionElapsedSec,
+  taskClearCurrentSessionElapsedSec,
 } from '../../../src/renderer/components/nodes/TaskNode/commands';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
 
@@ -36,6 +38,9 @@ function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
     parentTaskId: null,
     todoItemId: 'item-1',
     pomoSessionsCompleted: 0,
+    plannedMin: 25,
+    secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
     ...overrides,
   };
 }
@@ -169,5 +174,76 @@ describe('taskActivate', () => {
   it('returns the same reference when called on a done task', () => {
     const s = makeTaskState({ done: true });
     expect(taskActivate(s)).toBe(s);
+  });
+});
+
+// ── taskSetCurrentSessionElapsedSec ──────────────────────────────────────────
+
+describe('taskSetCurrentSessionElapsedSec', () => {
+  it('writes the given seconds to currentSessionElapsedSec', () => {
+    const s = makeTaskState({ currentSessionElapsedSec: 0 });
+    const next = taskSetCurrentSessionElapsedSec(s, { seconds: 120 });
+    expect(next.currentSessionElapsedSec).toBe(120);
+  });
+
+  it('floors a fractional value', () => {
+    const s = makeTaskState();
+    const next = taskSetCurrentSessionElapsedSec(s, { seconds: 45.9 });
+    expect(next.currentSessionElapsedSec).toBe(45);
+  });
+
+  it('clamps negative values to 0', () => {
+    const s = makeTaskState();
+    const next = taskSetCurrentSessionElapsedSec(s, { seconds: -10 });
+    expect(next.currentSessionElapsedSec).toBe(0);
+  });
+
+  it('clamps 0 explicitly (boundary)', () => {
+    const s = makeTaskState();
+    const next = taskSetCurrentSessionElapsedSec(s, { seconds: 0 });
+    expect(next.currentSessionElapsedSec).toBe(0);
+  });
+
+  it('does not mutate original state', () => {
+    const s = makeTaskState({ currentSessionElapsedSec: 5 });
+    taskSetCurrentSessionElapsedSec(s, { seconds: 99 });
+    expect(s.currentSessionElapsedSec).toBe(5);
+  });
+
+  it('preserves all other fields', () => {
+    const s = makeTaskState({ text: 'important', done: false, plannedMin: 30 });
+    const next = taskSetCurrentSessionElapsedSec(s, { seconds: 60 });
+    expect(next.text).toBe('important');
+    expect(next.done).toBe(false);
+    expect(next.plannedMin).toBe(30);
+  });
+});
+
+// ── taskClearCurrentSessionElapsedSec ─────────────────────────────────────────
+
+describe('taskClearCurrentSessionElapsedSec', () => {
+  it('resets currentSessionElapsedSec to 0', () => {
+    const s = makeTaskState({ currentSessionElapsedSec: 300 });
+    const next = taskClearCurrentSessionElapsedSec(s);
+    expect(next.currentSessionElapsedSec).toBe(0);
+  });
+
+  it('returns same reference when already 0 (no-op)', () => {
+    const s = makeTaskState({ currentSessionElapsedSec: 0 });
+    const next = taskClearCurrentSessionElapsedSec(s);
+    expect(next).toBe(s);
+  });
+
+  it('does not mutate original state', () => {
+    const s = makeTaskState({ currentSessionElapsedSec: 100 });
+    taskClearCurrentSessionElapsedSec(s);
+    expect(s.currentSessionElapsedSec).toBe(100);
+  });
+
+  it('preserves all other fields', () => {
+    const s = makeTaskState({ text: 'focus task', secondsAccumulated: 600 });
+    const next = taskClearCurrentSessionElapsedSec({ ...s, currentSessionElapsedSec: 50 });
+    expect(next.text).toBe('focus task');
+    expect(next.secondsAccumulated).toBe(600);
   });
 });

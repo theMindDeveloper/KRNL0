@@ -5,6 +5,7 @@ import type { PomoConfig, PomoState } from './types';
 import { defaultPomoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { TaskState } from '../TaskNode/types';
 
 const TICK_MS = 500;
@@ -23,7 +24,7 @@ export function calcRemainingPct(
   remainingMs: number,
   totalMs: number,
 ): number {
-  if (status === 'running' || status === 'break') {
+  if (status === 'running' || status === 'break' || status === 'paused') {
     return Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
   }
   return status === 'idle' ? 100 : 0;
@@ -33,6 +34,7 @@ export function calcRemainingPct(
 export function primaryButtonLabel(status: PomoState['status']): string {
   switch (status) {
     case 'running': return 'PAUSE';
+    case 'paused':  return 'RESUME';
     case 'break':   return 'SKIP BREAK';
     case 'done':    return 'START';
     default:        return 'START'; // 'idle'
@@ -71,6 +73,7 @@ export function PomoNode({
   }, [config, gearOpen]);
 
   // Visual tick — state mutations go through onCommand (Decision #9)
+  // Only runs while running or break — NOT while paused (frozen display).
   useEffect(() => {
     if (state.status !== 'running' && state.status !== 'break') return;
     const id = setInterval(() => setTick((t) => t + 1), TICK_MS);
@@ -84,10 +87,13 @@ export function PomoNode({
         ? state.breakMin * 60_000
         : state.durationMin * 60_000;
 
+  // A.4 — paused: elapsedMs reads from the frozen checkpoint
   const elapsedMs =
-    (state.status === 'running' || state.status === 'break') && state.startedAt !== null
-      ? Date.now() - Date.parse(state.startedAt)
-      : 0;
+    state.status === 'paused'
+      ? state.pausedElapsedMs
+      : (state.status === 'running' || state.status === 'break') && state.startedAt !== null
+        ? Date.now() - Date.parse(state.startedAt)
+        : 0;
   const remainingMs = totalMs - elapsedMs;
 
   // F7 — auto-dispatch pomo.complete when timer hits zero
@@ -97,25 +103,39 @@ export function PomoNode({
 
   const isTaskMode = state.activeTaskId !== null;
 
-  // Decision 22 §4 + F10 — derive plannedSessions from the active task's
-  // plannedMin. Single-value selector; identity is stable across unrelated
-  // store updates so this does NOT cause re-renders on viewport saves etc.
-  const activeTaskPlannedMin = useBoardStore((s) => {
-    const id = state.activeTaskId;
-    if (!id || !s.board) return null;
-    const t = s.board.nodes.find((n) => n.id === id);
-    return t ? (t.state as TaskState).plannedMin : null;
-  });
+  // Decision 22 §4 + F10 + A.6 — derive plannedSessions from the active task's
+  // plannedMin, and also read that task's pomoSessionsCompleted for the per-task counter.
+  const { activeTaskPlannedMin, activeTaskPomoSessionsCompleted } = useBoardStore(
+    useShallow((s) => {
+      const id = state.activeTaskId;
+      if (!id || !s.board) {
+        return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
+      }
+      const t = s.board.nodes.find((n) => n.id === id);
+      if (!t) return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
+      const ts = t.state as TaskState;
+      return {
+        activeTaskPlannedMin: ts.plannedMin ?? null,
+        activeTaskPomoSessionsCompleted: ts.pomoSessionsCompleted ?? 0,
+      };
+    }),
+  );
 
   const pipCount = isTaskMode && activeTaskPlannedMin
     ? Math.max(1, Math.ceil(activeTaskPlannedMin / config.sessionMin))
     : config.longBreakEvery;
-  const completedDots = state.sessionsCompleted % pipCount;
 
-  // F5 — context-driven primary button
+  // A.6 — when in task mode, use the per-task session counter
+  const sessionsForDisplay = isTaskMode
+    ? activeTaskPomoSessionsCompleted
+    : state.sessionsCompleted;
+  const completedDots = sessionsForDisplay % pipCount;
+
+  // F5 — context-driven primary button (A.3)
   const handlePrimary = () => {
     if (state.status === 'idle' || state.status === 'done') onCommand('pomo.start');
-    else if (state.status === 'running') onCommand('pomo.cancel');
+    else if (state.status === 'running') onCommand('pomo.pause');
+    else if (state.status === 'paused') onCommand('pomo.resume');
     else if (state.status === 'break') onCommand('pomo.skipBreak');
   };
   // F4 — RESET always dispatches pomo.cancel (FSM guards the actual transition)
@@ -138,7 +158,7 @@ export function PomoNode({
     animationDelay: `${i * 0.7}s`,
   })), []);
 
-  // F3 — colon blinks at 1 Hz ONLY while running
+  // F3 — colon blinks at 1 Hz ONLY while running (halted during paused)
   const colonAnimation = state.status === 'running'
     ? 'pomo-blink 1s steps(2) infinite'
     : 'none';
@@ -147,6 +167,9 @@ export function PomoNode({
     ? `TASK · ${truncate(state.label || 'task', 18)}`
     : 'DEEP WORK';
   const headerRight = isTaskMode ? '· ACTIVE' : '· POMO.025';
+
+  // A.2 — gear disabled while session is in-flight (running, paused, break)
+  const gearDisabled = state.status !== 'idle' && state.status !== 'done';
 
   const openGear = () => {
     setDraftConfig(config);
@@ -171,6 +194,11 @@ export function PomoNode({
       const clamped = Number.isFinite(raw) ? Math.max(1, Math.round(raw)) : draftConfig[key];
       setDraftConfig((d) => ({ ...d, [key]: clamped }));
     };
+
+  // A.5 — pip cap: show at most 8 pips; append "+N more" when pipCount > 8
+  const MAX_PIPS = 8;
+  const visiblePipCount = Math.min(pipCount, MAX_PIPS);
+  const overflowPips = pipCount > MAX_PIPS ? pipCount - MAX_PIPS : 0;
 
   return (
     <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
@@ -204,9 +232,13 @@ export function PomoNode({
           padding: 0;
           line-height: 1;
         }
-        .pomo-gear-btn:hover {
+        .pomo-gear-btn:hover:not(:disabled) {
           color: var(--acid);
           border-color: var(--acid);
+        }
+        .pomo-gear-btn:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
         }
         .pomo-settings-row {
           display: flex;
@@ -239,7 +271,7 @@ export function PomoNode({
         }
       `}</style>
 
-      {/* Header — gear + bullet + DEEP WORK / TASK */}
+      {/* Header — title + bullet + gear (A.1: gear is last flex child = right side) */}
       <div
         style={{
           padding: '7px 12px 6px',
@@ -253,22 +285,6 @@ export function PomoNode({
           letterSpacing: '0.04em',
         }}
       >
-        {/* Decision 22 F9 — Gear icon */}
-        <button
-          type="button"
-          className="pomo-gear-btn"
-          data-testid="pomo-gear"
-          aria-label={gearOpen ? 'Close settings' : 'Open settings'}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (gearOpen) closeGearAndClearActive();
-            else openGear();
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{ fontSize: 11 }}
-        >
-          {gearOpen ? '✕' : '⚙'}
-        </button>
         <span style={{
           width: 6, height: 6, borderRadius: '50%',
           background: state.status === 'running'
@@ -285,6 +301,26 @@ export function PomoNode({
           {headerLeft}
         </span>
         <span style={{ color: 'var(--ink-3)' }}>{headerRight}</span>
+        {/* A.1 — spacer pushes gear to the right */}
+        <span style={{ flex: 1 }} />
+        {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight */}
+        <button
+          type="button"
+          className="pomo-gear-btn"
+          data-testid="pomo-gear"
+          aria-label={gearOpen ? 'Close settings' : 'Open settings'}
+          title={gearDisabled ? 'Stop session to edit settings' : undefined}
+          disabled={gearDisabled}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (gearOpen) closeGearAndClearActive();
+            else openGear();
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ fontSize: 11 }}
+        >
+          {gearOpen ? '✕' : '⚙'}
+        </button>
       </div>
 
       {/* Body — either settings panel OR vapor tube */}
@@ -505,7 +541,7 @@ export function PomoNode({
                 }}
               >
                 {isTaskMode
-                  ? `${truncate(state.label || 'task', 18)} · phase ${String(state.sessionsCompleted + 1).padStart(2, '0')}`
+                  ? `${truncate(state.label || 'task', 18)} · phase ${String(sessionsForDisplay + 1).padStart(2, '0')}`
                   : `${state.label || 'deep work'} · phase 03`}
               </div>
               <div
@@ -525,9 +561,10 @@ export function PomoNode({
           <div
             className="pomo-pips"
             data-testid="pomo-pips"
-            style={{ display: 'flex', gap: 8, justifyContent: 'flex-start' }}
+            style={{ display: 'flex', gap: 8, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap' }}
           >
-            {Array.from({ length: pipCount }).map((_, i) => {
+            {/* A.5 — render at most 8 pips */}
+            {Array.from({ length: visiblePipCount }).map((_, i) => {
               const ps = pipState(i, completedDots, state.status);
               return (
                 <span
@@ -542,10 +579,27 @@ export function PomoNode({
                     background: ps === 'done' ? 'var(--rust)' : 'transparent',
                     boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
                     position: 'relative',
+                    flexShrink: 0,
                   }}
                 />
               );
             })}
+            {/* A.5 — overflow indicator */}
+            {overflowPips > 0 && (
+              <span
+                data-testid="pomo-pips-overflow"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9.5,
+                  color: 'var(--ink-3)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  flexShrink: 0,
+                }}
+              >
+                +{overflowPips} more
+              </span>
+            )}
             <span style={{
               marginLeft: 'auto',
               fontFamily: 'var(--font-mono)',
@@ -554,7 +608,7 @@ export function PomoNode({
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
             }}>
-              session {state.sessionsCompleted} / {pipCount}
+              session {sessionsForDisplay} / {pipCount}
             </span>
           </div>
 

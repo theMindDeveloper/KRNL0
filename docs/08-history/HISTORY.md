@@ -391,3 +391,22 @@ Three changes, in priority order:
 The PomoNode FSM gains long-break branching: `pomoComplete` now reads `(sessionsCompleted + 1) % longBreakEvery === 0` and writes either `shortBreakMin` or `longBreakMin` into `state.breakMin`. The legacy `PomoConfig` schemas (the seed's `{ shortBreakMin, longBreakMin, sessionsUntilLongBreak }` and v1 `defaultPomoConfig`'s `{ defaultDurationMin, defaultBreakMin, longBreakEvery, longBreakMin }`) are healed at load time by `migratePomoConfig` into the canonical `{ sessionMin, shortBreakMin, longBreakMin, longBreakEvery }` — this migration runs *before* `migrateNodeStates` so CONFIG_DEFAULTS doesn't clobber legacy-derived values. Tests pin the migration and the FSM. TodoNode's add-task row gains a small minutes input; the regex `/,\s*time:\s*(\d+)/i` is a fallback when the dedicated input is empty.
 
 **Tests:** 572 passed (+17 new), 0 typecheck errors.
+
+---
+
+## [2026-05-13] — Pomodoro v2 bug-fix pass (PR #90 follow-up)
+
+**Type:** Bug fix / hardening
+**Branch:** `claude/objective-montalcini-ae7bb0` (PR #90 picks up the additional commit)
+**Files changed:**
+- ADR: `docs/03-architecture/decisions.md` (Decision 22.1)
+- Requirements: `docs/06-requirements/{pomo,task}-node.md` (F-rows added)
+- Renderer types/FSM: `PomoNode/types.ts` (paused status, pausedAt, pausedElapsedMs), `PomoNode/commands.ts` (pomoPause, pomoResume; pomoCancel loosened), `TaskNode/types.ts` (currentSessionElapsedSec), `TaskNode/commands.ts` (taskSetCurrentSessionElapsedSec, taskClearCurrentSessionElapsedSec)
+- Dispatcher: `commandDispatch.ts` (loadTaskIntoPomo, checkpointActiveTaskElapsed, extended task.toggle/task.delete cascades, secondsAccumulated commit on toggle-done)
+- Renderer UI: `PomoNode/index.tsx`, `TaskNode/index.tsx`
+- Persistence: `src/main/persistence/board.ts` (STATE_DEFAULTS extensions, seed updated)
+- Tests: `tests/unit/renderer/PomoNode.decision22.test.ts` (+pause/resume), `tests/unit/renderer/TaskNode.commands.test.ts` (+ checkpoint), `tests/unit/main/board.decision22-migration.test.ts` (+migration), `tests/unit/renderer/commandDispatch.decision22-bugs.test.ts` (new — 15), `tests/unit/renderer/PomoNode.bugs.test.tsx` (new — 15), `tests/unit/renderer/TaskNode.bugs.test.tsx` (new — 13), `tests/integration/PomoNode.decision22-bugs.scenarios.test.ts` (new — 25 Gherkin)
+
+**Summary:** User ran `npm run dev` on the v0.6.1 worktree and filed 9 bugs against the Pomodoro v2 feature. An audit confirmed all 9 plus 3 adjacent defects. A 4-agent team (FSM → dispatcher → UI → tester → pm-docs) executed the bug-fix pass on the same branch. Highlights: (1) real PAUSE/RESUME via a new `'paused'` FSM status with `pausedAt`/`pausedElapsedMs`; (2) per-task in-flight session checkpoint (`currentSessionElapsedSec`) so task A retains its progress when the user switches to task B and back; (3) `task.loadIntoPomo` separates "load settings" from "start session" so clicking a task no longer auto-starts the timer; (4) session-length clamp so a 1-min task gets a 1-min session, not 10; (5) gear UI moved top-right and disabled while busy; (6) pip count capped at 8 with overflow text. The 9 user stories the user manually tested are now Gherkin scenarios in `tests/integration/PomoNode.decision22-bugs.scenarios.test.ts`, ensuring CI catches any regression.
+
+**Tests:** 662 passing (+53 since PR #90 base), 0 typecheck errors, build clean.

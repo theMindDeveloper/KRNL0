@@ -35,6 +35,8 @@ export function seedBoard(): PartialBoard {
           sessionsCompleted: 0,
           activeTaskId: null,
           history: [],
+          pausedAt: null,
+          pausedElapsedMs: 0,
         },
         // Decision 22 — canonical PomoConfig shape.
         config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
@@ -150,6 +152,7 @@ function migrateTaskChain(board: Record<string, unknown>): Record<string, unknow
 const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
   // Decision 22: `activeTaskId` is the new field on PomoState. Older boards
   // get it backfilled to `null` (default mode).
+  // Decision 22.1: `pausedAt` and `pausedElapsedMs` backfill for pre-v2.1 boards.
   pomo: () => ({
     status: 'idle',
     startedAt: null,
@@ -159,18 +162,22 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     sessionsCompleted: 0,
     activeTaskId: null,
     history: [],
+    pausedAt: null,
+    pausedElapsedMs: 0,
   }),
   todo: () => ({ items: [] }),
   habit: () => ({ habits: [] }),
   term: () => ({ sessionId: null, title: 'Terminal' }),
   // Decision 20: parentTaskId / todoItemId / pomoSessionsCompleted backfill.
   // Decision 22: plannedMin / secondsAccumulated backfill.
+  // Decision 22.1: currentSessionElapsedSec backfill for pre-v2.1 boards.
   'todo.task': () => ({
     parentTaskId: null,
     todoItemId: null,
     pomoSessionsCompleted: 0,
     plannedMin: 25,
     secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
   }),
   // Decision 21: heal text/image child nodes saved with partial state.
   text: () => ({ text: '' }),

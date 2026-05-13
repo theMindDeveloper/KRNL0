@@ -96,49 +96,49 @@ describe('F8 — TaskNode card opacity is 0.4 when done', () => {
   });
 });
 
-// ── F9 — Body click fires task.startPomo (drag-safe) ─────────────────────────
+// ── F9 — Body click loads task into pomo (drag-safe) — Bug #2 fix ────────────
 
-describe('F9 — Body click fires task.startPomo', () => {
-  it('clicking the root body fires task.startPomo when not done', () => {
+describe('F9 — Body click fires task.loadIntoPomo', () => {
+  it('clicking the root body fires task.loadIntoPomo when not done', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
     // Simulate clean click (mousedown at same position as click)
     fireEvent.mouseDown(root, { clientX: 10, clientY: 10 });
     fireEvent.click(root, { clientX: 10, clientY: 10 });
-    expect(onCommand).toHaveBeenCalledWith('task.startPomo');
+    expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
-  it('does NOT fire task.startPomo when done = true', () => {
+  it('does NOT fire task.loadIntoPomo when done = true', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: true }), onCommand);
     const root = screen.getByTestId('task-node-root');
     fireEvent.mouseDown(root, { clientX: 10, clientY: 10 });
     fireEvent.click(root, { clientX: 10, clientY: 10 });
-    expect(onCommand).not.toHaveBeenCalledWith('task.startPomo');
+    expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
-  it('does NOT fire task.startPomo when drag distance > 4px', () => {
+  it('does NOT fire task.loadIntoPomo when drag distance > 4px', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
     // mousedown at (0,0), click at (10,0) → distance > 4px → drag
     fireEvent.mouseDown(root, { clientX: 0, clientY: 0 });
     fireEvent.click(root, { clientX: 10, clientY: 0 });
-    expect(onCommand).not.toHaveBeenCalledWith('task.startPomo');
+    expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
-  it('checkbox click does NOT bubble task.startPomo', () => {
+  it('checkbox click does NOT bubble task.loadIntoPomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const checkbox = document.querySelector('.task-check') as HTMLElement;
     // Checkbox has stopPropagation on its onClick
     fireEvent.mouseDown(checkbox, { clientX: 5, clientY: 5 });
     fireEvent.click(checkbox, { clientX: 5, clientY: 5 });
-    // task.toggle should be called but not task.startPomo
+    // task.toggle should be called but not task.loadIntoPomo
     const calls = onCommand.mock.calls.map((c) => c[0]);
     expect(calls).toContain('task.toggle');
-    expect(calls).not.toContain('task.startPomo');
+    expect(calls).not.toContain('task.loadIntoPomo');
   });
 });
 

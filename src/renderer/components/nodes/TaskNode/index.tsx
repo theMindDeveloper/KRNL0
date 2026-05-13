@@ -31,15 +31,18 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
 
   const seqNum = String(state.sequenceNumber ?? 1).padStart(2, '0');
   const layer = state.layer ?? 0;
-  const eta = state.eta ?? `~${state.durationMin}M`;
   const tag = state.tag ?? '';
   const taskId = node.id;
+
+  // B.2 — live ETA display: use plannedMin (writable) rather than the stale eta string
+  const etaDisplay = `~${state.plannedMin ?? state.durationMin} min`;
 
   // Decision 22 F15 — subscribe to the pomo mother's runtime state. The
   // selector returns a fresh object every call, so we use `useShallow` to
   // gate re-renders on the actual field values (status / activeTaskId /
   // startedAt) — without it every unrelated store mutation would trigger a
   // full re-render for every TaskNode on the board (the dock/perf regression).
+  // B.4 — selector also includes status so ring colour reacts to 'paused'.
   const pomoRuntime = useBoardStore(
     useShallow((s) => {
       const pomo = s.board?.nodes.find((n) => n.kind === 'pomo');
@@ -55,6 +58,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
 
   const isActive = pomoRuntime?.activeTaskId === taskId;
   const isActiveRunning = isActive && pomoRuntime?.status === 'running' && pomoRuntime?.startedAt !== null;
+  const isActivePaused = isActive && pomoRuntime?.status === 'paused';
 
   // Local tick — only mount the interval when this task is actively running.
   const [, setTick] = useState(0);
@@ -64,10 +68,21 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     return () => clearInterval(id);
   }, [isActiveRunning]);
 
-  const liveDelta = isActiveRunning && pomoRuntime?.startedAt
-    ? (Date.now() - Date.parse(pomoRuntime.startedAt)) / 1000
-    : 0;
-  const elapsedSec = (state.secondsAccumulated ?? 0) + liveDelta;
+  // B.3 — corner timer formula: include currentSessionElapsedSec checkpoint
+  const checkpointSec = state.currentSessionElapsedSec ?? 0;
+  let elapsedSec: number;
+  if (isActiveRunning && pomoRuntime?.startedAt) {
+    // Running: liveDelta already includes the checkpoint via offset startedAt
+    // (loadTaskIntoPomo sets startedAt = now - checkpointMs when autoStart=true).
+    const liveDelta = Math.max(0, (Date.now() - Date.parse(pomoRuntime.startedAt)) / 1000);
+    elapsedSec = (state.secondsAccumulated ?? 0) + liveDelta;
+  } else if (isActive) {
+    // Paused/loaded: show secondsAccumulated + checkpoint (frozen).
+    elapsedSec = (state.secondsAccumulated ?? 0) + checkpointSec;
+  } else {
+    // Inactive: show secondsAccumulated + checkpoint (if any, from a prior session).
+    elapsedSec = (state.secondsAccumulated ?? 0) + checkpointSec;
+  }
   const showTimer = elapsedSec > 0 || isActive;
 
   // ── inline edit ────────────────────────────────────────────────────────────
@@ -98,6 +113,36 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     } else if (e.key === 'Escape') {
       e.stopPropagation();
       cancelEdit();
+    }
+  };
+
+  // ── inline ETA edit (B.2) ──────────────────────────────────────────────────
+  const [isEditingEta, setIsEditingEta] = useState(false);
+  const [etaValue, setEtaValue] = useState('');
+
+  const startEtaEdit = () => {
+    setEtaValue(String(state.plannedMin ?? state.durationMin));
+    setIsEditingEta(true);
+  };
+
+  const commitEtaEdit = () => {
+    const parsed = parseInt(etaValue, 10);
+    const clamped = Number.isFinite(parsed) ? Math.max(1, parsed) : (state.plannedMin ?? state.durationMin);
+    onCommand('task.setPlannedMin', { minutes: clamped });
+    setIsEditingEta(false);
+  };
+
+  const cancelEtaEdit = () => {
+    setIsEditingEta(false);
+  };
+
+  const handleEtaKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      commitEtaEdit();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      cancelEtaEdit();
     }
   };
 
@@ -151,7 +196,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     },
   ];
 
-  // ── body click → start pomo (drag-safe) ───────────────────────────────────
+  // ── body click → load task into pomo, no auto-start (B.1 / Bug #2 fix) ────
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
   const handleBodyMouseDown = (e: MouseEvent) => {
@@ -165,9 +210,21 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     mouseDownPos.current = null;
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) return; // drag, not click
     if (!state.done) {
-      onCommand('task.startPomo');
+      onCommand('task.loadIntoPomo');
     }
   };
+
+  // B.4 — ring colour reacts to paused status (solid acid, no glow)
+  const borderColor = isActiveRunning
+    ? 'var(--acid)'
+    : isActivePaused
+      ? 'var(--acid)'
+      : 'var(--paper-3)';
+  const boxShadow = isActiveRunning
+    ? '0 0 0 2px var(--acid), 0 0 24px rgba(201,241,88,0.45)'
+    : isActivePaused
+      ? '0 0 0 2px var(--acid)'
+      : 'var(--shadow-1)';
 
   return (
     <div
@@ -179,12 +236,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       style={{
         position: 'relative',
         width: 220,
-        border: `1px solid ${isActive ? 'var(--acid)' : 'var(--paper-3)'}`,
+        border: `1px solid ${borderColor}`,
         borderRadius: 'var(--radius-lg)',
         background: 'var(--node-bg)',
-        boxShadow: isActive
-          ? '0 0 0 2px var(--acid), 0 0 24px rgba(201,241,88,0.45)'
-          : 'var(--shadow-1)',
+        boxShadow,
         overflow: 'visible',
         opacity: state.done ? 0.4 : 1,
         transition: 'opacity 0.15s, box-shadow 0.2s, border-color 0.2s',
@@ -357,7 +412,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           )}
         </div>
 
-        {/* F5: footer — tag + ETA */}
+        {/* F5: footer — tag + ETA (B.2: ETA is double-click editable) */}
         <div
           className="task-foot"
           style={{
@@ -373,7 +428,43 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           }}
         >
           <span className="task-tag">{tag}</span>
-          <span className="task-eta">{eta}</span>
+          {isEditingEta ? (
+            <input
+              type="number"
+              min={1}
+              value={etaValue}
+              autoFocus
+              onChange={(e) => setEtaValue(e.target.value)}
+              onKeyDown={handleEtaKeyDown}
+              onBlur={commitEtaEdit}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                width: 60,
+                background: 'var(--paper-2)',
+                border: '1px solid var(--ink-3)',
+                borderRadius: 3,
+                outline: 'none',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                color: 'var(--ink-3)',
+                textAlign: 'right',
+                padding: '1px 4px',
+              }}
+            />
+          ) : (
+            <span
+              className="task-eta"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                startEtaEdit();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ cursor: 'text' }}
+            >
+              {etaDisplay}
+            </span>
+          )}
         </div>
 
         {/* Add-subtask inline input */}

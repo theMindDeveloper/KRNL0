@@ -42,7 +42,10 @@ function makePomoState(): PomoState {
     breakMin: 5,
     label: '',
     sessionsCompleted: 0,
+    activeTaskId: null,
     history: [],
+    pausedAt: null,
+    pausedElapsedMs: 0,
   };
 }
 
@@ -93,6 +96,9 @@ function makeBoardWithTodoAndTask(opts: {
     parentTaskId: null,
     todoItemId: opts.todoItemId !== undefined ? opts.todoItemId : itemId,
     pomoSessionsCompleted: 0,
+    plannedMin: 20,
+    secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
   };
 
   const taskNode = {
@@ -113,7 +119,7 @@ function makeBoardWithTodoAndTask(opts: {
       position: { x: 0, y: 0 },
       isMother: true,
       state: makePomoState(),
-      config: { defaultDurationMin: 25, defaultBreakMin: 5, longBreakEvery: 4, longBreakMin: 15 },
+      config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
     });
   }
 
@@ -264,6 +270,9 @@ describe('F11 (todo) — todo.remove cascades to linked TaskNode + edges', () =>
       parentTaskId: null,
       todoItemId: itemId,
       pomoSessionsCompleted: 0,
+      plannedMin: 20,
+      secondsAccumulated: 0,
+      currentSessionElapsedSec: 0,
     };
 
     const childTaskState: TaskState = {
@@ -278,6 +287,9 @@ describe('F11 (todo) — todo.remove cascades to linked TaskNode + edges', () =>
       parentTaskId: task1Id, // child of task-1
       todoItemId: null,
       pomoSessionsCompleted: 0,
+      plannedMin: 10,
+      secondsAccumulated: 0,
+      currentSessionElapsedSec: 0,
     };
 
     const cascadeBoard: Board = {
@@ -456,6 +468,9 @@ describe('F13 (task) — task.delete cascades TaskNode + descendants + linked To
       parentTaskId: null,
       todoItemId: itemId,
       pomoSessionsCompleted: 0,
+      plannedMin: 20,
+      secondsAccumulated: 0,
+      currentSessionElapsedSec: 0,
     };
 
     const childState: TaskState = {
@@ -470,6 +485,9 @@ describe('F13 (task) — task.delete cascades TaskNode + descendants + linked To
       parentTaskId: task1Id,
       todoItemId: null,
       pomoSessionsCompleted: 0,
+      plannedMin: 10,
+      secondsAccumulated: 0,
+      currentSessionElapsedSec: 0,
     };
 
     const cascadeBoard: Board = {
