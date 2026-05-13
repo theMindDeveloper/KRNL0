@@ -85,7 +85,7 @@ function TaskPomoBar({ state, taskId }: { state: TaskState; taskId: string }) {
 // TaskNode — child task card spawned when a todo item is added.
 // No slot tag, no corner brackets (those are mother-only, Decision #8).
 // Handles are added by the rfAdapters HOC — DO NOT import Handle here.
-export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, TaskConfig>) {
+export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) {
   const { state } = node;
   const _config = (node.config as TaskConfig | null) ?? defaultTaskConfig();
   void _config;
@@ -121,18 +121,13 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
   const isActiveRunning = isActive && pomoRuntime?.status === 'running' && pomoRuntime?.startedAt !== null;
   const isActivePaused = isActive && pomoRuntime?.status === 'paused';
 
-  // When this task transitions from unselected → selected (RF click selection),
-  // refresh the pomo with this task's saved state. React Flow swallows the
-  // mousedown sequence for drag detection in the real browser, so the body
-  // onClick handler is unreliable; piggy-backing on RF's selection signal is
-  // the robust path. Idempotent in the dispatcher when already active.
-  const prevSelectedRef = useRef(false);
-  useEffect(() => {
-    if (selected && !prevSelectedRef.current && !state.done) {
-      onCommand('task.loadIntoPomo');
-    }
-    prevSelectedRef.current = selected;
-  }, [selected, state.done, onCommand]);
+  // NOTE: removed the previous selection→loadIntoPomo effect. Selection (RF's
+  // internal state) must stay decoupled from pomo loading. Tying them together
+  // broke marquee multi-select — every freshly-selected task would re-load the
+  // pomo, which mutates board state, which triggers the derivedNodes effect,
+  // which wipes RF's per-node `selected: true` flags. Loading happens
+  // exclusively through `handleBodyClick` (drag-safe) and the TodoNode row
+  // click. Marquee → pure selection; click → selection + pomo load.
 
   // Local tick — only mount the interval when this task is actively running.
   const [, setTick] = useState(0);
