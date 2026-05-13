@@ -315,10 +315,10 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
           {` task · #${seqNum} L${layer}`}
         </span>
 
-        {/* Header right slot: START (when not done + not running) or STOP (only
-            when the timer is actually running). A loaded-but-paused task still
-            shows START — pressing it resumes the timer. STOP is the abandon
-            affordance and only makes sense for a live session. */}
+        {/* Header right slot: START (when not done + not running) or PAUSE
+            (only when the timer is actually running). PAUSE suspends but keeps
+            the task loaded — pressing START resumes from the checkpoint. To
+            fully abandon a session, press RESET on the parent PomoNode. */}
         <div style={{ display: 'flex', gap: 4 }}>
           {!state.done && !isActiveRunning && (
             <button
@@ -349,10 +349,10 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
           {isActiveRunning && (
             <button
               type="button"
-              data-testid="task-stop-btn"
+              data-testid="task-pause-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                onCommand('task.stopPomo');
+                onCommand('task.pausePomo');
               }}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
@@ -369,7 +369,7 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
                 background: 'transparent',
               }}
             >
-              STOP
+              PAUSE
             </button>
           )}
         </div>

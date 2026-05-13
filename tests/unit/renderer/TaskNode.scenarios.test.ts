@@ -102,7 +102,7 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
 
   // ── F2 — START button dispatches task.startPomo (Decision 22.2 Fix 1) ────
   // The old "+ pomo" button (.task-pomo-btn) was replaced by task-start-btn /
-  // task-stop-btn. task-start-btn dispatches task.startPomo (same auto-start
+  // task-pause-btn. task-start-btn dispatches task.startPomo (same auto-start
   // path as the old button). task.spawnPomo is still handled by the dispatcher
   // but the UI no longer references it directly.
   describe('F2 — START button dispatches task.startPomo', () => {
@@ -169,7 +169,7 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
 
   // ── F4b — Done state hides START button; shows neither START nor STOP ────
   // Decision 22.2: the old .task-pomo-btn is gone. task-start-btn is hidden
-  // when done=true. task-stop-btn is only shown when the task is the active
+  // when done=true. task-pause-btn is only shown when the task is the active
   // pomo task (isActive). When done=true, neither button should be present.
   describe('F4b — Done state hides START button (Decision 22.2)', () => {
     it('task-start-btn is not present when done is true', () => {
@@ -184,7 +184,7 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
       // so START should be shown and STOP should not.
       const startBtn = document.querySelector('[data-testid="task-start-btn"]');
       expect(startBtn).not.toBeNull();
-      const stopBtn = document.querySelector('[data-testid="task-stop-btn"]');
+      const stopBtn = document.querySelector('[data-testid="task-pause-btn"]');
       expect(stopBtn).toBeNull();
     });
   });

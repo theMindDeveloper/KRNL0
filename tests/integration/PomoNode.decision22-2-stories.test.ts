@@ -235,8 +235,8 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     expect(startBtn).toBeTruthy();
   });
 
-  it('T1.3: when isActive (activeTaskId matches), task-stop-btn is shown and task-start-btn is NOT', () => {
-    // Seed the store so the task appears as the active one
+  it('T1.3: when isActiveRunning (activeTaskId matches + status=running), task-pause-btn is shown and task-start-btn is NOT', () => {
+    // Seed the store so the task appears as the active running one
     const pomoState = makePomoState({ activeTaskId: 'task-1', status: 'running', startedAt: new Date().toISOString() });
     const board: Board = {
       version: 1,
@@ -257,9 +257,9 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     };
     useBoardStore.setState({ board });
     renderTaskNode(makeTaskState({ done: false }));
-    // task-stop-btn should exist (isActive === true)
-    const stopBtn = screen.getByTestId('task-stop-btn');
-    expect(stopBtn).toBeTruthy();
+    // task-pause-btn should exist (isActiveRunning === true)
+    const pauseBtn = screen.getByTestId('task-pause-btn');
+    expect(pauseBtn).toBeTruthy();
     // task-start-btn should NOT exist
     const startBtn = document.querySelector('[data-testid="task-start-btn"]');
     expect(startBtn).toBeNull();
@@ -275,7 +275,7 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
-  it('T1.5: clicking task-stop-btn dispatches task.stopPomo', () => {
+  it('T1.5: clicking task-pause-btn dispatches task.pausePomo', () => {
     const pomoState = makePomoState({ activeTaskId: 'task-1', status: 'running', startedAt: new Date().toISOString() });
     const board: Board = {
       version: 1,
@@ -291,12 +291,12 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
 
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
-    const stopBtn = screen.getByTestId('task-stop-btn');
-    fireEvent.click(stopBtn);
-    expect(onCommand).toHaveBeenCalledWith('task.stopPomo');
+    const pauseBtn = screen.getByTestId('task-pause-btn');
+    fireEvent.click(pauseBtn);
+    expect(onCommand).toHaveBeenCalledWith('task.pausePomo');
   });
 
-  it('T1.6: task.stopPomo on a running active task — pomo goes idle, history record written, secondsAccumulated includes elapsed', () => {
+  it('T1.6: task.pausePomo on a running active task — pomo goes to paused, no history record, activeTaskId preserved, no commit to secondsAccumulated yet', () => {
     const startedAt = new Date(Date.now() - 30_000).toISOString();
     const board = makeBoardWithTasks({
       pomoState: {
@@ -309,26 +309,27 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     });
     useBoardStore.getState().setBoard(board);
 
-    makeCommandHandler('task-a')('task.stopPomo');
+    makeCommandHandler('task-a')('task.pausePomo');
 
     const ps = getPomoState();
-    expect(ps.status).toBe('idle');
-    expect(ps.activeTaskId).toBeNull();
-    expect(ps.history).toHaveLength(1);
-    expect(ps.history[0]!.completed).toBe(false);
+    expect(ps.status).toBe('paused');
+    expect(ps.activeTaskId).toBe('task-a');
+    // PAUSE writes no history record — that's only on cancel/complete.
+    expect(ps.history).toHaveLength(0);
+    // pausedElapsedMs reflects the ~30s elapsed at pause time.
+    expect(ps.pausedElapsedMs).toBeGreaterThanOrEqual(28_000);
+    expect(ps.pausedElapsedMs).toBeLessThanOrEqual(32_000);
 
     const ts = getTaskState('task-a');
-    // ~30s should have been committed
-    expect(ts.secondsAccumulated).toBeGreaterThanOrEqual(28);
-    expect(ts.secondsAccumulated).toBeLessThanOrEqual(32);
+    // Elapsed is still in-flight: secondsAccumulated unchanged until cancel/complete.
+    expect(ts.secondsAccumulated).toBe(0);
   });
 
-  it('T1.7: task.stopPomo on a paused active task — pomo goes idle, history record written, secondsAccumulated includes pausedElapsedMs/1000', () => {
+  it('T1.7: task.pausePomo on a paused active task is a no-op (already paused)', () => {
     const nowMs = Date.now();
     const startedAt = new Date(nowMs - 20_000).toISOString();
     const pausedAt = new Date(nowMs).toISOString();
     const board = makeBoardWithTasks({
-      taskA: { currentSessionElapsedSec: 20 },
       pomoState: {
         status: 'paused',
         startedAt,
@@ -341,20 +342,14 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     });
     useBoardStore.getState().setBoard(board);
 
-    makeCommandHandler('task-a')('task.stopPomo');
+    makeCommandHandler('task-a')('task.pausePomo');
 
     const ps = getPomoState();
-    expect(ps.status).toBe('idle');
-    expect(ps.activeTaskId).toBeNull();
-    expect(ps.history).toHaveLength(1);
-
-    const ts = getTaskState('task-a');
-    // elapsed from the history record: startedAt to pausedAt = 20s
-    expect(ts.secondsAccumulated).toBeGreaterThanOrEqual(18);
-    expect(ts.secondsAccumulated).toBeLessThanOrEqual(22);
+    expect(ps.status).toBe('paused');
+    expect(ps.pausedElapsedMs).toBe(20_000);
   });
 
-  it('T1.8: task.stopPomo on a task that is NOT the active one is a no-op', () => {
+  it('T1.8: task.pausePomo on a task that is NOT the active one is a no-op', () => {
     const startedAt = new Date(Date.now() - 15_000).toISOString();
     const board = makeBoardWithTasks({
       taskB: {},
@@ -368,17 +363,16 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     });
     useBoardStore.getState().setBoard(board);
 
-    // Stop task-a which is NOT the active task
-    makeCommandHandler('task-a')('task.stopPomo');
+    // Pause task-a which is NOT the active task
+    makeCommandHandler('task-a')('task.pausePomo');
 
     const ps = getPomoState();
     // Pomo should be unchanged — still running on task-b
     expect(ps.status).toBe('running');
     expect(ps.activeTaskId).toBe('task-b');
-    expect(ps.history).toHaveLength(0);
   });
 
-  it('T1.9: currentSessionElapsedSec is cleared on the just-stopped task', () => {
+  it('T1.9: currentSessionElapsedSec is NOT cleared on pause — it survives so START can resume', () => {
     const startedAt = new Date(Date.now() - 40_000).toISOString();
     const board = makeBoardWithTasks({
       taskA: { currentSessionElapsedSec: 40 },
@@ -392,10 +386,11 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     });
     useBoardStore.getState().setBoard(board);
 
-    makeCommandHandler('task-a')('task.stopPomo');
+    makeCommandHandler('task-a')('task.pausePomo');
 
+    // Pause preserves the per-task checkpoint; only cancel/complete clears it.
     const ts = getTaskState('task-a');
-    expect(ts.currentSessionElapsedSec).toBe(0);
+    expect(ts.currentSessionElapsedSec).toBe(40);
   });
 
 });

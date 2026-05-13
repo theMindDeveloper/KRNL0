@@ -507,52 +507,22 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
-    // ── task.stopPomo: cancel the active session for this task (Decision 22.2 Fix 1) ──
-    // Mirrors the cancel-commit cascade in task.toggle (lines below) and task.delete.
-    // loadTaskIntoPomo sets startedAt = now - checkpointMs, so the history record
-    // produced by pomoCancel already encodes the full elapsed time. Do NOT call
-    // checkpointActiveTaskElapsed() first — that would double-count the checkpoint.
-    if (command === 'task.stopPomo') {
+    // ── task.pausePomo: pause the live session for this task ─────────────
+    // The TaskNode's per-task PAUSE button (previously labelled STOP) is a
+    // shortcut to the parent PomoNode's PAUSE — it suspends the timer but
+    // keeps the task loaded as the active task, so START can resume from
+    // the same elapsed checkpoint. To fully abandon a session, the user
+    // presses RESET on the PomoNode (which dispatches pomo.cancel).
+    if (command === 'task.pausePomo') {
       const freshBoard = useBoardStore.getState().board;
       if (!freshBoard) return;
       const pomoNode = freshBoard.nodes.find((n) => n.kind === 'pomo');
       if (!pomoNode) return;
       const ps = pomoNode.state as PomoState;
-      // No-op if this task is not the active one.
+      // No-op unless this task is the running active one.
       if (ps.activeTaskId !== nodeId) return;
-      if (ps.status !== 'running' && ps.status !== 'paused') {
-        // Idle/done/break — just clear the active slot so UI stays consistent.
-        updateNode(pomoNode.id, { state: pomoClearActiveTask(ps) });
-        const saved = useBoardStore.getState().board;
-        if (saved) void window.krnl?.boardSave(saved);
-        return;
-      }
-      // Cancel the FSM — history record captures startedAt … now.
-      const cancelledState = pomoClearActiveTask(pomoCancel(ps));
-      updateNode(pomoNode.id, { state: cancelledState });
-
-      // Commit the elapsed seconds from the history record into secondsAccumulated.
-      const newest = cancelledState.history[cancelledState.history.length - 1];
-      if (newest) {
-        const elapsedSec = Math.max(
-          0,
-          Math.floor((Date.parse(newest.endedAt) - Date.parse(newest.startedAt)) / 1000),
-        );
-        const taskNode = useBoardStore
-          .getState()
-          .board?.nodes.find((n) => n.id === nodeId);
-        if (taskNode && taskNode.kind === 'todo.task') {
-          const ts = taskNode.state as TaskState;
-          updateNode(nodeId, {
-            state: {
-              ...ts,
-              secondsAccumulated: (ts.secondsAccumulated ?? 0) + elapsedSec,
-              currentSessionElapsedSec: 0,
-            },
-          });
-        }
-      }
-
+      if (ps.status !== 'running') return;
+      updateNode(pomoNode.id, { state: pomoPause(ps) });
       const saved = useBoardStore.getState().board;
       if (saved) void window.krnl?.boardSave(saved);
       return;
