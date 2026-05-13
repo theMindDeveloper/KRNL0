@@ -19,6 +19,10 @@ import {
   taskEdit,
   taskIncrementPomo,
   taskActivate,
+  taskStartPomo,
+  taskFlushPomo,
+  taskResetPomo,
+  taskSetDuration,
 } from '../../../src/renderer/components/nodes/TaskNode/commands';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
 
@@ -36,6 +40,9 @@ function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
     parentTaskId: null,
     todoItemId: 'item-1',
     pomoSessionsCompleted: 0,
+    pomoElapsedMs: 0,
+    pomoStartedAt: null,
+    pomoTargetMin: 0,
     ...overrides,
   };
 }
@@ -169,5 +176,169 @@ describe('taskActivate', () => {
   it('returns the same reference when called on a done task', () => {
     const s = makeTaskState({ done: true });
     expect(taskActivate(s)).toBe(s);
+  });
+});
+
+// ── taskStartPomo ─────────────────────────────────────────────────────────────
+
+describe('taskStartPomo', () => {
+  const fakeNow = '2026-05-13T10:00:00.000Z';
+  const fakeEnv = { uuid: () => 'test-uuid', now: () => fakeNow, nowMs: () => Date.parse(fakeNow) };
+
+  it('sets pomoStartedAt to env.now()', () => {
+    const s = makeTaskState({ durationMin: 25 });
+    const next = taskStartPomo(s, {}, fakeEnv);
+    expect(next.pomoStartedAt).toBe(fakeNow);
+  });
+
+  it('sets pomoTargetMin from args.durationMin when provided', () => {
+    const s = makeTaskState({ durationMin: 25 });
+    const next = taskStartPomo(s, { durationMin: 30 }, fakeEnv);
+    expect(next.pomoTargetMin).toBe(30);
+  });
+
+  it('falls back to state.durationMin when args.durationMin is omitted', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    const next = taskStartPomo(s, {}, fakeEnv);
+    expect(next.pomoTargetMin).toBe(20);
+  });
+
+  it('preserves all other fields', () => {
+    const s = makeTaskState({ text: 'my task', pomoElapsedMs: 5000 });
+    const next = taskStartPomo(s, {}, fakeEnv);
+    expect(next.text).toBe('my task');
+    expect(next.pomoElapsedMs).toBe(5000);
+  });
+
+  it('does not mutate original state', () => {
+    const s = makeTaskState();
+    taskStartPomo(s, {}, fakeEnv);
+    expect(s.pomoStartedAt).toBe(null);
+  });
+});
+
+// ── taskFlushPomo ─────────────────────────────────────────────────────────────
+
+describe('taskFlushPomo', () => {
+  it('is a no-op when pomoStartedAt is null', () => {
+    const s = makeTaskState({ pomoStartedAt: null });
+    const next = taskFlushPomo(s, {});
+    expect(next).toBe(s);
+  });
+
+  it('accumulates elapsed time into pomoElapsedMs', () => {
+    const startedAt = '2026-05-13T10:00:00.000Z';
+    const nowMs = Date.parse(startedAt) + 60_000; // 1 minute later
+    const env = { uuid: () => 'x', now: () => startedAt, nowMs: () => nowMs };
+    const s = makeTaskState({ pomoStartedAt: startedAt, pomoElapsedMs: 10_000 });
+    const next = taskFlushPomo(s, {}, env);
+    expect(next.pomoElapsedMs).toBe(70_000); // 10000 + 60000
+  });
+
+  it('clears pomoStartedAt after flush', () => {
+    const startedAt = '2026-05-13T10:00:00.000Z';
+    const env = { uuid: () => 'x', now: () => startedAt, nowMs: () => Date.parse(startedAt) + 1000 };
+    const s = makeTaskState({ pomoStartedAt: startedAt, pomoElapsedMs: 0 });
+    const next = taskFlushPomo(s, {}, env);
+    expect(next.pomoStartedAt).toBe(null);
+  });
+
+  it('preserves all other fields', () => {
+    const startedAt = '2026-05-13T10:00:00.000Z';
+    const env = { uuid: () => 'x', now: () => startedAt, nowMs: () => Date.parse(startedAt) + 500 };
+    const s = makeTaskState({ pomoStartedAt: startedAt, text: 'flush me', done: true });
+    const next = taskFlushPomo(s, {}, env);
+    expect(next.text).toBe('flush me');
+    expect(next.done).toBe(true);
+  });
+
+  it('does not mutate original state', () => {
+    const startedAt = '2026-05-13T10:00:00.000Z';
+    const env = { uuid: () => 'x', now: () => startedAt, nowMs: () => Date.parse(startedAt) + 1000 };
+    const s = makeTaskState({ pomoStartedAt: startedAt, pomoElapsedMs: 0 });
+    taskFlushPomo(s, {}, env);
+    expect(s.pomoStartedAt).toBe(startedAt);
+    expect(s.pomoElapsedMs).toBe(0);
+  });
+});
+
+// ── taskResetPomo ─────────────────────────────────────────────────────────────
+
+describe('taskResetPomo', () => {
+  it('clears pomoElapsedMs to 0', () => {
+    const s = makeTaskState({ pomoElapsedMs: 90_000 });
+    expect(taskResetPomo(s).pomoElapsedMs).toBe(0);
+  });
+
+  it('clears pomoStartedAt to null', () => {
+    const s = makeTaskState({ pomoStartedAt: '2026-05-13T10:00:00.000Z' });
+    expect(taskResetPomo(s).pomoStartedAt).toBe(null);
+  });
+
+  it('clears pomoTargetMin to 0', () => {
+    const s = makeTaskState({ pomoTargetMin: 25 });
+    expect(taskResetPomo(s).pomoTargetMin).toBe(0);
+  });
+
+  it('preserves all other fields', () => {
+    const s = makeTaskState({ text: 'reset me', done: true, durationMin: 30 });
+    const next = taskResetPomo(s);
+    expect(next.text).toBe('reset me');
+    expect(next.done).toBe(true);
+    expect(next.durationMin).toBe(30);
+  });
+
+  it('does not mutate original state', () => {
+    const s = makeTaskState({ pomoElapsedMs: 5000, pomoTargetMin: 25 });
+    taskResetPomo(s);
+    expect(s.pomoElapsedMs).toBe(5000);
+    expect(s.pomoTargetMin).toBe(25);
+  });
+});
+
+// ── taskSetDuration ───────────────────────────────────────────────────────────
+
+describe('taskSetDuration', () => {
+  it('updates durationMin and eta', () => {
+    const s = makeTaskState({ durationMin: 20, eta: '~20 min' });
+    const next = taskSetDuration(s, { durationMin: 45 });
+    expect(next.durationMin).toBe(45);
+    expect(next.eta).toBe('~45 min');
+  });
+
+  it('is a no-op when pomo is running (pomoStartedAt is set)', () => {
+    const s = makeTaskState({ durationMin: 20, pomoStartedAt: '2026-05-13T10:00:00.000Z' });
+    const next = taskSetDuration(s, { durationMin: 45 });
+    expect(next).toBe(s);
+  });
+
+  it('clamps minimum to 1', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    expect(taskSetDuration(s, { durationMin: 0 }).durationMin).toBe(1);
+    expect(taskSetDuration(s, { durationMin: -5 }).durationMin).toBe(1);
+  });
+
+  it('clamps maximum to 480', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    expect(taskSetDuration(s, { durationMin: 600 }).durationMin).toBe(480);
+  });
+
+  it('rounds fractional input', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    expect(taskSetDuration(s, { durationMin: 22.6 }).durationMin).toBe(23);
+  });
+
+  it('preserves all other fields', () => {
+    const s = makeTaskState({ text: 'duration task', done: false, pomoElapsedMs: 1000 });
+    const next = taskSetDuration(s, { durationMin: 30 });
+    expect(next.text).toBe('duration task');
+    expect(next.done).toBe(false);
+    expect(next.pomoElapsedMs).toBe(1000);
+  });
+
+  it('does not mutate original state', () => {
+    const s = makeTaskState({ durationMin: 20 });
+    taskSetDuration(s, { durationMin: 30 });
+    expect(s.durationMin).toBe(20);
   });
 });

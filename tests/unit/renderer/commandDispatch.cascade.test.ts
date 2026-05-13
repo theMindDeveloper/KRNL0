@@ -93,6 +93,9 @@ function makeBoardWithTodoAndTask(opts: {
     parentTaskId: null,
     todoItemId: opts.todoItemId !== undefined ? opts.todoItemId : itemId,
     pomoSessionsCompleted: 0,
+    pomoElapsedMs: 0,
+    pomoStartedAt: null,
+    pomoTargetMin: 0,
   };
 
   const taskNode = {
@@ -264,6 +267,9 @@ describe('F11 (todo) — todo.remove cascades to linked TaskNode + edges', () =>
       parentTaskId: null,
       todoItemId: itemId,
       pomoSessionsCompleted: 0,
+      pomoElapsedMs: 0,
+      pomoStartedAt: null,
+      pomoTargetMin: 0,
     };
 
     const childTaskState: TaskState = {
@@ -278,6 +284,9 @@ describe('F11 (todo) — todo.remove cascades to linked TaskNode + edges', () =>
       parentTaskId: task1Id, // child of task-1
       todoItemId: null,
       pomoSessionsCompleted: 0,
+      pomoElapsedMs: 0,
+      pomoStartedAt: null,
+      pomoTargetMin: 0,
     };
 
     const cascadeBoard: Board = {
@@ -456,6 +465,9 @@ describe('F13 (task) — task.delete cascades TaskNode + descendants + linked To
       parentTaskId: null,
       todoItemId: itemId,
       pomoSessionsCompleted: 0,
+      pomoElapsedMs: 0,
+      pomoStartedAt: null,
+      pomoTargetMin: 0,
     };
 
     const childState: TaskState = {
@@ -470,6 +482,9 @@ describe('F13 (task) — task.delete cascades TaskNode + descendants + linked To
       parentTaskId: task1Id,
       todoItemId: null,
       pomoSessionsCompleted: 0,
+      pomoElapsedMs: 0,
+      pomoStartedAt: null,
+      pomoTargetMin: 0,
     };
 
     const cascadeBoard: Board = {

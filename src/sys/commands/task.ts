@@ -193,6 +193,9 @@ export async function taskAdd(
     parentTaskId: null,
     todoItemId: addedItem.id,
     pomoSessionsCompleted: 0,
+    pomoElapsedMs: 0,
+    pomoStartedAt: null,
+    pomoTargetMin: 0,
   };
 
   // Link taskNodeId on the TodoItem
@@ -385,6 +388,9 @@ export async function taskSubtask(
     parentTaskId,
     todoItemId: null,
     pomoSessionsCompleted: 0,
+    pomoElapsedMs: 0,
+    pomoStartedAt: null,
+    pomoTargetMin: 0,
   };
 
   const childNode: AnyNode = {

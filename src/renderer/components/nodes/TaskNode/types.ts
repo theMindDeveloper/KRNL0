@@ -11,6 +11,9 @@ export interface TaskState {
   parentTaskId: string | null;   // Decision 20: null = root task, else parent task node id
   todoItemId: string | null;     // Decision 20: back-link to TodoItem.id
   pomoSessionsCompleted: number; // number of completed pomo sessions for this task
+  pomoElapsedMs: number;         // cumulative ms accrued; never includes the running slice
+  pomoStartedAt: string | null;  // ISO; null = this task is not the active pomo
+  pomoTargetMin: number;         // captured at pomo.start; denominator for progress bar
 }
 
 export interface TaskConfig {
