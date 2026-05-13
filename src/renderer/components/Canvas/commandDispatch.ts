@@ -818,14 +818,19 @@ export function makeCommandHandler(nodeId: string) {
     if (node.kind === 'todo' && command === 'todo.add') {
       const rawText = (args['text'] as string | undefined) ?? '';
       const { plannedMin: parsedMin, strippedText } = parseMinutesFromText(rawText);
-      if (strippedText !== rawText || parsedMin !== null) {
-        // Rebuild args with stripped text. Parsed trailing/legacy minutes take precedence
-        // over the UI minutes input (decisions.md: "trailing suffix > structured plannedMin
-        // from the UI — typing 'foo 25m' is the user's explicit intent").
+      // Two-phase input sends `durationMin`; map it to `plannedMin` if no
+      // trailing suffix overrode it. Trailing suffix still takes precedence.
+      const argDuration = args['durationMin'];
+      const durationAsPlanned =
+        typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1
+          ? Math.max(1, Math.round(argDuration))
+          : null;
+      const effectivePlanned = parsedMin ?? durationAsPlanned;
+      if (strippedText !== rawText || effectivePlanned !== null) {
         effectiveArgs = {
           ...args,
           text: strippedText,
-          ...(parsedMin !== null ? { plannedMin: parsedMin } : {}),
+          ...(effectivePlanned !== null ? { plannedMin: effectivePlanned } : {}),
         };
       }
     }
