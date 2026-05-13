@@ -48,7 +48,7 @@ const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = 
   'ai':          { width: 380, height: 600 },
   'habit':       { width: 380, height: 600 },
   'terminal':    { width: 380, height: 600 },
-  'habit.lane':  { width: 280, height: 140 },
+  'habit.lane':  { width: 200, height: 120 },
   'text':        { width: 240, height: 120 },
   'image':       { width: 240, height: 200 },
 };
@@ -102,7 +102,9 @@ export function toRfEdge(
   srcKind: string,
   tgtKind: string
 ): RFEdge {
-  const isTaskFlow = srcKind === 'todo.task' && tgtKind === 'todo.task';
+  const isTaskFlow =
+    (srcKind === 'todo.task' && (tgtKind === 'todo.task' || tgtKind === 'habit.lane')) ||
+    (srcKind === 'habit.lane' && tgtKind === 'todo.task');
   return {
     id: edge.id,
     source: edge.from.nodeId,
