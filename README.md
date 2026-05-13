@@ -2,7 +2,7 @@
 
 # 🧪 KRNL0 🧪
   
-![krnl0 logo](docs/assets/krnl0logo0.png)
+![krnl0 logo](docs/assets/krnl0logo.png)
 **The Life OS. One canvas for everything you do.**
 
 Pomodoro, todos, habits, kanban, notes, projects — all on one infinite whiteboard.
