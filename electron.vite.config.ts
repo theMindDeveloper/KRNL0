@@ -32,6 +32,15 @@ export default defineConfig({
         '@voice': resolve(__dirname, 'src/voice'),
       }
     },
+    server: {
+      // Per-worktree isolated port set by scripts/dev.mjs. Falls back to the
+      // Vite default (5173) when running outside the isolation wrapper.
+      // strictPort: true ensures Vite errors instead of silently falling back
+      // to another port — which would cause Electron main to load the wrong
+      // renderer bundle when two worktrees run simultaneously.
+      port: process.env.KRNL0_DEV_PORT ? Number(process.env.KRNL0_DEV_PORT) : 5173,
+      strictPort: true,
+    },
     plugins: [react()]
   }
 })
