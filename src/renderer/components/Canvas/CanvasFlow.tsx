@@ -454,8 +454,14 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const existingEdges = board?.edges ?? [];
     const sourceNode = nodes.find((n) => n.id === conn.source);
     const targetNode = nodes.find((n) => n.id === conn.target);
-    const bothTasks = sourceNode?.kind === 'todo.task' && targetNode?.kind === 'todo.task';
-    const event = bothTasks ? 'task.next' : 'link';
+    const srcIsTask = sourceNode?.kind === 'todo.task';
+    const tgtIsTask = targetNode?.kind === 'todo.task';
+    const srcIsHabitLane = sourceNode?.kind === 'habit.lane';
+    const tgtIsHabitLane = targetNode?.kind === 'habit.lane';
+    const isTaskFlow =
+      (srcIsTask && (tgtIsTask || tgtIsHabitLane)) ||
+      (srcIsHabitLane && tgtIsTask);
+    const event = isTaskFlow ? 'task.next' : 'link';
 
     // Dedup: refuse to add a second edge with the same (source, target, event).
     // Drag-to-connect is easy to fire twice; the canvas should not accumulate
@@ -468,11 +474,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     );
     if (duplicate) return;
 
-    const edge: KrnlEdge = bothTasks
+    const targetCommand = tgtIsHabitLane ? 'habit.markDone' : 'task.activate';
+    const edge: KrnlEdge = isTaskFlow
       ? {
           id: `edge-${crypto.randomUUID()}`,
           from: { nodeId: conn.source, event: 'task.next' },
-          to: { nodeId: conn.target, command: 'task.activate' },
+          to: { nodeId: conn.target, command: targetCommand },
           enabled: true,
         }
       : {
