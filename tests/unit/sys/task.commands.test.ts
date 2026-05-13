@@ -522,6 +522,26 @@ describe('sys task sibling', () => {
     expect(forkEdge).toBeDefined();
   });
 
+  it('sibling has todoItemId set and appears in parent TodoNode items', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'source task');
+    const taskId = (addRes.data as { id: string }).id;
+
+    const sibRes = await taskSibling(ctx, taskId);
+    expect(sibRes.ok).toBe(true);
+    const sibId = (sibRes.data as { id: string }).id;
+
+    // todoItemId must not be null on the new sibling TaskState
+    const sib = findTasks().find((t) => t.id === sibId)!;
+    const sibTodoItemId = (sib.state as TaskState).todoItemId;
+    expect(sibTodoItemId).not.toBeNull();
+
+    // The parent TodoNode must contain a TodoItem pointing back to the sibling
+    const todoMother = findTodoMother();
+    const item = (todoMother.state as TodoState).items.find((i) => i.taskNodeId === sibId);
+    expect(item).toBeDefined();
+    expect(item!.id).toBe(sibTodoItemId);
+  });
+
   it('returns error when task id is missing', async () => {
     const res = await taskSibling(ctx, undefined);
     expect(res.ok).toBe(false);
