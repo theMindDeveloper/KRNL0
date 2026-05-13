@@ -869,6 +869,47 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
+    // ── calendar.schedule: cross-node router — dispatch task.setSchedule to target ─
+    // ADR 0001 §4: calendar.schedule looks up the target task and dispatches
+    // task.setSchedule. Cosmetic edge creation is the drop handler's responsibility
+    // (Slice 5). This MUST be before applyCommand because applyCommand returns null
+    // for calendar.schedule (it's not a pure-state command).
+    if (node.kind === 'calendar' && command === 'calendar.schedule') {
+      const scheduleArgs = args as {
+        taskId: string;
+        scheduledFor: string;
+        scheduledDurationMin?: number;
+      };
+      if (!scheduleArgs.taskId || !scheduleArgs.scheduledFor) return;
+      const currentBoard = useBoardStore.getState().board;
+      if (!currentBoard) return;
+      const targetTask = currentBoard.nodes.find((n) => n.id === scheduleArgs.taskId);
+      if (!targetTask || targetTask.kind !== 'todo.task') return;
+      const prevTask = targetTask.state as TaskState;
+      const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
+        scheduledFor: scheduleArgs.scheduledFor,
+      };
+      if (typeof scheduleArgs.scheduledDurationMin === 'number') {
+        schedPatch.scheduledDurationMin = scheduleArgs.scheduledDurationMin;
+      }
+      const nextTaskState = taskSetSchedule(prevTask, schedPatch);
+      updateNode(scheduleArgs.taskId, { state: nextTaskState });
+      // Mirror to linked TodoItem.
+      if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
+        const todoNode = currentBoard.nodes.find((n) => n.id === prevTask.parentTodoId);
+        if (todoNode && todoNode.kind === 'todo') {
+          const newTodoState = todoSetItemSchedule(todoNode.state as TodoState, {
+            itemId: prevTask.todoItemId,
+            scheduledFor: scheduleArgs.scheduledFor,
+          });
+          updateNode(todoNode.id, { state: newTodoState });
+        }
+      }
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
     // ── todo.add pre-processing: strip trailing-suffix minutes from the text
     //    before todoAdd runs, so the stored TodoItem.text is already clean.
     //    Decision 22.2 Fix 3: dispatcher is the single source of truth for parsing.
@@ -1170,46 +1211,6 @@ export function makeCommandHandler(nodeId: string) {
             });
             updateNode(todoNode.id, { state: newTodoState });
           }
-        }
-      }
-      const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
-      return;
-    }
-
-    // ── calendar.schedule: cross-node router — dispatch task.setSchedule to target ─
-    // ADR 0001 §4: calendar.schedule looks up the target task and dispatches
-    // task.setSchedule. Cosmetic edge creation is the drop handler's responsibility
-    // (Slice 5). Returns early before applyCommand's generic patch fallback.
-    if (node.kind === 'calendar' && command === 'calendar.schedule') {
-      const scheduleArgs = args as {
-        taskId: string;
-        scheduledFor: string;
-        scheduledDurationMin?: number;
-      };
-      if (!scheduleArgs.taskId || !scheduleArgs.scheduledFor) return;
-      const currentBoard = useBoardStore.getState().board;
-      if (!currentBoard) return;
-      const targetTask = currentBoard.nodes.find((n) => n.id === scheduleArgs.taskId);
-      if (!targetTask || targetTask.kind !== 'todo.task') return;
-      const prevTask = targetTask.state as TaskState;
-      const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
-        scheduledFor: scheduleArgs.scheduledFor,
-      };
-      if (typeof scheduleArgs.scheduledDurationMin === 'number') {
-        schedPatch.scheduledDurationMin = scheduleArgs.scheduledDurationMin;
-      }
-      const nextTaskState = taskSetSchedule(prevTask, schedPatch);
-      updateNode(scheduleArgs.taskId, { state: nextTaskState });
-      // Mirror to linked TodoItem.
-      if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
-        const todoNode = currentBoard.nodes.find((n) => n.id === prevTask.parentTodoId);
-        if (todoNode && todoNode.kind === 'todo') {
-          const newTodoState = todoSetItemSchedule(todoNode.state as TodoState, {
-            itemId: prevTask.todoItemId,
-            scheduledFor: scheduleArgs.scheduledFor,
-          });
-          updateNode(todoNode.id, { state: newTodoState });
         }
       }
       const updated = useBoardStore.getState().board;
