@@ -135,8 +135,12 @@ describe('TextNode — F5 resize dispatches text.setSize', () => {
   });
 });
 
-describe('TextNode — F6 default size', () => {
-  it('renders with default width 260 when state has no width/height', () => {
+describe('TextNode — F6 size source-of-truth', () => {
+  // The card itself stretches to fill its React Flow wrapper. State.width /
+  // state.height are forwarded to the wrapper by toRfNode (see rfAdapters),
+  // which keeps the selection ring + Handles aligned with the card edges
+  // across resizes. So the card's own inline width/height is always 100%.
+  it('renders as 100% of its RF wrapper regardless of state size', () => {
     render(
       <TextNode
         node={fixture({ text: '' })}
@@ -146,10 +150,11 @@ describe('TextNode — F6 default size', () => {
       />,
     );
     const root = screen.getByTestId('text-node-root') as HTMLDivElement;
-    expect(root.style.width).toBe('260px');
+    expect(root.style.width).toBe('100%');
+    expect(root.style.height).toBe('100%');
   });
 
-  it('renders with persisted width/height when present', () => {
+  it('stays 100% even when state has explicit width/height', () => {
     render(
       <TextNode
         node={fixture({ text: '', width: 420, height: 180 })}
@@ -159,8 +164,8 @@ describe('TextNode — F6 default size', () => {
       />,
     );
     const root = screen.getByTestId('text-node-root') as HTMLDivElement;
-    expect(root.style.width).toBe('420px');
-    expect(root.style.height).toBe('180px');
+    expect(root.style.width).toBe('100%');
+    expect(root.style.height).toBe('100%');
   });
 });
 
