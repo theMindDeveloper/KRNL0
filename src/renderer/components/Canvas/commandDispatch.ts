@@ -640,10 +640,22 @@ export function makeCommandHandler(nodeId: string) {
     // ── task.addSubtask: spawn a child TaskNode one layer deeper ────────────
     // Decision 22.2 Fix 4: backfills a TodoItem on the parent TodoNode so the
     // subtask is visible in the todo list (bidirectional linkage invariant).
+    // Bug 4: accepts optional durationMin arg from the two-phase inline input.
     if (command === 'task.addSubtask') {
       const parentTask = node.state as TaskState;
       const text = (args['text'] as string | undefined) ?? '';
       if (!text.trim()) return;
+
+      // Bug 4: use explicit durationMin arg if provided, fall back to parent's value.
+      const argDuration = args['durationMin'];
+      const childDurationMin =
+        typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1
+          ? Math.round(argDuration)
+          : parentTask.durationMin;
+      const childPlannedMin =
+        typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1
+          ? Math.round(argDuration)
+          : (parentTask.plannedMin ?? parentTask.durationMin);
 
       const freshBoard = useBoardStore.getState().board;
       if (!freshBoard) return;
@@ -680,8 +692,8 @@ export function makeCommandHandler(nodeId: string) {
       const childState: TaskState = {
         text: text.trim(),
         done: false,
-        durationMin: parentTask.durationMin,
-        eta: parentTask.eta,
+        durationMin: childDurationMin,
+        eta: `~${childPlannedMin} min`,
         sequenceNumber: seq,
         layer: parentTask.layer + 1,
         createdAt: new Date().toISOString(),
@@ -689,7 +701,7 @@ export function makeCommandHandler(nodeId: string) {
         parentTaskId: nodeId,
         todoItemId: itemId !== '' ? itemId : null,
         pomoSessionsCompleted: 0,
-        plannedMin: parentTask.plannedMin ?? parentTask.durationMin,
+        plannedMin: childPlannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
       };

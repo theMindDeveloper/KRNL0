@@ -276,21 +276,21 @@ describe('F11 — Inline edit', () => {
   });
 });
 
-// ── F12 — Add subtask ─────────────────────────────────────────────────────────
+// ── F12 — Add subtask (two-phase input) ──────────────────────────────────────
 
 describe('F12 — Add subtask inline input', () => {
-  it('clicking "Add subtask" shows a subtask input field', () => {
+  it('clicking "Add subtask" shows a subtask name input field', () => {
     renderTaskNode(makeTaskState({ done: false }));
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
     const addBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => b.textContent === 'Add subtask',
     )!;
     fireEvent.click(addBtn);
-    const input = document.querySelector('input[placeholder="subtask…"]') as HTMLInputElement;
+    const input = document.querySelector('input[placeholder="subtask name…"]') as HTMLInputElement;
     expect(input).not.toBeNull();
   });
 
-  it('typing in the subtask input and pressing Enter fires task.addSubtask', () => {
+  it('two-phase: Enter on name → duration input → Enter fires task.addSubtask with text and durationMin', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
@@ -298,13 +298,19 @@ describe('F12 — Add subtask inline input', () => {
       (b) => b.textContent === 'Add subtask',
     )!;
     fireEvent.click(addBtn);
-    const input = document.querySelector('input[placeholder="subtask…"]') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'subtask text' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onCommand).toHaveBeenCalledWith('task.addSubtask', { text: 'subtask text' });
+    // Phase 1: name
+    const nameInput = document.querySelector('input[placeholder="subtask name…"]') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'subtask text' } });
+    fireEvent.keyDown(nameInput, { key: 'Enter' });
+    // Phase 2: duration
+    const durInput = document.querySelector('input[placeholder="how long? (min)"]') as HTMLInputElement;
+    expect(durInput).not.toBeNull();
+    fireEvent.change(durInput, { target: { value: '20' } });
+    fireEvent.keyDown(durInput, { key: 'Enter' });
+    expect(onCommand).toHaveBeenCalledWith('task.addSubtask', { text: 'subtask text', durationMin: 20 });
   });
 
-  it('pressing Escape in subtask input dismisses it without dispatching', () => {
+  it('pressing Escape in name phase dismisses without dispatching', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
@@ -312,12 +318,12 @@ describe('F12 — Add subtask inline input', () => {
       (b) => b.textContent === 'Add subtask',
     )!;
     fireEvent.click(addBtn);
-    const input = document.querySelector('input[placeholder="subtask…"]') as HTMLInputElement;
+    const input = document.querySelector('input[placeholder="subtask name…"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'draft' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(onCommand).not.toHaveBeenCalledWith('task.addSubtask', expect.anything());
     // Input should be gone
-    expect(document.querySelector('input[placeholder="subtask…"]')).toBeNull();
+    expect(document.querySelector('input[placeholder="subtask name…"]')).toBeNull();
   });
 });
 

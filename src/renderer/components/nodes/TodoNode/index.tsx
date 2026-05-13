@@ -1,12 +1,14 @@
 import { useState, useRef } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
-import type { TodoConfig, TodoState } from './types';
+import type { TodoConfig, TodoItem, TodoState } from './types';
 import { visibleItems } from './commands';
 import { defaultTodoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { ContextMenu } from '../../ContextMenu';
 import type { ContextMenuItem } from '../../ContextMenu';
+import { useBoardStore } from '../../../store/boardStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -32,7 +34,66 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     hasTaskNode: boolean;
   } | null>(null);
 
-  const items = visibleItems(state, config);
+  const rawItems = visibleItems(state, config);
+
+  // Bug 5: Sort items by chain order. Items are grouped into undone/done buckets
+  // first, then within each bucket sorted by their position in the task.next chain.
+  // Orphan items (no taskNodeId) go at the end of each bucket in insertion order.
+  const chainIndex = useBoardStore(useShallow((s) => s.selectTaskChain()));
+
+  const sortByChain = (bucket: TodoItem[]): TodoItem[] => {
+    // Build a task-nodeId → chain-position map by walking the chain index.
+    // A root is a task with no predecessor in the chain index.
+    const taskIds = bucket.map((i) => i.taskNodeId).filter((id): id is string => id !== null);
+    const taskIdSet = new Set(taskIds);
+
+    // Find roots: task nodes in our bucket that have no prev in the chain index,
+    // or whose prev is not also in our bucket.
+    const roots = taskIds.filter((id) => {
+      const entry = chainIndex.get(id);
+      return !entry || !entry.prev || !taskIdSet.has(entry.prev);
+    });
+
+    const visited = new Set<string>();
+    const ordered: TodoItem[] = [];
+
+    const emit = (taskNodeId: string) => {
+      if (visited.has(taskNodeId)) return;
+      visited.add(taskNodeId);
+      const item = bucket.find((i) => i.taskNodeId === taskNodeId);
+      if (item) ordered.push(item);
+      // Follow the next pointer within the same bucket
+      const entry = chainIndex.get(taskNodeId);
+      if (entry?.next && taskIdSet.has(entry.next)) {
+        emit(entry.next);
+      }
+    };
+
+    // Sort roots by their original bucket index for deterministic ordering
+    const rootsSorted = roots.slice().sort((a, b) => {
+      const ai = bucket.findIndex((i) => i.taskNodeId === a);
+      const bi = bucket.findIndex((i) => i.taskNodeId === b);
+      return ai - bi;
+    });
+
+    for (const root of rootsSorted) {
+      emit(root);
+    }
+
+    // Any remaining items not yet visited (orphans without taskNodeId, or disconnected)
+    for (const item of bucket) {
+      if (!item.taskNodeId || !visited.has(item.taskNodeId)) {
+        ordered.push(item);
+      }
+    }
+
+    return ordered;
+  };
+
+  const undoneBucket = rawItems.filter((i) => !i.done);
+  const doneBucket = rawItems.filter((i) => i.done);
+  const items = [...sortByChain(undoneBucket), ...sortByChain(doneBucket)];
+
   const undoneCount = state.items.filter((i) => !i.done).length;
   const hasDone = state.items.some((i) => i.done);
 

@@ -499,20 +499,8 @@ describe('sys task sibling', () => {
     );
   });
 
-  it('adds a chain edge from source to new sibling', async () => {
-    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'source task');
-    const taskId = (addRes.data as { id: string }).id;
-    const res = await taskSibling(ctx, taskId);
-    const sibId = (res.data as { id: string }).id;
-    const { edges } = readBoard();
-    const edge = edges.find(
-      (e) => e.from.nodeId === taskId && e.to.nodeId === sibId,
-    );
-    expect(edge).toBeDefined();
-  });
-
-  it('rewires existing next-edge through new sibling', async () => {
-    // Create task1 → task2 chain, then insert sibling after task1
+  it('creates a fork: sibling connects to same downstream nodes as source', async () => {
+    // Create task1 → task2 chain, then add sibling fork from task1
     const res1 = await taskAdd(ctx, TODO_MOTHER_ID, 'task 1');
     const res2 = await taskAdd(ctx, TODO_MOTHER_ID, 'task 2');
     const task1Id = (res1.data as { id: string }).id;
@@ -522,21 +510,16 @@ describe('sys task sibling', () => {
     const sibId = (sibRes.data as { id: string }).id;
 
     const { edges } = readBoard();
-    // Old task1 → task2 direct edge should be gone
+    // Original task1 → task2 edge must be PRESERVED (purely additive)
     const directEdge = edges.find(
       (e) => e.from.nodeId === task1Id && e.to.nodeId === task2Id,
     );
-    expect(directEdge).toBeUndefined();
-    // task1 → sib should exist
-    const firstEdge = edges.find(
-      (e) => e.from.nodeId === task1Id && e.to.nodeId === sibId,
-    );
-    expect(firstEdge).toBeDefined();
-    // sib → task2 should exist
-    const secondEdge = edges.find(
+    expect(directEdge).toBeDefined();
+    // sib → task2 fork edge should exist (sibling connects to the same downstream)
+    const forkEdge = edges.find(
       (e) => e.from.nodeId === sibId && e.to.nodeId === task2Id,
     );
-    expect(secondEdge).toBeDefined();
+    expect(forkEdge).toBeDefined();
   });
 
   it('returns error when task id is missing', async () => {

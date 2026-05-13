@@ -405,12 +405,28 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const onConnect = useCallback((conn: Connection) => {
     if (!conn.source || !conn.target) return;
     if (conn.source === conn.target) return;
-    const edge: KrnlEdge = {
-      id: `edge-${crypto.randomUUID()}`,
-      from: { nodeId: conn.source, event: 'link' },
-      to: { nodeId: conn.target, command: 'link' },
-      enabled: true,
-    };
+
+    // Bug 1 fix: if both endpoints are task nodes, create a task.next edge so
+    // the chain index (which only counts from.event === 'task.next') picks it up.
+    const nodes = useBoardStore.getState().board?.nodes ?? [];
+    const sourceNode = nodes.find((n) => n.id === conn.source);
+    const targetNode = nodes.find((n) => n.id === conn.target);
+    const bothTasks = sourceNode?.kind === 'todo.task' && targetNode?.kind === 'todo.task';
+
+    const edge: KrnlEdge = bothTasks
+      ? {
+          id: `edge-${crypto.randomUUID()}`,
+          from: { nodeId: conn.source, event: 'task.next' },
+          to: { nodeId: conn.target, command: 'task.activate' },
+          enabled: true,
+        }
+      : {
+          id: `edge-${crypto.randomUUID()}`,
+          from: { nodeId: conn.source, event: 'link' },
+          to: { nodeId: conn.target, command: 'link' },
+          enabled: true,
+        };
+
     addEdge(edge);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
