@@ -53,51 +53,32 @@
 }
 
 /* ── Selection ring strategy ────────────────────────────────────────────────
-   Default (TaskNode and any new kinds without an explicit override): paint a
-   rounded ring on the RF wrapper. The wrapper for tasks is the card itself, so
-   border-radius lands correctly.
+   Every KRNL node renders its visible card as the FIRST child div of the RF
+   wrapper, with inline `boxShadow` for elevation/border glow. Inline styles
+   beat external CSS, so to paint the selection ring on the visible card we
+   need `!important` to override the inline shadow during selection.
 
-   Mother nodes (pomo / todo / habit / terminal) and habit.lane: the RF wrapper
-   has no border-radius and may extend beyond the visible content (registered
-   INITIAL_DIMS vs the actual rendered card). Painting on the wrapper produces
-   a sharp box that sits outside the rounded card → "double highlight". For
-   those families we hide the wrapper ring and paint on the INNER content div,
-   which is sized to real content and has border-radius var(--radius-lg).
-   Result: one rounded ring per node, tight to the visible bounds. */
+   We also hide the RF wrapper's own outline/shadow so no sharp-cornered ring
+   appears outside the rounded card. */
 
-/* Default — applies when no per-kind rule below overrides. */
+/* Hide RF's default wrapper ring/shadow on ALL selected nodes. */
 .react-flow__node.selected {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acid), 0 0 16px rgba(201, 241, 88, 0.35);
-  border-radius: var(--radius-lg);
+  outline: none !important;
+  box-shadow: none !important;
 }
 
-/* Todo / Task get cyan instead of acid. */
-.react-flow__node.selected.krnl-kind-todo--task {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78, 168, 176, 0.35);
-  border-radius: var(--radius-lg);
+/* Acid ring for mother kinds (pomo / habit / terminal) and habit.lane child. */
+.react-flow__node.selected.krnl-kind-pomo > div:first-of-type,
+.react-flow__node.selected.krnl-kind-habit > div:first-of-type,
+.react-flow__node.selected.krnl-kind-terminal > div:first-of-type,
+.react-flow__node.selected.krnl-kind-habit--lane > div:first-of-type {
+  box-shadow: 0 0 0 2px var(--acid), 0 0 16px rgba(201, 241, 88, 0.35) !important;
 }
 
-/* Mother kinds + habit.lane: move the ring to the inner content div, hide it
-   on the RF wrapper. The inner div has its own border-radius so the shadow
-   wraps the visible card, not the RF wrapper. */
-.react-flow__node.selected.krnl-kind-pomo,
-.react-flow__node.selected.krnl-kind-todo,
-.react-flow__node.selected.krnl-kind-habit,
-.react-flow__node.selected.krnl-kind-terminal,
-.react-flow__node.selected.krnl-kind-habit--lane {
-  outline: none;
-  box-shadow: none;
-}
-.react-flow__node.selected.krnl-kind-pomo > div,
-.react-flow__node.selected.krnl-kind-habit > div,
-.react-flow__node.selected.krnl-kind-terminal > div,
-.react-flow__node.selected.krnl-kind-habit--lane > div {
-  box-shadow: 0 0 0 2px var(--acid), 0 0 16px rgba(201, 241, 88, 0.35);
-}
-.react-flow__node.selected.krnl-kind-todo > div {
-  box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78, 168, 176, 0.35);
+/* Cyan ring for the Todo mother and Task children. */
+.react-flow__node.selected.krnl-kind-todo > div:first-of-type,
+.react-flow__node.selected.krnl-kind-todo--task > div:first-of-type {
+  box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78, 168, 176, 0.35) !important;
 }
 
 /* ── MiniMap ─────────────────────────────────────────────────────────────── */
