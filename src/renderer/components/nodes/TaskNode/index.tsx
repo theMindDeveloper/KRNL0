@@ -160,19 +160,22 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
   const showTimer = elapsedSec > 0 || isActive;
 
   // ── Task chain prev/next display ───────────────────────────────────────────
-  const { prevText, nextText } = useBoardStore(
+  // Shows ALL adjacent task.next neighbours; forks are highlighted in cyan.
+  const { prevTexts, nextTexts } = useBoardStore(
     useShallow((s) => {
       const idx = s.selectTaskChain();
-      const entry = idx.get(node.id) ?? { prev: null, next: null };
-      const resolveText = (id: string | null): string | null => {
-        if (!id) return null;
-        const n = s.board?.nodes.find((nd) => nd.id === id);
-        const txt = (n?.state as { text?: string } | undefined)?.text ?? '';
-        return txt.length > 16 ? txt.slice(0, 14) + '…' : txt;
-      };
+      const entry = idx.get(node.id);
+      const resolve = (ids: readonly string[]): string[] =>
+        ids
+          .map((id) => {
+            const n = s.board?.nodes.find((nd) => nd.id === id);
+            const txt = (n?.state as { text?: string } | undefined)?.text ?? '';
+            return txt.length > 14 ? txt.slice(0, 12) + '…' : txt;
+          })
+          .filter((t) => t.length > 0);
       return {
-        prevText: resolveText(entry.prev),
-        nextText: resolveText(entry.next),
+        prevTexts: resolve(entry?.prevs ?? []),
+        nextTexts: resolve(entry?.nexts ?? []),
       };
     }),
   );
@@ -645,12 +648,13 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
           )}
         </div>
 
-        {/* F5b: chain hint — prev/next task labels */}
-        {(prevText !== null || nextText !== null) && (
+        {/* F5b: chain hint — prev/next task labels. Forks (>1) get cyan accent. */}
+        {(prevTexts.length > 0 || nextTexts.length > 0) && (
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
+              gap: 6,
               fontFamily: 'var(--font-mono)',
               fontSize: 8.5,
               color: 'var(--ink-4)',
@@ -658,8 +662,12 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
               letterSpacing: '0.03em',
             }}
           >
-            <span>{prevText !== null ? `← ${prevText}` : ''}</span>
-            <span>{nextText !== null ? `${nextText} →` : ''}</span>
+            <span style={{ color: prevTexts.length > 1 ? 'var(--cyan)' : 'var(--ink-4)' }}>
+              {prevTexts.length > 0 ? `← ${prevTexts.join(', ')}` : ''}
+            </span>
+            <span style={{ color: nextTexts.length > 1 ? 'var(--cyan)' : 'var(--ink-4)', textAlign: 'right' }}>
+              {nextTexts.length > 0 ? `${nextTexts.join(', ')} →` : ''}
+            </span>
           </div>
         )}
 
