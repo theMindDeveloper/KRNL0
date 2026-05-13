@@ -19,6 +19,7 @@ import {
   applyNodeChanges,
   type NodeChange,
   type EdgeChange,
+  type Edge as RFEdge,
   type Viewport,
   type EdgeProps,
   type OnSelectionChangeParams,
@@ -30,6 +31,7 @@ import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
 import { makeCommandHandler } from './commandDispatch';
 import { Dock } from '../Dock';
+import { ContextMenu } from '../ContextMenu';
 import { ingestImageFile, initialDisplaySize } from './dropImage';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
@@ -236,6 +238,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   const addEdge = useBoardStore((s) => s.addEdge);
   const removeNode = useBoardStore((s) => s.removeNode);
+  const removeEdge = useBoardStore((s) => s.removeEdge);
 
   // Right-click context menu state. Pinned to the screen position of the
   // event; cleared on outside click / Escape / window blur. Only opened for
@@ -244,6 +247,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const [ctxMenu, setCtxMenu] = useState<
     { x: number; y: number; nodeId: string; isMother: false } | null
   >(null);
+
+  const [edgeCtxMenu, setEdgeCtxMenu] = useState<{
+    x: number;
+    y: number;
+    edgeId: string;
+  } | null>(null);
 
   const onNodeContextMenu = useCallback(
     (event: React.MouseEvent, rfNode: KrnlRFNode) => {
@@ -266,6 +275,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   );
 
   const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  const handleEdgeContextMenu = useCallback((e: React.MouseEvent, edge: RFEdge) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEdgeCtxMenu({ x: e.clientX, y: e.clientY, edgeId: edge.id });
+  }, []);
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -590,6 +605,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onNodeContextMenu={onNodeContextMenu}
+      onEdgeContextMenu={handleEdgeContextMenu}
       onPaneClick={closeCtxMenu}
       onPaneContextMenu={closeCtxMenu}
       onDrop={onDrop}
@@ -634,6 +650,23 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         style={{ display: 'none' }}
         data-testid="canvas-image-file-input"
       />
+
+      {edgeCtxMenu !== null && (
+        <ContextMenu
+          x={edgeCtxMenu.x}
+          y={edgeCtxMenu.y}
+          items={[{
+            label: 'Disconnect',
+            danger: true,
+            onSelect: () => {
+              removeEdge(edgeCtxMenu.edgeId);
+              const updated = useBoardStore.getState().board;
+              if (updated) void window.krnl?.boardSave(updated);
+            },
+          }]}
+          onDismiss={() => setEdgeCtxMenu(null)}
+        />
+      )}
 
       {ctxMenu && (
         <div
