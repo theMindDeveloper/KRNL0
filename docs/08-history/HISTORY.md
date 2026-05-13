@@ -410,3 +410,33 @@ The PomoNode FSM gains long-break branching: `pomoComplete` now reads `(sessions
 **Summary:** User ran `npm run dev` on the v0.6.1 worktree and filed 9 bugs against the Pomodoro v2 feature. An audit confirmed all 9 plus 3 adjacent defects. A 4-agent team (FSM → dispatcher → UI → tester → pm-docs) executed the bug-fix pass on the same branch. Highlights: (1) real PAUSE/RESUME via a new `'paused'` FSM status with `pausedAt`/`pausedElapsedMs`; (2) per-task in-flight session checkpoint (`currentSessionElapsedSec`) so task A retains its progress when the user switches to task B and back; (3) `task.loadIntoPomo` separates "load settings" from "start session" so clicking a task no longer auto-starts the timer; (4) session-length clamp so a 1-min task gets a 1-min session, not 10; (5) gear UI moved top-right and disabled while busy; (6) pip count capped at 8 with overflow text. The 9 user stories the user manually tested are now Gherkin scenarios in `tests/integration/PomoNode.decision22-bugs.scenarios.test.ts`, ensuring CI catches any regression.
 
 **Tests:** 662 passing (+53 since PR #90 base), 0 typecheck errors, build clean.
+
+---
+
+## [2026-05-13] — Pomodoro / Todo family v2.2 — UI polish, animated edges, subtask backfill
+
+**Type:** Bug fix / UX polish
+**Branch:** `claude/objective-montalcini-ae7bb0` (PR #90 second follow-up pass)
+**ADR:** Decision 22.2
+**Commits:** `0705d71` (feat), `734933b` (fix), `8f6e3c5` (test)
+**Files changed:**
+- ADR: `docs/03-architecture/decisions.md` (Decision 22.2)
+- Docs: `docs/03-architecture/styling-philosophy.md` (new — color-family contract)
+- Renderer UI: `TaskNode/index.tsx` (START/STOP buttons replace `+ POMO`), `TodoNode/index.tsx` (header bullet `--cyan`, MotherFrame `borderColor="var(--cyan-glow)"`, minutes input wider)
+- Dispatcher: `commandDispatch.ts` (`task.stopPomo` command, `parseMinutesFromText` trailing-suffix parser, `task.addSubtask` bidirectional backfill, `task.delete` subtask cascade)
+- Canvas: `rfAdapters.tsx` (animated task-flow edges `animated: true` for `todo.task → todo.task`; `krnl-kind-<kind>` className emitted for CSS-scoped selection ring)
+- Styles: `reactflow-theme.css` (cyan selection ring for `.krnl-kind-todo` / `.krnl-kind-todo--task`, softer drop-shadow `3px / 0.30`)
+- Tests: `tests/integration/PomoNode.decision22-2-stories.test.ts` (new — 30 Gherkin scenarios across 6 user stories)
+
+**What happened.** User ran `npm run dev` on the Decision 22.1 worktree and filed 6 follow-up issues. None required schema changes — every fix reuses existing state fields:
+
+- **Issue 1 — Blue `+ POMO` button auto-starts pomo.** Replace single `+ POMO` with per-task START (green, `--acid`) and STOP (red, `--rust`). START dispatches `task.startPomo`; STOP dispatches new `task.stopPomo` command which commits elapsed seconds, cancels the pomo, and clears `activeTaskId`. STOP only visible when this task is the active one. `task.spawnPomo` stays in dispatcher for sys CLI.
+- **Issue 2 — Task body click should load only, not start.** Verified: body-click dispatches `task.loadIntoPomo` (Decision 22.1). No code change needed; documented in Decision 22.2 as a contract invariant.
+- **Issue 3 — TodoNode quick-add: typing time in text field should work without a mouse click.** Extended `parseMinutesFromText` to also match a trailing suffix (`"foo 25m"`, `"foo 25 min"`, `"foo 25minutes"`). Returns `{ plannedMin, strippedText }`. Trailing suffix takes precedence over inline `, time: N` and over UI minutes input. Minutes input widened from 36 px to 52 px.
+- **Issue 4 — Subtask via right-click didn't appear in parent TodoList.** `task.addSubtask` now appends a new TodoItem to the parent TodoNode (resolved via `parentTask.parentTodoId`) and writes bidirectional links atomically. `task.delete` cascade extended to remove every descendant's linked TodoItem before removing task nodes.
+- **Issue 5 — Selection highlight: rounded blue ring for todo family.** `rfAdapters.tsx` emits `krnl-kind-<kind>` className per node. A more-specific CSS rule in `reactflow-theme.css` overrides the global acid-green ring for `.krnl-kind-todo` and `.krnl-kind-todo--task`: rounded `box-shadow: 0 0 0 2px var(--cyan)`. TodoNode header bullet changed from `--rust` to `--cyan`; MotherFrame receives `borderColor="var(--cyan-glow)"`.
+- **Issue 6 — Animated edge lines not visible.** `rfAdapters.tsx` sets `animated: true` only when `srcKind === 'todo.task' && tgtKind === 'todo.task'`. Cyan drop-shadow softened from `5px / 0.45` to `3px / 0.30`; hover retains `9px / 0.85`.
+
+**Why.** Concrete UX problems that blocked daily use: the auto-starting `+ POMO` button hijacked the timer unintentionally; subtasks silently vanished from the todo list; the selection ring gave no visual indication of todo-family membership; the dash-march animation the user originally spec'd was disabled.
+
+**Tests:** 694 passing (+32 since Decision 22.1 pass), 1 todo, 0 failed. Typecheck clean.
