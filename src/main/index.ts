@@ -2,7 +2,7 @@ import { app, BrowserWindow, protocol } from 'electron';
 import { join } from 'path';
 import { mkdirSync, copyFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
-import { registerHandlers } from './ipc/handlers';
+import { registerHandlers, getCliDispatch } from './ipc/handlers';
 import {
   registerAssetHandlers,
   registerAssetProtocol,
@@ -90,7 +90,7 @@ app.whenReady().then(() => {
 
   // TNF1: RPC server starts before any window opens.
   const boardPath = process.env['KRNL0_BOARD_PATH'] ?? '';
-  rpcServer = createRpcServer(boardPath);
+  rpcServer = createRpcServer(boardPath, getCliDispatch);
 
   registerHandlers(rpcServer);
   registerAssetHandlers();

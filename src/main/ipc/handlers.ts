@@ -35,6 +35,19 @@ process.env['KRNL0_BOARD_PATH'] = BOARD_PATH;
 // Active PTY sessions keyed by sessionId
 const ptySessions = new Map<string, pty.IPty>();
 
+// Phase 2: renderer-coupled dispatch. Set by registerHandlers().
+// Used by SysFacade for viewport/undo/redo/theme commands.
+export type CliDispatchFn = (
+  command: string,
+  args: Record<string, unknown>,
+) => Promise<{ ok: boolean; message: string; exitCode?: number }>;
+
+let cliDispatchFn: CliDispatchFn | null = null;
+
+export function getCliDispatch(): CliDispatchFn | null {
+  return cliDispatchFn;
+}
+
 function loadBoard() {
   return loadBoardFrom(BOARD_PATH);
 }
@@ -75,10 +88,61 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       boardPath: BOARD_PATH,
       hasOpenRenderer,
       onBoardChanged: broadcastBoardReload,
+      ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
     });
     const result = await facade.run(argv);
     return { ok: result.ok, message: result.message ?? '' };
   });
+
+  // cli:dispatch — main→renderer command dispatch for renderer-coupled commands.
+  // Used by Phase 2 CLI commands (viewport/undo/redo/theme/marquee/node.move).
+  // Main sends cli:dispatch:request to all windows, waits up to 5s for reply.
+  const pendingCliDispatches = new Map<string, {
+    resolve: (result: { ok: boolean; message: string }) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
+
+  ipcMain.on('cli:dispatch:reply', (_event, id: string, ok: boolean, message: string) => {
+    const pending = pendingCliDispatches.get(id);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    pendingCliDispatches.delete(id);
+    pending.resolve({ ok, message });
+  });
+
+  /**
+   * Dispatch a command to the renderer. Returns ok=false + exit-code 2 if no
+   * renderer window is open (T27, T28, T31).
+   */
+  async function cliDispatch(
+    command: string,
+    args: Record<string, unknown>,
+  ): Promise<{ ok: boolean; message: string; exitCode?: number }> {
+    const windows = BrowserWindow.getAllWindows();
+    if (windows.length === 0) {
+      return {
+        ok: false,
+        message: `${command} requires an open renderer window`,
+        exitCode: 2,
+      };
+    }
+    const id = randomUUID();
+    const result = await new Promise<{ ok: boolean; message: string }>((resolve) => {
+      const timer = setTimeout(() => {
+        pendingCliDispatches.delete(id);
+        resolve({ ok: false, message: `cli:dispatch timeout for ${command}` });
+      }, 5000);
+      pendingCliDispatches.set(id, { resolve, timer });
+      for (const win of windows) {
+        win.webContents.send('cli:dispatch:request', id, command, args);
+      }
+    });
+    return result;
+  }
+
+  // Expose cliDispatch on the facade so sys:run can use it for Phase 2 commands.
+  // We attach it to the ipcMain context via a module-level variable.
+  cliDispatchFn = cliDispatch;
 
   ipcMain.handle('brain:ask', async (_event, prompt: string) => {
     // TODO (Week 5): route to active BrainProvider instance (created by BrainFactory)

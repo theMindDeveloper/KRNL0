@@ -23,6 +23,9 @@ interface KrnlBridge {
   assetRead: (assetId: string) => Promise<KrnlAssetReadResult | null>
   assetDelete: (assetId: string) => Promise<void>
   onBoardChanged: (callback: () => void) => () => void
+  // Phase 2: cli:dispatch
+  onCliDispatch?: (callback: (id: string, command: string, args: Record<string, unknown>) => void) => () => void
+  cliDispatchReply?: (id: string, ok: boolean, message: string) => void
 }
 
 interface Window {
