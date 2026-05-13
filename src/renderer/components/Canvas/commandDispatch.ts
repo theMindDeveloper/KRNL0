@@ -764,12 +764,13 @@ export function makeCommandHandler(nodeId: string) {
       const rawText = (args['text'] as string | undefined) ?? '';
       const { plannedMin: parsedMin, strippedText } = parseMinutesFromText(rawText);
       if (strippedText !== rawText || parsedMin !== null) {
-        // Rebuild args with stripped text and (if no explicit plannedMin) parsed minutes.
-        const hasExplicitPlanned = typeof args['plannedMin'] === 'number' && Number.isFinite(args['plannedMin'] as number);
+        // Rebuild args with stripped text. Parsed trailing/legacy minutes take precedence
+        // over the UI minutes input (decisions.md: "trailing suffix > structured plannedMin
+        // from the UI — typing 'foo 25m' is the user's explicit intent").
         effectiveArgs = {
           ...args,
           text: strippedText,
-          ...(parsedMin !== null && !hasExplicitPlanned ? { plannedMin: parsedMin } : {}),
+          ...(parsedMin !== null ? { plannedMin: parsedMin } : {}),
         };
       }
     }
