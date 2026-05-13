@@ -39,6 +39,9 @@ function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
     parentTaskId: null,
     todoItemId: null,
     pomoSessionsCompleted: 0,
+    plannedMin: 45,
+    secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
     ...overrides,
   };
 }
@@ -97,15 +100,31 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
     });
   });
 
-  // ── F2 — + pomo button spawns child ──────────────────────────────────────
-  describe('F2 — + pomo button dispatches task.spawnPomo', () => {
-    it('calls onCommand with task.spawnPomo when button clicked', () => {
+  // ── F2 — START button dispatches task.startPomo (Decision 22.2 Fix 1) ────
+  // The old "+ pomo" button (.task-pomo-btn) was replaced by task-start-btn /
+  // task-stop-btn. task-start-btn dispatches task.startPomo (same auto-start
+  // path as the old button). task.spawnPomo is still handled by the dispatcher
+  // but the UI no longer references it directly.
+  describe('F2 — START button dispatches task.startPomo', () => {
+    it('START button exists when done=false and task is not active', () => {
       const onCommand = vi.fn();
-      renderTaskNode(makeTaskState(), onCommand);
-      const btn = document.querySelector('.task-pomo-btn') as HTMLElement;
+      renderTaskNode(makeTaskState({ done: false }), onCommand);
+      const btn = screen.getByTestId('task-start-btn') as HTMLElement;
       expect(btn).not.toBeNull();
+    });
+
+    it('clicking START button dispatches task.startPomo', () => {
+      const onCommand = vi.fn();
+      renderTaskNode(makeTaskState({ done: false }), onCommand);
+      const btn = screen.getByTestId('task-start-btn') as HTMLElement;
       fireEvent.click(btn);
-      expect(onCommand).toHaveBeenCalledWith('task.spawnPomo');
+      expect(onCommand).toHaveBeenCalledWith('task.startPomo');
+    });
+
+    it('.task-pomo-btn no longer exists (old button removed)', () => {
+      renderTaskNode(makeTaskState({ done: false }));
+      const oldBtn = document.querySelector('.task-pomo-btn');
+      expect(oldBtn).toBeNull();
     });
   });
 
@@ -148,18 +167,25 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
     });
   });
 
-  // ── F4b — Done state hides + pomo button ─────────────────────────────────
-  describe('F4b — Done state hides + pomo button (NF3)', () => {
-    it('+ pomo button is not present when done is true', () => {
+  // ── F4b — Done state hides START button; shows neither START nor STOP ────
+  // Decision 22.2: the old .task-pomo-btn is gone. task-start-btn is hidden
+  // when done=true. task-stop-btn is only shown when the task is the active
+  // pomo task (isActive). When done=true, neither button should be present.
+  describe('F4b — Done state hides START button (Decision 22.2)', () => {
+    it('task-start-btn is not present when done is true', () => {
       renderTaskNode(makeTaskState({ done: true }));
-      const btn = document.querySelector('.task-pomo-btn');
+      const btn = document.queryByTestId ? document.queryByTestId('task-start-btn') : document.querySelector('[data-testid="task-start-btn"]');
       expect(btn).toBeNull();
     });
 
-    it('+ pomo button is present when done is false', () => {
+    it('task-start-btn is present when done is false (and task not active)', () => {
       renderTaskNode(makeTaskState({ done: false }));
-      const btn = document.querySelector('.task-pomo-btn');
-      expect(btn).not.toBeNull();
+      // task is not active (pomoRuntime.activeTaskId will be null with no board store),
+      // so START should be shown and STOP should not.
+      const startBtn = document.querySelector('[data-testid="task-start-btn"]');
+      expect(startBtn).not.toBeNull();
+      const stopBtn = document.querySelector('[data-testid="task-stop-btn"]');
+      expect(stopBtn).toBeNull();
     });
   });
 

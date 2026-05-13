@@ -96,12 +96,15 @@ describe('B1 — Body click dispatches task.loadIntoPomo', () => {
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
-  it('+ pomo button still dispatches task.spawnPomo (not affected by B1)', () => {
+  it('START button dispatches task.startPomo (not task.loadIntoPomo) — Decision 22.2', () => {
+    // The old .task-pomo-btn was replaced. The new task-start-btn dispatches
+    // task.startPomo (same auto-start path). task.spawnPomo is still handled
+    // by the dispatcher for sys CLI use but the UI no longer dispatches it.
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
-    const pomoBtn = document.querySelector('.task-pomo-btn') as HTMLElement;
-    fireEvent.click(pomoBtn);
-    expect(onCommand).toHaveBeenCalledWith('task.spawnPomo');
+    const startBtn = screen.getByTestId('task-start-btn') as HTMLElement;
+    fireEvent.click(startBtn);
+    expect(onCommand).toHaveBeenCalledWith('task.startPomo');
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 });
