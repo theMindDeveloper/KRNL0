@@ -7,6 +7,7 @@ import { TerminalNode } from './TerminalNode';
 import { TaskNode } from './TaskNode';
 import { TextNode } from './TextNode';
 import { ImageNode } from './ImageNode';
+import { ClockNode } from './ClockNode';
 import { UnknownNode } from './UnknownNode';
 import type { NodeProps } from './types';
 import { createNodeAdapter } from '../Canvas/rfAdapters';
@@ -24,6 +25,7 @@ const NODE_REGISTRY_RAW: Record<string, AnyNodeComponent> = {
   habit: HabitNode as AnyNodeComponent,
   'habit.lane': HabitLaneNode as AnyNodeComponent,
   term: TerminalNode as AnyNodeComponent,
+  clock: ClockNode as AnyNodeComponent,
   'todo.task': TaskNode as AnyNodeComponent,
   text: TextNode as AnyNodeComponent,
   image: ImageNode as AnyNodeComponent,
@@ -46,6 +48,7 @@ export const NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> 
   habit:          createNodeAdapter(HabitNode as AnyNodeComponent),
   'habit.lane':   createNodeAdapter(HabitLaneNode as AnyNodeComponent),
   term:           createNodeAdapter(TerminalNode as AnyNodeComponent),
+  clock:          createNodeAdapter(ClockNode as AnyNodeComponent),
   'todo.task':    createNodeAdapter(TaskNode as AnyNodeComponent),
   'pomo.session': createNodeAdapter(TaskNode as AnyNodeComponent),
   'habit.day':    createNodeAdapter(TaskNode as AnyNodeComponent),
