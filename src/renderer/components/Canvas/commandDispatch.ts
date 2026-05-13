@@ -53,6 +53,10 @@ import {
   taskEdit,
   taskIncrementPomo,
   taskActivate,
+  taskStartPomo,
+  taskFlushPomo,
+  taskResetPomo,
+  taskSetDuration,
 } from '../nodes/TaskNode/commands';
 import type { TaskState } from '../nodes/TaskNode/types';
 
@@ -120,6 +124,10 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'task.edit':          return { state: taskEdit(s as never, args as never) };
         case 'task.incrementPomo': return { state: taskIncrementPomo(s as never) };
         case 'task.activate':      return { state: taskActivate(s as never) };
+        case 'task.startPomo':     return { state: taskStartPomo(s as never, args as never) };
+        case 'task.flushPomo':     return { state: taskFlushPomo(s as never, args as never) };
+        case 'task.resetPomo':     return { state: taskResetPomo(s as never) };
+        case 'task.setDuration':   return { state: taskSetDuration(s as never, args as never) };
       }
       break;
     }
@@ -359,6 +367,9 @@ export function makeCommandHandler(nodeId: string) {
         parentTaskId: nodeId,
         todoItemId: null,
         pomoSessionsCompleted: 0,
+        pomoElapsedMs: 0,
+        pomoStartedAt: null,
+        pomoTargetMin: 0,
       };
 
       const childNode: Node = {
@@ -520,6 +531,9 @@ export function makeCommandHandler(nodeId: string) {
         parentTaskId: null,
         todoItemId: itemId,
         pomoSessionsCompleted: 0,
+        pomoElapsedMs: 0,
+        pomoStartedAt: null,
+        pomoTargetMin: 0,
       };
 
       const taskNodeId = `task-${crypto.randomUUID()}`;

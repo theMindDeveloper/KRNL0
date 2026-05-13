@@ -155,6 +155,9 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     parentTaskId: null,
     todoItemId: null,
     pomoSessionsCompleted: 0,
+    pomoElapsedMs: 0,
+    pomoStartedAt: null,
+    pomoTargetMin: 0,
   }),
   // Decision 21: heal text/image child nodes saved with partial state.
   text: () => ({ text: '' }),

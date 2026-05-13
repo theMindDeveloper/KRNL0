@@ -39,6 +39,9 @@ function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
     parentTaskId: null,
     todoItemId: null,
     pomoSessionsCompleted: 0,
+    pomoElapsedMs: 0,
+    pomoStartedAt: null,
+    pomoTargetMin: 0,
     ...overrides,
   };
 }
