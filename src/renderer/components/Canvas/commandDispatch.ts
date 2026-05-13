@@ -535,6 +535,20 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
+    // ── todo.loadTaskForItem: resolve itemId → taskNodeId → LOAD ONLY ─────
+    // Single-clicking a TodoItem row refreshes the pomo with the task's saved
+    // state (label, durationMin, checkpoint elapsed) without auto-starting.
+    // The user must press START on the pomo to begin the session.
+    if (command === 'todo.loadTaskForItem') {
+      const todoState = node.state as TodoState;
+      const itemId = args['itemId'] as string | undefined;
+      if (!itemId) return;
+      const item = todoState.items.find((i) => i.id === itemId);
+      if (!item?.taskNodeId) return;
+      loadTaskIntoPomo(item.taskNodeId, { autoStart: false });
+      return;
+    }
+
     // ── task.delete: cascade-delete task + descendants + linked TodoItems ───
     // Decision 22.2: cascade now removes per-descendant TodoItems (subtasks are
     // tracked in the TodoList as of Decision 22.2, so every descendant may have
