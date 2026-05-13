@@ -31,6 +31,7 @@ import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
 import { makeCommandHandler } from './commandDispatch';
 import { Dock } from '../Dock';
 import { ingestImageFile, initialDisplaySize } from './dropImage';
+import { defaultClockState } from '../nodes/ClockNode/types';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
@@ -350,6 +351,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     });
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {},
+      clock: defaultClockState() as unknown as Record<string, unknown>,
       'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
       text: { text: '' },
       image: {},
@@ -360,7 +362,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       position: { x: center.x, y: center.y },
       state: defaultState[args.kind],
       config: {},
-      isMother: false,
+      isMother: (['pomo', 'todo', 'habit', 'term', 'clock'] as NodeKind[]).includes(args.kind),
     };
     addNode(newNode);
     const updated = useBoardStore.getState().board;
