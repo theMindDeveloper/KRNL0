@@ -22,6 +22,7 @@
 | F12 | `todo.clearDone` cascades — every removed done item also removes its linked TaskNode, all descendants of that TaskNode, and all referencing edges |
 | F13 | `todo.toggle` mirrors done state to the linked TaskNode (if `taskNodeId !== null`); `task.toggle` mirrors done state back to the linked TodoItem (if `todoItemId !== null`) |
 | F14 | Each `TodoItem` stores `taskNodeId: string \| null`; `todo.add` initialises it as `null`; `todoLinkTask` sets it atomically when the TaskNode is spawned |
+| F15 | The add-task row renders a **minutes input** (3 chars wide, mono) next to the text input. It defaults to the current `pomoConfig.sessionMin` value. On `Enter` the dispatched `todo.add` carries `{ text, plannedMin }`; the spawned TaskNode is created with that `plannedMin` (and `durationMin = pomoConfig.sessionMin`). Free-form text matching `/,\s*time:\s*(\d+)/i` also extracts a `plannedMin` if the dedicated input is empty. |
 
 ---
 
@@ -186,4 +187,4 @@ Feature: TodoNode task list
 
 ---
 
-*Last updated: 2026-05-12*
+*Last updated: 2026-05-13 — Decision 22 (minutes input on add-task row)*

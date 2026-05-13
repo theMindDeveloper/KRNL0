@@ -21,6 +21,13 @@
 | F11 | "Add subtask" in the context menu shows an inline `subtask…` input; pressing Enter dispatches `task.addSubtask` with the typed text, spawning a child TaskNode with `layer = parent.layer + 1`, `parentTaskId = parent.id`, and a `task.next → task.activate` chain edge |
 | F12 | "Delete" in the context menu dispatches `task.delete`; the dispatcher BFS-collects the node and all descendants (via `parentTaskId` chain), removes them all plus incident edges, removes the linked `TodoItem` (if `todoItemId !== null`), then renumbers siblings |
 | F13 | `TaskState` gains three persisted fields: `parentTaskId: string \| null` (null = root task), `todoItemId: string \| null` (back-link to spawning TodoItem), and `pomoSessionsCompleted: number` (default 0); these are backfilled on older `board.json` nodes at load time |
+| F14 | `TaskState` gains two more persisted fields (Decision 22): `plannedMin: number` (minutes budgeted for this task; default = `pomoConfig.sessionMin` at creation), and `secondsAccumulated: number` (total seconds spent across all pomo sessions for this task; default 0). Both backfill on older boards via `STATE_DEFAULTS['todo.task']`. |
+| F15 | When the pomo mother's `state.activeTaskId === thisTaskId`, the node root gains class `"active"` which renders a 2px acid-coloured ring (`box-shadow: 0 0 0 2px var(--acid), 0 0 24px rgba(201,241,88,0.45)`). |
+| F16 | A **corner timer** in the top-left of the body shows the time spent on this task. Value is `secondsAccumulated + (pomo.status === 'running' && pomo.activeTaskId === thisTaskId ? (now - pomo.startedAt) / 1000 : 0)`, formatted as `H:MM:SS` (or `MM:SS` when under 1h). The component subscribes to a single 500ms `setInterval` only when this task is the active running task; otherwise the displayed value is static. |
+| F17 | Clicking the task body sets the pomo's `activeTaskId` to this task and immediately starts a session (existing `task.startPomo` flow, now atomic with activation per Decision 22 §5). If another task was the active running task at the moment of the click, the dispatcher commits its elapsed time to its `secondsAccumulated` and records a cancelled history entry before switching. (Superseded by F18 — Decision 22.1) |
+| F18 | Clicking the task body dispatches `task.loadIntoPomo` (no auto-start). The pomo FSM goes to `paused` with the task's `currentSessionElapsedSec` as `pausedElapsedMs` if non-zero, else `idle`. The `+ pomo` header button continues to dispatch `task.spawnPomo` for explicit auto-start. (Supersedes F17 — Decision 22.1) |
+| F19 | Double-clicking the ETA badge in the footer enters inline edit mode (numeric input, pre-filled with current `plannedMin`); Enter dispatches `task.setPlannedMin` with the parsed minutes; ESC cancels with no dispatch. |
+| F20 | `TaskState` gains `currentSessionElapsedSec: number` (Decision 22.1). Default 0. Backfilled by `STATE_DEFAULTS['todo.task']`. Written when a task is swapped out of the active slot; cleared on `pomo.cancel` / `pomo.complete` after the final commit to `secondsAccumulated`. |
 
 ---
 
@@ -176,4 +183,4 @@ Feature: TaskNode display and interaction
 
 ---
 
-*Last updated: 2026-05-12*
+*Last updated: 2026-05-13 — Decision 22.1 (load-without-start, ETA inline edit, currentSessionElapsedSec)*
