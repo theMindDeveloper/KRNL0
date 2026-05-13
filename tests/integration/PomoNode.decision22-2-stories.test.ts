@@ -805,3 +805,100 @@ describe('Story 6 — Animated task-flow edges (Decision 22.2 Fix 6)', () => {
   });
 
 });
+
+// ── Story 7 — "Running task must keep running when I click another task" ──────
+//
+// The user reported: started Task A, then clicked Task B (to connect an edge or
+// move it on the canvas), and Task A's timer stopped. Passive click-driven
+// loads must NOT disturb a live session — only explicit START presses do.
+
+describe('Story 7 — Click protect-running (background runs survive selection)', () => {
+
+  it('T7.1: passive task.loadIntoPomo on Task B while Task A is running NO-OPs (pomo still running A)', () => {
+    const board = makeBoardWithTasks({
+      taskA: { plannedMin: 25 },
+      taskB: { plannedMin: 10 },
+      pomoState: {
+        status: 'running',
+        activeTaskId: 'task-a',
+        startedAt: new Date(Date.now() - 60_000).toISOString(),
+        durationMin: 25,
+        label: 'Task A',
+      },
+    });
+    useBoardStore.getState().setBoard(board);
+
+    makeCommandHandler('task-b')('task.loadIntoPomo');
+
+    const ps = getPomoState();
+    expect(ps.activeTaskId).toBe('task-a');
+    expect(ps.status).toBe('running');
+    expect(ps.label).toBe('Task A');
+  });
+
+  it('T7.2: passive todo.loadTaskForItem on item-2 while Task A is running NO-OPs', () => {
+    const board = makeBoardWithTasks({
+      taskA: { plannedMin: 25 },
+      taskB: { plannedMin: 10 },
+      pomoState: {
+        status: 'running',
+        activeTaskId: 'task-a',
+        startedAt: new Date(Date.now() - 60_000).toISOString(),
+        durationMin: 25,
+        label: 'Task A',
+      },
+    });
+    useBoardStore.getState().setBoard(board);
+
+    makeCommandHandler('todo-mother')('todo.loadTaskForItem', { itemId: 'item-2' });
+
+    const ps = getPomoState();
+    expect(ps.activeTaskId).toBe('task-a');
+    expect(ps.status).toBe('running');
+  });
+
+  it('T7.3: passive load on Task B while Task A is PAUSED still switches (paused is not protected)', () => {
+    const board = makeBoardWithTasks({
+      taskA: { plannedMin: 25 },
+      taskB: { plannedMin: 10 },
+      pomoState: {
+        status: 'paused',
+        activeTaskId: 'task-a',
+        startedAt: new Date().toISOString(),
+        pausedAt: new Date().toISOString(),
+        pausedElapsedMs: 60_000,
+        durationMin: 25,
+        label: 'Task A',
+      },
+    });
+    useBoardStore.getState().setBoard(board);
+
+    makeCommandHandler('task-b')('task.loadIntoPomo');
+
+    const ps = getPomoState();
+    expect(ps.activeTaskId).toBe('task-b');
+    expect(ps.status).toBe('paused');
+  });
+
+  it('T7.4: explicit task.startPomo on Task B while Task A is running force-switches', () => {
+    const board = makeBoardWithTasks({
+      taskA: { plannedMin: 25 },
+      taskB: { plannedMin: 10 },
+      pomoState: {
+        status: 'running',
+        activeTaskId: 'task-a',
+        startedAt: new Date(Date.now() - 60_000).toISOString(),
+        durationMin: 25,
+        label: 'Task A',
+      },
+    });
+    useBoardStore.getState().setBoard(board);
+
+    makeCommandHandler('task-b')('task.startPomo');
+
+    const ps = getPomoState();
+    expect(ps.activeTaskId).toBe('task-b');
+    expect(ps.status).toBe('running');
+  });
+
+});

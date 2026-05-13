@@ -340,14 +340,22 @@ function checkpointActiveTaskElapsed(): number {
  * Decision 22.1 §4 — unified activation helper.
  * Loads a task into the pomo with optional auto-start.
  *
- * autoStart=true  → FSM becomes 'running' with offset startedAt honouring checkpoint.
- * autoStart=false → FSM becomes 'paused' with pausedElapsedMs = checkpoint.
+ * autoStart=true   → FSM becomes 'running' with offset startedAt honouring checkpoint.
+ * autoStart=false  → FSM becomes 'paused' with pausedElapsedMs = checkpoint.
+ * protectRunning=true → if a DIFFERENT task is currently running, no-op. Used by
+ *   passive click-driven loads (task body click, todo-row click) so that the
+ *   user can click around to select / connect / move tasks without disturbing
+ *   the live session. Explicit START / Start-pomo paths pass protectRunning=false
+ *   to force-switch.
  *
  * Idempotent guards:
  *   - same task + running → no-op (B6).
  *   - same task + paused  → no-op (avoids silently resetting checkpoint).
  */
-function loadTaskIntoPomo(taskNodeId: string, opts: { autoStart: boolean }): void {
+function loadTaskIntoPomo(
+  taskNodeId: string,
+  opts: { autoStart: boolean; protectRunning?: boolean },
+): void {
   const { board, updateNode } = useBoardStore.getState();
   if (!board) return;
 
@@ -364,6 +372,17 @@ function loadTaskIntoPomo(taskNodeId: string, opts: { autoStart: boolean }): voi
   if (
     ps.activeTaskId === taskNodeId &&
     (ps.status === 'running' || ps.status === 'paused')
+  ) {
+    return;
+  }
+
+  // Protect-running guard: a different task is currently RUNNING and the caller
+  // is a passive load (click/selection). Refuse to disturb the live session.
+  if (
+    opts.protectRunning === true &&
+    ps.activeTaskId !== null &&
+    ps.activeTaskId !== taskNodeId &&
+    ps.status === 'running'
   ) {
     return;
   }
@@ -482,8 +501,9 @@ export function makeCommandHandler(nodeId: string) {
     }
 
     // ── task.loadIntoPomo: load without auto-start (Bug #2 fix) ───────────
+    // Passive (click/selection driven) — protect a different running session.
     if (command === 'task.loadIntoPomo') {
-      loadTaskIntoPomo(nodeId, { autoStart: false });
+      loadTaskIntoPomo(nodeId, { autoStart: false, protectRunning: true });
       return;
     }
 
@@ -553,13 +573,14 @@ export function makeCommandHandler(nodeId: string) {
     // Single-clicking a TodoItem row refreshes the pomo with the task's saved
     // state (label, durationMin, checkpoint elapsed) without auto-starting.
     // The user must press START on the pomo to begin the session.
+    // Passive click — protect a different running session.
     if (command === 'todo.loadTaskForItem') {
       const todoState = node.state as TodoState;
       const itemId = args['itemId'] as string | undefined;
       if (!itemId) return;
       const item = todoState.items.find((i) => i.id === itemId);
       if (!item?.taskNodeId) return;
-      loadTaskIntoPomo(item.taskNodeId, { autoStart: false });
+      loadTaskIntoPomo(item.taskNodeId, { autoStart: false, protectRunning: true });
       return;
     }
 

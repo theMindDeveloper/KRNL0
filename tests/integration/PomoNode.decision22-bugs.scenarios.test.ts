@@ -483,7 +483,12 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
 
   describe('Group D — Task switch with per-task checkpoint', () => {
 
-    it('D1: Given pomo running task A for ~120s, when task.loadIntoPomo(B) dispatched, then task A gains currentSessionElapsedSec≈120 and pomo switches to task B', () => {
+    // Updated for Decision 22.2 protect-running rule: passive
+    // task.loadIntoPomo no-ops when a different task is running. The
+    // checkpoint-on-switch behaviour now only triggers from explicit
+    // task.startPomo. See Story 7 (T7.1–T7.4) for the protect-running
+    // scenarios and D1b below for the explicit-switch checkpoint.
+    it('D1: Given pomo running task A for ~120s, when task.loadIntoPomo(B) dispatched, then pomo STAYS on task A (protect-running)', () => {
       const startedAt = new Date(Date.now() - 120_000).toISOString();
       const board = makeBoardWithTasks({
         taskB: {},
@@ -499,13 +504,34 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
 
       makeCommandHandler('task-b')('task.loadIntoPomo');
 
+      const ps = getPomoState();
+      expect(ps.activeTaskId).toBe('task-a');
+      expect(ps.status).toBe('running');
+      expect(ps.label).toBe('Task A');
+    });
+
+    it('D1b: explicit task.startPomo on B while A is running force-switches and checkpoints A', () => {
+      const startedAt = new Date(Date.now() - 120_000).toISOString();
+      const board = makeBoardWithTasks({
+        taskB: {},
+        pomoState: {
+          status: 'running',
+          startedAt,
+          activeTaskId: 'task-a',
+          label: 'Task A',
+          durationMin: 25,
+        },
+      });
+      useBoardStore.getState().setBoard(board);
+
+      makeCommandHandler('task-b')('task.startPomo');
+
       const taskA = getTaskState('task-a');
       const ps = getPomoState();
-
       expect(taskA.currentSessionElapsedSec).toBeGreaterThanOrEqual(118);
       expect(taskA.currentSessionElapsedSec).toBeLessThanOrEqual(122);
       expect(ps.activeTaskId).toBe('task-b');
-      expect(ps.status).toBe('paused');
+      expect(ps.status).toBe('running');
     });
 
     it('D2: Given task A was previously active with 120s checkpoint, when task.loadIntoPomo(A) dispatched again, then pomo pausedElapsedMs=120000 (checkpoint restored)', () => {
