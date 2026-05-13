@@ -1,6 +1,8 @@
 # 🧪 KRNL0 🧪
 
 <div align="center">
+
+# 🧪 KRNL0 🧪
   
 ![krnl0 logo](docs/assets/krnl0logo0.png)
 **The Life OS. One canvas for everything you do.**
