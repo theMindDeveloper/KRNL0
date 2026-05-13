@@ -1,18 +1,7 @@
 <div align="center">
 
-# KRNL0
-   
-```
-  ▄█   ▄█▄ ███▄▄▄▄      ▄████████  ▄█        ▄██████▄  
-  ███ ▄███▀ ███▀▀▀██▄   ███    ███ ███       ███    ███ 
-  ███▐██▀   ███   ███   ███    ███ ███       ███    ███ 
- ▄█████▀    ███   ███  ▄███▄▄▄▄██▀ ███       ███ ██████
-▀▀█████▄    ███   ███ ▀▀███▀▀▀▀▀   ███       ██████ ███ 
-  ███▐██▄   ███   ███ ▀███████████ ███       ███    ███
-  ███ ▀███▄ ███   ███   ███    ███ ███▌    ▄ ███    ███ 
-  ███   ▀█▀  ▀█   █▀    ███    ███ █████▄▄██  ▀██████▀  
-  ▀                     ███    ███ ▀                    
-```
+#🧪 KRNL0 🧪
+![krnl0 logo](docs/assets/krnl0logo0.png)
 **The Life OS. One canvas for everything you do.**
 
 Pomodoro, todos, habits, kanban, notes, projects — all on one infinite whiteboard.
