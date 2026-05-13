@@ -26,8 +26,18 @@ export function seedBoard(): PartialBoard {
         kind: 'pomo',
         position: { x: -808, y: 0 },
         isMother: true,
-        state: { status: 'idle', startedAt: null, durationMin: 25, label: '', sessionsCompleted: 0, history: [] },
-        config: { shortBreakMin: 5, longBreakMin: 15, sessionsUntilLongBreak: 4 },
+        state: {
+          status: 'idle',
+          startedAt: null,
+          durationMin: 25,
+          breakMin: 5,
+          label: '',
+          sessionsCompleted: 0,
+          activeTaskId: null,
+          history: [],
+        },
+        // Decision 22 — canonical PomoConfig shape.
+        config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
       },
       {
         id: 'mother-todo',
@@ -138,6 +148,8 @@ function migrateTaskChain(board: Record<string, unknown>): Record<string, unknow
 }
 
 const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
+  // Decision 22: `activeTaskId` is the new field on PomoState. Older boards
+  // get it backfilled to `null` (default mode).
   pomo: () => ({
     status: 'idle',
     startedAt: null,
@@ -145,16 +157,20 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     breakMin: 5,
     label: '',
     sessionsCompleted: 0,
+    activeTaskId: null,
     history: [],
   }),
   todo: () => ({ items: [] }),
   habit: () => ({ habits: [] }),
   term: () => ({ sessionId: null, title: 'Terminal' }),
-  // Decision 20: backfill new fields on existing task nodes at load time
+  // Decision 20: parentTaskId / todoItemId / pomoSessionsCompleted backfill.
+  // Decision 22: plannedMin / secondsAccumulated backfill.
   'todo.task': () => ({
     parentTaskId: null,
     todoItemId: null,
     pomoSessionsCompleted: 0,
+    plannedMin: 25,
+    secondsAccumulated: 0,
   }),
   // Decision 21: heal text/image child nodes saved with partial state.
   text: () => ({ text: '' }),
@@ -169,9 +185,43 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
 
 // Decision #14 — back-fill v2 config defaults on existing habit mother nodes
 // so reloads of pre-v2 board.json don't surface an undefined view.
+// Decision #22 — canonicalise PomoConfig fields. Older boards used
+// `{ shortBreakMin, longBreakMin, sessionsUntilLongBreak }` (seed) or
+// `{ defaultDurationMin, defaultBreakMin, longBreakEvery, longBreakMin }`
+// (v1 defaultPomoConfig). The canonical shape is
+// `{ sessionMin, shortBreakMin, longBreakMin, longBreakEvery }`. The migration
+// in `migratePomoConfig` below promotes legacy names; `CONFIG_DEFAULTS['pomo']`
+// supplies a baseline when the entire config object is missing.
 const CONFIG_DEFAULTS: Record<string, () => Record<string, unknown>> = {
   habit: () => ({ weekStartsOn: 'monday', view: 'week' }),
+  pomo: () => ({ sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 }),
 };
+
+// Decision 22 — heal pre-v2 PomoConfig shapes into the canonical fields.
+function migratePomoConfig(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return n;
+    const node = n as { kind?: string; config?: Record<string, unknown> | null };
+    if (node.kind !== 'pomo') return n;
+    const cfg = (node.config ?? {}) as Record<string, unknown>;
+    const num = (...keys: string[]): number | undefined => {
+      for (const k of keys) {
+        const v = cfg[k];
+        if (typeof v === 'number' && Number.isFinite(v)) return v;
+      }
+      return undefined;
+    };
+    const sessionMin = num('sessionMin', 'defaultDurationMin') ?? 25;
+    const shortBreakMin = num('shortBreakMin', 'defaultBreakMin') ?? 5;
+    const longBreakMin = num('longBreakMin') ?? 15;
+    const longBreakEvery = num('longBreakEvery', 'sessionsUntilLongBreak') ?? 4;
+    const canonical = { sessionMin, shortBreakMin, longBreakMin, longBreakEvery };
+    return { ...node, config: { ...cfg, ...canonical } };
+  });
+  return board;
+}
 
 // Per-habit color back-fill — v2 habit schema requires `color`. Render-time
 // fallback handles unwritten habits but persistent writes (re-saves) should
@@ -212,6 +262,27 @@ function migrateNodeStates(board: Record<string, unknown>): Record<string, unkno
   return board;
 }
 
+/**
+ * Decision 22 — backfill `plannedMin` on existing task nodes that pre-date
+ * the field. Use the existing `durationMin` if present so the budget shows
+ * something meaningful instead of the global default. `secondsAccumulated`
+ * is handled by STATE_DEFAULTS spread (defaults to 0).
+ */
+function migrateTaskPlannedMin(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return n;
+    const node = n as { kind?: string; state?: Record<string, unknown> | null };
+    if (node.kind !== 'todo.task') return n;
+    const s = (node.state ?? {}) as Record<string, unknown>;
+    if (typeof s['plannedMin'] === 'number') return n;
+    const fallback = typeof s['durationMin'] === 'number' ? s['durationMin'] : 25;
+    return { ...node, state: { ...s, plannedMin: fallback } };
+  });
+  return board;
+}
+
 /** Decision 20: backfill taskNodeId on TodoItems that are missing it. */
 function migrateTodoItemFields(board: Record<string, unknown>): Record<string, unknown> {
   const nodes = board['nodes'];
@@ -238,10 +309,19 @@ export function loadBoardFrom(boardPath: string): unknown {
     if (existsSync(boardPath)) {
       const raw = readFileSync(boardPath, 'utf-8');
       const parsed: unknown = JSON.parse(raw);
+      // Migration order matters: shape-promoting migrations (pomo config rename,
+      // task plannedMin backfill from durationMin) must run BEFORE
+      // `migrateNodeStates` so the canonical fields exist when STATE/CONFIG
+      // DEFAULTS apply their baseline spread — otherwise the defaults clobber
+      // legacy-derived values.
       return migrateTodoItemFields(
         migrateHabitFields(
           migrateNodeStates(
-            migrateTaskChain(migrateMotherPositions(parsed)),
+            migrateTaskPlannedMin(
+              migratePomoConfig(
+                migrateTaskChain(migrateMotherPositions(parsed)),
+              ),
+            ),
           ),
         ),
       );
