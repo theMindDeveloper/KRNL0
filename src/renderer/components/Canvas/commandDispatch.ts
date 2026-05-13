@@ -280,6 +280,78 @@ function renumberSiblings(parentTodoId: string, parentTaskId: string | null): vo
 }
 
 /**
+ * Cascade-delete one or more TaskNodes plus all their descendants.
+ * Cleans up linked TodoItems from parent TodoNodes and renumbers siblings.
+ * Used by both the marquee right-click delete path and the task.delete command.
+ */
+export function deleteTaskNodesCascade(taskIds: string[]): void {
+  const { board, updateNode } = useBoardStore.getState();
+  if (!board) return;
+
+  const allDescendants = new Set<string>();
+  const parentPairs: Array<{ parentTodoId: string; parentTaskId: string | null }> = [];
+  const seenPairs = new Set<string>();
+
+  for (const taskId of taskIds) {
+    const node = board.nodes.find((n) => n.id === taskId);
+    if (!node || node.kind !== 'todo.task') continue;
+    const ts = node.state as TaskState;
+    const pairKey = `${ts.parentTodoId}:${ts.parentTaskId ?? ''}`;
+    if (!seenPairs.has(pairKey)) {
+      seenPairs.add(pairKey);
+      parentPairs.push({ parentTodoId: ts.parentTodoId, parentTaskId: ts.parentTaskId });
+    }
+    for (const id of collectDescendants(taskId, board.nodes)) {
+      allDescendants.add(id);
+    }
+  }
+
+  if (allDescendants.size === 0) return;
+
+  // Clear pomo if any deleted task (or descendant) is the active task.
+  const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
+  if (pomoNode) {
+    const ps = pomoNode.state as PomoState;
+    if (ps.activeTaskId !== null && allDescendants.has(ps.activeTaskId)) {
+      let cancelledState = ps;
+      if (ps.status !== 'idle') cancelledState = pomoCancel(ps);
+      updateNode(pomoNode.id, { state: pomoClearActiveTask(cancelledState) });
+    }
+  }
+
+  // Collect TodoItems to remove, grouped by their parent TodoNode.
+  const todoItemsByParent = new Map<string, string[]>();
+  for (const descId of allDescendants) {
+    const descNode = board.nodes.find((n) => n.id === descId);
+    if (!descNode || descNode.kind !== 'todo.task') continue;
+    const ts = descNode.state as TaskState;
+    if (ts.todoItemId === null) continue;
+    const existing = todoItemsByParent.get(ts.parentTodoId);
+    if (existing) existing.push(ts.todoItemId);
+    else todoItemsByParent.set(ts.parentTodoId, [ts.todoItemId]);
+  }
+
+  const currentBoard = useBoardStore.getState().board;
+  if (currentBoard) {
+    for (const [parentTodoId, itemIds] of todoItemsByParent) {
+      const todoNode = currentBoard.nodes.find((n) => n.id === parentTodoId);
+      if (!todoNode) continue;
+      let newTodoState = todoNode.state as TodoState;
+      for (const itemId of itemIds) {
+        newTodoState = todoRemove(newTodoState, { id: itemId });
+      }
+      updateNode(todoNode.id, { state: newTodoState });
+    }
+  }
+
+  removeNodeSet([...allDescendants]);
+
+  for (const { parentTodoId, parentTaskId } of parentPairs) {
+    renumberSiblings(parentTodoId, parentTaskId);
+  }
+}
+
+/**
  * Mutate the mother habit's state via a pure handler. Returns true if the
  * mother was found and the patch persisted.
  */
@@ -584,59 +656,8 @@ export function makeCommandHandler(nodeId: string) {
     }
 
     // ── task.delete: cascade-delete task + descendants + linked TodoItems ───
-    // Decision 22.2: cascade now removes per-descendant TodoItems (subtasks are
-    // tracked in the TodoList as of Decision 22.2, so every descendant may have
-    // a linked TodoItem that must be unlinked before the nodes are removed).
     if (command === 'task.delete') {
-      const taskState = node.state as TaskState;
-      const descendants = collectDescendants(nodeId, board.nodes);
-      const descendantSet = new Set(descendants);
-
-      // Defect A: clear pomo if the deleted task (or any descendant) is active.
-      const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
-      if (pomoNode) {
-        const ps = pomoNode.state as PomoState;
-        if (ps.activeTaskId !== null && descendantSet.has(ps.activeTaskId)) {
-          let cancelledState = ps;
-          if (ps.status !== 'idle') {
-            cancelledState = pomoCancel(ps);
-          }
-          const clearedState = pomoClearActiveTask(cancelledState);
-          updateNode(pomoNode.id, { state: clearedState });
-        }
-      }
-
-      // Collect {parentTodoId → itemIds[]} from ALL descendants (root included)
-      // that have a linked TodoItem. One updateNode per parent TodoNode.
-      const todoItemsByParent = new Map<string, string[]>();
-      for (const descId of descendants) {
-        const descNode = board.nodes.find((n) => n.id === descId);
-        if (!descNode || descNode.kind !== 'todo.task') continue;
-        const ts = descNode.state as TaskState;
-        if (ts.todoItemId === null) continue;
-        const existing = todoItemsByParent.get(ts.parentTodoId);
-        if (existing) {
-          existing.push(ts.todoItemId);
-        } else {
-          todoItemsByParent.set(ts.parentTodoId, [ts.todoItemId]);
-        }
-      }
-      const currentBoard = useBoardStore.getState().board;
-      if (currentBoard) {
-        for (const [parentTodoId, itemIds] of todoItemsByParent) {
-          const todoNode = currentBoard.nodes.find((n) => n.id === parentTodoId);
-          if (!todoNode) continue;
-          // Reduce all item removals in a single pass so we emit one updateNode.
-          let newTodoState = todoNode.state as TodoState;
-          for (const itemId of itemIds) {
-            newTodoState = todoRemove(newTodoState, { id: itemId });
-          }
-          updateNode(todoNode.id, { state: newTodoState });
-        }
-      }
-
-      removeNodeSet(descendants);
-      renumberSiblings(taskState.parentTodoId, taskState.parentTaskId);
+      deleteTaskNodesCascade([nodeId]);
       const final = useBoardStore.getState().board;
       if (final) void window.krnl?.boardSave(final);
       return;
