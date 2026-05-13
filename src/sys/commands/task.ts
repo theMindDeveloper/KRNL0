@@ -418,6 +418,159 @@ export async function taskSubtask(
   };
 }
 
+export async function taskDuration(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+  minutes: number | undefined,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task duration requires a <taskId>' };
+  if (minutes === undefined || isNaN(minutes) || minutes <= 0) {
+    return { ok: false, message: 'task duration requires a positive <minutes> number' };
+  }
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, taskId);
+  if (!taskNode) return { ok: false, message: `No task node with id "${taskId}"` };
+
+  // Guard: if the pomo mother is actively running, refuse to change duration.
+  const pomoMother = findPomoMother(board);
+  if (pomoMother) {
+    const ps = pomoMother.state as import('../../renderer/components/nodes/PomoNode/types').PomoState;
+    if (ps.status === 'running' && ps.startedAt !== null) {
+      return {
+        ok: false,
+        message: 'Cannot change duration while a pomo session is running. Stop the pomo first.',
+      };
+    }
+  }
+
+  const ts = taskNode.state as TaskState;
+  const nextState: TaskState = {
+    ...ts,
+    durationMin: minutes,
+    eta: `~${minutes} min`,
+  };
+  updateNode(board, taskId, { ...taskNode, state: nextState });
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Task "${taskId.slice(0, 8)}" duration set to ${minutes} min.`,
+    data: { id: taskId, durationMin: minutes },
+  };
+}
+
+export async function taskSibling(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task sibling requires a <taskId>' };
+  const board = loadBoard(ctx);
+  const sourceNode = findTaskNode(board, taskId);
+  if (!sourceNode) return { ok: false, message: `No task node with id "${taskId}"` };
+
+  const sourceTs = sourceNode.state as TaskState;
+
+  // Find any existing outgoing task.next edge from the source node
+  const existingEdge = (board.edges as Array<{
+    id: string;
+    from: { nodeId: string; event: string };
+    to: { nodeId: string; command: string };
+    enabled: boolean;
+  }>).find(
+    (e) => e.from.nodeId === taskId && e.from.event === 'task.next',
+  );
+  const existingEdgeId = existingEdge?.id;
+  const nextNodeId = existingEdge?.to.nodeId;
+
+  const now = new Date().toISOString();
+  const newNodeId = `task-${randomUUID()}`;
+  const newTaskState: TaskState = {
+    text: 'New task',
+    done: false,
+    durationMin: sourceTs.durationMin,
+    eta: sourceTs.eta,
+    sequenceNumber: sourceTs.sequenceNumber + 1,
+    layer: sourceTs.layer,
+    createdAt: now,
+    parentTodoId: sourceTs.parentTodoId,
+    parentTaskId: sourceTs.parentTaskId,
+    todoItemId: null,
+    pomoSessionsCompleted: 0,
+  };
+
+  const newNode: AnyNode = {
+    id: newNodeId,
+    kind: 'todo.task',
+    isMother: false,
+    position: {
+      x: (sourceNode.position?.x ?? 0) + 252,
+      y: sourceNode.position?.y ?? 0,
+    },
+    state: newTaskState,
+    config: { showDuration: true },
+  };
+
+  // Edge from source → new
+  const edgeToNew = {
+    id: `edge-${randomUUID()}`,
+    from: { nodeId: taskId, event: 'task.next' },
+    to: { nodeId: newNodeId, command: 'task.activate' },
+    enabled: true,
+  };
+
+  // If there was a next node, rewire: new → next
+  const rewireEdge = nextNodeId !== undefined
+    ? {
+        id: `edge-${randomUUID()}`,
+        from: { nodeId: newNodeId, event: 'task.next' },
+        to: { nodeId: nextNodeId, command: 'task.activate' },
+        enabled: true,
+      }
+    : null;
+
+  // Remove the old source→next edge (will be replaced by source→new)
+  const filteredEdges = existingEdgeId
+    ? (board.edges as Array<{ id: string }>).filter((e) => e.id !== existingEdgeId)
+    : board.edges;
+
+  board.nodes = [...board.nodes, newNode];
+  board.edges = rewireEdge
+    ? [...filteredEdges, edgeToNew, rewireEdge]
+    : [...filteredEdges, edgeToNew];
+
+  // Renumber siblings (same parentTodoId + parentTaskId) by createdAt
+  renumberSiblings(board, sourceTs.parentTodoId, sourceTs.parentTaskId);
+
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Sibling task inserted after "${taskId.slice(0, 8)}…" (id: ${newNodeId.slice(0, 13)}…).`,
+    data: { id: newNodeId },
+  };
+}
+
+export async function taskResetPomo(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task reset-pomo requires a <taskId>' };
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, taskId);
+  if (!taskNode) return { ok: false, message: `No task node with id "${taskId}"` };
+
+  const ts = taskNode.state as TaskState;
+  const nextState: TaskState = {
+    ...ts,
+    pomoSessionsCompleted: 0,
+  };
+  updateNode(board, taskId, { ...taskNode, state: nextState });
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Pomo progress reset for task "${taskId.slice(0, 8)}".`,
+    data: { id: taskId, pomoSessionsCompleted: 0 },
+  };
+}
+
 export async function taskList(
   ctx: TaskCtx,
   todoId?: string,
