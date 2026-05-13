@@ -123,3 +123,9 @@
 .react-flow__pane {
   cursor: default;
 }
+
+/* ── Calendar today-cell pulse ───────────────────────────────────────────── */
+@keyframes krnl-today-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.9; }
+}

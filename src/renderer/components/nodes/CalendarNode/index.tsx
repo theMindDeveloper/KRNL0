@@ -1,11 +1,12 @@
-// ADR 0001 — CalendarNode (Slice 1 shell).
-// Renders an empty MotherFrame with a placeholder body. Slice 2/3/4 will
-// replace the placeholder divs with real WeekView, MonthView, and YearView.
+// ADR 0001 — CalendarNode (Slice 2: MonthView wired).
+// Slice 1 shell upgraded: 'month' case now renders the real MonthView.
+// Week and year remain placeholder stubs for Slices 3/4.
 
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import type { NodeProps } from '../types';
 import type { CalendarConfig, CalendarState } from './types';
 import { defaultCalendarConfig } from './types';
+import { MonthView } from './MonthView';
 
 export function CalendarNode({
   node,
@@ -28,9 +29,11 @@ export function CalendarNode({
         );
       case 'month':
         return (
-          <div style={placeholderStyle}>
-            <span>Month view (coming in Slice 3)</span>
-          </div>
+          <MonthView
+            state={node.state as CalendarState}
+            config={config}
+            onCommand={onCommand}
+          />
         );
       case 'year':
         return (
