@@ -4,6 +4,8 @@ import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
+import { useBoardStore } from '../../../store/boardStore';
+import { useShallow } from 'zustand/react/shallow';
 
 // TaskNode — child task card spawned when a todo item is added.
 // No slot tag, no corner brackets (those are mother-only, Decision #8).
@@ -17,6 +19,24 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const layer = state.layer ?? 0;
   const eta = state.eta ?? `~${state.durationMin}M`;
   const tag = state.tag ?? '';
+
+  // ── Task chain prev/next display ───────────────────────────────────────────
+  const { prevText, nextText } = useBoardStore(
+    useShallow((s) => {
+      const idx = s.selectTaskChain();
+      const entry = idx.get(node.id) ?? { prev: null, next: null };
+      const resolveText = (id: string | null): string | null => {
+        if (!id) return null;
+        const n = s.board?.nodes.find((nd) => nd.id === id);
+        const txt = (n?.state as { text?: string } | undefined)?.text ?? '';
+        return txt.length > 16 ? txt.slice(0, 14) + '…' : txt;
+      };
+      return {
+        prevText: resolveText(entry.prev),
+        nextText: resolveText(entry.next),
+      };
+    }),
+  );
 
   // ── inline edit ────────────────────────────────────────────────────────────
   const [isEditing, setIsEditing] = useState(false);
@@ -290,6 +310,24 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           <span className="task-tag">{tag}</span>
           <span className="task-eta">{eta}</span>
         </div>
+
+        {/* F5b: chain hint — prev/next task labels */}
+        {(prevText !== null || nextText !== null) && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              color: 'var(--ink-4)',
+              paddingTop: 3,
+              letterSpacing: '0.03em',
+            }}
+          >
+            <span>{prevText !== null ? `← ${prevText}` : ''}</span>
+            <span>{nextText !== null ? `${nextText} →` : ''}</span>
+          </div>
+        )}
 
         {/* Add-subtask inline input */}
         {isAddingSubtask && (
