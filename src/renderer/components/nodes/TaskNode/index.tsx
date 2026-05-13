@@ -238,27 +238,67 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
     }
   };
 
-  // ── add-subtask row ────────────────────────────────────────────────────────
-  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
-  const [subtaskValue, setSubtaskValue] = useState('');
+  // ── two-phase inline input (subtask or sibling) ───────────────────────────
+  // mode: null = hidden, 'subtask' = adding subtask, 'sibling' = adding sibling
+  type InlineMode = 'subtask' | 'sibling';
+  const [inlineMode, setInlineMode] = useState<InlineMode | null>(null);
+  const [inlineName, setInlineName] = useState('');
+  const [inlineDuration, setInlineDuration] = useState('');
+  const [inlinePhase, setInlinePhase] = useState<'name' | 'duration'>('name');
+  const [inlineDurationInvalid, setInlineDurationInvalid] = useState(false);
 
-  const commitSubtask = () => {
-    const trimmed = subtaskValue.trim();
-    if (trimmed) {
-      onCommand('task.addSubtask', { text: trimmed });
-    }
-    setSubtaskValue('');
-    setIsAddingSubtask(false);
+  // legacy alias so we don't break the context menu open
+  const isAddingSubtask = inlineMode === 'subtask';
+
+  const cancelInline = () => {
+    setInlineMode(null);
+    setInlineName('');
+    setInlineDuration('');
+    setInlinePhase('name');
+    setInlineDurationInvalid(false);
   };
 
-  const handleSubtaskKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.stopPropagation();
-      commitSubtask();
-    } else if (e.key === 'Escape') {
-      e.stopPropagation();
-      setSubtaskValue('');
-      setIsAddingSubtask(false);
+  const submitInline = (name: string, durationMin: number) => {
+    if (inlineMode === 'subtask') {
+      onCommand('task.addSubtask', { text: name, durationMin });
+    } else if (inlineMode === 'sibling') {
+      useBoardStore.getState().insertSiblingTaskAfter(node.id, { text: name, durationMin });
+    }
+    cancelInline();
+  };
+
+  const handleInlineKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (inlinePhase === 'name') {
+      if (e.key === 'Enter') {
+        e.stopPropagation();
+        const name = inlineName.trim();
+        if (name) {
+          setInlinePhase('duration');
+          setInlineDuration('');
+          setInlineDurationInvalid(false);
+        }
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        cancelInline();
+      }
+    } else {
+      // duration phase
+      if (e.key === 'Enter') {
+        e.stopPropagation();
+        const parsed = parseInt(inlineDuration, 10);
+        if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
+          setInlineDurationInvalid(false);
+          submitInline(inlineName.trim(), parsed);
+        } else {
+          setInlineDurationInvalid(true);
+        }
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        // Go back to name phase, keep name
+        setInlinePhase('name');
+        setInlineDuration('');
+        setInlineDurationInvalid(false);
+      }
     }
   };
 
@@ -278,13 +318,23 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
     },
     {
       label: 'Add subtask',
-      onSelect: () => setIsAddingSubtask(true),
+      onSelect: () => {
+        setInlineMode('subtask');
+        setInlineName('');
+        setInlineDuration('');
+        setInlinePhase('name');
+        setInlineDurationInvalid(false);
+      },
       disabled: state.done,
     },
     {
       label: 'Add sibling task',
       onSelect: () => {
-        useBoardStore.getState().insertSiblingTaskAfter(node.id);
+        setInlineMode('sibling');
+        setInlineName('');
+        setInlineDuration('');
+        setInlinePhase('name');
+        setInlineDurationInvalid(false);
       },
       disabled: state.done,
     },
@@ -613,22 +663,45 @@ export function TaskNode({ node, selected, onCommand }: NodeProps<TaskState, Tas
           </div>
         )}
 
-        {/* Add-subtask inline input */}
-        {isAddingSubtask && (
+        {/* Two-phase inline input for subtask / sibling */}
+        {inlineMode !== null && (
           <input
-            type="text"
-            value={subtaskValue}
+            type={inlinePhase === 'duration' ? 'number' : 'text'}
+            min={inlinePhase === 'duration' ? 1 : undefined}
+            max={inlinePhase === 'duration' ? 480 : undefined}
+            value={inlinePhase === 'name' ? inlineName : inlineDuration}
             autoFocus
-            placeholder="subtask…"
-            onChange={(e) => setSubtaskValue(e.target.value)}
-            onKeyDown={handleSubtaskKeyDown}
-            onBlur={commitSubtask}
+            placeholder={
+              inlinePhase === 'name'
+                ? inlineMode === 'subtask' ? 'subtask name…' : 'sibling task name…'
+                : 'how long? (min)'
+            }
+            onChange={(e) => {
+              if (inlinePhase === 'name') {
+                setInlineName(e.target.value);
+              } else {
+                setInlineDuration(e.target.value);
+                setInlineDurationInvalid(false);
+              }
+            }}
+            onKeyDown={handleInlineKeyDown}
+            onBlur={() => {
+              // On blur during duration phase: revert to name phase without submitting.
+              // On blur during name phase with empty input: cancel entirely.
+              if (inlinePhase === 'duration') {
+                setInlinePhase('name');
+                setInlineDuration('');
+                setInlineDurationInvalid(false);
+              } else if (!inlineName.trim()) {
+                cancelInline();
+              }
+            }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: '1px solid var(--ink-4)',
+              borderBottom: `1px solid ${inlineDurationInvalid ? 'var(--rust)' : 'var(--ink-4)'}`,
               outline: 'none',
               fontFamily: 'var(--font-sans)',
               fontSize: 12,

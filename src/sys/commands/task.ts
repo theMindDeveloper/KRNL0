@@ -475,33 +475,24 @@ export async function taskSibling(
 
   const sourceTs = sourceNode.state as TaskState;
 
-  // Find any existing outgoing task.next edge from the source node
-  const existingEdge = (board.edges as Array<{
-    id: string;
-    from: { nodeId: string; event: string };
-    to: { nodeId: string; command: string };
-    enabled: boolean;
-  }>).find(
-    (e) => e.from.nodeId === taskId && e.from.event === 'task.next',
-  );
-  const existingEdgeId = existingEdge?.id;
-  const nextNodeId = existingEdge?.to.nodeId;
-
   const now = new Date().toISOString();
+  const newItemId = randomUUID();
   const newNodeId = `task-${randomUUID()}`;
+  const plannedMin = sourceTs.plannedMin ?? sourceTs.durationMin;
+
   const newTaskState: TaskState = {
     text: 'New task',
     done: false,
     durationMin: sourceTs.durationMin,
-    eta: sourceTs.eta,
+    eta: `~${plannedMin} min`,
     sequenceNumber: sourceTs.sequenceNumber + 1,
     layer: sourceTs.layer,
     createdAt: now,
     parentTodoId: sourceTs.parentTodoId,
     parentTaskId: sourceTs.parentTaskId,
-    todoItemId: null,
+    todoItemId: newItemId,
     pomoSessionsCompleted: 0,
-    plannedMin: sourceTs.plannedMin ?? sourceTs.durationMin,
+    plannedMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
   };
@@ -510,41 +501,73 @@ export async function taskSibling(
     id: newNodeId,
     kind: 'todo.task',
     isMother: false,
+    // Parallel fork: position below source, not beside it
     position: {
-      x: (sourceNode.position?.x ?? 0) + 252,
-      y: sourceNode.position?.y ?? 0,
+      x: sourceNode.position?.x ?? 0,
+      y: (sourceNode.position?.y ?? 0) + 240,
     },
     state: newTaskState,
     config: { showDuration: true },
   };
 
-  // Edge from source → new
-  const edgeToNew = {
-    id: `edge-${randomUUID()}`,
-    from: { nodeId: taskId, event: 'task.next' },
-    to: { nodeId: newNodeId, command: 'task.activate' },
-    enabled: true,
+  // Bug 2: Walk downstream chain from taskId at the same layer,
+  // collecting all reachable targets. Add fork edges from newNode to each.
+  // Do NOT remove any existing edges (purely additive parallel fork).
+  type RawEdge = {
+    id: string;
+    from: { nodeId: string; event: string };
+    to: { nodeId: string; command: string };
+    enabled: boolean;
   };
+  const edgesArr = board.edges as RawEdge[];
+  const downstreamTargets: string[] = [];
+  const visited = new Set<string>();
+  let current: string | undefined = taskId;
+  const cap = board.nodes.length + 1;
+  let steps = 0;
+  while (current !== undefined && steps < cap) {
+    steps++;
+    const nextEdge = edgesArr.find(
+      (e) => e.from.nodeId === current && e.from.event === 'task.next',
+    );
+    if (!nextEdge) break;
+    const nextId = nextEdge.to.nodeId;
+    if (visited.has(nextId)) break; // cycle guard
+    const nextNode = findTaskNode(board, nextId);
+    if (!nextNode) break;
+    const nextTs = nextNode.state as TaskState;
+    if (nextTs.layer !== sourceTs.layer) break;
+    visited.add(nextId);
+    downstreamTargets.push(nextId);
+    current = nextId;
+  }
 
-  // If there was a next node, rewire: new → next
-  const rewireEdge = nextNodeId !== undefined
-    ? {
-        id: `edge-${randomUUID()}`,
-        from: { nodeId: newNodeId, event: 'task.next' },
-        to: { nodeId: nextNodeId, command: 'task.activate' },
-        enabled: true,
-      }
-    : null;
+  const forkEdges: RawEdge[] = downstreamTargets.map((targetId) => ({
+    id: `edge-${randomUUID()}`,
+    from: { nodeId: newNodeId, event: 'task.next' },
+    to: { nodeId: targetId, command: 'task.activate' },
+    enabled: true,
+  }));
 
-  // Remove the old source→next edge (will be replaced by source→new)
-  const filteredEdges = existingEdgeId
-    ? (board.edges as Array<{ id: string }>).filter((e) => e.id !== existingEdgeId)
-    : board.edges;
+  // Bug 3: Append a new TodoItem to the parent TodoNode (bidirectional link).
+  const todoNode = (board.nodes as AnyNode[]).find(
+    (n) => n.id === sourceTs.parentTodoId && n.kind === 'todo',
+  );
+  if (todoNode) {
+    const todoState = todoNode.state as TodoState;
+    const newItem = {
+      id: newItemId,
+      text: 'New task',
+      done: false,
+      createdAt: now,
+      completedAt: null as string | null,
+      taskNodeId: newNodeId,
+    };
+    todoNode.state = { ...todoState, items: [...todoState.items, newItem] };
+  }
 
   board.nodes = [...board.nodes, newNode];
-  board.edges = rewireEdge
-    ? [...filteredEdges, edgeToNew, rewireEdge]
-    : [...filteredEdges, edgeToNew];
+  board.edges = [...edgesArr, ...forkEdges];
 
   // Renumber siblings (same parentTodoId + parentTaskId) by createdAt
   renumberSiblings(board, sourceTs.parentTodoId, sourceTs.parentTaskId);

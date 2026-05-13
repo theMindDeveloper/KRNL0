@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Board, BoardViewport, Node, Edge } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
+import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
 
 const INITIAL_VIEWPORT: BoardViewport = { x: 0, y: 160, zoom: 1 };
 const ZOOM_MIN = 0.25;
@@ -49,7 +50,7 @@ interface BoardStore {
   resetViewport: () => void;
   selectNode: (id: string | null) => void;
   selectTaskChain: () => ReadonlyMap<string, { prev: string | null; next: string | null }>;
-  insertSiblingTaskAfter: (taskNodeId: string) => void;
+  insertSiblingTaskAfter: (taskNodeId: string, opts?: { text?: string; durationMin?: number }) => void;
 }
 
 function clampZoom(zoom: number): number {
@@ -181,7 +182,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
     return _cachedChainIndex;
   },
 
-  insertSiblingTaskAfter: (taskNodeId: string) => {
+  insertSiblingTaskAfter: (taskNodeId: string, opts?: { text?: string; durationMin?: number }) => {
     set((s) => {
       if (!s.board) return s;
 
@@ -189,62 +190,100 @@ export const useBoardStore = create<BoardStore>((set) => ({
       if (!sourceNode || sourceNode.kind !== 'todo.task') return s;
 
       const sourceTaskState = sourceNode.state as TaskState;
+      const text = opts?.text ?? 'New task';
+      const durationMin = opts?.durationMin ?? sourceTaskState.durationMin;
+      const plannedMin = opts?.durationMin ?? sourceTaskState.plannedMin ?? sourceTaskState.durationMin;
 
-      // Find any existing outgoing task.next edge from the source node
-      const existingEdge = s.board.edges.find(
-        (e) => e.from.nodeId === taskNodeId && e.from.event === 'task.next',
-      );
-      const existingEdgeId = existingEdge?.id;
-      const nextId = existingEdge?.to.nodeId;
+      // Bug 3: create a new TodoItem in the parent TodoNode so the sibling
+      // appears in the todo list. This is the same bidirectional-link pattern
+      // used by task.addSubtask in commandDispatch.ts.
+      const newItemId = crypto.randomUUID();
+      const newNodeId = `task-${crypto.randomUUID()}`;
 
-      // Build new task state — includes all required TaskState fields
+      // Build new task state — parallel fork, same layer / parentTodoId / parentTaskId
       const newTaskState: TaskState = {
-        text: 'New task',
+        text,
         done: false,
-        durationMin: sourceTaskState.durationMin,
-        eta: sourceTaskState.eta,
+        durationMin,
+        eta: `~${plannedMin} min`,
         sequenceNumber: sourceTaskState.sequenceNumber + 1,
         layer: sourceTaskState.layer,
         createdAt: new Date().toISOString(),
         parentTodoId: sourceTaskState.parentTodoId,
         parentTaskId: sourceTaskState.parentTaskId,
-        todoItemId: null,
+        todoItemId: newItemId,
         pomoSessionsCompleted: 0,
-        plannedMin: sourceTaskState.plannedMin ?? sourceTaskState.durationMin,
+        plannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
       };
 
-      const newNodeId = `task-${crypto.randomUUID()}`;
       const newNode: Node = {
         id: newNodeId,
         kind: 'todo.task',
-        position: { x: sourceNode.position.x + 252, y: sourceNode.position.y },
+        // Bug 2: position parallel to source (Y offset), not inserted in the chain
+        position: { x: sourceNode.position.x, y: sourceNode.position.y + 240 },
         isMother: false,
         state: newTaskState,
         config: { showDuration: true },
       };
 
-      // Build new edges
-      const edgeToNew: Edge = {
-        id: `edge-${crypto.randomUUID()}`,
-        from: { nodeId: taskNodeId, event: 'task.next' },
-        to: { nodeId: newNodeId, command: 'task.activate' },
-        enabled: true,
-      };
-      const additionalEdges: Edge[] = [];
-      if (nextId !== undefined) {
-        additionalEdges.push({
-          id: `edge-${crypto.randomUUID()}`,
-          from: { nodeId: newNodeId, event: 'task.next' },
-          to: { nodeId: nextId, command: 'task.activate' },
-          enabled: true,
-        });
+      // Bug 2: Walk the chain forward from taskNodeId (same layer only), collecting
+      // all downstream task node ids. Add an edge from newSibling to each.
+      // Do NOT remove or modify any existing edges (purely additive fork).
+      const edgesArr = s.board.edges;
+      const downstreamTargets: string[] = [];
+      const visited = new Set<string>();
+      let current: string | undefined = taskNodeId;
+      const cap = s.board.nodes.length + 1;
+      let steps = 0;
+      while (current !== undefined && steps < cap) {
+        steps++;
+        const nextEdge = edgesArr.find(
+          (e) => e.from.nodeId === current && e.from.event === 'task.next',
+        );
+        if (!nextEdge) break;
+        const nextId = nextEdge.to.nodeId;
+        if (visited.has(nextId)) break; // cycle guard
+        // Only follow at the same layer
+        const nextNode = s.board.nodes.find((n) => n.id === nextId);
+        if (!nextNode || nextNode.kind !== 'todo.task') break;
+        const nextTs = nextNode.state as TaskState;
+        if (nextTs.layer !== sourceTaskState.layer) break;
+        visited.add(nextId);
+        downstreamTargets.push(nextId);
+        current = nextId;
       }
+
+      const newEdges: Edge[] = downstreamTargets.map((targetId) => ({
+        id: `edge-${crypto.randomUUID()}`,
+        from: { nodeId: newNodeId, event: 'task.next' },
+        to: { nodeId: targetId, command: 'task.activate' },
+        enabled: true,
+      }));
+
+      // Bug 3: append a new TodoItem to the parent TodoNode (bidirectional link).
+      const newTodoItem: TodoItem = {
+        id: newItemId,
+        text,
+        done: false,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+        taskNodeId: newNodeId,
+      };
+
+      const updatedNodes = s.board.nodes.map((n) => {
+        if (n.id !== sourceTaskState.parentTodoId) return n;
+        const todoState = n.state as TodoState;
+        return {
+          ...n,
+          state: { ...todoState, items: [...todoState.items, newTodoItem] },
+        };
+      });
 
       // Inline renumber: find all siblings (same parentTodoId + parentTaskId),
       // sort by createdAt, assign 1-based sequenceNumber
-      const allNodesWithNew = [...s.board.nodes, newNode];
+      const allNodesWithNew = [...updatedNodes, newNode];
       const siblings = allNodesWithNew
         .filter((n) => {
           if (n.kind !== 'todo.task') return false;
@@ -266,7 +305,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
         renumberMap.set(sib.id, idx + 1);
       });
 
-      const updatedNodes = allNodesWithNew.map((n) => {
+      const finalNodes = allNodesWithNew.map((n) => {
         const newSeq = renumberMap.get(n.id);
         if (newSeq === undefined) return n;
         return {
@@ -275,15 +314,12 @@ export const useBoardStore = create<BoardStore>((set) => ({
         };
       });
 
-      const filteredEdges = existingEdgeId
-        ? s.board.edges.filter((e) => e.id !== existingEdgeId)
-        : s.board.edges;
-
       return {
         board: {
           ...s.board,
-          nodes: updatedNodes,
-          edges: [...filteredEdges, edgeToNew, ...additionalEdges],
+          nodes: finalNodes,
+          // Additive: keep all existing edges, append the new fork edges
+          edges: [...s.board.edges, ...newEdges],
         },
       };
     });
