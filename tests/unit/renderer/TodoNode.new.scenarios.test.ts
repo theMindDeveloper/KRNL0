@@ -226,10 +226,10 @@ describe('F9 — TodoNode row right-click context menu', () => {
   });
 });
 
-// ── F10 — Row click fires todo.startPomoForItem ───────────────────────────────
+// ── F10 — Row click fires todo.loadTaskForItem (load-only, Decision 22.3) ─────
 
-describe('F10 — Row text click fires todo.startPomoForItem when linked', () => {
-  it('clicking linked undone item text fires todo.startPomoForItem', () => {
+describe('F10 — Row text click fires todo.loadTaskForItem when linked', () => {
+  it('clicking linked undone item text fires todo.loadTaskForItem (load only, no auto-start)', () => {
     const onCommand = vi.fn();
     let s = defaultTodoState();
     s = todoAdd(s, { text: 'linked task' }, envAt(T1, 'item-1'));
@@ -237,10 +237,10 @@ describe('F10 — Row text click fires todo.startPomoForItem when linked', () =>
     renderTodoNode(s, onCommand);
     const textEl = document.querySelector('.todo-text') as HTMLElement;
     fireEvent.click(textEl);
-    expect(onCommand).toHaveBeenCalledWith('todo.startPomoForItem', { itemId: 'item-1' });
+    expect(onCommand).toHaveBeenCalledWith('todo.loadTaskForItem', { itemId: 'item-1' });
   });
 
-  it('clicking unlinked item text does NOT fire todo.startPomoForItem', () => {
+  it('clicking unlinked item text does NOT fire todo.loadTaskForItem', () => {
     const onCommand = vi.fn();
     let s = defaultTodoState();
     s = todoAdd(s, { text: 'no task' }, envAt(T1, 'item-1'));
@@ -248,10 +248,10 @@ describe('F10 — Row text click fires todo.startPomoForItem when linked', () =>
     renderTodoNode(s, onCommand);
     const textEl = document.querySelector('.todo-text') as HTMLElement;
     fireEvent.click(textEl);
-    expect(onCommand).not.toHaveBeenCalledWith('todo.startPomoForItem', expect.anything());
+    expect(onCommand).not.toHaveBeenCalledWith('todo.loadTaskForItem', expect.anything());
   });
 
-  it('clicking a done linked item does NOT fire todo.startPomoForItem', () => {
+  it('clicking a done linked item does NOT fire todo.loadTaskForItem', () => {
     const onCommand = vi.fn();
     let s = defaultTodoState();
     s = todoAdd(s, { text: 'linked task' }, envAt(T1, 'item-1'));
@@ -260,7 +260,7 @@ describe('F10 — Row text click fires todo.startPomoForItem when linked', () =>
     renderTodoNode(s, onCommand);
     const textEl = document.querySelector('.todo-text') as HTMLElement;
     fireEvent.click(textEl);
-    expect(onCommand).not.toHaveBeenCalledWith('todo.startPomoForItem', expect.anything());
+    expect(onCommand).not.toHaveBeenCalledWith('todo.loadTaskForItem', expect.anything());
   });
 });
 

@@ -427,7 +427,6 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
                 e.stopPropagation();
                 if (!state.done) startEdit();
               }}
-              onClick={(e) => e.stopPropagation()}
               style={{
                 fontFamily: 'var(--font-sans)',
                 fontSize: 13,
@@ -490,7 +489,6 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
                 e.stopPropagation();
                 startEtaEdit();
               }}
-              onClick={(e) => e.stopPropagation()}
               style={{ cursor: 'text' }}
             >
               {etaDisplay}

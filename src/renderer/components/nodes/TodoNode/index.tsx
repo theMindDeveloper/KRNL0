@@ -254,10 +254,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                     className="todo-text"
                     onDoubleClick={() => !item.done && startEdit(item.id, item.text)}
                     onClick={(e) => {
-                      // body click → start pomo for the linked task (if any)
                       e.stopPropagation();
                       if (item.taskNodeId !== null && !item.done) {
-                        onCommand('todo.startPomoForItem', { itemId: item.id });
+                        onCommand('todo.loadTaskForItem', { itemId: item.id });
                       }
                     }}
                     style={{
