@@ -1,4 +1,4 @@
-// MotherFrame — shared card frame for the 4 fixed mother nodes.
+// MotherFrame — shared card frame for the 6 fixed mother nodes.
 // Replicates the LifeOS Whiteboard.html `.node.fixed` pattern:
 //   - badge slot tag (top:-11px, left:14px) with spine-hot-colored slot number
 //   - 4 outset corner brackets (inset:-8px, L-shapes)
@@ -19,7 +19,7 @@ interface Props {
 }
 
 export const MOTHER_WIDTH = 380;
-export const MOTHER_TOTAL = 5;
+export const MOTHER_TOTAL = 6;
 
 export function MotherFrame({
   slotIndex,
