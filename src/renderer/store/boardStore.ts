@@ -5,6 +5,30 @@ const INITIAL_VIEWPORT: BoardViewport = { x: 0, y: 160, zoom: 1 };
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
 
+// ── Task chain index (module-level memoization) ───────────────────────────────
+// Keyed by nodeId → { prev, next } for edges where from.event === 'task.next'.
+// The Map reference is stable when the edges array reference is unchanged,
+// so Zustand's Object.is equality avoids unnecessary re-renders.
+let _lastEdges: readonly Edge[] | null = null;
+let _cachedChainIndex: ReadonlyMap<string, { prev: string | null; next: string | null }> =
+  new Map();
+
+function buildChainIndex(
+  edges: readonly Edge[],
+): ReadonlyMap<string, { prev: string | null; next: string | null }> {
+  const map = new Map<string, { prev: string | null; next: string | null }>();
+  for (const e of edges) {
+    if (e.from.event !== 'task.next') continue;
+    const fromId = e.from.nodeId;
+    const toId = e.to.nodeId;
+    const fromEntry = map.get(fromId) ?? { prev: null, next: null };
+    map.set(fromId, { ...fromEntry, next: toId });
+    const toEntry = map.get(toId) ?? { prev: null, next: null };
+    map.set(toId, { ...toEntry, prev: fromId });
+  }
+  return map;
+}
+
 interface BoardStore {
   board: Board | null;
   viewport: BoardViewport;
@@ -23,6 +47,7 @@ interface BoardStore {
   zoomAt: (focalScreenX: number, focalScreenY: number, factor: number) => void;
   resetViewport: () => void;
   selectNode: (id: string | null) => void;
+  selectTaskChain: () => ReadonlyMap<string, { prev: string | null; next: string | null }>;
 }
 
 function clampZoom(zoom: number): number {
@@ -145,4 +170,12 @@ export const useBoardStore = create<BoardStore>((set) => ({
     }),
 
   resetViewport: () => set({ viewport: INITIAL_VIEWPORT }),
+
+  selectTaskChain: () => {
+    const edges = useBoardStore.getState().board?.edges ?? [];
+    if (edges === _lastEdges) return _cachedChainIndex;
+    _lastEdges = edges;
+    _cachedChainIndex = buildChainIndex(edges);
+    return _cachedChainIndex;
+  },
 }));
