@@ -411,16 +411,45 @@ describe('WeekView — out-of-range task', () => {
   });
 });
 
-// ── ADR 0002 — Habit drag-to-schedule (WeekView) ─────────────────────────────
+// ── ADR 0002 A1 — Habit drag-to-schedule (WeekView) ──────────────────────────
+// A1 binding: chooser opens on DROP (not dragover). Cell context = drop cell.
 
-describe('WeekView — habit drag-to-schedule', () => {
+describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
   // Anchor: 2026-05-11 (Monday). Week: Mon=05-11 … Sun=05-17.
   // 2026-05-13 = Wednesday = ISO dow 3.
   // 2026-05-14 = Thursday  = ISO dow 4.
 
   beforeEach(() => setEmptyBoard());
 
-  it('dragover habit MIME opens chooser; onPick("daily") dispatches calendar.scheduleHabit', () => {
+  it('dragover habit MIME does NOT open chooser (A1)', () => {
+    const onCommand = vi.fn();
+    render(
+      <WeekView
+        state={makeState({ anchorDate: '2026-05-11' })}
+        config={makeConfig()}
+        onCommand={onCommand}
+      />,
+    );
+
+    setHabitDrag({ habitId: 'h1', habitMotherId: 'hm1', color: 'acid', name: 'Run' });
+
+    // Drag over Monday cell — chooser must NOT open.
+    const monCell = document.querySelector('[data-testid="week-cell-2026-05-11-09"]');
+    expect(monCell).toBeTruthy();
+
+    fireEvent.dragOver(monCell!, {
+      dataTransfer: {
+        types: ['application/krnl-habit'],
+        dropEffect: 'copy',
+      },
+    });
+
+    // A1: chooser must still be closed after dragover.
+    expect(radialBus.session).toBeNull();
+    expect(onCommand).not.toHaveBeenCalled();
+  });
+
+  it('drop on cell opens chooser; onPick("daily") dispatches calendar.scheduleHabit', () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -433,21 +462,21 @@ describe('WeekView — habit drag-to-schedule', () => {
     // Simulate the habit drag payload being stored by HabitNode.WeekRow.onDragStart.
     setHabitDrag({ habitId: 'h1', habitMotherId: 'hm1', color: 'acid', name: 'Run' });
 
-    // Drag over Wednesday (2026-05-13) at hour 09.
+    // Drop on Wednesday (2026-05-13) at hour 09.
     const cell = document.querySelector('[data-testid="week-cell-2026-05-13-09"]');
     expect(cell).toBeTruthy();
 
-    fireEvent.dragOver(cell!, {
+    fireEvent.drop(cell!, {
       dataTransfer: {
         types: ['application/krnl-habit'],
-        dropEffect: 'copy',
+        getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
       },
     });
 
-    // The chooser should now be open (pendingCellRef populated, bus has session).
+    // The chooser should now be open (dropCellRef populated, bus has session).
     expect(radialBus.session).not.toBeNull();
 
-    // Simulate the RadialChooserHost window drop handler calling onPick.
+    // Simulate the user clicking the daily wedge.
     const session = radialBus.session!;
     const dailyOpt = session.options.find((o) => o.value === 'daily');
     expect(dailyOpt).toBeTruthy();
@@ -460,7 +489,7 @@ describe('WeekView — habit drag-to-schedule', () => {
     });
   });
 
-  it('onPick("weekly") dispatches calendar.scheduleHabit with correct IsoDow for the cell', () => {
+  it('onPick("weekly") dispatches calendar.scheduleHabit with correct IsoDow for the drop cell', () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -472,14 +501,14 @@ describe('WeekView — habit drag-to-schedule', () => {
 
     setHabitDrag({ habitId: 'h2', habitMotherId: 'hm1', color: 'cyan', name: 'Yoga' });
 
-    // Thursday (2026-05-14 = ISO dow 4) at hour 07.
+    // Drop on Thursday (2026-05-14 = ISO dow 4) at hour 07.
     const cell = document.querySelector('[data-testid="week-cell-2026-05-14-07"]');
     expect(cell).toBeTruthy();
 
-    fireEvent.dragOver(cell!, {
+    fireEvent.drop(cell!, {
       dataTransfer: {
         types: ['application/krnl-habit'],
-        dropEffect: 'copy',
+        getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
       },
     });
 
@@ -492,6 +521,57 @@ describe('WeekView — habit drag-to-schedule', () => {
       habitId: 'h2',
       habitMotherId: 'hm1',
       schedule: { kind: 'weekly', timeOfDay: '07:00', days: [4] },
+    });
+  });
+
+  // Key discriminator test: drop cell, not first-hovered cell, is the schedule target.
+  it('drop cell is the schedule target regardless of which cells were hovered during drag', () => {
+    const onCommand = vi.fn();
+    render(
+      <WeekView
+        state={makeState({ anchorDate: '2026-05-11' })}
+        config={makeConfig()}
+        onCommand={onCommand}
+      />,
+    );
+
+    setHabitDrag({ habitId: 'h3', habitMotherId: 'hm1', color: 'acid', name: 'Swim' });
+
+    // Hover Monday first (old v1 bug: would lock to Monday).
+    const monCell = document.querySelector('[data-testid="week-cell-2026-05-11-09"]');
+    expect(monCell).toBeTruthy();
+    fireEvent.dragOver(monCell!, {
+      dataTransfer: {
+        types: ['application/krnl-habit'],
+        dropEffect: 'copy',
+      },
+    });
+
+    // Chooser must NOT open during dragover.
+    expect(radialBus.session).toBeNull();
+
+    // Now drop on Wednesday — completely different cell.
+    const wedCell = document.querySelector('[data-testid="week-cell-2026-05-13-14"]');
+    expect(wedCell).toBeTruthy();
+    fireEvent.drop(wedCell!, {
+      dataTransfer: {
+        types: ['application/krnl-habit'],
+        getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
+      },
+    });
+
+    expect(radialBus.session).not.toBeNull();
+
+    // Pick weekly — should use Wednesday (ISO dow 3), NOT Monday (ISO dow 1).
+    const session = radialBus.session!;
+    const weeklyOpt = session.options.find((o) => o.value === 'weekly');
+    expect(weeklyOpt).toBeTruthy();
+    session.onPick(weeklyOpt!.value, weeklyOpt!);
+
+    expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
+      habitId: 'h3',
+      habitMotherId: 'hm1',
+      schedule: { kind: 'weekly', timeOfDay: '14:00', days: [3] }, // Wednesday
     });
   });
 });

@@ -1,7 +1,10 @@
-// ADR 0002 — RadialChooserHost component.
+// ADR 0002 — RadialChooserHost component (amended 2026-05-14 per A1 + A2).
 // Mount once at the App root. Portals to document.body.
 // Reads state from the module-level radialBus singleton.
-// Hosts window-level dragover (capture) + keydown listeners when open.
+// A1: Chooser opens on DROP (not dragover). Confirmation is a pointer CLICK on a
+//     wedge. Dead-zone click or outside-click cancels. Escape cancels.
+// A2: Apple Liquid Glass aesthetic — backdrop blur, translucent dark wedges,
+//     per-wedge stroke accent, entry bounce animation.
 
 import { useEffect, useRef, useSyncExternalStore, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -44,6 +47,17 @@ function wedgePath(
     `A ${inner} ${inner} 0 ${largeArc} 0 ${x2i} ${y2i}`,
     'Z',
   ].join(' ');
+}
+
+// Inset wedge path for inner highlight ring (slightly inset from outer edge).
+function innerHighlightPath(
+  startAngle: number,
+  endAngle: number,
+  inner: number,
+  outer: number,
+): string {
+  const inset = 1;
+  return wedgePath(startAngle, endAngle, inner + inset, outer - inset);
 }
 
 // Compute angle in radians of cursor relative to the chooser origin.
@@ -159,27 +173,9 @@ export function RadialChooserHost() {
     );
   }
 
-  // ── Window-level event listeners when open ───────────────────────────────
+  // ── Window-level event listeners when open (A1) ──────────────────────────
 
-  const handleDragOver = useCallback(
-    (e: DragEvent) => {
-      if (!radialBus.session) return;
-      e.preventDefault();
-      const s = radialBus.session;
-      const idx = hitTestWedge(
-        s.origin.x,
-        s.origin.y,
-        e.clientX,
-        e.clientY,
-        s.innerRadius,
-        s.radius,
-        anglesRef.current,
-      );
-      radialBus.updateHovered(idx);
-    },
-    [],
-  );
-
+  // pointermove: track hovered wedge by angle.
   const handlePointermove = useCallback(
     (e: PointerEvent) => {
       if (!radialBus.session) return;
@@ -198,11 +194,32 @@ export function RadialChooserHost() {
     [],
   );
 
-  const handleDrop = useCallback(
-    (e: DragEvent) => {
+  // click (capture): confirm on wedge, cancel on dead-zone or outside.
+  const handleClick = useCallback(
+    (e: MouseEvent) => {
       if (!radialBus.session) return;
       e.preventDefault();
+      e.stopPropagation();
       const s = radialBus.session;
+      const d2 = distSq(s.origin.x, s.origin.y, e.clientX, e.clientY);
+
+      // Inside dead zone → cancel.
+      if (d2 <= s.innerRadius * s.innerRadius) {
+        const { onCancel } = s;
+        radialBus.close();
+        onCancel?.();
+        return;
+      }
+
+      // Outside outer radius → cancel.
+      if (d2 > s.radius * s.radius) {
+        const { onCancel } = s;
+        radialBus.close();
+        onCancel?.();
+        return;
+      }
+
+      // On a wedge → pick.
       const idx = hitTestWedge(
         s.origin.x,
         s.origin.y,
@@ -215,13 +232,14 @@ export function RadialChooserHost() {
       if (idx !== null) {
         const opt = s.options[idx];
         if (opt && !('disabled' in opt && opt.disabled)) {
-          const { onPick, onCancel } = s;
+          const { onPick, onCancel: _cancel } = s;
           radialBus.close();
           onPick(opt.value, opt);
           return;
         }
       }
-      // Dead zone or outside — cancel.
+
+      // Gap between wedges — cancel.
       const { onCancel } = s;
       radialBus.close();
       onCancel?.();
@@ -240,135 +258,157 @@ export function RadialChooserHost() {
     [],
   );
 
-  const handleDragEnd = useCallback(
-    () => {
-      if (!radialBus.session) return;
-      const { onCancel } = radialBus.session;
-      radialBus.close();
-      onCancel?.();
-    },
-    [],
-  );
-
   useEffect(() => {
     if (!session) return;
-    window.addEventListener('dragover', handleDragOver, { capture: true });
+    // A1: pointermove for hover tracking, click (capture) for confirm/cancel, keydown for Escape.
+    // No drag listeners — the drag has already ended when this chooser opens.
     window.addEventListener('pointermove', handlePointermove);
-    window.addEventListener('drop', handleDrop, { capture: true });
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('dragend', handleDragEnd);
+    window.addEventListener('click', handleClick, { capture: true });
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
-      window.removeEventListener('dragover', handleDragOver, { capture: true });
       window.removeEventListener('pointermove', handlePointermove);
-      window.removeEventListener('drop', handleDrop, { capture: true });
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('dragend', handleDragEnd);
+      window.removeEventListener('click', handleClick, { capture: true });
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
-  }, [session, handleDragOver, handlePointermove, handleDrop, handleKeyDown, handleDragEnd]);
+  }, [session, handlePointermove, handleClick, handleKeyDown]);
 
   if (!session) return null;
 
   const { origin, options, radius, innerRadius, hoveredIndex } = session;
   const angles = anglesRef.current;
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render (A2 — Apple Liquid Glass) ─────────────────────────────────────
 
   const svgSize = (radius + 4) * 2; // a small margin around the outer radius
   const svgLeft = origin.x - svgSize / 2;
   const svgTop = origin.y - svgSize / 2;
 
   return createPortal(
+    // Outer wrapper: fixed full-screen so pointer-events pass through where not
+    // occupied. The glass wrapper is absolutely sized to the chooser bounding box.
     <div
       className="radial-chooser-root"
       style={{ zIndex: RADIAL_CHOOSER_Z }}
       data-testid="radial-chooser-host"
     >
-      <svg
-        className="radial-chooser-svg radial-chooser-animate"
-        width={svgSize}
-        height={svgSize}
+      {/* A2: backdrop-filter blur wrapper — must wrap SVG, sized to bounding circle */}
+      <div
+        className="radial-chooser-glass radial-chooser-animate"
         style={{
           left: svgLeft,
           top: svgTop,
+          width: svgSize,
+          height: svgSize,
           zIndex: RADIAL_CHOOSER_Z,
         }}
-        data-testid="radial-chooser-svg"
       >
-        <g transform={`translate(${svgSize / 2}, ${svgSize / 2})`}>
-          {/* Wedges */}
-          {options.map((opt, i) => {
-            const wa = angles[i];
-            if (!wa) return null;
-            const isHovered = hoveredIndex === i;
-            const wedgeColor = (opt as RadialOption<unknown>).color ?? 'var(--acid)';
-            return (
-              <path
-                key={opt.id}
-                className={`radial-wedge${isHovered ? ' radial-wedge--hovered' : ''}`}
-                d={wedgePath(wa.start, wa.end, innerRadius, radius)}
-                fill={wedgeColor}
-                opacity={isHovered ? 0.85 : 0.45}
-                data-testid={`radial-wedge-${i}`}
-                data-hovered={isHovered ? 'true' : undefined}
+        <svg
+          className="radial-chooser-svg"
+          width={svgSize}
+          height={svgSize}
+          data-testid="radial-chooser-svg"
+        >
+          <g transform={`translate(${svgSize / 2}, ${svgSize / 2})`}>
+            {/* Wedges */}
+            {options.map((opt, i) => {
+              const wa = angles[i];
+              if (!wa) return null;
+              const isHovered = hoveredIndex === i;
+              const wedgeColor = (opt as RadialOption<unknown>).color ?? 'var(--acid)';
+              return (
+                <g key={opt.id}>
+                  {/* Wedge fill — translucent dark glass (A2 §2) */}
+                  <path
+                    className={`radial-wedge${isHovered ? ' radial-wedge--hovered' : ''}`}
+                    d={wedgePath(wa.start, wa.end, innerRadius, radius)}
+                    data-testid={`radial-wedge-${i}`}
+                    data-hovered={isHovered ? 'true' : undefined}
+                  />
+                  {/* Per-wedge stroke accent (A2 §3) */}
+                  <path
+                    className={`radial-wedge-stroke${isHovered ? ' radial-wedge-stroke--hovered' : ''}`}
+                    d={wedgePath(wa.start, wa.end, innerRadius, radius)}
+                    fill="none"
+                    stroke={wedgeColor}
+                    strokeWidth={isHovered ? 2.5 : 1.5}
+                    style={isHovered ? { filter: `drop-shadow(0 0 8px ${wedgeColor})` } : undefined}
+                    data-testid={`radial-wedge-stroke-${i}`}
+                  />
+                  {/* Inner highlight (A2 §5) */}
+                  <path
+                    className="radial-wedge-highlight"
+                    d={innerHighlightPath(wa.start, wa.end, innerRadius, radius)}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.08)"
+                    strokeWidth={1}
+                  />
+                </g>
+              );
+            })}
+
+            {/* Dead zone circle (A2 §6) */}
+            <g className={`radial-dead-zone-group`} data-testid="radial-dead-zone-group">
+              <circle
+                className="radial-dead-zone"
+                cx={0}
+                cy={0}
+                r={innerRadius}
+                data-testid="radial-dead-zone"
               />
-            );
-          })}
+              <text
+                className="radial-dead-glyph"
+                x={0}
+                y={0}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                data-testid="radial-dead-glyph"
+              >
+                ×
+              </text>
+            </g>
 
-          {/* Dead zone circle */}
-          <circle
-            className="radial-dead-zone"
-            cx={0}
-            cy={0}
-            r={innerRadius}
-            data-testid="radial-dead-zone"
-          />
-          <text
-            className="radial-dead-glyph"
-            x={0}
-            y={0}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            data-testid="radial-dead-glyph"
-          >
-            ×
-          </text>
+            {/* Wedge labels + icons */}
+            {options.map((opt, i) => {
+              const wa = angles[i];
+              if (!wa) return null;
+              const isHovered = hoveredIndex === i;
+              const wedgeColor = (opt as RadialOption<unknown>).color ?? 'var(--acid)';
+              // Position label at the midpoint angle, 62% of the way between inner and outer.
+              const midR = innerRadius + (radius - innerRadius) * 0.62;
+              const lx = midR * Math.cos(wa.mid);
+              const ly = midR * Math.sin(wa.mid);
+              const truncLabel =
+                opt.label.length > 10 ? opt.label.slice(0, 9) + '…' : opt.label;
 
-          {/* Wedge labels + icons */}
-          {options.map((opt, i) => {
-            const wa = angles[i];
-            if (!wa) return null;
-            // Position label at the midpoint angle, 65% of the way between inner and outer.
-            const midR = innerRadius + (radius - innerRadius) * 0.62;
-            const lx = midR * Math.cos(wa.mid);
-            const ly = midR * Math.sin(wa.mid);
-            const truncLabel =
-              opt.label.length > 10 ? opt.label.slice(0, 9) + '…' : opt.label;
-
-            return (
-              <g key={`label-${opt.id}`}>
-                {opt.icon && (
+              return (
+                <g key={`label-${opt.id}`} style={{ pointerEvents: 'none' }}>
+                  {opt.icon && (
+                    <text
+                      className="radial-wedge-icon"
+                      x={lx}
+                      y={ly - 8}
+                      fill={wedgeColor}
+                      data-testid={`radial-wedge-icon-${i}`}
+                    >
+                      {opt.icon}
+                    </text>
+                  )}
                   <text
-                    className="radial-wedge-icon"
+                    className="radial-wedge-label"
                     x={lx}
-                    y={ly - 6}
-                    data-testid={`radial-wedge-icon-${i}`}
+                    y={opt.icon ? ly + 8 : ly}
+                    fill={wedgeColor}
+                    style={isHovered ? { fontWeight: 'bold' } : undefined}
+                    data-testid={`radial-wedge-label-${i}`}
                   >
-                    {opt.icon}
+                    {truncLabel}
                   </text>
-                )}
-                <text
-                  className="radial-wedge-label"
-                  x={lx}
-                  y={opt.icon ? ly + 7 : ly}
-                  data-testid={`radial-wedge-label-${i}`}
-                >
-                  {truncLabel}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-      </svg>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+      </div>
     </div>,
     document.body,
   );
