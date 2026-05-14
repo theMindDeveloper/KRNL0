@@ -105,6 +105,9 @@ import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types'
 import {
   clockLinkTodo,
   clockSetViewWindow,
+  clockSetSelectedDate,
+  clockAdvanceDay,
+  clockGoToday,
 } from '../nodes/ClockNode/commands';
 import type { ClockState } from '../nodes/ClockNode/types';
 
@@ -257,6 +260,13 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: clockLinkTodo(clockState, args as never) };
         case 'clock.setViewWindow':
           return { state: clockSetViewWindow(clockState, args as never) };
+        // ADR 0004 §3.2 — day-selector commands.
+        case 'clock.setSelectedDate':
+          return { state: clockSetSelectedDate(clockState, args as never) };
+        case 'clock.advanceDay':
+          return { state: clockAdvanceDay(clockState, args as never) };
+        case 'clock.goToday':
+          return { state: clockGoToday(clockState) };
       }
       break;
     }
@@ -820,6 +830,99 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
+    // ── task.addNext: spawn a sequential successor at the same chain level ──
+    // ADR 0004 §2 — sibling-level task (parentTaskId = source.parentTaskId,
+    // NOT source.id). One task.next edge from source. Bidirectional mirror:
+    // append a TodoItem on the parent TodoNode, identical to task.addSubtask's
+    // tail. Position offset is one card width to the right (horizontal flow).
+    if (command === 'task.addNext') {
+      if (node.kind !== 'todo.task') return;
+      const sourceTask = node.state as TaskState;
+      const text = (args['text'] as string | undefined) ?? '';
+      if (!text.trim()) return;
+
+      const argDuration = args['durationMin'];
+      const newDurationMin =
+        typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1
+          ? Math.round(argDuration)
+          : sourceTask.durationMin;
+      const newPlannedMin =
+        typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1
+          ? Math.round(argDuration)
+          : (sourceTask.plannedMin ?? sourceTask.durationMin);
+
+      const freshBoard = useBoardStore.getState().board;
+      if (!freshBoard) return;
+
+      // Sequence number among tasks sharing the same (parentTodoId, parentTaskId).
+      const siblings = freshBoard.nodes.filter((n) => {
+        if (n.kind !== 'todo.task') return false;
+        const ts = n.state as TaskState;
+        return (
+          ts.parentTodoId === sourceTask.parentTodoId &&
+          ts.parentTaskId === sourceTask.parentTaskId
+        );
+      });
+      const seq = siblings.length + 1;
+
+      const newNodeId = `task-${crypto.randomUUID()}`;
+
+      // Append a TodoItem on the parent TodoNode (bidirectional invariant).
+      const todoNode = freshBoard.nodes.find((n) => n.id === sourceTask.parentTodoId);
+      let itemId = '';
+      if (todoNode && todoNode.kind === 'todo') {
+        const prevTodoState = todoNode.state as TodoState;
+        let newTodoState = todoAdd(prevTodoState, { text: text.trim() });
+        const newItem = newTodoState.items[newTodoState.items.length - 1];
+        if (newItem) {
+          itemId = newItem.id;
+          newTodoState = todoLinkTask(newTodoState, { itemId, taskNodeId: newNodeId });
+        }
+        updateNode(todoNode.id, { state: newTodoState });
+      }
+
+      const newState: TaskState = {
+        text: text.trim(),
+        done: false,
+        durationMin: newDurationMin,
+        eta: `~${newPlannedMin} min`,
+        sequenceNumber: seq,
+        layer: sourceTask.layer,
+        createdAt: new Date().toISOString(),
+        parentTodoId: sourceTask.parentTodoId,
+        parentTaskId: sourceTask.parentTaskId,
+        todoItemId: itemId !== '' ? itemId : null,
+        pomoSessionsCompleted: 0,
+        plannedMin: newPlannedMin,
+        secondsAccumulated: 0,
+        currentSessionElapsedSec: 0,
+      };
+
+      const newNode: Node = {
+        id: newNodeId,
+        kind: 'todo.task',
+        // ADR 0004 §2 — one card width to the right, same y.
+        position: { x: node.position.x + 252, y: node.position.y },
+        isMother: false,
+        state: newState,
+        config: { showDuration: true },
+      };
+
+      const edge: Edge = {
+        id: `edge-${crypto.randomUUID()}`,
+        from: { nodeId: nodeId, event: 'task.next' },
+        to: { nodeId: newNode.id, command: 'task.activate' },
+        enabled: true,
+      };
+
+      const { addNode, addEdge } = useBoardStore.getState();
+      addNode(newNode);
+      addEdge(edge);
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
     // ── habit.spawnLane (issued by the mother HabitNode context menu) ────
     if (node.kind === 'habit' && command === 'habit.spawnLane') {
       const habitId = args['habitId'];
@@ -918,10 +1021,7 @@ export function makeCommandHandler(nodeId: string) {
     }
 
     // ── calendar.schedule: cross-node router — dispatch task.setSchedule to target ─
-    // ADR 0001 §4: calendar.schedule looks up the target task and dispatches
-    // task.setSchedule. Cosmetic edge creation is the drop handler's responsibility
-    // (Slice 5). This MUST be before applyCommand because applyCommand returns null
-    // for calendar.schedule (it's not a pure-state command).
+    // ADR 0005: anchors are independent fixpoints; no chain-wide clearing.
     if (node.kind === 'calendar' && command === 'calendar.schedule') {
       const scheduleArgs = args as {
         taskId: string;
@@ -934,6 +1034,7 @@ export function makeCommandHandler(nodeId: string) {
       const targetTask = currentBoard.nodes.find((n) => n.id === scheduleArgs.taskId);
       if (!targetTask || targetTask.kind !== 'todo.task') return;
       const prevTask = targetTask.state as TaskState;
+
       const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
         scheduledFor: scheduleArgs.scheduledFor,
       };
@@ -944,7 +1045,8 @@ export function makeCommandHandler(nodeId: string) {
       updateNode(scheduleArgs.taskId, { state: nextTaskState });
       // Mirror to linked TodoItem.
       if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
-        const todoNode = currentBoard.nodes.find((n) => n.id === prevTask.parentTodoId);
+        const freshBoard = useBoardStore.getState().board;
+        const todoNode = freshBoard?.nodes.find((n) => n.id === prevTask.parentTodoId);
         if (todoNode && todoNode.kind === 'todo') {
           const newTodoState = todoSetItemSchedule(todoNode.state as TodoState, {
             itemId: prevTask.todoItemId,
@@ -1273,12 +1375,14 @@ export function makeCommandHandler(nodeId: string) {
 
     // ── task.setSchedule (on todo.task): bidirectional mirror to linked TodoItem ─
     // ADR 0001: same cascade pattern as task.toggle.
+    // ADR 0005: anchors are independent fixpoints; no chain-wide clearing.
     if (node.kind === 'todo.task' && command === 'task.setSchedule' && result.state !== undefined) {
       const prevTask = node.state as TaskState;
+      const schedArgs = args as { scheduledFor: string | null; scheduledDurationMin?: number };
+
       updateNode(nodeId, { state: result.state });
       // Mirror scheduledFor to the linked TodoItem if one exists.
       if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
-        const schedArgs = args as { scheduledFor: string | null; scheduledDurationMin?: number };
         const currentBoard = useBoardStore.getState().board;
         if (currentBoard) {
           const todoNode = currentBoard.nodes.find((n) => n.id === prevTask.parentTodoId);

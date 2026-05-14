@@ -8,11 +8,17 @@ You are typically invoked from inside a TerminalNode on the canvas. Every comman
 
 ## How the world works
 
-**The board file (read-only for you):**
+**The board file (read via `krnl`, never write directly):**
 ```
 ~/Documents/krnl0/board.json
 ```
-Read it to discover current nodes, IDs, and state. **Never write to it directly** — always use `krnl`.
+**Never write to it directly** — always use `krnl`. To **read** state, prefer the CLI over reading the file:
+- `krnl info --json` — quickest "where am I?" snapshot for AI
+- `krnl board show --json` — full board as bare JSON
+- `krnl node list --json`, `krnl node read <ref> --json` — per-node detail
+- `krnl todo list --json`, `krnl task list --json`, `krnl habit list --json`, `krnl edge list --json` — focused reads
+
+Every read command supports `--json` (bare JSON to stdout, no banner, no `[stub]` prefix). Falling back to reading `board.json` directly is fine when the CLI can't express what you need, but the CLI is the supported surface and stays in sync with the canvas.
 
 **The mutation surface — the `krnl` CLI:**
 ```
@@ -22,6 +28,9 @@ krnl <group> <subcommand> [args]
 - Talks to the running Electron process over a per-launch RPC pipe (auth-token gated).
 - Every mutation broadcasts to the open canvas — your changes appear instantly without reload.
 - Exit code: `0` success · `1` user/command error · `2` "requires an open renderer" (some commands like `viewport`, `undo`, `theme` need a window open).
+- **`sys ...` is a deprecated alias** that prints "sys is deprecated" to stderr and forwards to `krnl`. Use `krnl`.
+
+**Edges are visual-only today.** The CLI lets you add, list, enable, disable, and remove edges. They render as lines on the canvas. They do **not** automatically fire `to.command` when `from.event` is emitted — runtime edge dispatch is in the architecture but not wired in the renderer. If a user asks you to "wire X to Y so Y reacts when X does", be honest: you can draw the wire, but you'll need to run the target command yourself. See `skills/wire-edge.md`.
 
 **Self-discovery:**
 ```
@@ -44,18 +53,25 @@ krnl task subtask <parentId> "<text>"
 krnl task edit <id> "<new text>"
 krnl task toggle <id>                  # mark done / undone (mirrors to TodoItem)
 krnl task duration <id> <minutes>
-krnl task sibling <id>                 # fork a parallel branch from <id>
+krnl task sibling <id>                 # fork a parallel branch from <id> (same as task parallel)
+krnl task parallel <id>               # fork a parallel branch — canonical name for sibling
+krnl task addNext <sourceRef> "<text>" [--duration <min>]  # add sequential next task beside source (x+252)
+krnl task schedule <ref> --at <YYYY-MM-DDTHH:MM> [--duration <min>]  # set wall-clock anchor for cascade
+krnl task unschedule <ref>            # clear wall-clock anchor from a task
 krnl task pomo <id>                    # start a pomo session for this task
 krnl task reset-pomo <id>              # clear pomo count
 krnl task delete <id>                  # cascades to descendants, cancels active pomo
-krnl task list [<todoId>]              # optional filter by parent todo
+krnl task list [<todoId>] [--json]     # optional filter by parent todo; --json for parsing
+krnl task chain <ref1> <ref2> [<ref3>...]  # wire task.next → task.activate between consecutive tasks
 ```
+
+**All `<id>` arguments accept:** full UUID, ≥4-char prefix, or unique text match. Same as `git`'s SHA shortening.
 
 ### Todos — items on the mother TodoNode
 ```
-krnl todo add "<text>" [--tag <label>]      # also creates a linked TaskNode
-krnl todo check <id>                        # toggle done/undone
-krnl todo list
+krnl todo add "<text>" [--tag <label>]      # also creates a linked TaskNode (bidirectional)
+krnl todo check <ref>                       # toggle done/undone — accepts id-prefix or text
+krnl todo list [--json]                     # add --json to parse from script/AI
 ```
 
 ### Habits — on the mother HabitNode
@@ -93,25 +109,62 @@ krnl image clear <id>                        # detach asset, keep node
 
 ### Edges — wire events to commands
 ```
-krnl edge add --from <nodeId:event> --to <nodeId:command>
-krnl edge remove <id>
-krnl edge list
+krnl edge add --from <nodeRef:event> --to <nodeRef:command>   # refs accept prefix
+krnl edge remove <ref>
+krnl edge enable <ref>
+krnl edge disable <ref>
+krnl edge list [--json]
 ```
 For complex wirings see `skills/wire-edge.md`.
 
 ### Low-level node operations
 Use only when no higher-level group covers what you need.
 ```
-krnl node add <kind> [--at x,y]        # kinds: task, text, image, todo, habit, terminal, pomo
-krnl node remove <id>
-krnl node list
+krnl node list [--kind <k>] [--mother|--child] [--json]
+krnl node read <ref> [--json]          # full state + config + incident edges
+krnl node remove <ref> [--force]       # cascades for tasks; --force needed for mothers
+krnl node move <ref> --to x,y          # animated, needs renderer
+krnl node set-position <ref> --x N --y N    # direct write, no renderer needed
+```
+(`node add` exists only as a stub today. To create a node, use the kind-specific commands: `task add`, `todo add`, `text add`, `image add`, `habit add`. Mother nodes are created automatically by the migration layer.)
+
+### Board reads
+```
+krnl board show [--json]               # full board snapshot
+krnl board summary [--json]            # one-line counts
+krnl board stats [--json]              # per-kind + per-event counts
+krnl board save [path]                 # autosave is always on
+krnl board load <path>
 ```
 
-### Board persistence
+### Cascade scheduling — anchor tasks to wall-clock time (ADR 0003/0005)
+
+Tasks with `scheduledFor` set become **anchors**. Successor tasks in the same chain derive their times automatically (plannedMin offset from the anchor's endISO). Multiple anchors per chain are allowed (ADR 0005).
+
 ```
-krnl board show                        # print current board JSON
-krnl board save [path]
-krnl board load <path>
+krnl task schedule <ref> --at 2026-05-15T09:00 [--duration <min>]
+krnl task unschedule <ref>             # removes scheduledFor entirely
+krnl cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]   # all scheduled placements
+```
+
+Mirrors bidirectionally: `task schedule` also updates the linked TodoItem's `scheduledFor`.
+
+### Clock day-selector (ADR 0004)
+
+The ClockNode shows wall-clock placements for a specific day. Use `clock day` to navigate.
+
+```
+krnl clock day <YYYY-MM-DD|today|+1|-1>   # set clock's selected date
+krnl clock show [--json]                   # show scheduled tasks for selected date + window
+```
+
+`clock show` respects the clock's `viewWindow` (0 = AM 00:00-12:00, 1 = PM 12:00-24:00).
+
+### Self-introspection (read these first!)
+```
+krnl info [--json]                     # counts + mother ids + theme + viewport
+krnl settings show [--json]            # theme, viewport, boardPath, version
+krnl viewport show [--json]            # current viewport (no renderer needed)
 ```
 
 ### Terminal (controls THIS terminal node)
@@ -142,10 +195,11 @@ krnl hear                              # one-shot STT — prints transcript
 ## Working with IDs
 
 Most operations need an ID. The flow is always:
-1. **List or read first** — `krnl task list`, `krnl habit list`, `krnl board show`, etc.
-2. **Match by ID, not by index or name.** IDs look like `task-8a9afa61…` or `habit-a1b2…`.
-3. **Habit and todo commands accept a name as a fallback** for ergonomics — but if the name is ambiguous, prefer the ID.
+1. **List or read first** — `krnl task list --json`, `krnl habit list --json`, `krnl board show --json`, etc.
+2. **Refs accept any of:** full UUID, ≥4-char id prefix (git-style), or unique text/name match.
+3. **Habit and todo commands accept a name as a fallback** for ergonomics — but if the name is ambiguous, the CLI returns the list of matching IDs so you can disambiguate.
 4. **Never invent IDs.** If you don't see one in the most recent listing, list again.
+5. **For multi-step workflows:** read once with `--json`, then chain mutations using prefix refs. Example: after `krnl todo list --json` returns 8-char ids, you can pass those directly to `krnl task add --todo <prefix>`.
 
 ---
 
@@ -226,3 +280,28 @@ krnl task edit <new-id> "design review"
 
 **User:** "when I finish a pomodoro, mark deep-work done"
 → Multi-step wiring. Read `skills/wire-edge.md` first.
+
+---
+
+**User:** "schedule the spec task at 9am tomorrow"
+```
+krnl task list --json                 # find the task id
+krnl task schedule <id> --at 2026-05-16T09:00
+```
+**Reply:** "Spec task anchored at 9am tomorrow. Successors will cascade from there."
+
+---
+
+**User:** "what's on the clock today?"
+```
+krnl clock show --json
+```
+**Reply:** "Two tasks scheduled this morning — spec at 9, design review at 10:30."
+
+---
+
+**User:** "show me everything on the calendar this week"
+```
+krnl cal show --from 2026-05-13 --to 2026-05-20
+```
+**Reply:** "Three tasks across Monday and Wednesday — spec, design review, and stand-up prep."

@@ -1,4 +1,5 @@
 import type { ClockState } from './types';
+import { todayLocalYMD } from './types';
 
 export const clockLinkTodo = (
   s: ClockState,
@@ -13,4 +14,44 @@ export const clockSetViewWindow = (
 ): ClockState => ({
   ...s,
   viewWindow: args.window === 1 ? 1 : 0,
+});
+
+// ── ADR 0004 §3.2 — day-selector commands ──────────────────────────────────
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Set the clock's selected day. Validates YYYY-MM-DD; otherwise no-op. */
+export const clockSetSelectedDate = (
+  s: ClockState,
+  args: { date: string },
+): ClockState => {
+  if (typeof args.date !== 'string' || !YMD_RE.test(args.date)) return s;
+  return { ...s, selectedDate: args.date };
+};
+
+/** Advance the selected day by ±1. Uses local Date arithmetic. */
+export const clockAdvanceDay = (
+  s: ClockState,
+  args: { delta: -1 | 1 },
+): ClockState => {
+  const delta = args.delta === -1 ? -1 : args.delta === 1 ? 1 : 0;
+  if (delta === 0) return s;
+  // Parse the current YYYY-MM-DD as local-midnight (avoid UTC TZ shift).
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.selectedDate);
+  if (!match) return { ...s, selectedDate: todayLocalYMD() };
+  const y = Number.parseInt(match[1]!, 10);
+  const mo = Number.parseInt(match[2]!, 10) - 1;
+  const da = Number.parseInt(match[3]!, 10);
+  const d = new Date(y, mo, da);
+  d.setDate(d.getDate() + delta);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return { ...s, selectedDate: `${yy}-${mm}-${dd}` };
+};
+
+/** Reset the clock's selected day to today (local). */
+export const clockGoToday = (s: ClockState): ClockState => ({
+  ...s,
+  selectedDate: todayLocalYMD(),
 });

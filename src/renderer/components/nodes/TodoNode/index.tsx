@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TodoConfig, TodoItem, TodoState } from './types';
@@ -36,6 +36,13 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   const rawItems = visibleItems(state, config);
 
+  // 60-second tick for past-item graying.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Build a map from taskNodeId → plannedMin so drag payloads can include duration.
   const taskPlannedMin = useBoardStore(
     useShallow((s): Map<string, number> => {
@@ -45,6 +52,29 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         if (n.kind !== 'todo.task') continue;
         const st = n.state as { plannedMin?: number; durationMin?: number };
         map.set(n.id, st.plannedMin ?? st.durationMin ?? 25);
+      }
+      return map;
+    }),
+  );
+
+  // Map taskNodeId → { scheduledFor, scheduledDurationMin } for past-graying.
+  const taskScheduledInfo = useBoardStore(
+    useShallow((s): Map<string, { scheduledFor: string; durationMin: number }> => {
+      if (!s.board) return new Map();
+      const map = new Map<string, { scheduledFor: string; durationMin: number }>();
+      for (const n of s.board.nodes) {
+        if (n.kind !== 'todo.task') continue;
+        const st = n.state as {
+          scheduledFor?: string;
+          scheduledDurationMin?: number;
+          plannedMin?: number;
+          durationMin?: number;
+        };
+        if (!st.scheduledFor) continue;
+        map.set(n.id, {
+          scheduledFor: st.scheduledFor,
+          durationMin: st.scheduledDurationMin ?? st.plannedMin ?? st.durationMin ?? 25,
+        });
       }
       return map;
     }),
@@ -281,7 +311,17 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               No todos yet
             </div>
           ) : (
-            items.map((item) => (
+            items.map((item) => {
+              // Gray out if done OR if the scheduled end has passed.
+              const sched = item.taskNodeId !== null
+                ? taskScheduledInfo.get(item.taskNodeId)
+                : item.scheduledFor
+                  ? { scheduledFor: item.scheduledFor, durationMin: 25 }
+                  : undefined;
+              const isPast = sched !== undefined &&
+                new Date(sched.scheduledFor).getTime() + sched.durationMin * 60_000 <= nowMs;
+              const isGrayed = item.done || isPast;
+              return (
               <div
                 key={item.id}
                 className={`todo-item${item.done ? ' done' : ''}`}
@@ -306,7 +346,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   alignItems: 'center',
                   gap: 8,
                   padding: '4px 14px',
-                  opacity: item.done ? 0.5 : 1,
+                  opacity: isGrayed ? 0.5 : 1,
                   cursor: 'grab',
                 }}
               >
@@ -444,7 +484,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   ✕
                 </button>
               </div>
-            ))
+            );
+            })
           )}
         </div>
 
