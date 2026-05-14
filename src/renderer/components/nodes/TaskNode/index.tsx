@@ -250,9 +250,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     }
   };
 
-  // ── two-phase inline input (subtask or sibling) ───────────────────────────
-  // mode: null = hidden, 'subtask' = adding subtask, 'sibling' = adding sibling
-  type InlineMode = 'subtask' | 'sibling';
+  // ── two-phase inline input (subtask, sibling, or next) ────────────────────
+  // mode: null = hidden, 'subtask' = adding subtask, 'sibling' = adding parallel
+  // task (ADR 0004 §2 — UI-label-only rename; internal name retained for stability),
+  // 'next' = adding next (sequential successor — ADR 0004 §2).
+  type InlineMode = 'subtask' | 'sibling' | 'next';
   const [inlineMode, setInlineMode] = useState<InlineMode | null>(null);
   const [inlineName, setInlineName] = useState('');
   const [inlineDuration, setInlineDuration] = useState('');
@@ -274,7 +276,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     if (inlineMode === 'subtask') {
       onCommand('task.addSubtask', { text: name, durationMin });
     } else if (inlineMode === 'sibling') {
+      // ADR 0004 §2 — internal mode 'sibling' / UI label "Add parallel task".
       useBoardStore.getState().insertSiblingTaskAfter(node.id, { text: name, durationMin });
+    } else if (inlineMode === 'next') {
+      // ADR 0004 §2 — sequential successor at the same chain level.
+      onCommand('task.addNext', { text: name, durationMin });
     }
     cancelInline();
   };
@@ -347,7 +353,21 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       disabled: state.done,
     },
     {
-      label: 'Add sibling task',
+      // ADR 0004 §2 — sequential successor: same chain level as source,
+      // single task.next edge.
+      label: 'Add next task',
+      onSelect: () => {
+        setInlineMode('next');
+        setInlineName('');
+        setInlineDuration('');
+        setInlinePhase('name');
+        setInlineDurationInvalid(false);
+      },
+      disabled: state.done,
+    },
+    {
+      // ADR 0004 §2 — UI label only; internal mode 'sibling' retained.
+      label: 'Add parallel task',
       onSelect: () => {
         setInlineMode('sibling');
         setInlineName('');
@@ -689,7 +709,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             autoFocus
             placeholder={
               inlinePhase === 'name'
-                ? inlineMode === 'subtask' ? 'subtask name…' : 'sibling task name…'
+                ? inlineMode === 'subtask'
+                  ? 'subtask name…'
+                  : inlineMode === 'next'
+                    ? 'next task name…'
+                    : 'parallel task name…'
                 : 'how long? (min)'
             }
             onChange={(e) => {
