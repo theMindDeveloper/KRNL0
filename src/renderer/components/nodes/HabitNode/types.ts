@@ -36,6 +36,21 @@ export function isHabitView(value: unknown): value is HabitView {
   return typeof value === 'string' && (HABIT_VIEWS as readonly string[]).includes(value);
 }
 
+// ADR 0002 — HabitSchedule discriminated union.
+// ISO day-of-week, 1 = Monday … 7 = Sunday. Matches ISO-8601.
+export type IsoDow = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type HabitSchedule =
+  | { kind: 'daily'; timeOfDay: string; durationMin?: number }
+  | { kind: 'weekly'; timeOfDay: string; days: IsoDow[]; durationMin?: number }
+  | { kind: 'weekdays'; timeOfDay: string; durationMin?: number };
+
+export const TIME_OF_DAY_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+export function isValidTimeOfDay(t: string): boolean {
+  return TIME_OF_DAY_RE.test(t);
+}
+
 export interface Habit {
   id: string;           // crypto.randomUUID()
   name: string;
@@ -44,6 +59,7 @@ export interface Habit {
   archived: boolean;    // default false; archived habits hidden from grid
   color: HabitColor;    // v2 — default 'acid'
   icon?: string;        // v2.1 — optional glyph/emoji; falls back to round-robin glyph
+  schedule?: HabitSchedule; // ADR 0002 — absence = unscheduled
 }
 
 // Built-in icon palette presented in the context menu. Mix of mono glyphs

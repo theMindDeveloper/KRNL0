@@ -17,6 +17,7 @@ import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
 import { useBoardStore } from './store/boardStore';
 import { useBoardChannel } from './store/useBoardChannel';
+import { RadialChooserHost } from './components/ui/RadialChooser';    
 import { useCliDispatch } from './store/useCliDispatch';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
@@ -116,6 +117,7 @@ export function App() {
             <Orb />
           </div>
           <StatusBar />
+          <RadialChooserHost />
         </div>
       </ReactFlowProvider>
     </ErrorBoundary>

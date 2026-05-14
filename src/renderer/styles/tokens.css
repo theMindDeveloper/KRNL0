@@ -29,8 +29,11 @@
   --rust:      #c8553d;
   --rust-deep: #a83e2a;
   --plum:      #6b4ea8;
-  --cyan:      #4ea8b0;
-  --cyan-glow: #7dd6df;
+  /* NOTE: --cyan updated to Tailwind cyan-400 (#22d3ee) per ADR 0002 A2 radial
+     chooser accent requirement. Previous value was #4ea8b0 (muted teal). */
+  --cyan:      #22d3ee;
+  --cyan-glow: #67e8f9;
+  --purple:    #a78bfa;
 
   /* Extended palette (habit colors v2.1) — muted-cyber tones */
   --amber: #d9a55a;
