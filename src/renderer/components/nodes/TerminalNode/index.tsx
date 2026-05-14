@@ -6,6 +6,8 @@ import type { TermState, TermConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HEADER_LABEL, LIVE_BADGE_TEXT } from './constants';
 import { startTerminalSession } from './session';
+import { MotdBanner } from './MotdBanner';
+import pkg from '../../../../../package.json';
 
 export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TermState, TermConfig>) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -15,6 +17,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
   const [hovered, setHovered] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const copySelection = () => {
     const sel = termRef.current?.getSelection() ?? '';
@@ -103,7 +106,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
         fit,
         krnl: window.krnl,
         onCommand,
-        setSessionId: (id) => { sessionIdRef.current = id; },
+        setSessionId: (id) => { sessionIdRef.current = id; setActiveSessionId(id); },
         isCancelled: () => cancelled,
       }).then((cleanup) => {
         if (cancelled) {
@@ -241,6 +244,10 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
             {LIVE_BADGE_TEXT}
           </div>
         </div>
+
+        {/* MOTD banner — rendered as React above xterm so PowerShell/PSReadLine
+            can't clear it on startup. See MotdBanner.tsx header for rationale. */}
+        <MotdBanner version={pkg.version} sessionId={activeSessionId} />
 
         {/* xterm mount — nodrag/nopan/nowheel keep RF from consuming pointer
             events. tabIndex=-1 + nodesFocusable={false} on <ReactFlow> stop RF

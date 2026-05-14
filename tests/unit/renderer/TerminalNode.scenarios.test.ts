@@ -199,9 +199,18 @@ describe('F1 — Header anatomy', () => {
 // ---------------------------------------------------------------------------
 
 describe('F2 — Welcome output on mount', () => {
-  it('startTerminalSession writes motd returned by ptyCreate to the terminal (T1)', async () => {
+  // Note: MOTD is now rendered as React (MotdBanner.tsx) above the xterm body
+  // rather than written as ANSI bytes into xterm itself. This is because
+  // PowerShell + PSReadLine emit screen-clearing escape sequences during
+  // initialization that wipe any pre-written banner from xterm. The React
+  // banner sits outside the shell's reach. Tests assert that no MOTD-shaped
+  // bytes leak into xterm; visual coverage of MotdBanner is a separate
+  // component test.
+
+  it('startTerminalSession does not leak motd bytes into the terminal (T1)', async () => {
     const MOCK_MOTD = '\x1b[38;2;201;241;88m  ██╗  ██╗██████╗\x1b[0m\r\n  krnl0 · v0.2.0\r\n';
-    // Override ptyCreate to return a non-empty motd
+    // Even when ptyCreate returns a non-empty motd, session.ts must NOT
+    // write it to xterm — the React banner handles display.
     const term = (() => {
       const writeCalls: string[] = [];
       const _handlers: Array<(data: string) => void> = [];
@@ -242,10 +251,12 @@ describe('F2 — Welcome output on mount', () => {
       isCancelled: () => false,
     });
 
-    // MOTD must have been written synchronously before pty:data subscription
-    expect(term.writeCalls).toContain(MOCK_MOTD);
-    // MOTD is written before any pty data arrives (it's the first write)
-    expect(term.writeCalls[0]).toBe(MOCK_MOTD);
+    // MOTD bytes from ptyCreate must NOT have been written to xterm.
+    expect(term.writeCalls).not.toContain(MOCK_MOTD);
+    const motdLikeWrite = term.writeCalls.find(
+      (s) => s.includes('\x1b[38;2;201;241;88m') || s.includes('██'),
+    );
+    expect(motdLikeWrite).toBeUndefined();
   });
 
   it('startTerminalSession does not write anything when motd is empty string (T6)', async () => {
