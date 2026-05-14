@@ -223,18 +223,41 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     }
     childEnv['KRNL0_MAIN_PID'] = String(process.pid);
 
-    // PowerShell prints a multi-line copyright banner + "Install the latest
-    // PowerShell" notice on startup, which dominates a small terminal viewport
-    // and pushes the KRNL0 MOTD off the top of the visible area. -NoLogo
-    // suppresses both. Only applies to powershell.exe / pwsh.exe; cmd.exe and
-    // POSIX shells don't recognize it.
+    // PowerShell launch flags:
+    //  -NoLogo : suppress the multi-line copyright banner that would
+    //            otherwise dominate the terminal viewport.
+    //  -NoExit -Command "..." : run an init snippet AFTER the profile loads
+    //            (so our settings win over the user's profile defaults), then
+    //            stay in interactive mode. We turn off PSReadLine's inline
+    //            prediction here — its ghost-text behavior looks like a
+    //            "space after the first 2 characters" bug on a fresh shell
+    //            with no command history to match against, and is more
+    //            confusing than helpful for KRNL0's terminal node.
+    //
+    // Users who want the prediction back can either set
+    //   $env:KRNL0_KEEP_PSREADLINE_PREDICTION = '1'
+    // before launching the app, or change the option themselves at the
+    // prompt with `Set-PSReadLineOption -PredictionSource History`.
+    //
+    // Only applies to powershell.exe / pwsh.exe; cmd.exe and POSIX shells
+    // ignore these flags.
     const shellArgs: string[] = (() => {
       const base = shell.toLowerCase();
-      if (base.endsWith('powershell.exe') || base.endsWith('pwsh.exe')
-          || base === 'powershell' || base === 'pwsh') {
-        return ['-NoLogo'];
+      const isPwsh = base.endsWith('powershell.exe') || base.endsWith('pwsh.exe')
+        || base === 'powershell' || base === 'pwsh';
+      if (!isPwsh) return [];
+      const args = ['-NoLogo'];
+      if (process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] !== '1') {
+        args.push(
+          '-NoExit',
+          '-Command',
+          // Wrap in try/catch so missing PSReadLine (old PS versions) doesn't
+          // abort the session. -ErrorAction SilentlyContinue handles older
+          // PSReadLine that didn't ship -PredictionSource.
+          "try { Set-PSReadLineOption -PredictionSource None -ErrorAction SilentlyContinue } catch {}",
+        );
       }
-      return [];
+      return args;
     })();
 
     let proc: pty.IPty;
