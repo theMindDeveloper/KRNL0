@@ -1456,3 +1456,134 @@ ClockNode becomes a permanent mother at **slot 6** (`mother-clock`, `x=1252, y=0
 **v2 deferred:** An opt-in `clock.alignMode: 'sequential' | 'scheduled'` mode that reads `TaskState.scheduledFor` for arc placement. Requires a separate ADR.
 
 ---
+
+## Decision 24 — Unified Task Timeline Selector + ClockNode Rewrite
+
+**Date:** 2026-05-14
+**Status:** Accepted
+**Supersedes:** nothing (additive on top of Decision 23.1)
+**Related:** Decision 22 (`plannedMin`), Decision 22.1 (per-task checkpoint), Decision 22.2 (animated chain), Decision 23.1 (Clock as permanent mother), ADR 0001 (Calendar)
+**Plan file:** `C:\Users\momo\.claude\plans\just-improve-my-prompt-eager-dongarra.md`
+
+### Context
+
+Decision 23.1 introduced ClockNode v1 with a sequential `plannedMin` stack of root tasks sorted by `sequenceNumber`. Four requirements that v1 cannot address:
+
+1. **Chain order, not numeric order.** Root tasks form a `task.next` graph; `sequenceNumber` sort breaks down on forks.
+2. **Breaks are missing.** Pomo `shortBreakMin` / `longBreakMin` / `longBreakEvery` are first-class scheduled time; they must occupy the 12-hour ring.
+3. **Reactivity.** Edits to tasks or Pomo config must repaint the clock without manual refresh.
+4. **Calendar will eventually share the same data.** Two views on one derived Timeline.
+
+### Decision
+
+Replace the filter-and-loop in `ClockNode/index.tsx:42-74` with a single memoized selector: **`selectTimeline(board, todoId)`** in `src/renderer/store/timelineSelector.ts`. ClockNode is the v1 consumer; CalendarNode is v2 (deferred).
+
+**Data model:** `TimelineSegment` discriminated union (`task | break`), `ParallelGroup`, `Timeline` (ordered by `startMin`, includes breaks). Full types in `timelineSelector.ts`.
+
+**Memoization:** module-level reference-identity cache on `(board.nodes, board.edges, pomoConfig)`. Same pattern as `_lastEdges` / `selectTaskChain` in `boardStore.ts`. Invalidated automatically on every Zustand `set(...)` that touches nodes or edges. Pure, synchronous, no React hooks.
+
+**Break algorithm:** one break per task or parallel group. `breakCounter % cfg.longBreakEvery === 0 → long`, else short. Trailing break emitted by selector; stripped by ClockNode at render time. Calendar (v2) may keep it.
+
+**Parallel arcs:** same radius `R=108`, same `strokeWidth=18`, `mix-blend-mode: multiply` so overlapping colors compose visibly. Parallel group members share `startMin`; group `endMin = startMin + max(branch.plannedMin)`.
+
+**Break arcs:** `strokeWidth=9`, `stroke="var(--paper-3)"`, opacity 0.6 (short) / 0.8 (long).
+
+**Done tasks:** still consume their `plannedMin` slot; rendered at 0.4 opacity.
+
+**No new persisted fields.** Timeline is derived from existing `TaskState.plannedMin`, `TaskState.done`, `task.next` edges, and `PomoConfig`. Existing boards load and save unchanged.
+
+**Calendar integration (v1):** Calendar ignores Timeline. It continues to use `scheduledFor` directly per ADR 0001. A future ADR may bridge the two.
+
+### Consequences
+
+- `ClockNode` becomes a thin renderer: reads `selectTimeline`, renders segments as SVG arcs.
+- The old `tasks` selector and manual `arcs` reduce loop in `ClockNode/index.tsx` are deleted.
+- All future views wanting "the todo's plan as time" import `selectTimeline` from `timelineSelector.ts`. No copies, no parallel implementations.
+- Tests: 12 selector unit tests + 6 component tests added; existing ClockNode.scenarios tests updated to account for break arcs in the segment count.
+
+---
+
+## Decision 24.1 — Color-token contract: selector palette MUST exist in tokens.css
+
+**Date:** 2026-05-14
+**Status:** Accepted — patch on Decision 24
+**Author:** architect
+**Plan file:** `C:\Users\momo\.claude\plans\just-improve-my-prompt-eager-dongarra.md` (full root-cause analysis at the bottom)
+
+### Context
+
+User reported only the first of 3 chained tasks rendered on the clock face. Tester verified all 18 unit tests passed including the 3-task chain case. Data on disk was correct, selector logic was correct, DOM structure was correct. The bug was paint, not data.
+
+### Root cause
+
+`timelineSelector.ts:16` defines `COLORS = ['rose', 'sky', 'mint', 'amber', 'violet']`. ClockNode renders each task arc with `stroke={`var(--${seg.colorToken})`}`. Three of the five tokens — `--sky`, `--mint`, `--violet` — **are not declared** in `src/renderer/styles/tokens.css`. When `var()` references an undefined custom property without a fallback, SVG `stroke` falls back to its initial value `none`. The `<circle>` elements exist in the DOM with correct geometry; they paint nothing.
+
+For the user's 3-task chain: task1→rose (defined, paints), task2→sky (undefined, transparent), task3→mint (undefined, transparent). Exact match with the symptom.
+
+### Decision (rule for backend-dev)
+
+1. **Constrain the palette to defined tokens.** `COLORS` in `timelineSelector.ts` becomes `['rose', 'amber', 'teal', 'lilac', 'sand', 'moss']` (six warm/cool alternating tokens, all defined in tokens.css). Re-export `COLORS` for tests.
+2. **Add a CSS fallback in the stroke prop.** ClockNode line 248: `stroke={`var(--${seg.colorToken}, #c87080)`}` so a future palette regression cannot paint transparent.
+3. **Brighten break arcs.** Replace `var(--paper-3)` with `var(--ink-4)` for break arc stroke; keep 0.6 / 0.8 opacity for short / long.
+4. **Add a contract test** at `tests/unit/renderer/timelineSelector.colorTokens.test.ts` that reads `tokens.css` and asserts every entry in `COLORS` has a `--<name>:` declaration in light + dark + noir variants.
+5. **Add a fixture-replay test** at `tests/unit/renderer/ClockNode.userBoard.fixture.test.tsx` that mirrors the user's exact failing board (3 tasks 120/80/30, 2 chain edges, mother-todo link) and asserts (a) 3 task arc circles in the rendered SVG and (b) every rendered `stroke` references a `var(--<token>)` whose name is in the imported `COLORS` set. Catches both selector-emit regressions and palette-drift regressions for this specific board.
+6. **Update existing color-rotation test.** `tests/unit/renderer/timelineSelector.test.ts:147-163` currently asserts `rose / sky / mint`; change to `rose / amber / teal` to match the new palette. (One existing test affected; all 17 others continue to pass.)
+7. **Add a runtime diagnostic** in `selectTimelines` that on first call checks `getComputedStyle(document.documentElement)` for each token in `COLORS` and `console.warn`s once if any resolve empty. Catches future drift in production, not jsdom.
+8. **Add a dev-only debug overlay** in ClockNode behind `import.meta.env.DEV && import.meta.env.VITE_CLOCK_DEBUG === '1'` showing segment count, totals, and first 6 segment summaries. Off by default; available for future debug sessions of the same class.
+
+### Consequences
+
+- New invariant: every name in the selector palette must have a matching CSS custom property in tokens.css across light / dark / noir variants. Enforced by the contract test.
+- jsdom tests confirm DOM shape; the contract test confirms CSS variable existence; the runtime diagnostic confirms resolution under the live theme. Three layers cover the gap that this bug exploited.
+
+### Test gap acknowledgment
+
+Decision 24's 18 tests covered selector correctness and component DOM structure. None tested the contract between code constants and the stylesheet. **jsdom does not paint** — assertions on `getAttribute('stroke')` checked the literal string `"var(--sky)"` was set, not that `--sky` resolves to a color. The new contract test is the missing test class.
+
+---
+
+## Decision 24.2 — Visible breaks (dark-theme contrast) + 12h view toggle
+
+**Date:** 2026-05-14
+**Status:** Accepted
+**Supersedes:** Decision 24.1's break stroke (`var(--ink-4)`) and Decision 23.1's `windowStartHour` UI / state field / command (`clock.setWindowStart`).
+**Plan file:** `.claude/plans/just-improve-my-prompt-eager-dongarra.md`
+
+### Problem
+
+Three issues reported by user after Decision 24.1:
+
+1. **Break arcs invisible in dark theme.** Decision 24.1 changed break stroke from `var(--paper-3)` to `var(--ink-4)`. In dark theme `--ink-4 = #5a5244` over `--paper-2 = #1a1814` is a luminance delta of ~22 — below human perceptual threshold for thin strokes. The fix moved the bug from light to dark theme.
+
+2. **Pomo settings not visualized.** Breaks exist in the DOM but are not visible, so the user cannot see that Pomo config affects the timeline.
+
+3. **Window-start control is the wrong model.** `windowStartHour: 0–23` with +/- buttons anchored arcs to wall-clock time, which is dishonest — Timeline `startMin` is "minutes from plan start," not clock time. User mental model is "let me page through 12-hour halves of my plan."
+
+### Decisions
+
+**Q1 — Break visibility:** `var(--ink-3)` at `strokeWidth=6` for short breaks; `var(--ink-2)` at `strokeWidth=10` for long breaks. Both at `opacity=1.0`. Drops the opacity-based differentiation from 24.1. `--ink-3` and `--ink-2` pass contrast checks against `--paper-2` in both light and dark themes (ΔL ≈ 40 and 70 respectively).
+
+**Q2 — No legend.** The width/ink hierarchy IS the visualization. SVG `<title>` children on each break arc provide accessible hover-tooltips (e.g. `"short break · 5m"`).
+
+**Q3 — 12h view toggle.** Replace `windowStartHour: number` state with `viewWindow: 0 | 1`. Single button UI: `→ 12h–24h` (window 0) or `← 0h–12h` (window 1). Hour labels read `0..11` or `12..23`. Toggle disabled when `totalMin ≤ 720`. Overflow badge threshold moved to 1440 min (24h). Defensive clamp: if plan fits in window 0, `effectiveWindow` is forced to 0 without mutating persisted state.
+
+**Q4 — Migration:** New `migrateClockState` strips `windowStartHour` and ensures `viewWindow: 0` exists. Idempotent. Runs BEFORE `migrateNodeStates` in the load pipeline. `STATE_DEFAULTS['clock']` and `migrateAddClockMother` seed updated to use `viewWindow: 0`.
+
+**Q5 — Command dispatcher:** `clock.setWindowStart` removed entirely. `clock.setViewWindow({ window: 0 | 1 })` added. No backward-compat alias (commands are not persisted).
+
+**Q7 — Token contract:** `BREAK_TOKENS = ['ink-2', 'ink-3'] as const` exported from `ClockNode/index.tsx`. Contract test extends `timelineSelector.colorTokens.test.ts` to assert both tokens have `--<name>:` declarations in tokens.css.
+
+### Test delta
+
+- **Deleted:** 8 `clock.setWindowStart` tests in `ClockNode.commands.test.ts`.
+- **Updated:** 4 fixture `windowStartHour` → `viewWindow` replacements; 4 stroke-width/color assertion updates; AC7 overflow threshold updated to 1440.
+- **New:** 5 migration tests (`board.decision24_2-migration.test.ts`) + 8 viewWindow render tests (`ClockNode.viewWindow.test.tsx`) + 3 break visibility tests + 1 break-token contract test = **17 new cases**.
+
+### Consequences
+
+- Timeline labels now read `0..23` as plan-hours, not wall-clock time. Wall-clock anchoring foreclosed; a future ADR may add a "plan start time" picker.
+- Plans > 24h (>1440 min) show overflow badge only; no third window. Multi-window support is a separate ADR.
+- `viewWindow: 0 | 1` is a strict union — extending to N windows requires deliberate migration.
+- The automated break-token contract test (`BREAK_TOKENS` vs tokens.css) closes the same regression class that caused Decision 24.1's bug.
+
+---

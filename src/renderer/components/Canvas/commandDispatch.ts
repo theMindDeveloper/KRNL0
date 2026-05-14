@@ -97,7 +97,7 @@ import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types'
 // ── Clock ─────────────────────────────────────────────────────────────
 import {
   clockLinkTodo,
-  clockSetWindowStart,
+  clockSetViewWindow,
 } from '../nodes/ClockNode/commands';
 import type { ClockState } from '../nodes/ClockNode/types';
 
@@ -235,8 +235,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
       switch (command) {
         case 'clock.linkTodo':
           return { state: clockLinkTodo(clockState, args as never) };
-        case 'clock.setWindowStart':
-          return { state: clockSetWindowStart(clockState, args as never) };
+        case 'clock.setViewWindow':
+          return { state: clockSetViewWindow(clockState, args as never) };
       }
       break;
     }
