@@ -144,7 +144,7 @@ function makeTask(id: string, scheduledFor: string, plannedMin = 25) {
 describe('WeekView — row count', () => {
   beforeEach(() => setEmptyBoard());
 
-  it('renders 18 hour rows for default hourRange {start:6, end:23}', () => {
+  it('always renders 24 hour rows regardless of persisted hourRange (PR #122)', () => {
     render(
       <WeekView
         state={makeState()}
@@ -152,13 +152,12 @@ describe('WeekView — row count', () => {
         onCommand={noop}
       />,
     );
-    // One row per hour: 6,7,...,23 → 18 rows per column.
-    // We check via data-testid pattern for a single column (2026-05-11 = Monday).
+    // PR #122: WeekView ignores persisted hourRange and always renders 0..23.
     const rows = document.querySelectorAll('[data-testid^="week-cell-2026-05-11-"]');
-    expect(rows).toHaveLength(18);
+    expect(rows).toHaveLength(24);
   });
 
-  it('row count formula: end - start + 1, not off-by-one', () => {
+  it('still renders 24 rows even when hourRange config is narrowed (PR #122)', () => {
     render(
       <WeekView
         state={makeState()}
@@ -166,9 +165,9 @@ describe('WeekView — row count', () => {
         onCommand={noop}
       />,
     );
-    // 8..18 inclusive = 11 rows
+    // PR #122: hourRange config is intentionally ignored — 24 rows always.
     const rows = document.querySelectorAll('[data-testid^="week-cell-2026-05-11-"]');
-    expect(rows).toHaveLength(11);
+    expect(rows).toHaveLength(24);
   });
 });
 
@@ -390,9 +389,9 @@ describe('WeekView — empty state hint', () => {
   });
 });
 
-describe('WeekView — out-of-range task', () => {
-  it('task scheduled before hourRange renders task block with up-caret badge', () => {
-    // Task at 03:00, hourRange starts at 06:00 → out of range (before).
+describe('WeekView — early-morning task (PR #122 24h grid)', () => {
+  it('task scheduled at 03:00 renders inline at its actual minute (no clipping, no caret)', () => {
+    // PR #122 forces 24h: a 03:00 task is just rendered in the row for hour 3.
     useBoardStore.setState({
       board: {
         version: 1,
@@ -414,11 +413,11 @@ describe('WeekView — out-of-range task', () => {
 
     const block = document.querySelector('[data-testid="task-block-early-task"]');
     expect(block).toBeTruthy();
-    // Should have the up-caret badge text.
-    expect(block?.textContent).toContain('↑');
-    // Block should be positioned at top (row 0): top = 0.
+    // No continuation arrow on a single-day, head slice.
+    expect(block?.textContent ?? '').not.toContain('↑');
+    // Row height is 28px and the task starts at hour 3 → top = 3 * 28 = 84px.
     const style = (block as HTMLElement)?.style;
-    expect(style?.top).toBe('0px');
+    expect(style?.top).toBe('84px');
   });
 });
 

@@ -25,18 +25,23 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'pomo', usage: 'task pomo <id>', summary: 'Start a pomo session for this task' },
       { name: 'subtask', usage: 'task subtask <parentId> "<text>"', summary: 'Add a child task' },
       { name: 'duration', usage: 'task duration <id> <minutes>', summary: 'Set task duration in minutes' },
-      { name: 'sibling', usage: 'task sibling <id>', summary: 'Fork a sibling task in parallel' },
+      { name: 'sibling', usage: 'task sibling <id>', summary: 'Fork a sibling task in parallel (same as task parallel)' },
+      { name: 'parallel', usage: 'task parallel <id>', summary: 'Fork a parallel task (canonical alias for task sibling)' },
       { name: 'reset-pomo', usage: 'task reset-pomo <id>', summary: 'Reset pomo session count for task' },
-      { name: 'list', usage: 'task list [<todoId>]', summary: 'List tasks, optionally filtered by TodoNode' },
+      { name: 'chain', usage: 'task chain <ref1> <ref2> [<ref3>...]', summary: 'Wire task.next → task.activate between consecutive tasks' },
+      { name: 'schedule', usage: 'task schedule <ref> --at <YYYY-MM-DDTHH:MM> [--duration <min>]', summary: 'Schedule a task at a wall-clock time (cascade anchor)' },
+      { name: 'unschedule', usage: 'task unschedule <ref>', summary: 'Clear the scheduled time from a task' },
+      { name: 'addNext', usage: 'task addNext <sourceRef> "<text>" [--duration <min>]', summary: 'Add a sequential successor task after source' },
+      { name: 'list', usage: 'task list [<todoId>] [--json]', summary: 'List tasks, optionally filtered by TodoNode. IDs/refs accept ≥4-char prefix or unique text.' },
     ],
   },
   {
     group: 'todo',
     summary: 'Manage TodoItems on the mother TodoNode',
     subcommands: [
-      { name: 'add', usage: 'todo add "<text>" [--tag <label>]', summary: 'Add a TodoItem + linked TaskNode' },
-      { name: 'check', usage: 'todo check <id>', summary: 'Toggle a TodoItem done/undone' },
-      { name: 'list', usage: 'todo list', summary: 'List all TodoItems' },
+      { name: 'add', usage: 'todo add "<text>" [--tag <label>]', summary: 'Add a TodoItem + linked TaskNode (both created, bidirectional link)' },
+      { name: 'check', usage: 'todo check <ref>', summary: 'Toggle a TodoItem done/undone — <ref> accepts id-prefix or text match' },
+      { name: 'list', usage: 'todo list [--json]', summary: 'List all TodoItems (--json prints bare JSON)' },
     ],
   },
   {
@@ -49,7 +54,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'color', usage: 'habit color <id|name> <acid|rust|cyan|plum|spine|ink>', summary: 'Set habit color' },
       { name: 'remove', usage: 'habit remove <id|name>', summary: 'Remove a habit' },
       { name: 'view', usage: 'habit view <week|month|year>', summary: 'Set habit view mode' },
-      { name: 'list', usage: 'habit list', summary: 'List all habits' },
+      { name: 'list', usage: 'habit list [--json]', summary: 'List all habits' },
     ],
   },
   {
@@ -84,27 +89,62 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'edge',
     summary: 'Manage edges (event → command wires)',
     subcommands: [
-      { name: 'add', usage: 'edge add --from <node:event> --to <node:command>', summary: 'Create a wired edge' },
-      { name: 'remove', usage: 'edge remove <id>', summary: 'Remove an edge' },
-      { name: 'list', usage: 'edge list', summary: 'List all edges' },
+      { name: 'add', usage: 'edge add --from <nodeRef:event> --to <nodeRef:command>', summary: 'Create a wired edge (refs accept prefix)' },
+      { name: 'remove', usage: 'edge remove <ref>', summary: 'Remove an edge (ref accepts id-prefix)' },
+      { name: 'enable', usage: 'edge enable <ref>', summary: 'Enable a disabled edge' },
+      { name: 'disable', usage: 'edge disable <ref>', summary: 'Disable an edge without removing it' },
+      { name: 'list', usage: 'edge list [--json]', summary: 'List all edges' },
     ],
   },
   {
     group: 'node',
-    summary: 'Low-level node management',
+    summary: 'Low-level node management — all refs accept id-prefix or unique text',
     subcommands: [
-      { name: 'add', usage: 'node add <kind> [--at x,y]', summary: 'Add a node of given kind' },
-      { name: 'remove', usage: 'node remove <id>', summary: 'Remove a node by id' },
-      { name: 'list', usage: 'node list', summary: 'List all nodes' },
+      { name: 'read', usage: 'node read <ref> [--json]', summary: 'Print full state + config + incident edges for one node' },
+      { name: 'remove', usage: 'node remove <ref> [--force]', summary: 'Remove a node (cascades for tasks; --force needed for mothers)' },
+      { name: 'set-position', usage: 'node set-position <ref> --x N --y N', summary: 'Set node position directly' },
+      { name: 'move', usage: 'node move <ref> --to x,y', summary: 'Animate node move (requires renderer)' },
+      { name: 'list', usage: 'node list [--kind <k>] [--mother|--child] [--json]', summary: 'List all nodes' },
     ],
   },
   {
     group: 'board',
-    summary: 'Board persistence',
+    summary: 'Board read + persistence',
     subcommands: [
-      { name: 'show', usage: 'board show', summary: 'Print board as JSON' },
-      { name: 'save', usage: 'board save [path]', summary: 'Save board to path' },
+      { name: 'show', usage: 'board show [--json]', summary: 'Print board: --json emits bare JSON; default is a human summary' },
+      { name: 'summary', usage: 'board summary [--json]', summary: 'One-line counts of nodes + edges' },
+      { name: 'stats', usage: 'board stats [--json]', summary: 'Per-kind node counts + per-event edge counts' },
+      { name: 'save', usage: 'board save [path]', summary: '(autosave is always on — kept for parity)' },
       { name: 'load', usage: 'board load <path>', summary: 'Load board from path' },
+    ],
+  },
+  {
+    group: 'cal',
+    summary: 'Calendar view of cascade-scheduled tasks (ADR 0003/0005)',
+    subcommands: [
+      { name: 'show', usage: 'cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]', summary: 'List all scheduled task placements, sorted by time' },
+    ],
+  },
+  {
+    group: 'clock',
+    summary: 'Clock day-selector and wall-clock task view (ADR 0004)',
+    subcommands: [
+      { name: 'day', usage: 'clock day <YYYY-MM-DD|today|+1|-1>', summary: 'Set the clock selected date (absolute, today, or ±1 day)' },
+      { name: 'show', usage: 'clock show [--json]', summary: 'Show scheduled tasks for the clock\'s selected date and view window' },
+    ],
+  },
+  {
+    group: 'info',
+    summary: 'AI-oriented "where am I" snapshot',
+    subcommands: [
+      { name: 'info', usage: 'info [--json]', summary: 'Counts + mother-node ids + theme + viewport — one call to bootstrap context' },
+    ],
+  },
+  {
+    group: 'settings',
+    summary: 'Read app settings',
+    subcommands: [
+      { name: 'show', usage: 'settings show [--json]', summary: 'theme + viewport + boardPath + version' },
     ],
   },
   {
@@ -122,6 +162,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'pan', usage: 'viewport pan --dx N --dy N', summary: 'Pan canvas by delta' },
       { name: 'zoom', usage: 'viewport zoom --factor N', summary: 'Zoom canvas by factor' },
+      { name: 'show', usage: 'viewport show [--json]', summary: 'Print current viewport (read-only, no renderer required)' },
     ],
   },
   {

@@ -17,7 +17,7 @@ export interface CalendarConfig {
   weekStartsOn: 'monday';      // locked, mirrors HabitConfig
   showHabits: boolean;         // default true
   showPomoHeatmap: boolean;    // default true (mostly relevant in year view)
-  hourRange: { start: number; end: number }; // default { start: 6, end: 23 }
+  hourRange: { start: number; end: number }; // default { start: 0, end: 23 }
 }
 
 // Zod schema — state only. Config is plain JSON, healed by the migration layer.
@@ -36,5 +36,5 @@ export const defaultCalendarConfig = (): CalendarConfig => ({
   weekStartsOn: 'monday',
   showHabits: true,
   showPomoHeatmap: true,
-  hourRange: { start: 6, end: 23 },
+  hourRange: { start: 0, end: 23 },
 });

@@ -4,7 +4,10 @@ import { SysParser } from '../../../src/sys/parser';
 describe('SysParser', () => {
   describe('board commands', () => {
     it('parses board show', () => {
-      expect(SysParser.parse(['board', 'show'])).toEqual({ kind: 'board', sub: 'show', path: undefined });
+      expect(SysParser.parse(['board', 'show'])).toEqual({ kind: 'board', sub: 'show', json: false });
+    });
+    it('parses board show --json', () => {
+      expect(SysParser.parse(['board', 'show', '--json'])).toEqual({ kind: 'board', sub: 'show', json: true });
     });
     it('parses board save with path', () => {
       expect(SysParser.parse(['board', 'save', '/tmp/board.json'])).toEqual({
@@ -49,7 +52,10 @@ describe('SysParser', () => {
       });
     });
     it('parses todo list', () => {
-      expect(SysParser.parse(['todo', 'list'])).toEqual({ kind: 'todo', sub: 'list' });
+      expect(SysParser.parse(['todo', 'list'])).toEqual({ kind: 'todo', sub: 'list', json: false });
+    });
+    it('parses todo list --json', () => {
+      expect(SysParser.parse(['todo', 'list', '--json'])).toEqual({ kind: 'todo', sub: 'list', json: true });
     });
     it('parses todo check', () => {
       expect(SysParser.parse(['todo', 'check', 'abc123'])).toMatchObject({
@@ -61,12 +67,12 @@ describe('SysParser', () => {
   describe('task commands', () => {
     it('parses task list', () => {
       expect(SysParser.parse(['task', 'list'])).toEqual({
-        kind: 'task', sub: 'list', todoId: undefined,
+        kind: 'task', sub: 'list', todoId: undefined, json: false,
       });
     });
     it('parses task list with todoId filter', () => {
       expect(SysParser.parse(['task', 'list', 'mother-todo'])).toEqual({
-        kind: 'task', sub: 'list', todoId: 'mother-todo',
+        kind: 'task', sub: 'list', todoId: 'mother-todo', json: false,
       });
     });
     it('parses task add with text', () => {
@@ -119,6 +125,92 @@ describe('SysParser', () => {
         kind: 'task', sub: 'reset-pomo', id: 'task-id-1',
       });
     });
+    it('parses task parallel', () => {
+      expect(SysParser.parse(['task', 'parallel', 'task-id-1'])).toEqual({
+        kind: 'task', sub: 'parallel', id: 'task-id-1',
+      });
+    });
+    it('parses task schedule bare', () => {
+      expect(SysParser.parse(['task', 'schedule', 'task-id-1', '--at', '2026-05-15T09:00'])).toEqual({
+        kind: 'task', sub: 'schedule', id: 'task-id-1', at: '2026-05-15T09:00', durationMin: undefined,
+      });
+    });
+    it('parses task schedule with --duration', () => {
+      expect(SysParser.parse(['task', 'schedule', 'task-id-1', '--at', '2026-05-15T09:00', '--duration', '45'])).toEqual({
+        kind: 'task', sub: 'schedule', id: 'task-id-1', at: '2026-05-15T09:00', durationMin: 45,
+      });
+    });
+    it('parses task unschedule', () => {
+      expect(SysParser.parse(['task', 'unschedule', 'task-id-1'])).toEqual({
+        kind: 'task', sub: 'unschedule', id: 'task-id-1',
+      });
+    });
+    it('parses task addNext bare', () => {
+      expect(SysParser.parse(['task', 'addNext', 'task-id-1', 'write tests'])).toEqual({
+        kind: 'task', sub: 'addNext', sourceRef: 'task-id-1', text: 'write tests', durationMin: undefined,
+      });
+    });
+    it('parses task addNext with --duration', () => {
+      expect(SysParser.parse(['task', 'addNext', 'task-id-1', 'write tests', '--duration', '30'])).toEqual({
+        kind: 'task', sub: 'addNext', sourceRef: 'task-id-1', text: 'write tests', durationMin: 30,
+      });
+    });
+  });
+
+  describe('cal commands', () => {
+    it('parses cal show bare', () => {
+      expect(SysParser.parse(['cal', 'show'])).toEqual({
+        kind: 'cal', sub: 'show', from: undefined, to: undefined, json: false,
+      });
+    });
+    it('parses cal show with --from', () => {
+      expect(SysParser.parse(['cal', 'show', '--from', '2026-05-15'])).toEqual({
+        kind: 'cal', sub: 'show', from: '2026-05-15', to: undefined, json: false,
+      });
+    });
+    it('parses cal show with --to', () => {
+      expect(SysParser.parse(['cal', 'show', '--to', '2026-05-20'])).toEqual({
+        kind: 'cal', sub: 'show', from: undefined, to: '2026-05-20', json: false,
+      });
+    });
+    it('parses cal show --json', () => {
+      expect(SysParser.parse(['cal', 'show', '--json'])).toEqual({
+        kind: 'cal', sub: 'show', from: undefined, to: undefined, json: true,
+      });
+    });
+  });
+
+  describe('clock commands', () => {
+    it('parses clock day with date', () => {
+      expect(SysParser.parse(['clock', 'day', '2026-05-15'])).toEqual({
+        kind: 'clock', sub: 'day', arg: '2026-05-15',
+      });
+    });
+    it('parses clock day today', () => {
+      expect(SysParser.parse(['clock', 'day', 'today'])).toEqual({
+        kind: 'clock', sub: 'day', arg: 'today',
+      });
+    });
+    it('parses clock day +1', () => {
+      expect(SysParser.parse(['clock', 'day', '+1'])).toEqual({
+        kind: 'clock', sub: 'day', arg: '+1',
+      });
+    });
+    it('parses clock day -1', () => {
+      expect(SysParser.parse(['clock', 'day', '-1'])).toEqual({
+        kind: 'clock', sub: 'day', arg: '-1',
+      });
+    });
+    it('parses clock show', () => {
+      expect(SysParser.parse(['clock', 'show'])).toEqual({
+        kind: 'clock', sub: 'show', json: false,
+      });
+    });
+    it('parses clock show --json', () => {
+      expect(SysParser.parse(['clock', 'show', '--json'])).toEqual({
+        kind: 'clock', sub: 'show', json: true,
+      });
+    });
   });
 
   describe('habit commands', () => {
@@ -154,7 +246,7 @@ describe('SysParser', () => {
     });
     it('parses habit list', () => {
       expect(SysParser.parse(['habit', 'list'])).toEqual({
-        kind: 'habit', sub: 'list',
+        kind: 'habit', sub: 'list', json: false,
       });
     });
   });
@@ -166,7 +258,7 @@ describe('SysParser', () => {
       });
     });
     it('parses edge list', () => {
-      expect(SysParser.parse(['edge', 'list'])).toEqual({ kind: 'edge', sub: 'list' });
+      expect(SysParser.parse(['edge', 'list'])).toEqual({ kind: 'edge', sub: 'list', json: false });
     });
     it('parses edge remove', () => {
       expect(SysParser.parse(['edge', 'remove', 'edge-id-001'])).toMatchObject({

@@ -2,6 +2,12 @@ import { SysParser } from './parser';
 import * as habit from './commands/habit';
 import * as todo from './commands/todo';
 import * as task from './commands/task';
+import * as boardCmd from './commands/board';
+import * as nodeCmd from './commands/node';
+import * as edgeCmd from './commands/edge';
+import * as infoCmd from './commands/info';
+import * as calCmd from './commands/cal';
+import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
 import {
   imageAdd,
@@ -99,6 +105,68 @@ export class SysFacade {
 
     if (command.kind === 'version') {
       return { ok: true, message: `krnl0 v${this.version}` };
+    }
+
+    // ── Board reads ──────────────────────────────────────────────────────────
+    if (command.kind === 'board') {
+      const bCtx: boardCmd.BoardCtx = { boardPath: this.deps.boardPath };
+      switch (command.sub) {
+        case 'show':    return boardCmd.boardShow(bCtx, command.json);
+        case 'summary': return boardCmd.boardSummary(bCtx, command.json);
+        case 'stats':   return boardCmd.boardStats(bCtx, command.json);
+        case 'save':    return boardCmd.boardSave(command.path);
+        case 'load':    return boardCmd.boardLoad(command.path);
+      }
+    }
+
+    // ── Info / settings / viewport reads ────────────────────────────────────
+    if (command.kind === 'info') {
+      const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
+      return infoCmd.infoShow(iCtx, command.json);
+    }
+    if (command.kind === 'settings' && command.sub === 'show') {
+      const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
+      return infoCmd.settingsShow(iCtx, command.json);
+    }
+    if (command.kind === 'viewport' && command.sub === 'show') {
+      const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
+      return infoCmd.viewportShow(iCtx, command.json);
+    }
+
+    // ── Generic node CRUD ────────────────────────────────────────────────────
+    if (command.kind === 'node') {
+      const nCtx: nodeCmd.NodeCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'list': {
+          const filters: nodeCmd.NodeListFilters = {};
+          if (command.nodeKind !== undefined) filters.kind = command.nodeKind;
+          if (command.motherOnly) filters.motherOnly = true;
+          if (command.childOnly) filters.childOnly = true;
+          return nodeCmd.nodeList(nCtx, filters, command.json);
+        }
+        case 'read':         return nodeCmd.nodeRead(nCtx, command.id, command.json);
+        case 'remove':       return nodeCmd.nodeRemove(nCtx, command.id, command.force);
+        case 'set-position': return nodeCmd.nodeSetPosition(nCtx, command.id, command.x, command.y);
+        // 'move' and 'add' handled below via the existing renderer-coupled path.
+      }
+    }
+
+    // ── Edge CRUD ────────────────────────────────────────────────────────────
+    if (command.kind === 'edge') {
+      const eCtx: edgeCmd.EdgeCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'list':    return edgeCmd.edgeList(eCtx, command.json);
+        case 'add':     return edgeCmd.edgeAdd(eCtx, command.from, command.to);
+        case 'remove':  return edgeCmd.edgeRemove(eCtx, command.id);
+        case 'enable':  return edgeCmd.edgeEnable(eCtx, command.id, true);
+        case 'disable': return edgeCmd.edgeEnable(eCtx, command.id, false);
+      }
     }
 
     if (command.kind === 'whoami') {
@@ -209,7 +277,7 @@ export class SysFacade {
         case 'color':  return habit.cliColor(ctx, command.name, command.color);
         case 'remove': return habit.cliRemove(ctx, command.name);
         case 'view':   return habit.cliView(ctx, command.view);
-        case 'list':   return habit.cliList(ctx);
+        case 'list':   return habit.cliList(ctx, command.json);
       }
     }
 
@@ -221,7 +289,7 @@ export class SysFacade {
       switch (command.sub) {
         case 'add':   return todo.todoAdd(ctx, command.text, command.tag);
         case 'check': return todo.todoCheck(ctx, command.id);
-        case 'list':  return todo.todoList(ctx);
+        case 'list':  return todo.todoList(ctx, command.json);
       }
     }
 
@@ -231,7 +299,7 @@ export class SysFacade {
         ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
       };
       switch (command.sub) {
-        case 'list':    return task.taskList(ctx, command.todoId);
+        case 'list':    return task.taskList(ctx, command.todoId, command.json);
         case 'add':     return task.taskAdd(ctx, command.todoId, command.text, command.durationMin);
         case 'edit':    return task.taskEdit(ctx, command.id, command.text);
         case 'toggle':  return task.taskToggle(ctx, command.id);
@@ -240,7 +308,30 @@ export class SysFacade {
         case 'subtask':    return task.taskSubtask(ctx, command.parentId, command.text);
         case 'duration':   return task.taskDuration(ctx, command.id, command.minutes);
         case 'sibling':    return task.taskSibling(ctx, command.id);
+        case 'parallel':   return task.taskParallel(ctx, command.id);
         case 'reset-pomo': return task.taskResetPomo(ctx, command.id);
+        case 'chain':      return task.taskChain(ctx, command.refs);
+        case 'schedule':   return task.taskSchedule(ctx, command.id, command.at, command.durationMin);
+        case 'unschedule': return task.taskUnschedule(ctx, command.id);
+        case 'addNext':    return task.taskAddNext(ctx, command.sourceRef, command.text, command.durationMin);
+      }
+    }
+
+    if (command.kind === 'cal') {
+      const ctx: calCmd.CalCtx = { boardPath: this.deps.boardPath };
+      if (command.sub === 'show') {
+        return calCmd.calShow(ctx, command.from, command.to, command.json);
+      }
+    }
+
+    if (command.kind === 'clock') {
+      const ctx: clockCmd.ClockCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'day':  return clockCmd.clockDay(ctx, command.arg);
+        case 'show': return clockCmd.clockShow(ctx, command.json);
       }
     }
 
