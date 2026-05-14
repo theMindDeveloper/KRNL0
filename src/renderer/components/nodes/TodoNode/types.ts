@@ -9,6 +9,9 @@ export interface TodoItem {
   createdAt: string;     // ISO 8601
   completedAt: string | null; // ISO when done = true, null otherwise
   taskNodeId: string | null;  // Decision 20: back-link to spawned TaskNode.id
+  // ADR 0001 — Calendar integration: mirrors TaskState.scheduledFor for items
+  // that haven't spawned a TaskNode yet. Optional — absence means unscheduled.
+  scheduledFor?: string;      // ISO 8601 local datetime, e.g. "2026-05-20T14:30"
 }
 
 export interface TodoState {
