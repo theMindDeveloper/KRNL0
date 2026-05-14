@@ -82,8 +82,10 @@ import {
   habitSetColor,
   habitSetIcon,
   habitSetView,
+  habitSetSchedule,
 } from '../nodes/HabitNode/commands';
 import type { HabitState } from '../nodes/HabitNode/types';
+import type { HabitSchedule } from '../nodes/HabitNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
 
 // ── Calendar ──────────────────────────────────────────────────────────
@@ -194,15 +196,17 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
     }
     case 'habit': {
       switch (command) {
-        case 'habit.add':       return { state: habitAdd(s as never, args as never) };
-        case 'habit.toggleDay': return { state: habitToggleDay(s as never, args as never) };
-        case 'habit.markDone':  return { state: habitMarkDone(s as never, args as never) };
-        case 'habit.remove':    return { state: habitRemove(s as never, args as never) };
-        case 'habit.archive':   return { state: habitArchive(s as never, args as never) };
-        case 'habit.rename':    return { state: habitRename(s as never, args as never) };
-        case 'habit.setColor':  return { state: habitSetColor(s as never, args as never) };
-        case 'habit.setIcon':   return { state: habitSetIcon(s as never, args as never) };
-        case 'habit.setView':   return { config: habitSetView(c as never, args as never) };
+        case 'habit.add':         return { state: habitAdd(s as never, args as never) };
+        case 'habit.toggleDay':   return { state: habitToggleDay(s as never, args as never) };
+        case 'habit.markDone':    return { state: habitMarkDone(s as never, args as never) };
+        case 'habit.remove':      return { state: habitRemove(s as never, args as never) };
+        case 'habit.archive':     return { state: habitArchive(s as never, args as never) };
+        case 'habit.rename':      return { state: habitRename(s as never, args as never) };
+        case 'habit.setColor':    return { state: habitSetColor(s as never, args as never) };
+        case 'habit.setIcon':     return { state: habitSetIcon(s as never, args as never) };
+        case 'habit.setView':     return { config: habitSetView(c as never, args as never) };
+        // ADR 0002 §5 — set/clear schedule on a habit.
+        case 'habit.setSchedule': return { state: habitSetSchedule(s as never, args as never) };
       }
       break;
     }
@@ -924,6 +928,30 @@ export function makeCommandHandler(nodeId: string) {
           updateNode(todoNode.id, { state: newTodoState });
         }
       }
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
+    // ── calendar.scheduleHabit: cross-node router — dispatch habit.setSchedule to habit mother ─
+    // ADR 0002 §5: calendar.scheduleHabit looks up the habit mother by habitMotherId
+    // and dispatches habit.setSchedule. The calendar node does NOT mutate habit state directly.
+    if (node.kind === 'calendar' && command === 'calendar.scheduleHabit') {
+      const schedArgs = args as {
+        habitId?: string;
+        habitMotherId?: string;
+        schedule?: HabitSchedule;
+      };
+      if (!schedArgs.habitId || !schedArgs.habitMotherId || !schedArgs.schedule) return;
+      const currentBoard = useBoardStore.getState().board;
+      if (!currentBoard) return;
+      const habitMother = currentBoard.nodes.find((n) => n.id === schedArgs.habitMotherId);
+      if (!habitMother || habitMother.kind !== 'habit') return;
+      const nextHabitState = habitSetSchedule(habitMother.state as HabitState, {
+        habitId: schedArgs.habitId,
+        schedule: schedArgs.schedule,
+      });
+      updateNode(habitMother.id, { state: nextHabitState });
       const updated = useBoardStore.getState().board;
       if (updated) void window.krnl?.boardSave(updated);
       return;
