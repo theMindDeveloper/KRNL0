@@ -9,13 +9,10 @@ const R = 108;
 const CIRCUMFERENCE = 2 * Math.PI * R;
 const TOTAL_MIN = 720;
 
-/** Convert a 0-23 hour to a 12-hour display label. */
-function wallClockLabel(h: number): string {
-  const h24 = ((h % 24) + 24) % 24;
-  if (h24 === 0) return '12';
-  if (h24 > 12) return String(h24 - 12);
-  return String(h24);
-}
+// Decision 24.2 — palette is constrained to tokens defined in src/renderer/styles/tokens.css.
+// Adding a name here without a matching `--<name>` definition will cause break arcs to paint nothing.
+// Index 0 = long break (strongest ink), Index 1 = short break (medium ink).
+export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 
 export function ClockNode({
   node,
@@ -25,7 +22,7 @@ export function ClockNode({
   onMoveLeft,
   onMoveRight,
 }: NodeProps<ClockState, ClockConfig>) {
-  const { linkedTodoId, windowStartHour } = node.state;
+  const { linkedTodoId, viewWindow } = node.state;
 
   // Read all todo nodes (for link dropdown)
   const todoNodes = useBoardStore(
@@ -58,17 +55,31 @@ export function ClockNode({
     return segments;
   })();
 
-  // Build arc geometry. Each segment maps to one SVG <circle>.
-  const arcs = renderableSegments.map((seg) => {
-    const arcLengthMin = Math.max(0, Math.min(seg.endMin - seg.startMin, TOTAL_MIN - seg.startMin));
+  // Decision 24.2 Q3.5 — Defensive clamp: if the plan fits within window 0,
+  // force-render window 0 regardless of persisted viewWindow. Prevents stranding
+  // the user on an empty ring after they delete tasks. Does NOT mutate persisted state.
+  const effectiveWindow: 0 | 1 = totalMin <= TOTAL_MIN ? 0 : viewWindow;
+  const windowStart = effectiveWindow * TOTAL_MIN;
+  const windowEnd = windowStart + TOTAL_MIN;
+
+  // Decision 24.2 Q3 — Build arc geometry using windowed flatMap.
+  // Segments outside the current 12h window are filtered out; boundary-spanning
+  // segments are clipped to their intersection with [windowStart, windowEnd).
+  const arcs = renderableSegments.flatMap((seg) => {
+    const segStart = Math.max(seg.startMin, windowStart);
+    const segEnd = Math.min(seg.endMin, windowEnd);
+    if (segEnd <= segStart) return [];   // outside this window — skip
+    const arcLengthMin = segEnd - segStart;
+    const offsetMin = segStart - windowStart;   // relative to window
     const arcLength = (arcLengthMin / TOTAL_MIN) * CIRCUMFERENCE;
-    const startOffset = (seg.startMin / TOTAL_MIN) * CIRCUMFERENCE;
-    return { seg, arcLength, startOffset };
+    const startOffset = (offsetMin / TOTAL_MIN) * CIRCUMFERENCE;
+    return [{ seg, arcLength, startOffset }];
   });
 
-  const overflowMin = Math.max(0, totalMin - TOTAL_MIN);
+  // Decision 24.2 Q3 — overflow badge: only past 1440 min (24h), not 720.
+  const overflowMin = Math.max(0, totalMin - 2 * TOTAL_MIN);
 
-  // 12 tick marks — i=0 is at top (12 o'clock), clockwise at 30° intervals
+  // Decision 24.2 Q3 — 12 tick marks; labels derived from effectiveWindow, not wall-clock.
   const ticks = Array.from({ length: 12 }, (_, i) => {
     const angleDeg = i * 30 - 90; // -90 puts i=0 at top
     const angleRad = (angleDeg * Math.PI) / 180;
@@ -81,7 +92,8 @@ export function ClockNode({
     const y2 = 150 + outerR * Math.sin(angleRad);
     const lx = 150 + labelR * Math.cos(angleRad);
     const ly = 150 + labelR * Math.sin(angleRad);
-    const label = wallClockLabel(windowStartHour + i);
+    const hour = effectiveWindow * 12 + i;   // 0..11 or 12..23
+    const label = String(hour);
     return { x1, y1, x2, y2, lx, ly, label, isTop: i === 0 };
   });
 
@@ -119,7 +131,7 @@ export function ClockNode({
           gap: 8,
         }}
       >
-        {/* Header */}
+        {/* Header — Decision 24.2: dynamic range label */}
         <div
           style={{
             display: 'flex',
@@ -136,7 +148,7 @@ export function ClockNode({
               textTransform: 'uppercase',
             }}
           >
-            CLOCK · 12H
+            {`CLOCK · ${effectiveWindow * 12}–${(effectiveWindow + 1) * 12}H`}
           </span>
         </div>
 
@@ -222,37 +234,52 @@ export function ClockNode({
           {/* Timeline arcs — one circle per segment (task or break) */}
           {arcs.map(({ seg, arcLength, startOffset }) => {
             if (seg.kind === 'break') {
+              // Decision 24.2 Q1 — break arcs: ink-2/ink-3 at opacity 1.
+              // Short break: BREAK_TOKENS[1]='ink-3', strokeWidth=6.
+              // Long break:  BREAK_TOKENS[0]='ink-2', strokeWidth=10.
+              const isLong = seg.breakKind === 'long';
+              const strokeColor = isLong
+                ? `var(--${BREAK_TOKENS[0]})`
+                : `var(--${BREAK_TOKENS[1]})`;
+              const strokeW = isLong ? 10 : 6;
+              const durationMin = seg.endMin - seg.startMin;
+              const kindLabel = isLong ? 'long break' : 'short break';
               return (
+                <g key={`${seg.breakId}-w${effectiveWindow}`}>
+                  <title>{`${kindLabel} · ${durationMin}m`}</title>
+                  <circle
+                    cx={150}
+                    cy={150}
+                    r={R}
+                    fill="transparent"
+                    stroke={strokeColor}
+                    strokeWidth={strokeW}
+                    strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
+                    strokeDashoffset={-startOffset}
+                    transform="rotate(-90 150 150)"
+                    opacity={1}
+                  />
+                </g>
+              );
+            }
+            const durationMin = seg.endMin - seg.startMin;
+            return (
+              <g key={`${seg.taskId}-w${effectiveWindow}`}>
+                <title>{`task ${seg.taskId.slice(-8)} · ${durationMin}m`}</title>
                 <circle
-                  key={seg.breakId}
                   cx={150}
                   cy={150}
                   r={R}
                   fill="transparent"
-                  stroke="var(--ink-4)"
-                  strokeWidth={9}
+                  stroke={`var(--${seg.colorToken}, #c87080)`}
+                  strokeWidth={18}
                   strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
                   strokeDashoffset={-startOffset}
                   transform="rotate(-90 150 150)"
-                  opacity={seg.breakKind === 'long' ? 0.8 : 0.6}
+                  opacity={seg.done ? 0.4 : 1}
+                  style={seg.parallelGroupId !== null ? { mixBlendMode: 'multiply' as const } : undefined}
                 />
-              );
-            }
-            return (
-              <circle
-                key={seg.taskId}
-                cx={150}
-                cy={150}
-                r={R}
-                fill="transparent"
-                stroke={`var(--${seg.colorToken}, #c87080)`}
-                strokeWidth={18}
-                strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
-                strokeDashoffset={-startOffset}
-                transform="rotate(-90 150 150)"
-                opacity={seg.done ? 0.4 : 1}
-                style={seg.parallelGroupId !== null ? { mixBlendMode: 'multiply' as const } : undefined}
-              />
+              </g>
             );
           })}
 
@@ -304,7 +331,7 @@ export function ClockNode({
               tasks:{' '}
               {segments.filter((s) => s.kind === 'task').length} | breaks:{' '}
               {segments.filter((s) => s.kind === 'break').length} | total:{' '}
-              {totalMin}min
+              {totalMin}min | win:{effectiveWindow}
             </div>
             {segments.slice(0, 6).map((s, i) => (
               <div key={i}>
@@ -317,7 +344,9 @@ export function ClockNode({
           </div>
         )}
 
-        {/* Overflow badge — shows when totalMin (tasks + breaks) exceeds 720 min */}
+        {/* Overflow badge — shows only when totalMin exceeds 1440 min (24h).
+            Decision 24.2: badge threshold moved from 720 to 1440; user can
+            navigate minutes 720-1440 via the view toggle. */}
         {overflowMin > 0 && (
           <div
             style={{
@@ -331,46 +360,32 @@ export function ClockNode({
           </div>
         )}
 
-        {/* Window-start control */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            justifyContent: 'center',
-          }}
-        >
-          <span style={labelStyle}>Start:</span>
-          <button
-            type="button"
-            style={controlBtnStyle}
-            onClick={() =>
-              onCommand('clock.setWindowStart', { hour: windowStartHour - 1 })
-            }
-          >
-            −
-          </button>
-          <span
-            style={{
-              fontSize: 12,
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--ink)',
-              minWidth: 28,
-              textAlign: 'center',
-            }}
-          >
-            {wallClockLabel(windowStartHour)}
-          </span>
-          <button
-            type="button"
-            style={controlBtnStyle}
-            onClick={() =>
-              onCommand('clock.setWindowStart', { hour: windowStartHour + 1 })
-            }
-          >
-            +
-          </button>
-        </div>
+        {/* Decision 24.2 Q3 — 12h view toggle (replaces Start: −/+ row).
+            Disabled when the plan fits within window 0 (totalMin ≤ 720). */}
+        {(() => {
+          const canToggle = totalMin > TOTAL_MIN;
+          const targetWindow: 0 | 1 = effectiveWindow === 0 ? 1 : 0;
+          const label = effectiveWindow === 0 ? '→ 12h–24h' : '← 0h–12h';
+          return (
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button
+                type="button"
+                disabled={!canToggle}
+                style={{
+                  ...controlBtnStyle,
+                  opacity: canToggle ? 1 : 0.4,
+                  cursor: canToggle ? 'pointer' : 'not-allowed',
+                }}
+                title={canToggle ? `Switch to ${label.slice(2)}` : 'Plan fits within 12h'}
+                onClick={() => {
+                  if (canToggle) onCommand('clock.setViewWindow', { window: targetWindow });
+                }}
+              >
+                {label}
+              </button>
+            </div>
+          );
+        })()}
       </div>
     </MotherFrame>
   );

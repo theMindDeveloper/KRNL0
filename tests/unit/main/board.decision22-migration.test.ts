@@ -267,7 +267,7 @@ describe('Decision 22 — board migration', () => {
     const clock = loaded.nodes.find((n) => n.id === 'mother-clock');
     expect(clock).toBeDefined();
     expect(clock!.kind).toBe('clock');
-    expect(clock!.state).toMatchObject({ linkedTodoId: null, windowStartHour: 8 });
+    expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
     // Position matches NEW_MOTHER_POSITIONS entry for mother-clock (Decision 23.1)
     expect((clock as { position?: { x: number; y: number } }).position).toMatchObject({ x: 1252, y: 0 });
   });
@@ -285,7 +285,7 @@ describe('Decision 22 — board migration', () => {
           kind: 'clock',
           position: { x: 1252, y: 0 },
           isMother: true,
-          state: { linkedTodoId: null, windowStartHour: 8 },
+          state: { linkedTodoId: null, viewWindow: 0 },
           config: {},
         },
       ],
@@ -296,7 +296,7 @@ describe('Decision 22 — board migration', () => {
 
     const clockNodes = loaded.nodes.filter((n) => n.id === 'mother-clock');
     expect(clockNodes).toHaveLength(1);
-    expect(clockNodes[0]!.state).toMatchObject({ linkedTodoId: null, windowStartHour: 8 });
+    expect(clockNodes[0]!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
   });
 
   // ── AC1 — Fresh seed (Decision 23.1) ─────────────────────────────────────────
@@ -314,7 +314,7 @@ describe('Decision 22 — board migration', () => {
     expect(clock!.kind).toBe('clock');
     expect(clock!.position).toEqual({ x: 1252, y: 0 });
     expect(clock!.isMother).toBe(true);
-    expect(clock!.state).toEqual({ linkedTodoId: null, windowStartHour: 8 });
+    expect(clock!.state).toEqual({ linkedTodoId: null, viewWindow: 0 });
     expect(clock!.config).toEqual({});
   });
 });

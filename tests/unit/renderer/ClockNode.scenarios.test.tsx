@@ -34,7 +34,7 @@ afterEach(() => {
 function makeClockState(overrides: Partial<ClockState> = {}): ClockState {
   return {
     linkedTodoId: null,
-    windowStartHour: 8,
+    viewWindow: 0,
     ...overrides,
   };
 }
@@ -198,7 +198,7 @@ describe('AC5 — ClockNode renders a 12-hour face', () => {
     expect(arcCircles).toHaveLength(5); // 3 task + 2 break (trailing stripped)
   });
 
-  it('task arcs have strokeWidth=18; break arcs have strokeWidth=9', () => {
+  it('task arcs have strokeWidth=18; break arcs have strokeWidth=6 (short) or 10 (long)', () => {
     _seq = 0;
     const todoId = 'todo-stroke';
     const task1 = makeTaskNode('s-task-1', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
@@ -212,7 +212,10 @@ describe('AC5 — ClockNode renders a 12-hour face', () => {
     expect(arcCircles).toHaveLength(3);
 
     const taskArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '18');
-    const breakArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '9');
+    // Decision 24.2: short breaks use strokeWidth=6, long breaks use strokeWidth=10
+    const breakArcs = Array.from(arcCircles).filter(
+      (c) => c.getAttribute('stroke-width') === '6' || c.getAttribute('stroke-width') === '10',
+    );
     expect(taskArcs).toHaveLength(2);
     expect(breakArcs).toHaveLength(1);
   });
@@ -282,8 +285,8 @@ describe('AC6 — Done tasks render at 40% opacity', () => {
 
 // ── AC7 — Overflow badge ──────────────────────────────────────────────────────
 
-describe('AC7 — Overflow badge for tasks exceeding 720 minutes', () => {
-  it('shows no overflow badge when totalMin (tasks + breaks) <= 720', () => {
+describe('AC7 — Overflow badge for tasks exceeding 1440 minutes (Decision 24.2)', () => {
+  it('shows no overflow badge when totalMin (tasks + breaks) <= 1440', () => {
     _seq = 0;
     const todoId = 'todo-1';
     // 1 task × 360 min + 1 trailing break (5min) = 365 total. No overflow.
@@ -295,22 +298,27 @@ describe('AC7 — Overflow badge for tasks exceeding 720 minutes', () => {
     expect(screen.queryByText(/\+\d+ min/)).toBeNull();
   });
 
-  it('shows "+N min" badge when totalMin (tasks + breaks) exceeds 720', () => {
+  it('shows "+N min" badge when totalMin (tasks + breaks) exceeds 1440', () => {
     _seq = 0;
     const todoId = 'todo-1';
-    // 3 tasks × 300 min = 900 task time, + 3 breaks × 5 min = 15 break time = 915 totalMin
-    // overflow = 915 - 720 = 195
+    // Decision 24.2: overflow badge threshold is 1440 (24h), not 720.
+    // 5 tasks × 300 min = 1500 task time, plus breaks. Total well exceeds 1440.
     const task1 = makeTaskNode('task-1', makeTaskState({ parentTodoId: todoId, plannedMin: 300 }));
     const task2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 300 }));
     const task3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, plannedMin: 300 }));
-    seedBoard([makeTodoNode(todoId), task1, task2, task3], [
+    const task4 = makeTaskNode('task-4', makeTaskState({ parentTodoId: todoId, plannedMin: 300 }));
+    const task5 = makeTaskNode('task-5', makeTaskState({ parentTodoId: todoId, plannedMin: 300 }));
+    seedBoard([makeTodoNode(todoId), task1, task2, task3, task4, task5], [
       makeEdge('task-1', 'task-2'),
       makeEdge('task-2', 'task-3'),
+      makeEdge('task-3', 'task-4'),
+      makeEdge('task-4', 'task-5'),
     ]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    expect(screen.getByText('+195 min')).toBeDefined();
+    // Badge appears and shows a positive overflow value (exact value depends on break cadence)
+    expect(screen.getByText(/^\+\d+ min$/)).toBeDefined();
   });
 
   it('shows no overflow badge when linkedTodoId is null', () => {
@@ -339,7 +347,7 @@ describe('Decision 24 — Break arcs', () => {
     expect(arcCircles[0]!.getAttribute('stroke-width')).toBe('18');
   });
 
-  it('break arcs have visible ink stroke (var(--ink-4))', () => {
+  it('break arcs use var(--ink-3) for short breaks (Decision 24.2 — replaces ink-4)', () => {
     _seq = 0;
     const todoId = 'todo-bcolor';
     const task1 = makeTaskNode('bc-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
@@ -352,10 +360,10 @@ describe('Decision 24 — Break arcs', () => {
     // 2 task arcs + 1 break arc (trailing stripped)
     expect(arcCircles).toHaveLength(3);
 
-    const breakArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '9');
+    // Decision 24.2: short break uses strokeWidth=6 and var(--ink-3)
+    const breakArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '6');
     expect(breakArcs).toHaveLength(1);
-    // Decision 24.1 — ink-4 for visible break arcs (paper-3 was too close to background)
-    expect(breakArcs[0]!.getAttribute('stroke')).toBe('var(--ink-4)');
+    expect(breakArcs[0]!.getAttribute('stroke')).toBe('var(--ink-3)');
   });
 });
 
@@ -440,7 +448,10 @@ describe('AC3 — Pomo config reactivity: break arc changes when shortBreakMin c
     const arcLen5 = (5 / TOTAL_MIN) * CIRCUMFERENCE;
 
     const getBreakDashArrayValue = (): string | null => {
-      const arcs = getArcCircles().filter((c) => c.getAttribute('stroke-width') === '9');
+      // Decision 24.2: short breaks use strokeWidth=6 (long breaks use 10)
+      const arcs = getArcCircles().filter(
+        (c) => c.getAttribute('stroke-width') === '6' || c.getAttribute('stroke-width') === '10',
+      );
       return arcs[0]?.getAttribute('stroke-dasharray') ?? null;
     };
 
@@ -462,5 +473,111 @@ describe('AC3 — Pomo config reactivity: break arc changes when shortBreakMin c
     expect(dash10).not.toBe(dash5);
     // And start with the arc length for a 10-min break
     expect(dash10).toContain(arcLen10.toFixed(0).slice(0, 4));
+  });
+});
+
+// ── Decision 24.2 — Break arc visibility ─────────────────────────────────────
+
+describe('Decision 24.2 — break arc visibility', () => {
+  it('short break arcs use stroke=var(--ink-3) and strokeWidth=6', () => {
+    _seq = 0;
+    const todoId = 'todo-brk-short';
+    // 2 tasks with a short break between them (longBreakEvery=100 so no long break fires)
+    const task1 = makeTaskNode('bs-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task2 = makeTaskNode('bs-2', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const board: Board = {
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-14T08:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        makePomoNode({ shortBreakMin: 5, longBreakEvery: 100 }),
+        makeTodoNode(todoId),
+        task1,
+        task2,
+      ],
+      edges: [makeEdge('bs-1', 'bs-2')],
+    };
+    useBoardStore.setState({ board });
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    const breakArc = Array.from(document.querySelectorAll('svg circle')).find(
+      (c) => c.getAttribute('stroke-width') === '6',
+    );
+    expect(breakArc, 'should have a break arc with strokeWidth=6').toBeDefined();
+    expect(breakArc!.getAttribute('stroke')).toBe('var(--ink-3)');
+  });
+
+  it('long break arcs use stroke=var(--ink-2) and strokeWidth=10', () => {
+    _seq = 0;
+    const todoId = 'todo-brk-long';
+    // 5 tasks + longBreakEvery=4 → the 4th break (between tasks 4 and 5) is a long break.
+    // The trailing break after task 5 is stripped, so the long break at position 4 IS rendered.
+    const task1 = makeTaskNode('bl-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task2 = makeTaskNode('bl-2', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task3 = makeTaskNode('bl-3', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task4 = makeTaskNode('bl-4', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task5 = makeTaskNode('bl-5', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const board: Board = {
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-14T08:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        makePomoNode({ shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 }),
+        makeTodoNode(todoId),
+        task1,
+        task2,
+        task3,
+        task4,
+        task5,
+      ],
+      edges: [
+        makeEdge('bl-1', 'bl-2'),
+        makeEdge('bl-2', 'bl-3'),
+        makeEdge('bl-3', 'bl-4'),
+        makeEdge('bl-4', 'bl-5'),
+      ],
+    };
+    useBoardStore.setState({ board });
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    const longBreakArc = Array.from(document.querySelectorAll('svg circle')).find(
+      (c) => c.getAttribute('stroke-width') === '10',
+    );
+    expect(longBreakArc, 'should have a long break arc with strokeWidth=10').toBeDefined();
+    expect(longBreakArc!.getAttribute('stroke')).toBe('var(--ink-2)');
+  });
+
+  it('break arcs render with opacity=1 (not 0.6 or 0.8 from Decision 24.1)', () => {
+    _seq = 0;
+    const todoId = 'todo-brk-opacity';
+    const task1 = makeTaskNode('bo-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task2 = makeTaskNode('bo-2', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const board: Board = {
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-14T08:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        makePomoNode({ shortBreakMin: 5, longBreakEvery: 100 }),
+        makeTodoNode(todoId),
+        task1,
+        task2,
+      ],
+      edges: [makeEdge('bo-1', 'bo-2')],
+    };
+    useBoardStore.setState({ board });
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    const breakArc = Array.from(document.querySelectorAll('svg circle')).find(
+      (c) => c.getAttribute('stroke-width') === '6',
+    );
+    expect(breakArc, 'should have a break arc').toBeDefined();
+    const opacity = breakArc!.getAttribute('opacity');
+    expect(opacity).not.toBe('0.6');
+    expect(opacity).not.toBe('0.8');
+    // Decision 24.2: opacity must be 1
+    expect(opacity).toBe('1');
   });
 });

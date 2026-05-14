@@ -18,6 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { COLORS } from '../../../src/renderer/store/timelineSelector';
+import { BREAK_TOKENS } from '../../../src/renderer/components/nodes/ClockNode';
 
 describe('Decision 24.1 — color-token contract', () => {
   it('every COLORS entry has a matching CSS custom property in tokens.css', () => {
@@ -25,6 +26,18 @@ describe('Decision 24.1 — color-token contract', () => {
     const css = readFileSync(cssPath, 'utf-8');
 
     for (const token of COLORS) {
+      const re = new RegExp(`--${token}\\s*:`);
+      expect(re.test(css), `--${token} must be defined in src/renderer/styles/tokens.css`).toBe(true);
+    }
+  });
+});
+
+describe('Decision 24.2 — break-token contract', () => {
+  it('every BREAK_TOKENS entry has a matching CSS custom property in tokens.css', () => {
+    const cssPath = resolve(__dirname, '../../../src/renderer/styles/tokens.css');
+    const css = readFileSync(cssPath, 'utf-8');
+
+    for (const token of BREAK_TOKENS) {
       const re = new RegExp(`--${token}\\s*:`);
       expect(re.test(css), `--${token} must be defined in src/renderer/styles/tokens.css`).toBe(true);
     }
