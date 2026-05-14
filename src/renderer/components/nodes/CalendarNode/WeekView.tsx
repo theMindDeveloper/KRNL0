@@ -1,14 +1,19 @@
 // ADR 0001 Decision 24 — WeekView (Slice 3).
+// ADR 0002 — Habit drag-to-schedule integration + habit block visualisation.
 // Renders a 7-column × N-row hour grid. Supports drag-to-schedule from TodoNode
-// rows and TaskNode blocks. NowLine is rendered as an overlay.
+// rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
+// RadialChooser. NowLine is rendered as an overlay.
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useCallback, type ReactNode } from 'react';
 import type { DragEvent } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
+import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
+import { useRadialChooser } from '../../ui/RadialChooser';
+import type { RadialOption } from '../../ui/RadialChooser';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +49,26 @@ function todayYMD(): string {
 // Short day labels Mon-Sun.
 const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
 
+// Convert JS getDay() (0=Sun..6=Sat) to ISO-8601 day-of-week (1=Mon..7=Sun).
+function jsGetDayToIsoDow(jsDay: number): IsoDow {
+  return (jsDay === 0 ? 7 : jsDay) as IsoDow;
+}
+
+// Convert a YYYY-MM-DD to its ISO day-of-week (1=Mon..7=Sun).
+function ymdToIsoDow(ymd: string): IsoDow {
+  const d = parseYMD(ymd);
+  return jsGetDayToIsoDow(d.getDay());
+}
+
+// Check if a habit is scheduled on a given ISO day-of-week.
+function habitScheduledOnDow(schedule: HabitSchedule, isoDow: IsoDow): boolean {
+  switch (schedule.kind) {
+    case 'daily': return true;
+    case 'weekly': return schedule.days.includes(isoDow);
+    case 'weekdays': return isoDow >= 1 && isoDow <= 5;
+  }
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface ScheduledTask {
@@ -52,6 +77,14 @@ interface ScheduledTask {
   scheduledFor: string;         // ISO local datetime "YYYY-MM-DDTHH:MM"
   scheduledDurationMin: number; // calendar block duration (fallback: plannedMin or durationMin)
   plannedMin: number;           // for drag payload
+}
+
+interface ScheduledHabit {
+  id: string;
+  name: string;
+  color: string;        // CSS color token name (e.g. 'acid', 'cyan')
+  icon: string | undefined;
+  schedule: HabitSchedule;
 }
 
 interface WeekViewProps {
@@ -64,6 +97,28 @@ interface WeekViewProps {
 
 const GUTTER_WIDTH = 36; // px — time gutter width
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
+
+// Radial chooser options for habit scheduling (ADR 0002 §4 + §D binding).
+type HabitScheduleKind = 'weekly' | 'daily';
+
+function makeHabitChooserOptions(): RadialOption<HabitScheduleKind>[] {
+  return [
+    {
+      id: 'weekly',
+      label: 'EVERY WEEK',
+      icon: '↺',
+      color: 'var(--cyan)',
+      value: 'weekly',
+    },
+    {
+      id: 'daily',
+      label: 'EVERY DAY',
+      icon: '◉',
+      color: 'var(--acid)',
+      value: 'daily',
+    },
+  ];
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -85,9 +140,6 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   // Column index (0-6) of today, -1 if not in this week.
   const todayColIndex = weekDays.indexOf(today);
 
-  // Determine row height: fill available height or fall back to min.
-  // We use a fixed row height of MIN_ROW_HEIGHT since we don't know the
-  // container height at render time; the grid overflows if needed.
   const rowHeight = MIN_ROW_HEIGHT;
 
   // Sub-header nav handlers.
@@ -126,6 +178,30 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     }),
   );
 
+  // Read scheduled habits from the board store (ADR 0002 §6).
+  const scheduledHabits = useBoardStore(
+    useShallow((s): ScheduledHabit[] => {
+      if (!s.board) return [];
+      const result: ScheduledHabit[] = [];
+      for (const n of s.board.nodes) {
+        if (n.kind !== 'habit') continue;
+        const habitState = n.state as { habits?: Habit[] } | null;
+        if (!habitState?.habits) continue;
+        for (const h of habitState.habits) {
+          if (h.archived || !h.schedule) continue;
+          result.push({
+            id: h.id,
+            name: h.name,
+            color: h.color,
+            icon: h.icon,
+            schedule: h.schedule,
+          });
+        }
+      }
+      return result;
+    }),
+  );
+
   // Build a map from YYYY-MM-DD → ScheduledTask[] for the rendered week.
   const tasksByDay = useMemo(() => {
     const map = new Map<string, ScheduledTask[]>();
@@ -146,22 +222,75 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   // Whether any task is scheduled this week (controls empty-state hint).
   const hasTasksThisWeek = tasksByDay.size > 0;
 
-  // Column width: total minus gutter, divided by 7.
-  // Use a percentage-based approach in the render; for NowLine we need px,
-  // so we compute based on a nominal 280px column area (can be refined).
-  // WeekView fills its container via flex; actual columnWidth is computed dynamically.
-  // NowLine receives a computed value from the grid ref in a real layout pass.
-  // For simplicity, use a stable calculation assuming the MotherFrame width.
-  // MOTHER_WIDTH from MotherFrame is ~320. Gutter=36. (320-36)/7 ≈ 40.6.
-  // These are fallback values; layout is CSS-driven.
+  // Column width fallback for NowLine.
   const NOMINAL_COLUMN_WIDTH = 40;
+
+  // ── RadialChooser for habit drops ───────────────────────────────────────────
+
+  // pendingHabitDrop holds the habit payload while the chooser is open.
+  // It is read when onPick fires.
+  const pendingHabitRef = useRef<{
+    habitId: string;
+    habitMotherId: string;
+    dayYMD: string;
+    hour: number;
+  } | null>(null);
+
+  const chooser = useRadialChooser<HabitScheduleKind>({
+    radius: 88,
+    innerRadius: 24,
+    onPick: useCallback(
+      (kind: HabitScheduleKind) => {
+        const pending = pendingHabitRef.current;
+        if (!pending) return;
+        pendingHabitRef.current = null;
+
+        const timeOfDay = `${String(pending.hour).padStart(2, '0')}:00`;
+        const isoDow = ymdToIsoDow(pending.dayYMD);
+
+        const schedule: HabitSchedule =
+          kind === 'daily'
+            ? { kind: 'daily', timeOfDay }
+            : { kind: 'weekly', timeOfDay, days: [isoDow] };
+
+        onCommand('calendar.scheduleHabit', {
+          habitId: pending.habitId,
+          habitMotherId: pending.habitMotherId,
+          schedule,
+        });
+      },
+      [onCommand],
+    ),
+    onCancel: useCallback(() => {
+      pendingHabitRef.current = null;
+    }, []),
+  });
 
   // ── Drop target handler factory ─────────────────────────────────────────────
 
   function makeCellHandlers(dayYMD: string, hour: number) {
     return {
       onDragOver: (e: DragEvent<HTMLDivElement>) => {
-        if (!e.dataTransfer.types.includes('application/krnl-task')) return;
+        const types = e.dataTransfer.types;
+
+        // ADR 0002 §4: habit MIME takes priority.
+        if (types.includes('application/krnl-habit')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          e.currentTarget.setAttribute('data-drop-target', 'true');
+          // Open chooser only once per entry (isOpen guard).
+          if (!chooser.isOpen) {
+            const raw = e.dataTransfer.getData('application/krnl-habit');
+            // Note: getData returns '' during dragover in most browsers.
+            // We store the cell data so onDrop can use it via pendingHabitRef.
+            // The actual payload is extracted in onDrop.
+            void raw;
+            chooser.open({ x: e.clientX, y: e.clientY }, makeHabitChooserOptions());
+          }
+          return;
+        }
+
+        if (!types.includes('application/krnl-task')) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         e.currentTarget.setAttribute('data-drop-target', 'true');
@@ -171,6 +300,32 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       },
       onDrop: (e: DragEvent<HTMLDivElement>) => {
         e.preventDefault();
+        e.currentTarget.removeAttribute('data-drop-target');
+
+        // ADR 0002 §4: check habit MIME first.
+        const habitRaw = e.dataTransfer.getData('application/krnl-habit');
+        if (habitRaw) {
+          const payload = JSON.parse(habitRaw) as {
+            habitId?: string;
+            habitMotherId?: string;
+          };
+          if (payload.habitId && payload.habitMotherId) {
+            // Store for the chooser's onPick callback.
+            pendingHabitRef.current = {
+              habitId: payload.habitId,
+              habitMotherId: payload.habitMotherId,
+              dayYMD,
+              hour,
+            };
+          }
+          // The chooser handles the rest via window-level drop listener.
+          // If chooser was not open (e.g. drop happened immediately), close.
+          if (!chooser.isOpen) {
+            pendingHabitRef.current = null;
+          }
+          return;
+        }
+
         const raw = e.dataTransfer.getData('application/krnl-task');
         if (!raw) return;
         const payload = JSON.parse(raw) as {
@@ -178,19 +333,13 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           itemId?: string;
           durationMin: number;
         };
-        // v1: only allow drops from tasks that already have a TaskNode.
         if (!payload.taskId) return;
         const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:00`;
-        // Cross-node router: calendar.schedule looks up the task and applies
-        // taskSetSchedule. Firing task.setSchedule directly here would no-op
-        // because onCommand is bound to the CalendarNode, which has no such
-        // handler. ADR 0001 §4 + commandDispatch.ts:877.
         onCommand('calendar.schedule', {
           taskId: payload.taskId,
           scheduledFor,
           scheduledDurationMin: payload.durationMin,
         });
-        e.currentTarget.removeAttribute('data-drop-target');
         // 240ms acid flash.
         e.currentTarget.classList.add('calendar-cell--just-dropped');
         const el = e.currentTarget;
@@ -238,9 +387,6 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       };
 
       const handleBlockClick = () => {
-        // Cross-node router: calendar.activateTask routes to task.activate on
-        // the target node. Firing task.activate directly here would no-op
-        // (onCommand is bound to CalendarNode, no task.activate handler there).
         onCommand('calendar.activateTask', { taskId: task.id });
       };
 
@@ -315,6 +461,83 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         </div>
       );
     });
+  }
+
+  // ── Habit block renderer (ADR 0002 §6) ──────────────────────────────────────
+
+  function renderHabitBlocks(dayYMD: string) {
+    const isoDow = ymdToIsoDow(dayYMD);
+    const blocks: ReactNode[] = [];
+
+    for (const habit of scheduledHabits) {
+      if (!habitScheduledOnDow(habit.schedule, isoDow)) continue;
+
+      const [hStr, mStr] = habit.schedule.timeOfDay.split(':');
+      const habitHour = parseInt(hStr ?? '0', 10);
+      const habitMin = parseInt(mStr ?? '0', 10);
+
+      // Per ADR 0002 §6: if timeOfDay is outside hourRange, do not render.
+      if (habitHour < hourRange.start || habitHour > hourRange.end) continue;
+
+      const hoursFromStart = habitHour - hourRange.start + habitMin / 60;
+      const topPx = Math.round(hoursFromStart * rowHeight);
+
+      const nameLabel = habit.name.length > 10 ? habit.name.slice(0, 9) + '…' : habit.name;
+
+      blocks.push(
+        <div
+          key={`habit-block-${habit.id}`}
+          data-testid={`habit-block-${habit.id}-${dayYMD}`}
+          title={`${habit.name} — ${habit.schedule.timeOfDay}`}
+          style={{
+            position: 'absolute',
+            top: topPx,
+            left: 2,
+            right: 2,
+            height: 12,
+            background: `var(--${habit.color})`,
+            opacity: 0.7,
+            borderRadius: 2,
+            overflow: 'hidden',
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            padding: '0 2px',
+            pointerEvents: 'none',
+          }}
+        >
+          {habit.icon && (
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8,
+                lineHeight: 1,
+                flexShrink: 0,
+                color: 'var(--paper)',
+              }}
+            >
+              {habit.icon}
+            </span>
+          )}
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8,
+              color: 'var(--paper)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1,
+            }}
+          >
+            {nameLabel}
+          </span>
+        </div>,
+      );
+    }
+
+    return blocks;
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -495,6 +718,9 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                     />
                   );
                 })}
+
+                {/* Habit blocks (zIndex: 1 — behind tasks) */}
+                {renderHabitBlocks(dayYMD)}
 
                 {/* Task blocks rendered as absolute-positioned children */}
                 {renderTaskBlocks(dayYMD)}
