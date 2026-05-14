@@ -225,7 +225,7 @@ describe('WeekView — navigation arrows', () => {
 describe('WeekView — drop to schedule', () => {
   beforeEach(() => setEmptyBoard());
 
-  it('drop with valid krnl-task payload fires task.setSchedule with correct scheduledFor', () => {
+  it('drop with valid krnl-task payload fires calendar.schedule with correct scheduledFor', () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -248,7 +248,7 @@ describe('WeekView — drop to schedule', () => {
       },
     });
 
-    expect(onCommand).toHaveBeenCalledWith('task.setSchedule', {
+    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', {
       taskId: 'task-abc',
       scheduledFor: '2026-05-12T14:00',
       scheduledDurationMin: 50,
