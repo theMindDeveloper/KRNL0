@@ -2,8 +2,8 @@
 // Each handler is pure: (state | config, args, env?) => state | config.
 // Time and id sources are injected so tests can pin them.
 
-import type { Habit, HabitColor, HabitConfig, HabitState, HabitView } from './types';
-import { isHabitColor, isHabitView, todayLocal } from './types';
+import type { Habit, HabitColor, HabitConfig, HabitSchedule, HabitState, HabitView, IsoDow } from './types';
+import { isHabitColor, isHabitView, isValidTimeOfDay, todayLocal } from './types';
 
 export interface HabitEnv {
   uuid: () => string;
@@ -159,6 +159,54 @@ export function habitSetIcon(
       return { ...h, icon: trimmed };
     }),
   };
+}
+
+// ADR 0002 — set or clear the schedule for a habit.
+// Pure handler: returns state unchanged on invalid args (no throw).
+export function habitSetSchedule(
+  state: HabitState,
+  args: { habitId: string; schedule: HabitSchedule | null },
+): HabitState {
+  const { habitId, schedule } = args;
+  const habitIdx = state.habits.findIndex((h) => h.id === habitId);
+  if (habitIdx === -1) return state; // no-op if habit not found
+
+  const habit = state.habits[habitIdx]!;
+
+  if (schedule === null) {
+    // Remove the schedule field entirely — keeps board.json clean.
+    const { schedule: _removed, ...rest } = habit;
+    void _removed;
+    const updated: Habit = rest as Habit;
+    const habits = state.habits.slice();
+    habits[habitIdx] = updated;
+    return { ...state, habits };
+  }
+
+  // Validate timeOfDay.
+  if (!isValidTimeOfDay(schedule.timeOfDay)) return state;
+
+  let normalised: HabitSchedule;
+  if (schedule.kind === 'weekly') {
+    const deduped = [...new Set(schedule.days)].sort((a, b) => a - b) as IsoDow[];
+    if (deduped.length === 0) {
+      // Empty days = unschedule.
+      const { schedule: _removed, ...rest } = habit;
+      void _removed;
+      const updated: Habit = rest as Habit;
+      const habits = state.habits.slice();
+      habits[habitIdx] = updated;
+      return { ...state, habits };
+    }
+    normalised = { kind: 'weekly', timeOfDay: schedule.timeOfDay, days: deduped };
+  } else {
+    normalised = schedule;
+  }
+
+  const updated: Habit = { ...habit, schedule: normalised };
+  const habits = state.habits.slice();
+  habits[habitIdx] = updated;
+  return { ...state, habits };
 }
 
 // Streak = consecutive days in log ending at today (if present) or yesterday.
