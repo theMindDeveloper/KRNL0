@@ -13,6 +13,7 @@ export interface TermSurface {
   attachCustomKeyEventHandler?(handler: (event: KeyboardEvent) => boolean): void;
   getSelection?(): string;
   clearSelection?(): void;
+  scrollToTop?(): void;
 }
 
 /** Minimal FitAddon surface. */
@@ -53,14 +54,22 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
 
   if (isCancelled()) return () => undefined;
 
+  // Defer fit + size capture until the next animation frame so the container
+  // has real dimensions. Without this, term.cols/rows default to 80×24 even
+  // when the actual viewport is ~50×14, and main generates a 9-row MOTD that
+  // immediately scrolls into scrollback once the shell prompt arrives.
+  let fitOk = false;
   try {
     fit.fit();
+    fitOk = true;
   } catch {
-    // container not yet sized — ignore
+    // container not yet sized — fall through with conservative defaults
   }
 
-  const cols = term.cols || 80;
-  const rows = term.rows || 24;
+  // Use measured size when fit succeeded; otherwise use a small default that
+  // forces renderMotd into its compact one-line form (T5).
+  const cols = fitOk && term.cols > 0 ? term.cols : 40;
+  const rows = fitOk && term.rows > 0 ? term.rows : 12;
 
   if (!krnl) return () => undefined;
 
@@ -68,7 +77,20 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
   // Write motd synchronously here (before subscribing to pty:data) so the
   // banner appears before the shell prompt and there is no IPC race (T1).
   const { sessionId: sid, motd } = await krnl.ptyCreate(cols, rows);
-  if (motd) term.write(motd);
+  // Dev-only diagnostic so future "MOTD invisible" reports surface the actual
+  // cols/rows/motd-length without needing a code change.
+  if (typeof window !== 'undefined' && (window as { __KRNL0_DEBUG?: boolean }).__KRNL0_DEBUG !== false) {
+    // eslint-disable-next-line no-console
+    console.log('[krnl][motd]', { cols, rows, fitOk, motdLen: motd?.length ?? 0 });
+  }
+  if (motd) {
+    term.write(motd);
+    // Belt-and-suspenders: ensure MOTD is rendered to the top of the visible
+    // viewport. xterm auto-scrolls on subsequent writes, but if PowerShell
+    // emits a prompt before MOTD bytes are flushed to the renderer, the
+    // viewport can end up scrolled past the banner.
+    term.scrollToTop?.();
+  }
   if (isCancelled()) {
     krnl.ptyKill(sid);
     return () => undefined;
