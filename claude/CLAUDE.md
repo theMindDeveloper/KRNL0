@@ -53,7 +53,11 @@ krnl task subtask <parentId> "<text>"
 krnl task edit <id> "<new text>"
 krnl task toggle <id>                  # mark done / undone (mirrors to TodoItem)
 krnl task duration <id> <minutes>
-krnl task sibling <id>                 # fork a parallel branch from <id>
+krnl task sibling <id>                 # fork a parallel branch from <id> (same as task parallel)
+krnl task parallel <id>               # fork a parallel branch — canonical name for sibling
+krnl task addNext <sourceRef> "<text>" [--duration <min>]  # add sequential next task beside source (x+252)
+krnl task schedule <ref> --at <YYYY-MM-DDTHH:MM> [--duration <min>]  # set wall-clock anchor for cascade
+krnl task unschedule <ref>            # clear wall-clock anchor from a task
 krnl task pomo <id>                    # start a pomo session for this task
 krnl task reset-pomo <id>              # clear pomo count
 krnl task delete <id>                  # cascades to descendants, cancels active pomo
@@ -132,6 +136,29 @@ krnl board stats [--json]              # per-kind + per-event counts
 krnl board save [path]                 # autosave is always on
 krnl board load <path>
 ```
+
+### Cascade scheduling — anchor tasks to wall-clock time (ADR 0003/0005)
+
+Tasks with `scheduledFor` set become **anchors**. Successor tasks in the same chain derive their times automatically (plannedMin offset from the anchor's endISO). Multiple anchors per chain are allowed (ADR 0005).
+
+```
+krnl task schedule <ref> --at 2026-05-15T09:00 [--duration <min>]
+krnl task unschedule <ref>             # removes scheduledFor entirely
+krnl cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]   # all scheduled placements
+```
+
+Mirrors bidirectionally: `task schedule` also updates the linked TodoItem's `scheduledFor`.
+
+### Clock day-selector (ADR 0004)
+
+The ClockNode shows wall-clock placements for a specific day. Use `clock day` to navigate.
+
+```
+krnl clock day <YYYY-MM-DD|today|+1|-1>   # set clock's selected date
+krnl clock show [--json]                   # show scheduled tasks for selected date + window
+```
+
+`clock show` respects the clock's `viewWindow` (0 = AM 00:00-12:00, 1 = PM 12:00-24:00).
 
 ### Self-introspection (read these first!)
 ```
@@ -253,3 +280,28 @@ krnl task edit <new-id> "design review"
 
 **User:** "when I finish a pomodoro, mark deep-work done"
 → Multi-step wiring. Read `skills/wire-edge.md` first.
+
+---
+
+**User:** "schedule the spec task at 9am tomorrow"
+```
+krnl task list --json                 # find the task id
+krnl task schedule <id> --at 2026-05-16T09:00
+```
+**Reply:** "Spec task anchored at 9am tomorrow. Successors will cascade from there."
+
+---
+
+**User:** "what's on the clock today?"
+```
+krnl clock show --json
+```
+**Reply:** "Two tasks scheduled this morning — spec at 9, design review at 10:30."
+
+---
+
+**User:** "show me everything on the calendar this week"
+```
+krnl cal show --from 2026-05-13 --to 2026-05-20
+```
+**Reply:** "Three tasks across Monday and Wednesday — spec, design review, and stand-up prep."

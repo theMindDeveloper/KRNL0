@@ -6,6 +6,8 @@ import * as boardCmd from './commands/board';
 import * as nodeCmd from './commands/node';
 import * as edgeCmd from './commands/edge';
 import * as infoCmd from './commands/info';
+import * as calCmd from './commands/cal';
+import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
 import {
   imageAdd,
@@ -306,8 +308,30 @@ export class SysFacade {
         case 'subtask':    return task.taskSubtask(ctx, command.parentId, command.text);
         case 'duration':   return task.taskDuration(ctx, command.id, command.minutes);
         case 'sibling':    return task.taskSibling(ctx, command.id);
+        case 'parallel':   return task.taskParallel(ctx, command.id);
         case 'reset-pomo': return task.taskResetPomo(ctx, command.id);
         case 'chain':      return task.taskChain(ctx, command.refs);
+        case 'schedule':   return task.taskSchedule(ctx, command.id, command.at, command.durationMin);
+        case 'unschedule': return task.taskUnschedule(ctx, command.id);
+        case 'addNext':    return task.taskAddNext(ctx, command.sourceRef, command.text, command.durationMin);
+      }
+    }
+
+    if (command.kind === 'cal') {
+      const ctx: calCmd.CalCtx = { boardPath: this.deps.boardPath };
+      if (command.sub === 'show') {
+        return calCmd.calShow(ctx, command.from, command.to, command.json);
+      }
+    }
+
+    if (command.kind === 'clock') {
+      const ctx: clockCmd.ClockCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'day':  return clockCmd.clockDay(ctx, command.arg);
+        case 'show': return clockCmd.clockShow(ctx, command.json);
       }
     }
 
