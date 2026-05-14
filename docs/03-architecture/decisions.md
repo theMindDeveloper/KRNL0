@@ -1456,3 +1456,49 @@ ClockNode becomes a permanent mother at **slot 6** (`mother-clock`, `x=1252, y=0
 **v2 deferred:** An opt-in `clock.alignMode: 'sequential' | 'scheduled'` mode that reads `TaskState.scheduledFor` for arc placement. Requires a separate ADR.
 
 ---
+
+## Decision 24 — Unified Task Timeline Selector + ClockNode Rewrite
+
+**Date:** 2026-05-14
+**Status:** Accepted
+**Supersedes:** nothing (additive on top of Decision 23.1)
+**Related:** Decision 22 (`plannedMin`), Decision 22.1 (per-task checkpoint), Decision 22.2 (animated chain), Decision 23.1 (Clock as permanent mother), ADR 0001 (Calendar)
+**Plan file:** `C:\Users\momo\.claude\plans\just-improve-my-prompt-eager-dongarra.md`
+
+### Context
+
+Decision 23.1 introduced ClockNode v1 with a sequential `plannedMin` stack of root tasks sorted by `sequenceNumber`. Four requirements that v1 cannot address:
+
+1. **Chain order, not numeric order.** Root tasks form a `task.next` graph; `sequenceNumber` sort breaks down on forks.
+2. **Breaks are missing.** Pomo `shortBreakMin` / `longBreakMin` / `longBreakEvery` are first-class scheduled time; they must occupy the 12-hour ring.
+3. **Reactivity.** Edits to tasks or Pomo config must repaint the clock without manual refresh.
+4. **Calendar will eventually share the same data.** Two views on one derived Timeline.
+
+### Decision
+
+Replace the filter-and-loop in `ClockNode/index.tsx:42-74` with a single memoized selector: **`selectTimeline(board, todoId)`** in `src/renderer/store/timelineSelector.ts`. ClockNode is the v1 consumer; CalendarNode is v2 (deferred).
+
+**Data model:** `TimelineSegment` discriminated union (`task | break`), `ParallelGroup`, `Timeline` (ordered by `startMin`, includes breaks). Full types in `timelineSelector.ts`.
+
+**Memoization:** module-level reference-identity cache on `(board.nodes, board.edges, pomoConfig)`. Same pattern as `_lastEdges` / `selectTaskChain` in `boardStore.ts`. Invalidated automatically on every Zustand `set(...)` that touches nodes or edges. Pure, synchronous, no React hooks.
+
+**Break algorithm:** one break per task or parallel group. `breakCounter % cfg.longBreakEvery === 0 → long`, else short. Trailing break emitted by selector; stripped by ClockNode at render time. Calendar (v2) may keep it.
+
+**Parallel arcs:** same radius `R=108`, same `strokeWidth=18`, `mix-blend-mode: multiply` so overlapping colors compose visibly. Parallel group members share `startMin`; group `endMin = startMin + max(branch.plannedMin)`.
+
+**Break arcs:** `strokeWidth=9`, `stroke="var(--paper-3)"`, opacity 0.6 (short) / 0.8 (long).
+
+**Done tasks:** still consume their `plannedMin` slot; rendered at 0.4 opacity.
+
+**No new persisted fields.** Timeline is derived from existing `TaskState.plannedMin`, `TaskState.done`, `task.next` edges, and `PomoConfig`. Existing boards load and save unchanged.
+
+**Calendar integration (v1):** Calendar ignores Timeline. It continues to use `scheduledFor` directly per ADR 0001. A future ADR may bridge the two.
+
+### Consequences
+
+- `ClockNode` becomes a thin renderer: reads `selectTimeline`, renders segments as SVG arcs.
+- The old `tasks` selector and manual `arcs` reduce loop in `ClockNode/index.tsx` are deleted.
+- All future views wanting "the todo's plan as time" import `selectTimeline` from `timelineSelector.ts`. No copies, no parallel implementations.
+- Tests: 12 selector unit tests + 6 component tests added; existing ClockNode.scenarios tests updated to account for break arcs in the segment count.
+
+---
