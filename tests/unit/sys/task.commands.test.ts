@@ -620,10 +620,12 @@ describe('sys task list', () => {
     expect((res.data as unknown[]).length).toBe(1);
   });
 
-  it('returns empty when filtering by unknown todoId', async () => {
+  it('errors when filtering by unknown todoId', async () => {
+    // Issue #117 §1 — refs are resolved against the board; unknown ref must
+    // fail loudly so AI/scripts don't silently get an empty list.
     await taskAdd(ctx, TODO_MOTHER_ID, 'task');
     const res = await taskList(ctx, 'nonexistent-todo');
-    expect(res.ok).toBe(true);
-    expect((res.data as unknown[]).length).toBe(0);
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain('nonexistent-todo');
   });
 });

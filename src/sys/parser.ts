@@ -1,14 +1,17 @@
 export type SysCommand =
-  | { kind: 'board'; sub: 'show' | 'save' | 'load'; path: string | undefined }
-  | { kind: 'node'; sub: 'list' }
-  | { kind: 'node'; sub: 'remove'; id: string | undefined }
+  | { kind: 'board'; sub: 'show' | 'summary' | 'stats'; json: boolean }
+  | { kind: 'board'; sub: 'save' | 'load'; path: string | undefined }
+  | { kind: 'node'; sub: 'list'; nodeKind: string | undefined; motherOnly: boolean; childOnly: boolean; json: boolean }
+  | { kind: 'node'; sub: 'read'; id: string | undefined; json: boolean }
+  | { kind: 'node'; sub: 'remove'; id: string | undefined; force: boolean }
+  | { kind: 'node'; sub: 'set-position'; id: string | undefined; x: number | undefined; y: number | undefined }
   | { kind: 'node'; sub: 'add'; nodeKind: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'pomo'; sub: 'stop' | 'status' }
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
-  | { kind: 'todo'; sub: 'list' }
+  | { kind: 'todo'; sub: 'list'; json: boolean }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
   | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
-  | { kind: 'task'; sub: 'list'; todoId: string | undefined }
+  | { kind: 'task'; sub: 'list'; todoId: string | undefined; json: boolean }
   | { kind: 'task'; sub: 'add'; todoId: string | undefined; text: string | undefined; durationMin: number | undefined }
   | { kind: 'task'; sub: 'edit'; id: string | undefined; text: string | undefined }
   | { kind: 'task'; sub: 'toggle'; id: string | undefined }
@@ -18,14 +21,18 @@ export type SysCommand =
   | { kind: 'task'; sub: 'duration'; id: string | undefined; minutes: number | undefined }
   | { kind: 'task'; sub: 'sibling'; id: string | undefined }
   | { kind: 'task'; sub: 'reset-pomo'; id: string | undefined }
+  | { kind: 'task'; sub: 'chain'; refs: string[] }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
   | { kind: 'habit'; sub: 'done'; name: string | undefined; date: string | undefined }
   | { kind: 'habit'; sub: 'color'; name: string | undefined; color: string | undefined }
   | { kind: 'habit'; sub: 'view'; view: string | undefined }
-  | { kind: 'habit'; sub: 'list' }
-  | { kind: 'edge'; sub: 'list' }
+  | { kind: 'habit'; sub: 'list'; json: boolean }
+  | { kind: 'edge'; sub: 'list'; json: boolean }
   | { kind: 'edge'; sub: 'remove'; id: string | undefined }
   | { kind: 'edge'; sub: 'add'; from: string | undefined; to: string | undefined }
+  | { kind: 'edge'; sub: 'enable' | 'disable'; id: string | undefined }
+  | { kind: 'info'; json: boolean }
+  | { kind: 'settings'; sub: 'show'; json: boolean }
   | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
   | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
@@ -40,6 +47,7 @@ export type SysCommand =
   | { kind: 'node'; sub: 'move'; id: string | undefined; to: { x: number; y: number } | undefined }
   | { kind: 'viewport'; sub: 'pan'; dx: number | undefined; dy: number | undefined }
   | { kind: 'viewport'; sub: 'zoom'; factor: number | undefined }
+  | { kind: 'viewport'; sub: 'show'; json: boolean }
   | { kind: 'undo' }
   | { kind: 'redo' }
   | { kind: 'marquee'; rect: { x1: number; y1: number; x2: number; y2: number } | undefined; delete: boolean }
@@ -62,6 +70,11 @@ function numFlag(args: string[], name: string): number | undefined {
   return isNaN(n) ? undefined : n;
 }
 
+/** Returns true iff `--<name>` appears anywhere in `args`. */
+function hasFlag(args: string[], name: string): boolean {
+  return args.includes(`--${name}`);
+}
+
 export class SysParser {
   static parse(argv: string[]): SysCommand | null {
     const [cmd, sub, ...rest] = argv;
@@ -73,14 +86,38 @@ export class SysParser {
     if (cmd === 'hear') return { kind: 'hear' };
 
     if (cmd === 'board') {
-      if (sub === 'show' || sub === 'save' || sub === 'load') {
+      if (sub === 'show' || sub === 'summary' || sub === 'stats') {
+        return { kind: 'board', sub, json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'save' || sub === 'load') {
         return { kind: 'board', sub, path: rest[0] };
       }
     }
 
     if (cmd === 'node') {
-      if (sub === 'list')   return { kind: 'node', sub: 'list' };
-      if (sub === 'remove') return { kind: 'node', sub: 'remove', id: rest[0] };
+      if (sub === 'list') {
+        return {
+          kind: 'node', sub: 'list',
+          nodeKind: flag(rest, 'kind'),
+          motherOnly: hasFlag(rest, 'mother'),
+          childOnly: hasFlag(rest, 'child'),
+          json: hasFlag(rest, 'json'),
+        };
+      }
+      if (sub === 'read') {
+        return { kind: 'node', sub: 'read', id: rest[0], json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'remove') {
+        return { kind: 'node', sub: 'remove', id: rest[0], force: hasFlag(rest, 'force') };
+      }
+      if (sub === 'set-position') {
+        return {
+          kind: 'node', sub: 'set-position',
+          id: rest[0],
+          x: numFlag(rest, 'x'),
+          y: numFlag(rest, 'y'),
+        };
+      }
       if (sub === 'add') {
         const atStr = flag(rest, 'at');
         const at = atStr ? parseAt(atStr) : undefined;
@@ -90,6 +127,16 @@ export class SysParser {
         const toStr = flag(rest, 'to');
         const to = toStr ? parseAt(toStr) : undefined;
         return { kind: 'node', sub: 'move', id: rest[0], to };
+      }
+    }
+
+    if (cmd === 'info') {
+      return { kind: 'info', json: hasFlag([sub ?? '', ...rest], 'json') };
+    }
+
+    if (cmd === 'settings') {
+      if (sub === 'show' || sub === undefined) {
+        return { kind: 'settings', sub: 'show', json: hasFlag(rest, 'json') };
       }
     }
 
@@ -106,7 +153,7 @@ export class SysParser {
     }
 
     if (cmd === 'todo') {
-      if (sub === 'list')  return { kind: 'todo', sub: 'list' };
+      if (sub === 'list')  return { kind: 'todo', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'check') return { kind: 'todo', sub: 'check', id: rest[0] };
       if (sub === 'add') {
         return { kind: 'todo', sub: 'add', text: rest[0], tag: flag(rest, 'tag') };
@@ -115,7 +162,18 @@ export class SysParser {
 
     if (cmd === 'task') {
       if (sub === 'list') {
-        return { kind: 'task', sub: 'list', todoId: rest[0] };
+        // Allow --todo flag or positional; --json optional.
+        const todoFlag = flag(rest, 'todo');
+        const positional = rest[0] && !rest[0].startsWith('--') ? rest[0] : undefined;
+        return {
+          kind: 'task', sub: 'list',
+          todoId: todoFlag ?? positional,
+          json: hasFlag(rest, 'json'),
+        };
+      }
+      if (sub === 'chain') {
+        const refs = rest.filter((a) => !a.startsWith('--'));
+        return { kind: 'task', sub: 'chain', refs };
       }
       if (sub === 'add') {
         const durRaw = flag(rest, 'duration');
@@ -163,7 +221,7 @@ export class SysParser {
       if (sub === 'add')    return { kind: 'habit', sub: 'add',    name: rest[0] };
       if (sub === 'streak') return { kind: 'habit', sub: 'streak', name: rest[0] };
       if (sub === 'remove') return { kind: 'habit', sub: 'remove', name: rest[0] };
-      if (sub === 'list')   return { kind: 'habit', sub: 'list' };
+      if (sub === 'list')   return { kind: 'habit', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'done') {
         return { kind: 'habit', sub: 'done', name: rest[0], date: flag(rest, 'date') };
       }
@@ -176,8 +234,10 @@ export class SysParser {
     }
 
     if (cmd === 'edge') {
-      if (sub === 'list')   return { kind: 'edge', sub: 'list' };
+      if (sub === 'list')   return { kind: 'edge', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'remove') return { kind: 'edge', sub: 'remove', id: rest[0] };
+      if (sub === 'enable') return { kind: 'edge', sub: 'enable', id: rest[0] };
+      if (sub === 'disable') return { kind: 'edge', sub: 'disable', id: rest[0] };
       if (sub === 'add') {
         return {
           kind: 'edge', sub: 'add',
@@ -250,6 +310,9 @@ export class SysParser {
       }
       if (sub === 'zoom') {
         return { kind: 'viewport', sub: 'zoom', factor: numFlag(rest, 'factor') };
+      }
+      if (sub === 'show') {
+        return { kind: 'viewport', sub: 'show', json: hasFlag(rest, 'json') };
       }
     }
 
