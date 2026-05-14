@@ -73,24 +73,13 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
 
   if (!krnl) return () => undefined;
 
-  // F4: pty:create — returns sessionId + motd.
-  // Write motd synchronously here (before subscribing to pty:data) so the
-  // banner appears before the shell prompt and there is no IPC race (T1).
-  const { sessionId: sid, motd } = await krnl.ptyCreate(cols, rows);
-  // Dev-only diagnostic so future "MOTD invisible" reports surface the actual
-  // cols/rows/motd-length without needing a code change.
-  if (typeof window !== 'undefined' && (window as { __KRNL0_DEBUG?: boolean }).__KRNL0_DEBUG !== false) {
-    // eslint-disable-next-line no-console
-    console.log('[krnl][motd]', { cols, rows, fitOk, motdLen: motd?.length ?? 0 });
-  }
-  if (motd) {
-    term.write(motd);
-    // Belt-and-suspenders: ensure MOTD is rendered to the top of the visible
-    // viewport. xterm auto-scrolls on subsequent writes, but if PowerShell
-    // emits a prompt before MOTD bytes are flushed to the renderer, the
-    // viewport can end up scrolled past the banner.
-    term.scrollToTop?.();
-  }
+  // F4: pty:create — returns sessionId (motd is also returned for legacy
+  // callers but NOT written to xterm here). The banner now lives in React
+  // (MotdBanner.tsx) above the xterm body, because PowerShell + PSReadLine
+  // emit screen-clearing escape sequences during init that wipe any
+  // pre-written banner. The React banner is outside the shell's reach.
+  const { sessionId: sid } = await krnl.ptyCreate(cols, rows);
+  void fitOk; // kept for future diagnostic logging
   if (isCancelled()) {
     krnl.ptyKill(sid);
     return () => undefined;
