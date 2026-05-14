@@ -6,7 +6,7 @@
 // A2: Apple Liquid Glass aesthetic — backdrop blur, translucent dark wedges,
 //     per-wedge stroke accent, entry bounce animation.
 
-import { useEffect, useRef, useState, useSyncExternalStore, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { radialBus } from './bus';
 import { RADIAL_CHOOSER_Z } from './types';
@@ -166,33 +166,13 @@ export function RadialChooserHost() {
 
   // Exit animation (A2 §7): hold a snapshot of the closing session for 120ms
   // so the host can render with the 'radial-chooser-closing' CSS class before
-  // unmounting. closingFrame is set when session flips null; cleared after 120ms.
+  // unmounting. useLayoutEffect ensures the closingFrame is set synchronously
+  // before the browser paints, preventing a single-frame gap on close.
   const [closingFrame, setClosingFrame] = useState<ChooserSession | null>(null);
   const closingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (session === null && closingFrame === null) return; // already clear
-    if (session !== null) {
-      // New session opened — cancel any pending close animation.
-      if (closingTimerRef.current !== null) {
-        clearTimeout(closingTimerRef.current);
-        closingTimerRef.current = null;
-      }
-      setClosingFrame(null);
-    } else {
-      // session just became null → start exit animation.
-      // closingFrame should already be null here since we copy from prev session below.
-    }
-  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Detect the session→null transition to start the closing animation.
   const prevSessionRef = useRef<ChooserSession | null>(null);
-  if (prevSessionRef.current !== null && session === null && closingFrame === null) {
-    // Capture snapshot synchronously during render (before effect runs).
-    // We need to schedule setClosingFrame in an effect to avoid calling setState during render.
-  }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const prev = prevSessionRef.current;
     prevSessionRef.current = session;
 
@@ -203,17 +183,15 @@ export function RadialChooserHost() {
         setClosingFrame(null);
         closingTimerRef.current = null;
       }, 120);
-    }
-
-    if (session !== null && closingTimerRef.current !== null) {
-      // New session opened while old exit was running — cancel.
+    } else if (session !== null && closingTimerRef.current !== null) {
+      // New session opened while exit was running — cancel closing animation.
       clearTimeout(closingTimerRef.current);
       closingTimerRef.current = null;
       setClosingFrame(null);
     }
   }, [session]);
 
-  // Clean up timer on unmount.
+  // Clean up pending timer on unmount.
   useEffect(() => {
     return () => {
       if (closingTimerRef.current !== null) clearTimeout(closingTimerRef.current);
