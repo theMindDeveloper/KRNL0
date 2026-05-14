@@ -29,6 +29,13 @@ export interface ScheduledTaskPlacement {
   /** The task whose scheduledFor produced this chain's placement. */
   anchorTaskId: string;
   parallelGroupId: string | null;
+  /** ADR 0004 §4.2 — 0-based index of this branch within its parallel group.
+   *  Null iff parallelGroupId is null. Stability guarantee: whatever order
+   *  `chainWalker.walkChain` emits for `unit.branches` IS the canonical order
+   *  for this index. (As of writing, that order is the unvisited-set order
+   *  determined by `nextsOf(...)` traversal; treat it as opaque — the
+   *  contract is "matches walkChain's branch enumeration," not a sort key.) */
+  parallelBranchIndex: number | null;
   /** True iff this placement is the chain's anchor (taskId === anchorTaskId). */
   isAnchor: boolean;
 }
@@ -261,6 +268,7 @@ function build(board: Board): ScheduleResult {
             endISO,
             anchorTaskId,
             parallelGroupId: null,
+            parallelBranchIndex: null,
             isAnchor,
           });
           cursorMin += unit.plannedMin;
@@ -269,7 +277,9 @@ function build(board: Board): ScheduleResult {
           // cost = max(branch.plannedMin) (ADR 0003 §3.5).
           // Only emit branches that belong to this chain's component.
           const groupStartISO = addMinutesISO(anchorISO, cursorMin);
-          for (const branch of unit.branches) {
+          // ADR 0004 §4.2 — emit parallelBranchIndex matching walkChain's
+          // branch enumeration order.
+          for (const [idx, branch] of unit.branches.entries()) {
             if (!chainComponent.has(branch.taskId)) continue;
             const isAnchor = branch.taskId === anchorTaskId;
             const ts = taskInfoById.get(branch.taskId)?.taskState;
@@ -283,6 +293,7 @@ function build(board: Board): ScheduleResult {
               endISO,
               anchorTaskId,
               parallelGroupId: unit.groupId,
+              parallelBranchIndex: idx,
               isAnchor,
             });
           }

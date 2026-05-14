@@ -342,6 +342,61 @@ describe('Test 9 — Reference-identity memoization', () => {
   });
 });
 
+// ── Test 11 — ADR 0004 §4.2 — parallelBranchIndex on placements ────────────
+
+describe('Test 11 — parallelBranchIndex (ADR 0004 §4.2)', () => {
+  it('non-parallel tasks get parallelBranchIndex = null', () => {
+    _taskSeq = 0;
+    const todoId = 'todo-bi-1';
+    const t1 = makeTaskNode('t1', todoId, 25, { scheduledFor: '2026-05-20T10:00' });
+    const t2 = makeTaskNode('t2', todoId, 25);
+    const board = makeBoard(
+      [makeTodoNode(todoId), t1, t2],
+      [makeEdge('t1', 't2')],
+    );
+    const { placements } = selectSchedule(board);
+    expect(placements.get('t1')?.parallelBranchIndex).toBeNull();
+    expect(placements.get('t2')?.parallelBranchIndex).toBeNull();
+  });
+
+  it('parallel-group branches get 0..N-1 indices matching walkChain branch order', () => {
+    _taskSeq = 0;
+    const todoId = 'todo-bi-2';
+    // t1 anchored → fork to t2a, t2b, t2c (three parallel branches).
+    const t1 = makeTaskNode('t1', todoId, 25, { scheduledFor: '2026-05-20T09:00' });
+    const t2a = makeTaskNode('t2a', todoId, 30);
+    const t2b = makeTaskNode('t2b', todoId, 15);
+    const t2c = makeTaskNode('t2c', todoId, 20);
+    const board = makeBoard(
+      [makeTodoNode(todoId), t1, t2a, t2b, t2c],
+      [makeEdge('t1', 't2a'), makeEdge('t1', 't2b'), makeEdge('t1', 't2c')],
+    );
+
+    const { placements } = selectSchedule(board);
+    expect(placements.size).toBe(4);
+
+    // All three branches carry a non-null index.
+    const indices = ['t2a', 't2b', 't2c']
+      .map((id) => placements.get(id)?.parallelBranchIndex)
+      .filter((i): i is number => typeof i === 'number');
+    expect(indices).toHaveLength(3);
+    // Indices are the contiguous set 0..2.
+    expect([...indices].sort((a, b) => a - b)).toEqual([0, 1, 2]);
+
+    // They all share a parallelGroupId.
+    expect(placements.get('t2a')?.parallelGroupId).not.toBeNull();
+    expect(placements.get('t2b')?.parallelGroupId).toBe(
+      placements.get('t2a')?.parallelGroupId,
+    );
+    expect(placements.get('t2c')?.parallelGroupId).toBe(
+      placements.get('t2a')?.parallelGroupId,
+    );
+
+    // Anchor itself is null.
+    expect(placements.get('t1')?.parallelBranchIndex).toBeNull();
+  });
+});
+
 // ── Test 10 — No anchors → empty placements ────────────────────────────────
 
 describe('Test 10 — No scheduled tasks → empty placement map', () => {
