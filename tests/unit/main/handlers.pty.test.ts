@@ -201,26 +201,30 @@ describe('F4 — pty:create', () => {
     }
   });
 
-  it('passes -NoLogo to PowerShell and unloads PSReadLine by default', async () => {
+  it('passes -NoLogo to PowerShell and runs krnl-init.ps1 by default', async () => {
     const { spawn } = await import('node-pty');
     const event = makeEvent();
 
     const prevShell = process.env['KRNL0_SHELL'];
-    const prevKeep = process.env['KRNL0_KEEP_PSREADLINE'];
+    const prevKeep = process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+    const prevCliDir = process.env['KRNL0_CLI_DIR'];
     process.env['KRNL0_SHELL'] = 'powershell.exe';
-    delete process.env['KRNL0_KEEP_PSREADLINE'];
+    process.env['KRNL0_CLI_DIR'] = 'C:\\fake-cli-dir';
+    delete process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
     try {
       await invoke('pty:create', event, 80, 24);
       const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
       const args = spawnCall[1] as string[];
       expect(args).toContain('-NoLogo');
       expect(args).toContain('-NoExit');
-      expect(args).toContain('-Command');
-      expect(args.some((a) => a.includes('Remove-Module PSReadLine'))).toBe(true);
+      expect(args).toContain('-File');
+      expect(args.some((a) => a.endsWith('krnl-init.ps1'))).toBe(true);
     } finally {
       if (prevShell === undefined) delete process.env['KRNL0_SHELL'];
       else process.env['KRNL0_SHELL'] = prevShell;
-      if (prevKeep !== undefined) process.env['KRNL0_KEEP_PSREADLINE'] = prevKeep;
+      if (prevKeep !== undefined) process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = prevKeep;
+      if (prevCliDir === undefined) delete process.env['KRNL0_CLI_DIR'];
+      else process.env['KRNL0_CLI_DIR'] = prevCliDir;
     }
   });
 
@@ -241,25 +245,29 @@ describe('F4 — pty:create', () => {
     }
   });
 
-  it('preserves PSReadLine when KRNL0_KEEP_PSREADLINE=1', async () => {
+  it('preserves PSReadLine prediction when KRNL0_KEEP_PSREADLINE_PREDICTION=1', async () => {
     const { spawn } = await import('node-pty');
     const event = makeEvent();
 
     const prevShell = process.env['KRNL0_SHELL'];
-    const prevKeep = process.env['KRNL0_KEEP_PSREADLINE'];
+    const prevKeep = process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+    const prevCliDir = process.env['KRNL0_CLI_DIR'];
     process.env['KRNL0_SHELL'] = 'powershell.exe';
-    process.env['KRNL0_KEEP_PSREADLINE'] = '1';
+    process.env['KRNL0_CLI_DIR'] = 'C:\\fake-cli-dir';
+    process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = '1';
     try {
       await invoke('pty:create', event, 80, 24);
       const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
       const args = spawnCall[1] as string[];
       expect(args).toEqual(['-NoLogo']);
-      expect(args).not.toContain('-Command');
+      expect(args).not.toContain('-File');
     } finally {
       if (prevShell === undefined) delete process.env['KRNL0_SHELL'];
       else process.env['KRNL0_SHELL'] = prevShell;
-      if (prevKeep === undefined) delete process.env['KRNL0_KEEP_PSREADLINE'];
-      else process.env['KRNL0_KEEP_PSREADLINE'] = prevKeep;
+      if (prevKeep === undefined) delete process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+      else process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = prevKeep;
+      if (prevCliDir === undefined) delete process.env['KRNL0_CLI_DIR'];
+      else process.env['KRNL0_CLI_DIR'] = prevCliDir;
     }
   });
 

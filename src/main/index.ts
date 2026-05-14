@@ -71,7 +71,7 @@ function setupCliDir(): string {
   // In packaged:   resources/app.asar/out/main/index.js → ../../bin
   const srcBin = join(__dirname, '../../bin');
 
-  for (const file of ['krnl.js', 'krnl', 'krnl.cmd', 'sys.js', 'package.json']) {
+  for (const file of ['krnl.js', 'krnl', 'krnl.cmd', 'sys.js', 'package.json', 'krnl-init.ps1']) {
     const src = join(srcBin, file);
     const dst = join(cliDir, file);
     try {
