@@ -1,7 +1,6 @@
 // TerminalNode session logic — extracted for unit-testability.
 // All side-effects (pty calls, terminal writes) are injected via deps.
-
-import { BOOT_LINE_ASCII, BOOT_LINE_SEPARATOR } from './constants';
+// MOTD is now emitted by main via pty:data before the shell prompt renders (T1).
 
 /** Minimal Terminal surface needed by startTerminalSession. */
 export interface TermSurface {
@@ -14,6 +13,7 @@ export interface TermSurface {
   attachCustomKeyEventHandler?(handler: (event: KeyboardEvent) => boolean): void;
   getSelection?(): string;
   clearSelection?(): void;
+  scrollToTop?(): void;
 }
 
 /** Minimal FitAddon surface. */
@@ -23,12 +23,15 @@ export interface FitSurface {
 
 /** The krnl preload bridge surface (subset used by the terminal). */
 export interface KrnlBridge {
-  ptyCreate(cols: number, rows: number): Promise<string>;
+  ptyCreate(cols: number, rows: number): Promise<{ sessionId: string; motd: string }>;
   ptyWrite(sessionId: string, data: string): void | Promise<void>;
   ptyResize(sessionId: string, cols: number, rows: number): void | Promise<void>;
   ptyKill(sessionId: string): void | Promise<void>;
   onPtyData(sessionId: string, callback: (data: string) => void): () => void;
   onPtyExit(sessionId: string, callback: () => void): () => void;
+  // Optional in tests — only the production bridge implements clipboard.
+  clipboardReadText?(): Promise<string>;
+  clipboardWriteText?(text: string): Promise<void>;
 }
 
 export interface SessionDeps {
@@ -54,23 +57,32 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
 
   if (isCancelled()) return () => undefined;
 
+  // Defer fit + size capture until the next animation frame so the container
+  // has real dimensions. Without this, term.cols/rows default to 80×24 even
+  // when the actual viewport is ~50×14, and main generates a 9-row MOTD that
+  // immediately scrolls into scrollback once the shell prompt arrives.
+  let fitOk = false;
   try {
     fit.fit();
+    fitOk = true;
   } catch {
-    // container not yet sized — ignore
+    // container not yet sized — fall through with conservative defaults
   }
 
-  const cols = term.cols || 80;
-  const rows = term.rows || 24;
-
-  // F2: write boot lines
-  term.write(BOOT_LINE_ASCII);
-  term.write(BOOT_LINE_SEPARATOR);
+  // Use measured size when fit succeeded; otherwise use a small default that
+  // forces renderMotd into its compact one-line form (T5).
+  const cols = fitOk && term.cols > 0 ? term.cols : 40;
+  const rows = fitOk && term.rows > 0 ? term.rows : 12;
 
   if (!krnl) return () => undefined;
 
-  // F4: pty:create
-  const sid = await krnl.ptyCreate(cols, rows);
+  // F4: pty:create — returns sessionId (motd is also returned for legacy
+  // callers but NOT written to xterm here). The banner now lives in React
+  // (MotdBanner.tsx) above the xterm body, because PowerShell + PSReadLine
+  // emit screen-clearing escape sequences during init that wipe any
+  // pre-written banner. The React banner is outside the shell's reach.
+  const { sessionId: sid } = await krnl.ptyCreate(cols, rows);
+  void fitOk; // kept for future diagnostic logging
   if (isCancelled()) {
     krnl.ptyKill(sid);
     return () => undefined;
@@ -89,30 +101,42 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
     onCommand('term.sessionEnd', { sessionId: sid });
   });
 
-  // Issue #75: Ctrl+C must always reach the PTY. With a selection, copy to
-  // clipboard. Without a selection, send 0x03 (SIGINT/ETX) so the running
-  // process is interrupted. We do this via attachCustomKeyEventHandler so
-  // we don't rely on xterm's variable default behaviour, which can drop
-  // 0x03 under Electron when the helper textarea loses focus mid-press.
+  // Custom key handling — must use attachCustomKeyEventHandler (not a
+  // bubble-phase React onKeyDown) because xterm processes keydown internally
+  // before bubbling, and would otherwise transmit the raw control bytes
+  // (^C, ^V) to the PTY before we get a chance to suppress them.
+  //
+  // Ctrl+C:  selection → copy. No selection → send 0x03 (SIGINT/ETX).
+  // Ctrl+V / Ctrl+Shift+V: read clipboard, write to PTY (bracketed paste
+  //   awareness is left to the shell).
   term.attachCustomKeyEventHandler?.((event) => {
     if (event.type !== 'keydown') return true;
-    const isCtrlC =
-      (event.ctrlKey || event.metaKey) &&
-      !event.shiftKey &&
-      !event.altKey &&
-      (event.key === 'c' || event.key === 'C');
-    if (!isCtrlC) return true;
+    const mod = event.ctrlKey || event.metaKey;
+    if (!mod || event.altKey) return true;
 
-    const sel = term.getSelection?.() ?? '';
-    if (sel) {
-      // Copy and let the PTY keep running.
-      try { void navigator.clipboard.writeText(sel); } catch { /* ignore */ }
-      term.clearSelection?.();
+    const k = event.key;
+
+    if (!event.shiftKey && (k === 'c' || k === 'C')) {
+      const sel = term.getSelection?.() ?? '';
+      if (sel) {
+        void krnl.clipboardWriteText?.(sel);
+        term.clearSelection?.();
+        return false;
+      }
+      void krnl.ptyWrite(sid, '\x03');
       return false;
     }
-    // No selection — interrupt the running process.
-    void krnl.ptyWrite(sid, '\x03');
-    return false;
+
+    if (k === 'v' || k === 'V') {
+      // Prevent xterm from emitting ^V (0x16) to the pty, then paste.
+      void (async () => {
+        const text = await krnl.clipboardReadText?.();
+        if (text) void krnl.ptyWrite(sid, text);
+      })();
+      return false;
+    }
+
+    return true;
   });
 
   // F5: xterm input → pty:write.

@@ -1,4 +1,4 @@
-import { app, ipcMain, BrowserWindow } from 'electron';
+import { app, ipcMain, BrowserWindow, clipboard } from 'electron';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -6,6 +6,21 @@ import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
 import { loadBoardFrom, saveBoardTo } from '../persistence/board';
+import { notifyBoardChanged } from '../boardIo';
+import { renderMotd } from '../rpc/motd';
+import type { RpcServer } from '../rpc/server';
+
+// Read version once at module load (package.json is bundled into resources).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const APP_VERSION: string = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pkg = require('../../../package.json') as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 // Board location — isolated per Electron app name so multiple worktrees
 // (e.g. main vs feat/new-features) don't share the same board.json.
@@ -21,6 +36,19 @@ process.env['KRNL0_BOARD_PATH'] = BOARD_PATH;
 // Active PTY sessions keyed by sessionId
 const ptySessions = new Map<string, pty.IPty>();
 
+// Phase 2: renderer-coupled dispatch. Set by registerHandlers().
+// Used by SysFacade for viewport/undo/redo/theme commands.
+export type CliDispatchFn = (
+  command: string,
+  args: Record<string, unknown>,
+) => Promise<{ ok: boolean; message: string; exitCode?: number }>;
+
+let cliDispatchFn: CliDispatchFn | null = null;
+
+export function getCliDispatch(): CliDispatchFn | null {
+  return cliDispatchFn;
+}
+
 function loadBoard() {
   return loadBoardFrom(BOARD_PATH);
 }
@@ -29,17 +57,11 @@ function saveBoard(data: unknown) {
   saveBoardTo(BOARD_PATH, data);
 }
 
-function broadcastBoardReload(): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('board:reload');
-  }
-}
-
 function hasOpenRenderer(): boolean {
   return BrowserWindow.getAllWindows().length > 0;
 }
 
-export function registerHandlers(): void {
+export function registerHandlers(rpcServer?: RpcServer): void {
   ipcMain.handle('board:load', async () => {
     return loadBoard();
   });
@@ -60,10 +82,66 @@ export function registerHandlers(): void {
     const facade = new SysFacade({
       boardPath: BOARD_PATH,
       hasOpenRenderer,
-      onBoardChanged: broadcastBoardReload,
+      onBoardChanged: notifyBoardChanged,
+      ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
     });
     const result = await facade.run(argv);
     return { ok: result.ok, message: result.message ?? '' };
+  });
+
+  // cli:dispatch — main→renderer command dispatch for renderer-coupled commands.
+  // Used by Phase 2 CLI commands (viewport/undo/redo/theme/marquee/node.move).
+  // Main sends cli:dispatch:request to all windows, waits up to 5s for reply.
+  const pendingCliDispatches = new Map<string, {
+    resolve: (result: { ok: boolean; message: string }) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
+
+  ipcMain.on('cli:dispatch:reply', (_event, id: string, ok: boolean, message: string) => {
+    const pending = pendingCliDispatches.get(id);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    pendingCliDispatches.delete(id);
+    pending.resolve({ ok, message });
+  });
+
+  /**
+   * Dispatch a command to the renderer. Returns ok=false + exit-code 2 if no
+   * renderer window is open (T27, T28, T31).
+   */
+  async function cliDispatch(
+    command: string,
+    args: Record<string, unknown>,
+  ): Promise<{ ok: boolean; message: string; exitCode?: number }> {
+    const windows = BrowserWindow.getAllWindows();
+    if (windows.length === 0) {
+      return {
+        ok: false,
+        message: `${command} requires an open renderer window`,
+        exitCode: 2,
+      };
+    }
+    const id = randomUUID();
+    const result = await new Promise<{ ok: boolean; message: string }>((resolve) => {
+      const timer = setTimeout(() => {
+        pendingCliDispatches.delete(id);
+        resolve({ ok: false, message: `cli:dispatch timeout for ${command}` });
+      }, 5000);
+      pendingCliDispatches.set(id, { resolve, timer });
+      for (const win of windows) {
+        win.webContents.send('cli:dispatch:request', id, command, args);
+      }
+    });
+    return result;
+  }
+
+  // Expose cliDispatch on the facade so sys:run can use it for Phase 2 commands.
+  // We attach it to the ipcMain context via a module-level variable.
+  cliDispatchFn = cliDispatch;
+
+  ipcMain.handle('clipboard:readText', () => clipboard.readText());
+  ipcMain.handle('clipboard:writeText', (_event, text: string) => {
+    clipboard.writeText(text);
   });
 
   ipcMain.handle('brain:ask', async (_event, prompt: string) => {
@@ -128,13 +206,79 @@ export function registerHandlers(): void {
     let cwdExists = false;
     try { cwdExists = existsSync(cwd); } catch { /* ignore */ }
 
+    // Build child environment: inherit process.env, then prepend KRNL0_CLI_DIR
+    // to PATH so the krnl binary is reachable (T7), and inject RPC credentials.
+    const isWin32 = process.platform === 'win32';
+    const pathKey = isWin32 ? 'Path' : 'PATH';
+    const existingPath = (process.env[pathKey] ?? process.env['PATH'] ?? '');
+    const cliDir = process.env['KRNL0_CLI_DIR'] ?? '';
+    const newPath = cliDir ? `${cliDir}${isWin32 ? ';' : ':'}${existingPath}` : existingPath;
+    const childEnv: Record<string, string> = Object.fromEntries(
+      Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
+    );
+    if (cliDir) childEnv[pathKey] = newPath;
+    if (rpcServer) {
+      childEnv['KRNL0_RPC_SOCKET'] = rpcServer.socketPath;
+      childEnv['KRNL0_RPC_TOKEN']  = rpcServer.token;
+    }
+    childEnv['KRNL0_MAIN_PID'] = String(process.pid);
+
+    // Tell krnl-init.ps1 where claude/CLAUDE.md lives so the wrapped
+    // `claude` function runs the real binary with CWD = <project>/claude.
+    // Claude Code auto-discovers CLAUDE.md from the CWD upward, so a CWD
+    // hop is enough to load the in-app instructions without polluting
+    // the user's shell location. KRNL0_CLAUDE_HOME override wins for
+    // packaged builds where the resource path differs.
+    const claudeHome = process.env['KRNL0_CLAUDE_HOME']
+      ?? join(app.getAppPath(), 'claude');
+    try {
+      if (existsSync(claudeHome)) {
+        childEnv['KRNL0_CLAUDE_HOME'] = claudeHome;
+      }
+    } catch { /* ignore — function will no-op without the env var */ }
+
+    // PowerShell launch flags:
+    //  -NoLogo : suppress the multi-line copyright banner that would
+    //            otherwise dominate the terminal viewport.
+    //  -NoExit -File "krnl-init.ps1" : load profile, then run our init
+    //            script (which lives in $KRNL0_CLI_DIR), then drop to
+    //            interactive. The script disables PSReadLine's inline
+    //            prediction feature (the "first-2-chars-then-gap" visual
+    //            artifact users reported) but KEEPS PSReadLine itself
+    //            loaded so syntax coloring, tab completion, and screen
+    //            clearing (cls / Clear-Host) all work normally.
+    //
+    // Why a file and not -Command: node-pty's Windows command-line
+    // serialization mangles -Command payloads that contain braces or
+    // quotes. Passing -File path-to-a-script.ps1 is just a path — a
+    // single safe argv item with no quoting hazards.
+    //
+    // Opt-out: KRNL0_KEEP_PSREADLINE_PREDICTION=1 in env before app
+    // launch, or `Set-PSReadLineOption -PredictionSource History` at
+    // the prompt.
+    //
+    // Only applies to powershell.exe / pwsh.exe; cmd.exe and POSIX shells
+    // ignore these flags.
+    const shellArgs: string[] = (() => {
+      const base = shell.toLowerCase();
+      const isPwsh = base.endsWith('powershell.exe') || base.endsWith('pwsh.exe')
+        || base === 'powershell' || base === 'pwsh';
+      if (!isPwsh) return [];
+      const args = ['-NoLogo'];
+      const cliDir = process.env['KRNL0_CLI_DIR'];
+      if (cliDir && process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] !== '1') {
+        args.push('-NoExit', '-File', join(cliDir, 'krnl-init.ps1'));
+      }
+      return args;
+    })();
+
     let proc: pty.IPty;
     try {
-      proc = pty.spawn(shell, [], {
+      proc = pty.spawn(shell, shellArgs, {
         cols,
         rows,
         cwd,
-        env: process.env,
+        env: childEnv,
         name: 'xterm-color',
       });
     } catch (err) {
@@ -182,7 +326,16 @@ export function registerHandlers(): void {
     });
 
     ptySessions.set(sessionId, proc);
-    return sessionId;
+
+    // T1–T6: build MOTD and include in the reply so the renderer writes it
+    // synchronously before subscribing to pty:data (avoids any IPC race).
+    // Pass rows so renderMotd falls back to the compact form on short viewports
+    // (otherwise the 9-row wide banner scrolls into scrollback when the shell
+    // prompt arrives).
+    const motd = process.env['KRNL0_NO_MOTD'] === '1'
+      ? ''
+      : renderMotd({ version: APP_VERSION, sessionId, cols, rows });
+    return { sessionId, motd };
   });
 
   // pty:write — send keystrokes directly to the PTY (not stdin.write)
