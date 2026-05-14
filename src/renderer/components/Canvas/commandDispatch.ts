@@ -101,6 +101,13 @@ import {
 } from '../nodes/CalendarNode/commands';
 import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types';
 
+// ── Clock ─────────────────────────────────────────────────────────────
+import {
+  clockLinkTodo,
+  clockSetViewWindow,
+} from '../nodes/ClockNode/commands';
+import type { ClockState } from '../nodes/ClockNode/types';
+
 // ── Text + Image ──────────────────────────────────────────────────────
 import { textSetText, textSetSize } from '../nodes/TextNode/commands';
 import {
@@ -240,6 +247,16 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         // calendar.schedule: cross-node router (handled in makeCommandHandler).
         // applyCommand returns null here so the router path intercepts it and
         // dispatches task.setSchedule to the target task node.
+      }
+      break;
+    }
+    case 'clock': {
+      const clockState = s as unknown as ClockState;
+      switch (command) {
+        case 'clock.linkTodo':
+          return { state: clockLinkTodo(clockState, args as never) };
+        case 'clock.setViewWindow':
+          return { state: clockSetViewWindow(clockState, args as never) };
       }
       break;
     }

@@ -34,7 +34,8 @@ export type NodeKind =
   | 'todo.task'
   | 'habit.day'
   | 'text'
-  | 'image';
+  | 'image'
+  | 'clock';
 
 // Spec a node-kind module exports to the kernel (commands, events, schema).
 // Renamed from `NodeKind` to avoid shadowing the literal union above.

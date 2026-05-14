@@ -1,3 +1,15 @@
+// Vite injects import.meta.env at build time. Extend ImportMeta so TypeScript
+// knows the shape. Only the fields we actually use are declared here.
+interface ImportMetaEnv {
+  readonly DEV: boolean;
+  readonly MODE: string;
+  readonly VITE_CLOCK_DEBUG?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 interface KrnlAssetWriteResult {
   assetId: string
   ext: string

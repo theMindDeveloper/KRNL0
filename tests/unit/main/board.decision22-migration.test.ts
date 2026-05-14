@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadBoardFrom } from '../../../src/main/persistence/board';
+import { loadBoardFrom, seedBoard } from '../../../src/main/persistence/board';
 
 interface LoadedBoard {
   nodes: Array<{
@@ -234,5 +234,87 @@ describe('Decision 22 — board migration', () => {
       longBreakMin: 15,
       longBreakEvery: 4,
     });
+  });
+
+  // ── Decision 23.1 — migrateAddClockMother ────────────────────────────────────
+
+  it('Decision 23.1: back-fills mother-clock into a board that predates the clock mother', () => {
+    // Simulate a board saved before Decision 23.1 — no mother-clock node.
+    const preClock = {
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-13T00:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        {
+          id: 'mother-pomo',
+          kind: 'pomo',
+          position: { x: -808, y: 0 },
+          isMother: true,
+          state: {
+            status: 'idle', startedAt: null, durationMin: 25, breakMin: 5,
+            label: '', sessionsCompleted: 0, activeTaskId: null, history: [],
+            pausedAt: null, pausedElapsedMs: 0,
+          },
+          config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
+        },
+      ],
+      edges: [],
+    };
+    writeFileSync(path, JSON.stringify(preClock), 'utf-8');
+    const loaded = loadBoardFrom(path) as LoadedBoard;
+
+    const clock = loaded.nodes.find((n) => n.id === 'mother-clock');
+    expect(clock).toBeDefined();
+    expect(clock!.kind).toBe('clock');
+    expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
+    // Position matches NEW_MOTHER_POSITIONS entry for mother-clock (Decision 23.1)
+    expect((clock as { position?: { x: number; y: number } }).position).toMatchObject({ x: 1252, y: 0 });
+  });
+
+  it('Decision 23.1: migrateAddClockMother is idempotent — no duplicate mother-clock on double load', () => {
+    // Board already contains mother-clock (post-migration state).
+    const postClock = {
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-13T00:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        {
+          id: 'mother-clock',
+          kind: 'clock',
+          position: { x: 1252, y: 0 },
+          isMother: true,
+          state: { linkedTodoId: null, viewWindow: 0 },
+          config: {},
+        },
+      ],
+      edges: [],
+    };
+    writeFileSync(path, JSON.stringify(postClock), 'utf-8');
+    const loaded = loadBoardFrom(path) as LoadedBoard;
+
+    const clockNodes = loaded.nodes.filter((n) => n.id === 'mother-clock');
+    expect(clockNodes).toHaveLength(1);
+    expect(clockNodes[0]!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
+  });
+
+  // ── AC1 — Fresh seed (Decision 23.1) ─────────────────────────────────────────
+
+  it('AC1: seedBoard() produces exactly 6 mothers including mother-clock at (1252, 0)', () => {
+    const board = seedBoard();
+
+    // Exactly 6 nodes (the 6 permanent mothers)
+    expect(board.nodes).toHaveLength(6);
+
+    // mother-clock is in the seed
+    const clock = (board.nodes as Array<{ id: string; kind: string; position: { x: number; y: number }; isMother: boolean; state: Record<string, unknown>; config: Record<string, unknown> }>)
+      .find((n) => n.id === 'mother-clock');
+    expect(clock).toBeDefined();
+    expect(clock!.kind).toBe('clock');
+    expect(clock!.position).toEqual({ x: 1252, y: 0 });
+    expect(clock!.isMother).toBe(true);
+    expect(clock!.state).toEqual({ linkedTodoId: null, viewWindow: 0 });
+    expect(clock!.config).toEqual({});
   });
 });
