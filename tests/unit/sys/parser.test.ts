@@ -4,7 +4,10 @@ import { SysParser } from '../../../src/sys/parser';
 describe('SysParser', () => {
   describe('board commands', () => {
     it('parses board show', () => {
-      expect(SysParser.parse(['board', 'show'])).toEqual({ kind: 'board', sub: 'show', path: undefined });
+      expect(SysParser.parse(['board', 'show'])).toEqual({ kind: 'board', sub: 'show', json: false });
+    });
+    it('parses board show --json', () => {
+      expect(SysParser.parse(['board', 'show', '--json'])).toEqual({ kind: 'board', sub: 'show', json: true });
     });
     it('parses board save with path', () => {
       expect(SysParser.parse(['board', 'save', '/tmp/board.json'])).toEqual({
@@ -49,7 +52,10 @@ describe('SysParser', () => {
       });
     });
     it('parses todo list', () => {
-      expect(SysParser.parse(['todo', 'list'])).toEqual({ kind: 'todo', sub: 'list' });
+      expect(SysParser.parse(['todo', 'list'])).toEqual({ kind: 'todo', sub: 'list', json: false });
+    });
+    it('parses todo list --json', () => {
+      expect(SysParser.parse(['todo', 'list', '--json'])).toEqual({ kind: 'todo', sub: 'list', json: true });
     });
     it('parses todo check', () => {
       expect(SysParser.parse(['todo', 'check', 'abc123'])).toMatchObject({
@@ -61,12 +67,12 @@ describe('SysParser', () => {
   describe('task commands', () => {
     it('parses task list', () => {
       expect(SysParser.parse(['task', 'list'])).toEqual({
-        kind: 'task', sub: 'list', todoId: undefined,
+        kind: 'task', sub: 'list', todoId: undefined, json: false,
       });
     });
     it('parses task list with todoId filter', () => {
       expect(SysParser.parse(['task', 'list', 'mother-todo'])).toEqual({
-        kind: 'task', sub: 'list', todoId: 'mother-todo',
+        kind: 'task', sub: 'list', todoId: 'mother-todo', json: false,
       });
     });
     it('parses task add with text', () => {
@@ -154,7 +160,7 @@ describe('SysParser', () => {
     });
     it('parses habit list', () => {
       expect(SysParser.parse(['habit', 'list'])).toEqual({
-        kind: 'habit', sub: 'list',
+        kind: 'habit', sub: 'list', json: false,
       });
     });
   });
@@ -166,7 +172,7 @@ describe('SysParser', () => {
       });
     });
     it('parses edge list', () => {
-      expect(SysParser.parse(['edge', 'list'])).toEqual({ kind: 'edge', sub: 'list' });
+      expect(SysParser.parse(['edge', 'list'])).toEqual({ kind: 'edge', sub: 'list', json: false });
     });
     it('parses edge remove', () => {
       expect(SysParser.parse(['edge', 'remove', 'edge-id-001'])).toMatchObject({

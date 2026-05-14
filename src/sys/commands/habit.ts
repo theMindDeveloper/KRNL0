@@ -261,10 +261,13 @@ export async function cliView(
   };
 }
 
-export async function cliList(ctx: HabitCtx): Promise<SysResult> {
+export async function cliList(ctx: HabitCtx, json = false): Promise<SysResult> {
   const board = loadBoard(ctx);
   const mother = findMother(board);
-  if (!mother) return notFound();
+  if (!mother) {
+    if (json) return { ok: true, message: '[]', data: [] };
+    return notFound();
+  }
   const today = todayLocal();
   const rows = mother.state.habits.map((h) => ({
     id: h.id,
@@ -274,6 +277,9 @@ export async function cliList(ctx: HabitCtx): Promise<SysResult> {
     streak: calcStreak(h.log, today),
     logCount: h.log.length,
   }));
+  if (json) {
+    return { ok: true, message: JSON.stringify(rows), data: rows };
+  }
   const lines = rows.length === 0
     ? '(no habits)'
     : rows
