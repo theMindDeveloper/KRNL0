@@ -168,27 +168,112 @@ afterEach(() => {
 // F4 — pty:create spawns a PTY and returns a sessionId
 // ---------------------------------------------------------------------------
 
+/** pty:create now returns { sessionId, motd }. Helper to extract sessionId. */
+async function createSession(cols = 80, rows = 24, event = makeEvent()): Promise<string> {
+  const result = await invoke('pty:create', event, cols, rows) as { sessionId: string; motd: string };
+  return result.sessionId;
+}
+
 describe('F4 — pty:create', () => {
-  it('calls pty.spawn with empty args and returns a sessionId string', async () => {
+  it('calls pty.spawn with shell-appropriate args and returns { sessionId, motd }', async () => {
     const { spawn } = await import('node-pty');
     const event = makeEvent();
 
-    const sessionId = await invoke('pty:create', event, 80, 24);
+    // Force a POSIX shell to assert the no-flag path; PowerShell gets -NoLogo
+    // (covered by a separate test below).
+    const prev = process.env['KRNL0_SHELL'];
+    process.env['KRNL0_SHELL'] = '/bin/zsh';
+    try {
+      const result = await invoke('pty:create', event, 80, 24) as { sessionId: string; motd: string };
 
-    expect(spawn).toHaveBeenCalled();
-    // args must be [] per Decision 12 (no shell flags)
-    const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(spawnCall[1]).toEqual([]);
-    // cols / rows forwarded
-    expect(spawnCall[2]).toMatchObject({ cols: 80, rows: 24 });
+      expect(spawn).toHaveBeenCalled();
+      const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(spawnCall[1]).toEqual([]);
+      // cols / rows forwarded
+      expect(spawnCall[2]).toMatchObject({ cols: 80, rows: 24 });
 
-    expect(typeof sessionId).toBe('string');
-    expect((sessionId as string).length).toBeGreaterThan(0);
+      expect(typeof result.sessionId).toBe('string');
+      expect(result.sessionId.length).toBeGreaterThan(0);
+      expect(typeof result.motd).toBe('string');
+    } finally {
+      if (prev === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prev;
+    }
+  });
+
+  it('passes -NoLogo to PowerShell and runs krnl-init.ps1 by default', async () => {
+    const { spawn } = await import('node-pty');
+    const event = makeEvent();
+
+    const prevShell = process.env['KRNL0_SHELL'];
+    const prevKeep = process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+    const prevCliDir = process.env['KRNL0_CLI_DIR'];
+    process.env['KRNL0_SHELL'] = 'powershell.exe';
+    process.env['KRNL0_CLI_DIR'] = 'C:\\fake-cli-dir';
+    delete process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+    try {
+      await invoke('pty:create', event, 80, 24);
+      const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const args = spawnCall[1] as string[];
+      expect(args).toContain('-NoLogo');
+      expect(args).toContain('-NoExit');
+      expect(args).toContain('-File');
+      expect(args.some((a) => a.endsWith('krnl-init.ps1'))).toBe(true);
+    } finally {
+      if (prevShell === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prevShell;
+      if (prevKeep !== undefined) process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = prevKeep;
+      if (prevCliDir === undefined) delete process.env['KRNL0_CLI_DIR'];
+      else process.env['KRNL0_CLI_DIR'] = prevCliDir;
+    }
+  });
+
+  it('passes -NoLogo to pwsh (PowerShell Core) as well', async () => {
+    const { spawn } = await import('node-pty');
+    const event = makeEvent();
+
+    const prev = process.env['KRNL0_SHELL'];
+    process.env['KRNL0_SHELL'] = 'pwsh.exe';
+    try {
+      await invoke('pty:create', event, 80, 24);
+      const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const args = spawnCall[1] as string[];
+      expect(args).toContain('-NoLogo');
+    } finally {
+      if (prev === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prev;
+    }
+  });
+
+  it('preserves PSReadLine prediction when KRNL0_KEEP_PSREADLINE_PREDICTION=1', async () => {
+    const { spawn } = await import('node-pty');
+    const event = makeEvent();
+
+    const prevShell = process.env['KRNL0_SHELL'];
+    const prevKeep = process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+    const prevCliDir = process.env['KRNL0_CLI_DIR'];
+    process.env['KRNL0_SHELL'] = 'powershell.exe';
+    process.env['KRNL0_CLI_DIR'] = 'C:\\fake-cli-dir';
+    process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = '1';
+    try {
+      await invoke('pty:create', event, 80, 24);
+      const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const args = spawnCall[1] as string[];
+      expect(args).toEqual(['-NoLogo']);
+      expect(args).not.toContain('-File');
+    } finally {
+      if (prevShell === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prevShell;
+      if (prevKeep === undefined) delete process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+      else process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = prevKeep;
+      if (prevCliDir === undefined) delete process.env['KRNL0_CLI_DIR'];
+      else process.env['KRNL0_CLI_DIR'] = prevCliDir;
+    }
   });
 
   it('registers onData which forwards to event.sender.send with the right channel', async () => {
     const event = makeEvent();
-    const sessionId = await invoke('pty:create', event, 80, 24) as string;
+    const sessionId = await createSession(80, 24, event);
 
     expect(lastSpawnedProc).not.toBeNull();
     lastSpawnedProc!._fireData('hello pty');
@@ -201,7 +286,7 @@ describe('F4 — pty:create', () => {
 
   it('registers onExit which sends pty:exit:<sessionId> and removes session', async () => {
     const event = makeEvent();
-    const sessionId = await invoke('pty:create', event, 80, 24) as string;
+    const sessionId = await createSession(80, 24, event);
 
     lastSpawnedProc!._fireExit();
 
@@ -252,8 +337,7 @@ describe('#74 — pty:create cwd', () => {
 
 describe('F5 — pty:write', () => {
   it('calls proc.write(data) for a known sessionId', async () => {
-    const event = makeEvent();
-    const sessionId = await invoke('pty:create', event, 80, 24) as string;
+    const sessionId = await createSession();
     const proc = lastSpawnedProc!;
 
     await invoke('pty:write', makeEvent(), sessionId, 'ls\r');
@@ -283,8 +367,7 @@ describe('F5 — pty:write', () => {
 
 describe('F13 — pty:resize', () => {
   it('calls proc.resize(cols, rows) for a known sessionId', async () => {
-    const event = makeEvent();
-    const sessionId = await invoke('pty:create', event, 80, 24) as string;
+    const sessionId = await createSession();
     const proc = lastSpawnedProc!;
 
     await invoke('pty:resize', makeEvent(), sessionId, 120, 40);
@@ -305,8 +388,7 @@ describe('F13 — pty:resize', () => {
 
 describe('F15 — pty:kill', () => {
   it('calls proc.kill() for a known sessionId', async () => {
-    const event = makeEvent();
-    const sessionId = await invoke('pty:create', event, 80, 24) as string;
+    const sessionId = await createSession();
     const proc = lastSpawnedProc!;
 
     await invoke('pty:kill', makeEvent(), sessionId);
@@ -315,8 +397,7 @@ describe('F15 — pty:kill', () => {
   });
 
   it('removes the session so subsequent pty:write is a no-op', async () => {
-    const event = makeEvent();
-    const sessionId = await invoke('pty:create', event, 80, 24) as string;
+    const sessionId = await createSession();
     const proc = lastSpawnedProc!;
 
     await invoke('pty:kill', makeEvent(), sessionId);

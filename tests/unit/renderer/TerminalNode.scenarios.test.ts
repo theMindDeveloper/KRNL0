@@ -17,9 +17,6 @@ import { TerminalNode } from '../../../src/renderer/components/nodes/TerminalNod
 import {
   HEADER_LABEL,
   LIVE_BADGE_TEXT,
-  BOOT_LINE_ASCII,
-  BOOT_LINE_SEPARATOR,
-  BOOT_LINES,
 } from '../../../src/renderer/components/nodes/TerminalNode/constants';
 
 import {
@@ -82,6 +79,8 @@ function makeKrnl(sessionId = 'sid-test'): {
   ptyKillMock: Mock;
   onPtyDataMock: Mock;
   onPtyExitMock: Mock;
+  clipboardReadTextMock: Mock;
+  clipboardWriteTextMock: Mock;
   /** Call to fire a simulated pty:data event */
   fireData: (data: string) => void;
   /** Call to fire a simulated pty:exit event */
@@ -90,7 +89,7 @@ function makeKrnl(sessionId = 'sid-test'): {
   let dataCallback: ((data: string) => void) | null = null;
   let exitCallback: (() => void) | null = null;
 
-  const ptyCreateMock = vi.fn().mockResolvedValue(sessionId);
+  const ptyCreateMock = vi.fn().mockResolvedValue({ sessionId, motd: '' });
   const ptyWriteMock = vi.fn();
   const ptyResizeMock = vi.fn();
   const ptyKillMock = vi.fn();
@@ -102,6 +101,8 @@ function makeKrnl(sessionId = 'sid-test'): {
     exitCallback = cb;
     return vi.fn(); // cleanup
   });
+  const clipboardReadTextMock = vi.fn().mockResolvedValue('');
+  const clipboardWriteTextMock = vi.fn().mockResolvedValue(undefined);
 
   const bridge: KrnlBridge = {
     ptyCreate: ptyCreateMock,
@@ -110,6 +111,8 @@ function makeKrnl(sessionId = 'sid-test'): {
     ptyKill: ptyKillMock,
     onPtyData: onPtyDataMock,
     onPtyExit: onPtyExitMock,
+    clipboardReadText: clipboardReadTextMock,
+    clipboardWriteText: clipboardWriteTextMock,
   };
 
   return {
@@ -120,6 +123,8 @@ function makeKrnl(sessionId = 'sid-test'): {
     ptyKillMock,
     onPtyDataMock,
     onPtyExitMock,
+    clipboardReadTextMock,
+    clipboardWriteTextMock,
     fireData: (data) => dataCallback?.(data),
     fireExit: () => exitCallback?.(),
   };
@@ -198,39 +203,79 @@ describe('F1 — Header anatomy', () => {
 });
 
 // ---------------------------------------------------------------------------
-// F2 — Welcome output on mount
+// F2 — Welcome output on mount (MOTD via pty:create return value — T1)
 // ---------------------------------------------------------------------------
 
 describe('F2 — Welcome output on mount', () => {
-  it('BOOT_LINE_ASCII starts with the acid ANSI escape and the krnl0 ASCII logo text', () => {
-    expect(BOOT_LINE_ASCII).toContain('▙ krnl0 · v0.2.0 · claude code attached · tmux session "main"');
+  // Note: MOTD is now rendered as React (MotdBanner.tsx) above the xterm body
+  // rather than written as ANSI bytes into xterm itself. This is because
+  // PowerShell + PSReadLine emit screen-clearing escape sequences during
+  // initialization that wipe any pre-written banner from xterm. The React
+  // banner sits outside the shell's reach. Tests assert that no MOTD-shaped
+  // bytes leak into xterm; visual coverage of MotdBanner is a separate
+  // component test.
+
+  it('startTerminalSession does not leak motd bytes into the terminal (T1)', async () => {
+    const MOCK_MOTD = '\x1b[38;2;201;241;88m  ██╗  ██╗██████╗\x1b[0m\r\n  krnl0 · v0.2.0\r\n';
+    // Even when ptyCreate returns a non-empty motd, session.ts must NOT
+    // write it to xterm — the React banner handles display.
+    const term = (() => {
+      const writeCalls: string[] = [];
+      const _handlers: Array<(data: string) => void> = [];
+      return {
+        cols: 80, rows: 24,
+        writeCalls, _handlers,
+        write(data: string) { writeCalls.push(data); },
+        focus() { /* noop */ },
+        onData(handler: (data: string) => void) {
+          _handlers.push(handler);
+          return { dispose: () => { const i = _handlers.indexOf(handler); if (i !== -1) _handlers.splice(i, 1); } };
+        },
+        simulateInput(data: string) { for (const h of _handlers) h(data); },
+      };
+    })();
+    const fit = { fitCalled: false, fit() { this.fitCalled = true; } };
+    const onCommand = vi.fn();
+
+    let dataCallback: ((d: string) => void) | null = null;
+    let exitCallback: (() => void) | null = null;
+
+    const bridge: KrnlBridge = {
+      ptyCreate: vi.fn().mockResolvedValue({ sessionId: 'sid-f2', motd: MOCK_MOTD }),
+      ptyWrite: vi.fn(),
+      ptyResize: vi.fn(),
+      ptyKill: vi.fn(),
+      onPtyData: vi.fn((_: string, cb: (d: string) => void) => { dataCallback = cb; return vi.fn(); }),
+      onPtyExit: vi.fn((_: string, cb: () => void) => { exitCallback = cb; return vi.fn(); }),
+    };
+    void dataCallback; void exitCallback;
+
+    await startTerminalSession({
+      term,
+      fit,
+      krnl: bridge,
+      onCommand,
+      setSessionId: vi.fn(),
+      isCancelled: () => false,
+    });
+
+    // MOTD bytes from ptyCreate must NOT have been written to xterm.
+    expect(term.writeCalls).not.toContain(MOCK_MOTD);
+    const motdLikeWrite = term.writeCalls.find(
+      (s) => s.includes('\x1b[38;2;201;241;88m') || s.includes('██'),
+    );
+    expect(motdLikeWrite).toBeUndefined();
   });
 
-  it('BOOT_LINE_ASCII begins with the acid colour escape (38;2;201;241;88)', () => {
-    expect(BOOT_LINE_ASCII).toContain('\x1b[38;2;201;241;88m');
-  });
-
-  it('BOOT_LINE_SEPARATOR is a dim-escape separator', () => {
-    expect(BOOT_LINE_SEPARATOR).toContain('\x1b[2m');
-    expect(BOOT_LINE_SEPARATOR).toContain('─');
-  });
-
-  it('BOOT_LINES exports both lines in correct order', () => {
-    expect(BOOT_LINES).toHaveLength(2);
-    expect(BOOT_LINES[0]).toBe(BOOT_LINE_ASCII);
-    expect(BOOT_LINES[1]).toBe(BOOT_LINE_SEPARATOR);
-  });
-
-  it('startTerminalSession writes both boot lines to the terminal', async () => {
-    const { deps, term } = makeDeps();
+  it('startTerminalSession does not write anything when motd is empty string (T6)', async () => {
+    const { deps, term } = makeDeps(); // ptyCreate returns motd: '' by default
     await startTerminalSession(deps);
 
-    expect(term.writeCalls).toContain(BOOT_LINE_ASCII);
-    expect(term.writeCalls).toContain(BOOT_LINE_SEPARATOR);
-    // ASCII line written first
-    const asciiIdx = term.writeCalls.indexOf(BOOT_LINE_ASCII);
-    const sepIdx = term.writeCalls.indexOf(BOOT_LINE_SEPARATOR);
-    expect(asciiIdx).toBeLessThan(sepIdx);
+    // No MOTD write — the only writes are pty data from fireData
+    const motdLikeWrite = term.writeCalls.find(
+      (s) => s.includes('\x1b[38;2;201;241;88m') || s.includes('krnl0'),
+    );
+    expect(motdLikeWrite).toBeUndefined();
   });
 });
 
@@ -301,8 +346,8 @@ describe('F4b — IPC pty:kill on unmount', () => {
   });
 
   it('no ptyKill if session was cancelled before ptyCreate resolved', async () => {
-    let resolvePtyCreate!: (id: string) => void;
-    const pendingCreate = new Promise<string>((res) => { resolvePtyCreate = res; });
+    let resolvePtyCreate!: (result: { sessionId: string; motd: string }) => void;
+    const pendingCreate = new Promise<{ sessionId: string; motd: string }>((res) => { resolvePtyCreate = res; });
 
     const ptyKillMock = vi.fn();
     const bridge: KrnlBridge = {
@@ -328,7 +373,7 @@ describe('F4b — IPC pty:kill on unmount', () => {
 
     // Mark cancelled BEFORE the promise resolves
     cancelled = true;
-    resolvePtyCreate('sid-cancelled');
+    resolvePtyCreate({ sessionId: 'sid-cancelled', motd: '' });
 
     await sessionPromise;
 
@@ -468,10 +513,6 @@ describe('#75 — Ctrl+C → SIGINT or copy', () => {
     const term = makeTermWithKeyHandler();
     term.selection = 'hello';
 
-    // Stub navigator.clipboard so writeText doesn't blow up under Node.
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal('navigator', { clipboard: { writeText } });
-
     const fit = makeFit();
     const krnl = makeKrnl();
     const deps: SessionDeps = {
@@ -488,13 +529,37 @@ describe('#75 — Ctrl+C → SIGINT or copy', () => {
     const result = term.keyHandler!(fakeEvent);
 
     expect(result).toBe(false);
-    expect(writeText).toHaveBeenCalledWith('hello');
+    expect(krnl.clipboardWriteTextMock).toHaveBeenCalledWith('hello');
     expect(term.clearSelectionCalled).toBe(true);
     // Critical: must NOT have sent 0x03
     const calls = krnl.ptyWriteMock.mock.calls.map((c) => c[1]);
     expect(calls).not.toContain('\x03');
+  });
 
-    vi.unstubAllGlobals();
+  it('Ctrl+V reads clipboard, writes text to PTY, blocks ^V byte', async () => {
+    const term = makeTermWithKeyHandler();
+    const fit = makeFit();
+    const krnl = makeKrnl();
+    krnl.clipboardReadTextMock.mockResolvedValue('pasted text');
+
+    const deps: SessionDeps = {
+      term,
+      fit,
+      krnl: krnl.bridge,
+      onCommand: vi.fn(),
+      setSessionId: vi.fn(),
+      isCancelled: () => false,
+    };
+    await startTerminalSession(deps);
+
+    const fakeEvent = { type: 'keydown', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false, key: 'v' } as KeyboardEvent;
+    const result = term.keyHandler!(fakeEvent);
+    expect(result).toBe(false); // blocks xterm's default ^V transmission
+
+    // Allow the async paste continuation to flush.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(krnl.clipboardReadTextMock).toHaveBeenCalled();
+    expect(krnl.ptyWriteMock).toHaveBeenCalledWith('sid-test', 'pasted text');
   });
 
   it('non-Ctrl+C keys are passed through (handler returns true)', async () => {

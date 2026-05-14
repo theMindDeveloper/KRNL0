@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Terminal node: `krnl` CLI bridge — full UI parity from inside the PTY's shell, named-pipe/UDS transport with per-launch token auth (#108)
+- Terminal MOTD banner with ASCII KRNL0 logo, dynamic version, compact-form fallback for narrow terminals (#108)
+- Generated `krnl help` command from a single command registry (`src/shared/cli/commandRegistry.ts`) — new commands auto-document (#108)
+- `term.*` FSM commands (`setShell`, `setFontSize`, `setTitle`, `clear`) wired through `commandDispatch` (#108)
+- `krnl version`, `krnl whoami` subcommands (#108)
+- Phase 2 UI-parity surface: `node.move/resize`, `viewport pan/zoom/reset`, `undo/redo`, `select/marquee`, `edge add/remove/list`, `board show/save/load/reset`, `theme set` (#108)
 - Infinite canvas with pan (middle-mouse + space+drag) and zoom (focal-point wheel) — Issue #3
 - NODE_REGISTRY dispatch pattern routing node.kind to typed React components — Issue #4
 - PomoNode: 25-min FSM timer (idle/running/break), session persistence via startedAt, history log — Issue #5
@@ -28,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix(terminal): add `nokey` class + `onKeyDown` `stopPropagation` so xterm receives keyboard input (#terminal)
 
 ### Changed
+- Cascade logic (`task.delete`, todo↔task mirror) lifted from renderer into `src/shared/dispatch/` — single source of truth for both UI and CLI mutations; fixes latent pomo-cancel desync bug (#108)
+- `sys` binary is now a deprecation alias for `krnl`; prints one-line stderr note then delegates (#108)
+- MOTD banner moved from renderer (`BOOT_LINE_ASCII` in `session.ts`) to main process — version is now read dynamically from `package.json` at startup (#108)
 - feat(dock): redesign dock to spawn child nodes (text, image) instead of parent (mother) nodes
 - feat(nodes): add TextNode and ImageNode placeholder components
 - feat(canvas): implement actual node creation in `handleAddNode` (wired to `boardStore`)
