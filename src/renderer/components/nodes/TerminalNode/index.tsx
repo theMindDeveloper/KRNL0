@@ -6,6 +6,8 @@ import type { TermState, TermConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HEADER_LABEL, LIVE_BADGE_TEXT } from './constants';
 import { startTerminalSession } from './session';
+import { MotdBanner } from './MotdBanner';
+import pkg from '../../../../../package.json';
 
 export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TermState, TermConfig>) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -15,21 +17,20 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
   const [hovered, setHovered] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const copySelection = () => {
     const sel = termRef.current?.getSelection() ?? '';
     if (sel) {
-      try { void navigator.clipboard.writeText(sel); } catch { /* ignore */ }
+      void window.krnl?.clipboardWriteText(sel);
       termRef.current?.clearSelection();
     }
   };
   const pasteClipboard = async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) window.krnl?.ptyWrite(sid, text);
-    } catch { /* ignore */ }
+    const text = await window.krnl?.clipboardReadText();
+    if (text) void window.krnl?.ptyWrite(sid, text);
   };
   const selectAll = () => termRef.current?.selectAll();
 
@@ -103,7 +104,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
         fit,
         krnl: window.krnl,
         onCommand,
-        setSessionId: (id) => { sessionIdRef.current = id; },
+        setSessionId: (id) => { sessionIdRef.current = id; setActiveSessionId(id); },
         isCancelled: () => cancelled,
       }).then((cleanup) => {
         if (cancelled) {
@@ -242,6 +243,10 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           </div>
         </div>
 
+        {/* MOTD banner — rendered as React above xterm so PowerShell/PSReadLine
+            can't clear it on startup. See MotdBanner.tsx header for rationale. */}
+        <MotdBanner version={pkg.version} sessionId={activeSessionId} />
+
         {/* xterm mount — nodrag/nopan/nowheel keep RF from consuming pointer
             events. tabIndex=-1 + nodesFocusable={false} on <ReactFlow> stop RF
             from grabbing focus from xterm's internal textarea.
@@ -279,15 +284,14 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           }}
           onKeyDown={(e) => {
             e.stopPropagation();
-            // Standard terminal copy/paste — Ctrl+Shift+C / Ctrl+Shift+V.
-            // Ctrl+C alone is reserved for SIGINT (see session.ts).
+            // Ctrl+Shift+C → explicit copy (Ctrl+C alone is SIGINT, handled
+            // in session.ts attachCustomKeyEventHandler).
+            // Paste (Ctrl+V / Ctrl+Shift+V) is also handled in session.ts
+            // at the xterm level so xterm doesn't transmit ^V to the pty.
             const mod = e.ctrlKey || e.metaKey;
             if (mod && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
               e.preventDefault();
               copySelection();
-            } else if (mod && e.shiftKey && (e.key === 'V' || e.key === 'v')) {
-              e.preventDefault();
-              void pasteClipboard();
             }
           }}
           onKeyUp={(e) => e.stopPropagation()}

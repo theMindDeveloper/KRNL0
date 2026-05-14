@@ -28,6 +28,11 @@
 import { useBoardStore } from '../../store/boardStore';
 import type { Node } from '@shared/types/node';
 import type { Edge } from '@shared/types/edge';
+import {
+  deleteTaskCascade,
+  collectDescendants,
+} from '../../../shared/dispatch/task';
+import type { BoardShape } from '../../../shared/dispatch/types';
 
 // ── Pomo ──────────────────────────────────────────────────────────────
 import {
@@ -82,8 +87,10 @@ import {
   habitSetColor,
   habitSetIcon,
   habitSetView,
+  habitSetSchedule,
 } from '../nodes/HabitNode/commands';
 import type { HabitState } from '../nodes/HabitNode/types';
+import type { HabitSchedule } from '../nodes/HabitNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
 
 // ── Calendar ──────────────────────────────────────────────────────────
@@ -109,6 +116,17 @@ import {
   imageSetAlt,
   imageClear,
 } from '../nodes/ImageNode/commands';
+
+// ── Terminal ──────────────────────────────────────────────────────────
+import {
+  termSessionStart,
+  termSessionEnd,
+  termSetTitle,
+  termSetFontSize,
+  termClear,
+  termSetShell,
+} from '../nodes/TerminalNode/commands';
+import type { TermState, TermConfig } from '../nodes/TerminalNode/types';
 
 // ── dispatch ──────────────────────────────────────────────────────────
 
@@ -201,15 +219,17 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
     }
     case 'habit': {
       switch (command) {
-        case 'habit.add':       return { state: habitAdd(s as never, args as never) };
-        case 'habit.toggleDay': return { state: habitToggleDay(s as never, args as never) };
-        case 'habit.markDone':  return { state: habitMarkDone(s as never, args as never) };
-        case 'habit.remove':    return { state: habitRemove(s as never, args as never) };
-        case 'habit.archive':   return { state: habitArchive(s as never, args as never) };
-        case 'habit.rename':    return { state: habitRename(s as never, args as never) };
-        case 'habit.setColor':  return { state: habitSetColor(s as never, args as never) };
-        case 'habit.setIcon':   return { state: habitSetIcon(s as never, args as never) };
-        case 'habit.setView':   return { config: habitSetView(c as never, args as never) };
+        case 'habit.add':         return { state: habitAdd(s as never, args as never) };
+        case 'habit.toggleDay':   return { state: habitToggleDay(s as never, args as never) };
+        case 'habit.markDone':    return { state: habitMarkDone(s as never, args as never) };
+        case 'habit.remove':      return { state: habitRemove(s as never, args as never) };
+        case 'habit.archive':     return { state: habitArchive(s as never, args as never) };
+        case 'habit.rename':      return { state: habitRename(s as never, args as never) };
+        case 'habit.setColor':    return { state: habitSetColor(s as never, args as never) };
+        case 'habit.setIcon':     return { state: habitSetIcon(s as never, args as never) };
+        case 'habit.setView':     return { config: habitSetView(c as never, args as never) };
+        // ADR 0002 §5 — set/clear schedule on a habit.
+        case 'habit.setSchedule': return { state: habitSetSchedule(s as never, args as never) };
       }
       break;
     }
@@ -256,31 +276,48 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
       }
       break;
     }
+    case 'terminal': {
+      // T20: term.sessionStart / term.sessionEnd — update TermState.sessionId.
+      // T21: term.setTitle — update TermState.title.
+      // T22: term.setFontSize — update TermConfig.fontSize.
+      // T23: term.clear — side-effect written to PTY by the node's makeCommandHandler.
+      // T24: term.setShell — update TermConfig.shell.
+      const termState = s as unknown as TermState;
+      const termCfg = c as unknown as TermConfig;
+      switch (command) {
+        case 'term.sessionStart': {
+          const res = termSessionStart(termState, args as { sessionId: string });
+          return { state: res.state as Node['state'] };
+        }
+        case 'term.sessionEnd': {
+          const res = termSessionEnd(termState, args as { sessionId: string });
+          return { state: res.state as Node['state'] };
+        }
+        case 'term.setTitle': {
+          const res = termSetTitle(termState, args as { title: string });
+          return { state: res.state as Node['state'] };
+        }
+        case 'term.setFontSize': {
+          const res = termSetFontSize(termCfg, args as { fontSize: number });
+          return { config: res.config as Node['config'] };
+        }
+        case 'term.clear': {
+          // T23: ptyWrite side-effect — handled via cli:dispatch in Phase 2.
+          void termClear;
+          return null;
+        }
+        case 'term.setShell': {
+          const res = termSetShell(termCfg, args as { shell: string });
+          return { config: res.config as Node['config'] };
+        }
+      }
+      break;
+    }
   }
   return null; // unknown command — no-op
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
-
-/** BFS: collect nodeId + all descendant task node ids (by parentTaskId linkage). */
-function collectDescendants(rootId: string, nodes: readonly Node[]): string[] {
-  const result: string[] = [];
-  const queue = [rootId];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current === undefined) break;
-    result.push(current);
-    for (const n of nodes) {
-      if (n.kind === 'todo.task') {
-        const ts = n.state as TaskState;
-        if (ts.parentTaskId === current) {
-          queue.push(n.id);
-        }
-      }
-    }
-  }
-  return result;
-}
 
 /** Remove a set of node ids (and incident edges) from the store in one call. */
 function removeNodeSet(ids: string[]): void {
@@ -330,74 +367,49 @@ function renumberSiblings(parentTodoId: string, parentTaskId: string | null): vo
 
 /**
  * Cascade-delete one or more TaskNodes plus all their descendants.
- * Cleans up linked TodoItems from parent TodoNodes and renumbers siblings.
- * Used by both the marquee right-click delete path and the task.delete command.
+ * Delegates to the shared deleteTaskCascade pure function (shared/dispatch/task.ts)
+ * and applies the result to the Zustand store in one atomic setState call.
+ * Handles pomo cancel, TodoItem removal, and sibling renumber via the shared module.
  */
 export function deleteTaskNodesCascade(taskIds: string[]): void {
-  const { board, updateNode } = useBoardStore.getState();
-  if (!board) return;
+  const storeState = useBoardStore.getState();
+  if (!storeState.board) return;
 
-  const allDescendants = new Set<string>();
-  const parentPairs: Array<{ parentTodoId: string; parentTaskId: string | null }> = [];
-  const seenPairs = new Set<string>();
+  // Shallow-clone nodes/edges so deleteTaskCascade can mutate them safely.
+  // Cast to AnyNode[] — Node<unknown,unknown> is structurally AnyNode-compatible but
+  // lacks the index signature; we widen here at the boundary.
+  const workingBoard: BoardShape = {
+    ...storeState.board,
+    nodes: storeState.board.nodes as unknown as BoardShape['nodes'],
+    edges: [...storeState.board.edges],
+  };
 
+  // Track which ids have been consumed so that descendant ids passed in the
+  // bulk taskIds array don't produce spurious no-op calls on the next iteration.
+  const processed = new Set<string>();
   for (const taskId of taskIds) {
-    const node = board.nodes.find((n) => n.id === taskId);
-    if (!node || node.kind !== 'todo.task') continue;
-    const ts = node.state as TaskState;
-    const pairKey = `${ts.parentTodoId}:${ts.parentTaskId ?? ''}`;
-    if (!seenPairs.has(pairKey)) {
-      seenPairs.add(pairKey);
-      parentPairs.push({ parentTodoId: ts.parentTodoId, parentTaskId: ts.parentTaskId });
-    }
-    for (const id of collectDescendants(taskId, board.nodes)) {
-      allDescendants.add(id);
-    }
+    if (processed.has(taskId)) continue;
+    // Collect descendants BEFORE cascade so we can mark them processed.
+    const descendants = collectDescendants(taskId, workingBoard.nodes);
+    const result = deleteTaskCascade(workingBoard, taskId);
+    if (result.removedCount === 0) continue;
+    for (const id of descendants) processed.add(id);
   }
 
-  if (allDescendants.size === 0) return;
+  if (processed.size === 0) return;
 
-  // Clear pomo if any deleted task (or descendant) is the active task.
-  const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
-  if (pomoNode) {
-    const ps = pomoNode.state as PomoState;
-    if (ps.activeTaskId !== null && allDescendants.has(ps.activeTaskId)) {
-      let cancelledState = ps;
-      if (ps.status !== 'idle') cancelledState = pomoCancel(ps);
-      updateNode(pomoNode.id, { state: pomoClearActiveTask(cancelledState) });
-    }
-  }
-
-  // Collect TodoItems to remove, grouped by their parent TodoNode.
-  const todoItemsByParent = new Map<string, string[]>();
-  for (const descId of allDescendants) {
-    const descNode = board.nodes.find((n) => n.id === descId);
-    if (!descNode || descNode.kind !== 'todo.task') continue;
-    const ts = descNode.state as TaskState;
-    if (ts.todoItemId === null) continue;
-    const existing = todoItemsByParent.get(ts.parentTodoId);
-    if (existing) existing.push(ts.todoItemId);
-    else todoItemsByParent.set(ts.parentTodoId, [ts.todoItemId]);
-  }
-
-  const currentBoard = useBoardStore.getState().board;
-  if (currentBoard) {
-    for (const [parentTodoId, itemIds] of todoItemsByParent) {
-      const todoNode = currentBoard.nodes.find((n) => n.id === parentTodoId);
-      if (!todoNode) continue;
-      let newTodoState = todoNode.state as TodoState;
-      for (const itemId of itemIds) {
-        newTodoState = todoRemove(newTodoState, { id: itemId });
-      }
-      updateNode(todoNode.id, { state: newTodoState });
-    }
-  }
-
-  removeNodeSet([...allDescendants]);
-
-  for (const { parentTodoId, parentTaskId } of parentPairs) {
-    renumberSiblings(parentTodoId, parentTaskId);
-  }
+  // Apply the fully-mutated workingBoard back to the Zustand store in one
+  // atomic setState so history coalescing treats the entire cascade as one undo step.
+  useBoardStore.setState((s) => {
+    if (!s.board) return s;
+    return {
+      board: {
+        ...s.board,
+        nodes: workingBoard.nodes as Node[],
+        edges: workingBoard.edges,
+      },
+    };
+  });
 }
 
 /**
@@ -886,6 +898,25 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
+    // ── calendar.activateTask: cross-node router — fire task.activate on target ─
+    // Slice 3: clicking a scheduled task block in WeekView should activate the
+    // task (light up its chain). The block lives inside CalendarNode, so
+    // onCommand is bound to the calendar id — a plain task.activate dispatch
+    // would no-op. This router looks up the target task and applies taskActivate.
+    if (node.kind === 'calendar' && command === 'calendar.activateTask') {
+      const actArgs = args as { taskId?: string };
+      if (!actArgs.taskId) return;
+      const currentBoard = useBoardStore.getState().board;
+      if (!currentBoard) return;
+      const targetTask = currentBoard.nodes.find((n) => n.id === actArgs.taskId);
+      if (!targetTask || targetTask.kind !== 'todo.task') return;
+      const nextTaskState = taskActivate(targetTask.state as TaskState);
+      updateNode(actArgs.taskId, { state: nextTaskState });
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
     // ── calendar.schedule: cross-node router — dispatch task.setSchedule to target ─
     // ADR 0001 §4: calendar.schedule looks up the target task and dispatches
     // task.setSchedule. Cosmetic edge creation is the drop handler's responsibility
@@ -922,6 +953,30 @@ export function makeCommandHandler(nodeId: string) {
           updateNode(todoNode.id, { state: newTodoState });
         }
       }
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
+    // ── calendar.scheduleHabit: cross-node router — dispatch habit.setSchedule to habit mother ─
+    // ADR 0002 §5: calendar.scheduleHabit looks up the habit mother by habitMotherId
+    // and dispatches habit.setSchedule. The calendar node does NOT mutate habit state directly.
+    if (node.kind === 'calendar' && command === 'calendar.scheduleHabit') {
+      const schedArgs = args as {
+        habitId?: string;
+        habitMotherId?: string;
+        schedule?: HabitSchedule;
+      };
+      if (!schedArgs.habitId || !schedArgs.habitMotherId || !schedArgs.schedule) return;
+      const currentBoard = useBoardStore.getState().board;
+      if (!currentBoard) return;
+      const habitMother = currentBoard.nodes.find((n) => n.id === schedArgs.habitMotherId);
+      if (!habitMother || habitMother.kind !== 'habit') return;
+      const nextHabitState = habitSetSchedule(habitMother.state as HabitState, {
+        habitId: schedArgs.habitId,
+        schedule: schedArgs.schedule,
+      });
+      updateNode(habitMother.id, { state: nextHabitState });
       const updated = useBoardStore.getState().board;
       if (updated) void window.krnl?.boardSave(updated);
       return;
@@ -1107,7 +1162,10 @@ export function makeCommandHandler(nodeId: string) {
         if (removedItem?.taskNodeId) {
           const currentBoard = useBoardStore.getState().board;
           if (currentBoard) {
-            const descendants = collectDescendants(removedItem.taskNodeId, currentBoard.nodes);
+            const descendants = collectDescendants(
+              removedItem.taskNodeId,
+              currentBoard.nodes as unknown as BoardShape['nodes'],
+            );
             removeNodeSet(descendants);
             const ts = currentBoard.nodes.find(
               (n) => n.id === removedItem.taskNodeId,
@@ -1134,7 +1192,10 @@ export function makeCommandHandler(nodeId: string) {
         const taskIds: string[] = [];
         for (const item of prevState.items) {
           if (item.done && item.taskNodeId) {
-            taskIds.push(...collectDescendants(item.taskNodeId, currentBoard.nodes));
+            taskIds.push(...collectDescendants(
+              item.taskNodeId,
+              currentBoard.nodes as unknown as BoardShape['nodes'],
+            ));
           }
         }
         if (taskIds.length > 0) {

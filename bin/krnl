@@ -1,0 +1,3 @@
+#!/bin/sh
+# POSIX shim — delegates to krnl.js in the same directory.
+exec node "$(dirname "$0")/krnl.js" "$@"

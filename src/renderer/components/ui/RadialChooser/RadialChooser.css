@@ -1,0 +1,164 @@
+/* ADR 0002 — RadialChooser styles (A2 — frosted glass, KRNL0-coherent) */
+
+/* ── Root overlay ──────────────────────────────────────────────────────── */
+.radial-chooser-root {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+}
+
+/* ── Glass wrapper (A2 §1) ─────────────────────────────────────────────────
+   The SVG does not honour backdrop-filter directly in Chromium. We wrap it
+   in a div, clip to a circle, and let the blur+saturate produce the frosted
+   plate that whatever is behind tints. Translucent white tint reads well on
+   both KRNL0 light (paper) and dark themes. */
+.radial-chooser-glass {
+  position: fixed;
+  pointer-events: all;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(
+    circle at 50% 35%,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.04) 70%
+  );
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  /* Soft floating shadow + faint inner edge highlight */
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.28),
+    0 2px 8px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+[data-theme="dark"] .radial-chooser-glass {
+  background: radial-gradient(
+    circle at 50% 35%,
+    rgba(255, 255, 255, 0.10),
+    rgba(255, 255, 255, 0.02) 70%
+  );
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 2px 12px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+}
+
+/* ── SVG inside the glass wrapper ──────────────────────────────────────── */
+.radial-chooser-svg {
+  display: block;
+  overflow: visible;
+}
+
+/* ── Wedge fill (A2 §2) ─────────────────────────────────────────────────────
+   Fill colour is set inline per-wedge (purple/cyan). CSS only controls
+   transitions + hover brightness so each half-circle stays a solid block. */
+.radial-wedge {
+  cursor: default;
+  transition: filter 140ms ease;
+}
+
+.radial-wedge--hovered {
+  filter: brightness(1.18);
+}
+
+/* ── Dead zone (A2 §6) ─────────────────────────────────────────────────── */
+.radial-dead-zone-group {
+  transition: transform 120ms ease;
+  transform-origin: 0 0;
+  cursor: pointer;
+}
+.radial-dead-zone-group:hover {
+  transform: scale(1.08);
+}
+
+.radial-dead-zone {
+  fill: rgba(20, 18, 16, 0.55);
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
+}
+[data-theme="dark"] .radial-dead-zone {
+  fill: rgba(0, 0, 0, 0.45);
+  stroke: rgba(255, 255, 255, 0.12);
+}
+
+.radial-dead-glyph {
+  fill: rgba(255, 255, 255, 0.55);
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+.radial-dead-zone-group:hover .radial-dead-glyph {
+  fill: rgba(255, 255, 255, 0.95);
+}
+
+/* ── Wedge label (A2 §8) — white, sized to fit inside the wedge ─────────── */
+.radial-wedge-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  user-select: none;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  text-transform: uppercase;
+}
+
+/* ── Wedge icon (A2 §9) — white, sized to fit inside the wedge ──────────── */
+.radial-wedge-icon {
+  font-size: 16px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Inner highlight (A2 §5) ───────────────────────────────────────────── */
+.radial-wedge-highlight {
+  pointer-events: none;
+}
+
+/* ── Entry animation (A2 §7) ───────────────────────────────────────────── */
+@keyframes radial-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.radial-chooser-animate {
+  animation: radial-appear 180ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center;
+}
+
+/* ── Exit animation (A2 §7) ────────────────────────────────────────────── */
+@keyframes radial-disappear {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+.radial-chooser-closing {
+  animation: radial-disappear 120ms ease-out forwards;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .radial-chooser-animate,
+  .radial-chooser-closing {
+    animation: none;
+  }
+}

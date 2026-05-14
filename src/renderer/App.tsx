@@ -17,6 +17,8 @@ import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
 import { useBoardStore } from './store/boardStore';
 import { useBoardChannel } from './store/useBoardChannel';
+import { RadialChooserHost } from './components/ui/RadialChooser';    
+import { useCliDispatch } from './store/useCliDispatch';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
 // This is the only code path that satisfies "before first paint" for F6b.
@@ -84,6 +86,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 export function App() {
   const setBoard = useBoardStore((s) => s.setBoard);
   useBoardChannel();
+  useCliDispatch();
 
   useEffect(() => {
     // window.krnl?.boardLoad() returns undefined when krnl bridge is absent;
@@ -114,6 +117,7 @@ export function App() {
             <Orb />
           </div>
           <StatusBar />
+          <RadialChooserHost />
         </div>
       </ReactFlowProvider>
     </ErrorBoundary>

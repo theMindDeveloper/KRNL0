@@ -14,6 +14,8 @@
 //   habit → 1 listener.
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import type { DragEvent } from 'react';
+import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { NodeProps } from '../types';
@@ -216,6 +218,7 @@ export function HabitNode({
               habits={visibleHabits}
               today={today}
               weekDays={weekDays}
+              habitMotherId={node.id}
               onToggle={onToggleCell}
               onContextMenu={onContextMenu}
             />
@@ -225,6 +228,7 @@ export function HabitNode({
               habits={visibleHabits}
               today={today}
               monthDays={monthDays}
+              habitMotherId={node.id}
               onToggle={onToggleCell}
               onContextMenu={onContextMenu}
             />
@@ -234,6 +238,7 @@ export function HabitNode({
               habits={visibleHabits}
               today={today}
               yearGrid={yearGrid}
+              habitMotherId={node.id}
               onToggle={onToggleCell}
               onContextMenu={onContextMenu}
             />
@@ -336,6 +341,7 @@ interface RowCommonProps {
   habitIdx: number;
   today: string;
   isLast: boolean;
+  habitMotherId: string;
   onToggle: (id: string, date: string) => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
 }
@@ -346,11 +352,12 @@ interface WeekViewProps {
   habits: Habit[];
   today: string;
   weekDays: string[];
+  habitMotherId: string;
   onToggle: (id: string, date: string) => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
 }
 
-function WeekView({ habits, today, weekDays, onToggle, onContextMenu }: WeekViewProps) {
+function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextMenu }: WeekViewProps) {
   const gridWidth = WEEK_CELL_SIZE * 7 + WEEK_CELL_GAP * 6;
   return (
     <div data-view-week>
@@ -382,6 +389,7 @@ function WeekView({ habits, today, weekDays, onToggle, onContextMenu }: WeekView
           today={today}
           isLast={habitIdx === habits.length - 1}
           weekDays={weekDays}
+          habitMotherId={habitMotherId}
           onToggle={onToggle}
           onContextMenu={onContextMenu}
         />
@@ -400,6 +408,7 @@ const WeekRow = memo(function WeekRow({
   today,
   isLast,
   weekDays,
+  habitMotherId,
   onToggle,
   onContextMenu,
 }: WeekRowProps) {
@@ -407,10 +416,38 @@ const WeekRow = memo(function WeekRow({
   const streak = useMemo(() => calcStreak(habit.log, today), [habit.log, today]);
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  const handleDragStart = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      const payload = {
+        habitId: habit.id,
+        habitMotherId,
+        color: habit.color,
+        name: habit.name,
+      };
+      e.dataTransfer.setData('application/krnl-habit', JSON.stringify(payload));
+      e.dataTransfer.effectAllowed = 'copy';
+      setHabitDrag(payload);
+      const rowEl = rowRef.current;
+      if (rowEl) {
+        e.dataTransfer.setDragImage(rowEl, 0, rowEl.offsetHeight / 2);
+      }
+    },
+    [habit.id, habit.color, habit.name, habitMotherId],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    clearHabitDrag();
+  }, []);
 
   return (
     <div
+      ref={rowRef}
       data-habit-row={habit.id}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onContextMenu={(e) => onContextMenu(e, habit.id)}
       style={{
         paddingBottom: 8,
@@ -418,6 +455,7 @@ const WeekRow = memo(function WeekRow({
         borderBottom: isLast ? 'none' : '1px dashed var(--paper-2)',
         // expose habit color to CSS classes
         ['--habit-color' as string]: `var(--${color})`,
+        cursor: 'grab',
       } as React.CSSProperties}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -496,11 +534,12 @@ interface MonthViewProps {
   habits: Habit[];
   today: string;
   monthDays: string[];
+  habitMotherId: string;
   onToggle: (id: string, date: string) => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
 }
 
-function MonthView({ habits, today, monthDays, onToggle, onContextMenu }: MonthViewProps) {
+function MonthView({ habits, today, monthDays, habitMotherId, onToggle, onContextMenu }: MonthViewProps) {
   return (
     <div data-view-month>
       {habits.map((habit, habitIdx) => (
@@ -511,6 +550,7 @@ function MonthView({ habits, today, monthDays, onToggle, onContextMenu }: MonthV
           today={today}
           isLast={habitIdx === habits.length - 1}
           monthDays={monthDays}
+          habitMotherId={habitMotherId}
           onToggle={onToggle}
           onContextMenu={onContextMenu}
         />
@@ -529,6 +569,7 @@ const MonthRow = memo(function MonthRow({
   today,
   isLast,
   monthDays,
+  habitMotherId,
   onToggle,
   onContextMenu,
 }: MonthRowProps) {
@@ -536,6 +577,30 @@ const MonthRow = memo(function MonthRow({
   const streak = useMemo(() => calcStreak(habit.log, today), [habit.log, today]);
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
+  const monthRowRef = useRef<HTMLDivElement>(null);
+
+  const handleMonthDragStart = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      const payload = {
+        habitId: habit.id,
+        habitMotherId,
+        color: habit.color,
+        name: habit.name,
+      };
+      e.dataTransfer.setData('application/krnl-habit', JSON.stringify(payload));
+      e.dataTransfer.effectAllowed = 'copy';
+      setHabitDrag(payload);
+      const rowEl = monthRowRef.current;
+      if (rowEl) {
+        e.dataTransfer.setDragImage(rowEl, 0, rowEl.offsetHeight / 2);
+      }
+    },
+    [habit.id, habit.color, habit.name, habitMotherId],
+  );
+
+  const handleMonthDragEnd = useCallback(() => {
+    clearHabitDrag();
+  }, []);
 
   const onRowClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -552,13 +617,18 @@ const MonthRow = memo(function MonthRow({
 
   return (
     <div
+      ref={monthRowRef}
       data-habit-row={habit.id}
+      draggable
+      onDragStart={handleMonthDragStart}
+      onDragEnd={handleMonthDragEnd}
       onContextMenu={(e) => onContextMenu(e, habit.id)}
       style={{
         paddingBottom: 10,
         paddingTop: habitIdx === 0 ? 0 : 10,
         borderBottom: isLast ? 'none' : '1px dashed var(--paper-2)',
         ['--habit-color' as string]: `var(--${color})`,
+        cursor: 'grab',
       } as React.CSSProperties}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -630,11 +700,12 @@ interface YearViewProps {
   habits: Habit[];
   today: string;
   yearGrid: (string | null)[][];
+  habitMotherId: string;
   onToggle: (id: string, date: string) => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
 }
 
-function YearView({ habits, today, yearGrid, onToggle, onContextMenu }: YearViewProps) {
+function YearView({ habits, today, yearGrid, habitMotherId, onToggle, onContextMenu }: YearViewProps) {
   return (
     <div data-view-year>
       {habits.map((habit, habitIdx) => (
@@ -645,6 +716,7 @@ function YearView({ habits, today, yearGrid, onToggle, onContextMenu }: YearView
           today={today}
           isLast={habitIdx === habits.length - 1}
           yearGrid={yearGrid}
+          habitMotherId={habitMotherId}
           onToggle={onToggle}
           onContextMenu={onContextMenu}
         />
@@ -663,6 +735,7 @@ const YearRow = memo(function YearRow({
   today,
   isLast,
   yearGrid,
+  habitMotherId: _habitMotherId,
   onToggle,
   onContextMenu,
 }: YearRowProps) {
