@@ -82,7 +82,7 @@
 /* Cyan ring for the Todo mother and Task children. */
 .react-flow__node.selected.krnl-kind-todo > div:not(.react-flow__handle),
 .react-flow__node.selected.krnl-kind-todo--task > div:not(.react-flow__handle) {
-  box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(78, 168, 176, 0.35) !important;
+  box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(34, 211, 238, 0.35) !important;
 }
 
 /* Active-in-pomo task overrides the cyan selection ring with the acid one so
