@@ -437,6 +437,162 @@ function migrateTodoItemFields(board: Record<string, unknown>): Record<string, u
   return board;
 }
 
+/**
+ * ADR 0003 §8 — heal pre-ADR boards that have multiple anchors in a single
+ * chain. For each connected component of task.next edges restricted to one
+ * todo, if more than one task carries scheduledFor, keep the earliest and
+ * clear the rest (also clearing the linked TodoItem.scheduledFor mirror).
+ *
+ * Idempotent: a healed board has at most one anchor per chain, so a second
+ * run is a no-op.
+ *
+ * Runs AFTER migrateNodeStates so STATE_DEFAULTS has already supplied any
+ * missing fields. No BoardSchema.version bump — the persisted shape is
+ * unchanged; only the runtime invariant is tightened.
+ */
+function migrateNormalizeChainAnchors(
+  board: Record<string, unknown>,
+): Record<string, unknown> {
+  const nodes = board['nodes'];
+  const edges = board['edges'];
+  if (!Array.isArray(nodes)) return board;
+  const edgeArr = Array.isArray(edges) ? edges : [];
+
+  // Build per-todo task-id sets and remember each task's scheduledFor.
+  type TaskShape = {
+    id: string;
+    kind: string;
+    state?: {
+      parentTodoId?: string;
+      parentTaskId?: string | null;
+      scheduledFor?: string;
+      todoItemId?: string | null;
+    } | null;
+  };
+  const tasksByTodo = new Map<string, string[]>();
+  const stateById = new Map<string, NonNullable<TaskShape['state']>>();
+  for (const n of nodes) {
+    if (typeof n !== 'object' || n === null) continue;
+    const node = n as TaskShape;
+    if (node.kind !== 'todo.task') continue;
+    const s = node.state ?? {};
+    if (s.parentTaskId !== null && s.parentTaskId !== undefined) continue;
+    const todoId = s.parentTodoId;
+    if (typeof todoId !== 'string') continue;
+    if (!tasksByTodo.has(todoId)) tasksByTodo.set(todoId, []);
+    tasksByTodo.get(todoId)!.push(node.id);
+    stateById.set(node.id, s);
+  }
+
+  // Build a task.next adjacency (undirected, for connectivity).
+  type EdgeShape = { from?: { nodeId?: string; event?: string }; to?: { nodeId?: string } };
+  const adj = new Map<string, Set<string>>();
+  for (const e of edgeArr) {
+    if (typeof e !== 'object' || e === null) continue;
+    const ed = e as EdgeShape;
+    if (ed.from?.event !== 'task.next') continue;
+    const a = ed.from.nodeId;
+    const b = ed.to?.nodeId;
+    if (typeof a !== 'string' || typeof b !== 'string') continue;
+    if (!adj.has(a)) adj.set(a, new Set());
+    if (!adj.has(b)) adj.set(b, new Set());
+    adj.get(a)!.add(b);
+    adj.get(b)!.add(a);
+  }
+
+  // For each todo, find connected components and pick the earliest anchor
+  // per component. Tasks in the same component as a later anchor lose theirs.
+  const toClear = new Set<string>(); // task ids whose scheduledFor must be cleared
+  const todoItemClearByTodo = new Map<string, Set<string>>(); // todoId -> itemIds to clear
+
+  for (const [, taskIds] of tasksByTodo) {
+    const scope = new Set(taskIds);
+    const seen = new Set<string>();
+    for (const seed of taskIds) {
+      if (seen.has(seed)) continue;
+      // BFS component (restricted to this todo's task ids).
+      const comp: string[] = [];
+      const stack = [seed];
+      while (stack.length > 0) {
+        const id = stack.pop()!;
+        if (seen.has(id)) continue;
+        if (!scope.has(id)) continue;
+        seen.add(id);
+        comp.push(id);
+        const nbrs = adj.get(id);
+        if (!nbrs) continue;
+        for (const n of nbrs) {
+          if (!seen.has(n) && scope.has(n)) stack.push(n);
+        }
+      }
+      // Anchors in this component.
+      const anchors = comp.filter((id) => {
+        const sf = stateById.get(id)?.scheduledFor;
+        return typeof sf === 'string' && sf.length > 0;
+      });
+      if (anchors.length <= 1) continue;
+      // Earliest scheduledFor wins; ties → ascending task id for determinism.
+      anchors.sort((a, b) => {
+        const ta = stateById.get(a)?.scheduledFor ?? '';
+        const tb = stateById.get(b)?.scheduledFor ?? '';
+        if (ta < tb) return -1;
+        if (ta > tb) return 1;
+        return a < b ? -1 : a > b ? 1 : 0;
+      });
+      for (let i = 1; i < anchors.length; i++) {
+        const losingId = anchors[i]!;
+        toClear.add(losingId);
+        const s = stateById.get(losingId);
+        if (s?.parentTodoId && s.todoItemId) {
+          if (!todoItemClearByTodo.has(s.parentTodoId)) {
+            todoItemClearByTodo.set(s.parentTodoId, new Set());
+          }
+          todoItemClearByTodo.get(s.parentTodoId)!.add(s.todoItemId);
+        }
+      }
+    }
+  }
+
+  if (toClear.size === 0 && todoItemClearByTodo.size === 0) return board;
+
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return n;
+    const node = n as { id?: string; kind?: string; state?: Record<string, unknown> | null };
+    // Clear scheduledFor (and scheduledDurationMin) on losing task nodes.
+    if (
+      node.kind === 'todo.task' &&
+      typeof node.id === 'string' &&
+      toClear.has(node.id)
+    ) {
+      const s = (node.state ?? {}) as Record<string, unknown>;
+      const { scheduledFor: _sf, scheduledDurationMin: _sdm, ...rest } = s;
+      void _sf;
+      void _sdm;
+      return { ...node, state: rest };
+    }
+    // Clear linked TodoItem mirrors.
+    if (node.kind === 'todo' && typeof node.id === 'string') {
+      const itemIds = todoItemClearByTodo.get(node.id);
+      if (!itemIds) return n;
+      const s = (node.state ?? {}) as { items?: unknown[] } & Record<string, unknown>;
+      const items = s.items;
+      if (!Array.isArray(items)) return n;
+      const patched = items.map((it: unknown) => {
+        if (typeof it !== 'object' || it === null) return it;
+        const item = it as { id?: string; scheduledFor?: string };
+        if (typeof item.id !== 'string' || !itemIds.has(item.id)) return it;
+        const { scheduledFor: _sf, ...rest } = item;
+        void _sf;
+        return rest;
+      });
+      return { ...node, state: { ...s, items: patched } };
+    }
+    return n;
+  });
+
+  return board;
+}
+
 function validateBoardInvariants(board: unknown): unknown {
   if (typeof board !== 'object' || board === null) return board;
   const b = board as Record<string, unknown>;
@@ -491,7 +647,11 @@ export function loadBoardFrom(boardPath: string): unknown {
       return validateBoardInvariants(
         migrateTodoItemFields(
           migrateHabitFields(
-            migrateNodeStates(
+            // ADR 0003 §8 — heal pre-cascade boards that may have multiple
+            // anchors per chain. Runs AFTER migrateNodeStates so task states
+            // are already schema-healed.
+            migrateNormalizeChainAnchors(
+              migrateNodeStates(
               // Decision 24.2: migrateClockState strips legacy windowStartHour and
               // sets viewWindow BEFORE migrateNodeStates so STATE_DEFAULTS healing
               // doesn't re-add windowStartHour via the spread's right-operand win.
@@ -510,6 +670,7 @@ export function loadBoardFrom(boardPath: string): unknown {
                   ),
                 ),
               ),
+            ),
             ),
           ),
         ),
