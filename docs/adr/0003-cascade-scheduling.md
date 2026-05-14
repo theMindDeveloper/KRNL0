@@ -1,10 +1,13 @@
 # ADR 0003 — Cascade scheduling: one anchor per chain, derive successors
 
 **Date:** 2026-05-14
-**Status:** Accepted (architect sign-off — implementation may begin)
+**Status:** Partially superseded by [ADR 0005](0005-multi-anchor-cascade.md) on 2026-05-15. Sections affected: §1 (one-anchor invariant), §3.7 (mid-chain drop unschedules predecessors), §8 (`migrateNormalizeChainAnchors`). Sections still in force: selector module structure, dual-selector pattern with `timelineSelector`, shared `chainWalker.ts` extraction, calendar-vs-clock break-visibility divergence, no `BoardSchema.version` bump, no new persisted fields.
 **Author:** architect
-**Cross-reference:** also tracked in `docs/03-architecture/decisions.md` as Decision 25.
+**Cross-reference:** also tracked in `docs/03-architecture/decisions.md` as Decision 25 (and the supersession as Decision 27).
 **Supersedes:** nothing. Extends ADR 0001 §3 (`scheduledFor` field semantics) and Decision 24 (Unified Task Timeline Selector).
+**Superseded-in-part-by:** [ADR 0005 — Multi-anchor cascade scheduling](0005-multi-anchor-cascade.md).
+
+> **Reading order for current behaviour:** read this ADR for the cascade architecture, then read ADR 0005 for the live anchor model. Anywhere this ADR says "one anchor per chain" or "earliest anchor wins" or "mid-chain drop unschedules predecessors," ADR 0005 wins.
 
 ---
 
