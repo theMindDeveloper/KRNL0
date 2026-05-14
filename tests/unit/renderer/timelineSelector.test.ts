@@ -158,8 +158,8 @@ describe('Test 1 — Linear chain (10/20/40 min, short=5, long=15, every=4)', ()
     const timeline = selectTimeline(board, todoId);
     const taskSegs = timeline!.segments.filter((s) => s.kind === 'task');
     expect(taskSegs[0]?.kind === 'task' && taskSegs[0].colorToken).toBe('rose');
-    expect(taskSegs[1]?.kind === 'task' && taskSegs[1].colorToken).toBe('sky');
-    expect(taskSegs[2]?.kind === 'task' && taskSegs[2].colorToken).toBe('mint');
+    expect(taskSegs[1]?.kind === 'task' && taskSegs[1].colorToken).toBe('amber');
+    expect(taskSegs[2]?.kind === 'task' && taskSegs[2].colorToken).toBe('teal');
   });
 });
 

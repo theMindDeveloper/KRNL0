@@ -11,9 +11,11 @@ import { defaultPomoConfig } from '../components/nodes/PomoNode/types';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-export type ColorToken = 'rose' | 'sky' | 'mint' | 'amber' | 'violet';
-
-const COLORS: readonly ColorToken[] = ['rose', 'sky', 'mint', 'amber', 'violet'];
+// Decision 24.1 — palette is constrained to tokens defined in src/renderer/styles/tokens.css.
+// Adding a name here without a matching `--<name>` definition will cause arcs to paint nothing.
+// The contract test (tests/unit/renderer/timelineSelector.colorTokens.test.ts) enforces this.
+export const COLORS = ['rose', 'amber', 'teal', 'lilac', 'sand', 'moss'] as const;
+export type ColorToken = (typeof COLORS)[number];
 
 export type TimelineSegment =
   | {
@@ -59,7 +61,39 @@ export interface Timeline {
 let _cacheKey: { nodes: unknown; edges: unknown; cfg: unknown } | null = null;
 let _cache: ReadonlyMap<string, Timeline> = new Map();
 
+// ── Dev-only palette warning ───────────────────────────────────────────────────
+// Runs once at first selectTimelines call in a browser context (not in jsdom/Node).
+// Logs any COLORS entry whose CSS variable is not resolved in the live theme,
+// so future palette/token drift is caught at runtime before it reaches users.
+let _paletteChecked = false;
+function checkPaletteOnce(): void {
+  if (_paletteChecked) return;
+  // Skip in non-browser environments (Node.js test runner, electron main).
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  // Skip during test runs (jsdom doesn't apply tokens.css so custom properties
+  // always resolve to empty — false positives would pollute test output).
+  if (import.meta.env.MODE === 'test') return;
+  _paletteChecked = true;
+  try {
+    const root = getComputedStyle(document.documentElement);
+    const missing = (COLORS as readonly string[]).filter(
+      (c) => root.getPropertyValue(`--${c}`).trim() === '',
+    );
+    if (missing.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[timelineSelector] Color tokens missing from theme: ${missing.join(', ')}. ` +
+        `Arcs using these tokens will paint transparent. ` +
+        `Add them to src/renderer/styles/tokens.css.`,
+      );
+    }
+  } catch {
+    // getComputedStyle can throw in unusual environments — never crash the selector.
+  }
+}
+
 export function selectTimelines(board: Board | null): ReadonlyMap<string, Timeline> {
+  checkPaletteOnce();
   if (!board) return _cache; // last good cache; safe (null board ⇒ no consumers)
   const pomo = board.nodes.find((n) => n.kind === 'pomo') ?? null;
   const cfg = (pomo?.config as PomoConfig | null) ?? null;
