@@ -7,6 +7,7 @@ import type { NodeProps } from '../types';
 import type { CalendarConfig, CalendarState } from './types';
 import { defaultCalendarConfig } from './types';
 import { MonthView } from './MonthView';
+import { WeekView } from './WeekView';
 
 export function CalendarNode({
   node,
@@ -23,9 +24,11 @@ export function CalendarNode({
     switch (config.view) {
       case 'week':
         return (
-          <div style={placeholderStyle}>
-            <span>Week view (coming in Slice 2)</span>
-          </div>
+          <WeekView
+            state={node.state as CalendarState}
+            config={config}
+            onCommand={onCommand}
+          />
         );
       case 'month':
         return (
