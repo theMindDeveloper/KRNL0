@@ -169,3 +169,17 @@ Three flavors:
 | Unit mocks | Implement `BrainProvider`, `SttProvider`, etc. with deterministic fakes | Jest/Vitest unit tests |
 | `MockBoundary` | Full `IBoundary` with in-memory state | UI tests, Storybook |
 | Integration | Real `sys` CLI, real `board.json` in temp dir, real file watcher. No Whisper/Claude Code | CI |
+
+---
+
+## 6.10 Shared pure-function helper extracted from selector
+
+*Added by Decision 25 / ADR 0003.*
+
+**Rule:** Selector modules in `src/renderer/store/*Selector.ts` MUST NOT import from each other (hard rule #2). When two selectors need the same non-trivial pure helper (e.g. a chain walker, a date-range expander), extract the helper to a separate module named `*Walker.ts` or `*Helper.ts` that **emits no memoized values and exposes no `select*` functions**. Both selectors import from the helper module. The non-cross-import rule is preserved because the helper is not a selector — it has no cache, no result type tied to the board store, and consumers are free to call it from anywhere.
+
+**Threshold:** Duplicate the helper if it is < ~30 lines and has stable semantics (e.g. a trivial filter). Extract when it exceeds ~50 lines OR contains correctness-sensitive logic (graph walks, parser state machines, parallel-fork handling) where divergence between copies would silently produce different results.
+
+**First instance:** `src/renderer/store/chainWalker.ts` (extracted from `timelineSelector.ts` by ADR 0003), imported by both `timelineSelector.ts` (Decision 24) and `scheduleSelector.ts` (Decision 25). Exports: `ChainEntry`, `buildChainIndex`, `WalkUnit`, `walkChain`.
+
+**Forbidden:** a helper module that depends on Zustand store state, returns memoized references, or owns a module-level cache. Those properties make it a selector, and selectors do not import from selectors.

@@ -1828,3 +1828,17 @@ You are unblocked. Implement against the contract above. Two reminders:
 2. Do not create the cosmetic edge in the drop handler. That belongs to Slice 5. If the diff grows past the four files listed, you are out of scope.
 
 ---
+
+## Decision 25 — Cascade scheduling: one anchor per chain, derive successors (2026-05-14)
+
+**Date:** 2026-05-14
+**Status:** Accepted
+**Author:** architect
+**ADR:** [adr/0003-cascade-scheduling.md](../adr/0003-cascade-scheduling.md)
+**Cross-reference:** Extends ADR 0001 §3 (`scheduledFor` semantics), Decision 24 (Unified Timeline Selector).
+
+### Decision
+
+Scheduling one task auto-places its `task.next` successor graph back-to-back via a new pure memoized selector `selectSchedule(board)` in `src/renderer/store/scheduleSelector.ts`. The dropped task's `TaskState.scheduledFor` is the **only** persisted time in its chain (the "anchor"); successor times are derived at read time. Invariant: at most one anchor per chain — `task.setSchedule` clears all other anchors in the chain before writing the new one. WeekView and MonthView swap raw `scheduledFor` reads for `selectScheduledTasksForRange`; ClockNode is unchanged. The shared chain walker (`buildChainIndex`, `walkChain`, `WalkUnit`) is extracted from `timelineSelector.ts` into a new module `src/renderer/store/chainWalker.ts` — a blessed exception to hard rule #2 (no cross-import between selector modules), documented as design pattern 6.10. Mid-chain drops re-anchor at the dropped task and unschedule predecessors (no back-computation). Breaks are invisible on calendar (pure `plannedMin` sum) — divergent from ClockNode by design. Back-compat migration `migrateNormalizeChainAnchors` keeps the earliest anchor when an existing board violates the invariant. No `BoardSchema.version` bump; no new persisted fields. Full Q1–Q7 resolutions and file-by-file contract in ADR 0003.
+
+---
