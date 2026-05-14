@@ -20,8 +20,15 @@ export type SysCommand =
   | { kind: 'task'; sub: 'subtask'; parentId: string | undefined; text: string | undefined }
   | { kind: 'task'; sub: 'duration'; id: string | undefined; minutes: number | undefined }
   | { kind: 'task'; sub: 'sibling'; id: string | undefined }
+  | { kind: 'task'; sub: 'parallel'; id: string | undefined }
   | { kind: 'task'; sub: 'reset-pomo'; id: string | undefined }
   | { kind: 'task'; sub: 'chain'; refs: string[] }
+  | { kind: 'task'; sub: 'schedule'; id: string | undefined; at: string | undefined; durationMin: number | undefined }
+  | { kind: 'task'; sub: 'unschedule'; id: string | undefined }
+  | { kind: 'task'; sub: 'addNext'; sourceRef: string | undefined; text: string | undefined; durationMin: number | undefined }
+  | { kind: 'cal'; sub: 'show'; from: string | undefined; to: string | undefined; json: boolean }
+  | { kind: 'clock'; sub: 'day'; arg: string | undefined }
+  | { kind: 'clock'; sub: 'show'; json: boolean }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
   | { kind: 'habit'; sub: 'done'; name: string | undefined; date: string | undefined }
   | { kind: 'habit'; sub: 'color'; name: string | undefined; color: string | undefined }
@@ -212,8 +219,55 @@ export class SysParser {
       if (sub === 'sibling') {
         return { kind: 'task', sub: 'sibling', id: rest[0] };
       }
+      if (sub === 'parallel') {
+        return { kind: 'task', sub: 'parallel', id: rest[0] };
+      }
       if (sub === 'reset-pomo') {
         return { kind: 'task', sub: 'reset-pomo', id: rest[0] };
+      }
+      if (sub === 'schedule') {
+        const durRaw = flag(rest, 'duration');
+        return {
+          kind: 'task',
+          sub: 'schedule',
+          id: rest[0],
+          at: flag(rest, 'at'),
+          durationMin: durRaw !== undefined ? Number(durRaw) : undefined,
+        };
+      }
+      if (sub === 'unschedule') {
+        return { kind: 'task', sub: 'unschedule', id: rest[0] };
+      }
+      if (sub === 'addNext') {
+        const durRaw = flag(rest, 'duration');
+        return {
+          kind: 'task',
+          sub: 'addNext',
+          sourceRef: rest[0],
+          text: rest[1],
+          durationMin: durRaw !== undefined ? Number(durRaw) : undefined,
+        };
+      }
+    }
+
+    if (cmd === 'cal') {
+      if (sub === 'show' || sub === undefined) {
+        return {
+          kind: 'cal',
+          sub: 'show',
+          from: flag(rest, 'from'),
+          to: flag(rest, 'to'),
+          json: hasFlag(rest, 'json'),
+        };
+      }
+    }
+
+    if (cmd === 'clock') {
+      if (sub === 'day') {
+        return { kind: 'clock', sub: 'day', arg: rest[0] };
+      }
+      if (sub === 'show' || sub === undefined) {
+        return { kind: 'clock', sub: 'show', json: hasFlag(rest, 'json') };
       }
     }
 

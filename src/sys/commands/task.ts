@@ -7,6 +7,7 @@ import type { SysResult } from '../SysFacade';
 import {
   taskToggle as fsmTaskToggle,
   taskEdit as fsmTaskEdit,
+  taskSetSchedule as fsmTaskSetSchedule,
 } from '../../renderer/components/nodes/TaskNode/commands';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import {
@@ -14,6 +15,7 @@ import {
   todoRemove as fsmTodoRemove,
   todoLinkTask,
   todoAdd as fsmTodoAdd,
+  todoSetItemSchedule as fsmTodoSetItemSchedule,
 } from '../../renderer/components/nodes/TodoNode/commands';
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
 import type { PomoState } from '../../renderer/components/nodes/PomoNode/types';
@@ -621,6 +623,211 @@ export async function taskChain(ctx: TaskCtx, refs: string[]): Promise<SysResult
     data: { count: ids.length, edgesAdded: added },
   };
 }
+
+// ── ADR 0003/0005 — taskSchedule / taskUnschedule ────────────────────────────
+
+/**
+ * `krnl task schedule <ref> --at <ISO> [--duration <min>]`
+ * Sets scheduledFor (and optional scheduledDurationMin) on a TaskNode, then
+ * mirrors to the linked TodoItem via todoSetItemSchedule.
+ */
+export async function taskSchedule(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+  at: string | undefined,
+  durationMin?: number,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task schedule requires a <ref>' };
+  if (!at) return { ok: false, message: 'task schedule requires --at <ISO>' };
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, taskId);
+  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  taskId = taskNode.id;
+
+  const ts = taskNode.state as TaskState;
+  const nextState = fsmTaskSetSchedule(ts, {
+    scheduledFor: at,
+    ...(durationMin !== undefined ? { scheduledDurationMin: durationMin } : {}),
+  });
+  updateNode(board, taskId, { ...taskNode, state: nextState });
+
+  // Mirror to linked TodoItem.
+  if (ts.todoItemId !== null) {
+    const todoNode = findNode(board, ts.parentTodoId);
+    if (todoNode && todoNode.kind === 'todo') {
+      const newTodoState = fsmTodoSetItemSchedule(todoNode.state as TodoState, {
+        itemId: ts.todoItemId,
+        scheduledFor: at,
+      });
+      updateNode(board, todoNode.id, { ...todoNode, state: newTodoState });
+    }
+  }
+
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Task "${taskId.slice(0, 8)}" scheduled at ${at}${durationMin !== undefined ? ` for ${durationMin} min` : ''}.`,
+    data: { id: taskId, scheduledFor: at, scheduledDurationMin: durationMin },
+  };
+}
+
+/**
+ * `krnl task unschedule <ref>`
+ * Clears scheduledFor from a TaskNode (removes the field entirely, matching
+ * the FSM behaviour) and mirrors the clear to the linked TodoItem.
+ */
+export async function taskUnschedule(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task unschedule requires a <ref>' };
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, taskId);
+  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  taskId = taskNode.id;
+
+  const ts = taskNode.state as TaskState;
+  if (!('scheduledFor' in ts)) {
+    return { ok: true, message: `Task "${taskId.slice(0, 8)}" was not scheduled.` };
+  }
+  const nextState = fsmTaskSetSchedule(ts, { scheduledFor: null });
+  updateNode(board, taskId, { ...taskNode, state: nextState });
+
+  // Mirror to linked TodoItem.
+  if (ts.todoItemId !== null) {
+    const todoNode = findNode(board, ts.parentTodoId);
+    if (todoNode && todoNode.kind === 'todo') {
+      const newTodoState = fsmTodoSetItemSchedule(todoNode.state as TodoState, {
+        itemId: ts.todoItemId,
+        scheduledFor: null,
+      });
+      updateNode(board, todoNode.id, { ...todoNode, state: newTodoState });
+    }
+  }
+
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Task "${taskId.slice(0, 8)}" unscheduled.`,
+    data: { id: taskId },
+  };
+}
+
+// ── ADR 0004 — taskAddNext ────────────────────────────────────────────────────
+
+/**
+ * `krnl task addNext <sourceRef> "<text>" [--duration <min>]`
+ * Creates a sequential successor: same parentTaskId as source, same layer,
+ * positioned beside source (x + 252), with task.next → task.activate edge
+ * from source to the new node. Also creates a TodoItem on the parent TodoNode.
+ */
+export async function taskAddNext(
+  ctx: TaskCtx,
+  sourceRef: string | undefined,
+  text: string | undefined,
+  durationMin?: number,
+): Promise<SysResult> {
+  if (!sourceRef) return { ok: false, message: 'task addNext requires a <sourceRef>' };
+  if (!text) return { ok: false, message: 'task addNext requires <text>' };
+  const board = loadBoard(ctx);
+  const sourceNode = findTaskNode(board, sourceRef);
+  if (!sourceNode) return { ok: false, message: `No task node matching "${sourceRef}"` };
+
+  const sourceTs = sourceNode.state as TaskState;
+  const effectiveDuration = durationMin ?? sourceTs.durationMin;
+
+  const env = {
+    uuid: () => randomUUID(),
+    now: () => new Date().toISOString(),
+  };
+
+  // Add a TodoItem to the parent TodoNode.
+  const todoNode = findNode(board, sourceTs.parentTodoId);
+  if (!todoNode || todoNode.kind !== 'todo') {
+    return { ok: false, message: `Parent TodoNode "${sourceTs.parentTodoId}" not found.` };
+  }
+  const nextTodoState = fsmTodoAdd(todoNode.state as TodoState, { text }, env);
+  const addedItem = nextTodoState.items[nextTodoState.items.length - 1];
+  if (!addedItem) return { ok: false, message: 'Failed to add todo item.' };
+
+  const newNodeId = `task-${randomUUID()}`;
+  const now = env.now();
+
+  // Count siblings at the same level for sequencing.
+  const siblings = (board.nodes as AnyNode[]).filter((n) => {
+    if (n.kind !== 'todo.task') return false;
+    const ts = n.state as TaskState;
+    return (
+      ts.parentTodoId === sourceTs.parentTodoId &&
+      ts.parentTaskId === sourceTs.parentTaskId
+    );
+  });
+  const seq = siblings.length + 1;
+
+  const newTaskState: TaskState = {
+    text: text.trim(),
+    done: false,
+    durationMin: effectiveDuration,
+    eta: `~${effectiveDuration} min`,
+    sequenceNumber: seq,
+    layer: sourceTs.layer,
+    createdAt: now,
+    parentTodoId: sourceTs.parentTodoId,
+    parentTaskId: sourceTs.parentTaskId,
+    todoItemId: addedItem.id,
+    pomoSessionsCompleted: 0,
+    plannedMin: effectiveDuration,
+    secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
+  };
+
+  const newNode: AnyNode = {
+    id: newNodeId,
+    kind: 'todo.task',
+    isMother: false,
+    position: {
+      x: (sourceNode.position?.x ?? 0) + 252,
+      y: sourceNode.position?.y ?? 0,
+    },
+    state: newTaskState,
+    config: { showDuration: true },
+  };
+
+  // Link taskNodeId on the TodoItem.
+  const linkedTodoState = todoLinkTask(nextTodoState, {
+    itemId: addedItem.id,
+    taskNodeId: newNodeId,
+  });
+  updateNode(board, todoNode.id, { ...todoNode, state: linkedTodoState });
+
+  board.nodes = [...board.nodes, newNode];
+
+  // Wire task.next → task.activate from source to new node.
+  board.edges = [
+    ...board.edges,
+    {
+      id: `edge-${randomUUID()}`,
+      from: { nodeId: sourceNode.id, event: 'task.next' },
+      to: { nodeId: newNodeId, command: 'task.activate' },
+      enabled: true,
+    },
+  ];
+
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Next task "${text}" added after "${sourceNode.id.slice(0, 8)}…" (id: ${newNodeId.slice(0, 13)}…).`,
+    data: { id: newNodeId, itemId: addedItem.id },
+  };
+}
+
+// ── ADR 0004 — taskParallel (alias for taskSibling) ───────────────────────────
+
+/**
+ * `krnl task parallel <ref>` — canonical alias for `task sibling`.
+ * Kept as a one-liner alias so both names route to the same implementation.
+ */
+export const taskParallel = taskSibling;
 
 export async function taskList(
   ctx: TaskCtx,

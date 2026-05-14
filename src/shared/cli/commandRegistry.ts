@@ -25,9 +25,13 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'pomo', usage: 'task pomo <id>', summary: 'Start a pomo session for this task' },
       { name: 'subtask', usage: 'task subtask <parentId> "<text>"', summary: 'Add a child task' },
       { name: 'duration', usage: 'task duration <id> <minutes>', summary: 'Set task duration in minutes' },
-      { name: 'sibling', usage: 'task sibling <id>', summary: 'Fork a sibling task in parallel' },
+      { name: 'sibling', usage: 'task sibling <id>', summary: 'Fork a sibling task in parallel (same as task parallel)' },
+      { name: 'parallel', usage: 'task parallel <id>', summary: 'Fork a parallel task (canonical alias for task sibling)' },
       { name: 'reset-pomo', usage: 'task reset-pomo <id>', summary: 'Reset pomo session count for task' },
       { name: 'chain', usage: 'task chain <ref1> <ref2> [<ref3>...]', summary: 'Wire task.next → task.activate between consecutive tasks' },
+      { name: 'schedule', usage: 'task schedule <ref> --at <YYYY-MM-DDTHH:MM> [--duration <min>]', summary: 'Schedule a task at a wall-clock time (cascade anchor)' },
+      { name: 'unschedule', usage: 'task unschedule <ref>', summary: 'Clear the scheduled time from a task' },
+      { name: 'addNext', usage: 'task addNext <sourceRef> "<text>" [--duration <min>]', summary: 'Add a sequential successor task after source' },
       { name: 'list', usage: 'task list [<todoId>] [--json]', summary: 'List tasks, optionally filtered by TodoNode. IDs/refs accept ≥4-char prefix or unique text.' },
     ],
   },
@@ -112,6 +116,21 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'stats', usage: 'board stats [--json]', summary: 'Per-kind node counts + per-event edge counts' },
       { name: 'save', usage: 'board save [path]', summary: '(autosave is always on — kept for parity)' },
       { name: 'load', usage: 'board load <path>', summary: 'Load board from path' },
+    ],
+  },
+  {
+    group: 'cal',
+    summary: 'Calendar view of cascade-scheduled tasks (ADR 0003/0005)',
+    subcommands: [
+      { name: 'show', usage: 'cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]', summary: 'List all scheduled task placements, sorted by time' },
+    ],
+  },
+  {
+    group: 'clock',
+    summary: 'Clock day-selector and wall-clock task view (ADR 0004)',
+    subcommands: [
+      { name: 'day', usage: 'clock day <YYYY-MM-DD|today|+1|-1>', summary: 'Set the clock selected date (absolute, today, or ±1 day)' },
+      { name: 'show', usage: 'clock show [--json]', summary: 'Show scheduled tasks for the clock\'s selected date and view window' },
     ],
   },
   {
