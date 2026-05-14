@@ -127,6 +127,39 @@ describe('sys habit color', () => {
     const res = await cliColor(ctx, 'run', 'magenta');
     expect(res.ok).toBe(false);
   });
+
+  it('resolves a habit by ≥4-char id prefix (issue #117 §1 — same rule for habits)', async () => {
+    const add = await cliAdd(ctx, 'meditate');
+    const id = (add.data as { id: string }).id;
+    const prefix = id.slice(0, 8);
+    const res = await cliColor(ctx, prefix, 'cyan');
+    expect(res.ok).toBe(true);
+    expect(findMother().state.habits.find((h) => h.id === id)!.color).toBe('cyan');
+  });
+
+  it('disambiguates duplicate names by id-prefix', async () => {
+    // Two habits sharing the same name — name fallback is ambiguous,
+    // but each id-prefix still resolves uniquely.
+    const a = await cliAdd(ctx, 'duplicate');
+    const b = await cliAdd(ctx, 'duplicate');
+    const aId = (a.data as { id: string }).id;
+    const bId = (b.data as { id: string }).id;
+
+    // Name fallback errors out
+    const byName = await cliColor(ctx, 'duplicate', 'cyan');
+    expect(byName.ok).toBe(false);
+    expect(byName.message).toMatch(/[Aa]mbiguous/);
+
+    // id-prefix resolves uniquely
+    const byPrefix = await cliColor(ctx, aId.slice(0, 8), 'cyan');
+    expect(byPrefix.ok).toBe(true);
+
+    const mother = findMother();
+    const aHabit = mother.state.habits.find((h) => h.id === aId)!;
+    const bHabit = mother.state.habits.find((h) => h.id === bId)!;
+    expect(aHabit.color).toBe('cyan');
+    expect(bHabit.color).not.toBe('cyan');
+  });
 });
 
 describe('sys habit view', () => {
