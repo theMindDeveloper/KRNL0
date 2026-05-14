@@ -79,20 +79,31 @@ function writeBoard(ctx: HabitCtx, board: BoardShape, mother: MotherHabitNode): 
   ctx.onBoardChanged?.();
 }
 
-// Resolve idOrName → habit. Case-insensitive name match. Returns null if
-// not found or ambiguous (multiple name matches).
+// Resolve idOrName → habit. Order: exact id → ≥4-char id prefix → exact name
+// (case-insensitive). Mirrors the global resolveRef rule for consistency.
 function resolveHabit(
   state: HabitState,
   idOrName: string,
 ): { habit: Habit } | { error: string } {
   const exact = state.habits.find((h) => h.id === idOrName);
   if (exact) return { habit: exact };
+
+  if (idOrName.length >= 4) {
+    const byPrefix = state.habits.filter((h) => h.id.startsWith(idOrName));
+    if (byPrefix.length === 1) return { habit: byPrefix[0]! };
+    if (byPrefix.length > 1) {
+      return {
+        error: `Ambiguous habit prefix "${idOrName}" — matches: ${byPrefix.map((h) => h.id).slice(0, 5).join(', ')}`,
+      };
+    }
+  }
+
   const lower = idOrName.toLowerCase();
   const matches = state.habits.filter((h) => h.name.toLowerCase() === lower);
   if (matches.length === 1) return { habit: matches[0]! };
   if (matches.length > 1) {
     return {
-      error: `Ambiguous habit "${idOrName}" — ${matches.length} habits share that name. Use an id.`,
+      error: `Ambiguous habit "${idOrName}" — ${matches.length} habits share that name. Use an id or an id-prefix.`,
     };
   }
   return { error: `No habit matching "${idOrName}".` };
