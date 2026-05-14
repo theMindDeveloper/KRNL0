@@ -26,6 +26,7 @@
  */
 
 import { useBoardStore } from '../../store/boardStore';
+import { buildChainIndex } from '../../store/chainWalker';
 import type { Node } from '@shared/types/node';
 import type { Edge } from '@shared/types/edge';
 import {
@@ -157,6 +158,74 @@ export function parseMinutesFromText(text: string): { plannedMin: number | null;
     if (Number.isFinite(n) && n > 0) return { plannedMin: n, strippedText: text };
   }
   return { plannedMin: null, strippedText: text };
+}
+
+/**
+ * ADR 0003 §1 — one anchor per chain.
+ *
+ * Given a target task that is about to be scheduled, find every OTHER task
+ * in the same chain (connected component of task.next edges restricted to
+ * the same todo) that currently has scheduledFor set, and clear it (both
+ * on the task state and the linked TodoItem mirror). Returns the list of
+ * (taskId, prevTask) pairs that were cleared so the dispatcher can stage
+ * them via updateNode.
+ *
+ * This is invoked BEFORE writing the new anchor so the invariant
+ * "at most one anchor per chain" holds at every observable point in time.
+ *
+ * Note: walks task.next edges as undirected for connectivity (a chain is
+ * a connected component regardless of edge direction). Subtasks
+ * (parentTaskId !== null) are not considered chain members on their own —
+ * they roll up into their parent.
+ */
+function clearOtherAnchorsInChain(
+  targetTaskId: string,
+  board: { nodes: readonly Node[]; edges: readonly Edge[] },
+): Array<{ taskId: string; parentTodoId: string; todoItemId: string | null }> {
+  const targetNode = board.nodes.find((n) => n.id === targetTaskId);
+  if (!targetNode || targetNode.kind !== 'todo.task') return [];
+  const targetState = targetNode.state as TaskState;
+  const targetTodoId = targetState.parentTodoId;
+
+  // Scope: tasks in the same todo.
+  const scope = new Set<string>();
+  const stateById = new Map<string, TaskState>();
+  for (const n of board.nodes) {
+    if (n.kind !== 'todo.task') continue;
+    const ts = n.state as TaskState;
+    if (ts.parentTodoId !== targetTodoId) continue;
+    if (ts.parentTaskId !== null) continue; // subtasks not chain members
+    scope.add(n.id);
+    stateById.set(n.id, ts);
+  }
+  if (!scope.has(targetTaskId)) return [];
+
+  // Connected component containing the target (undirected walk over task.next).
+  const chainIndex = buildChainIndex(board.edges);
+  const component = new Set<string>();
+  const stack = [targetTaskId];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (component.has(id)) continue;
+    if (!scope.has(id)) continue;
+    component.add(id);
+    const entry = chainIndex.get(id);
+    if (!entry) continue;
+    for (const n of entry.nexts) if (!component.has(n) && scope.has(n)) stack.push(n);
+    for (const p of entry.prevs) if (!component.has(p) && scope.has(p)) stack.push(p);
+  }
+
+  // Any other task in the component with scheduledFor set must be cleared.
+  const out: Array<{ taskId: string; parentTodoId: string; todoItemId: string | null }> = [];
+  for (const id of component) {
+    if (id === targetTaskId) continue;
+    const ts = stateById.get(id);
+    if (!ts) continue;
+    if (typeof ts.scheduledFor === 'string' && ts.scheduledFor.length > 0) {
+      out.push({ taskId: id, parentTodoId: ts.parentTodoId, todoItemId: ts.todoItemId });
+    }
+  }
+  return out;
 }
 
 type Args = Record<string, unknown>;
@@ -934,6 +1003,38 @@ export function makeCommandHandler(nodeId: string) {
       const targetTask = currentBoard.nodes.find((n) => n.id === scheduleArgs.taskId);
       if (!targetTask || targetTask.kind !== 'todo.task') return;
       const prevTask = targetTask.state as TaskState;
+
+      // ADR 0003 §1 — one anchor per chain. Before writing the new anchor,
+      // find every OTHER scheduled task in the same chain and clear it
+      // (state + linked TodoItem mirror). This is the dispatcher's
+      // invariant: at no observable point may two tasks in one chain hold
+      // scheduledFor simultaneously.
+      const toClear = clearOtherAnchorsInChain(scheduleArgs.taskId, currentBoard);
+      for (const item of toClear) {
+        // Re-fetch each iteration so we don't clobber the previous write's
+        // mutation when multiple items share a todo node.
+        const stepBoard = useBoardStore.getState().board;
+        if (!stepBoard) break;
+        const otherNode = stepBoard.nodes.find((n) => n.id === item.taskId);
+        if (otherNode && otherNode.kind === 'todo.task') {
+          updateNode(item.taskId, {
+            state: taskSetSchedule(otherNode.state as TaskState, { scheduledFor: null }),
+          });
+        }
+        if (item.todoItemId !== null) {
+          const stepBoard2 = useBoardStore.getState().board;
+          const todoNode = stepBoard2?.nodes.find((n) => n.id === item.parentTodoId);
+          if (todoNode && todoNode.kind === 'todo') {
+            updateNode(todoNode.id, {
+              state: todoSetItemSchedule(todoNode.state as TodoState, {
+                itemId: item.todoItemId,
+                scheduledFor: null,
+              }),
+            });
+          }
+        }
+      }
+
       const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
         scheduledFor: scheduleArgs.scheduledFor,
       };
@@ -942,9 +1043,11 @@ export function makeCommandHandler(nodeId: string) {
       }
       const nextTaskState = taskSetSchedule(prevTask, schedPatch);
       updateNode(scheduleArgs.taskId, { state: nextTaskState });
-      // Mirror to linked TodoItem.
+      // Mirror to linked TodoItem. Re-fetch board so the freshly-cleared
+      // TodoItem mirrors from the loop above are not clobbered.
       if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
-        const todoNode = currentBoard.nodes.find((n) => n.id === prevTask.parentTodoId);
+        const freshBoard = useBoardStore.getState().board;
+        const todoNode = freshBoard?.nodes.find((n) => n.id === prevTask.parentTodoId);
         if (todoNode && todoNode.kind === 'todo') {
           const newTodoState = todoSetItemSchedule(todoNode.state as TodoState, {
             itemId: prevTask.todoItemId,
@@ -1273,12 +1376,50 @@ export function makeCommandHandler(nodeId: string) {
 
     // ── task.setSchedule (on todo.task): bidirectional mirror to linked TodoItem ─
     // ADR 0001: same cascade pattern as task.toggle.
+    // ADR 0003 §1 — one anchor per chain: when setting (not clearing)
+    // scheduledFor, clear every OTHER scheduled task in the same chain
+    // (both task state and TodoItem mirror) BEFORE writing the new anchor.
     if (node.kind === 'todo.task' && command === 'task.setSchedule' && result.state !== undefined) {
       const prevTask = node.state as TaskState;
+      const schedArgs = args as { scheduledFor: string | null; scheduledDurationMin?: number };
+
+      // Only fan out chain clears when SETTING a schedule (not clearing).
+      if (schedArgs.scheduledFor !== null && schedArgs.scheduledFor !== undefined) {
+        const currentBoardForClear = useBoardStore.getState().board;
+        if (currentBoardForClear) {
+          const toClear = clearOtherAnchorsInChain(nodeId, currentBoardForClear);
+          for (const item of toClear) {
+            // Re-fetch each iteration so we don't clobber the previous write
+            // when multiple items share a todo node.
+            const stepBoard = useBoardStore.getState().board;
+            if (!stepBoard) break;
+            const otherNode = stepBoard.nodes.find((n) => n.id === item.taskId);
+            if (otherNode && otherNode.kind === 'todo.task') {
+              updateNode(item.taskId, {
+                state: taskSetSchedule(otherNode.state as TaskState, { scheduledFor: null }),
+              });
+            }
+            if (item.todoItemId !== null) {
+              const stepBoard2 = useBoardStore.getState().board;
+              const todoNode = stepBoard2?.nodes.find((n) => n.id === item.parentTodoId);
+              if (todoNode && todoNode.kind === 'todo') {
+                updateNode(todoNode.id, {
+                  state: todoSetItemSchedule(todoNode.state as TodoState, {
+                    itemId: item.todoItemId,
+                    scheduledFor: null,
+                  }),
+                });
+              }
+            }
+          }
+        }
+      }
+
       updateNode(nodeId, { state: result.state });
       // Mirror scheduledFor to the linked TodoItem if one exists.
+      // Re-fetch board so freshly-cleared mirrors from the loop above are
+      // not clobbered.
       if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
-        const schedArgs = args as { scheduledFor: string | null; scheduledDurationMin?: number };
         const currentBoard = useBoardStore.getState().board;
         if (currentBoard) {
           const todoNode = currentBoard.nodes.find((n) => n.id === prevTask.parentTodoId);
