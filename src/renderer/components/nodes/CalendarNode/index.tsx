@@ -80,7 +80,7 @@ export function CalendarNode({
       </div>
 
       {/* View placeholder body */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {renderBody()}
       </div>
 

@@ -5,8 +5,9 @@
 // RadialChooser. NowLine is rendered as an overlay.
 
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
-import type { DragEvent } from 'react';
+import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { CalendarConfig, CalendarState } from './types';
@@ -76,9 +77,54 @@ function habitScheduledOnDow(schedule: HabitSchedule, isoDow: IsoDow): boolean {
 interface ScheduledTask {
   id: string;
   text: string;
+  done: boolean;
   scheduledFor: string;         // ISO local datetime "YYYY-MM-DDTHH:MM"
   scheduledDurationMin: number; // calendar block duration (fallback: plannedMin or durationMin)
   plannedMin: number;           // for drag payload
+}
+
+// One day's slice of a (potentially multi-day) task. `sliceStartMin` and
+// `sliceEndMin` are measured from local midnight of THIS day.
+interface TaskSlice {
+  task: ScheduledTask;
+  sliceStartMin: number; // 0–1440
+  sliceEndMin: number;   // 0–1440
+  isContinuation: boolean; // true on every day after the first
+  hasContinuation: boolean; // true if the task continues past this day
+}
+
+// Assign non-overlapping columns to slices using a greedy interval-graph
+// approach. Slices on the same day are laid out side-by-side when they overlap
+// in time.
+function computeColumnLayout(
+  slices: TaskSlice[],
+): Map<string, { colIndex: number; colCount: number }> {
+  if (slices.length === 0) return new Map();
+  const intervals = slices.map((s) => ({
+    id: s.task.id,
+    startMin: s.sliceStartMin,
+    endMin: s.sliceEndMin,
+  }));
+  const sorted = [...intervals].sort((a, b) => a.startMin - b.startMin);
+  const colEndMin: number[] = [];
+  const assignments = new Map<string, number>();
+  for (const interval of sorted) {
+    let col = 0;
+    while (col < colEndMin.length && (colEndMin[col] ?? 0) > interval.startMin) col++;
+    assignments.set(interval.id, col);
+    colEndMin[col] = interval.endMin;
+  }
+  const result = new Map<string, { colIndex: number; colCount: number }>();
+  for (const interval of intervals) {
+    const colIndex = assignments.get(interval.id) ?? 0;
+    let maxCol = colIndex;
+    for (const other of intervals) {
+      if (other.id !== interval.id && interval.startMin < other.endMin && other.startMin < interval.endMin)
+        maxCol = Math.max(maxCol, assignments.get(other.id) ?? 0);
+    }
+    result.set(interval.id, { colIndex, colCount: maxCol + 1 });
+  }
+  return result;
 }
 
 interface ScheduledHabit {
@@ -126,8 +172,12 @@ function makeHabitChooserOptions(): RadialOption<HabitScheduleKind>[] {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function WeekView({ state, config, onCommand }: WeekViewProps) {
-  const { hourRange } = config;
-  const rowCount = hourRange.end - hourRange.start + 1;
+  // Always render the full day (00 → 23) regardless of any persisted
+  // hourRange in the node config. This guarantees every calendar shows
+  // the same 24-hour grid.
+  void config;
+  const hourRange = { start: 0, end: 23 };
+  const rowCount = 24;
   const gridBodyRef = useRef<HTMLDivElement>(null);
 
   // Compute the Monday that anchors this week.
@@ -153,6 +203,23 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     onCommand('calendar.setAnchor', { date: addDays(mondayYMD, 7) });
   };
 
+  const reactFlow = useReactFlow();
+
+  // 60-second tick for "now" — used to gray out past task blocks.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+
+  // Popup shown when a task block is clicked.
+  const [taskPopup, setTaskPopup] = useState<{
+    task: ScheduledTask;
+    x: number;
+    y: number;
+  } | null>(null);
+
   // Read scheduled tasks from the board store.
   const scheduledTasks = useBoardStore(
     useShallow((s): ScheduledTask[] => {
@@ -162,6 +229,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         if (n.kind !== 'todo.task') continue;
         const st = n.state as {
           text?: string;
+          done?: boolean;
           scheduledFor?: string;
           scheduledDurationMin?: number;
           plannedMin?: number;
@@ -171,6 +239,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         result.push({
           id: n.id,
           text: typeof st.text === 'string' ? st.text : '',
+          done: st.done === true,
           scheduledFor: st.scheduledFor,
           scheduledDurationMin:
             st.scheduledDurationMin ?? st.plannedMin ?? st.durationMin ?? 25,
@@ -205,25 +274,49 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     }),
   );
 
-  // Build a map from YYYY-MM-DD → ScheduledTask[] for the rendered week.
-  const tasksByDay = useMemo(() => {
-    const map = new Map<string, ScheduledTask[]>();
+  // Build a map from YYYY-MM-DD → TaskSlice[], splitting any task whose
+  // duration crosses midnight into one slice per affected day.
+  const slicesByDay = useMemo(() => {
+    const map = new Map<string, TaskSlice[]>();
     const weekSet = new Set(weekDays);
     for (const task of scheduledTasks) {
-      const dayYMD = task.scheduledFor.slice(0, 10);
-      if (!weekSet.has(dayYMD)) continue;
-      const existing = map.get(dayYMD);
-      if (existing) {
-        existing.push(task);
-      } else {
-        map.set(dayYMD, [task]);
+      const startDayYMD = task.scheduledFor.slice(0, 10);
+      const [hStr, mStr] = task.scheduledFor.slice(11, 16).split(':');
+      const startMinOfDay =
+        (parseInt(hStr ?? '0', 10)) * 60 + (parseInt(mStr ?? '0', 10));
+      let remainingMin = Math.max(1, task.scheduledDurationMin);
+      let currentDayYMD = startDayYMD;
+      let sliceStart = startMinOfDay;
+      let isContinuation = false;
+      // Hard safety cap — a single task should never span more than 14 days.
+      for (let i = 0; i < 14 && remainingMin > 0; i++) {
+        const dayCapacity = 1440 - sliceStart;
+        const sliceLen = Math.min(remainingMin, dayCapacity);
+        const sliceEnd = sliceStart + sliceLen;
+        const hasContinuation = sliceLen < remainingMin;
+        if (weekSet.has(currentDayYMD)) {
+          const slice: TaskSlice = {
+            task,
+            sliceStartMin: sliceStart,
+            sliceEndMin: sliceEnd,
+            isContinuation,
+            hasContinuation,
+          };
+          const arr = map.get(currentDayYMD);
+          if (arr) arr.push(slice);
+          else map.set(currentDayYMD, [slice]);
+        }
+        remainingMin -= sliceLen;
+        sliceStart = 0;
+        isContinuation = true;
+        currentDayYMD = addDays(currentDayYMD, 1);
       }
     }
     return map;
   }, [scheduledTasks, weekDays]);
 
   // Whether any task is scheduled this week (controls empty-state hint).
-  const hasTasksThisWeek = tasksByDay.size > 0;
+  const hasTasksThisWeek = slicesByDay.size > 0;
 
   // Column width fallback for NowLine.
   const NOMINAL_COLUMN_WIDTH = 40;
@@ -356,7 +449,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           durationMin: number;
         };
         if (!payload.taskId) return;
-        const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:00`;
+        // Compute 15-min snap from mouse Y position within the hour cell.
+        const rect = e.currentTarget.getBoundingClientRect();
+        const relY = Math.max(0, e.clientY - rect.top);
+        const minuteRaw = Math.floor((relY / Math.max(1, rect.height)) * 60);
+        const snappedMinute = Math.min(45, Math.floor(minuteRaw / 15) * 15);
+        const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:${String(snappedMinute).padStart(2, '0')}`;
         onCommand('calendar.schedule', {
           taskId: payload.taskId,
           scheduledFor,
@@ -373,33 +471,35 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   // ── Task block renderer ─────────────────────────────────────────────────────
 
   function renderTaskBlocks(dayYMD: string) {
-    const tasks = tasksByDay.get(dayYMD);
-    if (!tasks || tasks.length === 0) return null;
+    const slices = slicesByDay.get(dayYMD);
+    if (!slices || slices.length === 0) return null;
 
-    return tasks.map((task) => {
-      // Parse the hour/minute from scheduledFor.
-      const timePart = task.scheduledFor.slice(11, 16); // "HH:MM"
-      const [hStr, mStr] = timePart.split(':');
-      const taskHour = parseInt(hStr ?? '0', 10);
-      const taskMin = parseInt(mStr ?? '0', 10);
+    const colLayout = computeColumnLayout(slices);
 
-      const isBeforeRange = taskHour < hourRange.start;
-      const isAfterRange = taskHour > hourRange.end;
+    return slices.map((slice) => {
+      const { task, sliceStartMin, sliceEndMin, isContinuation, hasContinuation } = slice;
 
-      // Clamp the block position.
-      const hoursFromStart = isBeforeRange
-        ? 0
-        : isAfterRange
-          ? rowCount - 1
-          : taskHour - hourRange.start + taskMin / 60;
+      // Convert minutes-from-midnight to grid-row offsets (rowHeight per hour).
+      const topPx = (sliceStartMin / 60) * rowHeight;
+      const sliceLen = Math.max(1, sliceEndMin - sliceStartMin);
+      const heightPx = Math.max(10, (sliceLen / 60) * rowHeight);
 
-      const topPx = hoursFromStart * rowHeight;
-      const heightPx = Math.max(
-        18,
-        (task.scheduledDurationMin / 60) * rowHeight,
-      );
+      // Side-by-side layout: divide column width equally.
+      const { colIndex, colCount } = colLayout.get(task.id) ?? { colIndex: 0, colCount: 1 };
+      const colWidthPct = 100 / colCount;
+      const leftPct = colIndex * colWidthPct;
+      const rightPct = 100 - (colIndex + 1) * colWidthPct;
+
+      // Gray out if done OR if the WHOLE scheduled task has finished (not just
+      // this slice — a multi-day task should not gray out the morning slice
+      // while it's still running in the evening of the prior day).
+      const scheduledEndMs =
+        new Date(task.scheduledFor).getTime() + task.scheduledDurationMin * 60_000;
+      const isPast = scheduledEndMs <= nowMs;
+      const isGrayed = task.done || isPast;
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
+        setTaskPopup(null);
         e.dataTransfer.setData(
           'application/krnl-task',
           JSON.stringify({ taskId: task.id, durationMin: task.scheduledDurationMin }),
@@ -408,35 +508,115 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
       };
 
-      const handleBlockClick = () => {
-        onCommand('calendar.activateTask', { taskId: task.id });
+      // Only opt into being a drop target for TASK payloads. Habit drags are
+      // ignored here so they bubble down to the underlying hour cell and
+      // trigger the radial weekly/daily chooser.
+      const handleBlockDragOver = (e: DragEvent<HTMLDivElement>) => {
+        const t = e.dataTransfer.types;
+        let isTask = false;
+        for (let i = 0; i < t.length; i++) {
+          if (t[i] === 'application/krnl-task') { isTask = true; break; }
+        }
+        if (!isTask) return; // fall through to cell
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
       };
+
+      const handleDropOnBlock = (e: DragEvent<HTMLDivElement>) => {
+        const t = e.dataTransfer.types;
+        let isTask = false;
+        for (let i = 0; i < t.length; i++) {
+          if (t[i] === 'application/krnl-task') { isTask = true; break; }
+        }
+        if (!isTask) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const raw = e.dataTransfer.getData('application/krnl-task');
+        if (!raw) return;
+        const payload = JSON.parse(raw) as { taskId?: string; durationMin: number };
+        if (!payload.taskId) return;
+
+        // Snap to the 15-min slot under the cursor within THIS block.
+        // Works for both self-drop (nudge within own span) and other-drop
+        // (place a second task at any slot inside this block's window — at
+        // the exact same start the two render as a parallel pair, at a
+        // different start they run consecutively / overlap partially).
+        const rect = e.currentTarget.getBoundingClientRect();
+        const relY = Math.max(0, e.clientY - rect.top);
+        const minutesIntoBlock = (relY / rowHeight) * 60;
+        const absMinute = sliceStartMin + minutesIntoBlock;
+        const snappedMin = Math.max(
+          0,
+          Math.min(1440 - 15, Math.floor(absMinute / 15) * 15),
+        );
+        const hour = Math.floor(snappedMin / 60);
+        const minute = snappedMin % 60;
+        onCommand('calendar.schedule', {
+          taskId: payload.taskId,
+          scheduledFor: `${dayYMD}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+          scheduledDurationMin: payload.durationMin,
+        });
+      };
+
+      const handleBlockClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        setTaskPopup({ task, x: e.clientX, y: e.clientY });
+      };
+
+      const handleBlockContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const board = useBoardStore.getState().board;
+        const taskNode = board?.nodes.find((n) => n.id === task.id);
+        if (taskNode) {
+          reactFlow.setCenter(
+            taskNode.position.x + 110,
+            taskNode.position.y + 80,
+            { duration: 400, zoom: 0.9 },
+          );
+        }
+      };
+
+      // Visual cue: continuation slices are clipped flat on the top edge,
+      // slices that continue past midnight are clipped flat on the bottom.
+      const borderTopLeftRadius = isContinuation ? 0 : 4;
+      const borderTopRightRadius = isContinuation ? 0 : 4;
+      const borderBottomLeftRadius = hasContinuation ? 0 : 4;
+      const borderBottomRightRadius = hasContinuation ? 0 : 4;
 
       return (
         <div
-          key={task.id}
-          data-testid={`task-block-${task.id}`}
-          draggable
-          onDragStart={handleBlockDragStart}
+          key={`${task.id}-${isContinuation ? 'cont' : 'head'}`}
+          data-testid={`task-block-${task.id}${isContinuation ? '-cont' : ''}`}
+          draggable={!isContinuation}
+          onDragStart={isContinuation ? undefined : handleBlockDragStart}
+          onDragOver={handleBlockDragOver}
+          onDrop={handleDropOnBlock}
           onClick={handleBlockClick}
-          title={task.text}
+          onContextMenu={handleBlockContextMenu}
+          title={task.text + (isContinuation ? ' (continued from previous day)' : '')}
           style={{
             position: 'absolute',
             top: topPx,
-            left: 2,
-            right: 2,
+            left: `calc(${leftPct}% + 2px)`,
+            right: `calc(${rightPct}% + 2px)`,
             height: heightPx,
-            background: 'var(--acid-faint)',
-            border: '1px solid var(--acid)',
-            borderRadius: 4,
-            cursor: 'grab',
+            background: isGrayed ? 'var(--paper-3)' : 'var(--acid-faint)',
+            border: `1px solid ${isGrayed ? 'var(--ink-4)' : 'var(--acid)'}`,
+            borderTopLeftRadius,
+            borderTopRightRadius,
+            borderBottomLeftRadius,
+            borderBottomRightRadius,
+            cursor: isContinuation ? 'pointer' : 'grab',
             overflow: 'hidden',
             zIndex: 2,
             padding: '1px 3px',
+            opacity: isGrayed ? 0.5 : 1,
           }}
         >
-          {/* Out-of-range badge */}
-          {isBeforeRange && (
+          {/* Continuation arrows — ↑ on continuation slices, ↓ on slices that
+              spill into the next day. */}
+          {isContinuation && (
             <span
               style={{
                 position: 'absolute',
@@ -446,40 +626,45 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 color: 'var(--acid)',
                 fontFamily: 'var(--font-mono)',
                 lineHeight: 1,
+                pointerEvents: 'none',
               }}
             >
               ↑
             </span>
           )}
-          {isAfterRange && (
+          {hasContinuation && (
             <span
               style={{
                 position: 'absolute',
-                top: 1,
-                left: 2,
+                bottom: 1,
+                right: 2,
                 fontSize: 9,
                 color: 'var(--acid)',
                 fontFamily: 'var(--font-mono)',
                 lineHeight: 1,
+                pointerEvents: 'none',
               }}
             >
               ↓
             </span>
           )}
-          <span
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 9,
-              color: 'var(--ink-2)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: 'block',
-              paddingLeft: isBeforeRange || isAfterRange ? 10 : 0,
-            }}
-          >
-            {task.text}
-          </span>
+          {heightPx >= 12 && (
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                color: 'var(--ink-2)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'block',
+                paddingLeft: isContinuation ? 10 : 0,
+                pointerEvents: 'none',
+              }}
+            >
+              {task.text}
+            </span>
+          )}
         </div>
       );
     });
@@ -579,8 +764,10 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         display: 'flex',
         flexDirection: 'column',
         flex: 1,
+        minHeight: 0,
         overflow: 'hidden',
         userSelect: 'none',
+        position: 'relative',
       }}
     >
       {/* Sub-header: [←] Week of {Month D} [→] */}
@@ -662,11 +849,13 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         })}
       </div>
 
-      {/* Grid body: gutter + 7 columns */}
+      {/* Grid body: gutter + 7 columns — flex-fills the calendar card and scrolls */}
       <div
         ref={gridBodyRef}
+        className="krnl-week-grid"
         style={{
           flex: 1,
+          minHeight: 0,
           overflowY: 'auto',
           display: 'flex',
           position: 'relative',
@@ -725,7 +914,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                   borderLeft: colIdx > 0 ? '1px solid var(--paper-3)' : undefined,
                 }}
               >
-                {/* Hour rows — drop targets */}
+                {/* Hour rows — drop targets (15-min snap computed from mouse Y at drop time) */}
                 {Array.from({ length: rowCount }, (_, rowIdx) => {
                   const hour = hourRange.start + rowIdx;
                   const handlers = makeCellHandlers(dayYMD, hour);
@@ -768,29 +957,166 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             />
           )}
         </div>
+      </div>
 
-        {/* Empty-state hint — shown when no tasks scheduled this week */}
-        {!hasTasksThisWeek && (
+      {/* Empty-state hint — shown when no tasks scheduled this week.
+          Rendered outside the scroll container so it stays centered as the
+          user scrolls the grid. */}
+      {!hasTasksThisWeek && (
+        <div
+          data-testid="week-empty-hint"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: GUTTER_WIDTH,
+            right: 0,
+            transform: 'translateY(-50%)',
+            textAlign: 'center',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9,
+            color: 'var(--ink-3)',
+            letterSpacing: '0.08em',
+            pointerEvents: 'none',
+          }}
+        >
+          DRAG A TASK ONTO THE GRID
+        </div>
+      )}
+
+      {/* Task info popup — shown on left-click of a task block */}
+      {taskPopup && (() => {
+        const startMs = new Date(taskPopup.task.scheduledFor).getTime();
+        const endMs = startMs + taskPopup.task.scheduledDurationMin * 60_000;
+        const fmt = (ms: number) => {
+          const d = new Date(ms);
+          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        };
+        const startStr = fmt(startMs);
+        const endStr = fmt(endMs);
+        const POPUP_W = 280;
+        return createPortal(
+        <>
+          {/* Backdrop: click anywhere to dismiss */}
           <div
-            data-testid="week-empty-hint"
+            onClick={() => setTaskPopup(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 1998 }}
+          />
+          <div
             style={{
-              position: 'absolute',
-              top: '50%',
-              left: GUTTER_WIDTH,
-              right: 0,
-              transform: 'translateY(-50%)',
-              textAlign: 'center',
+              position: 'fixed',
+              left: Math.min(taskPopup.x + 4, window.innerWidth - POPUP_W - 8),
+              top: taskPopup.y + 6,
+              zIndex: 1999,
+              background: 'var(--paper)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 8,
+              padding: '12px 14px',
               fontFamily: 'var(--font-mono)',
-              fontSize: 9,
-              color: 'var(--ink-3)',
-              letterSpacing: '0.08em',
-              pointerEvents: 'none',
+              fontSize: 11,
+              color: 'var(--ink)',
+              boxShadow: 'var(--shadow-1)',
+              minWidth: 240,
+              maxWidth: POPUP_W,
+              pointerEvents: 'auto',
             }}
           >
-            DRAG A TASK ONTO THE GRID
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--ink)',
+                marginBottom: 10,
+                wordBreak: 'break-word',
+                lineHeight: 1.3,
+              }}
+            >
+              {taskPopup.task.text}
+            </div>
+
+            {/* Start → End time row with gradient glow */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: 'var(--acid)',
+                  textShadow:
+                    '0 0 6px var(--acid), 0 0 14px rgba(201, 241, 88, 0.55)',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1,
+                }}
+              >
+                {startStr}
+              </span>
+              <div
+                style={{
+                  flex: 1,
+                  height: 3,
+                  borderRadius: 2,
+                  background:
+                    'linear-gradient(90deg, var(--acid) 0%, #9aedf6 100%)',
+                  boxShadow:
+                    '0 0 6px rgba(201, 241, 88, 0.55), 0 0 10px rgba(154, 237, 246, 0.45)',
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: 'var(--cyan)',
+                  textShadow:
+                    '0 0 6px var(--cyan), 0 0 14px rgba(34, 211, 238, 0.55)',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1,
+                }}
+              >
+                {endStr}
+              </span>
+            </div>
+
+            <div
+              style={{
+                color: 'var(--ink-3)',
+                fontSize: 10,
+                marginBottom: 10,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Duration · {taskPopup.task.scheduledDurationMin} min
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onCommand('calendar.activateTask', { taskId: taskPopup.task.id });
+                setTaskPopup(null);
+              }}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                color: 'var(--acid)',
+                border: '1px solid var(--acid)',
+                borderRadius: 3,
+                padding: '2px 6px',
+                background: 'transparent',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Activate
+            </button>
           </div>
-        )}
-      </div>
+        </>,
+        document.body,
+      );
+      })()}
 
       {/* Duration prompt (ADR 0002 §A3) — appears after the user picks
           weekly/daily, asking for the habit's duration in minutes. */}

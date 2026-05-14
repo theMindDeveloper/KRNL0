@@ -138,6 +138,21 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     return () => clearInterval(id);
   }, [isActiveRunning]);
 
+  // 60s tick for past-scheduled graying — only active when scheduledFor is set.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!state.scheduledFor) return;
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [state.scheduledFor]);
+
+  const scheduledEndMs = state.scheduledFor
+    ? new Date(state.scheduledFor).getTime() +
+      (state.scheduledDurationMin ?? state.plannedMin ?? state.durationMin ?? 25) * 60_000
+    : null;
+  const isPastScheduled = scheduledEndMs !== null && scheduledEndMs <= nowMs;
+  const isGrayed = state.done || isPastScheduled;
+
   // B.3 — corner timer formula: include currentSessionElapsedSec checkpoint
   const checkpointSec = state.currentSessionElapsedSec ?? 0;
   let elapsedSec: number;
@@ -402,9 +417,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         background: 'var(--node-bg)',
         boxShadow,
         overflow: 'visible',
-        opacity: state.done ? 0.4 : 1,
+        opacity: isGrayed ? 0.4 : 1,
         transition: 'opacity 0.15s, box-shadow 0.2s, border-color 0.2s',
-        cursor: state.done ? 'default' : 'pointer',
+        cursor: isGrayed ? 'default' : 'pointer',
       }}
       onDoubleClick={handleBodyDoubleClick}
     >

@@ -62,18 +62,38 @@ export function ClockNode({
   const windowStart = effectiveWindow * TOTAL_MIN;
   const windowEnd = windowStart + TOTAL_MIN;
 
+  // Build a branch-index map for parallel tasks so each branch gets its own radius.
+  const parallelBranchIndex = new Map<string, number>();
+  if (timeline?.parallelGroups) {
+    for (const group of timeline.parallelGroups.values()) {
+      group.taskIds.forEach((id, idx) => parallelBranchIndex.set(id, idx));
+    }
+  }
+
   // Decision 24.2 Q3 — Build arc geometry using windowed flatMap.
   // Segments outside the current 12h window are filtered out; boundary-spanning
   // segments are clipped to their intersection with [windowStart, windowEnd).
+  // Parallel tasks use concentric rings (branch 0 = outer, 1 = middle, 2 = inner).
   const arcs = renderableSegments.flatMap((seg) => {
     const segStart = Math.max(seg.startMin, windowStart);
     const segEnd = Math.min(seg.endMin, windowEnd);
     if (segEnd <= segStart) return [];   // outside this window — skip
     const arcLengthMin = segEnd - segStart;
     const offsetMin = segStart - windowStart;   // relative to window
-    const arcLength = (arcLengthMin / TOTAL_MIN) * CIRCUMFERENCE;
-    const startOffset = (offsetMin / TOTAL_MIN) * CIRCUMFERENCE;
-    return [{ seg, arcLength, startOffset }];
+
+    let arcR = R;
+    let arcSW = 18;
+    if (seg.kind === 'break') {
+      arcSW = seg.breakKind === 'long' ? 10 : 6;
+    } else if (seg.parallelGroupId !== null) {
+      const branchIdx = parallelBranchIndex.get(seg.taskId) ?? 0;
+      arcR = R + 5 - branchIdx * 10; // 113, 103, 93 ...
+      arcSW = 7;
+    }
+    const arcCircumference = 2 * Math.PI * arcR;
+    const arcLength = (arcLengthMin / TOTAL_MIN) * arcCircumference;
+    const startOffset = (offsetMin / TOTAL_MIN) * arcCircumference;
+    return [{ seg, arcLength, startOffset, arcR, arcSW, arcCircumference }];
   });
 
   // Decision 24.2 Q3 — overflow badge: only past 1440 min (24h), not 720.
@@ -232,7 +252,7 @@ export function ClockNode({
           />
 
           {/* Timeline arcs — one circle per segment (task or break) */}
-          {arcs.map(({ seg, arcLength, startOffset }) => {
+          {arcs.map(({ seg, arcLength, startOffset, arcR, arcSW, arcCircumference }) => {
             if (seg.kind === 'break') {
               // Decision 24.2 Q1 — break arcs: ink-2/ink-3 at opacity 1.
               // Short break: BREAK_TOKENS[1]='ink-3', strokeWidth=6.
@@ -241,7 +261,6 @@ export function ClockNode({
               const strokeColor = isLong
                 ? `var(--${BREAK_TOKENS[0]})`
                 : `var(--${BREAK_TOKENS[1]})`;
-              const strokeW = isLong ? 10 : 6;
               const durationMin = seg.endMin - seg.startMin;
               const kindLabel = isLong ? 'long break' : 'short break';
               return (
@@ -250,11 +269,11 @@ export function ClockNode({
                   <circle
                     cx={150}
                     cy={150}
-                    r={R}
+                    r={arcR}
                     fill="transparent"
                     stroke={strokeColor}
-                    strokeWidth={strokeW}
-                    strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
+                    strokeWidth={arcSW}
+                    strokeDasharray={`${arcLength} ${arcCircumference}`}
                     strokeDashoffset={-startOffset}
                     transform="rotate(-90 150 150)"
                     opacity={1}
@@ -269,15 +288,14 @@ export function ClockNode({
                 <circle
                   cx={150}
                   cy={150}
-                  r={R}
+                  r={arcR}
                   fill="transparent"
                   stroke={`var(--${seg.colorToken}, #c87080)`}
-                  strokeWidth={18}
-                  strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
+                  strokeWidth={arcSW}
+                  strokeDasharray={`${arcLength} ${arcCircumference}`}
                   strokeDashoffset={-startOffset}
                   transform="rotate(-90 150 150)"
                   opacity={seg.done ? 0.4 : 1}
-                  style={seg.parallelGroupId !== null ? { mixBlendMode: 'multiply' as const } : undefined}
                 />
               </g>
             );

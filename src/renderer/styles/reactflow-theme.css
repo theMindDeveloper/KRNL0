@@ -138,6 +138,27 @@
   transition: transform 80ms ease, background 80ms ease;
 }
 
+/* ── Calendar WeekView scrollbar ─────────────────────────────────────────── */
+.krnl-week-grid {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-3) var(--paper-2);
+}
+.krnl-week-grid::-webkit-scrollbar {
+  width: 8px;
+}
+.krnl-week-grid::-webkit-scrollbar-track {
+  background: var(--paper-2);
+  border-radius: 4px;
+}
+.krnl-week-grid::-webkit-scrollbar-thumb {
+  background: var(--ink-3);
+  border-radius: 4px;
+  border: 1px solid var(--paper-2);
+}
+.krnl-week-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-2);
+}
+
 /* ── Calendar WeekView drop-flash animation ──────────────────────────────── */
 @keyframes krnl-drop-flash {
   0%   { background: var(--acid); }
