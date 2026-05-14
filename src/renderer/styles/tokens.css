@@ -21,8 +21,9 @@
   --ink-4:    #9a9180;
 
   /* Signal — invariant across light/dark */
-  --acid:      #c9f158;
-  --acid-glow: #d8ff6e;
+  --acid:       #c9f158;
+  --acid-glow:  #d8ff6e;
+  --acid-faint: rgba(201, 241, 88, 0.08);
   --spine:     #5e7d1d;
   --spine-hot: #7ea22b;
   --rust:      #c8553d;
