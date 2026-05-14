@@ -90,6 +90,15 @@ export function seedBoard(): PartialBoard {
           hourRange: { start: 6, end: 23 },
         },
       },
+      // Decision 24.2 — sixth mother: Clock (12-hour visualization, viewWindow replaces windowStartHour)
+      {
+        id: 'mother-clock',
+        kind: 'clock',
+        position: { x: 1252, y: 0 },
+        isMother: true,
+        state: { linkedTodoId: null, viewWindow: 0 },
+        config: {},
+      },
     ],
     edges: [],
   };
@@ -101,6 +110,7 @@ const NEW_MOTHER_POSITIONS: Record<string, { x: number; y: number }> = {
   'mother-habit':    { x:   16, y: 0 },
   'mother-term':     { x:  428, y: 0 },
   'mother-calendar': { x:  840, y: 0 }, // ADR 0001 — slot 5
+  'mother-clock':    { x: 1252, y: 0 }, // Decision 23.1 — slot 6
 };
 
 function migrateMotherPositions(board: unknown): Record<string, unknown> {
@@ -207,6 +217,10 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
   }),
   // ADR 0001 — Calendar mother state defaults for boards migrated from pre-v1.
   calendar: () => ({ selectedDate: null, anchorDate: todayLocalYMD() }),
+  // Decision 24.2 — viewWindow replaces windowStartHour. Old field migrated out
+  // by migrateClockState; STATE_DEFAULTS supplies the canonical shape for
+  // boards that arrive without it.
+  clock: () => ({ linkedTodoId: null, viewWindow: 0 }),
   // Decision 21: heal text/image child nodes saved with partial state.
   text: () => ({ text: '' }),
   image: () => ({
@@ -317,6 +331,51 @@ function migrateAddCalendarMother(board: Record<string, unknown>): Record<string
       },
     },
   ];
+  return board;
+}
+
+// Decision 23.1 — inject the clock mother into boards that pre-date this feature.
+// Idempotent: no-op if 'mother-clock' already exists.
+// Runs BEFORE migrateNodeStates so the new node gets STATE_DEFAULTS healing.
+function migrateAddClockMother(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  const alreadyExists = nodes.some((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return false;
+    return (n as { id?: unknown })['id'] === 'mother-clock';
+  });
+  if (alreadyExists) return board;
+  board['nodes'] = [
+    ...nodes,
+    {
+      id: 'mother-clock',
+      kind: 'clock',
+      position: { x: 1252, y: 0 },
+      isMother: true,
+      state: { linkedTodoId: null, viewWindow: 0 },
+      config: {},
+    },
+  ];
+  return board;
+}
+
+// Decision 24.2 — strip legacy windowStartHour from clock nodes; ensure
+// viewWindow is set. Idempotent: safe to run on already-migrated boards
+// (windowStartHour will simply be absent; viewWindow will already exist).
+function migrateClockState(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return n;
+    const node = n as { kind?: string; state?: Record<string, unknown> | null };
+    if (node.kind !== 'clock') return n;
+    const oldState = (node.state ?? {}) as Record<string, unknown>;
+    // Strip windowStartHour, ensure viewWindow exists.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { windowStartHour, ...rest } = oldState;
+    const viewWindow = rest['viewWindow'] === 1 ? 1 : 0;
+    return { ...node, state: { ...rest, viewWindow } };
+  });
   return board;
 }
 
@@ -433,12 +492,21 @@ export function loadBoardFrom(boardPath: string): unknown {
         migrateTodoItemFields(
           migrateHabitFields(
             migrateNodeStates(
-              // ADR 0001: migrateAddCalendarMother runs before migrateNodeStates
-              // so the injected calendar node gets STATE/CONFIG_DEFAULTS healing.
-              migrateAddCalendarMother(
-                migrateTaskPlannedMin(
-                  migratePomoConfig(
-                    migrateTaskChain(migrateMotherPositions(parsed)),
+              // Decision 24.2: migrateClockState strips legacy windowStartHour and
+              // sets viewWindow BEFORE migrateNodeStates so STATE_DEFAULTS healing
+              // doesn't re-add windowStartHour via the spread's right-operand win.
+              migrateClockState(
+                // ADR 0001: migrateAddCalendarMother runs before migrateNodeStates
+                // so the injected calendar node gets STATE/CONFIG_DEFAULTS healing.
+                // Decision 23.1: migrateAddClockMother runs immediately after
+                // migrateAddCalendarMother (same reason — before migrateNodeStates).
+                migrateAddClockMother(
+                  migrateAddCalendarMother(
+                    migrateTaskPlannedMin(
+                      migratePomoConfig(
+                        migrateTaskChain(migrateMotherPositions(parsed)),
+                      ),
+                    ),
                   ),
                 ),
               ),
