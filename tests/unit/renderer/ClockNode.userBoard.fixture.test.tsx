@@ -80,6 +80,8 @@ function buildUserBoard(): Board {
     plannedMin: 120,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
+    // ADR 0004 §3 — Clock arcs now require an anchored chain.
+    scheduledFor: '2026-05-14T02:00',
   };
 
   const task2State: TaskState = {
@@ -151,6 +153,8 @@ function buildUserBoard(): Board {
     state: {
       linkedTodoId: todoId,
       viewWindow: 0,
+      // ADR 0004 §3 — Clock owns selectedDate; align with task1's anchor.
+      selectedDate: '2026-05-14',
     },
     config: {},
   };
@@ -199,18 +203,15 @@ describe('Decision 24.1 — user-reported 3-task chain renders all 3 task arcs',
       }),
     );
 
-    // All arc circles at r=108 (both task and break arcs)
-    const allArcCircles = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) => c.getAttribute('r') === '108',
+    // ADR 0004 §4 — task arcs paint at radius R = 108 (single-track here).
+    const taskArcs = Array.from(document.querySelectorAll('svg circle')).filter(
+      (c) => c.getAttribute('r') === '108' && c.getAttribute('stroke-width') === '18',
     );
 
-    // Task arcs: stroke-width=18
-    const taskArcs = allArcCircles.filter((c) => c.getAttribute('stroke-width') === '18');
-
-    // ASSERTION 1: exactly 3 task arcs (would fail before Decision 24.1 — only 1 painted)
+    // ASSERTION 1: exactly 3 task arcs.
     expect(taskArcs).toHaveLength(3);
 
-    // ASSERTION 2: each task arc stroke uses var(--<token>) where <token> is in COLORS
+    // ASSERTION 2: each task arc stroke uses var(--<token>) where <token> is in COLORS.
     const allowedTokens = new Set<string>(COLORS);
     for (const arc of taskArcs) {
       const stroke = arc.getAttribute('stroke') ?? '';
@@ -223,10 +224,11 @@ describe('Decision 24.1 — user-reported 3-task chain renders all 3 task arcs',
       ).toBe(true);
     }
 
-    // ASSERTION 3: at least 2 break arcs present (3 tasks → 3 breaks, trailing stripped at render)
-    // Decision 24.2: short breaks use strokeWidth=6, long breaks use strokeWidth=10
-    const breakArcs = allArcCircles.filter(
-      (c) => c.getAttribute('stroke-width') === '6' || c.getAttribute('stroke-width') === '10',
+    // ASSERTION 3: at least 2 break arcs at BREAK_R = 92 (ADR 0004 §3.5).
+    const breakArcs = Array.from(document.querySelectorAll('svg circle')).filter(
+      (c) =>
+        c.getAttribute('r') === '92' &&
+        (c.getAttribute('stroke-width') === '6' || c.getAttribute('stroke-width') === '10'),
     );
     expect(breakArcs.length).toBeGreaterThanOrEqual(2);
   });

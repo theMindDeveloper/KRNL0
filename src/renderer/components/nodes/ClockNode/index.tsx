@@ -1,18 +1,78 @@
+import { useMemo } from 'react';
 import type { NodeProps } from '../types';
 import type { ClockState, ClockConfig } from './types';
+import { todayLocalYMD } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
-import { useShallow } from 'zustand/react/shallow';
 import { selectTimeline } from '../../../store/timelineSelector';
+import { selectSchedule } from '../../../store/scheduleSelector';
+import type { TaskState } from '../TaskNode/types';
 
+// ADR 0004 §4 — concentric parallel rings.
 const R = 108;
+// ADR 0004 §3.5 — break ring sits inside the task ring so a back-to-back
+// successor task (at radius R) cannot eclipse a break that shares the same
+// wall-clock minutes.
+const BREAK_R = R - 16;
+const PARALLEL_OFFSET = 12;
 const CIRCUMFERENCE = 2 * Math.PI * R;
+const BREAK_CIRCUMFERENCE = 2 * Math.PI * BREAK_R;
 const TOTAL_MIN = 720;
+const DAY_MIN = 1440;
 
 // Decision 24.2 — palette is constrained to tokens defined in src/renderer/styles/tokens.css.
 // Adding a name here without a matching `--<name>` definition will cause break arcs to paint nothing.
 // Index 0 = long break (strongest ink), Index 1 = short break (medium ink).
 export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
+
+const COLOR_PALETTE = ['rose', 'amber', 'teal', 'lilac', 'sand', 'moss'] as const;
+
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+/** Deterministic colour for a task arc — stable for a given taskId. */
+function colorFor(taskId: string): string {
+  let h = 0;
+  for (let i = 0; i < taskId.length; i++) h = (h * 31 + taskId.charCodeAt(i)) >>> 0;
+  return COLOR_PALETTE[h % COLOR_PALETTE.length]!;
+}
+
+/** Parse a "YYYY-MM-DDTHH:MM" local-ISO into minutes-of-day. */
+function minutesOfDay(iso: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
+  if (!m) return null;
+  const hh = Number.parseInt(m[4]!, 10);
+  const mm = Number.parseInt(m[5]!, 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  return hh * 60 + mm;
+}
+
+/** Local weekday abbreviation for a YYYY-MM-DD string. */
+function weekdayShortOf(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return '';
+  const d = new Date(
+    Number.parseInt(m[1]!, 10),
+    Number.parseInt(m[2]!, 10) - 1,
+    Number.parseInt(m[3]!, 10),
+  );
+  return WEEKDAY_SHORT[d.getDay()] ?? '';
+}
+
+/** Next YYYY-MM-DD via local Date arithmetic. */
+function nextDayYMD(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return ymd;
+  const d = new Date(
+    Number.parseInt(m[1]!, 10),
+    Number.parseInt(m[2]!, 10) - 1,
+    Number.parseInt(m[3]!, 10),
+  );
+  d.setDate(d.getDate() + 1);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
 
 export function ClockNode({
   node,
@@ -22,64 +82,154 @@ export function ClockNode({
   onMoveLeft,
   onMoveRight,
 }: NodeProps<ClockState, ClockConfig>) {
-  const { linkedTodoId, viewWindow } = node.state;
+  const { linkedTodoId, viewWindow, selectedDate } = node.state;
 
-  // Read all todo nodes (for link dropdown)
-  const todoNodes = useBoardStore(
-    useShallow((s) => {
-      if (!s.board) return [] as Array<{ id: string }>;
-      return s.board.nodes
-        .filter((n) => n.kind === 'todo')
-        .map((n) => ({ id: n.id }));
-    }),
+  // Subscribe to the board reference. Zustand replaces this on any
+  // mutation; downstream selectors are memoized at module level.
+  const board = useBoardStore((s) => s.board);
+
+  // Todo dropdown list — primitive-derived, recomputed only when board.nodes
+  // changes.
+  const todoNodes = useMemo(() => {
+    if (!board) return [] as Array<{ id: string }>;
+    return board.nodes
+      .filter((n) => n.kind === 'todo')
+      .map((n) => ({ id: n.id }));
+  }, [board?.nodes]);
+
+  // ADR 0004 §3.5 — break shapes from selectTimeline (Calendar drops breaks;
+  // Clock keeps them — divergence is the binding decision).
+  const timeline = useMemo(
+    () => (board && linkedTodoId ? selectTimeline(board, linkedTodoId) : null),
+    [board, linkedTodoId],
   );
 
-  // Read Timeline via selectTimeline — single source of truth (Decision 24).
-  // useShallow ensures React only re-renders when the Timeline reference changes,
-  // not on every unrelated store mutation.
-  const timeline = useBoardStore(
-    useShallow((s) => (linkedTodoId ? selectTimeline(s.board, linkedTodoId) : null)),
-  );
+  // ADR 0004 §3.4 — full placements Map from the memoized selector. The
+  // Map is reference-stable on (nodes, edges) reference identity.
+  const placementsMap = useMemo(() => {
+    if (!board) return null;
+    return selectSchedule(board).placements;
+  }, [board]);
 
-  const segments = timeline?.segments ?? [];
-  const totalMin = timeline?.totalMin ?? 0;
+  // Task info index — built once per nodes change. Used both to filter
+  // placements by parentTodoId and to look up done/plannedMin in the arc loop.
+  const taskInfo = useMemo(() => {
+    const m = new Map<
+      string,
+      { done: boolean; plannedMin: number; parentTodoId: string }
+    >();
+    if (!board) return m;
+    for (const n of board.nodes) {
+      if (n.kind !== 'todo.task') continue;
+      const ts = n.state as TaskState;
+      m.set(n.id, {
+        done: ts.done,
+        plannedMin: ts.plannedMin ?? ts.durationMin,
+        parentTodoId: ts.parentTodoId,
+      });
+    }
+    return m;
+  }, [board?.nodes]);
 
-  // Trim trailing break (Decision 24 Q5).
-  // The selector always emits a trailing break after the last task/group so
-  // future Calendar consumers can keep it. ClockNode strips it here so the
-  // ring does not end on dead air.
-  const renderableSegments = (() => {
-    if (segments.length === 0) return segments;
-    const last = segments[segments.length - 1];
-    if (last !== undefined && last.kind === 'break') return segments.slice(0, -1);
-    return segments;
-  })();
-
-  // Decision 24.2 Q3.5 — Defensive clamp: if the plan fits within window 0,
-  // force-render window 0 regardless of persisted viewWindow. Prevents stranding
-  // the user on an empty ring after they delete tasks. Does NOT mutate persisted state.
-  const effectiveWindow: 0 | 1 = totalMin <= TOTAL_MIN ? 0 : viewWindow;
-  const windowStart = effectiveWindow * TOTAL_MIN;
+  // ADR 0004 §3.7 — viewWindow toggle is always enabled. No auto-flip.
+  const windowStart = viewWindow * TOTAL_MIN;
   const windowEnd = windowStart + TOTAL_MIN;
 
-  // Decision 24.2 Q3 — Build arc geometry using windowed flatMap.
-  // Segments outside the current 12h window are filtered out; boundary-spanning
-  // segments are clipped to their intersection with [windowStart, windowEnd).
-  const arcs = renderableSegments.flatMap((seg) => {
-    const segStart = Math.max(seg.startMin, windowStart);
-    const segEnd = Math.min(seg.endMin, windowEnd);
-    if (segEnd <= segStart) return [];   // outside this window — skip
-    const arcLengthMin = segEnd - segStart;
-    const offsetMin = segStart - windowStart;   // relative to window
-    const arcLength = (arcLengthMin / TOTAL_MIN) * CIRCUMFERENCE;
-    const startOffset = (offsetMin / TOTAL_MIN) * CIRCUMFERENCE;
-    return [{ seg, arcLength, startOffset }];
-  });
+  // ADR 0004 §3.4 — derive each placement's [startMinOfDay, endMinOfDay)
+  // and clip to the current 12h window. Tasks starting BEFORE the selected
+  // day are omitted; tasks ending after midnight clip at 1440.
+  const arcs = (() => {
+    if (!placementsMap || !linkedTodoId) return [];
+    const out: Array<{
+      taskId: string;
+      parallelGroupId: string | null;
+      parallelBranchIndex: number | null;
+      arcLength: number;
+      startOffset: number;
+    }> = [];
+    for (const p of placementsMap.values()) {
+      if (taskInfo.get(p.taskId)?.parentTodoId !== linkedTodoId) continue;
+      const startDate = p.startISO.slice(0, 10);
+      const endDate = p.endISO.slice(0, 10);
+      if (startDate < selectedDate) continue;
+      if (startDate > selectedDate) continue;
+      const startMin = minutesOfDay(p.startISO);
+      if (startMin === null) continue;
+      let endMin: number;
+      if (endDate > selectedDate) {
+        endMin = DAY_MIN;
+      } else {
+        const e = minutesOfDay(p.endISO);
+        if (e === null) continue;
+        endMin = e;
+      }
+      if (endMin <= startMin) continue;
 
-  // Decision 24.2 Q3 — overflow badge: only past 1440 min (24h), not 720.
-  const overflowMin = Math.max(0, totalMin - 2 * TOTAL_MIN);
+      const winStart = Math.max(startMin, windowStart);
+      const winEnd = Math.min(endMin, windowEnd);
+      if (winEnd <= winStart) continue;
 
-  // Decision 24.2 Q3 — 12 tick marks; labels derived from effectiveWindow, not wall-clock.
+      const arcLengthMin = winEnd - winStart;
+      const offsetMin = winStart - windowStart;
+      const arcLength = (arcLengthMin / TOTAL_MIN) * CIRCUMFERENCE;
+      const startOffset = (offsetMin / TOTAL_MIN) * CIRCUMFERENCE;
+
+      out.push({
+        taskId: p.taskId,
+        parallelGroupId: p.parallelGroupId,
+        parallelBranchIndex: p.parallelBranchIndex,
+        arcLength,
+        startOffset,
+      });
+    }
+    return out;
+  })();
+
+  // ADR 0004 §3.5 — break arcs: project each timeline break onto the wall
+  // clock via its predecessor's placement.endISO. Breaks whose predecessor
+  // is absent (different day or unanchored) are skipped.
+  const breakArcs = (() => {
+    if (!placementsMap || !timeline) return [];
+    const out: Array<{
+      breakId: string;
+      breakKind: 'short' | 'long';
+      durationMin: number;
+      arcLength: number;
+      startOffset: number;
+    }> = [];
+    for (const seg of timeline.segments) {
+      if (seg.kind !== 'break') continue;
+      const pred = placementsMap.get(seg.afterTaskId);
+      if (!pred) continue;
+      const breakStartDate = pred.endISO.slice(0, 10);
+      if (breakStartDate !== selectedDate) continue;
+      const breakStartMin = minutesOfDay(pred.endISO);
+      if (breakStartMin === null) continue;
+      const durationMin = Math.max(0, seg.endMin - seg.startMin);
+      const breakEndMin = Math.min(DAY_MIN, breakStartMin + durationMin);
+      if (breakEndMin <= breakStartMin) continue;
+
+      const winStart = Math.max(breakStartMin, windowStart);
+      const winEnd = Math.min(breakEndMin, windowEnd);
+      if (winEnd <= winStart) continue;
+
+      const arcLengthMin = winEnd - winStart;
+      const offsetMin = winStart - windowStart;
+      const arcLength = (arcLengthMin / TOTAL_MIN) * BREAK_CIRCUMFERENCE;
+      const startOffset = (offsetMin / TOTAL_MIN) * BREAK_CIRCUMFERENCE;
+
+      out.push({
+        breakId: seg.breakId,
+        breakKind: seg.breakKind,
+        durationMin,
+        arcLength,
+        startOffset,
+      });
+    }
+    return out;
+  })();
+
+  // ADR 0004 §3.4 — 12 tick marks; hour labels are wall-clock derived.
   const ticks = Array.from({ length: 12 }, (_, i) => {
     const angleDeg = i * 30 - 90; // -90 puts i=0 at top
     const angleRad = (angleDeg * Math.PI) / 180;
@@ -92,7 +242,7 @@ export function ClockNode({
     const y2 = 150 + outerR * Math.sin(angleRad);
     const lx = 150 + labelR * Math.cos(angleRad);
     const ly = 150 + labelR * Math.sin(angleRad);
-    const hour = effectiveWindow * 12 + i;   // 0..11 or 12..23
+    const hour = viewWindow * 12 + i;
     const label = String(hour);
     return { x1, y1, x2, y2, lx, ly, label, isTop: i === 0 };
   });
@@ -109,11 +259,29 @@ export function ClockNode({
     fontFamily: 'var(--font-mono)',
   };
 
+  const navBtnStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--ink-3)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    cursor: 'pointer',
+    padding: '2px 6px',
+    borderRadius: 3,
+    lineHeight: 1,
+  };
+
   const labelStyle: React.CSSProperties = {
     fontSize: 11,
     color: 'var(--ink-2)',
     fontFamily: 'var(--font-mono)',
   };
+
+  void nextDayYMD; // reserved for future range computations (not used directly).
+
+  const isToday = selectedDate === todayLocalYMD();
+  const weekday = weekdayShortOf(selectedDate);
+  const isEmpty = linkedTodoId !== null && arcs.length === 0;
 
   return (
     <MotherFrame
@@ -131,7 +299,7 @@ export function ClockNode({
           gap: 8,
         }}
       >
-        {/* Header — Decision 24.2: dynamic range label */}
+        {/* Header — wall-clock half-day range label */}
         <div
           style={{
             display: 'flex',
@@ -148,8 +316,62 @@ export function ClockNode({
               textTransform: 'uppercase',
             }}
           >
-            {`CLOCK · ${effectiveWindow * 12}–${(effectiveWindow + 1) * 12}H`}
+            {`CLOCK · ${viewWindow * 12}–${(viewWindow + 1) * 12}H`}
           </span>
+        </div>
+
+        {/* ADR 0004 §3.3 — day-selector sub-header */}
+        <div
+          data-testid="clock-day-selector"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <button
+            type="button"
+            data-testid="clock-day-prev"
+            onClick={() => onCommand('clock.advanceDay', { delta: -1 })}
+            style={navBtnStyle}
+          >
+            ←
+          </button>
+          <span
+            data-testid="clock-day-label"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              color: 'var(--ink-1)',
+              letterSpacing: '0.06em',
+            }}
+          >
+            {`${weekday} ${selectedDate}`}
+          </span>
+          <button
+            type="button"
+            data-testid="clock-day-today"
+            onClick={() => {
+              if (!isToday) onCommand('clock.goToday');
+            }}
+            disabled={isToday}
+            style={{
+              ...controlBtnStyle,
+              opacity: isToday ? 0.4 : 1,
+              cursor: isToday ? 'not-allowed' : 'pointer',
+            }}
+          >
+            TODAY
+          </button>
+          <button
+            type="button"
+            data-testid="clock-day-next"
+            onClick={() => onCommand('clock.advanceDay', { delta: 1 })}
+            style={navBtnStyle}
+          >
+            →
+          </button>
         </div>
 
         {/* Link UI */}
@@ -231,53 +453,66 @@ export function ClockNode({
             strokeWidth={1}
           />
 
-          {/* Timeline arcs — one circle per segment (task or break) */}
-          {arcs.map(({ seg, arcLength, startOffset }) => {
-            if (seg.kind === 'break') {
-              // Decision 24.2 Q1 — break arcs: ink-2/ink-3 at opacity 1.
-              // Short break: BREAK_TOKENS[1]='ink-3', strokeWidth=6.
-              // Long break:  BREAK_TOKENS[0]='ink-2', strokeWidth=10.
-              const isLong = seg.breakKind === 'long';
-              const strokeColor = isLong
-                ? `var(--${BREAK_TOKENS[0]})`
-                : `var(--${BREAK_TOKENS[1]})`;
-              const strokeW = isLong ? 10 : 6;
-              const durationMin = seg.endMin - seg.startMin;
-              const kindLabel = isLong ? 'long break' : 'short break';
-              return (
-                <g key={`${seg.breakId}-w${effectiveWindow}`}>
-                  <title>{`${kindLabel} · ${durationMin}m`}</title>
-                  <circle
-                    cx={150}
-                    cy={150}
-                    r={R}
-                    fill="transparent"
-                    stroke={strokeColor}
-                    strokeWidth={strokeW}
-                    strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
-                    strokeDashoffset={-startOffset}
-                    transform="rotate(-90 150 150)"
-                    opacity={1}
-                  />
-                </g>
-              );
-            }
-            const durationMin = seg.endMin - seg.startMin;
+          {/* ADR 0004 §3.5 — break arcs (inner ring at BREAK_R = R - 16) */}
+          {breakArcs.map(({ breakId, breakKind, durationMin, arcLength, startOffset }) => {
+            const isLong = breakKind === 'long';
+            const strokeColor = isLong
+              ? `var(--${BREAK_TOKENS[0]})`
+              : `var(--${BREAK_TOKENS[1]})`;
+            const strokeW = isLong ? 10 : 6;
+            const kindLabel = isLong ? 'long break' : 'short break';
             return (
-              <g key={`${seg.taskId}-w${effectiveWindow}`}>
-                <title>{`task ${seg.taskId.slice(-8)} · ${durationMin}m`}</title>
+              <g key={`${breakId}-w${viewWindow}-${selectedDate}`}>
+                <title>{`${kindLabel} · ${durationMin}m`}</title>
                 <circle
                   cx={150}
                   cy={150}
-                  r={R}
+                  r={BREAK_R}
                   fill="transparent"
-                  stroke={`var(--${seg.colorToken}, #c87080)`}
-                  strokeWidth={18}
-                  strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
+                  stroke={strokeColor}
+                  strokeWidth={strokeW}
+                  strokeDasharray={`${arcLength} ${BREAK_CIRCUMFERENCE}`}
                   strokeDashoffset={-startOffset}
                   transform="rotate(-90 150 150)"
-                  opacity={seg.done ? 0.4 : 1}
-                  style={seg.parallelGroupId !== null ? { mixBlendMode: 'multiply' as const } : undefined}
+                  opacity={1}
+                />
+              </g>
+            );
+          })}
+
+          {/* ADR 0004 §4 — Task arcs with concentric parallel rings */}
+          {arcs.map((a) => {
+            const isParallel = a.parallelGroupId !== null;
+            const branchIdx = a.parallelBranchIndex ?? 0;
+            const clampedIdx = Math.min(branchIdx, 3); // 4+ collapse to innermost
+            const radius = isParallel ? R + clampedIdx * PARALLEL_OFFSET : R;
+            const strokeW = isParallel ? 10 : 18;
+            const useMultiply = isParallel && branchIdx >= 4;
+
+            const info = taskInfo.get(a.taskId);
+            const done = info?.done === true;
+            const colorToken = colorFor(a.taskId);
+
+            // Per-arc circumference matches the radius the arc lives on.
+            const arcCircumference = 2 * Math.PI * radius;
+            const scaledArcLength = (a.arcLength / CIRCUMFERENCE) * arcCircumference;
+            const scaledStartOffset = (a.startOffset / CIRCUMFERENCE) * arcCircumference;
+
+            return (
+              <g key={`${a.taskId}-w${viewWindow}-${selectedDate}`}>
+                <title>{`task ${a.taskId.slice(-8)} · ${info?.plannedMin ?? 0}m`}</title>
+                <circle
+                  cx={150}
+                  cy={150}
+                  r={radius}
+                  fill="transparent"
+                  stroke={`var(--${colorToken}, #c87080)`}
+                  strokeWidth={strokeW}
+                  strokeDasharray={`${scaledArcLength} ${arcCircumference}`}
+                  strokeDashoffset={-scaledStartOffset}
+                  transform="rotate(-90 150 150)"
+                  opacity={done ? 0.4 : 1}
+                  style={useMultiply ? { mixBlendMode: 'multiply' as const } : undefined}
                 />
               </g>
             );
@@ -312,74 +547,34 @@ export function ClockNode({
           <circle cx={150} cy={150} r={3} fill="var(--ink-2)" />
         </svg>
 
-        {/* Debug overlay — only visible when VITE_CLOCK_DEBUG=1 in dev mode.
-            Shows selector output: segment counts + first 6 summaries.
-            Usage: `VITE_CLOCK_DEBUG=1 npm run dev` */}
-        {import.meta.env.DEV && import.meta.env.VITE_CLOCK_DEBUG === '1' && timeline && (
+        {/* ADR 0004 §3.6 — empty-day hint. Only when a todo is linked and
+            the selected day has zero placements. */}
+        {isEmpty && (
           <div
-            style={{
-              fontSize: 9,
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--ink-3)',
-              padding: '4px 8px',
-              background: 'var(--paper-2)',
-              borderRadius: 4,
-              lineHeight: 1.5,
-            }}
-          >
-            <div>
-              tasks:{' '}
-              {segments.filter((s) => s.kind === 'task').length} | breaks:{' '}
-              {segments.filter((s) => s.kind === 'break').length} | total:{' '}
-              {totalMin}min | win:{effectiveWindow}
-            </div>
-            {segments.slice(0, 6).map((s, i) => (
-              <div key={i}>
-                [{i}]{' '}
-                {s.kind === 'task'
-                  ? `task ${s.startMin}–${s.endMin} ${s.colorToken}`
-                  : `break ${s.startMin}–${s.endMin} ${s.breakKind}`}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Overflow badge — shows only when totalMin exceeds 1440 min (24h).
-            Decision 24.2: badge threshold moved from 720 to 1440; user can
-            navigate minutes 720-1440 via the view toggle. */}
-        {overflowMin > 0 && (
-          <div
+            data-testid="clock-empty-hint"
             style={{
               textAlign: 'center',
-              fontSize: 10,
-              color: 'var(--rose)',
+              fontSize: 11,
+              color: 'var(--ink-3)',
               fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.08em',
             }}
           >
-            +{overflowMin} min
+            DROP A TASK ONTO THE CALENDAR
           </div>
         )}
 
-        {/* Decision 24.2 Q3 — 12h view toggle (replaces Start: −/+ row).
-            Disabled when the plan fits within window 0 (totalMin ≤ 720). */}
+        {/* ADR 0004 §3.7 — 12h-window toggle, always enabled. */}
         {(() => {
-          const canToggle = totalMin > TOTAL_MIN;
-          const targetWindow: 0 | 1 = effectiveWindow === 0 ? 1 : 0;
-          const label = effectiveWindow === 0 ? '→ 12h–24h' : '← 0h–12h';
+          const targetWindow: 0 | 1 = viewWindow === 0 ? 1 : 0;
+          const label = viewWindow === 0 ? '→ 12h–24h' : '← 0h–12h';
           return (
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button
                 type="button"
-                disabled={!canToggle}
-                style={{
-                  ...controlBtnStyle,
-                  opacity: canToggle ? 1 : 0.4,
-                  cursor: canToggle ? 'pointer' : 'not-allowed',
-                }}
-                title={canToggle ? `Switch to ${label.slice(2)}` : 'Plan fits within 12h'}
-                onClick={() => {
-                  if (canToggle) onCommand('clock.setViewWindow', { window: targetWindow });
-                }}
+                style={controlBtnStyle}
+                title={`Switch to ${label.slice(2)}`}
+                onClick={() => onCommand('clock.setViewWindow', { window: targetWindow })}
               >
                 {label}
               </button>
