@@ -198,7 +198,12 @@ export function habitSetSchedule(
       habits[habitIdx] = updated;
       return { ...state, habits };
     }
-    normalised = { kind: 'weekly', timeOfDay: schedule.timeOfDay, days: deduped };
+    normalised = {
+      kind: 'weekly',
+      timeOfDay: schedule.timeOfDay,
+      days: deduped,
+      ...(schedule.durationMin !== undefined ? { durationMin: schedule.durationMin } : {}),
+    };
   } else {
     normalised = schedule;
   }

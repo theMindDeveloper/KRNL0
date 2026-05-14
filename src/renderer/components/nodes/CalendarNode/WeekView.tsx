@@ -4,8 +4,9 @@
 // rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
 // RadialChooser. NowLine is rendered as an overlay.
 
-import { useMemo, useRef, useCallback, type ReactNode } from 'react';
+import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { CalendarConfig, CalendarState } from './types';
@@ -241,6 +242,38 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     habit: HabitDragPayload;
   } | null>(null);
 
+  // After the user picks weekly/daily, we hold a prompt for the duration (in
+  // minutes). The prompt is rendered inline at the drop coordinates. On Enter
+  // we dispatch calendar.scheduleHabit; on Escape we cancel.
+  const [durationPrompt, setDurationPrompt] = useState<{
+    kind: HabitScheduleKind;
+    cell: { dayYMD: string; hour: number };
+    habit: HabitDragPayload;
+    origin: { x: number; y: number };
+  } | null>(null);
+
+  const dispatchSchedule = useCallback(
+    (
+      kind: HabitScheduleKind,
+      cell: { dayYMD: string; hour: number },
+      habit: HabitDragPayload,
+      durationMin: number,
+    ) => {
+      const timeOfDay = `${String(cell.hour).padStart(2, '0')}:00`;
+      const isoDow = ymdToIsoDow(cell.dayYMD);
+      const schedule: HabitSchedule =
+        kind === 'daily'
+          ? { kind: 'daily', timeOfDay, durationMin }
+          : { kind: 'weekly', timeOfDay, days: [isoDow], durationMin };
+      onCommand('calendar.scheduleHabit', {
+        habitId: habit.habitId,
+        habitMotherId: habit.habitMotherId,
+        schedule,
+      });
+    },
+    [onCommand],
+  );
+
   const chooser = useRadialChooser<HabitScheduleKind>({
     radius: 88,
     innerRadius: 24,
@@ -250,28 +283,25 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         // Clear the cell ref immediately so stale data doesn't leak.
         dropCellRef.current = null;
         if (!cell) return;
-        const { habit } = cell;
-
-        const timeOfDay = `${String(cell.hour).padStart(2, '0')}:00`;
-        const isoDow = ymdToIsoDow(cell.dayYMD);
-
-        const schedule: HabitSchedule =
-          kind === 'daily'
-            ? { kind: 'daily', timeOfDay }
-            : { kind: 'weekly', timeOfDay, days: [isoDow] };
-
-        onCommand('calendar.scheduleHabit', {
-          habitId: habit.habitId,
-          habitMotherId: habit.habitMotherId,
-          schedule,
+        // Compute the chooser origin for the duration prompt — same drop point.
+        // Hand off to the duration prompt instead of dispatching directly.
+        setDurationPrompt({
+          kind,
+          cell: { dayYMD: cell.dayYMD, hour: cell.hour },
+          habit: cell.habit,
+          origin: lastDropOriginRef.current ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 },
         });
       },
-      [onCommand],
+      [],
     ),
     onCancel: useCallback(() => {
       dropCellRef.current = null;
     }, []),
   });
+
+  // Tracks the most recent drop coordinates so the chooser onPick callback can
+  // position the follow-up duration prompt without re-reading the event.
+  const lastDropOriginRef = useRef<{ x: number; y: number } | null>(null);
 
   // ── Drop target handler factory (ADR 0002 A1) ──────────────────────────────
 
@@ -308,6 +338,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           const habit = getHabitDrag();
           if (!habit) return;
           dropCellRef.current = { dayYMD, hour, habit };
+          // Remember drop point for the follow-up duration prompt.
+          lastDropOriginRef.current = { x: e.clientX, y: e.clientY };
           // Open chooser at drop coordinates. onPick reads dropCellRef.
           chooser.open(
             { x: e.clientX, y: e.clientY },
@@ -473,18 +505,25 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const topPx = Math.round(hoursFromStart * rowHeight);
 
       const nameLabel = habit.name.length > 10 ? habit.name.slice(0, 9) + '…' : habit.name;
+      const blockHeight =
+        habit.schedule.durationMin && habit.schedule.durationMin > 0
+          ? Math.max(14, Math.round((habit.schedule.durationMin / 60) * rowHeight))
+          : 12;
+      const titleSuffix = habit.schedule.durationMin
+        ? ` (${habit.schedule.durationMin} min)`
+        : '';
 
       blocks.push(
         <div
           key={`habit-block-${habit.id}`}
           data-testid={`habit-block-${habit.id}-${dayYMD}`}
-          title={`${habit.name} — ${habit.schedule.timeOfDay}`}
+          title={`${habit.name} — ${habit.schedule.timeOfDay}${titleSuffix}`}
           style={{
             position: 'absolute',
             top: topPx,
             left: 2,
             right: 2,
-            height: 12,
+            height: blockHeight,
             background: `var(--${habit.color})`,
             opacity: 0.7,
             borderRadius: 2,
@@ -752,7 +791,179 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           </div>
         )}
       </div>
+
+      {/* Duration prompt (ADR 0002 §A3) — appears after the user picks
+          weekly/daily, asking for the habit's duration in minutes. */}
+      {durationPrompt && (
+        <HabitDurationPrompt
+          origin={durationPrompt.origin}
+          accent={durationPrompt.kind === 'daily' ? 'var(--cyan)' : 'var(--purple)'}
+          kindLabel={durationPrompt.kind === 'daily' ? 'EVERY DAY' : 'EVERY WEEK'}
+          onConfirm={(durationMin) => {
+            dispatchSchedule(
+              durationPrompt.kind,
+              durationPrompt.cell,
+              durationPrompt.habit,
+              durationMin,
+            );
+            setDurationPrompt(null);
+          }}
+          onCancel={() => setDurationPrompt(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// ── HabitDurationPrompt ────────────────────────────────────────────────────────
+// Small inline numeric input rendered at the drop point. Auto-focuses on mount.
+// Enter confirms; Escape or click-outside cancels.
+
+interface HabitDurationPromptProps {
+  origin: { x: number; y: number };
+  accent: string;          // CSS color for ring + button (purple/cyan)
+  kindLabel: string;       // "EVERY DAY" or "EVERY WEEK"
+  onConfirm: (durationMin: number) => void;
+  onCancel: () => void;
+}
+
+function HabitDurationPrompt({ origin, accent, kindLabel, onConfirm, onCancel }: HabitDurationPromptProps) {
+  const [value, setValue] = useState('25');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  // Cancel on click outside.
+  useEffect(() => {
+    const onDocPointer = (e: PointerEvent) => {
+      const root = rootRef.current;
+      if (!root) return;
+      if (e.target instanceof Node && root.contains(e.target)) return;
+      onCancel();
+    };
+    // Defer one tick so the click that opened the prompt doesn't immediately close it.
+    const id = setTimeout(() => {
+      window.addEventListener('pointerdown', onDocPointer, true);
+    }, 0);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener('pointerdown', onDocPointer, true);
+    };
+  }, [onCancel]);
+
+  function confirm() {
+    const n = parseInt(value, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= 480) {
+      onConfirm(n);
+    } else {
+      onCancel();
+    }
+  }
+
+  // Width ~150px, height ~56px. Centre on origin.
+  const W = 150;
+  const H = 56;
+  const ox = Number.isFinite(origin.x) ? origin.x : window.innerWidth / 2;
+  const oy = Number.isFinite(origin.y) ? origin.y : window.innerHeight / 2;
+  const left = Math.max(8, Math.min(window.innerWidth - W - 8, ox - W / 2));
+  const top = Math.max(8, Math.min(window.innerHeight - H - 8, oy - H / 2));
+
+  return createPortal(
+    <div
+      ref={rootRef}
+      data-testid="habit-duration-prompt"
+      style={{
+        position: 'fixed',
+        left,
+        top,
+        width: W,
+        height: H,
+        zIndex: 10010,
+        background: 'rgba(20, 18, 16, 0.92)',
+        backdropFilter: 'blur(16px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+        border: `1.5px solid ${accent}`,
+        borderRadius: 10,
+        boxShadow: `0 8px 24px rgba(0,0,0,0.45), 0 0 12px ${accent}`,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '6px 10px',
+        gap: 2,
+        fontFamily: 'var(--font-mono)',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 8,
+          letterSpacing: '0.10em',
+          color: accent,
+          textTransform: 'uppercase',
+          fontWeight: 700,
+        }}
+      >
+        {kindLabel} · DURATION
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input
+          ref={inputRef}
+          data-testid="habit-duration-input"
+          type="number"
+          min={1}
+          max={480}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              confirm();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              onCancel();
+            }
+          }}
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            color: '#fff',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 18,
+            fontWeight: 700,
+            padding: 0,
+            width: 0, // let flex take over
+            minWidth: 0,
+          }}
+        />
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.06em' }}>
+          MIN
+        </span>
+        <button
+          type="button"
+          data-testid="habit-duration-confirm"
+          onClick={confirm}
+          style={{
+            background: accent,
+            border: 'none',
+            color: '#0e0d0b',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            fontWeight: 700,
+            padding: '2px 8px',
+            borderRadius: 4,
+            cursor: 'pointer',
+            lineHeight: 1.4,
+          }}
+        >
+          OK
+        </button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

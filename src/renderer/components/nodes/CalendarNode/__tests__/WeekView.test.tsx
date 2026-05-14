@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
@@ -53,6 +53,17 @@ function makeConfig(overrides: Partial<CalendarConfig> = {}): CalendarConfig {
 }
 
 const noop = () => undefined;
+
+// Helper: after the chooser onPick fires, a duration prompt appears.
+// This sets the input value and presses Enter to commit.
+function commitDurationPrompt(value: number) {
+  const input = document.querySelector(
+    '[data-testid="habit-duration-input"]',
+  ) as HTMLInputElement | null;
+  if (!input) throw new Error('habit-duration-input not found in DOM');
+  fireEvent.change(input, { target: { value: String(value) } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+}
 
 function setEmptyBoard() {
   useBoardStore.setState({
@@ -480,12 +491,15 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     const session = radialBus.session!;
     const dailyOpt = session.options.find((o) => o.value === 'daily');
     expect(dailyOpt).toBeTruthy();
-    session.onPick(dailyOpt!.value, dailyOpt!);
+    act(() => { session.onPick(dailyOpt!.value, dailyOpt!); });
+
+    // The duration prompt should now be open; commit 30 min.
+    commitDurationPrompt(30);
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h1',
       habitMotherId: 'hm1',
-      schedule: { kind: 'daily', timeOfDay: '09:00' },
+      schedule: { kind: 'daily', timeOfDay: '09:00', durationMin: 30 },
     });
   });
 
@@ -515,12 +529,13 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     const session = radialBus.session!;
     const weeklyOpt = session.options.find((o) => o.value === 'weekly');
     expect(weeklyOpt).toBeTruthy();
-    session.onPick(weeklyOpt!.value, weeklyOpt!);
+    act(() => { session.onPick(weeklyOpt!.value, weeklyOpt!); });
+    commitDurationPrompt(45);
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h2',
       habitMotherId: 'hm1',
-      schedule: { kind: 'weekly', timeOfDay: '07:00', days: [4] },
+      schedule: { kind: 'weekly', timeOfDay: '07:00', days: [4], durationMin: 45 },
     });
   });
 
@@ -555,12 +570,13 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     const session = radialBus.session!;
     const dailyOpt = session.options.find((o) => o.value === 'daily');
     expect(dailyOpt).toBeTruthy();
-    session.onPick(dailyOpt!.value, dailyOpt!);
+    act(() => { session.onPick(dailyOpt!.value, dailyOpt!); });
+    commitDurationPrompt(20);
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h4',
       habitMotherId: 'hm1',
-      schedule: { kind: 'daily', timeOfDay: '09:00' },
+      schedule: { kind: 'daily', timeOfDay: '09:00', durationMin: 20 },
     });
   });
 
@@ -606,12 +622,13 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     const session = radialBus.session!;
     const weeklyOpt = session.options.find((o) => o.value === 'weekly');
     expect(weeklyOpt).toBeTruthy();
-    session.onPick(weeklyOpt!.value, weeklyOpt!);
+    act(() => { session.onPick(weeklyOpt!.value, weeklyOpt!); });
+    commitDurationPrompt(15);
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h3',
       habitMotherId: 'hm1',
-      schedule: { kind: 'weekly', timeOfDay: '14:00', days: [3] }, // Wednesday
+      schedule: { kind: 'weekly', timeOfDay: '14:00', days: [3], durationMin: 15 }, // Wednesday
     });
   });
 });

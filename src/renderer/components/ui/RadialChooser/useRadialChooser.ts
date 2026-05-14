@@ -8,7 +8,7 @@ import type { RadialChooserHandle, RadialChooserOptions, RadialOption } from './
 
 const DEFAULT_RADIUS = 88;
 const DEFAULT_INNER_RADIUS = 24;
-const DEFAULT_WEDGE_GAP = 4;
+const DEFAULT_WEDGE_GAP = 1;
 const MIN_RADIUS = 64;
 const MAX_RADIUS = 160;
 
