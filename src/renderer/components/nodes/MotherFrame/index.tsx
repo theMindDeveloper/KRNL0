@@ -14,6 +14,7 @@ interface Props {
   children: ReactNode;
   background?: string;     // override (terminal uses --term-bg)
   borderColor?: string;
+  minHeight?: number;      // override — must match INITIAL_DIMS_BY_KIND height
   onMoveLeft?: ((() => void) | undefined);   // undefined = disabled (first slot)
   onMoveRight?: ((() => void) | undefined);  // undefined = disabled (last slot)
 }
@@ -28,6 +29,7 @@ export function MotherFrame({
   children,
   background = 'var(--node-bg)',
   borderColor = 'var(--paper-3)',
+  minHeight = 600,
   onMoveLeft,
   onMoveRight,
 }: Props) {
@@ -68,7 +70,7 @@ export function MotherFrame({
         // (e.g. content 480 vs RF wrapper 600) makes the cyan selection ring
         // sit on the RF wrapper while the bg fills only part of it — looking
         // like a doubled / stretched highlight.
-        minHeight: 600,
+        minHeight,
         display: 'flex',
         flexDirection: 'column',
         background,
