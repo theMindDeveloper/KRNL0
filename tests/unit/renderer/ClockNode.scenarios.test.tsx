@@ -339,7 +339,7 @@ describe('Decision 24 — Break arcs', () => {
     expect(arcCircles[0]!.getAttribute('stroke-width')).toBe('18');
   });
 
-  it('break arcs have neutral grey stroke (var(--paper-3))', () => {
+  it('break arcs have visible ink stroke (var(--ink-4))', () => {
     _seq = 0;
     const todoId = 'todo-bcolor';
     const task1 = makeTaskNode('bc-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
@@ -354,7 +354,8 @@ describe('Decision 24 — Break arcs', () => {
 
     const breakArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '9');
     expect(breakArcs).toHaveLength(1);
-    expect(breakArcs[0]!.getAttribute('stroke')).toBe('var(--paper-3)');
+    // Decision 24.1 — ink-4 for visible break arcs (paper-3 was too close to background)
+    expect(breakArcs[0]!.getAttribute('stroke')).toBe('var(--ink-4)');
   });
 });
 

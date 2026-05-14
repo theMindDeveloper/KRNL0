@@ -1502,3 +1502,42 @@ Replace the filter-and-loop in `ClockNode/index.tsx:42-74` with a single memoize
 - Tests: 12 selector unit tests + 6 component tests added; existing ClockNode.scenarios tests updated to account for break arcs in the segment count.
 
 ---
+
+## Decision 24.1 — Color-token contract: selector palette MUST exist in tokens.css
+
+**Date:** 2026-05-14
+**Status:** Accepted — patch on Decision 24
+**Author:** architect
+**Plan file:** `C:\Users\momo\.claude\plans\just-improve-my-prompt-eager-dongarra.md` (full root-cause analysis at the bottom)
+
+### Context
+
+User reported only the first of 3 chained tasks rendered on the clock face. Tester verified all 18 unit tests passed including the 3-task chain case. Data on disk was correct, selector logic was correct, DOM structure was correct. The bug was paint, not data.
+
+### Root cause
+
+`timelineSelector.ts:16` defines `COLORS = ['rose', 'sky', 'mint', 'amber', 'violet']`. ClockNode renders each task arc with `stroke={`var(--${seg.colorToken})`}`. Three of the five tokens — `--sky`, `--mint`, `--violet` — **are not declared** in `src/renderer/styles/tokens.css`. When `var()` references an undefined custom property without a fallback, SVG `stroke` falls back to its initial value `none`. The `<circle>` elements exist in the DOM with correct geometry; they paint nothing.
+
+For the user's 3-task chain: task1→rose (defined, paints), task2→sky (undefined, transparent), task3→mint (undefined, transparent). Exact match with the symptom.
+
+### Decision (rule for backend-dev)
+
+1. **Constrain the palette to defined tokens.** `COLORS` in `timelineSelector.ts` becomes `['rose', 'amber', 'teal', 'lilac', 'sand', 'moss']` (six warm/cool alternating tokens, all defined in tokens.css). Re-export `COLORS` for tests.
+2. **Add a CSS fallback in the stroke prop.** ClockNode line 248: `stroke={`var(--${seg.colorToken}, #c87080)`}` so a future palette regression cannot paint transparent.
+3. **Brighten break arcs.** Replace `var(--paper-3)` with `var(--ink-4)` for break arc stroke; keep 0.6 / 0.8 opacity for short / long.
+4. **Add a contract test** at `tests/unit/renderer/timelineSelector.colorTokens.test.ts` that reads `tokens.css` and asserts every entry in `COLORS` has a `--<name>:` declaration in light + dark + noir variants.
+5. **Add a fixture-replay test** at `tests/unit/renderer/ClockNode.userBoard.fixture.test.tsx` that mirrors the user's exact failing board (3 tasks 120/80/30, 2 chain edges, mother-todo link) and asserts (a) 3 task arc circles in the rendered SVG and (b) every rendered `stroke` references a `var(--<token>)` whose name is in the imported `COLORS` set. Catches both selector-emit regressions and palette-drift regressions for this specific board.
+6. **Update existing color-rotation test.** `tests/unit/renderer/timelineSelector.test.ts:147-163` currently asserts `rose / sky / mint`; change to `rose / amber / teal` to match the new palette. (One existing test affected; all 17 others continue to pass.)
+7. **Add a runtime diagnostic** in `selectTimelines` that on first call checks `getComputedStyle(document.documentElement)` for each token in `COLORS` and `console.warn`s once if any resolve empty. Catches future drift in production, not jsdom.
+8. **Add a dev-only debug overlay** in ClockNode behind `import.meta.env.DEV && import.meta.env.VITE_CLOCK_DEBUG === '1'` showing segment count, totals, and first 6 segment summaries. Off by default; available for future debug sessions of the same class.
+
+### Consequences
+
+- New invariant: every name in the selector palette must have a matching CSS custom property in tokens.css across light / dark / noir variants. Enforced by the contract test.
+- jsdom tests confirm DOM shape; the contract test confirms CSS variable existence; the runtime diagnostic confirms resolution under the live theme. Three layers cover the gap that this bug exploited.
+
+### Test gap acknowledgment
+
+Decision 24's 18 tests covered selector correctness and component DOM structure. None tested the contract between code constants and the stylesheet. **jsdom does not paint** — assertions on `getAttribute('stroke')` checked the literal string `"var(--sky)"` was set, not that `--sky` resolves to a color. The new contract test is the missing test class.
+
+---

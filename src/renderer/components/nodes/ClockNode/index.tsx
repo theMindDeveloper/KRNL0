@@ -229,7 +229,7 @@ export function ClockNode({
                   cy={150}
                   r={R}
                   fill="transparent"
-                  stroke="var(--paper-3)"
+                  stroke="var(--ink-4)"
                   strokeWidth={9}
                   strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
                   strokeDashoffset={-startOffset}
@@ -245,7 +245,7 @@ export function ClockNode({
                 cy={150}
                 r={R}
                 fill="transparent"
-                stroke={`var(--${seg.colorToken})`}
+                stroke={`var(--${seg.colorToken}, #c87080)`}
                 strokeWidth={18}
                 strokeDasharray={`${arcLength} ${CIRCUMFERENCE}`}
                 strokeDashoffset={-startOffset}
@@ -284,6 +284,38 @@ export function ClockNode({
           {/* Center dot */}
           <circle cx={150} cy={150} r={3} fill="var(--ink-2)" />
         </svg>
+
+        {/* Debug overlay — only visible when VITE_CLOCK_DEBUG=1 in dev mode.
+            Shows selector output: segment counts + first 6 summaries.
+            Usage: `VITE_CLOCK_DEBUG=1 npm run dev` */}
+        {import.meta.env.DEV && import.meta.env.VITE_CLOCK_DEBUG === '1' && timeline && (
+          <div
+            style={{
+              fontSize: 9,
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--ink-3)',
+              padding: '4px 8px',
+              background: 'var(--paper-2)',
+              borderRadius: 4,
+              lineHeight: 1.5,
+            }}
+          >
+            <div>
+              tasks:{' '}
+              {segments.filter((s) => s.kind === 'task').length} | breaks:{' '}
+              {segments.filter((s) => s.kind === 'break').length} | total:{' '}
+              {totalMin}min
+            </div>
+            {segments.slice(0, 6).map((s, i) => (
+              <div key={i}>
+                [{i}]{' '}
+                {s.kind === 'task'
+                  ? `task ${s.startMin}–${s.endMin} ${s.colorToken}`
+                  : `break ${s.startMin}–${s.endMin} ${s.breakKind}`}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Overflow badge — shows when totalMin (tasks + breaks) exceeds 720 min */}
         {overflowMin > 0 && (
