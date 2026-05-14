@@ -26,6 +26,9 @@ interface KrnlBridge {
   // Phase 2: cli:dispatch
   onCliDispatch?: (callback: (id: string, command: string, args: Record<string, unknown>) => void) => () => void
   cliDispatchReply?: (id: string, ok: boolean, message: string) => void
+  // Clipboard via main (replaces navigator.clipboard in TerminalNode)
+  clipboardReadText: () => Promise<string>
+  clipboardWriteText: (text: string) => Promise<void>
 }
 
 interface Window {
