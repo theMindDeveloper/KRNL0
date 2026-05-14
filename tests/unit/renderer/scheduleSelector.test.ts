@@ -1,16 +1,23 @@
 /**
- * scheduleSelector tests — ADR 0003 §3.
+ * scheduleSelector tests — ADR 0003 §3 + ADR 0005.
  *
  * Covers:
  *   1. Single-anchor straight chain — all successors cascade by plannedMin.
  *   2. Mid-chain anchor — predecessors absent from output.
  *   3. Parallel-fork sharing startISO; group cumulative = max(branch.plannedMin).
  *   4. Multi-todo independent anchors.
- *   5. Multi-anchor-per-chain (defence-in-depth — earliest wins, dev warn).
+ *   5. Multi-anchor chain — each anchor is an independent fixpoint (ADR 0005).
  *   6. Breaks invisible (cascade math uses plannedMin only).
  *   7. Anchor's own scheduledDurationMin override applies.
  *   8. selectScheduledTasksForRange filters by [from, to).
  *   9. Reference-identity memoization on (nodes, edges).
+ *  10. No anchors → empty placements.
+ *  11. parallelBranchIndex (ADR 0004 §4.2).
+ *  12. Middle task anchored — predecessors skipped.
+ *  13. Two explicit anchors — gaps derive from each fixpoint.
+ *  14. Anchored branch in parallel group overrides group start.
+ *  15. Backwards-in-time anchor renders as written.
+ *  16. Unanchored chain produces no placements.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -224,16 +231,15 @@ describe('Test 4 — Multiple todos with independent anchors', () => {
   });
 });
 
-// ── Test 5 — Defence-in-depth: multi-anchor-in-chain → earliest wins ─────────
+// ── Test 5 — ADR 0005: multi-anchor chain — each anchor is an independent fixpoint ─
 
-describe('Test 5 — Defence-in-depth: corrupt board with two anchors in one chain', () => {
-  it('earliest scheduledFor wins; later anchor is ignored', () => {
+describe('Test 5 — ADR 0005: two anchors in one chain (both respected)', () => {
+  it('each anchor pins its own start; gap task derives from the preceding anchor', () => {
     _taskSeq = 0;
-    const todoId = 'todo-corrupt';
-    // Both t1 and t3 anchored — illegal per ADR 0003 §1 invariant. The
-    // selector defends by picking the earliest anchor (t1 at 10:00) and
-    // ignoring t3 at 16:00. (Load-time migration heals on next open.)
-    const t1 = makeTaskNode('t1', todoId, 25, { scheduledFor: '2026-05-20T10:00' });
+    const todoId = 'todo-multi-anchor';
+    // t1 anchored at 14:00, t3 anchored at 16:00, all plannedMin=25.
+    // Expected: t1@14:00 (anchor), t2@14:25 (derives from t1), t3@16:00 (anchor).
+    const t1 = makeTaskNode('t1', todoId, 25, { scheduledFor: '2026-05-20T14:00' });
     const t2 = makeTaskNode('t2', todoId, 25);
     const t3 = makeTaskNode('t3', todoId, 25, { scheduledFor: '2026-05-20T16:00' });
     const board = makeBoard(
@@ -242,13 +248,22 @@ describe('Test 5 — Defence-in-depth: corrupt board with two anchors in one cha
     );
 
     const { placements } = selectSchedule(board);
-    // Earliest anchor wins → t1 anchor, t2 cascades to 10:25, t3 cascades to 10:50.
     expect(placements.size).toBe(3);
-    expect(placements.get('t1')?.startISO).toBe('2026-05-20T10:00');
-    expect(placements.get('t1')?.isAnchor).toBe(true);
-    expect(placements.get('t3')?.startISO).toBe('2026-05-20T10:50');
-    expect(placements.get('t3')?.isAnchor).toBe(false);
-    expect(placements.get('t3')?.anchorTaskId).toBe('t1');
+    expect(placements.get('t1')).toMatchObject({
+      startISO: '2026-05-20T14:00',
+      isAnchor: true,
+      anchorTaskId: 't1',
+    });
+    expect(placements.get('t2')).toMatchObject({
+      startISO: '2026-05-20T14:25',
+      isAnchor: false,
+      anchorTaskId: 't1',
+    });
+    expect(placements.get('t3')).toMatchObject({
+      startISO: '2026-05-20T16:00',
+      isAnchor: true,
+      anchorTaskId: 't3',
+    });
   });
 });
 
@@ -411,6 +426,161 @@ describe('Test 10 — No scheduled tasks → empty placement map', () => {
     );
 
     const { placements } = selectSchedule(board);
+    expect(placements.size).toBe(0);
+  });
+});
+
+// ── Tests 12–16 — ADR 0005 multi-anchor scenarios ─────────────────────────────
+
+// ── Test 12 — Middle task anchored: predecessors skipped ──────────────────────
+
+describe('Test 12 — Middle task anchored (ADR 0005): predecessors are skipped', () => {
+  it('only B and C are emitted when B is anchored at 14:00 in A→B→C', () => {
+    _taskSeq = 0;
+    const todoId = 'todo-mid-anchor';
+    const a = makeTaskNode('a', todoId, 25);
+    const b = makeTaskNode('b', todoId, 25, { scheduledFor: '2026-05-20T14:00' });
+    const c = makeTaskNode('c', todoId, 25);
+    const board = makeBoard(
+      [makeTodoNode(todoId), a, b, c],
+      [makeEdge('a', 'b'), makeEdge('b', 'c')],
+    );
+
+    const { placements } = selectSchedule(board);
+    expect(placements.size).toBe(2);
+    expect(placements.get('a')).toBeUndefined();
+    expect(placements.get('b')).toMatchObject({
+      startISO: '2026-05-20T14:00',
+      isAnchor: true,
+      anchorTaskId: 'b',
+    });
+    expect(placements.get('c')).toMatchObject({
+      startISO: '2026-05-20T14:25',
+      isAnchor: false,
+      anchorTaskId: 'b',
+    });
+  });
+});
+
+// ── Test 13 — Two explicit anchors: gaps derive from each fixpoint ────────────
+
+describe('Test 13 — Two explicit anchors in A→B→C (ADR 0005)', () => {
+  it('A@14:00, B derives@14:25, C@16:00; anchorTaskId tracks the nearest fixpoint', () => {
+    _taskSeq = 0;
+    const todoId = 'todo-two-anchors';
+    const a = makeTaskNode('a', todoId, 25, { scheduledFor: '2026-05-20T14:00' });
+    const b = makeTaskNode('b', todoId, 25);
+    const c = makeTaskNode('c', todoId, 25, { scheduledFor: '2026-05-20T16:00' });
+    const board = makeBoard(
+      [makeTodoNode(todoId), a, b, c],
+      [makeEdge('a', 'b'), makeEdge('b', 'c')],
+    );
+
+    const { placements } = selectSchedule(board);
+    expect(placements.size).toBe(3);
+    expect(placements.get('a')).toMatchObject({
+      startISO: '2026-05-20T14:00',
+      isAnchor: true,
+      anchorTaskId: 'a',
+    });
+    expect(placements.get('b')).toMatchObject({
+      startISO: '2026-05-20T14:25',
+      isAnchor: false,
+      anchorTaskId: 'a',
+    });
+    expect(placements.get('c')).toMatchObject({
+      startISO: '2026-05-20T16:00',
+      isAnchor: true,
+      anchorTaskId: 'c',
+    });
+  });
+});
+
+// ── Test 14 — Anchored branch in parallel group overrides group start ─────────
+
+describe('Test 14 — Anchored branch in parallel group (ADR 0005 §4)', () => {
+  it('anchored branch Y sets group start; unanchored branch X starts at groupStart', () => {
+    _taskSeq = 0;
+    const todoId = 'todo-par-anchor';
+    // Chain: A (anchored @14:00, plannedMin=25) → parallel fork [X(30), Y(20, @15:00)].
+    // Group start = earliest anchored branch = Y's 15:00.
+    // X: starts at 15:00 (group start), ends 15:30.
+    // Y: starts at 15:00 (own anchor), ends 15:20.
+    // Cursor after group = 15:00 + max(30,20) = 15:30.
+    const a = makeTaskNode('a', todoId, 25, { scheduledFor: '2026-05-20T14:00' });
+    const x = makeTaskNode('x', todoId, 30);
+    const y = makeTaskNode('y', todoId, 20, { scheduledFor: '2026-05-20T15:00' });
+    const board = makeBoard(
+      [makeTodoNode(todoId), a, x, y],
+      [makeEdge('a', 'x'), makeEdge('a', 'y')],
+    );
+
+    const { placements } = selectSchedule(board);
+    expect(placements.size).toBe(3);
+    expect(placements.get('a')).toMatchObject({
+      startISO: '2026-05-20T14:00',
+      isAnchor: true,
+    });
+    // Y is anchored — its own scheduledFor wins.
+    expect(placements.get('y')).toMatchObject({
+      startISO: '2026-05-20T15:00',
+      isAnchor: true,
+      anchorTaskId: 'y',
+    });
+    // X is unanchored — starts at groupStart (15:00, earliest anchored branch).
+    expect(placements.get('x')).toMatchObject({
+      startISO: '2026-05-20T15:00',
+      isAnchor: false,
+      anchorTaskId: 'y',
+    });
+    // Both are in the same parallel group.
+    expect(placements.get('x')?.parallelGroupId).not.toBeNull();
+    expect(placements.get('x')?.parallelGroupId).toBe(placements.get('y')?.parallelGroupId);
+  });
+});
+
+// ── Test 15 — Backwards-in-time anchor renders as written ────────────────────
+
+describe('Test 15 — Backwards-in-time anchor (ADR 0005 §"Backwards-in-time anchors")', () => {
+  it('A@14:00, B derives@14:25, C@08:00 — no reorder, no warning', () => {
+    _taskSeq = 0;
+    const todoId = 'todo-out-of-order';
+    const a = makeTaskNode('a', todoId, 25, { scheduledFor: '2026-05-20T14:00' });
+    const b = makeTaskNode('b', todoId, 25);
+    const c = makeTaskNode('c', todoId, 25, { scheduledFor: '2026-05-20T08:00' });
+    const board = makeBoard(
+      [makeTodoNode(todoId), a, b, c],
+      [makeEdge('a', 'b'), makeEdge('b', 'c')],
+    );
+
+    const { placements } = selectSchedule(board);
+    expect(placements.size).toBe(3);
+    expect(placements.get('a')?.startISO).toBe('2026-05-20T14:00');
+    expect(placements.get('b')?.startISO).toBe('2026-05-20T14:25');
+    // C's own anchor renders as written — even though it's before A.
+    expect(placements.get('c')?.startISO).toBe('2026-05-20T08:00');
+    expect(placements.get('c')?.isAnchor).toBe(true);
+  });
+});
+
+// ── Test 16 — Unanchored chain → no placements ───────────────────────────────
+
+describe('Test 16 — Unanchored chain produces no placements (ADR 0005 sanity)', () => {
+  it('chain with no scheduledFor entries emits nothing', () => {
+    _taskSeq = 0;
+    const todoId = 'todo-unanchored';
+    const a = makeTaskNode('a', todoId, 25);
+    const b = makeTaskNode('b', todoId, 25);
+    const c = makeTaskNode('c', todoId, 25);
+    const board = makeBoard(
+      [makeTodoNode(todoId), a, b, c],
+      [makeEdge('a', 'b'), makeEdge('b', 'c')],
+    );
+
+    const { placements } = selectSchedule(board);
+    expect(placements.get('a')).toBeUndefined();
+    expect(placements.get('b')).toBeUndefined();
+    expect(placements.get('c')).toBeUndefined();
     expect(placements.size).toBe(0);
   });
 });

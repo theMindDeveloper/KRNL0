@@ -1,14 +1,13 @@
 /**
- * commandDispatch — ADR 0003 §1 one-anchor-per-chain invariant.
+ * commandDispatch — ADR 0005 multi-anchor coexistence.
  *
- * Tests that when task.setSchedule writes scheduledFor !== null on a task,
- * every OTHER task in the same chain that previously had scheduledFor set
- * is cleared (state + linked TodoItem mirror). Clearing scheduledFor (null)
- * on a task does NOT fan out — only the target's anchor is removed.
+ * Tests that setting an anchor on task X leaves every other task's anchor
+ * intact (both state and linked TodoItem mirror). This supersedes the old
+ * ADR 0003 §1 "clear-others" behaviour.
  *
  * Both write paths are exercised:
- *   - Direct on todo.task (case at applyCommand line ~216 + post-processing).
- *   - Cross-node router on calendar.schedule (around line 925).
+ *   - Direct on todo.task (task.setSchedule).
+ *   - Cross-node router on calendar.schedule.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -31,10 +30,7 @@ beforeEach(() => {
 const TODO_ID = 'todo-mother';
 const CAL_ID = 'cal-mother';
 
-function makeTaskState(
-  id: string,
-  overrides: Partial<TaskState> = {},
-): TaskState {
+function makeTaskState(id: string, overrides: Partial<TaskState> = {}): TaskState {
   return {
     text: id,
     done: false,
@@ -42,7 +38,7 @@ function makeTaskState(
     eta: '~25 min',
     sequenceNumber: 1,
     layer: 0,
-    createdAt: '2026-05-10T10:00:00.000Z',
+    createdAt: '2026-05-15T10:00:00.000Z',
     parentTodoId: TODO_ID,
     parentTaskId: null,
     todoItemId: `item-${id}`,
@@ -59,7 +55,7 @@ function makeItem(id: string, taskId: string, scheduledFor?: string): TodoItem {
     id: `item-${id}`,
     text: id,
     done: false,
-    createdAt: '2026-05-10T10:00:00.000Z',
+    createdAt: '2026-05-15T10:00:00.000Z',
     completedAt: null,
     taskNodeId: taskId,
   };
@@ -67,10 +63,6 @@ function makeItem(id: string, taskId: string, scheduledFor?: string): TodoItem {
   return base;
 }
 
-/**
- * Build a board with a 3-task chain t1 → t2 → t3 under one todo, plus an
- * optional calendar mother. Each task's scheduledFor can be set via opts.
- */
 function makeChainBoard(opts: {
   schedT1?: string;
   schedT2?: string;
@@ -117,7 +109,7 @@ function makeChainBoard(opts: {
   return {
     version: 1,
     schemaVersion: 1,
-    savedAt: '2026-05-10T10:00:00.000Z',
+    savedAt: '2026-05-15T10:00:00.000Z',
     viewport: { x: 0, y: 0, zoom: 1 },
     nodes,
     edges: [
@@ -138,10 +130,10 @@ function getItem(itemId: string): TodoItem {
   return todo.items.find((i) => i.id === itemId)!;
 }
 
-// ── Tests — direct todo.task dispatch ─────────────────────────────────────────
+// ── Tests — task.setSchedule leaves other anchors intact ──────────────────────
 
-describe('ADR 0003 §1 — task.setSchedule on todo.task clears other anchors', () => {
-  it('scheduling t1 when t3 already anchored clears t3 (state + item mirror)', () => {
+describe('ADR 0005 — task.setSchedule leaves other anchors intact', () => {
+  it('scheduling t1 when t3 already anchored keeps t3 anchor intact', () => {
     const board = makeChainBoard({ schedT3: '2026-05-20T16:00' });
     useBoardStore.getState().setBoard(board);
     expect(getTask('t3').scheduledFor).toBe('2026-05-20T16:00');
@@ -150,13 +142,15 @@ describe('ADR 0003 §1 — task.setSchedule on todo.task clears other anchors', 
     const handler = makeCommandHandler('t1');
     handler('task.setSchedule', { scheduledFor: '2026-05-20T09:00' });
 
+    // t1 gets its anchor.
     expect(getTask('t1').scheduledFor).toBe('2026-05-20T09:00');
-    expect(getTask('t3').scheduledFor).toBeUndefined();
     expect(getItem('item-t1').scheduledFor).toBe('2026-05-20T09:00');
-    expect(getItem('item-t3').scheduledFor).toBeUndefined();
+    // t3's anchor is untouched (ADR 0005 — no chain-wide clearing).
+    expect(getTask('t3').scheduledFor).toBe('2026-05-20T16:00');
+    expect(getItem('item-t3').scheduledFor).toBe('2026-05-20T16:00');
   });
 
-  it('scheduling t1 in a 3-task chain with no existing anchors does not crash', () => {
+  it('scheduling t1 in a chain with no existing anchors does not crash', () => {
     const board = makeChainBoard();
     useBoardStore.getState().setBoard(board);
     const handler = makeCommandHandler('t1');
@@ -166,30 +160,35 @@ describe('ADR 0003 §1 — task.setSchedule on todo.task clears other anchors', 
     expect(getTask('t3').scheduledFor).toBeUndefined();
   });
 
-  it('clearing scheduledFor on a non-anchor task is a no-op for the chain', () => {
-    const board = makeChainBoard({ schedT1: '2026-05-20T09:00' });
+  it('all three tasks can carry independent anchors simultaneously', () => {
+    const board = makeChainBoard({ schedT1: '2026-05-20T09:00', schedT2: '2026-05-20T10:00' });
     useBoardStore.getState().setBoard(board);
-    const handler = makeCommandHandler('t2');
-    handler('task.setSchedule', { scheduledFor: null });
-    // t1 must remain anchored — clearing a non-anchor does NOT fan out.
+    const handler = makeCommandHandler('t3');
+    handler('task.setSchedule', { scheduledFor: '2026-05-20T16:00' });
+
     expect(getTask('t1').scheduledFor).toBe('2026-05-20T09:00');
-    expect(getTask('t2').scheduledFor).toBeUndefined();
+    expect(getTask('t2').scheduledFor).toBe('2026-05-20T10:00');
+    expect(getTask('t3').scheduledFor).toBe('2026-05-20T16:00');
   });
 
-  it('clearing the anchor itself only clears the target', () => {
-    const board = makeChainBoard({ schedT1: '2026-05-20T09:00' });
+  it('clearing scheduledFor on a task does not affect siblings', () => {
+    const board = makeChainBoard({ schedT1: '2026-05-20T09:00', schedT3: '2026-05-20T16:00' });
     useBoardStore.getState().setBoard(board);
     const handler = makeCommandHandler('t1');
     handler('task.setSchedule', { scheduledFor: null });
+    // t1 cleared.
     expect(getTask('t1').scheduledFor).toBeUndefined();
     expect(getItem('item-t1').scheduledFor).toBeUndefined();
+    // t3 stays.
+    expect(getTask('t3').scheduledFor).toBe('2026-05-20T16:00');
+    expect(getItem('item-t3').scheduledFor).toBe('2026-05-20T16:00');
   });
 });
 
-// ── Tests — cross-node router (calendar.schedule) ─────────────────────────────
+// ── Tests — calendar.schedule (cross-node router) ─────────────────────────────
 
-describe('ADR 0003 §1 — calendar.schedule (cross-node) clears other anchors', () => {
-  it('drop on calendar moves the anchor: previous anchor task cleared', () => {
+describe('ADR 0005 — calendar.schedule leaves other anchors intact', () => {
+  it('dropping t2 on calendar keeps t1 anchor intact', () => {
     const board = makeChainBoard({ schedT1: '2026-05-20T09:00', withCalendar: true });
     useBoardStore.getState().setBoard(board);
     const handler = makeCommandHandler(CAL_ID);
@@ -198,10 +197,11 @@ describe('ADR 0003 §1 — calendar.schedule (cross-node) clears other anchors',
       scheduledFor: '2026-05-21T14:00',
       scheduledDurationMin: 30,
     });
-    // t2 is the new anchor; t1's anchor must be cleared.
+    // t2 gets a new anchor.
     expect(getTask('t2').scheduledFor).toBe('2026-05-21T14:00');
-    expect(getTask('t1').scheduledFor).toBeUndefined();
-    expect(getItem('item-t1').scheduledFor).toBeUndefined();
     expect(getItem('item-t2').scheduledFor).toBe('2026-05-21T14:00');
+    // t1's anchor is NOT cleared (ADR 0005).
+    expect(getTask('t1').scheduledFor).toBe('2026-05-20T09:00');
+    expect(getItem('item-t1').scheduledFor).toBe('2026-05-20T09:00');
   });
 });
