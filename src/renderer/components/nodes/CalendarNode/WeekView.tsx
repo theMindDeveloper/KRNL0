@@ -14,7 +14,7 @@ import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
 import { useRadialChooser } from '../../ui/RadialChooser';
 import type { RadialOption } from '../../ui/RadialChooser';
-import { getHabitDrag } from '../../../dnd/habitDrag';
+import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -230,11 +230,15 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   // ── RadialChooser for habit drops (ADR 0002 A1) ─────────────────────────────
 
   // dropCellRef captures the exact cell (dayYMD + hour) where the user released
-  // the drag. It is set ONLY in onDrop — no dragover bookkeeping. The onPick
-  // closure reads it; being a ref ensures no stale closure capture.
+  // the drag, AND the habit payload at drop time. Both are set ONLY in onDrop.
+  // We snapshot the habit here (not in onPick) because the HTML5 drag sequence
+  // fires `drop` → `dragend`, and `dragend` clears the habitDrag singleton —
+  // so by the time the user clicks a wedge to confirm, getHabitDrag() returns
+  // null. Snapshotting at drop time keeps the payload alive for onPick.
   const dropCellRef = useRef<{
     dayYMD: string;
     hour: number;
+    habit: HabitDragPayload;
   } | null>(null);
 
   const chooser = useRadialChooser<HabitScheduleKind>({
@@ -243,10 +247,10 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     onPick: useCallback(
       (kind: HabitScheduleKind) => {
         const cell = dropCellRef.current;
-        const habit = getHabitDrag();
         // Clear the cell ref immediately so stale data doesn't leak.
         dropCellRef.current = null;
-        if (!cell || !habit) return;
+        if (!cell) return;
+        const { habit } = cell;
 
         const timeOfDay = `${String(cell.hour).padStart(2, '0')}:00`;
         const isoDow = ymdToIsoDow(cell.dayYMD);
@@ -296,12 +300,14 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         e.preventDefault();
         e.currentTarget.removeAttribute('data-drop-target');
 
-        // A1: habit drop — capture cell context at drop time, then open chooser.
-        // getData() is readable in onDrop (unlike onDragOver). habitDrag singleton
-        // is also set, but we confirm MIME first for correctness.
+        // A1: habit drop — capture cell context AND habit payload at drop time,
+        // then open chooser. We snapshot the habit here because `dragend` (which
+        // clears the habitDrag singleton) fires AFTER drop but BEFORE the user
+        // can click a wedge to confirm.
         if (e.dataTransfer.types.includes('application/krnl-habit')) {
-          // Set cell context from THIS drop event — the exact target cell.
-          dropCellRef.current = { dayYMD, hour };
+          const habit = getHabitDrag();
+          if (!habit) return;
+          dropCellRef.current = { dayYMD, hour, habit };
           // Open chooser at drop coordinates. onPick reads dropCellRef.
           chooser.open(
             { x: e.clientX, y: e.clientY },
