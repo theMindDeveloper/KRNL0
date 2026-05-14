@@ -304,3 +304,102 @@ Out of scope. YearView already renders the completed-pomo heatmap (ADR 0001); la
 4. **Visualisation slice:** WeekView habit blocks (12px, opacity 0.7, z-index 1), MonthView habit dots. May ship in the same PR as the drop integration if the diff stays under ~250 lines.
 
 ---
+
+## Amendments (2026-05-14)
+
+User-driven amendments after testing v1 of PR #116. Both amendments are **binding** and **supersede** the corresponding original sections. Implementation must conform to these rules; conflicts with §2 or §6 above resolve in favour of the amendments.
+
+### A1 — Trigger model revised (supersedes §2)
+
+**Status of original §2:** SUPERSEDED. The dragover-to-open / drop-to-confirm flow is OUT. Two-phase replaces it.
+
+**Problem with v1:** dragover-to-open captured the **first** cell hovered (usually Monday) as the schedule target instead of the cell where the user released. Even with cell-tracking fixed, seeing the chooser while still dragging is undesired UX. The new model defers chooser appearance to drop time and confirms the pick via a separate pointer phase.
+
+**New binding rules:**
+
+1. **Drop opens the chooser, not dragover.** During the HTML5 drag, calendar cells only render the standard `data-drop-target` highlight (same affordance as task drops). No chooser geometry is mounted, no `chooser.open` is called, no `pointermove`/`dragover` capture listeners are installed during the drag.
+2. **Chooser appears at the drop point** — `{ x: e.clientX, y: e.clientY }` captured from the `drop` event. This is the origin passed to `chooser.open(origin, options)`.
+3. **Two-phase interaction.** HTML5 drag has ended by drop time (mouse button is up). The chooser therefore **cannot** rely on drag's release-to-confirm. It accepts a second pointer phase:
+   - On open: install a `window`-level `pointermove` listener for wedge-highlight tracking. The wedge under the cursor's angular position is highlighted.
+   - **Confirm:** user **clicks** a wedge. The click target IS the confirmation — `mousedown` → `mouseup` on the same wedge fires `onPick(value, option)`.
+   - **Cancel:** any of:
+     - Click inside the dead zone (the inner circle) → `onCancel`.
+     - Press `Escape` → `onCancel`.
+     - Click outside the chooser's bounding box (outside the outer radius) → `onCancel`.
+4. **Cell context is captured at drop time, period.** The cell receiving the `drop` event is the schedule target. There is no dragover bookkeeping, no "last hovered cell" memo, no Monday-bias. The drop handler reads `dataTransfer`, captures `{ clientX, clientY, cellIso }`, and only then calls `chooser.open`.
+5. **Hook API is unchanged.** `onPick`/`onCancel` callback shape stays. The change is purely in **when** the consumer calls `open()` — at `drop`, not at `dragover` — and in the host's internal listener set (`pointermove` + `click`, not `dragover` + `drop`).
+
+**Binding contract for the consumer (WeekView/MonthView cells):**
+
+```ts
+function onDrop(e: DragEvent, cellIso: string) {
+  const raw = e.dataTransfer?.getData('application/krnl-habit');
+  if (!raw) return;
+  e.preventDefault();
+  const payload = JSON.parse(raw) as KrnlHabitDragPayload;
+  chooser.open(
+    { x: e.clientX, y: e.clientY },
+    buildHabitWedges(payload, cellIso),  // returns RadialOption<HabitSchedule>[]
+  );
+  // onPick (set up once at host mount) dispatches calendar.scheduleHabit.
+}
+```
+
+**Binding contract for the host (`RadialChooserHost`):**
+
+- On `open`: install `window.addEventListener('pointermove', ...)`, `window.addEventListener('click', ...)`, `window.addEventListener('keydown', ...)` (capture phase for keydown to catch Escape pre-routing).
+- On `close` (pick or cancel): remove all three listeners synchronously.
+- The `pointermove` handler computes the hovered wedge by angle from origin; updates internal state to drive the hover style.
+- The `click` handler:
+  - If click point is inside dead zone → `onCancel`.
+  - Else if click point is inside a wedge → `onPick(option.value, option)`.
+  - Else (outside outer radius) → `onCancel`.
+- No `dragover`/`drop` listeners on the host. Those concerns belong to the cell, before `open` is called.
+
+**Tests must assert:**
+- `chooser.open` is **not** called during `dragover`.
+- `chooser.open` **is** called inside the `drop` handler with `{ x: e.clientX, y: e.clientY }`.
+- A click on a wedge fires `onPick` with the correct option.
+- A click in the dead zone fires `onCancel`.
+- A click outside the outer radius fires `onCancel`.
+- `Escape` fires `onCancel`.
+
+### A2 — Visual styling revised (supersedes §6 styling, not §6 data rules)
+
+**Status of original §6:** the **data/layout** rules for WeekView blocks and MonthView dots are unchanged. Only the **chooser's own visual material** is replaced. The original §6 did not specify chooser styling in detail — these rules now do, and lock the visual language as **Apple Liquid Glass** (recent macOS/iOS material).
+
+**Scope:** these rules apply to the `RadialChooserHost` render output only. WeekView habit blocks and MonthView dots keep the §6 spec verbatim.
+
+**Binding visual rules:**
+
+1. **Backdrop.** Wrap the SVG chooser in a `<div>` host (SVG does not honour `backdrop-filter` directly). The wrapper carries:
+   ```css
+   backdrop-filter: blur(24px) saturate(180%);
+   -webkit-backdrop-filter: blur(24px) saturate(180%);
+   ```
+   Wrapper sized to the chooser's outer-radius bounding box; clipped to a circle via `clip-path: circle(<radius>px at center)` so the blur tracks the wedge silhouette.
+2. **Wedge fill.** Translucent dark glass.
+   - Baseline: `rgba(20, 20, 20, 0.55)`.
+   - Hover: `rgba(30, 30, 30, 0.75)`.
+3. **Wedge stroke.** `1.5px` solid; colour = the option's `color` field (default `var(--acid)`).
+   - Hover: stroke thickens to `2.5px` and glows: `filter: drop-shadow(0 0 8px <color>)`.
+4. **Edge accent colours for the habit-drop caller (two-option case):**
+   - Weekly wedge stroke: `var(--purple)` if defined, else `#a78bfa`.
+   - Daily wedge stroke: `var(--cyan)` if defined, else `#22d3ee`.
+   - For `N >= 3` callers, each `RadialOption.color` is used directly as both stroke and icon/label tint. No theme override.
+5. **Inner highlight.** Subtle 1px inset `rgba(255, 255, 255, 0.08)` on each wedge — implemented either as an additional inner stroke on a slightly-inset wedge path, or via an SVG `<filter>` with a soft `feGaussianBlur`. Either approach is acceptable; the inner stroke is simpler and preferred.
+6. **Dead zone.** Dark translucent circle, `rgba(0, 0, 0, 0.4)` + the wrapper's backdrop blur applies. "×" glyph in `var(--ink-3)`. Hover: brighten "×" to `var(--ink-1)` and scale the dead-zone group to `1.05` (transform-origin: centre).
+7. **Animation.**
+   - Enter: `180ms cubic-bezier(0.34, 1.56, 0.64, 1)`, scale `0.6 → 1.0`, opacity `0 → 1`.
+   - Exit: `120ms ease-out`, scale `1.0 → 0.85`, opacity `1 → 0`.
+   - Transform-origin: centre of the chooser (the origin point).
+8. **Typography.** Option label: `var(--font-mono)`, `10px`, `text-transform: uppercase`, `letter-spacing: 0.08em`, colour = the wedge's stroke colour (so purple-stroke wedge ⇒ purple label; cyan-stroke wedge ⇒ cyan label).
+9. **Icon.** `18px`, centred above label inside the wedge. Colour matches stroke.
+10. **Outer glow / depth.** Whole chooser group carries `filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.5))` for a floating-sheet impression.
+
+**Notes for backend-dev:**
+- Define `--purple` and `--cyan` design tokens in the existing theme CSS if absent. Fall back inline only if the tokens cannot be added in the same slice.
+- The backdrop blur requires the wrapper to sit above an element with visible content; portaling to `document.body` is fine — the page background and any canvas pixels below contribute to the blur.
+- The dead-zone hover scale must not affect wedge geometry. Keep the dead zone in its own SVG `<g>` with an independent `transform`.
+
+---
