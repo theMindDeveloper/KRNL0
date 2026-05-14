@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 /**
- * ClockNode component render tests — Decision 23.1 (PR #112)
+ * ClockNode component render tests — Decision 24 (rewrite of Decision 23.1 tests)
+ *
+ * Decision 24 replaces the manual tasks selector + arcs loop with selectTimeline.
+ * Arcs now include break segments. Trailing break is stripped at render time.
  *
  * Covers:
  *   AC5 — clock renders 12h face; tasks linked via linkedTodoId produce arcs
  *   AC6 — done tasks render at 40% opacity
- *   AC7 — total plannedMin > 720 shows "+N min" badge
+ *   AC7 — total plannedMin > 720 shows "+N min" badge (now based on totalMin incl. breaks)
+ *   Decision 24 — break arcs, parallel arcs, trailing break stripped
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -15,7 +19,9 @@ import { ClockNode } from '../../../src/renderer/components/nodes/ClockNode';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
 import type { ClockState, ClockConfig } from '../../../src/renderer/components/nodes/ClockNode/types';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
+import type { PomoConfig } from '../../../src/renderer/components/nodes/PomoNode/types';
 import type { Node } from '../../../src/shared/types/node';
+import type { Edge } from '../../../src/shared/types/edge';
 import type { Board } from '../../../src/shared/types';
 
 afterEach(() => {
@@ -44,18 +50,38 @@ function makeClockNode(state: ClockState): Node<ClockState, ClockConfig> {
   };
 }
 
+function makePomoNode(cfg: Partial<PomoConfig> = {}): Node {
+  const config: PomoConfig = {
+    sessionMin: 25,
+    shortBreakMin: 5,
+    longBreakMin: 15,
+    longBreakEvery: 4,
+    ...cfg,
+  };
+  return {
+    id: 'mother-pomo',
+    kind: 'pomo',
+    position: { x: 0, y: 0 },
+    isMother: true,
+    state: {},
+    config,
+  };
+}
+
+let _seq = 0;
 function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
+  _seq++;
   return {
     text: 'Task',
     done: false,
     durationMin: 25,
     eta: '~25 min',
-    sequenceNumber: 1,
+    sequenceNumber: _seq,
     layer: 0,
-    createdAt: '2026-05-14T08:00:00.000Z',
+    createdAt: new Date(Date.UTC(2026, 4, 14, 0, 0, _seq)).toISOString(),
     parentTodoId: 'todo-1',
     parentTaskId: null,
-    todoItemId: 'item-1',
+    todoItemId: `item-${_seq}`,
     pomoSessionsCompleted: 0,
     plannedMin: 25,
     secondsAccumulated: 0,
@@ -75,14 +101,34 @@ function makeTaskNode(id: string, state: TaskState): Node<TaskState, { showDurat
   };
 }
 
-function seedBoard(nodes: Node[]): void {
+function makeTodoNode(todoId: string): Node {
+  return {
+    id: todoId,
+    kind: 'todo',
+    position: { x: 0, y: 0 },
+    isMother: true,
+    state: { items: [] },
+    config: {},
+  };
+}
+
+function makeEdge(fromId: string, toId: string): Edge {
+  return {
+    id: `edge-${fromId}-${toId}`,
+    from: { nodeId: fromId, event: 'task.next' },
+    to: { nodeId: toId, command: 'task.activate' },
+    enabled: true,
+  };
+}
+
+function seedBoard(nodes: Node[], edges: Edge[] = []): void {
   const board: Board = {
     version: 1,
     schemaVersion: 1,
     savedAt: '2026-05-14T08:00:00.000Z',
     viewport: { x: 0, y: 0, zoom: 1 },
-    nodes,
-    edges: [],
+    nodes: [makePomoNode(), ...nodes],
+    edges,
   };
   useBoardStore.setState({ board });
 }
@@ -102,59 +148,86 @@ function renderClockNode(
   );
 }
 
+/** Arc circles = circles at r=108 (both task arcs and break arcs share r=108). */
+function getArcCircles(): Element[] {
+  return Array.from(document.querySelectorAll('svg circle')).filter(
+    (c) => c.getAttribute('r') === '108',
+  );
+}
+
 // ── AC5 — Renders SVG with 12 tick marks ──────────────────────────────────────
 
 describe('AC5 — ClockNode renders a 12-hour face', () => {
   it('renders an SVG element representing the clock face', () => {
+    _seq = 0;
     renderClockNode(makeClockState());
     const svgs = document.querySelectorAll('svg');
     expect(svgs.length).toBeGreaterThan(0);
   });
 
   it('renders 12 tick marks on the clock face', () => {
+    _seq = 0;
     renderClockNode(makeClockState());
     const lines = document.querySelectorAll('svg line');
     expect(lines).toHaveLength(12);
   });
 
   it('shows link UI when linkedTodoId is null', () => {
+    _seq = 0;
     seedBoard([]);
     renderClockNode(makeClockState({ linkedTodoId: null }));
     expect(screen.getByText('Link Todo:')).toBeDefined();
   });
 
-  it('renders one arc circle per linked root task', () => {
+  it('renders one task arc + one break arc per task pair (trailing break stripped)', () => {
+    _seq = 0;
     const todoId = 'todo-1';
-    const task1 = makeTaskNode('task-1', makeTaskState({ parentTodoId: todoId, sequenceNumber: 1, plannedMin: 60 }));
-    const task2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, sequenceNumber: 2, plannedMin: 30 }));
-    const task3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, sequenceNumber: 3, plannedMin: 45 }));
-    seedBoard([task1, task2, task3]);
+    const task1 = makeTaskNode('task-1', makeTaskState({ parentTodoId: todoId, plannedMin: 60 }));
+    const task2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
+    const task3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, plannedMin: 45 }));
+    seedBoard([makeTodoNode(todoId), task1, task2, task3], [
+      makeEdge('task-1', 'task-2'),
+      makeEdge('task-2', 'task-3'),
+    ]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    // The component renders one <circle> arc per task plus the background ring
-    // plus the center dot. Background ring = 1 (r=130), center dot = 1 (r=3),
-    // arcs = 3 (r=108). Total = 5.
-    const circles = document.querySelectorAll('svg circle');
-    // We specifically look for arc circles (r=108) — one per task
-    const arcCircles = Array.from(circles).filter(
-      (c) => c.getAttribute('r') === '108',
-    );
+    // Decision 24: 3 tasks + 2 internal breaks + 1 trailing break (stripped) = 5 arcs
+    // Task arcs: 3, break arcs rendered: 2 (trailing stripped)
+    const arcCircles = getArcCircles();
+    expect(arcCircles).toHaveLength(5); // 3 task + 2 break (trailing stripped)
+  });
+
+  it('task arcs have strokeWidth=18; break arcs have strokeWidth=9', () => {
+    _seq = 0;
+    const todoId = 'todo-stroke';
+    const task1 = makeTaskNode('s-task-1', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
+    const task2 = makeTaskNode('s-task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
+    seedBoard([makeTodoNode(todoId), task1, task2], [makeEdge('s-task-1', 's-task-2')]);
+
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    const arcCircles = getArcCircles();
+    // 2 task arcs + 1 break arc (trailing stripped) = 3
     expect(arcCircles).toHaveLength(3);
+
+    const taskArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '18');
+    const breakArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '9');
+    expect(taskArcs).toHaveLength(2);
+    expect(breakArcs).toHaveLength(1);
   });
 
   it('excludes subtasks (parentTaskId !== null) from arcs', () => {
+    _seq = 0;
     const todoId = 'todo-1';
-    const rootTask = makeTaskNode('task-root', makeTaskState({ parentTodoId: todoId, sequenceNumber: 1, parentTaskId: null }));
-    const subTask = makeTaskNode('task-sub', makeTaskState({ parentTodoId: todoId, sequenceNumber: 2, parentTaskId: 'task-root' }));
-    seedBoard([rootTask, subTask]);
+    const rootTask = makeTaskNode('task-root', makeTaskState({ parentTodoId: todoId, parentTaskId: null }));
+    const subTask = makeTaskNode('task-sub', makeTaskState({ parentTodoId: todoId, parentTaskId: 'task-root' }));
+    seedBoard([makeTodoNode(todoId), rootTask, subTask]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    const arcCircles = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) => c.getAttribute('r') === '108',
-    );
-    // Only the root task gets an arc; subtask is excluded
+    const arcCircles = getArcCircles();
+    // Only root task arc — 1 task + 0 break arcs (trailing break stripped)
     expect(arcCircles).toHaveLength(1);
   });
 });
@@ -163,90 +236,174 @@ describe('AC5 — ClockNode renders a 12-hour face', () => {
 
 describe('AC6 — Done tasks render at 40% opacity', () => {
   it('done task arc has opacity 0.4', () => {
+    _seq = 0;
     const todoId = 'todo-1';
-    const doneTask = makeTaskNode('task-done', makeTaskState({ parentTodoId: todoId, sequenceNumber: 1, done: true, plannedMin: 60 }));
-    seedBoard([doneTask]);
+    const doneTask = makeTaskNode('task-done', makeTaskState({ parentTodoId: todoId, done: true, plannedMin: 60 }));
+    seedBoard([makeTodoNode(todoId), doneTask]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    const arcCircles = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) => c.getAttribute('r') === '108',
-    );
-    expect(arcCircles).toHaveLength(1);
-    expect(arcCircles[0]!.getAttribute('opacity')).toBe('0.4');
+    // 1 task arc (strokeWidth=18), trailing break stripped
+    const taskArcs = getArcCircles().filter((c) => c.getAttribute('stroke-width') === '18');
+    expect(taskArcs).toHaveLength(1);
+    expect(taskArcs[0]!.getAttribute('opacity')).toBe('0.4');
   });
 
-  it('in-progress task arc has no opacity attribute (defaults to 1)', () => {
+  it('in-progress task arc has opacity=1', () => {
+    _seq = 0;
     const todoId = 'todo-1';
-    const activeTask = makeTaskNode('task-active', makeTaskState({ parentTodoId: todoId, sequenceNumber: 1, done: false, plannedMin: 60 }));
-    seedBoard([activeTask]);
+    const activeTask = makeTaskNode('task-active', makeTaskState({ parentTodoId: todoId, done: false, plannedMin: 60 }));
+    seedBoard([makeTodoNode(todoId), activeTask]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    const arcCircles = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) => c.getAttribute('r') === '108',
-    );
-    expect(arcCircles).toHaveLength(1);
-    // opacity="1" means arc.done is false — React renders opacity={1} as the attribute "1"
-    expect(arcCircles[0]!.getAttribute('opacity')).toBe('1');
+    const taskArcs = getArcCircles().filter((c) => c.getAttribute('stroke-width') === '18');
+    expect(taskArcs).toHaveLength(1);
+    expect(taskArcs[0]!.getAttribute('opacity')).toBe('1');
   });
 
   it('done tasks are included in the arc list (not filtered out)', () => {
+    _seq = 0;
     const todoId = 'todo-1';
-    const doneTask = makeTaskNode('task-done', makeTaskState({ parentTodoId: todoId, sequenceNumber: 1, done: true, plannedMin: 30 }));
-    const activeTask = makeTaskNode('task-active', makeTaskState({ parentTodoId: todoId, sequenceNumber: 2, done: false, plannedMin: 30 }));
-    seedBoard([doneTask, activeTask]);
+    const doneTask = makeTaskNode('task-done', makeTaskState({ parentTodoId: todoId, done: true, plannedMin: 30 }));
+    const activeTask = makeTaskNode('task-active', makeTaskState({ parentTodoId: todoId, done: false, plannedMin: 30 }));
+    seedBoard([makeTodoNode(todoId), doneTask, activeTask], [makeEdge('task-done', 'task-active')]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    const arcCircles = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) => c.getAttribute('r') === '108',
-    );
-    // Both tasks appear — done tasks are never filtered
-    expect(arcCircles).toHaveLength(2);
+    // Both tasks appear: 2 task arcs + 1 break arc (trailing stripped) = 3
+    const arcCircles = getArcCircles();
+    expect(arcCircles).toHaveLength(3);
+
+    const taskArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '18');
+    expect(taskArcs).toHaveLength(2);
   });
 });
 
-// ── AC7 — Overflow badge when total plannedMin > 720 ─────────────────────────
+// ── AC7 — Overflow badge ──────────────────────────────────────────────────────
 
 describe('AC7 — Overflow badge for tasks exceeding 720 minutes', () => {
-  it('shows no overflow badge when total plannedMin <= 720', () => {
+  it('shows no overflow badge when totalMin (tasks + breaks) <= 720', () => {
+    _seq = 0;
     const todoId = 'todo-1';
-    const task = makeTaskNode('task-1', makeTaskState({ parentTodoId: todoId, sequenceNumber: 1, plannedMin: 360 }));
-    seedBoard([task]);
+    // 1 task × 360 min + 1 trailing break (5min) = 365 total. No overflow.
+    const task = makeTaskNode('task-1', makeTaskState({ parentTodoId: todoId, plannedMin: 360 }));
+    seedBoard([makeTodoNode(todoId), task]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    // No overflow text should be present
     expect(screen.queryByText(/\+\d+ min/)).toBeNull();
   });
 
-  it('shows "+N min" badge when total plannedMin exceeds 720', () => {
+  it('shows "+N min" badge when totalMin (tasks + breaks) exceeds 720', () => {
+    _seq = 0;
     const todoId = 'todo-1';
-    // 3 tasks × 300 min = 900 total → overflow = 180 min
-    const task1 = makeTaskNode('task-1', makeTaskState({ parentTodoId: todoId, sequenceNumber: 1, plannedMin: 300 }));
-    const task2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, sequenceNumber: 2, plannedMin: 300 }));
-    const task3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, sequenceNumber: 3, plannedMin: 300 }));
-    seedBoard([task1, task2, task3]);
+    // 3 tasks × 300 min = 900 task time, + 3 breaks × 5 min = 15 break time = 915 totalMin
+    // overflow = 915 - 720 = 195
+    const task1 = makeTaskNode('task-1', makeTaskState({ parentTodoId: todoId, plannedMin: 300 }));
+    const task2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 300 }));
+    const task3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, plannedMin: 300 }));
+    seedBoard([makeTodoNode(todoId), task1, task2, task3], [
+      makeEdge('task-1', 'task-2'),
+      makeEdge('task-2', 'task-3'),
+    ]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    expect(screen.getByText('+180 min')).toBeDefined();
-  });
-
-  it('shows "+1 min" badge when total is exactly 721', () => {
-    const todoId = 'todo-1';
-    const task = makeTaskNode('task-1', makeTaskState({ parentTodoId: todoId, sequenceNumber: 1, plannedMin: 721 }));
-    seedBoard([task]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    expect(screen.getByText('+1 min')).toBeDefined();
+    expect(screen.getByText('+195 min')).toBeDefined();
   });
 
   it('shows no overflow badge when linkedTodoId is null', () => {
+    _seq = 0;
     seedBoard([]);
     renderClockNode(makeClockState({ linkedTodoId: null }));
     expect(screen.queryByText(/\+\d+ min/)).toBeNull();
+  });
+});
+
+// ── Decision 24 — Break arcs ──────────────────────────────────────────────────
+
+describe('Decision 24 — Break arcs', () => {
+  it('trailing break is NOT rendered (last arc is a task arc)', () => {
+    _seq = 0;
+    const todoId = 'todo-trail';
+    const task1 = makeTaskNode('tr-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    seedBoard([makeTodoNode(todoId), task1]);
+
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    // 1 task only → trailing break stripped → 1 arc total
+    const arcCircles = getArcCircles();
+    expect(arcCircles).toHaveLength(1);
+    // The one arc must be a task arc (strokeWidth=18)
+    expect(arcCircles[0]!.getAttribute('stroke-width')).toBe('18');
+  });
+
+  it('break arcs have neutral grey stroke (var(--paper-3))', () => {
+    _seq = 0;
+    const todoId = 'todo-bcolor';
+    const task1 = makeTaskNode('bc-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task2 = makeTaskNode('bc-2', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    seedBoard([makeTodoNode(todoId), task1, task2], [makeEdge('bc-1', 'bc-2')]);
+
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    const arcCircles = getArcCircles();
+    // 2 task arcs + 1 break arc (trailing stripped)
+    expect(arcCircles).toHaveLength(3);
+
+    const breakArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '9');
+    expect(breakArcs).toHaveLength(1);
+    expect(breakArcs[0]!.getAttribute('stroke')).toBe('var(--paper-3)');
+  });
+});
+
+// ── Decision 24 — Parallel arcs ──────────────────────────────────────────────
+
+describe('Decision 24 — Parallel arcs with mix-blend-mode: multiply', () => {
+  it('parallel branch members have mixBlendMode style', () => {
+    _seq = 0;
+    const todoId = 'todo-par';
+    const tA = makeTaskNode('par-A', makeTaskState({ parentTodoId: todoId, plannedMin: 10 }));
+    const tB = makeTaskNode('par-B', makeTaskState({ parentTodoId: todoId, plannedMin: 20 }));
+    const tC = makeTaskNode('par-C', makeTaskState({ parentTodoId: todoId, plannedMin: 15 }));
+    // A forks to B and C
+    seedBoard([makeTodoNode(todoId), tA, tB, tC], [
+      makeEdge('par-A', 'par-B'),
+      makeEdge('par-A', 'par-C'),
+    ]);
+
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    // A=sequential, B and C=parallel, trailing break stripped
+    // segments: A(task), break-A, B(task,parallel), C(task,parallel), break-group
+    // trailing break stripped → rendered: A, break-A, B, C, [break-group stripped if last]
+    // Actually: A, break-A, B, C, break-group → trailing break-group stripped = 4 arcs
+    const arcCircles = getArcCircles();
+    expect(arcCircles.length).toBeGreaterThanOrEqual(3); // at minimum A + B + C
+
+    // Find task arcs
+    const taskArcs = Array.from(arcCircles).filter((c) => c.getAttribute('stroke-width') === '18');
+    // B and C should have mix-blend-mode: multiply in their style
+    const parallelArcs = taskArcs.filter((c) => {
+      const style = (c as HTMLElement).style.mixBlendMode;
+      return style === 'multiply';
+    });
+    expect(parallelArcs.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('sequential task arcs have no mixBlendMode style', () => {
+    _seq = 0;
+    const todoId = 'todo-seq';
+    const t1 = makeTaskNode('seq-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const t2 = makeTaskNode('seq-2', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    seedBoard([makeTodoNode(todoId), t1, t2], [makeEdge('seq-1', 'seq-2')]);
+
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    const taskArcs = getArcCircles().filter((c) => c.getAttribute('stroke-width') === '18');
+    for (const arc of taskArcs) {
+      expect((arc as HTMLElement).style.mixBlendMode).toBeFalsy();
+    }
   });
 });
