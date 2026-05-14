@@ -580,4 +580,83 @@ describe('Decision 24.2 — break arc visibility', () => {
     // Decision 24.2: opacity must be 1
     expect(opacity).toBe('1');
   });
+
+  // ── Decision 24.2 Q2 — SVG <title> tooltip content (item 10) ──────────────
+
+  it('short break arc <g> contains a <title> matching "short break · Nm"', () => {
+    _seq = 0;
+    const todoId = 'todo-tt-short';
+    const task1 = makeTaskNode('tt-s-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task2 = makeTaskNode('tt-s-2', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const board: Board = {
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-14T08:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        makePomoNode({ shortBreakMin: 5, longBreakEvery: 100 }),
+        makeTodoNode(todoId),
+        task1,
+        task2,
+      ],
+      edges: [makeEdge('tt-s-1', 'tt-s-2')],
+    };
+    useBoardStore.setState({ board });
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    // Find the short-break circle (strokeWidth=6), walk to parent <g>, get its <title>
+    const shortBreakCircle = Array.from(document.querySelectorAll('svg circle')).find(
+      (c) => c.getAttribute('stroke-width') === '6',
+    );
+    expect(shortBreakCircle, 'short break circle must exist').toBeDefined();
+    const g = shortBreakCircle!.parentElement;
+    expect(g?.tagName.toLowerCase()).toBe('g');
+    const titleEl = g?.querySelector('title');
+    expect(titleEl, '<title> must be present in break <g>').toBeDefined();
+    expect(titleEl!.textContent).toMatch(/^short break · \d+m$/);
+  });
+
+  it('long break arc <g> contains a <title> matching "long break · Nm"', () => {
+    _seq = 0;
+    const todoId = 'todo-tt-long';
+    const task1 = makeTaskNode('tt-l-1', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task2 = makeTaskNode('tt-l-2', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task3 = makeTaskNode('tt-l-3', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task4 = makeTaskNode('tt-l-4', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const task5 = makeTaskNode('tt-l-5', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
+    const board: Board = {
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-14T08:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        makePomoNode({ shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 }),
+        makeTodoNode(todoId),
+        task1,
+        task2,
+        task3,
+        task4,
+        task5,
+      ],
+      edges: [
+        makeEdge('tt-l-1', 'tt-l-2'),
+        makeEdge('tt-l-2', 'tt-l-3'),
+        makeEdge('tt-l-3', 'tt-l-4'),
+        makeEdge('tt-l-4', 'tt-l-5'),
+      ],
+    };
+    useBoardStore.setState({ board });
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    // Find the long-break circle (strokeWidth=10), walk to parent <g>, get its <title>
+    const longBreakCircle = Array.from(document.querySelectorAll('svg circle')).find(
+      (c) => c.getAttribute('stroke-width') === '10',
+    );
+    expect(longBreakCircle, 'long break circle must exist').toBeDefined();
+    const g = longBreakCircle!.parentElement;
+    expect(g?.tagName.toLowerCase()).toBe('g');
+    const titleEl = g?.querySelector('title');
+    expect(titleEl, '<title> must be present in long break <g>').toBeDefined();
+    expect(titleEl!.textContent).toMatch(/^long break · \d+m$/);
+  });
 });
