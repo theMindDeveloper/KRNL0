@@ -1832,10 +1832,10 @@ You are unblocked. Implement against the contract above. Two reminders:
 ## Decision 25 — Cascade scheduling: one anchor per chain, derive successors (2026-05-14)
 
 **Date:** 2026-05-14
-**Status:** Accepted
+**Status:** Partially superseded by Decision 27 (ADR 0005) on 2026-05-15 — the "one anchor per chain" invariant and the mid-chain-drop predecessor-unscheduling rule no longer apply. The selector architecture, dual-selector pattern, shared `chainWalker.ts` extraction, calendar-vs-clock break divergence, and "no new persisted fields" all remain in force.
 **Author:** architect
 **ADR:** [adr/0003-cascade-scheduling.md](../adr/0003-cascade-scheduling.md)
-**Cross-reference:** Extends ADR 0001 §3 (`scheduledFor` semantics), Decision 24 (Unified Timeline Selector).
+**Cross-reference:** Extends ADR 0001 §3 (`scheduledFor` semantics), Decision 24 (Unified Timeline Selector). Superseded-in-part by Decision 27 / ADR 0005.
 
 ### Decision
 
@@ -1880,5 +1880,53 @@ Four user-reported issues from post-ADR-0003 testing, locked in one ADR.
 Slices 1 & 2 are fully independent and may parallelise or interleave with 3–5. Slices 3 → 4 → 5 are strictly sequential.
 
 Full Q-resolutions, alternatives, and file-line-level contract in ADR 0004.
+
+---
+
+## Decision 27 — Multi-anchor cascade scheduling (supersedes Decision 25 §invariant) (2026-05-15)
+
+**Date:** 2026-05-15
+**Status:** Accepted
+**Author:** architect (post-user-feedback re-grilling on Decision 25)
+**ADR:** [adr/0005-multi-anchor-cascade.md](../adr/0005-multi-anchor-cascade.md)
+**Supersedes:** Decision 25 §"one anchor per chain" invariant, Decision 25 §mid-chain-drop predecessor-unscheduling, Decision 25 §`migrateNormalizeChainAnchors` healing migration. Other parts of Decision 25 (selector architecture, dual-selector pattern, shared `chainWalker.ts`, calendar-vs-clock break divergence, no new persisted fields) remain in force.
+
+### The problem (user-reported, after one demo cycle)
+
+> Created task1 → task2 → task3. Dropped task1 on calendar — all 3 cascaded back-to-back (good). Then dropped task3 elsewhere — task1 and task2 disappeared, only task3 remained on the calendar.
+
+The one-anchor invariant from Decision 25 was technically working as designed: the dispatcher cleared every other anchor in the chain on every new schedule, then the selector walked forward from the surviving anchor only. But the design **conflated logical dependency** (`task.next` says "comes after") **with time placement** (`scheduledFor` says "happens at"). Users reach for the chain link to express dependency; they reach for the calendar drop to express time. The one-anchor invariant forced both into a single concept and the resulting UX was hostile.
+
+### Options weighed
+
+| | Idea | Reason rejected |
+|---|---|---|
+| A | Drop cascade entirely. `task.next` = pure dependency. | Loses the "drop one, fill my afternoon" workflow that was Decision 25's primary value. |
+| B | Cascade only on the first drop; subsequent drops are independent. | "First" is hidden state with no UI affordance. Users would silently switch modes mid-flow. |
+| C | **Multi-anchor cascade — every anchor is a fixpoint; gaps derive forward.** | Smallest conceptual change that fixes the bug. Generalises Decision 25 instead of replacing it. **Selected.** |
+| D | Marquee → group → group cascades. Default = no cascade. | Adds a parallel scheduling concept (groups) when the existing one (chains) just needed relaxing. Two ways to express "these go together" is a worse design. |
+
+### Decision
+
+A chain may carry **any number of anchors**. The selector walks the chain forward and uses each anchor it encounters as the new cursor; gaps between anchors auto-derive from the previous unit's `plannedMin`. Anchored tasks set the cursor; unanchored tasks emit at the cursor and advance it. Predecessors of the first anchor stay unscheduled (no back-computation). Backwards-in-time anchors render as written — calendars don't enforce dependency-time alignment, and we shouldn't either. Overlapping derived intervals fall through to the calendar's existing column-layout (PR #122) and the clock's concentric-ring layout (Decision 26) for free.
+
+`task.setSchedule` and `calendar.schedule` no longer fan out chain-wide clears. `clearOtherAnchorsInChain` and `migrateNormalizeChainAnchors` are deleted in full. `isAnchor` continues to mean "this task has its own `scheduledFor`," and the duration-override rule (anchor honours `scheduledDurationMin ?? plannedMin`; derived placements use `plannedMin`) carries over from Decision 25 §3.7 — it just now applies per-anchor instead of per-chain.
+
+### Files affected
+
+- Modified: `src/renderer/store/scheduleSelector.ts` (new multi-anchor walk in `build()` — anchors are not sorted/deduped; cursor resets at each anchor encountered in walk order).
+- Modified: `src/renderer/components/Canvas/commandDispatch.ts` (deleted `clearOtherAnchorsInChain` and its two call sites in `calendar.schedule` + `task.setSchedule`).
+- Modified: `src/main/persistence/board.ts` (deleted `migrateNormalizeChainAnchors` and its pipeline wrap).
+- Tests: deleted `tests/unit/renderer/commandDispatch.cascadeAnchor.test.ts` and `tests/unit/main/board.adr0003-migration.test.ts`. Added `tests/unit/renderer/commandDispatch.multiAnchor.test.ts` (5 tests asserting siblings stay anchored). Added 5 new selector tests for mid-chain anchor, two-anchor gaps with correct `anchorTaskId`, anchored-parallel-branch group start, backwards-in-time anchors, unanchored-chain sanity.
+- Not modified: WeekView, MonthView, ClockNode, MotherFrame — all read placements via the selector, so they pick up multi-anchor for free.
+
+### Implementation notes the spec did not pin (chosen by backend-dev)
+
+1. **`anchorTaskId` for an unanchored branch in a parallel group with an anchored sibling** — set to the anchored sibling that determined `groupStart` (earliest `scheduledFor` among anchored branches). Not the upstream sequential anchor.
+2. **Tie-break for parallel anchored branches with identical `scheduledFor`** — first encountered in `walkChain` branch-enumeration order wins.
+3. **`cursorAnchorId` after a parallel group with no anchored branch** — carries over from the previous sequential anchor unchanged.
+4. **`cursorAnchorId` after a parallel group with ≥1 anchored branch** — becomes the anchored branch that won `groupStart`. Downstream sequential derived tasks attribute to it.
+
+These are internals (not user-visible). They are documented here so future selector refactors don't accidentally regress them.
 
 ---
