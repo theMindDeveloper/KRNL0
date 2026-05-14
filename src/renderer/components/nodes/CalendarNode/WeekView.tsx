@@ -99,7 +99,8 @@ interface WeekViewProps {
 const GUTTER_WIDTH = 36; // px — time gutter width
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
 
-// Radial chooser options for habit scheduling (ADR 0002 §4 + §D binding).
+// Radial chooser options for habit scheduling (ADR 0002 A1 + A2 binding).
+// Weekly: purple (#a78bfa via --purple), Daily: cyan (#22d3ee via --cyan).
 type HabitScheduleKind = 'weekly' | 'daily';
 
 function makeHabitChooserOptions(): RadialOption<HabitScheduleKind>[] {
@@ -108,14 +109,14 @@ function makeHabitChooserOptions(): RadialOption<HabitScheduleKind>[] {
       id: 'weekly',
       label: 'EVERY WEEK',
       icon: '↺',
-      color: 'var(--cyan)',
+      color: 'var(--purple)',
       value: 'weekly',
     },
     {
       id: 'daily',
       label: 'EVERY DAY',
       icon: '◉',
-      color: 'var(--acid)',
+      color: 'var(--cyan)',
       value: 'daily',
     },
   ];
@@ -226,13 +227,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   // Column width fallback for NowLine.
   const NOMINAL_COLUMN_WIDTH = 40;
 
-  // ── RadialChooser for habit drops ───────────────────────────────────────────
+  // ── RadialChooser for habit drops (ADR 0002 A1) ─────────────────────────────
 
-  // pendingCellRef holds the cell context (dayYMD + hour) while the chooser is
-  // open. The habit payload is read from the module-level habitDrag singleton
-  // (set by HabitNode.WeekRow/MonthRow on dragStart) because
-  // DragEvent.dataTransfer.getData() returns '' during dragover.
-  const pendingCellRef = useRef<{
+  // dropCellRef captures the exact cell (dayYMD + hour) where the user released
+  // the drag. It is set ONLY in onDrop — no dragover bookkeeping. The onPick
+  // closure reads it; being a ref ensures no stale closure capture.
+  const dropCellRef = useRef<{
     dayYMD: string;
     hour: number;
   } | null>(null);
@@ -242,10 +242,10 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     innerRadius: 24,
     onPick: useCallback(
       (kind: HabitScheduleKind) => {
-        const cell = pendingCellRef.current;
+        const cell = dropCellRef.current;
         const habit = getHabitDrag();
         // Clear the cell ref immediately so stale data doesn't leak.
-        pendingCellRef.current = null;
+        dropCellRef.current = null;
         if (!cell || !habit) return;
 
         const timeOfDay = `${String(cell.hour).padStart(2, '0')}:00`;
@@ -265,29 +265,22 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       [onCommand],
     ),
     onCancel: useCallback(() => {
-      pendingCellRef.current = null;
+      dropCellRef.current = null;
     }, []),
   });
 
-  // ── Drop target handler factory ─────────────────────────────────────────────
+  // ── Drop target handler factory (ADR 0002 A1) ──────────────────────────────
 
   function makeCellHandlers(dayYMD: string, hour: number) {
     return {
       onDragOver: (e: DragEvent<HTMLDivElement>) => {
         const types = e.dataTransfer.types;
 
-        // ADR 0002 §4: habit MIME takes priority.
+        // A1: habit MIME — only prevent default + highlight. Do NOT open chooser.
         if (types.includes('application/krnl-habit')) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
           e.currentTarget.setAttribute('data-drop-target', 'true');
-          // Open chooser only once per entry (isOpen guard). Store cell context
-          // immediately — getData() returns '' during dragover; habit payload is
-          // read from the habitDrag singleton inside onPick.
-          if (!chooser.isOpen) {
-            pendingCellRef.current = { dayYMD, hour };
-            chooser.open({ x: e.clientX, y: e.clientY }, makeHabitChooserOptions());
-          }
           return;
         }
 
@@ -303,11 +296,17 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         e.preventDefault();
         e.currentTarget.removeAttribute('data-drop-target');
 
-        // ADR 0002 §4: if a habit drag is in flight, the RadialChooserHost
-        // window-level drop listener (capture phase) handles it via onPick.
-        // The cell onDrop (bubble phase) only needs to prevent the browser's
-        // default behaviour — which is already done above. Do NOT dispatch here.
+        // A1: habit drop — capture cell context at drop time, then open chooser.
+        // getData() is readable in onDrop (unlike onDragOver). habitDrag singleton
+        // is also set, but we confirm MIME first for correctness.
         if (e.dataTransfer.types.includes('application/krnl-habit')) {
+          // Set cell context from THIS drop event — the exact target cell.
+          dropCellRef.current = { dayYMD, hour };
+          // Open chooser at drop coordinates. onPick reads dropCellRef.
+          chooser.open(
+            { x: e.clientX, y: e.clientY },
+            makeHabitChooserOptions(),
+          );
           return;
         }
 
