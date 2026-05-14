@@ -1842,3 +1842,43 @@ You are unblocked. Implement against the contract above. Two reminders:
 Scheduling one task auto-places its `task.next` successor graph back-to-back via a new pure memoized selector `selectSchedule(board)` in `src/renderer/store/scheduleSelector.ts`. The dropped task's `TaskState.scheduledFor` is the **only** persisted time in its chain (the "anchor"); successor times are derived at read time. Invariant: at most one anchor per chain — `task.setSchedule` clears all other anchors in the chain before writing the new one. WeekView and MonthView swap raw `scheduledFor` reads for `selectScheduledTasksForRange`; ClockNode is unchanged. The shared chain walker (`buildChainIndex`, `walkChain`, `WalkUnit`) is extracted from `timelineSelector.ts` into a new module `src/renderer/store/chainWalker.ts` — a blessed exception to hard rule #2 (no cross-import between selector modules), documented as design pattern 6.10. Mid-chain drops re-anchor at the dropped task and unschedule predecessors (no back-computation). Breaks are invisible on calendar (pure `plannedMin` sum) — divergent from ClockNode by design. Back-compat migration `migrateNormalizeChainAnchors` keeps the earliest anchor when an existing board violates the invariant. No `BoardSchema.version` bump; no new persisted fields. Full Q1–Q7 resolutions and file-by-file contract in ADR 0003.
 
 ---
+
+## Decision 26 — Clock day-anchored rendering, concentric parallel rings, migration bug-fix, "Add next task" menu (2026-05-14)
+
+**Date:** 2026-05-14
+**Status:** Accepted
+**Author:** architect
+**ADR:** [adr/0004-clock-day-anchored-rendering.md](../adr/0004-clock-day-anchored-rendering.md)
+**Cross-reference:** extends ADR 0001 (Calendar), ADR 0003 (cascade scheduling), Decision 24 (Timeline selector).
+
+### Decision
+
+Four user-reported issues from post-ADR-0003 testing, locked in one ADR.
+
+1. **Bug — destructive migration deleted.** `migrateTaskChain` in `src/main/persistence/board.ts:146-186` is removed in full. It filters out every edge whose `to.nodeId` is a task id and rebuilds a linear chain by `createdAt` — silently destroying every parallel fork on every load. A regression test in `tests/unit/main/board.persistence.test.ts` locks parallel-fork survival across save/load. Gating the heuristic was rejected; the heuristic itself was never correct.
+
+2. **UX — TaskNode context menu gains "Add next task".** New command `task.addNext` (handler in `commandDispatch.ts` alongside `task.addSubtask`) creates a sequential chain successor: `parentTaskId = source.parentTaskId` (same level), one `task.next` edge from source. Menu order: Edit text · Add subtask · Add next task · Add parallel task · Delete. "Add sibling task" is renamed to **"Add parallel task"** (UI label only — `insertSiblingTaskAfter` and the inline-mode name `'sibling'` stay internal). "Add subtask" semantics (roll-up into parent's `plannedMin`, invisible on timeline per Decision 24 Q1) are unchanged.
+
+3. **Clock day-anchored rendering.** `ClockState` gains `selectedDate: string` (YYYY-MM-DD, independent of CalendarState). New commands: `clock.setSelectedDate`, `clock.advanceDay`, `clock.goToday`. ClockNode arc geometry consumes `selectScheduledTasksForRange(board, dayStartISO, dayEndISO)` for task placements (wall-clock positions on the dial) and `selectTimeline` for break-segment shapes only (dual-selector read — option A). Break arcs paint at `BREAK_R = R - 16 = 92` (inside the task ring) to avoid wall-clock collision with the immediately-following successor task (which begins at the predecessor's `endISO` per ADR 0003 §3.6). The documented Clock-vs-Calendar break-visibility divergence from ADR 0003 §4 is preserved. Tasks whose `endISO` spills past midnight clip at midnight (no wraparound — consistent with ADR 0003 forecloses). Unanchored todos render an empty dial + hint message; no fallback to relative-time rendering. Day-selector UI: `[←]  Wed YYYY-MM-DD  [TODAY]  [→]` above the dial. The existing 0h–12h / 12h–24h `viewWindow` toggle stays, repurposed from "chain minutes" to "day minutes," with no auto-flip when the selected half is empty.
+
+4. **Concentric rings for parallel-group branches.** `ScheduledTaskPlacement` gains `parallelBranchIndex: number | null` (populated by `scheduleSelector` from `walkChain` branch order). ClockNode paints branch `i` at radius `R + i * PARALLEL_OFFSET` (R=108, PARALLEL_OFFSET=12). Outermost is `branch[0]`. Stroke width is reduced from 18 to 10 for parallel branches so concentric rings have a 2px gap. Branches with index ≥ 4 collapse onto the innermost concentric ring with `mixBlendMode: multiply` (degrade-only; no `+N` indicator in v1). Non-parallel tasks paint at base R with strokeWidth 18 (unchanged). Multiple parallel groups in one day lay out independently — each group has its own concentric stack within its own arc range.
+
+### Files affected
+
+- Modified: `src/main/persistence/board.ts` (delete migration + add `selectedDate` default in `STATE_DEFAULTS['clock']`), `src/renderer/components/nodes/TaskNode/index.tsx` (menu items), `src/renderer/components/Canvas/commandDispatch.ts` (`task.addNext` + 3 clock commands), `src/renderer/components/nodes/ClockNode/types.ts` (`selectedDate`), `src/renderer/components/nodes/ClockNode/index.tsx` (full render rewrite), `src/renderer/store/scheduleSelector.ts` (`parallelBranchIndex`).
+- Tests: `tests/unit/main/board.persistence.test.ts` (fork-survival regression), `tests/unit/renderer/scheduleSelector.test.ts` (branch index ordering), `tests/unit/renderer/ClockNode.test.tsx` (day projection, concentric rings, empty-day hint, `advanceDay`), `commandDispatch.test.ts` (`task.addNext`), TaskNode menu test (label rename).
+- Not modified: `src/renderer/components/nodes/CalendarNode/{WeekView,MonthView}.tsx` (`parallelBranchIndex` is additive), `src/renderer/store/chainWalker.ts`, `src/renderer/store/timelineSelector.ts`, `boardStore.insertSiblingTaskAfter` (internal name preserved).
+
+### Slice ordering (binding for backend-dev)
+
+1. Migration deletion + regression test (standalone PR).
+2. `task.addNext` + menu rename (standalone PR).
+3. `parallelBranchIndex` selector field (data-only).
+4. ClockState `selectedDate` + day-selector commands (no render).
+5. ClockNode render rewrite (dual-selector read + concentric rings + day-selector UI + empty hint).
+
+Slices 1 & 2 are fully independent and may parallelise or interleave with 3–5. Slices 3 → 4 → 5 are strictly sequential.
+
+Full Q-resolutions, alternatives, and file-line-level contract in ADR 0004.
+
+---
