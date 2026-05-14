@@ -226,18 +226,23 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     // PowerShell launch flags:
     //  -NoLogo : suppress the multi-line copyright banner that would
     //            otherwise dominate the terminal viewport.
-    //  -NoExit -Command "..." : run an init snippet AFTER the profile loads
-    //            (so our settings win over the user's profile defaults), then
-    //            stay in interactive mode. We turn off PSReadLine's inline
-    //            prediction here — its ghost-text behavior looks like a
-    //            "space after the first 2 characters" bug on a fresh shell
-    //            with no command history to match against, and is more
-    //            confusing than helpful for KRNL0's terminal node.
+    //  -NoExit -Command "Remove-Module PSReadLine ..." : unload PSReadLine
+    //            entirely after the profile loads, then drop to interactive.
+    //            The "first-2-characters-then-gap-then-typed-text" visual
+    //            artifact users reported on Windows is PSReadLine's
+    //            re-rendering of the input line for prediction + syntax
+    //            highlighting — disabling -PredictionSource alone is not
+    //            enough on every PSReadLine version, so we unload the
+    //            module entirely. PowerShell falls back to its built-in
+    //            console host line editor (basic but bug-free).
     //
-    // Users who want the prediction back can either set
-    //   $env:KRNL0_KEEP_PSREADLINE_PREDICTION = '1'
-    // before launching the app, or change the option themselves at the
-    // prompt with `Set-PSReadLineOption -PredictionSource History`.
+    // Trade-off: users lose inline tab-completion enhancements, history
+    // suggestions, and syntax coloring at the prompt. Standard tab
+    // completion and arrow-key history still work via the host. Users
+    // who want PSReadLine back can opt out by setting
+    //   $env:KRNL0_KEEP_PSREADLINE = '1'
+    // in the environment before launching the app, or by re-importing
+    // at the prompt with `Import-Module PSReadLine`.
     //
     // Only applies to powershell.exe / pwsh.exe; cmd.exe and POSIX shells
     // ignore these flags.
@@ -247,14 +252,14 @@ export function registerHandlers(rpcServer?: RpcServer): void {
         || base === 'powershell' || base === 'pwsh';
       if (!isPwsh) return [];
       const args = ['-NoLogo'];
-      if (process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] !== '1') {
+      if (process.env['KRNL0_KEEP_PSREADLINE'] !== '1') {
         args.push(
           '-NoExit',
           '-Command',
-          // Wrap in try/catch so missing PSReadLine (old PS versions) doesn't
-          // abort the session. -ErrorAction SilentlyContinue handles older
-          // PSReadLine that didn't ship -PredictionSource.
-          "try { Set-PSReadLineOption -PredictionSource None -ErrorAction SilentlyContinue } catch {}",
+          // Bare single statement — avoids braces / quoting that node-pty's
+          // Windows command-line serialization sometimes mangles. -EA SC
+          // handles older PowerShell where the module name or flag differs.
+          'Remove-Module PSReadLine -ErrorAction SilentlyContinue',
         );
       }
       return args;
