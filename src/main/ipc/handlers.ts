@@ -223,6 +223,20 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     }
     childEnv['KRNL0_MAIN_PID'] = String(process.pid);
 
+    // Tell krnl-init.ps1 where claude/CLAUDE.md lives so the wrapped
+    // `claude` function runs the real binary with CWD = <project>/claude.
+    // Claude Code auto-discovers CLAUDE.md from the CWD upward, so a CWD
+    // hop is enough to load the in-app instructions without polluting
+    // the user's shell location. KRNL0_CLAUDE_HOME override wins for
+    // packaged builds where the resource path differs.
+    const claudeHome = process.env['KRNL0_CLAUDE_HOME']
+      ?? join(app.getAppPath(), 'claude');
+    try {
+      if (existsSync(claudeHome)) {
+        childEnv['KRNL0_CLAUDE_HOME'] = claudeHome;
+      }
+    } catch { /* ignore — function will no-op without the env var */ }
+
     // PowerShell launch flags:
     //  -NoLogo : suppress the multi-line copyright banner that would
     //            otherwise dominate the terminal viewport.
