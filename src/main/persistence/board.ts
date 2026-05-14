@@ -96,7 +96,7 @@ export function seedBoard(): PartialBoard {
         kind: 'clock',
         position: { x: 1252, y: 0 },
         isMother: true,
-        state: { linkedTodoId: null, viewWindow: 0 },
+        state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
         config: {},
       },
     ],
@@ -178,7 +178,8 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
   // Decision 24.2 — viewWindow replaces windowStartHour. Old field migrated out
   // by migrateClockState; STATE_DEFAULTS supplies the canonical shape for
   // boards that arrive without it.
-  clock: () => ({ linkedTodoId: null, viewWindow: 0 }),
+  // ADR 0004 §3 — selectedDate (YYYY-MM-DD, local) defaults to today on heal.
+  clock: () => ({ linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() }),
   // Decision 21: heal text/image child nodes saved with partial state.
   text: () => ({ text: '' }),
   image: () => ({
@@ -310,7 +311,7 @@ function migrateAddClockMother(board: Record<string, unknown>): Record<string, u
       kind: 'clock',
       position: { x: 1252, y: 0 },
       isMother: true,
-      state: { linkedTodoId: null, viewWindow: 0 },
+      state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
       config: {},
     },
   ];

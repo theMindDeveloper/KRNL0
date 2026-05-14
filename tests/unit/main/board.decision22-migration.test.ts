@@ -314,7 +314,11 @@ describe('Decision 22 — board migration', () => {
     expect(clock!.kind).toBe('clock');
     expect(clock!.position).toEqual({ x: 1252, y: 0 });
     expect(clock!.isMother).toBe(true);
-    expect(clock!.state).toEqual({ linkedTodoId: null, viewWindow: 0 });
+    // ADR 0004 §3 — selectedDate defaults to today (local) in the seed.
+    expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
+    expect((clock!.state as { selectedDate?: string }).selectedDate).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
     expect(clock!.config).toEqual({});
   });
 });

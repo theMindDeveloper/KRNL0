@@ -106,6 +106,9 @@ import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types'
 import {
   clockLinkTodo,
   clockSetViewWindow,
+  clockSetSelectedDate,
+  clockAdvanceDay,
+  clockGoToday,
 } from '../nodes/ClockNode/commands';
 import type { ClockState } from '../nodes/ClockNode/types';
 
@@ -326,6 +329,13 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: clockLinkTodo(clockState, args as never) };
         case 'clock.setViewWindow':
           return { state: clockSetViewWindow(clockState, args as never) };
+        // ADR 0004 §3.2 — day-selector commands.
+        case 'clock.setSelectedDate':
+          return { state: clockSetSelectedDate(clockState, args as never) };
+        case 'clock.advanceDay':
+          return { state: clockAdvanceDay(clockState, args as never) };
+        case 'clock.goToday':
+          return { state: clockGoToday(clockState) };
       }
       break;
     }
