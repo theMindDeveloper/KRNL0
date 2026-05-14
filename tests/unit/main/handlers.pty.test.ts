@@ -201,19 +201,26 @@ describe('F4 — pty:create', () => {
     }
   });
 
-  it('passes -NoLogo to PowerShell to suppress its startup banner', async () => {
+  it('passes -NoLogo to PowerShell and disables PSReadLine prediction by default', async () => {
     const { spawn } = await import('node-pty');
     const event = makeEvent();
 
-    const prev = process.env['KRNL0_SHELL'];
+    const prevShell = process.env['KRNL0_SHELL'];
+    const prevKeep = process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
     process.env['KRNL0_SHELL'] = 'powershell.exe';
+    delete process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
     try {
       await invoke('pty:create', event, 80, 24);
       const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(spawnCall[1]).toEqual(['-NoLogo']);
+      const args = spawnCall[1] as string[];
+      expect(args).toContain('-NoLogo');
+      expect(args).toContain('-NoExit');
+      expect(args).toContain('-Command');
+      expect(args.some((a) => a.includes('PredictionSource None'))).toBe(true);
     } finally {
-      if (prev === undefined) delete process.env['KRNL0_SHELL'];
-      else process.env['KRNL0_SHELL'] = prev;
+      if (prevShell === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prevShell;
+      if (prevKeep !== undefined) process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = prevKeep;
     }
   });
 
@@ -226,10 +233,33 @@ describe('F4 — pty:create', () => {
     try {
       await invoke('pty:create', event, 80, 24);
       const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(spawnCall[1]).toEqual(['-NoLogo']);
+      const args = spawnCall[1] as string[];
+      expect(args).toContain('-NoLogo');
     } finally {
       if (prev === undefined) delete process.env['KRNL0_SHELL'];
       else process.env['KRNL0_SHELL'] = prev;
+    }
+  });
+
+  it('preserves PSReadLine prediction when KRNL0_KEEP_PSREADLINE_PREDICTION=1', async () => {
+    const { spawn } = await import('node-pty');
+    const event = makeEvent();
+
+    const prevShell = process.env['KRNL0_SHELL'];
+    const prevKeep = process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+    process.env['KRNL0_SHELL'] = 'powershell.exe';
+    process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = '1';
+    try {
+      await invoke('pty:create', event, 80, 24);
+      const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const args = spawnCall[1] as string[];
+      expect(args).toEqual(['-NoLogo']);
+      expect(args).not.toContain('-Command');
+    } finally {
+      if (prevShell === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prevShell;
+      if (prevKeep === undefined) delete process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'];
+      else process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] = prevKeep;
     }
   });
 
