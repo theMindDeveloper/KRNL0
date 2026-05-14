@@ -15,6 +15,7 @@
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
+import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { NodeProps } from '../types';
@@ -419,16 +420,15 @@ const WeekRow = memo(function WeekRow({
 
   const handleDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
-      e.dataTransfer.setData(
-        'application/krnl-habit',
-        JSON.stringify({
-          habitId: habit.id,
-          habitMotherId,
-          color: habit.color,
-          name: habit.name,
-        }),
-      );
+      const payload = {
+        habitId: habit.id,
+        habitMotherId,
+        color: habit.color,
+        name: habit.name,
+      };
+      e.dataTransfer.setData('application/krnl-habit', JSON.stringify(payload));
       e.dataTransfer.effectAllowed = 'copy';
+      setHabitDrag(payload);
       const rowEl = rowRef.current;
       if (rowEl) {
         e.dataTransfer.setDragImage(rowEl, 0, rowEl.offsetHeight / 2);
@@ -437,12 +437,17 @@ const WeekRow = memo(function WeekRow({
     [habit.id, habit.color, habit.name, habitMotherId],
   );
 
+  const handleDragEnd = useCallback(() => {
+    clearHabitDrag();
+  }, []);
+
   return (
     <div
       ref={rowRef}
       data-habit-row={habit.id}
       draggable
       onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onContextMenu={(e) => onContextMenu(e, habit.id)}
       style={{
         paddingBottom: 8,
@@ -576,16 +581,15 @@ const MonthRow = memo(function MonthRow({
 
   const handleMonthDragStart = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
-      e.dataTransfer.setData(
-        'application/krnl-habit',
-        JSON.stringify({
-          habitId: habit.id,
-          habitMotherId,
-          color: habit.color,
-          name: habit.name,
-        }),
-      );
+      const payload = {
+        habitId: habit.id,
+        habitMotherId,
+        color: habit.color,
+        name: habit.name,
+      };
+      e.dataTransfer.setData('application/krnl-habit', JSON.stringify(payload));
       e.dataTransfer.effectAllowed = 'copy';
+      setHabitDrag(payload);
       const rowEl = monthRowRef.current;
       if (rowEl) {
         e.dataTransfer.setDragImage(rowEl, 0, rowEl.offsetHeight / 2);
@@ -593,6 +597,10 @@ const MonthRow = memo(function MonthRow({
     },
     [habit.id, habit.color, habit.name, habitMotherId],
   );
+
+  const handleMonthDragEnd = useCallback(() => {
+    clearHabitDrag();
+  }, []);
 
   const onRowClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -613,6 +621,7 @@ const MonthRow = memo(function MonthRow({
       data-habit-row={habit.id}
       draggable
       onDragStart={handleMonthDragStart}
+      onDragEnd={handleMonthDragEnd}
       onContextMenu={(e) => onContextMenu(e, habit.id)}
       style={{
         paddingBottom: 10,

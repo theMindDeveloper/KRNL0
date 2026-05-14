@@ -20,10 +20,14 @@ import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import type { CalendarState, CalendarConfig } from '../types';
+import { radialBus } from '../../../ui/RadialChooser/bus';
+import { setHabitDrag, clearHabitDrag } from '../../../../dnd/habitDrag';
 
 afterEach(() => {
   cleanup();
   useBoardStore.setState({ board: null });
+  clearHabitDrag();
+  radialBus.close();
 });
 
 // ── Factories ─────────────────────────────────────────────────────────────────
@@ -61,6 +65,40 @@ function setEmptyBoard() {
       edges: [],
     },
   });
+}
+
+// Make a minimal habit-mother node for the board store.
+function makeHabitNode(
+  id: string,
+  habits: Array<{
+    id: string;
+    name: string;
+    color?: string;
+    schedule?: {
+      kind: 'daily' | 'weekly' | 'weekdays';
+      timeOfDay: string;
+      days?: number[];
+    };
+  }>,
+) {
+  return {
+    id,
+    kind: 'habit',
+    position: { x: 0, y: 0 },
+    isMother: true,
+    state: {
+      habits: habits.map((h) => ({
+        id: h.id,
+        name: h.name,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        log: [],
+        archived: false,
+        color: h.color ?? 'acid',
+        ...(h.schedule ? { schedule: h.schedule } : {}),
+      })),
+    },
+    config: { weekStartsOn: 'monday', view: 'week' },
+  };
 }
 
 function makeTask(id: string, scheduledFor: string, plannedMin = 25) {
@@ -370,5 +408,170 @@ describe('WeekView — out-of-range task', () => {
     // Block should be positioned at top (row 0): top = 0.
     const style = (block as HTMLElement)?.style;
     expect(style?.top).toBe('0px');
+  });
+});
+
+// ── ADR 0002 — Habit drag-to-schedule (WeekView) ─────────────────────────────
+
+describe('WeekView — habit drag-to-schedule', () => {
+  // Anchor: 2026-05-11 (Monday). Week: Mon=05-11 … Sun=05-17.
+  // 2026-05-13 = Wednesday = ISO dow 3.
+  // 2026-05-14 = Thursday  = ISO dow 4.
+
+  beforeEach(() => setEmptyBoard());
+
+  it('dragover habit MIME opens chooser; onPick("daily") dispatches calendar.scheduleHabit', () => {
+    const onCommand = vi.fn();
+    render(
+      <WeekView
+        state={makeState({ anchorDate: '2026-05-11' })}
+        config={makeConfig()}
+        onCommand={onCommand}
+      />,
+    );
+
+    // Simulate the habit drag payload being stored by HabitNode.WeekRow.onDragStart.
+    setHabitDrag({ habitId: 'h1', habitMotherId: 'hm1', color: 'acid', name: 'Run' });
+
+    // Drag over Wednesday (2026-05-13) at hour 09.
+    const cell = document.querySelector('[data-testid="week-cell-2026-05-13-09"]');
+    expect(cell).toBeTruthy();
+
+    fireEvent.dragOver(cell!, {
+      dataTransfer: {
+        types: ['application/krnl-habit'],
+        dropEffect: 'copy',
+      },
+    });
+
+    // The chooser should now be open (pendingCellRef populated, bus has session).
+    expect(radialBus.session).not.toBeNull();
+
+    // Simulate the RadialChooserHost window drop handler calling onPick.
+    const session = radialBus.session!;
+    const dailyOpt = session.options.find((o) => o.value === 'daily');
+    expect(dailyOpt).toBeTruthy();
+    session.onPick(dailyOpt!.value, dailyOpt!);
+
+    expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
+      habitId: 'h1',
+      habitMotherId: 'hm1',
+      schedule: { kind: 'daily', timeOfDay: '09:00' },
+    });
+  });
+
+  it('onPick("weekly") dispatches calendar.scheduleHabit with correct IsoDow for the cell', () => {
+    const onCommand = vi.fn();
+    render(
+      <WeekView
+        state={makeState({ anchorDate: '2026-05-11' })}
+        config={makeConfig()}
+        onCommand={onCommand}
+      />,
+    );
+
+    setHabitDrag({ habitId: 'h2', habitMotherId: 'hm1', color: 'cyan', name: 'Yoga' });
+
+    // Thursday (2026-05-14 = ISO dow 4) at hour 07.
+    const cell = document.querySelector('[data-testid="week-cell-2026-05-14-07"]');
+    expect(cell).toBeTruthy();
+
+    fireEvent.dragOver(cell!, {
+      dataTransfer: {
+        types: ['application/krnl-habit'],
+        dropEffect: 'copy',
+      },
+    });
+
+    const session = radialBus.session!;
+    const weeklyOpt = session.options.find((o) => o.value === 'weekly');
+    expect(weeklyOpt).toBeTruthy();
+    session.onPick(weeklyOpt!.value, weeklyOpt!);
+
+    expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
+      habitId: 'h2',
+      habitMotherId: 'hm1',
+      schedule: { kind: 'weekly', timeOfDay: '07:00', days: [4] },
+    });
+  });
+});
+
+describe('WeekView — habit block visualisation', () => {
+  // Anchor 2026-05-11 (Monday). Week Mon–Sun = 05-11 … 05-17.
+  // 2026-05-13 = Wednesday = ISO dow 3.
+
+  it('daily habit block renders in all 7 day columns', () => {
+    useBoardStore.setState({
+      board: {
+        version: 1,
+        schemaVersion: 1,
+        savedAt: new Date().toISOString(),
+        viewport: { x: 0, y: 0, zoom: 1 },
+        nodes: [
+          makeHabitNode('hm1', [
+            { id: 'h1', name: 'Run', color: 'acid', schedule: { kind: 'daily', timeOfDay: '08:00' } },
+          ]),
+        ],
+        edges: [],
+      },
+    });
+
+    render(
+      <WeekView
+        state={makeState({ anchorDate: '2026-05-11' })}
+        config={makeConfig()}
+        onCommand={noop}
+      />,
+    );
+
+    // All 7 days of the week should have a habit block for h1.
+    const weekDays = ['2026-05-11', '2026-05-12', '2026-05-13', '2026-05-14', '2026-05-15', '2026-05-16', '2026-05-17'];
+    for (const day of weekDays) {
+      const block = document.querySelector(`[data-testid="habit-block-h1-${day}"]`);
+      expect(block, `Expected habit block in column ${day}`).toBeTruthy();
+    }
+  });
+
+  it('weekly habit block renders only in the matching weekday column', () => {
+    // Schedule on Wednesday (ISO dow 3 = days:[3]).
+    useBoardStore.setState({
+      board: {
+        version: 1,
+        schemaVersion: 1,
+        savedAt: new Date().toISOString(),
+        viewport: { x: 0, y: 0, zoom: 1 },
+        nodes: [
+          makeHabitNode('hm1', [
+            {
+              id: 'h2',
+              name: 'Yoga',
+              color: 'cyan',
+              schedule: { kind: 'weekly', timeOfDay: '07:00', days: [3] },
+            },
+          ]),
+        ],
+        edges: [],
+      },
+    });
+
+    render(
+      <WeekView
+        state={makeState({ anchorDate: '2026-05-11' })}
+        config={makeConfig()}
+        onCommand={noop}
+      />,
+    );
+
+    // Wednesday column should have the block.
+    expect(document.querySelector('[data-testid="habit-block-h2-2026-05-13"]')).toBeTruthy();
+
+    // All other columns should not have the block.
+    const nonWedDays = ['2026-05-11', '2026-05-12', '2026-05-14', '2026-05-15', '2026-05-16', '2026-05-17'];
+    for (const day of nonWedDays) {
+      expect(
+        document.querySelector(`[data-testid="habit-block-h2-${day}"]`),
+        `Expected NO habit block in column ${day}`,
+      ).toBeNull();
+    }
   });
 });

@@ -14,6 +14,7 @@ import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
 import { useRadialChooser } from '../../ui/RadialChooser';
 import type { RadialOption } from '../../ui/RadialChooser';
+import { getHabitDrag } from '../../../dnd/habitDrag';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -227,11 +228,11 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
 
   // ── RadialChooser for habit drops ───────────────────────────────────────────
 
-  // pendingHabitDrop holds the habit payload while the chooser is open.
-  // It is read when onPick fires.
-  const pendingHabitRef = useRef<{
-    habitId: string;
-    habitMotherId: string;
+  // pendingCellRef holds the cell context (dayYMD + hour) while the chooser is
+  // open. The habit payload is read from the module-level habitDrag singleton
+  // (set by HabitNode.WeekRow/MonthRow on dragStart) because
+  // DragEvent.dataTransfer.getData() returns '' during dragover.
+  const pendingCellRef = useRef<{
     dayYMD: string;
     hour: number;
   } | null>(null);
@@ -241,12 +242,14 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     innerRadius: 24,
     onPick: useCallback(
       (kind: HabitScheduleKind) => {
-        const pending = pendingHabitRef.current;
-        if (!pending) return;
-        pendingHabitRef.current = null;
+        const cell = pendingCellRef.current;
+        const habit = getHabitDrag();
+        // Clear the cell ref immediately so stale data doesn't leak.
+        pendingCellRef.current = null;
+        if (!cell || !habit) return;
 
-        const timeOfDay = `${String(pending.hour).padStart(2, '0')}:00`;
-        const isoDow = ymdToIsoDow(pending.dayYMD);
+        const timeOfDay = `${String(cell.hour).padStart(2, '0')}:00`;
+        const isoDow = ymdToIsoDow(cell.dayYMD);
 
         const schedule: HabitSchedule =
           kind === 'daily'
@@ -254,15 +257,15 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             : { kind: 'weekly', timeOfDay, days: [isoDow] };
 
         onCommand('calendar.scheduleHabit', {
-          habitId: pending.habitId,
-          habitMotherId: pending.habitMotherId,
+          habitId: habit.habitId,
+          habitMotherId: habit.habitMotherId,
           schedule,
         });
       },
       [onCommand],
     ),
     onCancel: useCallback(() => {
-      pendingHabitRef.current = null;
+      pendingCellRef.current = null;
     }, []),
   });
 
@@ -278,13 +281,11 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
           e.currentTarget.setAttribute('data-drop-target', 'true');
-          // Open chooser only once per entry (isOpen guard).
+          // Open chooser only once per entry (isOpen guard). Store cell context
+          // immediately — getData() returns '' during dragover; habit payload is
+          // read from the habitDrag singleton inside onPick.
           if (!chooser.isOpen) {
-            const raw = e.dataTransfer.getData('application/krnl-habit');
-            // Note: getData returns '' during dragover in most browsers.
-            // We store the cell data so onDrop can use it via pendingHabitRef.
-            // The actual payload is extracted in onDrop.
-            void raw;
+            pendingCellRef.current = { dayYMD, hour };
             chooser.open({ x: e.clientX, y: e.clientY }, makeHabitChooserOptions());
           }
           return;
@@ -302,27 +303,11 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         e.preventDefault();
         e.currentTarget.removeAttribute('data-drop-target');
 
-        // ADR 0002 §4: check habit MIME first.
-        const habitRaw = e.dataTransfer.getData('application/krnl-habit');
-        if (habitRaw) {
-          const payload = JSON.parse(habitRaw) as {
-            habitId?: string;
-            habitMotherId?: string;
-          };
-          if (payload.habitId && payload.habitMotherId) {
-            // Store for the chooser's onPick callback.
-            pendingHabitRef.current = {
-              habitId: payload.habitId,
-              habitMotherId: payload.habitMotherId,
-              dayYMD,
-              hour,
-            };
-          }
-          // The chooser handles the rest via window-level drop listener.
-          // If chooser was not open (e.g. drop happened immediately), close.
-          if (!chooser.isOpen) {
-            pendingHabitRef.current = null;
-          }
+        // ADR 0002 §4: if a habit drag is in flight, the RadialChooserHost
+        // window-level drop listener (capture phase) handles it via onPick.
+        // The cell onDrop (bubble phase) only needs to prevent the browser's
+        // default behaviour — which is already done above. Do NOT dispatch here.
+        if (e.dataTransfer.types.includes('application/krnl-habit')) {
           return;
         }
 
