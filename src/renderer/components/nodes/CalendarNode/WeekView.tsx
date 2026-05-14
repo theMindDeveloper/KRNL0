@@ -227,7 +227,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         e.dataTransfer.setData(
           'application/krnl-task',
-          JSON.stringify({ taskId: task.id, durationMin: task.plannedMin }),
+          JSON.stringify({ taskId: task.id, durationMin: task.scheduledDurationMin }),
         );
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
@@ -503,7 +503,6 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               rowHeight={rowHeight}
               columnWidth={NOMINAL_COLUMN_WIDTH}
               gutterWidth={0}
-              todayColumnIndex={todayColIndex}
             />
           )}
         </div>

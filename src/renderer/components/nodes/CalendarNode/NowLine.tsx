@@ -12,7 +12,6 @@ export interface NowLineProps {
   rowHeight: number;
   columnWidth: number;
   gutterWidth: number;
-  todayColumnIndex: number;     // 0-based index of today within Mon-Sun (0=Mon, 6=Sun)
 }
 
 // Parse a YYYY-MM-DD to a Date at local midnight.
@@ -33,7 +32,6 @@ export function NowLine({
   rowHeight,
   columnWidth,
   gutterWidth,
-  todayColumnIndex,
 }: NowLineProps) {
   const [now, setNow] = useState(() => new Date());
 
@@ -46,6 +44,10 @@ export function NowLine({
   const todayYMD = toYMD(now);
   const weekEndDate = addDays(weekStartDate, 7);
   if (todayYMD < weekStartDate || todayYMD >= weekEndDate) return null;
+
+  // Compute today's column index (0=Mon, 6=Sun) from weekStartDate + todayYMD.
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStartDate, i));
+  const todayColumnIndex = weekDays.indexOf(todayYMD);
 
   // Only render if current hour is within hourRange.
   const currentHour = now.getHours();
