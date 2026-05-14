@@ -1,4 +1,4 @@
-import { app, ipcMain, BrowserWindow } from 'electron';
+import { app, ipcMain, BrowserWindow, clipboard } from 'electron';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -138,6 +138,11 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   // Expose cliDispatch on the facade so sys:run can use it for Phase 2 commands.
   // We attach it to the ipcMain context via a module-level variable.
   cliDispatchFn = cliDispatch;
+
+  ipcMain.handle('clipboard:readText', () => clipboard.readText());
+  ipcMain.handle('clipboard:writeText', (_event, text: string) => {
+    clipboard.writeText(text);
+  });
 
   ipcMain.handle('brain:ask', async (_event, prompt: string) => {
     // TODO (Week 5): route to active BrainProvider instance (created by BrainFactory)

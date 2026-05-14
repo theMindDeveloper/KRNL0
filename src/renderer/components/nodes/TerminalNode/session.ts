@@ -29,6 +29,9 @@ export interface KrnlBridge {
   ptyKill(sessionId: string): void | Promise<void>;
   onPtyData(sessionId: string, callback: (data: string) => void): () => void;
   onPtyExit(sessionId: string, callback: () => void): () => void;
+  // Optional in tests — only the production bridge implements clipboard.
+  clipboardReadText?(): Promise<string>;
+  clipboardWriteText?(text: string): Promise<void>;
 }
 
 export interface SessionDeps {
@@ -98,30 +101,42 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
     onCommand('term.sessionEnd', { sessionId: sid });
   });
 
-  // Issue #75: Ctrl+C must always reach the PTY. With a selection, copy to
-  // clipboard. Without a selection, send 0x03 (SIGINT/ETX) so the running
-  // process is interrupted. We do this via attachCustomKeyEventHandler so
-  // we don't rely on xterm's variable default behaviour, which can drop
-  // 0x03 under Electron when the helper textarea loses focus mid-press.
+  // Custom key handling — must use attachCustomKeyEventHandler (not a
+  // bubble-phase React onKeyDown) because xterm processes keydown internally
+  // before bubbling, and would otherwise transmit the raw control bytes
+  // (^C, ^V) to the PTY before we get a chance to suppress them.
+  //
+  // Ctrl+C:  selection → copy. No selection → send 0x03 (SIGINT/ETX).
+  // Ctrl+V / Ctrl+Shift+V: read clipboard, write to PTY (bracketed paste
+  //   awareness is left to the shell).
   term.attachCustomKeyEventHandler?.((event) => {
     if (event.type !== 'keydown') return true;
-    const isCtrlC =
-      (event.ctrlKey || event.metaKey) &&
-      !event.shiftKey &&
-      !event.altKey &&
-      (event.key === 'c' || event.key === 'C');
-    if (!isCtrlC) return true;
+    const mod = event.ctrlKey || event.metaKey;
+    if (!mod || event.altKey) return true;
 
-    const sel = term.getSelection?.() ?? '';
-    if (sel) {
-      // Copy and let the PTY keep running.
-      try { void navigator.clipboard.writeText(sel); } catch { /* ignore */ }
-      term.clearSelection?.();
+    const k = event.key;
+
+    if (!event.shiftKey && (k === 'c' || k === 'C')) {
+      const sel = term.getSelection?.() ?? '';
+      if (sel) {
+        void krnl.clipboardWriteText?.(sel);
+        term.clearSelection?.();
+        return false;
+      }
+      void krnl.ptyWrite(sid, '\x03');
       return false;
     }
-    // No selection — interrupt the running process.
-    void krnl.ptyWrite(sid, '\x03');
-    return false;
+
+    if (k === 'v' || k === 'V') {
+      // Prevent xterm from emitting ^V (0x16) to the pty, then paste.
+      void (async () => {
+        const text = await krnl.clipboardReadText?.();
+        if (text) void krnl.ptyWrite(sid, text);
+      })();
+      return false;
+    }
+
+    return true;
   });
 
   // F5: xterm input → pty:write.

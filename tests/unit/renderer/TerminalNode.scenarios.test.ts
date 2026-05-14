@@ -79,6 +79,8 @@ function makeKrnl(sessionId = 'sid-test'): {
   ptyKillMock: Mock;
   onPtyDataMock: Mock;
   onPtyExitMock: Mock;
+  clipboardReadTextMock: Mock;
+  clipboardWriteTextMock: Mock;
   /** Call to fire a simulated pty:data event */
   fireData: (data: string) => void;
   /** Call to fire a simulated pty:exit event */
@@ -99,6 +101,8 @@ function makeKrnl(sessionId = 'sid-test'): {
     exitCallback = cb;
     return vi.fn(); // cleanup
   });
+  const clipboardReadTextMock = vi.fn().mockResolvedValue('');
+  const clipboardWriteTextMock = vi.fn().mockResolvedValue(undefined);
 
   const bridge: KrnlBridge = {
     ptyCreate: ptyCreateMock,
@@ -107,6 +111,8 @@ function makeKrnl(sessionId = 'sid-test'): {
     ptyKill: ptyKillMock,
     onPtyData: onPtyDataMock,
     onPtyExit: onPtyExitMock,
+    clipboardReadText: clipboardReadTextMock,
+    clipboardWriteText: clipboardWriteTextMock,
   };
 
   return {
@@ -117,6 +123,8 @@ function makeKrnl(sessionId = 'sid-test'): {
     ptyKillMock,
     onPtyDataMock,
     onPtyExitMock,
+    clipboardReadTextMock,
+    clipboardWriteTextMock,
     fireData: (data) => dataCallback?.(data),
     fireExit: () => exitCallback?.(),
   };
@@ -505,10 +513,6 @@ describe('#75 — Ctrl+C → SIGINT or copy', () => {
     const term = makeTermWithKeyHandler();
     term.selection = 'hello';
 
-    // Stub navigator.clipboard so writeText doesn't blow up under Node.
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal('navigator', { clipboard: { writeText } });
-
     const fit = makeFit();
     const krnl = makeKrnl();
     const deps: SessionDeps = {
@@ -525,13 +529,37 @@ describe('#75 — Ctrl+C → SIGINT or copy', () => {
     const result = term.keyHandler!(fakeEvent);
 
     expect(result).toBe(false);
-    expect(writeText).toHaveBeenCalledWith('hello');
+    expect(krnl.clipboardWriteTextMock).toHaveBeenCalledWith('hello');
     expect(term.clearSelectionCalled).toBe(true);
     // Critical: must NOT have sent 0x03
     const calls = krnl.ptyWriteMock.mock.calls.map((c) => c[1]);
     expect(calls).not.toContain('\x03');
+  });
 
-    vi.unstubAllGlobals();
+  it('Ctrl+V reads clipboard, writes text to PTY, blocks ^V byte', async () => {
+    const term = makeTermWithKeyHandler();
+    const fit = makeFit();
+    const krnl = makeKrnl();
+    krnl.clipboardReadTextMock.mockResolvedValue('pasted text');
+
+    const deps: SessionDeps = {
+      term,
+      fit,
+      krnl: krnl.bridge,
+      onCommand: vi.fn(),
+      setSessionId: vi.fn(),
+      isCancelled: () => false,
+    };
+    await startTerminalSession(deps);
+
+    const fakeEvent = { type: 'keydown', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false, key: 'v' } as KeyboardEvent;
+    const result = term.keyHandler!(fakeEvent);
+    expect(result).toBe(false); // blocks xterm's default ^V transmission
+
+    // Allow the async paste continuation to flush.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(krnl.clipboardReadTextMock).toHaveBeenCalled();
+    expect(krnl.ptyWriteMock).toHaveBeenCalledWith('sid-test', 'pasted text');
   });
 
   it('non-Ctrl+C keys are passed through (handler returns true)', async () => {

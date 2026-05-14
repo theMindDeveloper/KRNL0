@@ -22,17 +22,15 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
   const copySelection = () => {
     const sel = termRef.current?.getSelection() ?? '';
     if (sel) {
-      try { void navigator.clipboard.writeText(sel); } catch { /* ignore */ }
+      void window.krnl?.clipboardWriteText(sel);
       termRef.current?.clearSelection();
     }
   };
   const pasteClipboard = async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) window.krnl?.ptyWrite(sid, text);
-    } catch { /* ignore */ }
+    const text = await window.krnl?.clipboardReadText();
+    if (text) void window.krnl?.ptyWrite(sid, text);
   };
   const selectAll = () => termRef.current?.selectAll();
 
@@ -286,15 +284,14 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           }}
           onKeyDown={(e) => {
             e.stopPropagation();
-            // Standard terminal copy/paste — Ctrl+Shift+C / Ctrl+Shift+V.
-            // Ctrl+C alone is reserved for SIGINT (see session.ts).
+            // Ctrl+Shift+C → explicit copy (Ctrl+C alone is SIGINT, handled
+            // in session.ts attachCustomKeyEventHandler).
+            // Paste (Ctrl+V / Ctrl+Shift+V) is also handled in session.ts
+            // at the xterm level so xterm doesn't transmit ^V to the pty.
             const mod = e.ctrlKey || e.metaKey;
             if (mod && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
               e.preventDefault();
               copySelection();
-            } else if (mod && e.shiftKey && (e.key === 'V' || e.key === 'v')) {
-              e.preventDefault();
-              void pasteClipboard();
             }
           }}
           onKeyUp={(e) => e.stopPropagation()}

@@ -57,4 +57,10 @@ contextBridge.exposeInMainWorld('krnl', {
   cliDispatchReply: (id: string, ok: boolean, message: string) => {
     ipcRenderer.send("cli:dispatch:reply", id, ok, message)
   },
+
+  // Clipboard — routed through main because navigator.clipboard is flaky in
+  // Electron (silent fails on permission/focus quirks). main has Electron's
+  // clipboard module which works unconditionally.
+  clipboardReadText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText'),
+  clipboardWriteText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:writeText', text),
 })
