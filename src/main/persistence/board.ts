@@ -143,48 +143,6 @@ function migrateMotherPositions(board: unknown): Record<string, unknown> {
   return b as Record<string, unknown>;
 }
 
-function migrateTaskChain(board: Record<string, unknown>): Record<string, unknown> {
-  const nodes = board['nodes'];
-  if (!Array.isArray(nodes)) return board;
-  const edges = board['edges'];
-  const edgeArr = Array.isArray(edges) ? edges : [];
-
-  type TaskNodeShape = { id: string; kind: string; state?: { createdAt?: string } };
-  const tasks = nodes.filter((n: unknown): n is TaskNodeShape => {
-    return typeof n === 'object' && n !== null && (n as { kind?: unknown }).kind === 'todo.task';
-  });
-  if (tasks.length === 0) {
-    board['edges'] = edgeArr;
-    return board;
-  }
-
-  const taskIds = new Set(tasks.map((t) => t.id));
-
-  const sorted = [...tasks].sort((a, b) => {
-    const ca = a.state?.createdAt ?? '';
-    const cb = b.state?.createdAt ?? '';
-    return ca < cb ? -1 : ca > cb ? 1 : 0;
-  });
-
-  type EdgeShape = { id: string; from: { nodeId: string; event: string }; to: { nodeId: string; command: string }; enabled?: boolean };
-  const cleaned = edgeArr.filter((e: unknown) => {
-    if (typeof e !== 'object' || e === null) return false;
-    const ed = e as { to?: { nodeId?: string } };
-    return !taskIds.has(ed.to?.nodeId ?? '');
-  }) as EdgeShape[];
-
-  for (let i = 1; i < sorted.length; i++) {
-    cleaned.push({
-      id: `edge-chain-${sorted[i]!.id}`,
-      from: { nodeId: sorted[i - 1]!.id, event: 'task.next' },
-      to: { nodeId: sorted[i]!.id, command: 'task.activate' },
-      enabled: true,
-    });
-  }
-  board['edges'] = cleaned;
-  return board;
-}
-
 const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
   // Decision 22: `activeTaskId` is the new field on PomoState. Older boards
   // get it backfilled to `null` (default mode).
@@ -664,7 +622,7 @@ export function loadBoardFrom(boardPath: string): unknown {
                   migrateAddCalendarMother(
                     migrateTaskPlannedMin(
                       migratePomoConfig(
-                        migrateTaskChain(migrateMotherPositions(parsed)),
+                        migrateMotherPositions(parsed),
                       ),
                     ),
                   ),
