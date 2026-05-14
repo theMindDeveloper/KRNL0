@@ -28,6 +28,9 @@ krnl <group> <subcommand> [args]
 - Talks to the running Electron process over a per-launch RPC pipe (auth-token gated).
 - Every mutation broadcasts to the open canvas — your changes appear instantly without reload.
 - Exit code: `0` success · `1` user/command error · `2` "requires an open renderer" (some commands like `viewport`, `undo`, `theme` need a window open).
+- **`sys ...` is a deprecated alias** that prints "sys is deprecated" to stderr and forwards to `krnl`. Use `krnl`.
+
+**Edges are visual-only today.** The CLI lets you add, list, enable, disable, and remove edges. They render as lines on the canvas. They do **not** automatically fire `to.command` when `from.event` is emitted — runtime edge dispatch is in the architecture but not wired in the renderer. If a user asks you to "wire X to Y so Y reacts when X does", be honest: you can draw the wire, but you'll need to run the target command yourself. See `skills/wire-edge.md`.
 
 **Self-discovery:**
 ```
