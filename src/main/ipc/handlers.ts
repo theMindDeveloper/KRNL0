@@ -226,23 +226,22 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     // PowerShell launch flags:
     //  -NoLogo : suppress the multi-line copyright banner that would
     //            otherwise dominate the terminal viewport.
-    //  -NoExit -Command "Remove-Module PSReadLine ..." : unload PSReadLine
-    //            entirely after the profile loads, then drop to interactive.
-    //            The "first-2-characters-then-gap-then-typed-text" visual
-    //            artifact users reported on Windows is PSReadLine's
-    //            re-rendering of the input line for prediction + syntax
-    //            highlighting — disabling -PredictionSource alone is not
-    //            enough on every PSReadLine version, so we unload the
-    //            module entirely. PowerShell falls back to its built-in
-    //            console host line editor (basic but bug-free).
+    //  -NoExit -File "krnl-init.ps1" : load profile, then run our init
+    //            script (which lives in $KRNL0_CLI_DIR), then drop to
+    //            interactive. The script disables PSReadLine's inline
+    //            prediction feature (the "first-2-chars-then-gap" visual
+    //            artifact users reported) but KEEPS PSReadLine itself
+    //            loaded so syntax coloring, tab completion, and screen
+    //            clearing (cls / Clear-Host) all work normally.
     //
-    // Trade-off: users lose inline tab-completion enhancements, history
-    // suggestions, and syntax coloring at the prompt. Standard tab
-    // completion and arrow-key history still work via the host. Users
-    // who want PSReadLine back can opt out by setting
-    //   $env:KRNL0_KEEP_PSREADLINE = '1'
-    // in the environment before launching the app, or by re-importing
-    // at the prompt with `Import-Module PSReadLine`.
+    // Why a file and not -Command: node-pty's Windows command-line
+    // serialization mangles -Command payloads that contain braces or
+    // quotes. Passing -File path-to-a-script.ps1 is just a path — a
+    // single safe argv item with no quoting hazards.
+    //
+    // Opt-out: KRNL0_KEEP_PSREADLINE_PREDICTION=1 in env before app
+    // launch, or `Set-PSReadLineOption -PredictionSource History` at
+    // the prompt.
     //
     // Only applies to powershell.exe / pwsh.exe; cmd.exe and POSIX shells
     // ignore these flags.
@@ -252,15 +251,9 @@ export function registerHandlers(rpcServer?: RpcServer): void {
         || base === 'powershell' || base === 'pwsh';
       if (!isPwsh) return [];
       const args = ['-NoLogo'];
-      if (process.env['KRNL0_KEEP_PSREADLINE'] !== '1') {
-        args.push(
-          '-NoExit',
-          '-Command',
-          // Bare single statement — avoids braces / quoting that node-pty's
-          // Windows command-line serialization sometimes mangles. -EA SC
-          // handles older PowerShell where the module name or flag differs.
-          'Remove-Module PSReadLine -ErrorAction SilentlyContinue',
-        );
+      const cliDir = process.env['KRNL0_CLI_DIR'];
+      if (cliDir && process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] !== '1') {
+        args.push('-NoExit', '-File', join(cliDir, 'krnl-init.ps1'));
       }
       return args;
     })();
