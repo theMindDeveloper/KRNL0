@@ -7,8 +7,10 @@
 import * as net from 'net';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import { BrowserWindow } from 'electron';
 import { SysFacade } from '../../sys/SysFacade';
 import type { CliDispatchFn } from '../../sys/SysFacade';
+import { notifyBoardChanged } from '../boardIo';
 
 export interface RpcServer {
   socketPath: string;
@@ -89,6 +91,8 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
           const dispatch = getDispatch?.() ?? null;
           const facade = new SysFacade({
             boardPath,
+            hasOpenRenderer: () => BrowserWindow.getAllWindows().length > 0,
+            onBoardChanged: notifyBoardChanged,
             ...(dispatch ? { cliDispatch: dispatch } : {}),
           });
           let result: { ok: boolean; message?: string };
