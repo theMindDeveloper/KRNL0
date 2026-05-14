@@ -232,10 +232,40 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
-  const { screenToFlowPosition, getNodes } = useReactFlow();
+  const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
+
+  // ── Fit-view on first launch (Architect Amendment B) ──────────────────────
+  // When the persisted viewport equals the legacy seed sentinel {0, 220, 1},
+  // it means the user has never panned/zoomed (fresh board) — or the viewport
+  // was previously clobbered by the now-removed migrateMotherPositions bug.
+  // In that case we fire fitView once so all 5 mothers are visible in the
+  // initial view. The didFitRef guard ensures this runs at most once per session.
+  const didFitRef = useRef(false);
+  const rfNodes = useBoardStore((s) => s.board?.nodes ?? []);
+
+  useEffect(() => {
+    if (didFitRef.current) return;
+    if (rfNodes.length === 0) return;
+    if (
+      initialViewport.x !== 0 ||
+      initialViewport.y !== 220 ||
+      initialViewport.zoom !== 1
+    ) {
+      // User has a real persisted viewport — do not fit.
+      didFitRef.current = true;
+      return;
+    }
+    // Sentinel matched — fit to mother nodes.
+    const motherIds = rfNodes
+      .filter((n) => (n as { isMother?: boolean }).isMother === true)
+      .map((n) => ({ id: (n as { id: string }).id }));
+    if (motherIds.length === 0) return;
+    fitView({ padding: 0.15, includeHiddenNodes: false, nodes: motherIds, duration: 0 });
+    didFitRef.current = true;
+  }, [rfNodes.length, initialViewport, fitView]);
 
   const addEdge = useBoardStore((s) => s.addEdge);
   const removeNode = useBoardStore((s) => s.removeNode);
@@ -407,7 +437,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       y: window.innerHeight / 2,
     });
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
-      pomo: {}, todo: {}, habit: {}, term: {},
+      pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
       'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
       text: { text: '' },
       image: {},
@@ -454,8 +484,14 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const existingEdges = board?.edges ?? [];
     const sourceNode = nodes.find((n) => n.id === conn.source);
     const targetNode = nodes.find((n) => n.id === conn.target);
-    const bothTasks = sourceNode?.kind === 'todo.task' && targetNode?.kind === 'todo.task';
-    const event = bothTasks ? 'task.next' : 'link';
+    const srcIsTask = sourceNode?.kind === 'todo.task';
+    const tgtIsTask = targetNode?.kind === 'todo.task';
+    const srcIsHabitLane = sourceNode?.kind === 'habit.lane';
+    const tgtIsHabitLane = targetNode?.kind === 'habit.lane';
+    const isTaskFlow =
+      (srcIsTask && (tgtIsTask || tgtIsHabitLane)) ||
+      (srcIsHabitLane && tgtIsTask);
+    const event = isTaskFlow ? 'task.next' : 'link';
 
     // Dedup: refuse to add a second edge with the same (source, target, event).
     // Drag-to-connect is easy to fire twice; the canvas should not accumulate
@@ -468,11 +504,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     );
     if (duplicate) return;
 
-    const edge: KrnlEdge = bothTasks
+    const targetCommand = tgtIsHabitLane ? 'habit.markDone' : 'task.activate';
+    const edge: KrnlEdge = isTaskFlow
       ? {
           id: `edge-${crypto.randomUUID()}`,
           from: { nodeId: conn.source, event: 'task.next' },
-          to: { nodeId: conn.target, command: 'task.activate' },
+          to: { nodeId: conn.target, command: targetCommand },
           enabled: true,
         }
       : {

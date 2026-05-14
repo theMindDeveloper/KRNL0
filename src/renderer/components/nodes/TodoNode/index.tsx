@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TodoConfig, TodoItem, TodoState } from './types';
 import { visibleItems } from './commands';
@@ -35,6 +35,20 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   } | null>(null);
 
   const rawItems = visibleItems(state, config);
+
+  // Build a map from taskNodeId → plannedMin so drag payloads can include duration.
+  const taskPlannedMin = useBoardStore(
+    useShallow((s): Map<string, number> => {
+      if (!s.board) return new Map();
+      const map = new Map<string, number>();
+      for (const n of s.board.nodes) {
+        if (n.kind !== 'todo.task') continue;
+        const st = n.state as { plannedMin?: number; durationMin?: number };
+        map.set(n.id, st.plannedMin ?? st.durationMin ?? 25);
+      }
+      return map;
+    }),
+  );
 
   // Bug 5: Sort items by chain order. Items are grouped into undone/done buckets
   // first, then within each bucket sorted by their position in the task.next chain.
@@ -271,6 +285,19 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               <div
                 key={item.id}
                 className={`todo-item${item.done ? ' done' : ''}`}
+                draggable={true}
+                onDragStart={(e: DragEvent<HTMLDivElement>) => {
+                  if (item.done) { e.preventDefault(); return; }
+                  const durationMin = item.taskNodeId !== null
+                    ? (taskPlannedMin.get(item.taskNodeId) ?? 25)
+                    : 25;
+                  const payload = item.taskNodeId !== null
+                    ? { taskId: item.taskNodeId, durationMin }
+                    : { itemId: item.id, durationMin };
+                  e.dataTransfer.setData('application/krnl-task', JSON.stringify(payload));
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
+                }}
                 onContextMenu={(e) =>
                   handleRowContextMenu(e, item.id, item.taskNodeId !== null)
                 }
@@ -280,6 +307,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   gap: 8,
                   padding: '4px 14px',
                   opacity: item.done ? 0.5 : 1,
+                  cursor: 'grab',
                 }}
               >
                 {/* F3: checkbox — dispatches todo.toggle */}

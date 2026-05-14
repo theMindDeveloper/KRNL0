@@ -5,6 +5,16 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
+// ADR 0001 — local helper; mirrors HabitNode/types.ts toYMD but kept here to
+// avoid importing renderer modules from the main process.
+function todayLocalYMD(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export interface PartialBoard {
   version?: number;
   schemaVersion?: number;
@@ -65,16 +75,32 @@ export function seedBoard(): PartialBoard {
         state: { sessionId: null, title: 'Terminal' },
         config: { shell: 'default', fontSize: 13 },
       },
+      // ADR 0001 — fifth mother: Calendar
+      {
+        id: 'mother-calendar',
+        kind: 'calendar',
+        position: { x: 840, y: 0 },
+        isMother: true,
+        state: { selectedDate: null, anchorDate: todayLocalYMD() },
+        config: {
+          view: 'week',
+          weekStartsOn: 'monday',
+          showHabits: true,
+          showPomoHeatmap: true,
+          hourRange: { start: 6, end: 23 },
+        },
+      },
     ],
     edges: [],
   };
 }
 
 const NEW_MOTHER_POSITIONS: Record<string, { x: number; y: number }> = {
-  'mother-pomo':  { x: -808, y: 0 },
-  'mother-todo':  { x: -396, y: 0 },
-  'mother-habit': { x:   16, y: 0 },
-  'mother-term':  { x:  428, y: 0 },
+  'mother-pomo':     { x: -808, y: 0 },
+  'mother-todo':     { x: -396, y: 0 },
+  'mother-habit':    { x:   16, y: 0 },
+  'mother-term':     { x:  428, y: 0 },
+  'mother-calendar': { x:  840, y: 0 }, // ADR 0001 — slot 5
 };
 
 function migrateMotherPositions(board: unknown): Record<string, unknown> {
@@ -101,8 +127,8 @@ function migrateMotherPositions(board: unknown): Record<string, unknown> {
     }
     return node;
   });
-  if (b.viewport) {
-    b.viewport = { ...b.viewport, x: 0, y: 220, zoom: 1 };
+  if (!b.viewport) {
+    b.viewport = { x: 0, y: 220, zoom: 1 };
   }
   return b as Record<string, unknown>;
 }
@@ -179,6 +205,8 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
   }),
+  // ADR 0001 — Calendar mother state defaults for boards migrated from pre-v1.
+  calendar: () => ({ selectedDate: null, anchorDate: todayLocalYMD() }),
   // Decision 21: heal text/image child nodes saved with partial state.
   text: () => ({ text: '' }),
   image: () => ({
@@ -202,6 +230,14 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
 const CONFIG_DEFAULTS: Record<string, () => Record<string, unknown>> = {
   habit: () => ({ weekStartsOn: 'monday', view: 'week' }),
   pomo: () => ({ sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 }),
+  // ADR 0001 — Calendar config defaults.
+  calendar: () => ({
+    view: 'week',
+    weekStartsOn: 'monday',
+    showHabits: true,
+    showPomoHeatmap: true,
+    hourRange: { start: 6, end: 23 },
+  }),
 };
 
 // Decision 22 — heal pre-v2 PomoConfig shapes into the canonical fields.
@@ -250,6 +286,37 @@ function migrateHabitFields(board: Record<string, unknown>): Record<string, unkn
     });
     return { ...node, state: { ...(node.state ?? {}), habits: patched } };
   });
+  return board;
+}
+
+// ADR 0001 — inject the calendar mother into boards that pre-date this feature.
+// Idempotent: no-op if 'mother-calendar' already exists.
+// Runs BEFORE migrateNodeStates so the new node gets STATE/CONFIG_DEFAULTS healing.
+function migrateAddCalendarMother(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  const alreadyExists = nodes.some((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return false;
+    return (n as { id?: unknown })['id'] === 'mother-calendar';
+  });
+  if (alreadyExists) return board;
+  board['nodes'] = [
+    ...nodes,
+    {
+      id: 'mother-calendar',
+      kind: 'calendar',
+      position: { x: 840, y: 0 },
+      isMother: true,
+      state: { selectedDate: null, anchorDate: todayLocalYMD() },
+      config: {
+        view: 'week',
+        weekStartsOn: 'monday',
+        showHabits: true,
+        showPomoHeatmap: true,
+        hourRange: { start: 6, end: 23 },
+      },
+    },
+  ];
   return board;
 }
 
@@ -366,9 +433,13 @@ export function loadBoardFrom(boardPath: string): unknown {
         migrateTodoItemFields(
           migrateHabitFields(
             migrateNodeStates(
-              migrateTaskPlannedMin(
-                migratePomoConfig(
-                  migrateTaskChain(migrateMotherPositions(parsed)),
+              // ADR 0001: migrateAddCalendarMother runs before migrateNodeStates
+              // so the injected calendar node gets STATE/CONFIG_DEFAULTS healing.
+              migrateAddCalendarMother(
+                migrateTaskPlannedMin(
+                  migratePomoConfig(
+                    migrateTaskChain(migrateMotherPositions(parsed)),
+                  ),
                 ),
               ),
             ),
