@@ -223,9 +223,23 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     }
     childEnv['KRNL0_MAIN_PID'] = String(process.pid);
 
+    // PowerShell prints a multi-line copyright banner + "Install the latest
+    // PowerShell" notice on startup, which dominates a small terminal viewport
+    // and pushes the KRNL0 MOTD off the top of the visible area. -NoLogo
+    // suppresses both. Only applies to powershell.exe / pwsh.exe; cmd.exe and
+    // POSIX shells don't recognize it.
+    const shellArgs: string[] = (() => {
+      const base = shell.toLowerCase();
+      if (base.endsWith('powershell.exe') || base.endsWith('pwsh.exe')
+          || base === 'powershell' || base === 'pwsh') {
+        return ['-NoLogo'];
+      }
+      return [];
+    })();
+
     let proc: pty.IPty;
     try {
-      proc = pty.spawn(shell, [], {
+      proc = pty.spawn(shell, shellArgs, {
         cols,
         rows,
         cwd,

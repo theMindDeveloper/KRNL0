@@ -36,17 +36,17 @@ const VERSION = readVersion();
 // ── Arg parsing ────────────────────────────────────────────────────────────
 
 const argv = process.argv.slice(2);
-const [cmd, sub, ...rest] = argv;
-
-// T10: krnl version
-if (!cmd || cmd === 'version') {
-  process.stdout.write(`krnl0 v${VERSION}\n`);
-  process.exit(0);
-}
+const [cmd] = argv;
 
 // T15: krnl (no args) — short overview
 if (!cmd) {
   process.stdout.write(`krnl0 v${VERSION} — canvas CLI\nRun 'krnl help' for usage.\n`);
+  process.exit(0);
+}
+
+// T10: krnl version
+if (cmd === 'version') {
+  process.stdout.write(`krnl0 v${VERSION}\n`);
   process.exit(0);
 }
 
@@ -59,17 +59,10 @@ if (cmd === 'whoami') {
   process.stdout.write(`token  : ${token ? '(set)' : '(unset)'}\n`);
   process.stdout.write(`pid    : ${pid}\n`);
   if (token && socket && socket !== '<unset>') {
-    // Probe the server
-    probe(socket, token).then((ok) => {
-      process.stdout.write(`auth   : ${ok ? '✓' : '✗'}\n`);
-      process.exit(0);
-    });
-  } else {
-    process.exit(0);
+    const ok = await probe(socket, token);
+    process.stdout.write(`auth   : ${ok ? '✓' : '✗'}\n`);
   }
-  // wait for async above
-  void 0;
-  return; // unreachable but satisfies linter
+  process.exit(0);
 }
 
 // Route to RPC
