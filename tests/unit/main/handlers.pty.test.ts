@@ -175,22 +175,62 @@ async function createSession(cols = 80, rows = 24, event = makeEvent()): Promise
 }
 
 describe('F4 — pty:create', () => {
-  it('calls pty.spawn with empty args and returns { sessionId, motd }', async () => {
+  it('calls pty.spawn with shell-appropriate args and returns { sessionId, motd }', async () => {
     const { spawn } = await import('node-pty');
     const event = makeEvent();
 
-    const result = await invoke('pty:create', event, 80, 24) as { sessionId: string; motd: string };
+    // Force a POSIX shell to assert the no-flag path; PowerShell gets -NoLogo
+    // (covered by a separate test below).
+    const prev = process.env['KRNL0_SHELL'];
+    process.env['KRNL0_SHELL'] = '/bin/zsh';
+    try {
+      const result = await invoke('pty:create', event, 80, 24) as { sessionId: string; motd: string };
 
-    expect(spawn).toHaveBeenCalled();
-    // args must be [] per Decision 12 (no shell flags)
-    const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(spawnCall[1]).toEqual([]);
-    // cols / rows forwarded
-    expect(spawnCall[2]).toMatchObject({ cols: 80, rows: 24 });
+      expect(spawn).toHaveBeenCalled();
+      const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(spawnCall[1]).toEqual([]);
+      // cols / rows forwarded
+      expect(spawnCall[2]).toMatchObject({ cols: 80, rows: 24 });
 
-    expect(typeof result.sessionId).toBe('string');
-    expect(result.sessionId.length).toBeGreaterThan(0);
-    expect(typeof result.motd).toBe('string');
+      expect(typeof result.sessionId).toBe('string');
+      expect(result.sessionId.length).toBeGreaterThan(0);
+      expect(typeof result.motd).toBe('string');
+    } finally {
+      if (prev === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prev;
+    }
+  });
+
+  it('passes -NoLogo to PowerShell to suppress its startup banner', async () => {
+    const { spawn } = await import('node-pty');
+    const event = makeEvent();
+
+    const prev = process.env['KRNL0_SHELL'];
+    process.env['KRNL0_SHELL'] = 'powershell.exe';
+    try {
+      await invoke('pty:create', event, 80, 24);
+      const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(spawnCall[1]).toEqual(['-NoLogo']);
+    } finally {
+      if (prev === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prev;
+    }
+  });
+
+  it('passes -NoLogo to pwsh (PowerShell Core) as well', async () => {
+    const { spawn } = await import('node-pty');
+    const event = makeEvent();
+
+    const prev = process.env['KRNL0_SHELL'];
+    process.env['KRNL0_SHELL'] = 'pwsh.exe';
+    try {
+      await invoke('pty:create', event, 80, 24);
+      const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(spawnCall[1]).toEqual(['-NoLogo']);
+    } finally {
+      if (prev === undefined) delete process.env['KRNL0_SHELL'];
+      else process.env['KRNL0_SHELL'] = prev;
+    }
   });
 
   it('registers onData which forwards to event.sender.send with the right channel', async () => {
