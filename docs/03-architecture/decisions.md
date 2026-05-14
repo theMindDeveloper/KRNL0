@@ -1431,3 +1431,194 @@ If a future affordance does not fit any of these four, that is a signal to chall
 - **Cascade invariant pinned.** Decision 20 invariant 1 (bidirectional linkage at creation) and invariant 4 (delete cascade clears all linked TodoItems) are now enforced for subtasks as well, not only root tasks. Add a Gherkin scenario for the multi-level case.
 
 ---
+
+## Decision 24 — CalendarNode Slice 3: WeekView + NowLine + drop-to-schedule (2026-05-14)
+
+**Date:** 2026-05-14
+**Status:** Accepted
+**Author:** architect
+**Cross-reference:** ADR 0001 (Calendar mother node). Follows Slice 1 (data + migration) and Slice 2 (MonthView, PR #113 / 507545c).
+
+### Context
+
+Slice 3 of the Calendar mother is the demo-defining slice. Three new mechanics land together: the WeekView hour grid, a live NowLine, and the drag-to-schedule interaction that turns a Todo row or unscheduled TaskNode into a `scheduledFor` mutation routed through `task.setSchedule` (already wired in Slice 1). ADR 0001 §5 locked the MIME (`application/krnl-task`) and §9 locked the payload shape; ADR 0001 §12 locked the NowLine perf rule (local `setInterval`, never the store). This decision resolves the ten implementation questions that were still open and pins which interactions ship in Slice 3 vs. which defer to Slice 5.
+
+### Decision
+
+Slice 3 ships: WeekView grid, NowLine, drop-from-TodoNode-row, drop-from-TaskNode-body, and reschedule-by-dragging-existing-blocks. It does **not** ship: bottom-edge resize handles, cosmetic edge creation, multi-day spans, in-cell sub-hour grid lines. The TodoNode drag-source change ships in the same PR as the WeekView drop target — splitting them produces two unverifiable halves.
+
+#### Answers (binding)
+
+**Q1 — Drag API: HTML5 native.** No new dependency. ADR 0001 §9 already locked the MIME contract for native `dataTransfer`; React-DnD / Pragmatic-dnd would require re-deriving the payload contract. The ghost-image quirk is handled by calling `e.dataTransfer.setDragImage(rowEl, 0, rowEl.offsetHeight / 2)` inside `onDragStart`.
+
+**Q2 — Snap granularity: hour-snap in Slice 3.** Drop on the 14:00 cell ⇒ `scheduledFor = "{day}T14:00"`. 15-min refinement is a Slice 5 follow-up; the contract for `scheduledFor` is already ISO local datetime so the upgrade is non-breaking.
+
+**Q3 — Cosmetic edge on drop: defer to Slice 5.** Slice 3 only sets `scheduledFor` via `task.setSchedule`. The edge creation logic lives in the cross-cutting slice alongside TodoNode↔Calendar sync, per ADR 0001's recommended slice ordering. The cosmetic-edge dedup rule from ADR 0001 §8 stays unchanged.
+
+**Q4 — Click vs drag disambiguation: pointer-event drag-threshold, 4px.** Same threshold already proven on TaskNode body-click (Decision 20 invariant 7, Decision 22.1). Use `onPointerDown` to record start coords; on `onPointerMove` if delta > 4px set a `dragging` flag and call `setDragImage` (HTML5 dragstart) via a programmatic `draggable` activation; on `onPointerUp` with no drag flag, dispatch `task.activate`. **Implementation note:** because HTML5 native drag fires `dragstart` independently of pointer threshold, the cleanest path is to leave `draggable={true}` always, capture click intent on `onClick` (which only fires when no drag occurred), and dispatch `task.activate` from there. The 4px threshold is enforced by the browser's drag-initiation heuristic; do not re-implement it.
+
+**Q5 — Resize handles: defer to Slice 5.** Slice 3 ships drop + reschedule-by-drag only. Duration is mutated via TodoNode quick-add (`"foo 25m"`, Decision 22.2 Fix 3) or the existing TaskNode minutes field. Block height in Slice 3 derives from `scheduledDurationMin` read-only.
+
+**Q6 — NowLine perf: confirmed — local `setInterval(60_000)` + local `useState`, unmount-cleanup.** This is ADR 0001 §12 verbatim. PomoNode/index.tsx:79 is the reference. The NowLine MUST NOT subscribe to the Zustand store and MUST NOT use the canvas-tick or any 60fps loop. Backend-dev: if you reach for a store selector or RAF, stop and re-read this paragraph.
+
+**Q7 — Out-of-range tasks: render at row 0 with a small "↑" badge.** Zero data loss. The badge is a 9px acid caret in the top-left of the block. Symmetrically, tasks scheduled after `hourRange.end` render at the bottom row with a "↓" badge. Both badges are decorative — clicking the block still fires `task.activate`.
+
+**Q8 — Multi-day spans: confirmed clipped at column bottom.** A task at 23:30 with 60-min duration renders as a block from 23:30 to the bottom of `hourRange.end` (or 24:00 if `hourRange.end >= 23` — the trailing edge is the row's bottom edge, not the next-row top). No cross-midnight rendering. ADR 0001 "Forecloses" already covers this.
+
+**Q9 — Empty state: faint hint when zero tasks scheduled all week.** Single line, `9px mono ink-3`, centered horizontally above the now-line (or at 50% column height if today is off-screen): `"DRAG A TASK ONTO THE GRID"`. Hides as soon as any scheduled task is visible in the current week. Do not animate.
+
+**Q10 — Scope: bundle TodoNode drag-source with WeekView drop-target.** Drag source and drop target are useless apart; splitting forces stubbed `dataTransfer` tests that don't catch integration bugs. The PR diff stays small because TodoNode's change is ~15 lines (`onDragStart` + `draggable={true}` on the row).
+
+### Contract
+
+#### New files
+
+- `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+- `src/renderer/components/nodes/CalendarNode/NowLine.tsx`
+
+#### WeekView component shape
+
+```ts
+interface WeekViewProps {
+  state: CalendarState;
+  config: CalendarConfig;
+  onCommand: (cmd: string, args: Record<string, unknown>) => void;
+}
+```
+
+Internal layout:
+- 7 day-columns (Mon-Sun), derived from `state.anchorDate` and `weekStartsOn`.
+- N hour-rows where N = `config.hourRange.end - config.hourRange.start + 1`. Default 17 (rows 06..22 inclusive — clarifying: `end: 23` in ADR 0001 means "show through 23:00", so the last row's top is 23:00 and its bottom is 24:00; row count = `end - start + 1 = 18`). **Pin this:** `rowCount = config.hourRange.end - config.hourRange.start + 1`; do not off-by-one.
+- Row height: derive from available body height (after sub-header + time gutter) so the grid fills the MotherFrame. Min row height 28px; if `rowCount * 28 > availableHeight`, content scrolls vertically (`overflow-y: auto`).
+- Sub-header: `[←] Week of {Month D} [→]` — arrows dispatch `calendar.setAnchor` with `addDays(state.anchorDate, ±7)`.
+- Time gutter: 36px wide, `9px mono ink-3`, label = `"HH"` (zero-padded), aligned to row top.
+- Today's column: faint `var(--acid)` tint (8% alpha) on the column background; header text pulses via the existing keyframe used by HabitNode's "today" cell (re-use, do not duplicate).
+
+#### Task block
+
+Scheduled tasks render as positioned divs inside their day-column:
+```ts
+{
+  position: 'absolute',
+  top: `${hoursFromStart * rowHeight}px`,
+  height: `${Math.max(18, (durationMin / 60) * rowHeight)}px`,
+  background: 'var(--acid-faint)',     // ~8% alpha acid
+  border: '1px solid var(--acid)',
+  borderRadius: 4,
+  cursor: 'grab',
+  draggable: true,
+}
+```
+- `onPointerUp` with no drag flag ⇒ `onCommand('task.activate', { taskId })`.
+- `onDragStart` ⇒ `dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId, durationMin }))`.
+- `onDrop` (on the new cell) reuses the same handler as the from-Todo drop path. No special case.
+
+#### Drop target (hour cell)
+
+```ts
+function onDragOver(e: DragEvent) {
+  if (!e.dataTransfer.types.includes('application/krnl-task')) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  cell.setAttribute('data-drop-target', 'true');
+}
+function onDragLeave(e: DragEvent) { cell.removeAttribute('data-drop-target'); }
+function onDrop(e: DragEvent) {
+  e.preventDefault();
+  const raw = e.dataTransfer.getData('application/krnl-task');
+  if (!raw) return;
+  const { taskId, itemId, durationMin } = JSON.parse(raw);
+  const scheduledFor = `${cellDate}T${String(cellHour).padStart(2, '0')}:00`;
+  onCommand('task.setSchedule', { taskId, itemId, scheduledFor, scheduledDurationMin: durationMin });
+  // Slice 3 does NOT create a cosmetic edge here — that lands in Slice 5.
+  flashCell(cell, 240);
+  cell.removeAttribute('data-drop-target');
+}
+```
+
+The `task.setSchedule` command shape — including the `taskId | itemId` either-branch — is already locked in ADR 0001 §6. The dispatcher routes to `'todo.task'` when `taskId` is present, and to the parent `'todo'` when only `itemId` is present. Slice 3 does not modify the dispatcher.
+
+**CSS rule (one new selector in `reactflow-theme.css`):**
+```css
+.krnl-calendar-cell[data-drop-target="true"] {
+  background: rgba(166, 255, 0, 0.10);
+  box-shadow: inset 0 0 0 1px var(--acid);
+  transform: scale(0.98);
+  transition: transform 80ms ease, background 80ms ease;
+}
+```
+
+#### NowLine component shape
+
+```ts
+interface NowLineProps {
+  weekStartDate: string;        // YYYY-MM-DD (Mon)
+  hourRange: { start: number; end: number };
+  rowHeight: number;
+  columnWidth: number;
+  gutterWidth: number;
+}
+```
+- Returns `null` if `now` is not within `[weekStartDate, weekStartDate + 7 days)`.
+- Returns `null` if `now.getHours() < hourRange.start` or `> hourRange.end`. (Out-of-view nows do not render; they are not clipped to the edge — the line is informational, the badges are for tasks.)
+- 1px `var(--acid)` line spanning all 7 day-columns; 4px acid dot at the intersection with today's column.
+- Tick contract: `setInterval(() => setTick(t => t + 1), 60_000)` in `useEffect`, cleared on unmount. No Zustand subscription. No RAF.
+
+#### TodoNode row — drag source addition
+
+`src/renderer/components/nodes/TodoNode/index.tsx`:
+- Row element gains `draggable={true}` and an `onDragStart` that:
+  1. Reads `item.taskNodeId` and `item.id`.
+  2. If `taskNodeId` exists ⇒ payload `{ taskId: taskNodeId, durationMin: linkedTask.plannedMin ?? 25 }`.
+  3. Else ⇒ payload `{ itemId: item.id, durationMin: 25 }`.
+  4. `e.dataTransfer.setData('application/krnl-task', JSON.stringify(payload))`.
+  5. `e.dataTransfer.effectAllowed = 'move'`.
+  6. `e.dataTransfer.setDragImage(e.currentTarget as HTMLElement, 0, 12)`.
+- **Drag-safe guards stay.** The existing 4px click-vs-drag threshold (Decision 20 invariant 7) still gates click dispatching. The HTML5 `draggable={true}` does not interfere because dragstart only fires after the browser's own drag threshold, which is also ~4px.
+
+#### CalendarNode index.tsx wiring
+
+Replace the week-view placeholder branch with `<WeekView state={node.state} config={config} onCommand={onCommand} />`. No other changes to `index.tsx`.
+
+#### Files affected (binding)
+
+**New:**
+- `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+- `src/renderer/components/nodes/CalendarNode/NowLine.tsx`
+
+**Modified:**
+- `src/renderer/components/nodes/CalendarNode/index.tsx` — week branch wires `WeekView`.
+- `src/renderer/components/nodes/TodoNode/index.tsx` — row gains `draggable` + `onDragStart`.
+- `src/renderer/styles/reactflow-theme.css` — add `.krnl-calendar-cell[data-drop-target="true"]` rule.
+
+**Not modified in this slice:**
+- `commandDispatch.ts` — `task.setSchedule` already exists (Slice 1).
+- `rfAdapters.tsx` — cosmetic edge override deferred to Slice 5.
+- Schema files — no shape changes.
+
+### Consequences
+
+**Enables:**
+- The live "drop a task onto Tuesday 2pm" demo interaction.
+- A reusable HTML5 drop-target idiom for future calendar surfaces (MonthView day-cell drop in Slice 5 reuses the exact same handler shape; only the `scheduledFor` computation differs).
+- Rescheduling without leaving the canvas: drag an existing block to a new hour ⇒ same dispatch path, no special UI.
+
+**Forecloses (this slice only — revisited in Slice 5):**
+- Sub-hour snap granularity.
+- Cosmetic edge auto-creation on drop.
+- Bottom-edge resize handles for duration mutation.
+- Multi-day / cross-midnight task spans (ADR 0001 already forecloses these in v1 globally).
+
+**Risks accepted:**
+- Hour-snap may feel coarse for users who think in 15-min blocks. Mitigated: Slice 5 upgrade is non-breaking because `scheduledFor` is already ISO datetime, and the wire payload's `durationMin` carries the necessary precision today.
+- Out-of-range badges add a small icon vocabulary (↑ / ↓) the user must learn. Mitigated: the badge is decorative; the block still occupies a real position so the user sees the scheduling intent.
+- `draggable={true}` on TodoNode rows could in principle interfere with React Flow node-drag if the row ever became a node body. It cannot, because rows live inside TodoNode's body and React Flow's drag handler is on the wrapper. Verified against existing TodoNode structure.
+
+### Backend-dev — start signal
+
+You are unblocked. Implement against the contract above. Two reminders:
+
+1. NowLine MUST own its own `setInterval`. No store subscription. If you find yourself writing `useBoardStore` inside NowLine, stop.
+2. Do not create the cosmetic edge in the drop handler. That belongs to Slice 5. If the diff grows past the four files listed, you are out of scope.
+
+---
