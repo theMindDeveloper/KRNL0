@@ -1,15 +1,14 @@
-// ADR 0003 §3 — Cascade scheduling selector.
+// ADR 0005 — Multi-anchor cascade scheduling selector.
 //
 // Single source of truth for "where does each task land on the wall clock?".
-// Given a board, produces a Map<taskId, ScheduledTaskPlacement> by:
-//   1. Finding chains (connected components of task.next edges within a todo).
-//   2. For each chain, locating its anchor (a task with scheduledFor set).
-//      Invariant (ADR 0003 §1): at most one anchor per chain. If a corrupt
-//      board violates this, the earliest scheduledFor wins and a dev warn
-//      fires.
-//   3. Walking the todo via chainWalker.walkChain, truncating to the anchor's
-//      WalkUnit and onward.
-//   4. Computing startISO/endISO by accumulating plannedMin (breaks invisible).
+// Each anchor (task with scheduledFor set) is an independent fixpoint.
+// The selector walks a chain's connected component and uses every anchor it
+// encounters as the new cursor; gaps between anchors auto-derive from the
+// previous unit's plannedMin. Predecessor tasks (before the first anchor in a
+// component) are skipped.
+//
+// Supersedes the ADR 0003 "earliest anchor wins" model. Multiple anchors per
+// chain are now correct by design, not a migration target.
 //
 // Memoized at module level on (board.nodes, board.edges) reference identity,
 // same pattern as selectTimelines.
@@ -175,133 +174,149 @@ function build(board: Board): ScheduleResult {
     }
   }
 
-  // For each todo, walk once and remember the unit ordering. Then for each
-  // anchored chain in that todo, slice the walk from the anchor's unit
-  // forward and emit placements.
+  // For each todo that has ≥1 anchor, walk units once and emit placements
+  // for every connected component that contains ≥1 anchored task.
+  // ADR 0005: each anchor is an independent fixpoint — no "earliest wins."
   for (const [todoId, anchorIds] of todoIdToAnchors) {
     const scope = todoIdToTaskIds.get(todoId);
     if (!scope || scope.size === 0) continue;
 
     const units = walkChain(todoId, board.nodes, chainIndex);
 
-    // Index: taskId → unit index (group members all map to the same unit index).
-    const unitIndexByTaskId = new Map<string, number>();
-    units.forEach((u, i) => {
-      if (u.kind === 'task') {
-        unitIndexByTaskId.set(u.taskId, i);
-      } else {
-        for (const b of u.branches) unitIndexByTaskId.set(b.taskId, i);
-      }
-    });
+    // Discover all distinct connected components that contain at least one
+    // anchor. Deduplicate by sorted chainKey so we don't process the same
+    // component twice when it has multiple anchors.
+    const chainsSeen = new Set<string>();
+    const componentByChainKey = new Map<string, Set<string>>();
+    const anchorsByChainKey = new Map<string, string[]>();
 
-    // Group anchors by their chain (connected component within this todo).
-    // Per ADR 0003 §1 invariant, at most one anchor per chain. Defence-in-depth:
-    // if multiple, earliest wins; dev warn.
-    const chainsSeen = new Set<string>(); // representative task id
-    const anchorByChain = new Map<string, string>(); // chainKey → anchor taskId
-
-    // Sort anchors so the "earliest" choice when colliding is deterministic.
-    const anchorsSorted = [...anchorIds].sort((a, b) => {
-      const ta = taskInfoById.get(a)?.taskState.scheduledFor ?? '';
-      const tb = taskInfoById.get(b)?.taskState.scheduledFor ?? '';
-      if (ta < tb) return -1;
-      if (ta > tb) return 1;
-      return a < b ? -1 : a > b ? 1 : 0;
-    });
-
-    for (const anchorId of anchorsSorted) {
+    for (const anchorId of anchorIds) {
       const component = connectedComponent(anchorId, chainIndex, scope);
-      // chainKey: sorted concatenation of component ids (stable).
       const chainKey = [...component].sort().join('|') || anchorId;
-      if (chainsSeen.has(chainKey)) {
-        if (import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[scheduleSelector] Multiple anchors in chain (todo=${todoId}). ` +
-            `Earliest wins; ignoring anchor ${anchorId}. ` +
-            `This violates ADR 0003 §1 — load-time migration should heal it.`,
-          );
-        }
-        continue;
+      if (!chainsSeen.has(chainKey)) {
+        chainsSeen.add(chainKey);
+        componentByChainKey.set(chainKey, component);
+        anchorsByChainKey.set(chainKey, []);
       }
-      chainsSeen.add(chainKey);
-      anchorByChain.set(chainKey, anchorId);
+      anchorsByChainKey.get(chainKey)!.push(anchorId);
     }
 
-    // For each (chainKey, anchor), slice the walk starting at the anchor's
-    // unit, then accumulate startISO/endISO.
-    for (const [, anchorTaskId] of anchorByChain) {
-      const anchorInfo = taskInfoById.get(anchorTaskId);
-      if (!anchorInfo) continue;
-      const anchorISO = anchorInfo.taskState.scheduledFor;
-      if (typeof anchorISO !== 'string' || anchorISO.length === 0) continue;
+    // Process each component that has ≥1 anchor.
+    for (const [chainKey, chainComponent] of componentByChainKey) {
+      const _anchorsInComponent = anchorsByChainKey.get(chainKey)!;
+      void _anchorsInComponent; // used implicitly via taskInfoById below
 
-      const startIdx = unitIndexByTaskId.get(anchorTaskId);
-      if (startIdx === undefined) continue;
+      // Walk units in order, maintaining cursor (ISO string or null) and
+      // cursorAnchorId (the anchor that last pushed the cursor).
+      // ADR 0005 §"Selector rules": predecessor tasks (before first anchor)
+      // are skipped; each explicit anchor resets the cursor to scheduledFor.
+      let cursor: string | null = null;
+      let cursorAnchorId: string | null = null;
 
-      // Determine chain scope (only emit placements for tasks in this chain's
-      // connected component). Predecessors of the anchor (units < startIdx)
-      // are dropped by construction; this scope check additionally prevents
-      // bleeding into a different chain within the same todo.
-      const chainComponent = connectedComponent(anchorTaskId, chainIndex, scope);
-
-      let cursorMin = 0;
-      for (let i = startIdx; i < units.length; i++) {
-        const unit = units[i]!;
+      for (const unit of units) {
         if (unit.kind === 'task') {
-          if (!chainComponent.has(unit.taskId)) {
-            // Different chain within the same todo — stop emitting for this anchor.
-            break;
+          // Only emit tasks in this component.
+          if (!chainComponent.has(unit.taskId)) continue;
+          const info = taskInfoById.get(unit.taskId);
+          if (!info) continue;
+          const ts = info.taskState;
+          const isAnchor =
+            typeof ts.scheduledFor === 'string' && ts.scheduledFor.length > 0;
+
+          if (isAnchor) {
+            // Explicit anchor: reset cursor to scheduledFor.
+            cursor = ts.scheduledFor as string;
+            cursorAnchorId = unit.taskId;
+            const durMin = clampPlanned(ts.scheduledDurationMin ?? ts.plannedMin);
+            placements.set(unit.taskId, {
+              taskId: unit.taskId,
+              startISO: cursor,
+              endISO: addMinutesISO(cursor, durMin),
+              anchorTaskId: unit.taskId,
+              parallelGroupId: null,
+              parallelBranchIndex: null,
+              isAnchor: true,
+            });
+            // Cursor advance always uses plannedMin (not scheduledDurationMin).
+            cursor = addMinutesISO(cursor, unit.plannedMin);
+          } else if (cursor !== null && cursorAnchorId !== null) {
+            // Derived: emit at current cursor.
+            const durMin = unit.plannedMin;
+            placements.set(unit.taskId, {
+              taskId: unit.taskId,
+              startISO: cursor,
+              endISO: addMinutesISO(cursor, durMin),
+              anchorTaskId: cursorAnchorId,
+              parallelGroupId: null,
+              parallelBranchIndex: null,
+              isAnchor: false,
+            });
+            cursor = addMinutesISO(cursor, unit.plannedMin);
           }
-          const isAnchor = unit.taskId === anchorTaskId;
-          // ADR 0003 §3.7 — duration override applies only on the anchor's
-          // own block; successors use their own plannedMin.
-          const ts = taskInfoById.get(unit.taskId)?.taskState;
-          const durMin = isAnchor
-            ? clampPlanned(ts?.scheduledDurationMin ?? ts?.plannedMin)
-            : unit.plannedMin;
-          const startISO = addMinutesISO(anchorISO, cursorMin);
-          const endISO = addMinutesISO(anchorISO, cursorMin + durMin);
-          placements.set(unit.taskId, {
-            taskId: unit.taskId,
-            startISO,
-            endISO,
-            anchorTaskId,
-            parallelGroupId: null,
-            parallelBranchIndex: null,
-            isAnchor,
-          });
-          cursorMin += unit.plannedMin;
+          // else: predecessor of first anchor — skip.
         } else {
-          // Parallel group — all branches share startISO. Group cumulative
-          // cost = max(branch.plannedMin) (ADR 0003 §3.5).
-          // Only emit branches that belong to this chain's component.
-          const groupStartISO = addMinutesISO(anchorISO, cursorMin);
-          // ADR 0004 §4.2 — emit parallelBranchIndex matching walkChain's
-          // branch enumeration order.
-          for (const [idx, branch] of unit.branches.entries()) {
-            if (!chainComponent.has(branch.taskId)) continue;
-            const isAnchor = branch.taskId === anchorTaskId;
+          // Parallel group — filter branches to those in this component.
+          const branchesInComponent = unit.branches
+            .map((b, idx) => ({ branch: b, idx }))
+            .filter(({ branch }) => chainComponent.has(branch.taskId));
+
+          if (branchesInComponent.length === 0) continue;
+
+          // Group start: earliest scheduledFor among anchored branches in this
+          // component, else cursor. (ADR 0005 §"Selector rules" step 4.)
+          // If no anchored branch and cursor is null, skip the group.
+          let groupStart: string | null = null;
+          let groupAnchorId: string | null = null;
+
+          for (const { branch } of branchesInComponent) {
             const ts = taskInfoById.get(branch.taskId)?.taskState;
+            if (!ts) continue;
+            if (typeof ts.scheduledFor === 'string' && ts.scheduledFor.length > 0) {
+              if (groupStart === null || ts.scheduledFor < groupStart) {
+                groupStart = ts.scheduledFor;
+                groupAnchorId = branch.taskId;
+              }
+            }
+          }
+
+          if (groupStart === null) {
+            // No anchored branches — fall back to cursor.
+            if (cursor === null) continue; // skip entire group (pre-first-anchor)
+            groupStart = cursor;
+            groupAnchorId = cursorAnchorId; // carries over from last sequential anchor
+          }
+
+          // Emit each branch.
+          let maxPlannedMin = 0;
+          for (const { branch, idx } of branchesInComponent) {
+            const ts = taskInfoById.get(branch.taskId)?.taskState;
+            const isAnchor =
+              ts !== undefined &&
+              typeof ts.scheduledFor === 'string' &&
+              ts.scheduledFor.length > 0;
+            const branchStart = isAnchor ? (ts!.scheduledFor as string) : groupStart!;
+            const branchAnchorId = isAnchor ? branch.taskId : (groupAnchorId ?? cursorAnchorId ?? branch.taskId);
             const durMin = isAnchor
-              ? clampPlanned(ts?.scheduledDurationMin ?? ts?.plannedMin)
+              ? clampPlanned(ts!.scheduledDurationMin ?? ts!.plannedMin)
               : branch.plannedMin;
-            const endISO = addMinutesISO(anchorISO, cursorMin + durMin);
             placements.set(branch.taskId, {
               taskId: branch.taskId,
-              startISO: groupStartISO,
-              endISO,
-              anchorTaskId,
+              startISO: branchStart,
+              endISO: addMinutesISO(branchStart, durMin),
+              anchorTaskId: branchAnchorId,
               parallelGroupId: unit.groupId,
               parallelBranchIndex: idx,
               isAnchor,
             });
+            if (branch.plannedMin > maxPlannedMin) maxPlannedMin = branch.plannedMin;
           }
-          cursorMin += Math.max(...unit.branches.map((b) => b.plannedMin));
+
+          // Advance cursor by max(branch.plannedMin) from groupStart.
+          // cursorAnchorId after the group = anchor that determined groupStart.
+          // (ADR 0005: if no anchored branch in group, cursorAnchorId carries over.)
+          cursor = addMinutesISO(groupStart!, maxPlannedMin);
+          if (groupAnchorId !== null) cursorAnchorId = groupAnchorId;
         }
-        // Note: breaks are invisible to the calendar (ADR 0003 §3.6) — we
-        // already skip them because walkChain emits task/group units only;
-        // break segments live in timelineSelector's buildAll, not here.
       }
     }
   }
