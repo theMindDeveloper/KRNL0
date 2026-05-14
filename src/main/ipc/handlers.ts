@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
 import { loadBoardFrom, saveBoardTo } from '../persistence/board';
+import { notifyBoardChanged } from '../boardIo';
 import { renderMotd } from '../rpc/motd';
 import type { RpcServer } from '../rpc/server';
 
@@ -56,12 +57,6 @@ function saveBoard(data: unknown) {
   saveBoardTo(BOARD_PATH, data);
 }
 
-function broadcastBoardReload(): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('board:reload');
-  }
-}
-
 function hasOpenRenderer(): boolean {
   return BrowserWindow.getAllWindows().length > 0;
 }
@@ -87,7 +82,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     const facade = new SysFacade({
       boardPath: BOARD_PATH,
       hasOpenRenderer,
-      onBoardChanged: broadcastBoardReload,
+      onBoardChanged: notifyBoardChanged,
       ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
     });
     const result = await facade.run(argv);
