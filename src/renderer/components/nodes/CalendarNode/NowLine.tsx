@@ -77,7 +77,7 @@ export function NowLine({
         zIndex: 10,
       }}
     >
-      {/* Horizontal line spanning all 7 day-columns */}
+      {/* Horizontal red "now" line spanning all 7 day-columns. */}
       <div
         data-testid="now-line-bar"
         style={{
@@ -86,20 +86,22 @@ export function NowLine({
           left: lineLeft,
           width: lineWidth,
           height: 1,
-          background: 'var(--acid)',
+          background: '#ef4444',
+          boxShadow: '0 0 4px rgba(239, 68, 68, 0.7)',
         }}
       />
-      {/* 4px dot at the intersection with today's column */}
+      {/* 4px dot at the intersection with today's column. */}
       <div
         data-testid="now-line-dot"
         style={{
           position: 'absolute',
           top: -2,
           left: dotLeft,
-          width: 4,
-          height: 4,
+          width: 5,
+          height: 5,
           borderRadius: '50%',
-          background: 'var(--acid)',
+          background: '#ef4444',
+          boxShadow: '0 0 6px rgba(239, 68, 68, 0.8)',
         }}
       />
     </div>
