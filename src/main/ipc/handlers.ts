@@ -294,9 +294,12 @@ export function registerHandlers(rpcServer?: RpcServer): void {
 
     // T1–T6: build MOTD and include in the reply so the renderer writes it
     // synchronously before subscribing to pty:data (avoids any IPC race).
+    // Pass rows so renderMotd falls back to the compact form on short viewports
+    // (otherwise the 9-row wide banner scrolls into scrollback when the shell
+    // prompt arrives).
     const motd = process.env['KRNL0_NO_MOTD'] === '1'
       ? ''
-      : renderMotd({ version: APP_VERSION, sessionId, cols });
+      : renderMotd({ version: APP_VERSION, sessionId, cols, rows });
     return { sessionId, motd };
   });
 

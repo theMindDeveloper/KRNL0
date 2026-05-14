@@ -21,39 +21,43 @@ export interface MotdOptions {
   version: string;
   sessionId: string;
   cols: number;
+  /**
+   * Optional viewport height. When < 14 we fall back to the compact form so
+   * the multi-line banner doesn't immediately scroll into scrollback before
+   * the shell prompt arrives. Defaults to a large value (skip the check) when
+   * the caller doesn't know the row count yet.
+   */
+  rows?: number;
 }
 
 /**
  * Render the MOTD banner as a string ready to write to the PTY.
- * T5: cols < 50 → compact single-line form.
- * T2–T4: otherwise multi-line logo + tagline + separator + prompt hint.
+ * T5: cols < 50 OR rows < 14 → compact single-line form.
+ * T2–T4: otherwise multi-line logo + tagline + hint.
  */
-export function renderMotd({ version, sessionId, cols }: MotdOptions): string {
+export function renderMotd({ version, sessionId, cols, rows = 1000 }: MotdOptions): string {
   const sid8 = sessionId.slice(0, 8);
 
-  if (cols < 50) {
-    // T5: compact one-liner
-    return `${ACID}krnl0 v${version} · 'help' for usage${RESET}\r\n`;
+  if (cols < 50 || rows < 14) {
+    // T5: compact one-liner — fits any reasonable viewport
+    return `${ACID}krnl0 v${version} · type 'krnl help'${RESET}\r\n`;
   }
 
   const tagline = `krnl0 · v${version} · claude code attached · session ${sid8}`;
-  const separator = '─'.repeat(Math.min(cols - 2, 60));
-  const hint = `type a command — try 'help' or 'krnl help'`;
+  const hint = `type a command — try 'krnl help'`;
 
   const parts: string[] = [];
 
-  // T2: acid-green logo
+  // T2: acid-green logo (6 rows)
   for (const line of LOGO_LINES) {
     parts.push(`${ACID}${line}${RESET}\r\n`);
   }
 
-  // T3: tagline
-  parts.push(`${ACID}  ${tagline}${RESET}\r\n`);
+  // T3: tagline (truncated if it would wrap)
+  const taglineLine = tagline.length > cols - 2 ? `krnl0 · v${version}` : tagline;
+  parts.push(`${ACID}  ${taglineLine}${RESET}\r\n`);
 
-  // T4: dim separator
-  parts.push(`${DIM}  ${separator}${RESET}\r\n`);
-
-  // T4: prompt hint
+  // T4: dim hint (no separator — saves a row + always fits)
   parts.push(`${DIM}  ${hint}${RESET}\r\n`);
 
   // blank line before shell prompt
