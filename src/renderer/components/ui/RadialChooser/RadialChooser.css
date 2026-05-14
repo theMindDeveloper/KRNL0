@@ -1,4 +1,4 @@
-/* ADR 0002 — RadialChooser styles (A2 — Apple Liquid Glass, 2026-05-14) */
+/* ADR 0002 — RadialChooser styles (A2 — frosted glass, KRNL0-coherent) */
 
 /* ── Root overlay ──────────────────────────────────────────────────────── */
 .radial-chooser-root {
@@ -7,23 +7,40 @@
   inset: 0;
 }
 
-/* ── Glass wrapper (A2 §1) ─────────────────────────────────────────────── */
-/* The SVG does not honour backdrop-filter directly in Electron/Chromium.
-   We wrap it in a div and clip to a circle so the blur follows the wedge
-   silhouette. The div is pointer-events:all so clicks are captured. */
+/* ── Glass wrapper (A2 §1) ─────────────────────────────────────────────────
+   The SVG does not honour backdrop-filter directly in Chromium. We wrap it
+   in a div, clip to a circle, and let the blur+saturate produce the frosted
+   plate that whatever is behind tints. Translucent white tint reads well on
+   both KRNL0 light (paper) and dark themes. */
 .radial-chooser-glass {
   position: fixed;
   pointer-events: all;
   border-radius: 50%;
-  /* Clip blur to the circular chooser shape */
-  /* clip-path set by --radial-r which JS could inject; we use border-radius alone
-     since the bounding box is a square — circle() would need runtime radius.
-     Chromium respects backdrop-filter with overflow:hidden + border-radius. */
   overflow: hidden;
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  /* Outer glow / depth (A2 §10) */
-  filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.5));
+  background: radial-gradient(
+    circle at 50% 35%,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.04) 70%
+  );
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  /* Soft floating shadow + faint inner edge highlight */
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.28),
+    0 2px 8px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+[data-theme="dark"] .radial-chooser-glass {
+  background: radial-gradient(
+    circle at 50% 35%,
+    rgba(255, 255, 255, 0.10),
+    rgba(255, 255, 255, 0.02) 70%
+  );
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 2px 12px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
 }
 
 /* ── SVG inside the glass wrapper ──────────────────────────────────────── */
@@ -32,63 +49,95 @@
   overflow: visible;
 }
 
-/* ── Wedge fill (A2 §2) ─────────────────────────────────────────────────── */
+/* ── Wedge fill (A2 §2) ─────────────────────────────────────────────────────
+   Translucent dark ink — same in both themes; reads well because the blur
+   below pulls the surrounding paper/canvas color into the wedge. Hover
+   bumps opacity. */
 .radial-wedge {
-  fill: rgba(20, 20, 20, 0.55);
+  fill: rgba(20, 18, 16, 0.38);
   cursor: default;
-  transition: fill 120ms ease;
+  transition: fill 140ms ease;
 }
 
 .radial-wedge--hovered {
-  fill: rgba(30, 30, 30, 0.75);
+  fill: rgba(20, 18, 16, 0.62);
+}
+
+[data-theme="dark"] .radial-wedge {
+  fill: rgba(255, 255, 255, 0.06);
+}
+[data-theme="dark"] .radial-wedge--hovered {
+  fill: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Per-wedge stroke accent (A2 §3) ────────────────────────────────────────
+   Stroke colour is set inline per-wedge. CSS controls width + glow on hover. */
+.radial-wedge-stroke {
+  transition: stroke-width 120ms ease, filter 140ms ease;
+  pointer-events: none;
 }
 
 /* ── Dead zone (A2 §6) ─────────────────────────────────────────────────── */
 .radial-dead-zone-group {
   transition: transform 120ms ease;
   transform-origin: 0 0;
+  cursor: pointer;
 }
 .radial-dead-zone-group:hover {
-  transform: scale(1.05);
+  transform: scale(1.08);
 }
 
 .radial-dead-zone {
-  fill: rgba(0, 0, 0, 0.4);
-  cursor: pointer;
+  fill: rgba(20, 18, 16, 0.55);
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
+}
+[data-theme="dark"] .radial-dead-zone {
+  fill: rgba(0, 0, 0, 0.45);
+  stroke: rgba(255, 255, 255, 0.12);
 }
 
 .radial-dead-glyph {
-  fill: var(--ink-3, #888);
+  fill: rgba(255, 255, 255, 0.55);
   font-family: var(--font-mono, monospace);
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 600;
   pointer-events: none;
   user-select: none;
 }
 .radial-dead-zone-group:hover .radial-dead-glyph {
-  fill: var(--ink-1, #ddd);
+  fill: rgba(255, 255, 255, 0.95);
 }
 
 /* ── Wedge label (A2 §8) ───────────────────────────────────────────────── */
-/* colour is set inline (per-wedge stroke colour) */
+/* fill (per-wedge accent colour) is set inline */
 .radial-wedge-label {
   font-family: var(--font-mono, monospace);
   font-size: 10px;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.10em;
   pointer-events: none;
   user-select: none;
   text-anchor: middle;
   dominant-baseline: middle;
   text-transform: uppercase;
+  /* Faint shadow lifts the label off the translucent plate */
+  paint-order: stroke fill;
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 0.4;
 }
 
 /* ── Wedge icon (A2 §9) ────────────────────────────────────────────────── */
-/* colour is set inline (per-wedge stroke colour) */
+/* fill (per-wedge accent colour) is set inline */
 .radial-wedge-icon {
-  font-size: 18px;
+  font-size: 22px;
   text-anchor: middle;
   dominant-baseline: middle;
   pointer-events: none;
   user-select: none;
+  paint-order: stroke fill;
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 0.5;
 }
 
 /* ── Inner highlight (A2 §5) ───────────────────────────────────────────── */
@@ -129,4 +178,12 @@
   animation: radial-disappear 120ms ease-out forwards;
   transform-origin: center;
   pointer-events: none;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .radial-chooser-animate,
+  .radial-chooser-closing {
+    animation: none;
+  }
 }

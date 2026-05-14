@@ -524,6 +524,46 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     });
   });
 
+  // Regression: HTML5 drag fires `drop` → then `dragend` (source clears the
+  // habitDrag singleton). The chooser stays open until the user clicks a wedge.
+  // The pick must still dispatch correctly because the payload was snapshotted
+  // at drop time, not read live at pick time.
+  it('onPick still dispatches after dragend has cleared the habitDrag singleton', () => {
+    const onCommand = vi.fn();
+    render(
+      <WeekView
+        state={makeState({ anchorDate: '2026-05-11' })}
+        config={makeConfig()}
+        onCommand={onCommand}
+      />,
+    );
+
+    setHabitDrag({ habitId: 'h4', habitMotherId: 'hm1', color: 'plum', name: 'Read' });
+
+    const cell = document.querySelector('[data-testid="week-cell-2026-05-12-09"]');
+    expect(cell).toBeTruthy();
+    fireEvent.drop(cell!, {
+      dataTransfer: {
+        types: ['application/krnl-habit'],
+        getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
+      },
+    });
+
+    // Simulate the dragend clearing the singleton between drop and click.
+    clearHabitDrag();
+
+    const session = radialBus.session!;
+    const dailyOpt = session.options.find((o) => o.value === 'daily');
+    expect(dailyOpt).toBeTruthy();
+    session.onPick(dailyOpt!.value, dailyOpt!);
+
+    expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
+      habitId: 'h4',
+      habitMotherId: 'hm1',
+      schedule: { kind: 'daily', timeOfDay: '09:00' },
+    });
+  });
+
   // Key discriminator test: drop cell, not first-hovered cell, is the schedule target.
   it('drop cell is the schedule target regardless of which cells were hovered during drag', () => {
     const onCommand = vi.fn();
