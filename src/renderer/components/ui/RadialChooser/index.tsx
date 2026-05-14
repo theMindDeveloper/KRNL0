@@ -347,7 +347,8 @@ export function RadialChooserHost() {
           data-testid="radial-chooser-svg"
         >
           <g transform={`translate(${svgSize / 2}, ${svgSize / 2})`}>
-            {/* Wedges */}
+            {/* Wedges — solid fill in the wedge's accent color (purple/cyan).
+                Hover bumps brightness via CSS filter. */}
             {options.map((opt, i) => {
               const wa = angles[i];
               if (!wa) return null;
@@ -355,29 +356,20 @@ export function RadialChooserHost() {
               const wedgeColor = (opt as RadialOption<unknown>).color ?? 'var(--acid)';
               return (
                 <g key={opt.id}>
-                  {/* Wedge fill — translucent dark glass (A2 §2) */}
                   <path
                     className={`radial-wedge${isHovered ? ' radial-wedge--hovered' : ''}`}
                     d={wedgePath(wa.start, wa.end, innerRadius, radius)}
+                    fill={wedgeColor}
                     data-testid={`radial-wedge-${i}`}
                     data-hovered={isHovered ? 'true' : undefined}
+                    style={isHovered ? { filter: `drop-shadow(0 0 12px ${wedgeColor})` } : undefined}
                   />
-                  {/* Per-wedge stroke accent (A2 §3) */}
-                  <path
-                    className={`radial-wedge-stroke${isHovered ? ' radial-wedge-stroke--hovered' : ''}`}
-                    d={wedgePath(wa.start, wa.end, innerRadius, radius)}
-                    fill="none"
-                    stroke={wedgeColor}
-                    strokeWidth={isHovered ? 2.5 : 1.5}
-                    style={isHovered ? { filter: `drop-shadow(0 0 8px ${wedgeColor})` } : undefined}
-                    data-testid={`radial-wedge-stroke-${i}`}
-                  />
-                  {/* Inner highlight (A2 §5) */}
+                  {/* Inner highlight — faint white inset arc for depth */}
                   <path
                     className="radial-wedge-highlight"
                     d={innerHighlightPath(wa.start, wa.end, innerRadius, radius)}
                     fill="none"
-                    stroke="rgba(255,255,255,0.08)"
+                    stroke="rgba(255,255,255,0.22)"
                     strokeWidth={1}
                   />
                 </g>
@@ -405,18 +397,17 @@ export function RadialChooserHost() {
               </text>
             </g>
 
-            {/* Wedge labels + icons */}
+            {/* Wedge labels + icons — both white, sized to fit inside the wedge */}
             {options.map((opt, i) => {
               const wa = angles[i];
               if (!wa) return null;
               const isHovered = hoveredIndex === i;
-              const wedgeColor = (opt as RadialOption<unknown>).color ?? 'var(--acid)';
               // Position label at the midpoint angle, 62% of the way between inner and outer.
               const midR = innerRadius + (radius - innerRadius) * 0.62;
               const lx = midR * Math.cos(wa.mid);
               const ly = midR * Math.sin(wa.mid);
               const truncLabel =
-                opt.label.length > 10 ? opt.label.slice(0, 9) + '…' : opt.label;
+                opt.label.length > 12 ? opt.label.slice(0, 11) + '…' : opt.label;
 
               return (
                 <g key={`label-${opt.id}`} style={{ pointerEvents: 'none' }}>
@@ -424,8 +415,8 @@ export function RadialChooserHost() {
                     <text
                       className="radial-wedge-icon"
                       x={lx}
-                      y={ly - 8}
-                      fill={wedgeColor}
+                      y={ly - 7}
+                      fill="#ffffff"
                       data-testid={`radial-wedge-icon-${i}`}
                     >
                       {opt.icon}
@@ -435,8 +426,8 @@ export function RadialChooserHost() {
                     className="radial-wedge-label"
                     x={lx}
                     y={opt.icon ? ly + 8 : ly}
-                    fill={wedgeColor}
-                    style={isHovered ? { fontWeight: 'bold' } : undefined}
+                    fill="#ffffff"
+                    style={isHovered ? { fontWeight: 700 } : undefined}
                     data-testid={`radial-wedge-label-${i}`}
                   >
                     {truncLabel}

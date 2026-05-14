@@ -41,9 +41,9 @@ export function isHabitView(value: unknown): value is HabitView {
 export type IsoDow = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export type HabitSchedule =
-  | { kind: 'daily'; timeOfDay: string }                      // "HH:MM" local, 24h
-  | { kind: 'weekly'; timeOfDay: string; days: IsoDow[] }     // non-empty, sorted asc, deduped
-  | { kind: 'weekdays'; timeOfDay: string };                  // Mon-Fri shortcut (days 1..5)
+  | { kind: 'daily'; timeOfDay: string; durationMin?: number }
+  | { kind: 'weekly'; timeOfDay: string; days: IsoDow[]; durationMin?: number }
+  | { kind: 'weekdays'; timeOfDay: string; durationMin?: number };
 
 export const TIME_OF_DAY_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 

@@ -50,31 +50,15 @@
 }
 
 /* ── Wedge fill (A2 §2) ─────────────────────────────────────────────────────
-   Translucent dark ink — same in both themes; reads well because the blur
-   below pulls the surrounding paper/canvas color into the wedge. Hover
-   bumps opacity. */
+   Fill colour is set inline per-wedge (purple/cyan). CSS only controls
+   transitions + hover brightness so each half-circle stays a solid block. */
 .radial-wedge {
-  fill: rgba(20, 18, 16, 0.38);
   cursor: default;
-  transition: fill 140ms ease;
+  transition: filter 140ms ease;
 }
 
 .radial-wedge--hovered {
-  fill: rgba(20, 18, 16, 0.62);
-}
-
-[data-theme="dark"] .radial-wedge {
-  fill: rgba(255, 255, 255, 0.06);
-}
-[data-theme="dark"] .radial-wedge--hovered {
-  fill: rgba(255, 255, 255, 0.14);
-}
-
-/* ── Per-wedge stroke accent (A2 §3) ────────────────────────────────────────
-   Stroke colour is set inline per-wedge. CSS controls width + glow on hover. */
-.radial-wedge-stroke {
-  transition: stroke-width 120ms ease, filter 140ms ease;
-  pointer-events: none;
+  filter: brightness(1.18);
 }
 
 /* ── Dead zone (A2 §6) ─────────────────────────────────────────────────── */
@@ -109,35 +93,26 @@
   fill: rgba(255, 255, 255, 0.95);
 }
 
-/* ── Wedge label (A2 §8) ───────────────────────────────────────────────── */
-/* fill (per-wedge accent colour) is set inline */
+/* ── Wedge label (A2 §8) — white, sized to fit inside the wedge ─────────── */
 .radial-wedge-label {
   font-family: var(--font-mono, monospace);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.10em;
+  letter-spacing: 0.08em;
   pointer-events: none;
   user-select: none;
   text-anchor: middle;
   dominant-baseline: middle;
   text-transform: uppercase;
-  /* Faint shadow lifts the label off the translucent plate */
-  paint-order: stroke fill;
-  stroke: rgba(0, 0, 0, 0.55);
-  stroke-width: 0.4;
 }
 
-/* ── Wedge icon (A2 §9) ────────────────────────────────────────────────── */
-/* fill (per-wedge accent colour) is set inline */
+/* ── Wedge icon (A2 §9) — white, sized to fit inside the wedge ──────────── */
 .radial-wedge-icon {
-  font-size: 22px;
+  font-size: 16px;
   text-anchor: middle;
   dominant-baseline: middle;
   pointer-events: none;
   user-select: none;
-  paint-order: stroke fill;
-  stroke: rgba(0, 0, 0, 0.55);
-  stroke-width: 0.5;
 }
 
 /* ── Inner highlight (A2 §5) ───────────────────────────────────────────── */
