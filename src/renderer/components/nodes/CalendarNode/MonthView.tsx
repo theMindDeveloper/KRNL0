@@ -7,6 +7,7 @@
 import { useMemo } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
+import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMonthDays, getMondayOf, toYMD, todayLocal } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -14,7 +15,8 @@ import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 interface ScheduledTask {
   id: string;
   text: string;
-  scheduledFor: string; // ISO local datetime
+  startISO: string; // ADR 0003: cascade-derived placement start
+  isAnchor: boolean; // ADR 0003: passed through for future visual treatment
 }
 
 interface ScheduledHabit {
@@ -109,24 +111,35 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
   const currentMonth = anchor.getMonth();
   const currentYear = anchor.getFullYear();
 
-  // Stable shallow selector: return only the minimal { id, text, scheduledFor }
-  // for todo.task nodes that have a scheduledFor field. This avoids re-rendering
-  // on pomo/habit/position changes.
+  // ADR 0003 §4 — read placements from the cascade selector, not raw
+  // scheduledFor. The grid spans 42 cells (6 weeks) starting at cells[0].
+  const monthRangeFromISO = `${cells[0]}T00:00`;
+  const lastCellYMD = cells[cells.length - 1] ?? cells[0]!;
+  // Range upper bound: last cell + 1 day (exclusive).
+  const lastDate = new Date(lastCellYMD + 'T00:00:00');
+  lastDate.setDate(lastDate.getDate() + 1);
+  const monthRangeToISO = `${toYMD(lastDate)}T00:00`;
   const scheduledTasks = useBoardStore(
     useShallow((s): ScheduledTask[] => {
       if (!s.board) return [];
-      const result: ScheduledTask[] = [];
-      for (const n of s.board.nodes) {
-        if (n.kind !== 'todo.task') continue;
-        const st = n.state as { text?: string; scheduledFor?: string };
-        if (!st.scheduledFor) continue;
-        result.push({
-          id: n.id,
+      const placements = selectScheduledTasksForRange(
+        s.board,
+        monthRangeFromISO,
+        monthRangeToISO,
+      );
+      const out: ScheduledTask[] = [];
+      for (const p of placements) {
+        const node = s.board.nodes.find((n) => n.id === p.taskId);
+        if (!node || node.kind !== 'todo.task') continue;
+        const st = node.state as { text?: string };
+        out.push({
+          id: p.taskId,
           text: typeof st.text === 'string' ? st.text : '',
-          scheduledFor: st.scheduledFor,
+          startISO: p.startISO,
+          isAnchor: p.isAnchor,
         });
       }
-      return result;
+      return out;
     }),
   );
 
@@ -154,8 +167,8 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
   const tasksByDay = useMemo(() => {
     const map = new Map<string, ScheduledTask[]>();
     for (const task of scheduledTasks) {
-      // scheduledFor is ISO local datetime; extract the date part.
-      const dayYMD = task.scheduledFor.slice(0, 10);
+      // startISO is ISO local datetime; extract the date part.
+      const dayYMD = task.startISO.slice(0, 10);
       const existing = map.get(dayYMD);
       if (existing) {
         existing.push(task);

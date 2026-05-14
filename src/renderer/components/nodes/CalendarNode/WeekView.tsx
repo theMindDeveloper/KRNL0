@@ -9,6 +9,7 @@ import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
+import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -76,9 +77,10 @@ function habitScheduledOnDow(schedule: HabitSchedule, isoDow: IsoDow): boolean {
 interface ScheduledTask {
   id: string;
   text: string;
-  scheduledFor: string;         // ISO local datetime "YYYY-MM-DDTHH:MM"
+  startISO: string;             // ADR 0003: cascade-derived placement start
   scheduledDurationMin: number; // calendar block duration (fallback: plannedMin or durationMin)
   plannedMin: number;           // for drag payload
+  isAnchor: boolean;            // ADR 0003: true iff the user explicitly anchored this task
 }
 
 interface ScheduledHabit {
@@ -153,31 +155,46 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     onCommand('calendar.setAnchor', { date: addDays(mondayYMD, 7) });
   };
 
-  // Read scheduled tasks from the board store.
+  // ADR 0003 §4 — read placements from the cascade selector, not raw
+  // scheduledFor. The selector derives successor start times from the chain's
+  // single anchor; WeekView no longer cares which task is the anchor for
+  // rendering, only the resulting placements.
+  const weekRangeFromISO = `${mondayYMD}T00:00`;
+  const weekRangeToISO = `${addDays(mondayYMD, 7)}T00:00`;
   const scheduledTasks = useBoardStore(
     useShallow((s): ScheduledTask[] => {
       if (!s.board) return [];
-      const result: ScheduledTask[] = [];
-      for (const n of s.board.nodes) {
-        if (n.kind !== 'todo.task') continue;
-        const st = n.state as {
+      const placements = selectScheduledTasksForRange(
+        s.board,
+        weekRangeFromISO,
+        weekRangeToISO,
+      );
+      const out: ScheduledTask[] = [];
+      for (const p of placements) {
+        const node = s.board.nodes.find((n) => n.id === p.taskId);
+        if (!node || node.kind !== 'todo.task') continue;
+        const st = node.state as {
           text?: string;
-          scheduledFor?: string;
           scheduledDurationMin?: number;
           plannedMin?: number;
           durationMin?: number;
         };
-        if (!st.scheduledFor) continue;
-        result.push({
-          id: n.id,
+        const plannedMin = st.plannedMin ?? st.durationMin ?? 25;
+        // Successors get their plannedMin as their block height; only the
+        // anchor honours scheduledDurationMin (ADR 0003 §3.7).
+        const blockDurationMin = p.isAnchor
+          ? (st.scheduledDurationMin ?? plannedMin)
+          : plannedMin;
+        out.push({
+          id: p.taskId,
           text: typeof st.text === 'string' ? st.text : '',
-          scheduledFor: st.scheduledFor,
-          scheduledDurationMin:
-            st.scheduledDurationMin ?? st.plannedMin ?? st.durationMin ?? 25,
-          plannedMin: st.plannedMin ?? st.durationMin ?? 25,
+          startISO: p.startISO,
+          scheduledDurationMin: blockDurationMin,
+          plannedMin,
+          isAnchor: p.isAnchor,
         });
       }
-      return result;
+      return out;
     }),
   );
 
@@ -210,7 +227,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     const map = new Map<string, ScheduledTask[]>();
     const weekSet = new Set(weekDays);
     for (const task of scheduledTasks) {
-      const dayYMD = task.scheduledFor.slice(0, 10);
+      const dayYMD = task.startISO.slice(0, 10);
       if (!weekSet.has(dayYMD)) continue;
       const existing = map.get(dayYMD);
       if (existing) {
@@ -377,8 +394,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     if (!tasks || tasks.length === 0) return null;
 
     return tasks.map((task) => {
-      // Parse the hour/minute from scheduledFor.
-      const timePart = task.scheduledFor.slice(11, 16); // "HH:MM"
+      // Parse the hour/minute from the placement's startISO.
+      const timePart = task.startISO.slice(11, 16); // "HH:MM"
       const [hStr, mStr] = timePart.split(':');
       const taskHour = parseInt(hStr ?? '0', 10);
       const taskMin = parseInt(mStr ?? '0', 10);
