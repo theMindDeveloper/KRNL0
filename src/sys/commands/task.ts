@@ -20,6 +20,11 @@ import type { PomoState } from '../../renderer/components/nodes/PomoNode/types';
 import {
   pomoStart as fsmPomoStart,
 } from '../../renderer/components/nodes/PomoNode/commands';
+import {
+  deleteTaskCascade,
+  renumberSiblings as sharedRenumberSiblings,
+} from '../../shared/dispatch/task';
+import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
 
 export interface TaskCtx {
   boardPath: string;
@@ -27,19 +32,12 @@ export interface TaskCtx {
 }
 
 interface BoardShape {
-  nodes: unknown[];
-  edges: unknown[];
+  nodes: AnyNode[];
+  edges: AnyEdge[];
   [k: string]: unknown;
 }
 
-interface AnyNode {
-  id: string;
-  kind: string;
-  isMother?: boolean;
-  state: unknown;
-  position?: { x: number; y: number };
-  [k: string]: unknown;
-}
+type AnyNode = SharedAnyNode;
 
 function loadBoard(ctx: TaskCtx): BoardShape {
   const raw = loadBoardFrom(ctx.boardPath);
@@ -89,49 +87,12 @@ function updateNode(board: BoardShape, id: string, newNode: AnyNode): void {
   });
 }
 
-/** BFS collect task node id + all descendant task node ids. */
-function collectDescendants(rootId: string, board: BoardShape): string[] {
-  const result: string[] = [];
-  const queue = [rootId];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current === undefined) break;
-    result.push(current);
-    for (const n of board.nodes) {
-      if (typeof n !== 'object' || n === null) continue;
-      const node = n as AnyNode;
-      if (node.kind !== 'todo.task') continue;
-      const ts = node.state as TaskState;
-      if (ts.parentTaskId === current) queue.push(node.id);
-    }
-  }
-  return result;
-}
-
-/** Renumber sibling tasks (1-based, sorted by createdAt) after add/delete. */
-function renumberSiblings(
+// Use shared renumberSiblings from dispatch module.
+const renumberSiblings = (
   board: BoardShape,
   parentTodoId: string,
   parentTaskId: string | null,
-): void {
-  const siblings = (board.nodes as AnyNode[])
-    .filter((n) => {
-      if (n.kind !== 'todo.task') return false;
-      const ts = n.state as TaskState;
-      return ts.parentTodoId === parentTodoId && ts.parentTaskId === parentTaskId;
-    })
-    .sort((a, b) => {
-      const ta = (a.state as TaskState).createdAt;
-      const tb = (b.state as TaskState).createdAt;
-      return ta.localeCompare(tb);
-    });
-  siblings.forEach((n, i) => {
-    const ts = n.state as TaskState;
-    if (ts.sequenceNumber !== i + 1) {
-      updateNode(board, n.id, { ...n, state: { ...ts, sequenceNumber: i + 1 } });
-    }
-  });
-}
+): void => sharedRenumberSiblings(board, parentTodoId, parentTaskId);
 
 // ── Commands ────────────────────────────────────────────────────────────────
 
@@ -299,34 +260,15 @@ export async function taskDelete(
   const taskNode = findTaskNode(board, taskId);
   if (!taskNode) return { ok: false, message: `No task node with id "${taskId}"` };
 
-  const ts = taskNode.state as TaskState;
-  const toRemove = new Set(collectDescendants(taskId, board));
-
-  // Remove linked TodoItem
-  if (ts.todoItemId !== null) {
-    const todoMother = findNode(board, ts.parentTodoId);
-    if (todoMother && todoMother.kind === 'todo') {
-      const newTodo = fsmTodoRemove(todoMother.state as TodoState, {
-        id: ts.todoItemId,
-      });
-      updateNode(board, todoMother.id, { ...todoMother, state: newTodo });
-    }
-  }
-
-  board.nodes = board.nodes.filter(
-    (n) => typeof n !== 'object' || n === null || !toRemove.has((n as AnyNode).id),
-  );
-  board.edges = board.edges.filter(
-    (e) => {
-      if (typeof e !== 'object' || e === null) return true;
-      const ed = e as { from?: { nodeId?: string }; to?: { nodeId?: string } };
-      return !toRemove.has(ed.from?.nodeId ?? '') && !toRemove.has(ed.to?.nodeId ?? '');
-    },
-  );
-
-  renumberSiblings(board, ts.parentTodoId, ts.parentTaskId);
+  // T17: Use shared cascade — handles pomo cancel + TodoItem cleanup + renumber.
+  const { removedCount, pomoCancelled } = deleteTaskCascade(board, taskId);
   saveBoard(ctx, board);
-  return { ok: true, message: `Task and ${toRemove.size - 1} descendant(s) deleted.` };
+
+  const desc = pomoCancelled ? ' (pomo session cancelled)' : '';
+  return {
+    ok: true,
+    message: `Task and ${removedCount - 1} descendant(s) deleted.${desc}`,
+  };
 }
 
 export async function taskStartPomo(

@@ -137,8 +137,8 @@ function migrateMotherPositions(board: unknown): Record<string, unknown> {
     }
     return node;
   });
-  if (b.viewport) {
-    b.viewport = { ...b.viewport, x: 0, y: 220, zoom: 1 };
+  if (!b.viewport) {
+    b.viewport = { x: 0, y: 220, zoom: 1 };
   }
   return b as Record<string, unknown>;
 }
