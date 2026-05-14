@@ -9,12 +9,36 @@ import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMonthDays, getMondayOf, toYMD, todayLocal } from '../HabitNode/types';
+import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 
 interface ScheduledTask {
   id: string;
   text: string;
   scheduledFor: string; // ISO local datetime
 }
+
+interface ScheduledHabit {
+  id: string;
+  color: string; // habit color token name
+  schedule: HabitSchedule;
+}
+
+// Convert JS getDay() (0=Sun..6=Sat) to ISO-8601 day-of-week (1=Mon..7=Sun).
+function jsGetDayToIsoDow(jsDay: number): IsoDow {
+  return (jsDay === 0 ? 7 : jsDay) as IsoDow;
+}
+
+// Check if a habit is scheduled on a given ISO day-of-week.
+function habitScheduledOnDow(schedule: HabitSchedule, isoDow: IsoDow): boolean {
+  switch (schedule.kind) {
+    case 'daily': return true;
+    case 'weekly': return schedule.days.includes(isoDow);
+    case 'weekdays': return isoDow >= 1 && isoDow <= 5;
+  }
+}
+
+// Max visible habit dots before "+N" overflow (ADR 0002 §6).
+const MAX_DOTS = 6;
 
 interface MonthViewProps {
   state: CalendarState;
@@ -102,6 +126,26 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
           scheduledFor: st.scheduledFor,
         });
       }
+      return result;
+    }),
+  );
+
+  // Read scheduled habits from the board store (ADR 0002 §6).
+  // Sorted by habit.id ascending for stable dot ordering.
+  const scheduledHabits = useBoardStore(
+    useShallow((s): ScheduledHabit[] => {
+      if (!s.board) return [];
+      const result: ScheduledHabit[] = [];
+      for (const n of s.board.nodes) {
+        if (n.kind !== 'habit') continue;
+        const habitState = n.state as { habits?: Habit[] } | null;
+        if (!habitState?.habits) continue;
+        for (const h of habitState.habits) {
+          if (h.archived || !h.schedule) continue;
+          result.push({ id: h.id, color: h.color, schedule: h.schedule });
+        }
+      }
+      result.sort((a, b) => a.id.localeCompare(b.id));
       return result;
     }),
   );
@@ -239,6 +283,15 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
           const visible = tasks.slice(0, MAX_CHIPS);
           const overflow = tasks.length - MAX_CHIPS;
 
+          // Compute habit dots for this cell.
+          const cellDate = parseAnchorDate(ymd);
+          const cellIsoDow = jsGetDayToIsoDow(cellDate.getDay());
+          const cellHabits = scheduledHabits.filter((h) =>
+            habitScheduledOnDow(h.schedule, cellIsoDow),
+          );
+          const visibleDots = cellHabits.slice(0, MAX_DOTS - 1);
+          const dotOverflow = cellHabits.length - visibleDots.length;
+
           return (
             <div
               key={ymd}
@@ -359,14 +412,49 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
                 )}
               </div>
 
-              {/* Habit dot row stub — reserved for Slice 5 */}
-              <div
-                style={{
-                  height: 1,
-                  position: 'relative',
-                  zIndex: 1,
-                }}
-              />
+              {/* Habit dots (ADR 0002 §6) */}
+              {cellHabits.length > 0 && (
+                <div
+                  data-testid={`month-habit-dots-${ymd}`}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: 2,
+                    alignItems: 'center',
+                    position: 'relative',
+                    zIndex: 1,
+                    marginTop: 1,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {visibleDots.map((h) => (
+                    <div
+                      key={h.id}
+                      data-testid={`month-habit-dot-${h.id}-${ymd}`}
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: `var(--${h.color})`,
+                        opacity: 0.85,
+                        flexShrink: 0,
+                      }}
+                    />
+                  ))}
+                  {dotOverflow > 0 && (
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 8,
+                        color: 'var(--ink-3)',
+                        lineHeight: 1,
+                      }}
+                    >
+                      +{dotOverflow + 1}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
