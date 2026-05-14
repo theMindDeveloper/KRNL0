@@ -270,6 +270,9 @@ export const useBoardStore = create<BoardStore>((set) => ({
     return _cachedChainIndex;
   },
 
+  // ADR 0004 §2 — UI label is "Add parallel task" since ADR 0004; internal
+  // name retained for stability (replicates source's incoming + outgoing
+  // edges so the new task runs concurrently with the source).
   insertSiblingTaskAfter: (taskNodeId: string, opts?: { text?: string; durationMin?: number }) => {
     set((s) => {
       if (!s.board) return s;
