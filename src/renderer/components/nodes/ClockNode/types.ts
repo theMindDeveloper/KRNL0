@@ -1,13 +1,13 @@
 export interface ClockState {
   linkedTodoId: string | null; // which Todo node to pull tasks from
-  windowStartHour: number;     // 0-23, hour at the 12-o'clock anchor; default 8
+  viewWindow: 0 | 1;           // 0 = minutes [0, 720); 1 = minutes [720, 1440)
 }
 
 export type ClockConfig = Record<string, never>;
 
 export const defaultClockState = (): ClockState => ({
   linkedTodoId: null,
-  windowStartHour: 8,
+  viewWindow: 0,
 });
 
 export const defaultClockConfig = (): ClockConfig => ({});

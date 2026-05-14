@@ -1,19 +1,20 @@
 /**
- * ClockNode command unit tests — Decision 23.1 (PR #112)
+ * ClockNode command unit tests — Decision 24.2 (supersedes Decision 23.1)
  *
- * Covers AC8:
+ * Covers:
  *   - clock.linkTodo  sets / clears linkedTodoId
- *   - clock.setWindowStart clamps to [0, 23] and rounds fractional inputs
+ *   - clock.setViewWindow sets viewWindow to 0 or 1; coerces non-1 to 0
  */
 
 import { describe, it, expect } from 'vitest';
 import {
   clockLinkTodo,
-  clockSetWindowStart,
+  clockSetViewWindow,
 } from '../../../src/renderer/components/nodes/ClockNode/commands';
+import type { ClockState } from '../../../src/renderer/components/nodes/ClockNode/types';
 import { defaultClockState } from '../../../src/renderer/components/nodes/ClockNode/types';
 
-describe('ClockNode commands (Decision 23.1)', () => {
+describe('ClockNode commands (Decision 24.2)', () => {
   // ── clock.linkTodo ─────────────────────────────────────────────────────────
 
   describe('clock.linkTodo', () => {
@@ -35,68 +36,40 @@ describe('ClockNode commands (Decision 23.1)', () => {
       expect(s.linkedTodoId).toBeNull();
     });
 
-    it('preserves windowStartHour when linking', () => {
-      const s = { ...defaultClockState(), windowStartHour: 14 };
-      const next = clockLinkTodo(s, { todoNodeId: 'todo-xyz' });
-      expect(next.windowStartHour).toBe(14);
+    it('preserves viewWindow when linking', () => {
+      const s: ClockState = { ...defaultClockState(), viewWindow: 1 };
+      const next = clockLinkTodo(s, { todoNodeId: 'todo-y' });
+      expect(next.viewWindow).toBe(1);
     });
   });
 
-  // ── clock.setWindowStart ───────────────────────────────────────────────────
+  // ── clock.setViewWindow ────────────────────────────────────────────────────
 
-  describe('clock.setWindowStart', () => {
-    it('accepts a valid mid-range hour (8 → 8)', () => {
-      const s = defaultClockState();
-      const next = clockSetWindowStart(s, { hour: 8 });
-      expect(next.windowStartHour).toBe(8);
+  describe('clock.setViewWindow', () => {
+    it('sets viewWindow to 0', () => {
+      const next = clockSetViewWindow({ ...defaultClockState(), viewWindow: 1 }, { window: 0 });
+      expect(next.viewWindow).toBe(0);
     });
 
-    it('accepts the lower boundary (0 → 0)', () => {
-      const s = defaultClockState();
-      const next = clockSetWindowStart(s, { hour: 0 });
-      expect(next.windowStartHour).toBe(0);
+    it('sets viewWindow to 1', () => {
+      const next = clockSetViewWindow(defaultClockState(), { window: 1 });
+      expect(next.viewWindow).toBe(1);
     });
 
-    it('accepts the upper boundary (23 → 23)', () => {
-      const s = defaultClockState();
-      const next = clockSetWindowStart(s, { hour: 23 });
-      expect(next.windowStartHour).toBe(23);
+    it('coerces non-1 inputs to 0', () => {
+      const next = clockSetViewWindow(defaultClockState(), { window: 2 as 0 | 1 });
+      expect(next.viewWindow).toBe(0);
     });
 
-    it('clamps below zero to 0 (-5 → 0)', () => {
-      const s = defaultClockState();
-      const next = clockSetWindowStart(s, { hour: -5 });
-      expect(next.windowStartHour).toBe(0);
+    it('preserves linkedTodoId', () => {
+      const next = clockSetViewWindow({ linkedTodoId: 'todo-x', viewWindow: 0 }, { window: 1 });
+      expect(next.linkedTodoId).toBe('todo-x');
     });
 
-    it('clamps above 23 to 23 (99 → 23)', () => {
+    it('is pure (does not mutate input)', () => {
       const s = defaultClockState();
-      const next = clockSetWindowStart(s, { hour: 99 });
-      expect(next.windowStartHour).toBe(23);
-    });
-
-    it('rounds fractional inputs (7.6 → 8)', () => {
-      const s = defaultClockState();
-      const next = clockSetWindowStart(s, { hour: 7.6 });
-      expect(next.windowStartHour).toBe(8);
-    });
-
-    it('rounds fractional inputs (7.4 → 7)', () => {
-      const s = defaultClockState();
-      const next = clockSetWindowStart(s, { hour: 7.4 });
-      expect(next.windowStartHour).toBe(7);
-    });
-
-    it('does not mutate the original state', () => {
-      const s = defaultClockState();
-      clockSetWindowStart(s, { hour: 12 });
-      expect(s.windowStartHour).toBe(8);
-    });
-
-    it('preserves linkedTodoId when changing window start', () => {
-      const s = { ...defaultClockState(), linkedTodoId: 'todo-abc' };
-      const next = clockSetWindowStart(s, { hour: 12 });
-      expect(next.linkedTodoId).toBe('todo-abc');
+      clockSetViewWindow(s, { window: 1 });
+      expect(s.viewWindow).toBe(0);
     });
   });
 });

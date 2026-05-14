@@ -150,7 +150,7 @@ function buildUserBoard(): Board {
     isMother: true,
     state: {
       linkedTodoId: todoId,
-      windowStartHour: 0,
+      viewWindow: 0,
     },
     config: {},
   };
@@ -224,7 +224,10 @@ describe('Decision 24.1 — user-reported 3-task chain renders all 3 task arcs',
     }
 
     // ASSERTION 3: at least 2 break arcs present (3 tasks → 3 breaks, trailing stripped at render)
-    const breakArcs = allArcCircles.filter((c) => c.getAttribute('stroke-width') === '9');
+    // Decision 24.2: short breaks use strokeWidth=6, long breaks use strokeWidth=10
+    const breakArcs = allArcCircles.filter(
+      (c) => c.getAttribute('stroke-width') === '6' || c.getAttribute('stroke-width') === '10',
+    );
     expect(breakArcs.length).toBeGreaterThanOrEqual(2);
   });
 });
