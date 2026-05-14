@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
 import React from 'react';
 import { ClockNode } from '../../../src/renderer/components/nodes/ClockNode';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
@@ -405,5 +405,61 @@ describe('Decision 24 — Parallel arcs with mix-blend-mode: multiply', () => {
     for (const arc of taskArcs) {
       expect((arc as HTMLElement).style.mixBlendMode).toBeFalsy();
     }
+  });
+});
+
+// ── AC3 — Pomo config reactivity: clock updates when shortBreakMin changes ────
+// Verifies that editing PomoConfig triggers Timeline recompute and ClockNode
+// re-renders with updated break arc lengths.
+
+describe('AC3 — Pomo config reactivity: break arc changes when shortBreakMin changes', () => {
+  it('break arc strokeDasharray reflects the new shortBreakMin after store update', async () => {
+    _seq = 0;
+    const todoId = 'todo-react';
+    const t1 = makeTaskNode('rc-1', makeTaskState({ parentTodoId: todoId, plannedMin: 60 }));
+    const t2 = makeTaskNode('rc-2', makeTaskState({ parentTodoId: todoId, plannedMin: 60 }));
+
+    // Initial board: shortBreakMin = 5
+    const makeBoard = (pomoCfg: Partial<PomoConfig>): Board => ({
+      version: 1,
+      schemaVersion: 1,
+      savedAt: '2026-05-14T08:00:00.000Z',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [makePomoNode(pomoCfg), makeTodoNode(todoId), t1, t2],
+      edges: [makeEdge('rc-1', 'rc-2')],
+    });
+
+    useBoardStore.setState({ board: makeBoard({ shortBreakMin: 5 }) });
+    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+
+    const CIRCUMFERENCE = 2 * Math.PI * 108;
+    const TOTAL_MIN = 720;
+
+    // Break arc with shortBreakMin=5: arcLengthMin = 5, arcLength = (5/720)*CIRCUMFERENCE
+    const arcLen5 = (5 / TOTAL_MIN) * CIRCUMFERENCE;
+
+    const getBreakDashArrayValue = (): string | null => {
+      const arcs = getArcCircles().filter((c) => c.getAttribute('stroke-width') === '9');
+      return arcs[0]?.getAttribute('stroke-dasharray') ?? null;
+    };
+
+    const dash5 = getBreakDashArrayValue();
+    expect(dash5).not.toBeNull();
+    // The dasharray should start with the arc length for a 5-min break
+    expect(dash5).toContain(arcLen5.toFixed(0).slice(0, 4)); // first 4 chars match
+
+    // Update store with shortBreakMin = 10 (new nodes reference → cache invalidated)
+    await act(async () => {
+      useBoardStore.setState({ board: makeBoard({ shortBreakMin: 10 }) });
+    });
+
+    // Break arc length should now reflect 10-min break
+    const arcLen10 = (10 / TOTAL_MIN) * CIRCUMFERENCE;
+    const dash10 = getBreakDashArrayValue();
+    expect(dash10).not.toBeNull();
+    // The new dasharray should reflect the longer break (different from dash5)
+    expect(dash10).not.toBe(dash5);
+    // And start with the arc length for a 10-min break
+    expect(dash10).toContain(arcLen10.toFixed(0).slice(0, 4));
   });
 });

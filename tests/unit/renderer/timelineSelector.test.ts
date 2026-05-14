@@ -489,6 +489,53 @@ describe('Test 11 — plannedMin === 0 coerced to 1 minute', () => {
   });
 });
 
+// ── AC1 — Chain order: explicit startMin/endMin per task (user bug fix) ───────
+// This is the targeted test for the user-reported bug: only the first of 3
+// chained tasks was showing. The fix is verified by asserting exact positions.
+
+describe('AC1 — Chain order: 3-task chain renders in order with correct positions', () => {
+  it('10-min task starts at 0, 20-min task starts after first break, 40-min task starts after second break', () => {
+    _taskSeq = 0;
+    const todoId = 'todo-ac1';
+    const t1 = makeTaskNode('ac1-t1', todoId, 10);
+    const t2 = makeTaskNode('ac1-t2', todoId, 20);
+    const t3 = makeTaskNode('ac1-t3', todoId, 40);
+    const board = makeBoard(
+      [makeTodoNode(todoId), t1, t2, t3],
+      [makeEdge('ac1-t1', 'ac1-t2'), makeEdge('ac1-t2', 'ac1-t3')],
+      { shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
+    );
+
+    const timeline = selectTimeline(board, todoId);
+    expect(timeline).not.toBeNull();
+
+    const taskSegs = timeline!.segments.filter((s) => s.kind === 'task');
+    expect(taskSegs).toHaveLength(3);
+
+    // Task 1 (10 min): starts at 0, ends at 10
+    const seg1 = taskSegs.find((s) => s.kind === 'task' && s.taskId === 'ac1-t1');
+    expect(seg1?.kind === 'task' && seg1.startMin).toBe(0);
+    expect(seg1?.kind === 'task' && seg1.endMin).toBe(10);
+
+    // Task 2 (20 min): starts after task1 (10) + break (5) = 15, ends at 35
+    const seg2 = taskSegs.find((s) => s.kind === 'task' && s.taskId === 'ac1-t2');
+    expect(seg2?.kind === 'task' && seg2.startMin).toBe(15);
+    expect(seg2?.kind === 'task' && seg2.endMin).toBe(35);
+
+    // Task 3 (40 min): starts after task2 (35) + break (5) = 40, ends at 80
+    const seg3 = taskSegs.find((s) => s.kind === 'task' && s.taskId === 'ac1-t3');
+    expect(seg3?.kind === 'task' && seg3.startMin).toBe(40);
+    expect(seg3?.kind === 'task' && seg3.endMin).toBe(80);
+
+    // All 3 tasks have their correct non-zero startMins (the user bug was only root showed)
+    expect(seg2?.kind === 'task' && (seg2.startMin ?? 0) > 0).toBe(true);
+    expect(seg3?.kind === 'task' && (seg3.startMin ?? 0) > 0).toBe(true);
+
+    // totalMin = 10 + 5 + 20 + 5 + 40 + 5 = 85
+    expect(timeline!.totalMin).toBe(85);
+  });
+});
+
 // ── Test 12 — No pomo node, falls back to defaultPomoConfig ──────────────────
 
 describe('Test 12 — No pomo node: uses defaultPomoConfig values', () => {
