@@ -181,7 +181,11 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         // v1: only allow drops from tasks that already have a TaskNode.
         if (!payload.taskId) return;
         const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:00`;
-        onCommand('task.setSchedule', {
+        // Cross-node router: calendar.schedule looks up the task and applies
+        // taskSetSchedule. Firing task.setSchedule directly here would no-op
+        // because onCommand is bound to the CalendarNode, which has no such
+        // handler. ADR 0001 §4 + commandDispatch.ts:877.
+        onCommand('calendar.schedule', {
           taskId: payload.taskId,
           scheduledFor,
           scheduledDurationMin: payload.durationMin,
@@ -234,7 +238,10 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       };
 
       const handleBlockClick = () => {
-        onCommand('task.activate', { taskId: task.id });
+        // Cross-node router: calendar.activateTask routes to task.activate on
+        // the target node. Firing task.activate directly here would no-op
+        // (onCommand is bound to CalendarNode, no task.activate handler there).
+        onCommand('calendar.activateTask', { taskId: task.id });
       };
 
       return (

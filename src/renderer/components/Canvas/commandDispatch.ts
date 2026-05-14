@@ -869,6 +869,25 @@ export function makeCommandHandler(nodeId: string) {
       return;
     }
 
+    // ── calendar.activateTask: cross-node router — fire task.activate on target ─
+    // Slice 3: clicking a scheduled task block in WeekView should activate the
+    // task (light up its chain). The block lives inside CalendarNode, so
+    // onCommand is bound to the calendar id — a plain task.activate dispatch
+    // would no-op. This router looks up the target task and applies taskActivate.
+    if (node.kind === 'calendar' && command === 'calendar.activateTask') {
+      const actArgs = args as { taskId?: string };
+      if (!actArgs.taskId) return;
+      const currentBoard = useBoardStore.getState().board;
+      if (!currentBoard) return;
+      const targetTask = currentBoard.nodes.find((n) => n.id === actArgs.taskId);
+      if (!targetTask || targetTask.kind !== 'todo.task') return;
+      const nextTaskState = taskActivate(targetTask.state as TaskState);
+      updateNode(actArgs.taskId, { state: nextTaskState });
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+      return;
+    }
+
     // ── calendar.schedule: cross-node router — dispatch task.setSchedule to target ─
     // ADR 0001 §4: calendar.schedule looks up the target task and dispatches
     // task.setSchedule. Cosmetic edge creation is the drop handler's responsibility
