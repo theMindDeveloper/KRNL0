@@ -285,7 +285,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               <div
                 key={item.id}
                 className={`todo-item${item.done ? ' done' : ''}`}
-                draggable={!item.done}
+                draggable={true}
                 onDragStart={(e: DragEvent<HTMLDivElement>) => {
                   if (item.done) { e.preventDefault(); return; }
                   const durationMin = item.taskNodeId !== null
@@ -307,7 +307,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   gap: 8,
                   padding: '4px 14px',
                   opacity: item.done ? 0.5 : 1,
-                  cursor: !item.done ? 'grab' : 'default',
+                  cursor: 'grab',
                 }}
               >
                 {/* F3: checkbox — dispatches todo.toggle */}

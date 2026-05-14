@@ -29,7 +29,6 @@ function makeProps(overrides: Partial<Parameters<typeof NowLine>[0]> = {}) {
     rowHeight: 28,
     columnWidth: 40,
     gutterWidth: 36,
-    todayColumnIndex: 3,          // Thursday = index 3 (Mon=0)
     ...overrides,
   };
 }
