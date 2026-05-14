@@ -36,11 +36,31 @@ contextBridge.exposeInMainWorld('krnl', {
   assetDelete: (assetId: string) =>
     ipcRenderer.invoke('asset:delete', { assetId }),
 
-  // Live sync â€” main â†’ renderer notification that board.json was mutated
+  // Live sync - main -> renderer notification that board.json was mutated
   // outside the renderer (e.g. via sys CLI). Renderer should re-load.
   onBoardChanged: (callback: () => void) => {
     const channel = 'board:changed'
     ipcRenderer.on(channel, () => callback())
     return () => ipcRenderer.removeAllListeners(channel)
   },
+
+  // Phase 2: cli:dispatch
+  onCliDispatch: (
+    callback: (id: string, command: string, args: Record<string, unknown>) => void,
+  ) => {
+    const channel = "cli:dispatch:request"
+    ipcRenderer.on(channel, (_event, id: string, command: string, args: Record<string, unknown>) => {
+      callback(id, command, args)
+    })
+    return () => ipcRenderer.removeAllListeners(channel)
+  },
+  cliDispatchReply: (id: string, ok: boolean, message: string) => {
+    ipcRenderer.send("cli:dispatch:reply", id, ok, message)
+  },
+
+  // Clipboard — routed through main because navigator.clipboard is flaky in
+  // Electron (silent fails on permission/focus quirks). main has Electron's
+  // clipboard module which works unconditionally.
+  clipboardReadText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText'),
+  clipboardWriteText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:writeText', text),
 })

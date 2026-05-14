@@ -1432,6 +1432,59 @@ If a future affordance does not fit any of these four, that is a signal to chall
 
 ---
 
+## Decision 23 — Terminal CLI Bridge: `krnl` Inside the PTY
+
+**Date:** 2026-05-14
+**Status:** Accepted
+**Author:** architect
+**ADR:** [adr-0014-terminal-cli-bridge.md](./adr-0014-terminal-cli-bridge.md)
+**Numbering note:** The existing log uses "Decision 14" twice (HabitNode v2 at line 897, Native Module Rebuild Flow at line 765 / also tagged 18). The next free slot is 23 (after 22.2).
+
+### Context
+
+The TerminalNode hosts a real PTY (Decision 12), and Decision 3 commits us to "Claude Code drives the app via a CLI." But the existing `sys` CLI is a renderer-to-main IPC (`sys:run`) — it cannot be invoked from inside the PTY's actual shell, which is a separate OS process with no `ipcRenderer`. There is no `krnl` binary on PATH. And the renderer's `commandDispatch.ts` holds cascade semantics (active-pomo cancel on task delete, todo↔task mirror, sibling renumber, marquee cascade) that `SysFacade` does not fully replicate — a CLI that mutates board.json directly today silently desyncs the running app.
+
+### Decision
+
+Three load-bearing calls:
+
+1. **Shared dispatch.** Cascade logic moves to `src/shared/dispatch/` as pure functions. Both renderer (`commandDispatch.ts`) and main (`SysFacade`) call the same module. No more "renderer truth, CLI approximation."
+2. **Named-pipe / Unix-socket RPC.** Main hosts a `net.createServer` listening on `${os.tmpdir()}/krnl0-${pid}.sock` (POSIX) or `\\.\pipe\krnl0-${pid}` (Windows). Per-launch path; per-launch 256-bit token in `KRNL0_RPC_TOKEN`. Wire format is line-delimited JSON: one request frame `{ v:1, token, id, argv }`, multiple response frames `{ v:1, id, kind:'stdout'|'stderr'|'exit', data|code }`. Token mismatch → single `exit` frame with code 126.
+3. **`krnl` binary distributed via per-launch temp dir.** App startup writes `bin/krnl.js` + POSIX shim `krnl` + Windows shim `krnl.cmd` into `${app.getPath('userData')}/cli-bin/` and prepends that path to the PTY child's PATH at `pty:create` time. The existing `sys` binary stays as a deprecation alias (one stderr note, then `exec`s the same `krnl.js`). The `sys:run` IPC channel is **not** renamed — only the binary name is.
+
+The MOTD banner moves from renderer (current `BOOT_LINE_ASCII` write in `session.ts`) to main, runs immediately after PTY spawn, reads version from `package.json` dynamically, and includes the ASCII KRNL0 logo + tagline + dim separator + "type 'help'" prompt. Compact one-line form for `cols < 50`. Opt-out via `KRNL0_NO_MOTD=1`.
+
+The `term.*` FSM (`setShell`, `setFontSize`, `setTitle`, `clear`) plus a `case 'term':` branch in `commandDispatch.ts` close the gap where `term.sessionStart` / `term.sessionEnd` events were emitted but never dispatched. Help is generated from a single command registry at `src/shared/cli/commandRegistry.ts`; the hand-maintained `HELP_TEXT` constant in `SysFacade.ts` is deleted.
+
+### Contract
+
+See ADR-0014 §11 for the full file-by-file contract. Key invariants backend-dev must hold:
+
+- Wire format: line-delimited JSON with `v: 1` on every frame; `exit` frame is always last.
+- Token check: first thing the server does on every request; mismatch → `exit code 126`, close.
+- Env injection: `pty:create` is **extended**, not forked. The existing `env: process.env` line spreads `KRNL0_RPC_SOCKET`, `KRNL0_RPC_TOKEN`, and the prepended `PATH`.
+- Cascade parity (T19 in `terminal-finish.md`): CLI mutations and UI mutations on the same board produce structurally identical output.
+- `BOOT_LINE_ASCII` is removed from the renderer; main writes the banner.
+
+### Phasing
+
+| Phase | Scope | Effort | Status |
+|---|---|---|---|
+| 1 | RPC server + `krnl` binary + MOTD + help + `term.*` FSM + shared dispatch for Phase-1 cascade commands (`task.delete`, `todo.remove`, etc.) | ~1 day | Shipped in PR #108 |
+| 2 | UI-parity surface: `node.move/resize`, `viewport.*`, `undo/redo`, `marquee.*`, `edge.*`, `board.*`, `theme.*`; adds `cli:dispatch` IPC for renderer-coupled commands | ~1 day | Shipped in PR #108 |
+| 3 | ANSI color in `krnl` output, `krnl init zsh` / `krnl init pwsh` shell-init snippets | ~½ day | Deferred — tracked in #109 |
+| 4 | Streaming commands, autocomplete generation | defer-OK | Deferred — tracked in #110 |
+
+Open questions OQ2, OQ4, OQ5, OQ6 tracked in #111.
+
+### Consequences
+
+- **Enables.** Claude Code inside the PTY mutates the app with no orphan state. `krnl` reaches UI parity for every operation in ADR-0014 §5. The banner makes the terminal feel like a real shell. Generated help auto-documents new commands.
+- **Forecloses.** Phase 2's `cli:dispatch` IPC couples a few commands (undo, viewport) to a live renderer — headless invocations cannot pan or undo. `KRNL0_RPC_TOKEN` is env-injected; any descendant of the PTY's shell has it (same trust boundary as access to `~/Documents/krnl0/board.json`).
+- **Cost.** ~2 dev days for Phase 1+2. One new teardown surface: the named-pipe server must close on `app.on('before-quit')` alongside the existing PTY cleanup.
+
+---
+
 ## Decision 24 — CalendarNode Slice 3: WeekView + NowLine + drop-to-schedule (2026-05-14)
 
 **Date:** 2026-05-14

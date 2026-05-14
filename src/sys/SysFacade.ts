@@ -9,6 +9,17 @@ import {
   imageResize,
   imageClear,
 } from './commands/image';
+import {
+  generateHelp,
+  generateGroupHelp,
+  generateSubHelp,
+} from '../shared/cli/commandRegistry';
+
+/** Function type for renderer-coupled CLI dispatch (Phase 2). */
+export type CliDispatchFn = (
+  command: string,
+  args: Record<string, unknown>,
+) => Promise<{ ok: boolean; message: string; exitCode?: number }>;
 
 export interface SysResult {
   ok: boolean;
@@ -20,6 +31,8 @@ export interface SysFacadeDeps {
   boardPath: string;
   hasOpenRenderer: () => boolean;
   onBoardChanged?: () => void;
+  /** Phase 2: renderer-coupled dispatch for viewport/undo/redo/theme commands. */
+  cliDispatch?: CliDispatchFn;
 }
 
 function defaultBoardPath(): string {
@@ -29,28 +42,159 @@ function defaultBoardPath(): string {
   return `${dir}/board.json`;
 }
 
+function readVersion(): string {
+  try {
+    // SysFacade is used both from main process (compiled) and from tests.
+    // The package.json is one level above src/.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pkg = require('../../package.json') as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 export class SysFacade {
   private readonly deps: SysFacadeDeps;
+  private readonly version: string;
 
   constructor(deps?: Partial<SysFacadeDeps>) {
     this.deps = {
       boardPath: deps?.boardPath ?? defaultBoardPath(),
       hasOpenRenderer: deps?.hasOpenRenderer ?? (() => false),
       ...(deps?.onBoardChanged ? { onBoardChanged: deps.onBoardChanged } : {}),
+      ...(deps?.cliDispatch ? { cliDispatch: deps.cliDispatch } : {}),
     };
+    this.version = readVersion();
   }
 
   async run(argv: string[]): Promise<SysResult> {
-    if (argv.length === 0 || argv[0] === 'help') {
-      return { ok: true, message: HELP_TEXT };
+    if (argv.length === 0) {
+      return { ok: true, message: generateHelp(this.version) };
     }
 
     const command = SysParser.parse(argv);
     if (!command) {
       return {
         ok: false,
-        message: `Unknown command: '${argv.join(' ')}'. Run 'sys help' for usage.`,
+        message: `Unknown command: '${argv.join(' ')}'. Run 'krnl help' for usage.`,
       };
+    }
+
+    if (command.kind === 'help') {
+      if (command.group && command.sub) {
+        const text = generateSubHelp(command.group, command.sub);
+        return text
+          ? { ok: true, message: text }
+          : { ok: false, message: `Unknown subcommand: ${command.group} ${command.sub}` };
+      }
+      if (command.group) {
+        const text = generateGroupHelp(command.group);
+        return text
+          ? { ok: true, message: text }
+          : { ok: false, message: `Unknown command group: ${command.group}` };
+      }
+      return { ok: true, message: generateHelp(this.version) };
+    }
+
+    if (command.kind === 'version') {
+      return { ok: true, message: `krnl0 v${this.version}` };
+    }
+
+    if (command.kind === 'whoami') {
+      const socket = process.env['KRNL0_RPC_SOCKET'] ?? '<unset>';
+      const pid = process.env['KRNL0_MAIN_PID'] ?? String(process.pid);
+      const token = process.env['KRNL0_RPC_TOKEN'];
+      return {
+        ok: true,
+        message: [
+          `socket : ${socket}`,
+          `token  : ${token ? '(set)' : '(unset)'}`,
+          `pid    : ${pid}`,
+        ].join('\n'),
+      };
+    }
+
+    if (command.kind === 'term') {
+      // term.* commands require an open renderer (they operate on TerminalNode state).
+      // Phase 1: headless stub — inform user.
+      if (!this.deps.hasOpenRenderer()) {
+        return {
+          ok: false,
+          message: `term.${command.sub} requires an open renderer window (exit 2 = no renderer).`,
+          data: { exitCode: 2 },
+        };
+      }
+      // Renderer-side dispatch is wired in commandDispatch.ts via cli:dispatch IPC (Phase 2).
+      if (!this.deps.cliDispatch) {
+        return {
+          ok: false,
+          message: `term.${command.sub} requires cli:dispatch (no renderer coupled)`,
+          data: { exitCode: 2 },
+        };
+      }
+      return this.deps.cliDispatch(`term.${command.sub}`, command as unknown as Record<string, unknown>);
+    }
+
+    // ── Phase 2 commands — renderer-coupled via cli:dispatch ──────────────────
+
+    if (command.kind === 'node' && command.sub === 'move') {
+      if (!command.id) return { ok: false, message: 'node move requires <id>' };
+      if (!command.to) return { ok: false, message: 'node move requires --to x,y' };
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'node move requires an open renderer window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('node.move', { id: command.id, x: command.to.x, y: command.to.y });
+    }
+
+    if (command.kind === 'viewport') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: `viewport.${command.sub} requires an open renderer window`, data: { exitCode: 2 } };
+      }
+      if (command.sub === 'pan') {
+        if (command.dx === undefined || command.dy === undefined) {
+          return { ok: false, message: 'viewport pan requires --dx and --dy' };
+        }
+        return this.deps.cliDispatch('viewport.pan', { dx: command.dx, dy: command.dy });
+      }
+      if (command.sub === 'zoom') {
+        if (command.factor === undefined) {
+          return { ok: false, message: 'viewport zoom requires --factor' };
+        }
+        return this.deps.cliDispatch('viewport.zoom', { factor: command.factor });
+      }
+    }
+
+    if (command.kind === 'undo') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'undo requires an open renderer window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('undo', {});
+    }
+
+    if (command.kind === 'redo') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'redo requires an open renderer window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('redo', {});
+    }
+
+    if (command.kind === 'marquee') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'marquee requires an open renderer window', data: { exitCode: 2 } };
+      }
+      if (!command.rect) return { ok: false, message: 'marquee requires --rect x1,y1,x2,y2' };
+      return this.deps.cliDispatch('marquee.delete', command.rect as unknown as Record<string, unknown>);
+    }
+
+    if (command.kind === 'theme') {
+      if (!command.value || !['light', 'dark'].includes(command.value)) {
+        return { ok: false, message: 'theme set requires <light|dark>' };
+      }
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'theme set requires an open renderer window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('theme.set', { value: command.value });
     }
 
     if (command.kind === 'habit') {
@@ -128,70 +272,3 @@ export class SysFacade {
   }
 }
 
-const HELP_TEXT = `
-krnl0 — sys CLI v0.1.0
-Usage: sys <subcommand> [args] [--json]
-
-Board:
-  sys board show
-  sys board save [path]
-  sys board load <path>
-
-Nodes:
-  sys node list
-  sys node add <kind> [--at x,y]
-  sys node remove <id>
-
-Text:
-  sys text add [--text "..."] [--at x,y]
-  sys text set <id> --text "..."
-  sys text resize <id> --w N --h N
-
-Image:
-  sys image add <abs-path> [--at x,y]
-  sys image replace <id> <abs-path>
-  sys image resize <id> --w N --h N
-  sys image clear <id>
-
-Pomodoro:
-  sys pomo start [--label "..."] [--minutes 25]
-  sys pomo stop
-  sys pomo status
-
-Todos:
-  sys todo add "..." [--tag work]
-  sys todo check <id>
-  sys todo list
-
-Tasks:
-  sys task add "<text>" [--todo <todoId>] [--duration <min>]
-  sys task edit <id> "<text>"
-  sys task toggle <id>
-  sys task delete <id>
-  sys task pomo <id>
-  sys task subtask <parentId> "<text>"
-  sys task duration <id> <minutes>
-  sys task sibling <id>
-  sys task reset-pomo <id>
-  sys task list [<todoId>]
-
-Habits:
-  sys habit add "<name>"
-  sys habit done <id|name> [--date YYYY-MM-DD]
-  sys habit streak <id|name>
-  sys habit color <id|name> <acid|rust|cyan|plum|spine|ink>
-  sys habit remove <id|name>
-  sys habit view <week|month|year>
-  sys habit list
-
-Edges:
-  sys edge add --from <node:event> --to <node:command> [--args k=v]
-  sys edge remove <id>
-  sys edge list
-
-Voice:
-  sys say "..."   speak via TTS
-  sys hear        one-shot STT transcription
-
-All commands accept --json for machine-readable output.
-`.trim();
