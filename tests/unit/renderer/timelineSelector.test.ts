@@ -278,7 +278,7 @@ describe('Test 3 — Parallel fork (A→[B,C]→D, plannedMin [10,20,30,5])', ()
 // ── Test 4 — Convergence: (A, B) → C ─────────────────────────────────────────
 
 describe('Test 4 — Convergence: A and B both link to C', () => {
-  it('emits A and B as a parallel group, then one break, then C', () => {
+  it('emits A and B as a parallel group with same startMin, then one break, then C once', () => {
     _taskSeq = 0;
     const todoId = 'todo-converge';
     const tA = makeTaskNode('cvA', todoId, 20);
@@ -303,6 +303,23 @@ describe('Test 4 — Convergence: A and B both link to C', () => {
     // C should appear exactly once (not double-counted)
     const cSegs = taskSegs.filter((s) => s.kind === 'task' && s.taskId === 'cvC');
     expect(cSegs).toHaveLength(1);
+
+    // A and B are parallel: same parallelGroupId, same startMin (at 0, no predecessor)
+    const segA = taskSegs.find((s) => s.kind === 'task' && s.taskId === 'cvA');
+    const segB = taskSegs.find((s) => s.kind === 'task' && s.taskId === 'cvB');
+    if (segA?.kind === 'task' && segB?.kind === 'task') {
+      expect(segA.parallelGroupId).not.toBeNull();
+      expect(segB.parallelGroupId).not.toBeNull();
+      expect(segA.parallelGroupId).toBe(segB.parallelGroupId);
+      expect(segA.startMin).toBe(segB.startMin);
+      expect(segA.startMin).toBe(0);
+    }
+
+    // Group endMin = max(A=20, B=10) = 20. C starts after group + break (5) = 25.
+    const segC = taskSegs.find((s) => s.kind === 'task' && s.taskId === 'cvC');
+    if (segC?.kind === 'task') {
+      expect(segC.startMin).toBe(25); // 20 (group end) + 5 (short break)
+    }
   });
 });
 

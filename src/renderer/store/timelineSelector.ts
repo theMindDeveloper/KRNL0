@@ -135,21 +135,29 @@ type WalkUnit =
  * Roots: tasks with parentTodoId === todoId AND parentTaskId === null AND no
  * incoming task.next edge from another task in this todo set.
  *
- * Multiple disconnected roots (no inter-root task.next edges) are concatenated
- * in ascending sequenceNumber order. Each root spawns its own linear walk; if
- * two roots share task.next targets, the visited-set ensures no double-counting.
+ * Multi-root convergence: if multiple root tasks all point to the same shared
+ * next target, they are treated as a parallel group before their shared successor.
+ * Unconnected roots are concatenated in ascending sequenceNumber order.
  *
- * Convergence (prevs.length > 1): a node is emitted the first time it is
- * encountered; the second visit is a no-op via the visited set.
+ * Fork (nexts.length > 1): emits a parallel group. Branches with a shared
+ * successor (intersection of all branch nexts) resume sequentially at that
+ * successor. Branches with no shared successor (non-rejoin fork) are walked
+ * independently and appended sequentially — one unit per branch tail.
+ *
+ * Convergence (prevs.length > 1): the visited set ensures each node is emitted
+ * at most once; second-visit is a no-op.
  *
  * Cycle defence: the visited set terminates any cycle.
+ *
+ * Subtasks (parentTaskId !== null) are never emitted as segments (rolled into
+ * parent's plannedMin per Decision 24 Q1).
  */
 function walkChain(
   todoId: string,
   nodes: readonly Node[],
   chainIndex: Map<string, ChainEntry>,
 ): WalkUnit[] {
-  // Build set of all task node ids belonging to this todo (root and subtask).
+  // Build lookup maps for tasks in this todo
   const allTodoTaskIds = new Set<string>();
   const taskNodesMap = new Map<string, TaskState>();
 
@@ -168,7 +176,6 @@ function walkChain(
       if (!ts || ts.parentTaskId !== null) return false; // skip subtasks
       const entry = chainIndex.get(id);
       if (!entry) return true; // no edges → root
-      // Root if none of its prevs are also in this todo's task set
       return !entry.prevs.some((prevId) => allTodoTaskIds.has(prevId));
     })
     .sort((a, b) => {
@@ -180,105 +187,152 @@ function walkChain(
   const units: WalkUnit[] = [];
   const visited = new Set<string>();
 
-  // BFS-style walk from a given task id
-  function walk(startId: string): void {
-    let currentIds: string[] = [startId];
+  type BranchEntry = { taskId: string; plannedMin: number; done: boolean };
 
-    while (currentIds.length > 0) {
-      // Filter already-visited (handles convergence)
-      currentIds = currentIds.filter((id) => !visited.has(id));
-      if (currentIds.length === 0) break;
+  function getBranchEntry(id: string): BranchEntry {
+    const ts = taskNodesMap.get(id);
+    return {
+      taskId: id,
+      plannedMin: ts ? clampPlanned(ts.plannedMin) : 1,
+      done: ts?.done ?? false,
+    };
+  }
 
-      if (currentIds.length === 1) {
-        // Sequential step
-        const id = currentIds[0]!;
-        const ts = taskNodesMap.get(id);
-        if (!ts || ts.parentTaskId !== null) {
-          // Subtask or unknown — skip, do not emit, but check nexts
-          visited.add(id);
-          const entry = chainIndex.get(id);
-          currentIds = (entry?.nexts ?? []).filter((nid) => allTodoTaskIds.has(nid));
-          continue;
-        }
+  function nextsOf(id: string): string[] {
+    return (chainIndex.get(id)?.nexts ?? []).filter((nid) => allTodoTaskIds.has(nid));
+  }
+
+  /**
+   * Walk a set of frontier IDs. If multiple IDs are provided they are treated as
+   * members of an already-formed parallel group (their groupId is passed in).
+   * Returns the set of IDs to continue walking from after this group resolves.
+   *
+   * Single-ID front: sequential step. Multi-ID front: parallel group step.
+   */
+  function walkFront(frontIds: string[], groupId: string | null): string[] {
+    // Filter already-visited
+    const unvisited = frontIds.filter((id) => !visited.has(id));
+    if (unvisited.length === 0) return [];
+
+    if (unvisited.length === 1) {
+      const id = unvisited[0]!;
+      const ts = taskNodesMap.get(id);
+
+      if (!ts || ts.parentTaskId !== null) {
+        // Subtask or unknown — mark visited, follow nexts
         visited.add(id);
-        units.push({
-          kind: 'task',
-          taskId: id,
-          plannedMin: clampPlanned(ts.plannedMin),
-          done: ts.done,
-        });
-        const entry = chainIndex.get(id);
-        const nexts = (entry?.nexts ?? []).filter((nid) => allTodoTaskIds.has(nid));
-        if (nexts.length === 0) {
-          break;
-        } else if (nexts.length === 1) {
-          currentIds = nexts;
-        } else {
-          // Fork — parallel group
-          const groupId = `pg-${id}`;
-          type BranchEntry = { taskId: string; plannedMin: number; done: boolean };
-          const branches: BranchEntry[] = nexts
-            .filter((nid) => !visited.has(nid))
-            .map((nid) => {
-              const branchTs = taskNodesMap.get(nid);
-              return {
-                taskId: nid,
-                plannedMin: branchTs ? clampPlanned(branchTs.plannedMin) : 1,
-                done: branchTs?.done ?? false,
-              };
-            });
+        return nextsOf(id);
+      }
 
-          // Mark all branch members visited
-          for (const b of branches) {
-            visited.add(b.taskId);
-          }
+      visited.add(id);
+      units.push({
+        kind: 'task',
+        taskId: id,
+        plannedMin: clampPlanned(ts.plannedMin),
+        done: ts.done,
+      });
+      return nextsOf(id);
+    }
 
-          const sentinelTaskId = branches[0]?.taskId ?? id;
+    // Multiple unvisited IDs → parallel group
+    const gid = groupId ?? `pg-${unvisited.join('-')}`;
+    const branches: BranchEntry[] = unvisited
+      .filter((id) => {
+        // Only include root tasks (not subtasks) as branches
+        const ts = taskNodesMap.get(id);
+        return ts?.parentTaskId === null;
+      })
+      .map(getBranchEntry);
 
-          units.push({
-            kind: 'group',
-            groupId,
-            branches,
-            sentinelTaskId,
-          });
+    for (const b of branches) {
+      visited.add(b.taskId);
+    }
 
-          // Find convergence: nodes that ALL branches flow into (intersection of nexts)
-          const branchNextSets = branches.map((b) => {
-            const bEntry = chainIndex.get(b.taskId);
-            return new Set((bEntry?.nexts ?? []).filter((nid) => allTodoTaskIds.has(nid)));
-          });
+    if (branches.length === 0) return [];
 
-          if (branchNextSets.length === 0) {
-            break;
-          }
+    const sentinelTaskId = branches[0]!.taskId;
+    units.push({ kind: 'group', groupId: gid, branches, sentinelTaskId });
 
-          // Find shared targets (convergence points) — present in all branch next-sets
-          const [firstSet, ...restSets] = branchNextSets;
-          const convergenceIds = firstSet
-            ? [...firstSet].filter((nid) => restSets.every((s) => s.has(nid)))
-            : [];
+    // Find convergence: intersection of each branch's nexts
+    const branchNextSets = branches.map((b) => new Set(nextsOf(b.taskId)));
+    const [firstSet, ...restSets] = branchNextSets;
+    const convergenceIds = firstSet
+      ? [...firstSet].filter((nid) => restSets.every((s) => s.has(nid)))
+      : [];
 
-          if (convergenceIds.length === 0) {
-            break;
-          }
+    if (convergenceIds.length > 0) {
+      return convergenceIds;
+    }
 
-          currentIds = convergenceIds;
-        }
+    // Non-rejoin fork: walk each branch's tail independently, appending units.
+    // Branches that diverge without a shared successor are walked in sequence.
+    for (const b of branches) {
+      let front = nextsOf(b.taskId);
+      while (front.length > 0) {
+        front = walkFront(front, null);
+      }
+    }
+    return [];
+  }
+
+  // Detect multi-root convergence: if multiple roots share a common next target,
+  // emit them as a parallel group before that target.
+  // Group roots by their shared next-set. Roots with identical nexts are parallel.
+  const processedRoots = new Set<string>();
+
+  function processRoots(ids: string[]): void {
+    // Group by shared first-level nexts (roots that all point to the same targets)
+    // Simple heuristic: roots whose nexts intersect with each other's nexts.
+    // We group roots whose nexts form a non-empty shared set with at least one other root.
+    const nextsPerRoot = new Map<string, Set<string>>();
+    for (const id of ids) {
+      nextsPerRoot.set(id, new Set(nextsOf(id)));
+    }
+
+    // Find groups of roots that all share at least one common next
+    const grouped: Array<string[]> = [];
+    const assignedToGroup = new Set<string>();
+
+    for (const id of ids) {
+      if (assignedToGroup.has(id)) continue;
+      const myNexts = nextsPerRoot.get(id) ?? new Set<string>();
+      if (myNexts.size === 0) {
+        // Isolated root — sequential unit
+        grouped.push([id]);
+        assignedToGroup.add(id);
+        continue;
+      }
+      // Find other unassigned roots that share at least one next with this root
+      const peers = ids.filter(
+        (other) =>
+          other !== id &&
+          !assignedToGroup.has(other) &&
+          [...(nextsPerRoot.get(other) ?? new Set<string>())].some((n) => myNexts.has(n)),
+      );
+      if (peers.length === 0) {
+        grouped.push([id]);
+        assignedToGroup.add(id);
       } else {
-        // Multiple parallel starts (unusual — means a convergence was found
-        // but there are multiple convergence targets, or the caller passed
-        // multiple disconnected roots). Walk each independently.
-        for (const id of currentIds) {
-          walk(id);
-        }
-        break;
+        const group = [id, ...peers];
+        for (const g of group) assignedToGroup.add(g);
+        grouped.push(group);
+      }
+    }
+
+    for (const group of grouped) {
+      if (processedRoots.has(group[0]!)) continue;
+      for (const id of group) processedRoots.add(id);
+
+      let front: string[] = group;
+      // For a multi-root group, use a stable groupId
+      const gid = group.length > 1 ? `pg-roots-${group.join('-')}` : null;
+      while (front.length > 0) {
+        front = walkFront(front, gid);
       }
     }
   }
 
-  for (const rootId of rootTaskIds) {
-    walk(rootId);
-  }
+  processRoots(rootTaskIds);
 
   return units;
 }
