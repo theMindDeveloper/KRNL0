@@ -52,23 +52,28 @@ function makeConfig(overrides: Partial<CalendarConfig> = {}): CalendarConfig {
 
 const noop = () => undefined;
 
-// Helper: after picking a swap option, a duration prompt appears.
-// This sets the input value and presses Enter to commit.
-function commitDurationPrompt(value: number) {
-  const input = document.querySelector(
-    '[data-testid="habit-duration-input"]',
-  ) as HTMLInputElement | null;
-  if (!input) throw new Error('habit-duration-input not found in DOM');
-  fireEvent.change(input, { target: { value: String(value) } });
-  fireEvent.keyDown(input, { key: 'Enter' });
-}
-
-// Helper: click the weekly or daily card in the HabitSwapModal.
+// Helper: click the weekly or daily card in the HabitSwapModal (pre-selects kind).
 function pickSwapOption(kind: 'weekly' | 'daily') {
   const testId = kind === 'weekly' ? 'habit-swap-weekly' : 'habit-swap-daily';
   const btn = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
   if (!btn) throw new Error(`${testId} button not found in DOM`);
   fireEvent.click(btn);
+}
+
+// Helper: set the duration input value in the HabitSwapModal, then click confirm.
+// The time input keeps its default value (derived from drop hour).
+function confirmSwapModal(durationMin: number) {
+  const durationInput = document.querySelector(
+    '[data-testid="habit-swap-duration-input"]',
+  ) as HTMLInputElement | null;
+  if (!durationInput) throw new Error('habit-swap-duration-input not found in DOM');
+  fireEvent.change(durationInput, { target: { value: String(durationMin) } });
+
+  const confirmBtn = document.querySelector(
+    '[data-testid="habit-swap-confirm"]',
+  ) as HTMLButtonElement | null;
+  if (!confirmBtn) throw new Error('habit-swap-confirm button not found in DOM');
+  fireEvent.click(confirmBtn);
 }
 
 function setEmptyBoard() {
@@ -494,11 +499,11 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     // The modal should now be open.
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
 
-    // Simulate the user clicking the daily card.
+    // Simulate the user clicking the daily card (pre-selects kind).
     act(() => { pickSwapOption('daily'); });
 
-    // The duration prompt should now be open; commit 30 min.
-    commitDurationPrompt(30);
+    // Set duration and click the confirm button in the modal.
+    act(() => { confirmSwapModal(30); });
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h1',
@@ -534,7 +539,7 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
 
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
     act(() => { pickSwapOption('weekly'); });
-    commitDurationPrompt(45);
+    act(() => { confirmSwapModal(45); });
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h2',
@@ -575,7 +580,7 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
 
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
     act(() => { pickSwapOption('daily'); });
-    commitDurationPrompt(20);
+    act(() => { confirmSwapModal(20); });
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h4',
@@ -626,7 +631,7 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
 
     // Pick weekly — should use Wednesday (ISO dow 3), NOT Monday (ISO dow 1).
     act(() => { pickSwapOption('weekly'); });
-    commitDurationPrompt(15);
+    act(() => { confirmSwapModal(15); });
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h3',
