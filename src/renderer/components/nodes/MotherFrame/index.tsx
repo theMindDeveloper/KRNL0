@@ -19,13 +19,13 @@ interface Props {
   onMoveRight?: ((() => void) | undefined);  // undefined = disabled (last slot)
 }
 
-// PR2 (LifeOS UI refresh) — canonical mother size is 440×440 (a balanced
-// square), down from the previous 380×600 portrait. MonthView's 6×7 grid
-// uses `flex: 1` rows so it scales cleanly; per-node body re-flows happen
-// in PR4-PR7. The mother size MUST stay in sync with INITIAL_DIMS_BY_KIND
-// in src/renderer/components/Canvas/rfAdapters.tsx — see ADR 0006.
-export const MOTHER_WIDTH = 440;
-export const MOTHER_HEIGHT = 440;
+// Wave C (LifeOS UI refresh) — bumped to 500×500 so mothers read as the
+// primary canvas anchor against the 220×120 child task cards. Was 440×440;
+// pre-PR2 was 380×600 portrait. MUST stay in sync with INITIAL_DIMS_BY_KIND
+// in src/renderer/components/Canvas/rfAdapters.tsx and the seed/migration
+// positions in src/main/persistence/board.ts — see ADR 0006.
+export const MOTHER_WIDTH = 500;
+export const MOTHER_HEIGHT = 500;
 export const MOTHER_TOTAL = 6;
 
 export function MotherFrame({

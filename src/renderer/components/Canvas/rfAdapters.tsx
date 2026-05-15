@@ -42,19 +42,21 @@ export type KrnlRFNode = RFNode<RFNodeData>;
 // the ResizeObserver has fired its first measurement. These are approximate
 // — RF replaces them with measured values once the ResizeObserver delivers.
 //
-// PR2 (LifeOS UI refresh) — mother kinds adopt a balanced 440×440 square,
-// down from 380×600 portrait. Sync point: MOTHER_WIDTH / MOTHER_HEIGHT in
-// src/renderer/components/nodes/MotherFrame/index.tsx. A mismatch makes the
-// RF selection ring sit off the visible card edge — see ADR 0006.
+// Wave C (LifeOS UI refresh) — mother kinds bumped to 500×500 so mothers
+// read as primary canvas anchors against the 220×120 child task cards.
+// Sync point: MOTHER_WIDTH / MOTHER_HEIGHT in
+// src/renderer/components/nodes/MotherFrame/index.tsx + seed positions in
+// src/main/persistence/board.ts. A mismatch makes the RF selection ring
+// sit off the visible card edge — see ADR 0006.
 const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = {
   'todo.task':   { width: 220, height: 120 },
-  'todo':        { width: 440, height: 440 },
-  'pomo':        { width: 440, height: 440 },
-  'ai':          { width: 440, height: 440 },
-  'habit':       { width: 440, height: 440 },
-  'terminal':    { width: 440, height: 440 },
-  'calendar':    { width: 440, height: 440 },
-  'clock':       { width: 440, height: 440 },
+  'todo':        { width: 500, height: 500 },
+  'pomo':        { width: 500, height: 500 },
+  'ai':          { width: 500, height: 500 },
+  'habit':       { width: 500, height: 500 },
+  'terminal':    { width: 500, height: 500 },
+  'calendar':    { width: 500, height: 500 },
+  'clock':       { width: 500, height: 500 },
   'habit.lane':  { width: 280, height: 170 },
   'text':        { width: 260, height: 120 },
   'image':       { width: 240, height: 180 },

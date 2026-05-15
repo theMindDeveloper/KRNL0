@@ -256,7 +256,7 @@ export function HabitLaneNode({
             flexShrink: 0,
           }}
         >
-          {doneToday ? '✓' : '·'}
+          {doneToday ? '✓' : ''}
         </button>
       </div>
 

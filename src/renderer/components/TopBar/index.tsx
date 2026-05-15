@@ -79,54 +79,61 @@ export function TopBar() {
     >
       {/* Left: brand + breadcrumb + live badge */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        {/* Brand mark: acid outer + ink inner block + KRNL0 wordmark.
-            PR3 (LifeOS UI refresh) — replaces the previous "■ KRNL0" inline
-            text with a nested-block graphic. The "0" of KRNL0 is dimmed to
-            match the LifeOS source treatment. */}
+        {/* Brand mark — Wave C (LifeOS UI refresh).
+            Source: user's logo-snippet.html — dashed halo ring + rounded
+            block mark (ink in light theme / acid in dark theme) + ■ glyph +
+            KRNL0 wordmark with dimmed "0". The SVG renders one of two
+            variants depending on `theme` so both halo dim and mark fill
+            track the surface they sit on. */}
         <span
           data-testid="topbar-brand"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 8,
+            gap: 10,
             userSelect: 'none',
           }}
         >
-          <span
-            aria-hidden
+          <svg
             data-testid="topbar-brand-mark"
-            style={{
-              width: 22,
-              height: 22,
-              background: 'var(--acid)',
-              display: 'grid',
-              placeItems: 'center',
-              borderRadius: 3,
-              flexShrink: 0,
-            }}
+            aria-hidden
+            width={26}
+            height={26}
+            viewBox="0 0 80 80"
+            style={{ display: 'block', flexShrink: 0, overflow: 'visible' }}
           >
-            <span
-              style={{
-                width: 10,
-                height: 10,
-                /* Hardcoded — in dark mode --ink flips to a light cream, but
-                   this is meant to be a permanently-black inner block on
-                   the acid square. Don't tokenise. */
-                background: '#1a1814',
-                borderRadius: 1,
-              }}
-            />
-          </span>
+            {theme === 'dark' ? (
+              <>
+                <rect x={2} y={4} width={72} height={72} rx={11}
+                      fill="none" stroke="#5a5244" strokeWidth={1.5}
+                      strokeDasharray="4 3" opacity={0.7} />
+                <rect x={10} y={12} width={56} height={56} rx={7} fill="#c9f158" />
+                <text x={38} y={40} textAnchor="middle" dominantBaseline="central"
+                      fontFamily="var(--font-mono)" fontWeight={700} fontSize={26}
+                      fill="#0e0d0b">■</text>
+              </>
+            ) : (
+              <>
+                <rect x={2} y={4} width={72} height={72} rx={11}
+                      fill="none" stroke="#9a9180" strokeWidth={1.5}
+                      strokeDasharray="4 3" opacity={0.6} />
+                <rect x={10} y={12} width={56} height={56} rx={7} fill="#1a1814" />
+                <text x={38} y={40} textAnchor="middle" dominantBaseline="central"
+                      fontFamily="var(--font-mono)" fontWeight={700} fontSize={26}
+                      fill="#c9f158">■</text>
+              </>
+            )}
+          </svg>
           <span
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 13,
               fontWeight: 700,
-              letterSpacing: '0.06em',
+              letterSpacing: '0.08em',
               color: 'var(--ink)',
             }}
           >
-            KRNL<span style={{ color: 'var(--ink-3)' }}>0</span>
+            KRNL<span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>0</span>
           </span>
         </span>
 
