@@ -62,6 +62,7 @@ function miniMapNodeColor(n: KrnlRFNode): string {
 
 function TaskFlowEdge({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -69,6 +70,11 @@ function TaskFlowEdge({
   sourcePosition,
   targetPosition,
 }: EdgeProps) {
+  // Bold when the source node is hovered. Primitive string selector keeps the
+  // subscription stable (null===null between pan frames → no extra re-renders).
+  const hoveredId = useBoardStore((s) => s.hoveredNodeId);
+  const bold = hoveredId !== null && source === hoveredId;
+
   const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
@@ -111,7 +117,7 @@ function TaskFlowEdge({
         path={edgePath}
         style={{
           stroke: `url(#${gradId})`,
-          strokeWidth: 3,
+          strokeWidth: bold ? 4 : 3,
           strokeDasharray: '14 8',
           strokeLinecap: 'round',
           opacity: 1,
@@ -123,6 +129,7 @@ function TaskFlowEdge({
 
 function DefaultEdge({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -131,6 +138,11 @@ function DefaultEdge({
   targetPosition,
   data,
 }: EdgeProps) {
+  // Bold when the source node is hovered. Primitive string selector keeps the
+  // subscription stable (null===null between pan frames → no extra re-renders).
+  const hoveredId = useBoardStore((s) => s.hoveredNodeId);
+  const bold = hoveredId !== null && source === hoveredId;
+
   const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
@@ -146,9 +158,9 @@ function DefaultEdge({
       path={edgePath}
       style={{
         stroke: active ? 'var(--acid)' : 'var(--ink-3)',
-        strokeWidth: active ? 1.5 : 1,
+        strokeWidth: bold ? (active ? 2.5 : 2) : (active ? 1.5 : 1),
         strokeDasharray: active ? undefined : '4 4',
-        opacity: active ? 1 : 0.6,
+        opacity: bold ? 1 : (active ? 1 : 0.6),
       }}
     />
   );
@@ -179,8 +191,7 @@ const rfMotherCache = new Map<
     src: KrnlNode;
     slotIndex: number;
     slotTotal: number;
-    hasLeft: boolean;
-    hasRight: boolean;
+    slotCentersXKey: string;
     rf: ReturnType<typeof toRfNode>;
   }
 >();
@@ -253,7 +264,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const updateNode = useBoardStore((s) => s.updateNode);
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
-  const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
+  const reorderMotherSlots = useBoardStore((s) => s.reorderMotherSlots);
   const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
 
   // Start the debounced viewport persister (Decision #7).
@@ -567,6 +578,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
     );
 
+    // Slot x-centers in flow coords (center of each mother card by slot order).
+    const slotCentersX: readonly number[] = motherNodes.map(
+      (n: KrnlNode) => n.position.x + 250 // MOTHER_WIDTH / 2 = 250
+    );
+    const slotCentersXKey = slotCentersX.join(',');
+
     return board.nodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
       const onSelect = getSelectHandler(node.id, selectNode);
@@ -575,60 +592,41 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         return getMemoizedRfNode(node, { onCommand, onSelect });
       }
 
-      // Mother node: cache by (node ref, slotIndex, slotTotal, hasLeft, hasRight).
+      // Mother node: cache by (node ref, slotIndex, slotTotal, slotCentersXKey).
       // Without this cache, every drag tick built a fresh RFNode for every
-      // mother — fresh `data` object with fresh `onMoveLeft`/`onMoveRight`
-      // closures — defeating React.memo on the adapter and forcing PomoNode /
-      // TodoNode / HabitNode / **TerminalNode (with its xterm instance)** to
-      // re-render 60fps. That was the dominant drag-lag cause.
+      // mother — fresh `data` object with fresh closures — defeating
+      // React.memo on the adapter and forcing PomoNode / TodoNode / HabitNode /
+      // TerminalNode (with its xterm instance) to re-render 60fps.
       const slotIndex = slotIndexMap.get(node.id) ?? 1;
-      const hasLeft = slotIndex > 1;
-      const hasRight = slotIndex < slotTotal;
       const cached = rfMotherCache.get(node.id);
       if (
         cached &&
         cached.src === node &&
         cached.slotIndex === slotIndex &&
         cached.slotTotal === slotTotal &&
-        cached.hasLeft === hasLeft &&
-        cached.hasRight === hasRight
+        cached.slotCentersXKey === slotCentersXKey
       ) {
         return cached.rf;
       }
 
-      const onMoveLeft = hasLeft
-        ? () => {
-            const prevMother = motherNodes[slotIndex - 2];
-            if (prevMother) {
-              swapMotherSlots(node.id, prevMother.id);
-              const updated = useBoardStore.getState().board;
-              if (updated) void window.krnl?.boardSave(updated);
-            }
-          }
-        : undefined;
-      const onMoveRight = hasRight
-        ? () => {
-            const nextMother = motherNodes[slotIndex];
-            if (nextMother) {
-              swapMotherSlots(node.id, nextMother.id);
-              const updated = useBoardStore.getState().board;
-              if (updated) void window.krnl?.boardSave(updated);
-            }
-          }
-        : undefined;
+      const onReorderDrop = (fromSlotIndex: number, toSlotIndex: number) => {
+        reorderMotherSlots(node.id, toSlotIndex);
+        const updated = useBoardStore.getState().board;
+        if (updated) void window.krnl?.boardSave(updated);
+      };
 
       const rf = toRfNode(node, {
         onCommand,
         onSelect,
         slotIndex,
         slotTotal,
-        onMoveLeft,
-        onMoveRight,
+        onReorderDrop,
+        slotCentersX,
       });
-      rfMotherCache.set(node.id, { src: node, slotIndex, slotTotal, hasLeft, hasRight, rf });
+      rfMotherCache.set(node.id, { src: node, slotIndex, slotTotal, slotCentersXKey, rf });
       return rf;
     });
-  }, [board, selectNode, swapMotherSlots]);
+  }, [board, selectNode, reorderMotherSlots]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
   // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that

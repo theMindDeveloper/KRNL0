@@ -73,6 +73,23 @@
   display: none !important;
 }
 
+/* ── Unified node hover highlight ───────────────────────────────────────────
+   Chosen approach: inset ring + faint outer glow (Option B from the brief).
+   A pure outline ring outside the card border sat on top of the RF selection
+   ring in z-order and made the acid/cyan ring feel layered. The inset approach
+   lives inside the card shadow space and reads as a subtle lift without
+   clashing with any selection ring color.
+   We keep the card's existing drop-shadow (0 2px 8px rgba(0,0,0,0.28)) by
+   compositing both shadows in one declaration with `!important` — the hover
+   rule must outrank the inline boxShadow set by MotherFrame's style prop. */
+.react-flow__node:hover > div:not(.react-flow__handle) {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.12),
+    0 0 14px rgba(255,255,255,0.06),
+    0 2px 8px rgba(0,0,0,0.28) !important;
+  transition: box-shadow 120ms ease;
+}
+
 /* ── Selection ring strategy ────────────────────────────────────────────────
    Every KRNL node renders its visible card as the FIRST child div of the RF
    wrapper, with inline `boxShadow` for elevation/border glow. Inline styles
