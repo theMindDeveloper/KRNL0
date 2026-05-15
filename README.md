@@ -345,43 +345,6 @@ npm run typecheck   # strict TypeScript, zero `any`
 | STT | Whisper.cpp | [`ggerganov/whisper.cpp`](https://github.com/ggerganov/whisper.cpp) | Local speech-to-text |
 | TTS | Piper | [`rhasspy/piper`](https://github.com/rhasspy/piper) | Local text-to-speech |
 
----
-
-## Roadmap
-
-10-week solo build. Live demo on **20 Jul 2026**.
-
-| Week | Focus | Status |
-|:---:|---|:---:|
-| 1 | Setup, kernel, persistence round-trip | ✅ |
-| 2 | Canvas, four mother nodes | ✅ |
-| 3 | Edges, child nodes, dispatcher | ✅ |
-| 4 | Terminal node + `krnl` CLI | ✅ |
-| 5 | Voice STT + brain provider | ✅ |
-| 6 | Voice TTS + reply loop | ✅ |
-| 7 | Calendar mother + cascade *(ADR 0001, 0003, 0005)* | 🔄 |
-| 8 | Habit scheduling + Clock day-anchor *(ADR 0002, 0004)* | 🔄 |
-| 9 | Polish, theming, density modes | ⏳ |
-| 10 | Demo prep, packaging, walkthrough | ⏳ |
-
-> Full plan: [`docs/07-roadmap/build-roadmap.md`](docs/07-roadmap/build-roadmap.md)
-
----
-
-## Inclusive design
-
-Built for HTW Berlin, course *Natural User Interfaces · Inclusive Design*. The architecture enforces R10: fully operable without mouse OR without keyboard.
-
-| Modality | Audience | Mechanism |
-|---|---|---|
-| Voice | Low-vision, motor-limited | Orb → Whisper → Brain → Piper |
-| Visual / pointer | Standard | Canvas + drag interactions |
-| Keyboard / CLI | Power users, screen readers | `krnl` in Terminal node |
-
-All three converge on the same `krnl` surface, the same `board.json`, the same canvas. Color is never the only signal — every state has a shape or label too.
-
----
-
 ## License
 
 [**Functional Source License v1.1**](LICENSE.md), with an Apache 2.0 future grant.
