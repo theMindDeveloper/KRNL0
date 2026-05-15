@@ -38,6 +38,7 @@ function createWindow(): BrowserWindow {
     width: 1440,
     height: 900,
     backgroundColor: '#f5f1e8', // --paper light
+    icon: join(__dirname, '../../build/icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

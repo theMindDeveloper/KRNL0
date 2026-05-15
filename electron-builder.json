@@ -1,6 +1,7 @@
 {
   "appId": "com.theminddevlab.krnl0",
   "productName": "krnl0",
+  "icon": "build/icon.png",
   "directories": {
     "output": "release"
   },
