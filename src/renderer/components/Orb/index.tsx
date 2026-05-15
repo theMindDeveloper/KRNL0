@@ -10,16 +10,11 @@
  *
  * Behaviour:
  * - Space (push-to-talk) preserves the previous FSM (idle -> listening on
- *   keydown; listening -> thinking on keyup). Stub — real brain bridge is
- *   the boundary integration in a later phase.
- * - Click toggles a chat panel anchored above the orb. The panel runs a
- *   *mock* submit — local useState only, no IPC, no store touch. Use it
- *   to design-review the chrome; replace mockReply() with the real call
- *   when the brain wire lands.
- * - Esc closes the panel.
- * - Orb is draggable. Position is persisted to localStorage. On drag-end a
- *   spring-bounce settle animation plays via key bump on the root div.
- *   Click is distinguished from drag by mouse delta threshold (< 4px = click).
+ *   keydown; listening -> thinking on keyup).
+ * - Click toggles a chat panel anchored above the orb.
+ * - Orb is draggable. Position is persisted to localStorage.
+ * - Quick-action buttons trigger pre-recorded voice flows with live camera
+ *   movement and krnl command execution.
  */
 
 import {
@@ -30,12 +25,18 @@ import {
   type FormEvent,
   type CSSProperties,
 } from 'react';
+import { useReactFlow } from '@xyflow/react';
+import { useBoardStore } from '../../../renderer/store/boardStore';
+import { voicePlayer } from '../Assistant/VoicePlayer';
+import { ScriptRunner } from '../Assistant/ScriptRunner';
+import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
+import { CLICK_CLIPS } from '../Assistant/clipMap';
+import { Commander } from '../Assistant/Commander';
+import type { Flow, BoardSnapshot } from '../Assistant/types';
 
-type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking';
+type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'running';
 interface ChatMsg { role: 'user' | 'ai'; text: string }
 
-// Stub responses — short, present-tense, no markdown. Replace once the
-// real brain bridge is wired; the shape (string in, string out) matches.
 const MOCK_REPLIES: readonly string[] = [
   "noted — i'll surface that when the next pomo wraps.",
   "focus on the cyan-edged chain first; cleanest tracer through.",
@@ -58,10 +59,7 @@ const STORAGE_KEY = 'krnl0-orb-pos';
 interface OrbPos { x: number; y: number }
 
 function defaultPos(): OrbPos {
-  return {
-    x: 22,
-    y: window.innerHeight - ORB_SIZE - 56,
-  };
+  return { x: 22, y: window.innerHeight - ORB_SIZE - 56 };
 }
 
 function clampPos(pos: OrbPos): OrbPos {
@@ -77,85 +75,162 @@ function loadPos(): OrbPos {
     if (raw) {
       const parsed = JSON.parse(raw) as unknown;
       if (
-        typeof parsed === 'object' &&
-        parsed !== null &&
-        'x' in parsed &&
-        'y' in parsed &&
+        typeof parsed === 'object' && parsed !== null &&
+        'x' in parsed && 'y' in parsed &&
         typeof (parsed as { x: unknown }).x === 'number' &&
         typeof (parsed as { y: unknown }).y === 'number'
       ) {
         return clampPos({ x: (parsed as OrbPos).x, y: (parsed as OrbPos).y });
       }
     }
-  } catch {
-    // corrupted storage — fall through to default
-  }
+  } catch { /* fall through */ }
   return defaultPos();
 }
 
 function savePos(pos: OrbPos): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
-  } catch {
-    // ignore quota errors
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+}
+
+// ── Board snapshot helper ─────────────────────────────────────────────────────
+function getBoardSnapshot(): BoardSnapshot {
+  const board = useBoardStore.getState().board;
+  const viewport = useBoardStore.getState().viewport;
+  if (!board) {
+    return {
+      nodeCount: 0, taskCount: 0, habitCount: 0,
+      hasPomo: false, hasTodo: false, hasCalendar: false, hasClock: false,
+      scheduledTaskCount: 0, chainedTaskCount: 0,
+      taskTexts: [], firstTaskText: null,
+      viewport,
+    };
   }
+  const tasks  = board.nodes.filter((n) => n.kind === 'todo.task');
+  const habits = board.nodes.filter((n) => n.kind === 'habit');
+
+  const scheduledTaskCount = tasks.filter((n) => {
+    const s = n.state as { scheduledFor?: unknown };
+    return s.scheduledFor !== undefined && s.scheduledFor !== null;
+  }).length;
+
+  const chainedTaskCount = new Set(
+    board.edges
+      .filter((e) => e.from?.event === 'task.next')
+      .flatMap((e) => [e.from.nodeId, e.to.nodeId]),
+  ).size;
+
+  const taskTexts = tasks
+    .map((n) => (n.state as { text?: string }).text ?? '')
+    .filter((t) => t.length > 0);
+
+  return {
+    nodeCount: board.nodes.length,
+    taskCount: tasks.length,
+    habitCount: habits.length,
+    hasPomo: board.nodes.some((n) => n.kind === 'pomo'),
+    hasTodo: board.nodes.some((n) => n.kind === 'todo'),
+    hasCalendar: board.nodes.some((n) => n.kind === 'calendar'),
+    hasClock: board.nodes.some((n) => n.kind === 'clock'),
+    scheduledTaskCount,
+    chainedTaskCount,
+    taskTexts,
+    firstTaskText: taskTexts[0] ?? null,
+    viewport,
+  };
 }
 
 export function Orb() {
+  const { setViewport } = useReactFlow();
+
   const [orbState, setOrbState] = useState<OrbState>('idle');
-  const [open, setOpen] = useState(false);
-  const [history, setHistory] = useState<ChatMsg[]>([]);
-  const [input, setInput] = useState('');
+  const [open, setOpen]         = useState(false);
+  const [history, setHistory]   = useState<ChatMsg[]>([]);
+  const [input, setInput]       = useState('');
   const [thinking, setThinking] = useState(false);
+  const [caption, setCaption]   = useState<string | null>(null);
+  const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
+  const [commanderOpen, setCommanderOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // ── Drag state ────────────────────────────────────────────────────────────
-  const [pos, setPos] = useState<OrbPos>(loadPos);
-  // Key bumped on drag-end to replay the orb-drop-settle keyframe.
+  const [pos, setPos]           = useState<OrbPos>(loadPos);
   const [settleKey, setSettleKey] = useState(0);
-  const draggingRef = useRef(false);
-  const dragMovedRef = useRef(false);
-  const dragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
-  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const draggingRef    = useRef(false);
+  const dragMovedRef   = useRef(false);
+  const dragOffsetRef  = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const dragStartRef   = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Clamp position when the window resizes (orb may drift off-screen).
+  // ── ScriptRunner ──────────────────────────────────────────────────────────
+  const runnerRef = useRef<ScriptRunner | null>(null);
+
+  useEffect(() => {
+    runnerRef.current = new ScriptRunner({
+      voice: voicePlayer,
+      setCaption,
+      setOrbState,
+      setActiveFlowId,
+      setViewport: (vp, opts) => setViewport(vp, opts),
+      getBoardSnapshot,
+    });
+  }, [setViewport]);
+
+  // Pre-warm click clips on mount.
+  useEffect(() => {
+    voicePlayer.preload(CLICK_CLIPS);
+  }, []);
+
+  // ── Startup greeting ─────────────────────────────────────────────────────
+  // ONE clip on mount, picked by time of day. No subscriptions, no triggers,
+  // no daemons. The proactive engine was removed — everything else the
+  // assistant says is user-prompted (click acks, flow narration, commander).
+  useEffect(() => {
+    const hour = new Date().getHours();
+    let pick: { clip: string; text: string };
+    if (hour >= 0 && hour < 5) {
+      pick = { clip: 'pa_past_midnight', text: "Past midnight. Whatever this is, it can wait." };
+    } else if (hour >= 5 && hour < 11) {
+      pick = { clip: 'pa_morning', text: "Morning." };
+    } else if (hour >= 22) {
+      pick = { clip: 'pa_its_late', text: "It's late. Tomorrow exists." };
+    } else {
+      pick = { clip: 'pa_welcome_back', text: "Welcome back. The board's where you left it." };
+    }
+
+    const greetTimer = window.setTimeout(() => {
+      setOrbState('speaking');
+      setCaption(pick.text);
+      voicePlayer.play(pick.clip).catch(() => { /* missing clip → caption only */ });
+      window.setTimeout(() => {
+        setCaption(null);
+        setOrbState('idle');
+      }, Math.max(2500, pick.text.split(' ').length * 320));
+    }, 1500);
+
+    return () => clearTimeout(greetTimer);
+  }, []);
+
+  // Clamp on resize.
   useEffect(() => {
     const onResize = () => {
-      setPos((p) => {
-        const clamped = clampPos(p);
-        savePos(clamped);
-        return clamped;
-      });
+      setPos((p) => { const c = clampPos(p); savePos(c); return c; });
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // ── Drag handlers ─────────────────────────────────────────────────────────
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    // Only primary button starts a drag.
     if (e.button !== 0) return;
-    // Don't prevent default here — onClick still needs to fire for clicks.
-    draggingRef.current = true;
-    dragMovedRef.current = false;
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
-    // Offset from orb top-left to mouse pointer.
-    dragOffsetRef.current = {
-      dx: e.clientX - pos.x,
-      dy: e.clientY - pos.y,
-    };
+    draggingRef.current   = true;
+    dragMovedRef.current  = false;
+    dragStartRef.current  = { x: e.clientX, y: e.clientY };
+    dragOffsetRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
 
     const onMouseMove = (ev: MouseEvent) => {
       if (!draggingRef.current) return;
-      const absDx = Math.abs(ev.clientX - dragStartRef.current.x);
-      const absDy = Math.abs(ev.clientY - dragStartRef.current.y);
-      if (absDx + absDy >= 4) {
+      if (Math.abs(ev.clientX - dragStartRef.current.x) + Math.abs(ev.clientY - dragStartRef.current.y) >= 4) {
         dragMovedRef.current = true;
       }
-      const newPos = clampPos({
-        x: ev.clientX - dragOffsetRef.current.dx,
-        y: ev.clientY - dragOffsetRef.current.dy,
-      });
-      setPos(newPos);
+      setPos(clampPos({ x: ev.clientX - dragOffsetRef.current.dx, y: ev.clientY - dragOffsetRef.current.dy }));
     };
 
     const onMouseUp = () => {
@@ -163,13 +238,8 @@ export function Orb() {
       draggingRef.current = false;
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
-
       if (dragMovedRef.current) {
-        // Save final position and trigger spring-settle animation.
-        setPos((p) => {
-          savePos(p);
-          return p;
-        });
+        setPos((p) => { savePos(p); return p; });
         setSettleKey((k) => k + 1);
       }
     };
@@ -178,32 +248,39 @@ export function Orb() {
     window.addEventListener('mouseup', onMouseUp);
   }, [pos.x, pos.y]);
 
+  // ── Click handler ─────────────────────────────────────────────────────────
   const onOrbClick = useCallback(() => {
-    // If the mouse moved enough during mousedown→mouseup, this was a drag, not a click.
-    if (dragMovedRef.current) {
-      dragMovedRef.current = false;
+    if (dragMovedRef.current) { dragMovedRef.current = false; return; }
+
+    if (activeFlowId) {
+      // Stop running flow on click.
+      runnerRef.current?.abort();
       return;
     }
+
+    // Play a random acknowledgment clip and toggle the panel.
+    voicePlayer.playRandom(CLICK_CLIPS).catch(() => {});
     setOpen((o) => !o);
+  }, [activeFlowId]);
+
+  // ── Flow launcher ─────────────────────────────────────────────────────────
+  const launchFlow = useCallback((flow: Flow) => {
+    if (!runnerRef.current) return;
+    setOpen(false);
+    runnerRef.current.run(flow);
   }, []);
 
-  // Push-to-talk on Space — never intercept when the user is typing.
+  // ── Space push-to-talk ────────────────────────────────────────────────────
   useEffect(() => {
     const isTypingTarget = (t: EventTarget | null): boolean => {
       if (!(t instanceof HTMLElement)) return false;
-      const tag = t.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable) return true;
-      // xterm.js focuses a hidden helper textarea; if focus falls back to
-      // the body (timing race with RF), check the active element too.
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return true;
       const active = document.activeElement as HTMLElement | null;
       if (active?.closest('.term-body') || active?.closest('.xterm')) return true;
       return false;
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Escape' && open) {
-        setOpen(false);
-        return;
-      }
+      if (e.code === 'Escape' && open) { setOpen(false); return; }
       if (isTypingTarget(e.target)) return;
       if (e.code === 'Space' && orbState === 'idle') {
         e.preventDefault();
@@ -215,9 +292,6 @@ export function Orb() {
       if (e.code === 'Space' && orbState === 'listening') {
         e.preventDefault();
         setOrbState('thinking');
-        // Stub: real path would be boundary.stopListening() -> brain.ask().
-        // For PR9 we just bounce back to idle after a short delay so the
-        // visual states are exercised.
         window.setTimeout(() => setOrbState('idle'), 600);
       }
     };
@@ -229,7 +303,7 @@ export function Orb() {
     };
   }, [orbState, open]);
 
-  // Focus the chat input when the panel opens.
+  // Focus the chat input when panel opens.
   useEffect(() => {
     if (open) {
       const id = window.setTimeout(() => inputRef.current?.focus(), 50);
@@ -238,7 +312,7 @@ export function Orb() {
     return undefined;
   }, [open]);
 
-  // Auto-scroll the chat history to the latest message.
+  // Auto-scroll history.
   const historyRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = historyRef.current;
@@ -249,11 +323,23 @@ export function Orb() {
     setHistory((h) => [...h, { role: 'user', text }]);
     setInput('');
     setThinking(true);
-    const delay = 500 + Math.random() * 700;
+
+    // Check if the text matches a flow.
+    const matchingFlow = FLOWS.find((f) =>
+      f.label.toLowerCase().includes(text.toLowerCase()) ||
+      text.toLowerCase().includes(f.id.replace('-', ' '))
+    );
+
     window.setTimeout(() => {
-      setHistory((h) => [...h, { role: 'ai', text: mockReply() }]);
-      setThinking(false);
-    }, delay);
+      if (matchingFlow) {
+        setThinking(false);
+        setHistory((h) => [...h, { role: 'ai', text: `launching: ${matchingFlow.label}` }]);
+        setTimeout(() => launchFlow(matchingFlow), 400);
+      } else {
+        setHistory((h) => [...h, { role: 'ai', text: mockReply() }]);
+        setThinking(false);
+      }
+    }, 500 + Math.random() * 400);
   };
 
   const onSubmit = (e: FormEvent) => {
@@ -262,18 +348,24 @@ export function Orb() {
     if (text && !thinking) submitMock(text);
   };
 
-  // ── Visual state ─────────────────────────────────────────────────────────
-  // Single drop-shadow per state — triple-stacked filters were forcing their
-  // own composited GPU layer on every frame.
-  const isPurple = orbState === 'thinking' || thinking;
-  const isHot = orbState === 'listening';
+  // ── Visual state ──────────────────────────────────────────────────────────
+  const isPurple  = orbState === 'thinking' || thinking;
+  const isHot     = orbState === 'listening';
+  const isSpeaking = orbState === 'speaking';
+  const isRunning = orbState === 'running';
+
   const glowFilter = isHot
     ? 'drop-shadow(0 0 28px rgba(201,241,88,0.95))'
     : isPurple
       ? 'drop-shadow(0 0 26px rgba(180,140,240,0.85))'
-      : 'drop-shadow(0 0 22px rgba(201,241,88,0.45))';
+      : isSpeaking
+        ? 'drop-shadow(0 0 24px rgba(201,241,88,0.7))'
+        : isRunning
+          ? 'drop-shadow(0 0 22px rgba(107,78,168,0.75))'
+          : 'drop-shadow(0 0 22px rgba(201,241,88,0.45))';
 
-  const showRings = isHot;
+  const showRings   = isHot || isSpeaking;
+  const showRunRing = isRunning;
 
   const orbButtonStyle: CSSProperties = {
     position: 'relative',
@@ -285,21 +377,33 @@ export function Orb() {
     cursor: draggingRef.current ? 'grabbing' : 'pointer',
     display: 'block',
     filter: glowFilter,
-    // ai-float paused when chat panel is open — reduces constant repaint
-    // while the user is typing/reading.
-    animation: open ? 'none' : 'ai-float 6s ease-in-out infinite',
+    animation: (open || activeFlowId) ? 'none' : 'ai-float 6s ease-in-out infinite',
     transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease',
-    // Keep the orb on a stable GPU layer so its drop-shadow filter doesn't
-    // trigger a repaint of the canvas stacking context during pan. The orb
-    // is position:fixed and doesn't move with the canvas, but without a
-    // dedicated layer the filter still invalidates the paint region it sits in.
     willChange: 'filter, transform',
   };
 
+  // Caption panel position — anchored relative to orb.
+  const captionAboveOrb = pos.y > 120;
+
+  // Commander launch handler — closes popup, runs sessionFromCommanderFlow with params.
+  const onCommanderLaunch = useCallback((params: { label: string; tasks: string; startISO?: string }) => {
+    setCommanderOpen(false);
+    if (!runnerRef.current) return;
+    // ScriptRunner.run accepts an optional params record on the second arg.
+    runnerRef.current.run(
+      sessionFromCommanderFlow,
+      params as unknown as Record<string, string>,
+    );
+  }, []);
+
   return (
-    // Root div carries the orb-drop-settle keyframe via key bump on settleKey.
-    // Using `top`/`left` for position (not bottom) so position state maps
-    // cleanly to viewport coords with no flip arithmetic.
+    <>
+      {commanderOpen && (
+        <Commander
+          onClose={() => setCommanderOpen(false)}
+          onLaunch={onCommanderLaunch}
+        />
+      )}
     <div
       key={settleKey}
       style={{
@@ -311,7 +415,38 @@ export function Orb() {
         animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
       }}
     >
-      {/* Chat panel — anchored above the orb, slides in via ai-panel-in. */}
+      {/* Voice caption — shown during flows */}
+      {caption !== null && !open && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            [captionAboveOrb ? 'bottom' : 'top']: 76,
+            width: 280,
+            background: isRunning
+              ? 'rgba(14,13,11,0.96)'
+              : 'rgba(14,13,11,0.94)',
+            backdropFilter: 'blur(14px)',
+            border: `1px solid ${isRunning ? 'rgba(107,78,168,0.4)' : 'rgba(201,241,88,0.22)'}`,
+            borderRadius: 10,
+            padding: '8px 12px',
+            fontFamily: isRunning ? 'var(--font-mono)' : 'var(--font-sans)',
+            fontSize: isRunning ? 11 : 12.5,
+            color: isRunning ? '#c9f158' : '#d4cfc0',
+            lineHeight: 1.5,
+            pointerEvents: 'none',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            animation: 'ai-panel-in 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+          }}
+        >
+          <span style={{ color: isRunning ? '#c9f158' : 'var(--acid)', marginRight: 6, opacity: 0.8 }}>
+            {isRunning ? '▶' : '◆'}
+          </span>
+          {caption}
+        </div>
+      )}
+
+      {/* Chat panel */}
       {open && (
         <div
           data-testid="orb-chat-panel"
@@ -351,13 +486,7 @@ export function Orb() {
             }}
           >
             <span data-testid="orb-chat-title">
-              <span
-                style={{
-                  color: 'var(--acid)',
-                  marginRight: 8,
-                  textShadow: '0 0 8px var(--acid-glow)',
-                }}
-              >
+              <span style={{ color: 'var(--acid)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
                 ◆
               </span>
               krnl0 · assistant
@@ -367,15 +496,9 @@ export function Orb() {
               data-testid="orb-chat-close"
               onClick={() => setOpen(false)}
               style={{
-                background: 'transparent',
-                border: 0,
-                color: 'var(--ink-3)',
-                cursor: 'pointer',
-                fontSize: 16,
-                lineHeight: 1,
-                padding: 0,
-                width: 20,
-                height: 20,
+                background: 'transparent', border: 0,
+                color: 'var(--ink-3)', cursor: 'pointer',
+                fontSize: 16, lineHeight: 1, padding: 0, width: 20, height: 20,
               }}
               aria-label="Close assistant"
             >
@@ -388,16 +511,9 @@ export function Orb() {
             ref={historyRef}
             data-testid="orb-chat-history"
             style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: 14,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              fontSize: 12.5,
-              color: '#d4cfc0',
-              minHeight: 80,
-              maxHeight: 340,
+              flex: 1, overflowY: 'auto', padding: 14,
+              display: 'flex', flexDirection: 'column', gap: 10,
+              fontSize: 12.5, color: '#d4cfc0', minHeight: 80, maxHeight: 340,
               lineHeight: 1.5,
             }}
           >
@@ -405,15 +521,32 @@ export function Orb() {
               <div style={{ color: '#8a8270' }}>
                 <div style={{ marginBottom: 8 }}>how can i help?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {[
-                    'what should i work on next',
-                    'summarize my board',
-                    'start a focus session',
-                  ].map((s) => (
+                  {/* Commander — opens the glass popup for custom sessions */}
+                  <button
+                    type="button"
+                    onClick={() => { setOpen(false); setCommanderOpen(true); }}
+                    style={{
+                      textAlign: 'left',
+                      background: 'linear-gradient(90deg, rgba(201,241,88,0.18) 0%, rgba(201,241,88,0.06) 60%, rgba(201,241,88,0.10) 100%)',
+                      border: '1px solid rgba(201, 241, 88, 0.40)',
+                      color: 'var(--acid)',
+                      padding: '6px 8px',
+                      borderRadius: 4,
+                      fontFamily: 'inherit',
+                      fontSize: 11.5,
+                      cursor: 'pointer',
+                      textShadow: '0 0 6px rgba(201,241,88,0.35)',
+                      letterSpacing: '0.02em',
+                      marginBottom: 4,
+                    }}
+                  >
+                    {'▸ commander · plan a session'}
+                  </button>
+                  {FLOWS.map((flow) => (
                     <button
-                      key={s}
+                      key={flow.id}
                       type="button"
-                      onClick={() => submitMock(s)}
+                      onClick={() => launchFlow(flow)}
                       style={{
                         textAlign: 'left',
                         background: 'rgba(201, 241, 88, 0.06)',
@@ -426,25 +559,15 @@ export function Orb() {
                         cursor: 'pointer',
                       }}
                     >
-                      {`› ${s}`}
+                      {`› ${flow.label}`}
                     </button>
                   ))}
                 </div>
               </div>
             )}
             {history.map((m, i) => (
-              <div
-                key={i}
-                style={{
-                  color: m.role === 'user' ? '#8a8270' : '#d4cfc0',
-                }}
-              >
-                <span
-                  style={{
-                    color: m.role === 'user' ? 'var(--ink-3)' : 'var(--acid)',
-                    marginRight: 4,
-                  }}
-                >
+              <div key={i} style={{ color: m.role === 'user' ? '#8a8270' : '#d4cfc0' }}>
+                <span style={{ color: m.role === 'user' ? 'var(--ink-3)' : 'var(--acid)', marginRight: 4 }}>
                   {m.role === 'user' ? '›' : '◆'}
                 </span>
                 {m.text}
@@ -458,12 +581,9 @@ export function Orb() {
                     <span
                       key={j}
                       style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: '50%',
+                        width: 5, height: 5, borderRadius: '50%',
                         display: 'inline-block',
-                        background: 'var(--acid)',
-                        boxShadow: '0 0 6px var(--acid)',
+                        background: 'var(--acid)', boxShadow: '0 0 6px var(--acid)',
                         animation: 'ai-dot 1.2s ease-in-out infinite',
                         animationDelay: `${j * 0.15}s`,
                       }}
@@ -478,9 +598,7 @@ export function Orb() {
           <form
             onSubmit={onSubmit}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
+              display: 'flex', alignItems: 'center', gap: 6,
               padding: '10px 12px',
               borderTop: '1px solid rgba(201, 241, 88, 0.15)',
               background: 'rgba(0, 0, 0, 0.2)',
@@ -497,14 +615,8 @@ export function Orb() {
               autoComplete="off"
               spellCheck={false}
               style={{
-                flex: 1,
-                background: 'transparent',
-                border: 0,
-                outline: 0,
-                color: '#d4cfc0',
-                fontFamily: 'inherit',
-                fontSize: 12.5,
-                padding: '4px 0',
+                flex: 1, background: 'transparent', border: 0, outline: 0,
+                color: '#d4cfc0', fontFamily: 'inherit', fontSize: 12.5, padding: '4px 0',
               }}
             />
           </form>
@@ -524,53 +636,51 @@ export function Orb() {
         <svg viewBox="0 0 80 80" width="64" height="64">
           <defs>
             <radialGradient id="orbGrad" cx="35%" cy="35%" r="70%">
-              <stop offset="0%" stopColor="#f0ffb8" stopOpacity="1" />
-              <stop offset="35%" stopColor="#c9f158" stopOpacity="0.95" />
-              <stop offset="70%" stopColor="#7fa830" stopOpacity="0.9" />
+              <stop offset="0%"   stopColor="#f0ffb8" stopOpacity="1" />
+              <stop offset="35%"  stopColor={isRunning ? '#b4a0ff' : '#c9f158'} stopOpacity="0.95" />
+              <stop offset="70%"  stopColor={isRunning ? '#6b4ea8' : '#7fa830'} stopOpacity="0.9" />
               <stop offset="100%" stopColor="#1a2f00" stopOpacity="1" />
             </radialGradient>
             <radialGradient id="orbHi" cx="32%" cy="28%" r="22%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+              <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.95" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </radialGradient>
             <filter id="orbBlur" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur stdDeviation="0.4" />
             </filter>
           </defs>
-          {/* Outer halos */}
           <circle cx="40" cy="40" r="38" fill="url(#orbGrad)" opacity="0.18" />
           <circle cx="40" cy="40" r="32" fill="url(#orbGrad)" opacity="0.35" />
-          {/* Main orb body */}
           <circle cx="40" cy="40" r="26" fill="url(#orbGrad)" filter="url(#orbBlur)" />
-          {/* Swirl band — rotates independently of the bob. ai-swirl
-              keyframe (PR1 tokens.css) drives the rotation. */}
           <g
             style={{
               animation: isPurple
                 ? 'ai-swirl 1.8s linear infinite'
-                : 'ai-swirl 8s linear infinite',
+                : isSpeaking
+                  ? 'ai-swirl 3s linear infinite'
+                  : isRunning
+                    ? 'ai-swirl 2.5s linear infinite'
+                    : 'ai-swirl 8s linear infinite',
               transformOrigin: '40px 40px',
             }}
           >
-            <ellipse cx="40" cy="36" rx="22" ry="7" fill="#c9f158" opacity="0.35" />
-            <ellipse cx="40" cy="44" rx="18" ry="5" fill="#7fa830" opacity="0.4" />
+            <ellipse cx="40" cy="36" rx="22" ry="7"
+              fill={isRunning ? '#b4a0ff' : '#c9f158'} opacity="0.35" />
+            <ellipse cx="40" cy="44" rx="18" ry="5"
+              fill={isRunning ? '#6b4ea8' : '#7fa830'} opacity="0.4" />
           </g>
-          {/* Specular highlight */}
           <ellipse cx="32" cy="30" rx="9" ry="6" fill="url(#orbHi)" />
           <circle cx="29" cy="27" r="2" fill="#ffffff" opacity="0.9" />
         </svg>
 
-        {/* Pulse rings — visible only while listening (Space PTT). Three
-            rings staggered for a sonar effect. */}
+        {/* Pulse rings — listening + speaking */}
         {showRings && (
           <>
             {[0, 0.5, 1].map((delay, idx) => (
               <span
                 key={idx}
                 style={{
-                  position: 'absolute',
-                  inset: 8,
-                  borderRadius: '50%',
+                  position: 'absolute', inset: 8, borderRadius: '50%',
                   border: '1.5px solid rgba(201, 241, 88, 0.5)',
                   pointerEvents: 'none',
                   animation: 'ai-ring 1.6s ease-out infinite',
@@ -580,7 +690,20 @@ export function Orb() {
             ))}
           </>
         )}
+
+        {/* Running ring — plum during command execution */}
+        {showRunRing && (
+          <span
+            style={{
+              position: 'absolute', inset: 4, borderRadius: '50%',
+              border: '1.5px solid rgba(180, 140, 240, 0.55)',
+              pointerEvents: 'none',
+              animation: 'ai-ring 2.2s ease-out infinite',
+            }}
+          />
+        )}
       </button>
     </div>
+    </>
   );
 }
