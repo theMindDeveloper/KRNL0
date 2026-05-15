@@ -269,8 +269,9 @@ describe('Decision 22 — board migration', () => {
     expect(clock!.kind).toBe('clock');
     expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
     // Position matches NEW_MOTHER_POSITIONS entry for mother-clock — bumped
-    // from 1252 to 1300 in PR2.1 to widen spine spacing to 520 (was 412).
-    expect((clock as { position?: { x: number; y: number } }).position).toMatchObject({ x: 1300, y: 0 });
+    // 1252 → 1300 (PR2.1, 520px spacing for 440-wide mothers) → 1350
+    // (Wave C, 540px spacing for 500-wide mothers).
+    expect((clock as { position?: { x: number; y: number } }).position).toMatchObject({ x: 1350, y: 0 });
   });
 
   it('Decision 23.1: migrateAddClockMother is idempotent — no duplicate mother-clock on double load', () => {
@@ -308,13 +309,13 @@ describe('Decision 22 — board migration', () => {
     // Exactly 6 nodes (the 6 permanent mothers)
     expect(board.nodes).toHaveLength(6);
 
-    // mother-clock is in the seed at the PR2.1 position (was 1252, now 1300
-    // after spine spacing widened to 520px to fit 440-wide mothers).
+    // mother-clock seed x: 1252 (orig) → 1300 (PR2.1, 520px spacing for 440-wide)
+    // → 1350 (Wave C, 540px spacing for 500-wide mothers).
     const clock = (board.nodes as Array<{ id: string; kind: string; position: { x: number; y: number }; isMother: boolean; state: Record<string, unknown>; config: Record<string, unknown> }>)
       .find((n) => n.id === 'mother-clock');
     expect(clock).toBeDefined();
     expect(clock!.kind).toBe('clock');
-    expect(clock!.position).toEqual({ x: 1300, y: 0 });
+    expect(clock!.position).toEqual({ x: 1350, y: 0 });
     expect(clock!.isMother).toBe(true);
     // ADR 0004 §3 — selectedDate defaults to today (local) in the seed.
     expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });

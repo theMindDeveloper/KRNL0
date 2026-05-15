@@ -70,15 +70,15 @@ function renderWithWrapper(element: React.ReactElement) {
 // ── F1 — Topbar left content ──────────────────────────────────────────────────
 
 describe('F1 — Topbar left content', () => {
-  // PR3 (LifeOS UI refresh) — the brand mark is now a nested-block graphic
-  // (acid outer square + ink inner block), not the inline "■" glyph. Check
-  // the graphic exists and the wordmark still renders alongside it.
-  it('renders the brand-mark as nested acid+ink blocks', () => {
+  // Wave C (LifeOS UI refresh) — the brand mark is now an SVG with a dashed
+  // halo + rounded mark block + ■ glyph inside (variant switches per theme).
+  it('renders the brand-mark as an SVG with multiple shape children', () => {
     renderWithWrapper(React.createElement(TopBar));
     const mark = screen.getByTestId('topbar-brand-mark');
     expect(mark).toBeTruthy();
-    // The outer acid block contains an inner ink block.
-    expect(mark.children.length).toBeGreaterThan(0);
+    expect(mark.tagName.toLowerCase()).toBe('svg');
+    // halo rect + mark rect + glyph text → at least 3 shape children.
+    expect(mark.children.length).toBeGreaterThanOrEqual(3);
   });
 
   it('renders the wordmark "KRNL0"', () => {
