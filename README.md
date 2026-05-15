@@ -116,7 +116,7 @@ Edit any duration upstream — every downstream block re-positions instantly. Pi
 
 ### 2. Habit drag-to-schedule
 
-Drag a habit from the Habit mother onto a calendar cell. A radial chooser appears at the drop point with three options — **Daily**, **Weekly**, **Weekdays** — styled in the Apple Liquid Glass material (`backdrop-filter: blur(24px) saturate(180%)`). Click a wedge to confirm; click the dead zone or press <kbd>Escape</kbd> to cancel.
+Drag a habit from the Habit mother onto a calendar cell. A chooser appears at the drop point with 2 options — **Daily**, **Weekly**. Click a wedge to confirm; click the dead zone or press <kbd>Escape</kbd> to cancel.
 
 The chooser is a reusable primitive (`useRadialChooser`), portaled to `document.body` with `z-index: 2147483000`. Future drag interactions — edge-type pickers, Pomo preset assignment — will reuse the same hook.
 
