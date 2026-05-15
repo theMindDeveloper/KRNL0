@@ -95,6 +95,9 @@ export function MotherFrame({
     pointerStartFlowX.current = flowStart.x;
     candidateSlotRef.current = slotIndex - 1;
 
+    // Fire hover immediately so the ghost appears at the source slot from drag start.
+    onReorderHover?.(slotIndex - 1);
+
     document.body.classList.add('krnl-reordering');
     setDragging(true);
     setSnapping(false);
