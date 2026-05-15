@@ -6,7 +6,8 @@
  * useMemo from board.nodes / board.edges. RF runs in controlled mode.
  */
 
-import { useMemo, useCallback, useState, useEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
+import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
+import { scheduleBatch } from '../../utils/rafBatcher';
 import {
   ReactFlow,
   Background,
@@ -221,39 +222,44 @@ const SwapButtonNode = memo(function SwapButtonNode({
 
   // Proximity reveal — button is invisible + non-interactive by default and
   // fades in only when the cursor is within PROXIMITY_PX of its center. The
-  // opacity + pointer-events toggle is mutated directly on the DOM via rAF so
-  // mousemove doesn't trigger any React re-render (would re-render the whole
-  // RF node tree at 60fps). The button stays click-through when hidden.
-  useEffect(() => {
-    const PROXIMITY_PX = 140;
-    let rafId: number | null = null;
-    let lastX = 0;
-    let lastY = 0;
-    const tick = () => {
-      rafId = null;
-      const btn = btnRef.current;
-      if (!btn) return;
-      const r = btn.getBoundingClientRect();
-      const dx = lastX - (r.left + r.width / 2);
-      const dy = lastY - (r.top + r.height / 2);
-      const near = (dx * dx + dy * dy) < (PROXIMITY_PX * PROXIMITY_PX);
-      if (near) {
-        btn.style.opacity = '1';
-        btn.style.pointerEvents = 'all';
-      } else {
-        btn.style.opacity = '0';
-        btn.style.pointerEvents = 'none';
-      }
-    };
+  // opacity + pointer-events toggle is mutated directly on the DOM via the
+  // shared rafBatcher so all swap-button BCR reads happen in the same batch
+  // pass as the badge reads — one layout flush per frame instead of 5 extra.
+  useLayoutEffect(() => {
+    const PROXIMITY_SQ = 140 * 140;
+    let cursorX = 0;
+    let cursorY = 0;
+    let btnCX = 0;
+    let btnCY = 0;
+
     const onMove = (e: PointerEvent) => {
-      lastX = e.clientX;
-      lastY = e.clientY;
-      if (rafId === null) rafId = requestAnimationFrame(tick);
+      cursorX = e.clientX;
+      cursorY = e.clientY;
     };
     window.addEventListener('pointermove', onMove, { passive: true });
+
+    const unschedule = scheduleBatch({
+      read() {
+        const btn = btnRef.current;
+        if (!btn) return;
+        const r = btn.getBoundingClientRect();
+        btnCX = r.left + r.width / 2;
+        btnCY = r.top + r.height / 2;
+      },
+      write() {
+        const btn = btnRef.current;
+        if (!btn) return;
+        const dx = cursorX - btnCX;
+        const dy = cursorY - btnCY;
+        const near = (dx * dx + dy * dy) < PROXIMITY_SQ;
+        btn.style.opacity = near ? '1' : '0';
+        btn.style.pointerEvents = near ? 'all' : 'none';
+      },
+    });
+
     return () => {
       window.removeEventListener('pointermove', onMove);
-      if (rafId !== null) cancelAnimationFrame(rafId);
+      unschedule();
     };
   }, []);
 

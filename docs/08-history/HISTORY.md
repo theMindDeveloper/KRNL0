@@ -440,3 +440,25 @@ The PomoNode FSM gains long-break branching: `pomoComplete` now reads `(sessions
 **Why.** Concrete UX problems that blocked daily use: the auto-starting `+ POMO` button hijacked the timer unintentionally; subtasks silently vanished from the todo list; the selection ring gave no visual indication of todo-family membership; the dash-march animation the user originally spec'd was disabled.
 
 **Tests:** 694 passing (+32 since Decision 22.1 pass), 1 todo, 0 failed. Typecheck clean.
+
+---
+
+## [2026-05-15] — Pan stutter fix: shared rAF batcher eliminates layout thrashing
+
+**Type:** Bug Fix / Performance
+**Branch:** `fix/pan-perf`
+**Issue:** #124
+**Files changed:**
+- `src/renderer/utils/rafBatcher.ts` (new)
+- `src/renderer/components/nodes/MotherFrame/index.tsx`
+- `src/renderer/components/Canvas/CanvasFlow.tsx`
+
+**Root cause.** After PR #123 the canvas pan stuttered at runtime. The culprit was 11 `getBoundingClientRect()` calls per animation frame — 6 from MotherFrame badge-tracking rAF loops and 5 from SwapButtonNode proximity-reveal rAF loops triggered by `pointermove`. Each loop ran independently, so reads and writes were interleaved across callbacks: callback A writes `style.left`, callback B reads `getBoundingClientRect()` (which must flush pending layout to return accurate values), causing up to 11 separate layout recalculations per 16 ms frame.
+
+**Fix.** Introduced a module-level `rafBatcher` singleton (`src/renderer/utils/rafBatcher.ts`) with a `scheduleBatch({ read, write }) => unregister` API. It runs ONE shared `requestAnimationFrame` loop that fires all registered `read()` callbacks before any `write()` callback. This guarantees a single layout flush per frame regardless of how many trackers are registered — the classic read-then-write batching pattern.
+
+- **MotherFrame** — replaced individual `useLayoutEffect` rAF loops with `scheduleBatch`. Badge BCR read goes in `read()`, `style.left/top` update in `write()`.
+- **SwapButtonNode** — replaced per-button `pointermove`→rAF pattern with `scheduleBatch`. Button BCR read goes in `read()`, opacity/pointer-events update in `write()`. Cursor position tracked via a module-level `pointermove` listener.
+- **MotherFrame** — removed `willChange: 'transform'` from inline style. Promoting 6 GPU compositor layers cost VRAM with no pan benefit (RF transforms the viewport wrapper during pan, not per-node elements). The CSS `transition: transform 280ms` on `.krnl-mother` is unchanged and still drives the swap animation.
+
+**Tests:** 1080 passing, 0 typecheck errors.

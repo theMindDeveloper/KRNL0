@@ -5,16 +5,17 @@
 //
 // Slot badge clipping note (2026-05-15): the badge needs to overhang the
 // panel's top edge per the LifeOS design, but `.react-flow` has
-// `overflow:hidden` to clip nodes during pan/zoom. When a mother is panned
-// near the canvas top, the negative-top badge gets sliced. The fix is to
-// portal the badge into `document.body` with `position:fixed` so it escapes
-// the canvas's clip context entirely. Position is tracked via rAF +
-// getBoundingClientRect so badge follows the panel during pan/zoom without
-// subscribing to RF store (which would re-render on every viewport tick).
+// `overflow:hidden` to clip nodes during pan/zoom. The fix is to portal the
+// badge into `document.body` with `position:fixed` so it escapes the canvas's
+// clip context entirely. Position is tracked via the shared rafBatcher —
+// all 6 badge reads happen in one batch before any writes, eliminating the
+// layout-thrashing (11 forced layout flushes → 1 per frame) that caused
+// pan stutter after PR #123.
 
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
+import { scheduleBatch } from '../../../utils/rafBatcher';
 
 interface Props {
   nodeId: string;          // reports hover to boardStore so edges can bold on hover
@@ -52,37 +53,30 @@ export function MotherFrame({
   const rootRef = useRef<HTMLDivElement>(null);
   const badgeRef = useRef<HTMLDivElement>(null);
 
-  // Single rAF loop per mother that mirrors the panel's top-left screen
-  // position to the portaled badge. getBoundingClientRect forces layout, so
-  // we read once and write once per frame, never inside React's render.
+  // Shared rAF batch: read BCR for this badge in the global read pass, write
+  // style.left/top in the global write pass. All 6 mothers share one rAF tick
+  // so reads happen before any write — one layout flush per frame instead of 6.
   useLayoutEffect(() => {
-    let rafId: number | null = null;
-    let lastL = NaN;
-    let lastT = NaN;
-    const tick = () => {
-      const root = rootRef.current;
-      const badge = badgeRef.current;
-      if (root && badge) {
+    let cachedL = NaN;
+    let cachedT = NaN;
+    let liveL = NaN;
+    let liveT = NaN;
+
+    return scheduleBatch({
+      read() {
+        const root = rootRef.current;
+        if (!root) return;
         const r = root.getBoundingClientRect();
-        // Badge anchored to panel's top-left, offset to overhang by 11px
-        // and indent 14px (matches original LifeOS layout).
-        const l = Math.round(r.left + 14);
-        const t = Math.round(r.top - 11);
-        if (l !== lastL) {
-          badge.style.left = `${l}px`;
-          lastL = l;
-        }
-        if (t !== lastT) {
-          badge.style.top = `${t}px`;
-          lastT = t;
-        }
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
+        liveL = Math.round(r.left + 14);
+        liveT = Math.round(r.top - 11);
+      },
+      write() {
+        const badge = badgeRef.current;
+        if (!badge) return;
+        if (liveL !== cachedL) { badge.style.left = `${liveL}px`; cachedL = liveL; }
+        if (liveT !== cachedT) { badge.style.top = `${liveT}px`; cachedT = liveT; }
+      },
+    });
   }, []);
 
   return (
@@ -118,9 +112,10 @@ export function MotherFrame({
         // is intentionally excluded — would block CSS custom-property
         // inheritance from tokens.css.
         contain: 'layout paint',
-        // Promote each mother to its own GPU compositor layer so pan only
-        // uploads texture deltas rather than re-rasterising the whole canvas.
-        willChange: 'transform',
+        // willChange:'transform' removed — promoting 6 compositor layers
+        // costs VRAM with no pan benefit (RF transforms the viewport wrapper,
+        // not per-node elements, during pan). Swap animation still works via
+        // the CSS transition on .react-flow__node.krnl-mother.
       }}
     >
       {/* Outset corner brackets — `inset:-8px`, opacity 0.3 base */}
@@ -143,8 +138,8 @@ export function MotherFrame({
 
       {/* Slot badge — portal target document.body, position:fixed so it
           escapes `.react-flow`'s overflow:hidden clip. Initial top/left are
-          off-screen; the rAF loop above writes the real coords on the next
-          paint. Guarded for SSR/non-DOM test envs (no document). */}
+          off-screen; the shared rafBatcher writes real coords on next paint.
+          Guarded for SSR/non-DOM test envs (no document). */}
       {typeof document !== 'undefined' && createPortal(
         <div
           ref={badgeRef}
