@@ -115,8 +115,9 @@ export function ClockNode({
   onCommand,
   slotIndex = 6,
   slotTotal = MOTHER_TOTAL,
-  onMoveLeft,
-  onMoveRight,
+  onReorderDrop,
+  onReorderHover,
+  slotCentersX,
 }: NodeProps<ClockState, ClockConfig>) {
   const { linkedTodoId } = node.state;
 
@@ -228,11 +229,13 @@ export function ClockNode({
 
   return (
     <MotherFrame
+      nodeId={node.id}
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
-      onMoveLeft={onMoveLeft}
-      onMoveRight={onMoveRight}
+      onReorderDrop={onReorderDrop}
+      onReorderHover={onReorderHover}
+      slotCentersX={slotCentersX}
     >
       <div
         style={{
@@ -476,15 +479,18 @@ export function ClockNode({
             <circle cx={CX} cy={CY} r={1.6} fill="var(--acid)" />
           </svg>
 
-          {/* Meridiem readout — absolutely positioned above clock center */}
+          {/* Meridiem readout — positioned inside the inner face just below
+              the 12 numeral. Previous `top:70 + fontSize:9` collided with
+              the "11" numeral (which sits at SVG y≈68). Bumped down to 92
+              and shrunk to 7.5px so it sits clear of all face numerals. */}
           <div
             style={{
               position: 'absolute',
-              top: 70,
+              top: 92,
               left: '50%',
               transform: 'translateX(-50%)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 9,
+              fontSize: 7.5,
               letterSpacing: '0.16em',
               color: 'var(--ink-4)',
               textTransform: 'uppercase',
@@ -492,7 +498,7 @@ export function ClockNode({
               whiteSpace: 'nowrap',
             }}
           >
-            <span style={{ color: 'var(--rust)', marginRight: 4, fontWeight: 700 }}>
+            <span style={{ color: 'var(--rust)', marginRight: 3, fontWeight: 700 }}>
               {hours >= 12 ? 'PM' : 'AM'}
             </span>
             {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}

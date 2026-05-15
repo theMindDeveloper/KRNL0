@@ -28,8 +28,9 @@ export interface RFNodeData extends Record<string, unknown> {
   onSelect: () => void;
   slotIndex?: number | undefined;
   slotTotal?: number | undefined;
-  onMoveLeft?: ((() => void) | undefined);
-  onMoveRight?: ((() => void) | undefined);
+  onReorderDrop?: ((fromSlotIndex: number, toSlotIndex: number) => void) | undefined;
+  onReorderHover?: ((candidateSlotIndex: number) => void) | undefined;
+  slotCentersX?: readonly number[] | undefined;
 }
 
 // Convenience alias for the full RF node type with our data.
@@ -69,8 +70,9 @@ export function toRfNode(
     onSelect: () => void;
     slotIndex?: number | undefined;
     slotTotal?: number | undefined;
-    onMoveLeft?: ((() => void) | undefined);
-    onMoveRight?: ((() => void) | undefined);
+    onReorderDrop?: ((fromSlotIndex: number, toSlotIndex: number) => void) | undefined;
+    onReorderHover?: ((candidateSlotIndex: number) => void) | undefined;
+    slotCentersX?: readonly number[] | undefined;
   }
 ): KrnlRFNode {
   // Decision 22.2 Fix 5 — add a CSS class keyed on node.kind so the todo-family
@@ -104,8 +106,9 @@ export function toRfNode(
       onSelect: ctx.onSelect,
       slotIndex: ctx.slotIndex,
       slotTotal: ctx.slotTotal,
-      onMoveLeft: ctx.onMoveLeft,
-      onMoveRight: ctx.onMoveRight,
+      onReorderDrop: ctx.onReorderDrop,
+      onReorderHover: ctx.onReorderHover,
+      slotCentersX: ctx.slotCentersX,
     },
   };
 }
@@ -163,7 +166,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
 ): ComponentType<RFNodeProps<KrnlRFNode>> {
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
-    const { node, onCommand, onSelect, slotIndex, slotTotal, onMoveLeft, onMoveRight } = data;
+    const { node, onCommand, onSelect, slotIndex, slotTotal, onReorderDrop, onReorderHover, slotCentersX } = data;
     // Mother nodes don't connect — render zero handles. Children get
     // interactive handles so users can wire edges between them.
     const showHandles = !node.isMother;
@@ -182,10 +185,11 @@ export function createNodeAdapter<S = unknown, C = unknown>(
           selected={selected === true}
           onCommand={onCommand}
           onSelect={onSelect}
-          slotIndex={slotIndex as number | undefined}
-          slotTotal={slotTotal as number | undefined}
-          onMoveLeft={onMoveLeft as (() => void) | undefined}
-          onMoveRight={onMoveRight as (() => void) | undefined}
+          {...(slotIndex !== undefined ? { slotIndex: slotIndex as number } : {})}
+          {...(slotTotal !== undefined ? { slotTotal: slotTotal as number } : {})}
+          {...(onReorderDrop !== undefined ? { onReorderDrop: onReorderDrop as (fromSlotIndex: number, toSlotIndex: number) => void } : {})}
+          {...(onReorderHover !== undefined ? { onReorderHover: onReorderHover as (candidateSlotIndex: number) => void } : {})}
+          {...(slotCentersX !== undefined ? { slotCentersX: slotCentersX as readonly number[] } : {})}
         />
         {showHandles && (
           <Handle

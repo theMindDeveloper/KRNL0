@@ -9,13 +9,12 @@ import { startTerminalSession } from './session';
 import { MotdBanner } from './MotdBanner';
 import pkg from '../../../../../package.json';
 
-export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TermState, TermConfig>) {
+export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL, onReorderDrop, onReorderHover, slotCentersX }: NodeProps<TermState, TermConfig>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
-  const [hovered, setHovered] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -150,13 +149,14 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
   return (
     <MotherFrame
+      nodeId={node.id}
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
       background="var(--term-bg)"
-      borderColor={hovered ? 'var(--acid)' : 'var(--paper-3)'}
-      onMoveLeft={onMoveLeft}
-      onMoveRight={onMoveRight}
+      onReorderDrop={onReorderDrop}
+      onReorderHover={onReorderHover}
+      slotCentersX={slotCentersX}
     >
       <style>{`
         @keyframes term-live-pulse {
@@ -171,8 +171,6 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       `}</style>
 
       <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
         onClick={focusTerm}
         style={{
           borderRadius: 5,

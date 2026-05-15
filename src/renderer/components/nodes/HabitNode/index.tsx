@@ -79,8 +79,9 @@ export function HabitNode({
   onCommand,
   slotIndex = 3,
   slotTotal = MOTHER_TOTAL,
-  onMoveLeft,
-  onMoveRight,
+  onReorderDrop,
+  onReorderHover,
+  slotCentersX,
 }: NodeProps<HabitState, HabitConfig>) {
   const { state, config } = node;
   const [newName, setNewName] = useState('');
@@ -163,11 +164,13 @@ export function HabitNode({
 
   return (
     <MotherFrame
+      nodeId={node.id}
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
-      onMoveLeft={onMoveLeft}
-      onMoveRight={onMoveRight}
+      onReorderDrop={onReorderDrop}
+      onReorderHover={onReorderHover}
+      slotCentersX={slotCentersX}
     >
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, flex: 1 }}>
         {/* Header */}
