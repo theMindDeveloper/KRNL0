@@ -44,6 +44,17 @@
   cursor: grabbing;
 }
 
+/* PR6 — Habit lane card tilts and lifts while being dragged. The rotation
+   is on the inner card, not the RF wrapper, so the drag-position transform
+   on the wrapper composes cleanly with the rotation here. */
+.react-flow__node.dragging.krnl-kind-habit--lane > div:not(.react-flow__handle) {
+  transform: rotate(-1.4deg);
+  box-shadow:
+    0 0 0 1.5px var(--acid),
+    0 18px 40px rgba(0, 0, 0, 0.35) !important;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
 /* Hide React Flow's group-selection bounding box. The user-facing selection
    indicator is the per-node ring; the wrapping rect just adds visual noise
    and lingers after a marquee drag completes. */
