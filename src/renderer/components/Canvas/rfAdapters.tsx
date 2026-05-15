@@ -41,15 +41,20 @@ export type KrnlRFNode = RFNode<RFNodeData>;
 // node that is not initialized") when a freshly-added node is dragged before
 // the ResizeObserver has fired its first measurement. These are approximate
 // — RF replaces them with measured values once the ResizeObserver delivers.
+//
+// PR2 (LifeOS UI refresh) — mother kinds adopt a balanced 440×440 square,
+// down from 380×600 portrait. Sync point: MOTHER_WIDTH / MOTHER_HEIGHT in
+// src/renderer/components/nodes/MotherFrame/index.tsx. A mismatch makes the
+// RF selection ring sit off the visible card edge — see ADR 0006.
 const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = {
   'todo.task':   { width: 220, height: 120 },
-  'todo':        { width: 380, height: 600 },
-  'pomo':        { width: 380, height: 600 },
-  'ai':          { width: 380, height: 600 },
-  'habit':       { width: 380, height: 600 },
-  'terminal':    { width: 380, height: 600 },
-  'calendar':    { width: 380, height: 600 },
-  'clock':       { width: 380, height: 600 },
+  'todo':        { width: 440, height: 440 },
+  'pomo':        { width: 440, height: 440 },
+  'ai':          { width: 440, height: 440 },
+  'habit':       { width: 440, height: 440 },
+  'terminal':    { width: 440, height: 440 },
+  'calendar':    { width: 440, height: 440 },
+  'clock':       { width: 440, height: 440 },
   'habit.lane':  { width: 200, height: 120 },
   'text':        { width: 260, height: 120 },
   'image':       { width: 240, height: 180 },
