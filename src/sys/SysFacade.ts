@@ -9,6 +9,7 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
+import { pomoStart, pomoStop, pomoStatus } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
@@ -263,6 +264,14 @@ export class SysFacade {
         return { ok: false, message: 'theme set requires an open renderer window', data: { exitCode: 2 } };
       }
       return this.deps.cliDispatch('theme.set', { value: command.value });
+    }
+
+    if (command.kind === 'pomo') {
+      switch (command.sub) {
+        case 'start':  return pomoStart(command.label, command.minutes);
+        case 'stop':   return pomoStop();
+        case 'status': return pomoStatus();
+      }
     }
 
     if (command.kind === 'habit') {
