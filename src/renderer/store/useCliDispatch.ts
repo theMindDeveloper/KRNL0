@@ -12,6 +12,7 @@
 import { useEffect } from 'react';
 import { useBoardStore } from './boardStore';
 import { deleteTaskNodesCascade } from '../components/Canvas/commandDispatch';
+import { sfxEngine } from '../sfx/sfxEngine';
 import type { Board } from '../../shared/types';
 import type { Node } from '../../shared/types';
 
@@ -117,6 +118,28 @@ export function useCliDispatch(): void {
             }
             ok = true;
             message = `Marquee deleted ${taskIds.length} task(s)`;
+            break;
+          }
+
+          case 'sfx.play': {
+            const { clipId } = args as { clipId: string };
+            sfxEngine.play(clipId).catch(() => {/* ignore playback errors in CLI path */});
+            ok = true;
+            message = `Playing SFX: ${clipId}`;
+            break;
+          }
+
+          case 'sfx.stop': {
+            sfxEngine.stop();
+            ok = true;
+            message = 'SFX stopped';
+            break;
+          }
+
+          case 'sfx.list': {
+            const clips = sfxEngine.clips();
+            ok = true;
+            message = clips.length > 0 ? clips.join('\n') : '(no sfx clips registered)';
             break;
           }
 

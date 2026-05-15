@@ -501,3 +501,22 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Result:** 0 DOM reads and 0 layout flushes per frame during pan. The only work per rAF tick is arithmetic in the `read()` callbacks and a single `style.transform` write per badge/button in `write()` — both compositor-level operations the GPU handles without involving the layout engine.
 
 **Tests:** 1080 passing, 0 typecheck errors.
+
+
+---
+
+## [2026-05-15] — Startup sound + SFX engine
+
+**Type:** Feature
+**Branch:** `feat/startup-sound`
+**Files changed:**
+- `src/renderer/sfx/sfxEngine.ts` (new — shared SFX engine singleton)
+- `src/renderer/sfx/sounds/krnl0startup.mp3` (new — startup audio asset)
+- `src/renderer/App.tsx` (play startup sound on mount)
+- `src/renderer/store/useCliDispatch.ts` (sfx.play / sfx.stop / sfx.list handlers)
+- `src/sys/parser.ts` (sfx play/stop/list command types)
+- `src/sys/SysFacade.ts` (sfx command routing via cliDispatch)
+
+**Summary:** Added a startup sound that plays when the renderer mounts, plus a thin shared SFX engine (`sfxEngine`) for app-level sound effects. The engine follows the same `import.meta.glob` + HTML5 Audio + caching pattern as the existing VoicePlayer in the Assistant component, but lives independently in `src/renderer/sfx/` so any component can use it without coupling to Assistant internals. The startup sound is a simple fire-and-forget play on App mount; autoplay-policy rejections are silently swallowed. Three sys CLI commands added: `krnl sfx play <clipId>`, `krnl sfx stop`, `krnl sfx list` — all renderer-coupled via the existing cliDispatch bridge.
+
+**Tests:** Pre-existing 2 AppChrome test failures and 1 typecheck error in PomoNode (both on main before this change). No regressions introduced.

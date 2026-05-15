@@ -266,6 +266,18 @@ export class SysFacade {
       return this.deps.cliDispatch('theme.set', { value: command.value });
     }
 
+    if (command.kind === 'sfx') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'sfx requires an open renderer window', data: { exitCode: 2 } };
+      }
+      if (command.sub === 'play') {
+        if (!command.clipId) return { ok: false, message: 'sfx play requires <clipId>' };
+        return this.deps.cliDispatch('sfx.play', { clipId: command.clipId });
+      }
+      if (command.sub === 'stop') return this.deps.cliDispatch('sfx.stop', {});
+      if (command.sub === 'list') return this.deps.cliDispatch('sfx.list', {});
+    }
+
     if (command.kind === 'pomo') {
       switch (command.sub) {
         case 'start':  return pomoStart(command.label, command.minutes);
