@@ -3,18 +3,22 @@
 //   - badge slot tag (top:-11px, left:14px) with spine-hot-colored slot number
 //   - 4 outset corner brackets (inset:-8px, L-shapes)
 //
-// Slot badge clipping note (2026-05-15): the badge needs to overhang the
-// panel's top edge per the LifeOS design, but `.react-flow` has
-// `overflow:hidden` to clip nodes during pan/zoom. When a mother is panned
-// near the canvas top, the negative-top badge gets sliced. The fix is to
-// portal the badge into `document.body` with `position:fixed` so it escapes
-// the canvas's clip context entirely. Position is tracked via rAF +
-// getBoundingClientRect so badge follows the panel during pan/zoom without
-// subscribing to RF store (which would re-render on every viewport tick).
+// Badge positioning (2026-05-15): the badge must overhang the panel top edge
+// but `.react-flow` has `overflow:hidden`. Solution: portal badge to
+// `document.body` with `position:fixed`.
+//
+// Badge tracking (pan-perf fix 2026-05-15): original approach called
+// getBoundingClientRect() in a rAF loop — 6 forced layout reads per frame
+// during pan. Replaced with viewportBus.rfToScreen() which computes the screen
+// position from RF flow-coordinates + the known viewport transform. Zero DOM
+// reads, zero layout flushes. Badge style uses CSS `transform:translate` (not
+// top/left) so the write is also compositor-level.
 
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
+import { scheduleBatch } from '../../../utils/rafBatcher';
+import { rfToScreen } from '../../../utils/viewportBus';
 
 interface Props {
   nodeId: string;          // reports hover to boardStore so edges can bold on hover
@@ -22,6 +26,11 @@ interface Props {
   slotTotal: number;
   width: number;
   children: ReactNode;
+  // RF flow-space position of this node — used to compute badge screen coords
+  // without calling getBoundingClientRect(). Must match the node's actual RF
+  // position (node.position from boardStore). For fixed mother nodes this is
+  // always correct; positions only change on explicit swap commands.
+  position: { x: number; y: number };
   background?: string;     // override (terminal uses --term-bg)
   borderColor?: string;
   minHeight?: number;      // override — must match INITIAL_DIMS_BY_KIND height
@@ -41,6 +50,7 @@ export function MotherFrame({
   slotTotal,
   width,
   children,
+  position,
   background = 'var(--node-bg)',
   borderColor = 'var(--paper-3)',
   minHeight = MOTHER_HEIGHT,
@@ -49,78 +59,67 @@ export function MotherFrame({
   const idx = String(slotIndex).padStart(2, '0');
   const total = String(slotTotal).padStart(2, '0');
 
-  const rootRef = useRef<HTMLDivElement>(null);
   const badgeRef = useRef<HTMLDivElement>(null);
 
-  // Single rAF loop per mother that mirrors the panel's top-left screen
-  // position to the portaled badge. getBoundingClientRect forces layout, so
-  // we read once and write once per frame, never inside React's render.
+  // Badge position tracking — pure arithmetic, no DOM reads.
+  // Badge anchor: left:14px, top:-11px relative to panel's RF top-left corner
+  // → in screen space: rfToScreen(nodeX + 14, nodeY - 11).
+  //
+  // CSS transform is used instead of top/left because transform writes are
+  // compositor-level (no layout dirtying). The badge starts at (0,0) hidden
+  // via transform: the first rAF tick writes the real position.
+  //
+  // Dependency on position.x/y: re-registers when node is swapped so the
+  // closure captures the new flow coordinates.
   useLayoutEffect(() => {
-    let rafId: number | null = null;
-    let lastL = NaN;
-    let lastT = NaN;
-    const tick = () => {
-      const root = rootRef.current;
-      const badge = badgeRef.current;
-      if (root && badge) {
-        const r = root.getBoundingClientRect();
-        // Badge anchored to panel's top-left, offset to overhang by 11px
-        // and indent 14px (matches original LifeOS layout).
-        const l = Math.round(r.left + 14);
-        const t = Math.round(r.top - 11);
-        if (l !== lastL) {
-          badge.style.left = `${l}px`;
-          lastL = l;
+    let cachedX = NaN;
+    let cachedY = NaN;
+    let liveX = NaN;
+    let liveY = NaN;
+
+    return scheduleBatch({
+      read() {
+        // Zero DOM reads — pure math from module-level viewport scalars.
+        const s = rfToScreen(position.x + 14, position.y - 11);
+        liveX = s.x;
+        liveY = s.y;
+      },
+      write() {
+        const badge = badgeRef.current;
+        if (!badge) return;
+        if (liveX !== cachedX || liveY !== cachedY) {
+          badge.style.transform = `translate(${liveX}px, ${liveY}px)`;
+          cachedX = liveX;
+          cachedY = liveY;
         }
-        if (t !== lastT) {
-          badge.style.top = `${t}px`;
-          lastT = t;
-        }
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, []);
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position.x, position.y]);
 
   return (
     <div
-      ref={rootRef}
       onMouseEnter={() => setHoveredNodeId(nodeId)}
       onMouseLeave={() => setHoveredNodeId(null)}
       style={{
         position: 'relative',
         width,
-        // Pinned fixed height (not minHeight) — see PR2.1 history. Bodies
-        // must overflow internally.
+        // Pinned fixed height — see PR2.1 history. Bodies must overflow internally.
         height: minHeight,
         display: 'flex',
         flexDirection: 'column',
-        // Subtle gradient overlay on the base bg for the "panel" feel — top
-        // is slightly lighter so the card has a hint of elevation. Falls back
-        // to plain bg if `background` was overridden (terminal --term-bg).
         background: background === 'var(--node-bg)'
           ? 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 30%), var(--node-bg)'
           : background,
         border: `1px solid ${borderColor}`,
         borderRadius: 8,
-        // Box-shadow only (no outline) so the panel rim is never clipped by
-        // upstream overflow:hidden ancestors. Modest blur (8px) keeps GPU
-        // composite cost low — wide shadows dominate pan repaints.
         boxShadow:
           '0 2px 8px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
-        // Outer is visible so corner brackets and the slot tag can sit at
-        // negative offsets; inner body needs its own overflow handling.
         overflow: 'visible',
-        // 'layout paint' limits repaint propagation to this subtree. 'style'
-        // is intentionally excluded — would block CSS custom-property
-        // inheritance from tokens.css.
         contain: 'layout paint',
-        // Promote each mother to its own GPU compositor layer so pan only
-        // uploads texture deltas rather than re-rasterising the whole canvas.
-        willChange: 'transform',
+        // willChange:'transform' removed (2026-05-15 pan-perf fix) — promoting
+        // 6 compositor layers costs VRAM with no benefit during pan. RF moves
+        // the viewport wrapper, not individual node elements.
       }}
     >
       {/* Outset corner brackets — `inset:-8px`, opacity 0.3 base */}
@@ -141,18 +140,20 @@ export function MotherFrame({
 
       {children}
 
-      {/* Slot badge — portal target document.body, position:fixed so it
-          escapes `.react-flow`'s overflow:hidden clip. Initial top/left are
-          off-screen; the rAF loop above writes the real coords on the next
-          paint. Guarded for SSR/non-DOM test envs (no document). */}
+      {/* Slot badge — portaled to document.body with position:fixed so it
+          escapes `.react-flow`'s overflow:hidden clip. Starts at (0,0) hidden
+          offscreen via transform; rafBatcher computes real coords each frame
+          from rfToScreen() — no getBoundingClientRect, no layout reads. */}
       {typeof document !== 'undefined' && createPortal(
         <div
           ref={badgeRef}
           aria-hidden
           style={{
             position: 'fixed',
-            top: -9999,
-            left: -9999,
+            top: 0,
+            left: 0,
+            // Start far offscreen — rAF writes the real transform on first paint.
+            transform: 'translate(-9999px, -9999px)',
             background: 'var(--paper-2)',
             color: 'var(--ink-2)',
             fontFamily: 'var(--font-mono)',

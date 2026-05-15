@@ -165,6 +165,7 @@ export function HabitNode({
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
+      position={node.position}
     >
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, flex: 1 }}>
         {/* Header */}
