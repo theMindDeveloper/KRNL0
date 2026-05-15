@@ -421,7 +421,7 @@ export function Orb() {
                         cursor: 'pointer',
                       }}
                     >
-                      {`> ${s}`}
+                      {`› ${s}`}
                     </button>
                   ))}
                 </div>
@@ -440,7 +440,7 @@ export function Orb() {
                     marginRight: 4,
                   }}
                 >
-                  {m.role === 'user' ? '>' : '◆'}
+                  {m.role === 'user' ? '›' : '◆'}
                 </span>
                 {m.text}
               </div>
