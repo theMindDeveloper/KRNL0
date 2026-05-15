@@ -141,6 +141,19 @@
   50%       { opacity: 0.9; }
 }
 
+/* PR7 — Calendar MonthView today highlight. The user asked for a solid
+   green fill on today's cell so it reads at a glance. Acid (#c9f158) is
+   theme-invariant; the text colour is hard-coded to #1a1814 (cyber light
+   --ink) so it stays readable on acid in both themes. */
+.krnl-month-cell--today {
+  background: var(--acid) !important;
+  color: #1a1814 !important;
+  font-weight: 600;
+}
+.krnl-month-cell--today .krnl-month-cell__day {
+  color: #1a1814 !important;
+}
+
 /* ── Calendar WeekView drop-target highlight ─────────────────────────────── */
 .krnl-calendar-cell[data-drop-target="true"] {
   background: rgba(166, 255, 0, 0.10);
