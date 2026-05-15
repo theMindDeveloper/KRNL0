@@ -81,6 +81,7 @@ export function HabitNode({
   slotTotal = MOTHER_TOTAL,
   onReorderDrop,
   onReorderHover,
+  onReorderEnd,
   slotCentersX,
 }: NodeProps<HabitState, HabitConfig>) {
   const { state, config } = node;
@@ -170,6 +171,7 @@ export function HabitNode({
       width={MOTHER_WIDTH}
       onReorderDrop={onReorderDrop}
       onReorderHover={onReorderHover}
+      onReorderEnd={onReorderEnd}
       slotCentersX={slotCentersX}
     >
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, flex: 1 }}>
