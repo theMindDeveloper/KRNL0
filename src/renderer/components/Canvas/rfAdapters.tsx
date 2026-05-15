@@ -55,7 +55,7 @@ const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = 
   'terminal':    { width: 440, height: 440 },
   'calendar':    { width: 440, height: 440 },
   'clock':       { width: 440, height: 440 },
-  'habit.lane':  { width: 200, height: 120 },
+  'habit.lane':  { width: 280, height: 170 },
   'text':        { width: 260, height: 120 },
   'image':       { width: 240, height: 180 },
 };
