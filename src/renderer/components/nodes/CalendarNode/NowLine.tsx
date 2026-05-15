@@ -58,12 +58,17 @@ export function NowLine({
   const hoursFromStart = currentHour - hourRange.start + currentMinute / 60;
   const yPos = hoursFromStart * rowHeight;
 
-  // X span: from start of gutter to end of all 7 columns.
-  const lineLeft = gutterWidth;
-  const lineWidth = columnWidth * 7;
-
-  // X position of the dot: left edge of today's column + half-column.
-  const dotLeft = gutterWidth + todayColumnIndex * columnWidth + columnWidth / 2 - 2;
+  // X span: anchored to the parent container's full width via left:gutter +
+  // right:0 so the bar always reaches the right edge of the day-cols area
+  // regardless of how the columns flex out (previous fixed `width:
+  // columnWidth*7` ended mid-week because columnWidth was a nominal 40px
+  // while real columns were ~80px each).
+  // Dot position uses a percentage across the 7-column area so it lands at
+  // today's column center for any column width.
+  const dotLeftPct = ((todayColumnIndex + 0.5) * 100) / 7;
+  // Silence unused-param ESLint warning — columnWidth is no longer needed
+  // but kept on the props interface for back-compat with callers.
+  void columnWidth;
 
   return (
     <div
@@ -83,8 +88,8 @@ export function NowLine({
         style={{
           position: 'absolute',
           top: 0,
-          left: lineLeft,
-          width: lineWidth,
+          left: gutterWidth,
+          right: 0,
           height: 1,
           background: '#ef4444',
           boxShadow: '0 0 4px rgba(239, 68, 68, 0.7)',
@@ -96,7 +101,7 @@ export function NowLine({
         style={{
           position: 'absolute',
           top: -2,
-          left: dotLeft,
+          left: `calc(${gutterWidth}px + ${dotLeftPct}% - 2px)`,
           width: 5,
           height: 5,
           borderRadius: '50%',

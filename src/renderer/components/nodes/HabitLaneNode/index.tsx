@@ -165,6 +165,10 @@ export function HabitLaneNode({
         boxShadow: 'var(--shadow-1)',
         overflow: 'hidden',
         position: 'relative',
+        // Scope repaints to this card subtree so the 7-day strip and inner
+        // elements don't bleed into surrounding layers during canvas pan.
+        // 'style' excluded to preserve var(--habit-color) inheritance below.
+        contain: 'layout paint',
         ['--habit-color' as string]: `var(--${color})`,
       } as React.CSSProperties}
     >
