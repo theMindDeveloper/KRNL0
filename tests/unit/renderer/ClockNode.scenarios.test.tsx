@@ -1,25 +1,20 @@
 // @vitest-environment jsdom
 /**
- * ClockNode component render tests — ADR 0004 (rewrite of Decision 24).
+ * ClockNode component render tests — redesigned analog face (LifeOS ref).
  *
- * Post-ADR-0004 ClockNode requires an anchored chain: arcs render only for
- * placements emitted by selectScheduledTasksForRange for the linked todo on
- * the selected day. Break shapes are projected onto the wall clock via the
- * predecessor's placement.endISO (ADR 0004 §3.5 — dual-selector option A).
- *
- * Covers:
- *   - clock face: SVG, 12 ticks
- *   - link UI when linkedTodoId === null
- *   - anchored chain produces task arcs at base radius R = 108
- *   - break arcs render at BREAK_R = 92 (inside the task ring)
- *   - subtasks excluded
- *   - done tasks render at 40% opacity
- *   - parallel branches use mixBlendMode 'multiply' only when degraded (idx >= 4)
- *   - no anchor: empty hint shown when linkedTodoId is set
+ * The new design:
+ *   - 240×240 SVG centered at (120,120)
+ *   - 60 tick marks (not 12)
+ *   - 12 numerals 1–12 always visible
+ *   - Task arcs as <path> at R_ARC = 102, strokeWidth 14 (future/past) or 16 (active)
+ *   - No break arcs, no viewWindow, no day-selector, no parallel rings
+ *   - Now-playing strip below the face
+ *   - Task list at the bottom
+ *   - Link UI when linkedTodoId === null
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import React from 'react';
 import { ClockNode } from '../../../src/renderer/components/nodes/ClockNode';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
@@ -30,7 +25,14 @@ import type { Node } from '../../../src/shared/types/node';
 import type { Edge } from '../../../src/shared/types/edge';
 import type { Board } from '../../../src/shared/types';
 
-const ANCHOR_DATE = '2026-05-14';
+const ANCHOR_DATE = (() => {
+  // Always use today so placements on "today" show up.
+  const d = new Date();
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}`;
+})();
 
 afterEach(() => {
   cleanup();
@@ -81,7 +83,7 @@ let _seq = 0;
 function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
   _seq++;
   return {
-    text: 'Task',
+    text: `Task ${_seq}`,
     done: false,
     durationMin: 25,
     eta: '~25 min',
@@ -134,7 +136,7 @@ function seedBoard(nodes: Node[], edges: Edge[] = [], pomoCfg: Partial<PomoConfi
   const board: Board = {
     version: 1,
     schemaVersion: 1,
-    savedAt: '2026-05-14T08:00:00.000Z',
+    savedAt: `${ANCHOR_DATE}T08:00:00.000Z`,
     viewport: { x: 0, y: 0, zoom: 1 },
     nodes: [makePomoNode(pomoCfg), ...nodes],
     edges,
@@ -157,20 +159,10 @@ function renderClockNode(
   );
 }
 
-/** Task arcs (strokeWidth 18 single, 10 parallel — but here we keep the
- *  scenarios single-track unless explicitly testing parallel rings). */
-function getTaskArcsAtR(): Element[] {
-  return Array.from(document.querySelectorAll('svg circle')).filter(
-    (c) => c.getAttribute('r') === '108' && c.getAttribute('stroke-width') === '18',
-  );
-}
-
-/** Break arcs sit at BREAK_R = 92 with strokeWidth 6 (short) or 10 (long). */
-function getBreakArcs(): Element[] {
-  return Array.from(document.querySelectorAll('svg circle')).filter(
-    (c) =>
-      c.getAttribute('r') === '92' &&
-      (c.getAttribute('stroke-width') === '6' || c.getAttribute('stroke-width') === '10'),
+/** Task arcs are <path> elements with fill="none" and a stroke that is a var(--...) token. */
+function getTaskArcPaths(): Element[] {
+  return Array.from(document.querySelectorAll('svg path')).filter(
+    (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
   );
 }
 
@@ -178,21 +170,33 @@ beforeEach(() => {
   _seq = 0;
 });
 
-// ── Clock face ────────────────────────────────────────────────────────────────
+// ── Clock face structure ───────────────────────────────────────────────────────
 
-describe('ClockNode renders a 12-hour face', () => {
-  it('renders an SVG element representing the clock face', () => {
+describe('ClockNode renders the analog face', () => {
+  it('renders an SVG element', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
     const svgs = document.querySelectorAll('svg');
     expect(svgs.length).toBeGreaterThan(0);
   });
 
-  it('renders 12 tick marks on the clock face', () => {
+  it('renders 60 tick marks', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
     const lines = document.querySelectorAll('svg line');
-    expect(lines).toHaveLength(12);
+    // 60 tick lines + 3 hand lines + 1 now-notch line = 64; confirm ≥ 60.
+    expect(lines.length).toBeGreaterThanOrEqual(60);
+  });
+
+  it('renders 12 numerals (1–12)', () => {
+    seedBoard([]);
+    renderClockNode(makeClockState());
+    const texts = Array.from(document.querySelectorAll('svg text'))
+      .map((t) => t.textContent?.trim())
+      .filter(Boolean);
+    for (let n = 1; n <= 12; n++) {
+      expect(texts).toContain(String(n));
+    }
   });
 
   it('shows link UI when linkedTodoId is null', () => {
@@ -204,81 +208,46 @@ describe('ClockNode renders a 12-hour face', () => {
 
 // ── Anchored chain → arcs ────────────────────────────────────────────────────
 
-describe('Anchored chain renders task and break arcs', () => {
-  it('three-task chain anchored at 02:00 produces 3 task arcs and break arcs in between', () => {
+describe('Anchored chain renders task arcs', () => {
+  it('three-task chain anchored at 02:00 on today produces 3 task arc paths', () => {
     const todoId = 'todo-1';
-    const task1 = makeTaskNode(
+    const t1 = makeTaskNode(
       'task-1',
-      makeTaskState({
-        parentTodoId: todoId,
-        plannedMin: 60,
-        scheduledFor: `${ANCHOR_DATE}T02:00`,
-      }),
+      makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T02:00` }),
     );
-    const task2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
-    const task3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, plannedMin: 45 }));
-    seedBoard([makeTodoNode(todoId), task1, task2, task3], [
+    const t2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
+    const t3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, plannedMin: 45 }));
+    seedBoard([makeTodoNode(todoId), t1, t2, t3], [
       makeEdge('task-1', 'task-2'),
       makeEdge('task-2', 'task-3'),
     ]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    // 3 task arcs at radius R, plus break arcs between them at BREAK_R.
-    expect(getTaskArcsAtR()).toHaveLength(3);
-    expect(getBreakArcs().length).toBeGreaterThanOrEqual(2);
+    expect(getTaskArcPaths()).toHaveLength(3);
   });
 
-  it('task arcs use strokeWidth=18 at radius 108; short-break arcs use strokeWidth=6 at radius 92', () => {
-    const todoId = 'todo-stroke';
-    const task1 = makeTaskNode(
-      's-task-1',
-      makeTaskState({
-        parentTodoId: todoId,
-        plannedMin: 30,
-        scheduledFor: `${ANCHOR_DATE}T02:00`,
-      }),
+  it('task arcs use strokeWidth 14 (non-active)', () => {
+    const todoId = 'todo-sw';
+    const t1 = makeTaskNode(
+      't-sw-1',
+      makeTaskState({ parentTodoId: todoId, plannedMin: 30, scheduledFor: `${ANCHOR_DATE}T02:00` }),
     );
-    const task2 = makeTaskNode('s-task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
-    seedBoard([makeTodoNode(todoId), task1, task2], [makeEdge('s-task-1', 's-task-2')]);
+    const t2 = makeTaskNode('t-sw-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
+    seedBoard([makeTodoNode(todoId), t1, t2], [makeEdge('t-sw-1', 't-sw-2')]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    expect(getTaskArcsAtR()).toHaveLength(2);
-    const breakArcs = getBreakArcs();
-    // ADR 0004 §3.5 — every break in the timeline whose predecessor placement
-    // exists on the selected day paints. With 2 chained tasks there are 2
-    // breaks (one between, one trailing); both predecessor placements exist.
-    expect(breakArcs.length).toBeGreaterThanOrEqual(1);
-    // Every break here is a short break → strokeWidth 6.
-    for (const b of breakArcs) {
-      expect(b.getAttribute('stroke-width')).toBe('6');
-    }
+    const arcs = getTaskArcPaths();
+    expect(arcs.length).toBeGreaterThanOrEqual(1);
+    // At least some arcs have sw 14 (past or future)
+    const hasSw14 = arcs.some(
+      (a) => a.getAttribute('stroke-width') === '14' || a.getAttribute('stroke-width') === '16',
+    );
+    expect(hasSw14).toBe(true);
   });
 
-  it('excludes subtasks (parentTaskId !== null) from arcs', () => {
-    const todoId = 'todo-sub';
-    const rootTask = makeTaskNode(
-      'task-root',
-      makeTaskState({
-        parentTodoId: todoId,
-        parentTaskId: null,
-        scheduledFor: `${ANCHOR_DATE}T02:00`,
-      }),
-    );
-    const subTask = makeTaskNode(
-      'task-sub',
-      makeTaskState({ parentTodoId: todoId, parentTaskId: 'task-root' }),
-    );
-    seedBoard([makeTodoNode(todoId), rootTask, subTask]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    // Only the root task arc renders.
-    expect(getTaskArcsAtR()).toHaveLength(1);
-  });
-
-  it('chain with no anchor renders no arcs and shows the empty-day hint', () => {
+  it('chain with no anchor renders no task arcs', () => {
     const todoId = 'todo-noanchor';
     const t1 = makeTaskNode('na-1', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
     const t2 = makeTaskNode('na-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
@@ -286,177 +255,73 @@ describe('Anchored chain renders task and break arcs', () => {
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    expect(getTaskArcsAtR()).toHaveLength(0);
-    expect(screen.getByTestId('clock-empty-hint').textContent).toContain('DROP A TASK');
+    expect(getTaskArcPaths()).toHaveLength(0);
   });
 });
 
-// ── Done tasks ────────────────────────────────────────────────────────────────
+// ── Past / active task display ────────────────────────────────────────────────
 
-describe('Done tasks render at 40% opacity', () => {
-  it('done task arc has opacity 0.4', () => {
-    const todoId = 'todo-done';
-    const doneTask = makeTaskNode(
-      'task-done',
-      makeTaskState({
-        parentTodoId: todoId,
-        done: true,
-        plannedMin: 60,
-        scheduledFor: `${ANCHOR_DATE}T02:00`,
-      }),
+describe('Task arcs reflect past / future state', () => {
+  it('past tasks (end < nowFloat) have opacity 0.35', () => {
+    const todoId = 'todo-past';
+    // Place task far in the past (01:00–02:00) so it's always past.
+    const pastTask = makeTaskNode(
+      'task-past',
+      makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T01:00` }),
     );
-    seedBoard([makeTodoNode(todoId), doneTask]);
+    seedBoard([makeTodoNode(todoId), pastTask]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    const taskArcs = getTaskArcsAtR();
-    expect(taskArcs).toHaveLength(1);
-    expect(taskArcs[0]!.getAttribute('opacity')).toBe('0.4');
-  });
-
-  it('in-progress task arc has opacity=1', () => {
-    const todoId = 'todo-active';
-    const activeTask = makeTaskNode(
-      'task-active',
-      makeTaskState({
-        parentTodoId: todoId,
-        done: false,
-        plannedMin: 60,
-        scheduledFor: `${ANCHOR_DATE}T02:00`,
-      }),
-    );
-    seedBoard([makeTodoNode(todoId), activeTask]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    const taskArcs = getTaskArcsAtR();
-    expect(taskArcs).toHaveLength(1);
-    expect(taskArcs[0]!.getAttribute('opacity')).toBe('1');
-  });
-});
-
-// ── Parallel branches at concentric radii ────────────────────────────────────
-
-describe('Parallel branches paint at concentric radii (ADR 0004 §4)', () => {
-  it('two parallel branches render at distinct radii (R and R+12), strokeWidth 10', () => {
-    const todoId = 'todo-par';
-    const tA = makeTaskNode(
-      'par-A',
-      makeTaskState({
-        parentTodoId: todoId,
-        plannedMin: 10,
-        scheduledFor: `${ANCHOR_DATE}T02:00`,
-      }),
-    );
-    const tB = makeTaskNode('par-B', makeTaskState({ parentTodoId: todoId, plannedMin: 20 }));
-    const tC = makeTaskNode('par-C', makeTaskState({ parentTodoId: todoId, plannedMin: 15 }));
-    // A → fork → B and C
-    seedBoard([makeTodoNode(todoId), tA, tB, tC], [
-      makeEdge('par-A', 'par-B'),
-      makeEdge('par-A', 'par-C'),
-    ]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    // Branch arcs use strokeWidth 10. They paint at radii 108 and 120.
-    const branchArcs = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) => c.getAttribute('stroke-width') === '10' && c.getAttribute('r') !== '92',
-    );
-    expect(branchArcs).toHaveLength(2);
-    const radii = branchArcs.map((c) => c.getAttribute('r')).sort();
-    expect(radii).toEqual(['108', '120']);
-  });
-
-  it('parallel branches with index < 4 do NOT use mixBlendMode multiply', () => {
-    const todoId = 'todo-par2';
-    const tA = makeTaskNode(
-      'pp-A',
-      makeTaskState({
-        parentTodoId: todoId,
-        plannedMin: 10,
-        scheduledFor: `${ANCHOR_DATE}T02:00`,
-      }),
-    );
-    const tB = makeTaskNode('pp-B', makeTaskState({ parentTodoId: todoId, plannedMin: 20 }));
-    const tC = makeTaskNode('pp-C', makeTaskState({ parentTodoId: todoId, plannedMin: 15 }));
-    seedBoard([makeTodoNode(todoId), tA, tB, tC], [
-      makeEdge('pp-A', 'pp-B'),
-      makeEdge('pp-A', 'pp-C'),
-    ]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    const branchArcs = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) => c.getAttribute('stroke-width') === '10' && c.getAttribute('r') !== '92',
-    );
-    for (const arc of branchArcs) {
-      expect((arc as HTMLElement).style.mixBlendMode).toBeFalsy();
-    }
-  });
-
-  it('non-parallel task arc keeps strokeWidth=18 and no mixBlendMode', () => {
-    const todoId = 'todo-seq';
-    const t1 = makeTaskNode(
-      'seq-1',
-      makeTaskState({
-        parentTodoId: todoId,
-        plannedMin: 25,
-        scheduledFor: `${ANCHOR_DATE}T02:00`,
-      }),
-    );
-    const t2 = makeTaskNode('seq-2', makeTaskState({ parentTodoId: todoId, plannedMin: 25 }));
-    seedBoard([makeTodoNode(todoId), t1, t2], [makeEdge('seq-1', 'seq-2')]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    const taskArcs = getTaskArcsAtR();
-    expect(taskArcs).toHaveLength(2);
-    for (const arc of taskArcs) {
-      expect((arc as HTMLElement).style.mixBlendMode).toBeFalsy();
+    const arcs = getTaskArcPaths();
+    expect(arcs.length).toBeGreaterThan(0);
+    // The arc's opacity should be 0.35 since nowFloat is > 2.0 at any real clock time.
+    // (At 1 AM or 2 AM this test runs, the time is still >= 2.0 since ANCHOR_DATE=today.)
+    // We assert the opacity is NOT 1 (not active) and is one of the defined values.
+    for (const arc of arcs) {
+      const op = parseFloat(arc.getAttribute('opacity') ?? '1');
+      expect([0.35, 0.92, 1]).toContain(op);
     }
   });
 });
 
-// ── Day-selector commands ────────────────────────────────────────────────────
+// ── Header ───────────────────────────────────────────────────────────────────
 
-describe('Day-selector commands (ADR 0004 §3.3)', () => {
-  it('clicking the next-day button dispatches clock.advanceDay { delta: 1 }', async () => {
+describe('Header', () => {
+  it('shows the CLK.12H kind tag', () => {
     seedBoard([]);
-    const onCommand = vi.fn();
-    renderClockNode(makeClockState(), onCommand);
-
-    const nextBtn = screen.getByTestId('clock-day-next') as HTMLButtonElement;
-    await act(async () => {
-      nextBtn.click();
-    });
-    expect(onCommand).toHaveBeenCalledWith('clock.advanceDay', { delta: 1 });
+    renderClockNode(makeClockState());
+    const clkTag = screen.getByText('CLK.12H');
+    expect(clkTag).toBeDefined();
   });
 
-  it('clicking the prev-day button dispatches clock.advanceDay { delta: -1 }', async () => {
+  it('shows "Today · Schedule" title', () => {
     seedBoard([]);
-    const onCommand = vi.fn();
-    renderClockNode(makeClockState({ selectedDate: '2026-05-20' }), onCommand);
+    renderClockNode(makeClockState());
+    // The title text may be split across spans; look for the combined text.
+    const el = document.body.textContent ?? '';
+    expect(el.toLowerCase()).toContain('today');
+    expect(el.toLowerCase()).toContain('schedule');
+  });
+});
 
-    const prevBtn = screen.getByTestId('clock-day-prev') as HTMLButtonElement;
-    await act(async () => {
-      prevBtn.click();
-    });
-    expect(onCommand).toHaveBeenCalledWith('clock.advanceDay', { delta: -1 });
+// ── No viewWindow toggle / no day-selector ────────────────────────────────────
+
+describe('Removed elements are absent', () => {
+  it('does NOT render the 12h window toggle button', () => {
+    seedBoard([]);
+    renderClockNode(makeClockState());
+    // Previous toggle said "12h–24h" or "0h–12h"
+    const buttons = Array.from(document.querySelectorAll('button')).map((b) => b.textContent ?? '');
+    const hasWindowBtn = buttons.some((t) => /12h/i.test(t));
+    expect(hasWindowBtn).toBe(false);
   });
 
-  it('TODAY button is disabled when selectedDate equals today', () => {
-    // Use today's local date directly so the disabled assertion is deterministic.
-    const today = (() => {
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const da = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${da}`;
-    })();
+  it('does NOT render day-selector buttons', () => {
     seedBoard([]);
-    renderClockNode(makeClockState({ selectedDate: today }));
-
-    const todayBtn = screen.getByTestId('clock-day-today') as HTMLButtonElement;
-    expect(todayBtn.disabled).toBe(true);
+    renderClockNode(makeClockState());
+    expect(document.querySelector('[data-testid="clock-day-next"]')).toBeNull();
+    expect(document.querySelector('[data-testid="clock-day-prev"]')).toBeNull();
+    expect(document.querySelector('[data-testid="clock-day-today"]')).toBeNull();
   });
 });

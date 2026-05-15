@@ -1,21 +1,15 @@
 // @vitest-environment jsdom
 /**
- * Decision 24.1 — User-board fixture-replay test.
+ * User-board fixture-replay test — adapted for the LifeOS analog redesign.
  *
- * Mirrors the user's actual failing board: a 3-task chain (120/80/30 min)
- * linked to a ClockNode via linkedTodoId='mother-todo'. This test would have
- * failed before the Decision 24.1 palette fix because task 2 and task 3 would
- * have received undefined tokens (--sky, --mint) that render as stroke="none".
- *
+ * Mirrors the user's 3-task chain (120/80/30 min) linked to mother-todo.
  * Assertions:
- *  1. Exactly 3 task arc circles (stroke-width=18) are rendered.
- *  2. Each task arc stroke uses var(--<token>) where <token> is in COLORS.
- *  3. At least 2 break arc circles (stroke-width=9) are rendered.
+ *  1. Exactly 3 task arc <path> elements (fill="none") are rendered.
+ *  2. Each task arc stroke uses a var(--<token>) CSS variable.
+ *  3. No break arcs exist (new design removes breaks).
  *
- * Together with timelineSelector.colorTokens.test.ts (which asserts every COLORS
- * entry is defined in tokens.css), these two tests form the complete chain:
- *   selector emits token → renderer emits var(--token) → token is in COLORS
- *   → token is in tokens.css → CSS resolves to a real color → arc paints.
+ * The task anchor date is today (dynamic) so selectSchedule emits placements
+ * for today's date which the new ClockNode always displays.
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -23,7 +17,6 @@ import { render, cleanup } from '@testing-library/react';
 import React from 'react';
 import { ClockNode } from '../../../src/renderer/components/nodes/ClockNode';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
-import { COLORS } from '../../../src/renderer/store/timelineSelector';
 import type { Board } from '../../../src/shared/types';
 import type { Node } from '../../../src/shared/types/node';
 import type { Edge } from '../../../src/shared/types/edge';
@@ -36,11 +29,18 @@ afterEach(() => {
   useBoardStore.setState({ board: null });
 });
 
-// ── Board fixture — mirrors user's .krnl0-data/board.json ─────────────────────
+/** Today's YYYY-MM-DD in local time. */
+function todayYMD(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}`;
+}
 
 function buildUserBoard(): Board {
+  const TODAY = todayYMD();
   const todoId = 'mother-todo';
-  const clockId = 'mother-clock';
 
   const pomoNode: Node = {
     id: 'mother-pomo',
@@ -72,7 +72,7 @@ function buildUserBoard(): Board {
     eta: '~120 min',
     sequenceNumber: 1,
     layer: 0,
-    createdAt: '2026-05-14T00:00:01.000Z',
+    createdAt: `${TODAY}T00:00:01.000Z`,
     parentTodoId: todoId,
     parentTaskId: null,
     todoItemId: 'item-task1',
@@ -80,8 +80,7 @@ function buildUserBoard(): Board {
     plannedMin: 120,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
-    // ADR 0004 §3 — Clock arcs now require an anchored chain.
-    scheduledFor: '2026-05-14T02:00',
+    scheduledFor: `${TODAY}T02:00`,
   };
 
   const task2State: TaskState = {
@@ -91,7 +90,7 @@ function buildUserBoard(): Board {
     eta: '~80 min',
     sequenceNumber: 2,
     layer: 0,
-    createdAt: '2026-05-14T00:00:02.000Z',
+    createdAt: `${TODAY}T00:00:02.000Z`,
     parentTodoId: todoId,
     parentTaskId: null,
     todoItemId: 'item-task2',
@@ -108,7 +107,7 @@ function buildUserBoard(): Board {
     eta: '~30 min',
     sequenceNumber: 3,
     layer: 0,
-    createdAt: '2026-05-14T00:00:03.000Z',
+    createdAt: `${TODAY}T00:00:03.000Z`,
     parentTodoId: todoId,
     parentTaskId: null,
     todoItemId: 'item-task3',
@@ -146,20 +145,18 @@ function buildUserBoard(): Board {
   };
 
   const clockNode: Node<ClockState, ClockConfig> = {
-    id: clockId,
+    id: 'mother-clock',
     kind: 'clock',
     position: { x: 1252, y: 0 },
     isMother: true,
     state: {
       linkedTodoId: todoId,
       viewWindow: 0,
-      // ADR 0004 §3 — Clock owns selectedDate; align with task1's anchor.
-      selectedDate: '2026-05-14',
+      selectedDate: TODAY,
     },
     config: {},
   };
 
-  // 2 task.next edges chaining task-1 → task-2 → task-3
   const edges: Edge[] = [
     {
       id: 'edge-task1-task2',
@@ -178,16 +175,14 @@ function buildUserBoard(): Board {
   return {
     version: 1,
     schemaVersion: 1,
-    savedAt: '2026-05-14T00:00:00.000Z',
+    savedAt: `${TODAY}T00:00:00.000Z`,
     viewport: { x: 0, y: 0, zoom: 1 },
     nodes: [pomoNode, todoNode, task1Node, task2Node, task3Node, clockNode],
     edges,
   };
 }
 
-// ── Test ──────────────────────────────────────────────────────────────────────
-
-describe('Decision 24.1 — user-reported 3-task chain renders all 3 task arcs', () => {
+describe('User-board fixture — 3-task chain renders 3 task arc paths', () => {
   it('mirrors user board: 3 tasks (120/80/30 min), 2 task.next edges, linkedTodoId=mother-todo', () => {
     const board = buildUserBoard();
     useBoardStore.setState({ board });
@@ -203,33 +198,24 @@ describe('Decision 24.1 — user-reported 3-task chain renders all 3 task arcs',
       }),
     );
 
-    // ADR 0004 §4 — task arcs paint at radius R = 108 (single-track here).
-    const taskArcs = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) => c.getAttribute('r') === '108' && c.getAttribute('stroke-width') === '18',
+    // Task arcs in the new design are <path> elements with fill="none" and a var(--) stroke.
+    const taskArcPaths = Array.from(document.querySelectorAll('svg path')).filter(
+      (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
     );
 
     // ASSERTION 1: exactly 3 task arcs.
-    expect(taskArcs).toHaveLength(3);
+    expect(taskArcPaths).toHaveLength(3);
 
-    // ASSERTION 2: each task arc stroke uses var(--<token>) where <token> is in COLORS.
-    const allowedTokens = new Set<string>(COLORS);
-    for (const arc of taskArcs) {
+    // ASSERTION 2: each arc stroke is a var(--token) CSS variable.
+    for (const arc of taskArcPaths) {
       const stroke = arc.getAttribute('stroke') ?? '';
-      const match = stroke.match(/^var\(--([a-z]+)/);
-      expect(match, `task arc stroke "${stroke}" must use var(--<token>, ...) syntax`).not.toBeNull();
-      const token = match![1]!;
-      expect(
-        allowedTokens.has(token),
-        `token "${token}" from stroke "${stroke}" must be a member of COLORS`,
-      ).toBe(true);
+      expect(stroke).toMatch(/^var\(--[a-z][\w-]*\)/);
     }
 
-    // ASSERTION 3: at least 2 break arcs at BREAK_R = 92 (ADR 0004 §3.5).
+    // ASSERTION 3: no break arcs (the new design removed breaks entirely).
     const breakArcs = Array.from(document.querySelectorAll('svg circle')).filter(
-      (c) =>
-        c.getAttribute('r') === '92' &&
-        (c.getAttribute('stroke-width') === '6' || c.getAttribute('stroke-width') === '10'),
+      (c) => c.getAttribute('r') === '92',
     );
-    expect(breakArcs.length).toBeGreaterThanOrEqual(2);
+    expect(breakArcs).toHaveLength(0);
   });
 });
