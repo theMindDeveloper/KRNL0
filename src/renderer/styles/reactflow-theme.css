@@ -54,6 +54,11 @@
     0 18px 40px rgba(0, 0, 0, 0.35) !important;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
+/* Wave-B — fade the "↘ drop on a calendar day" drop-hint into view only
+   when the lane is being dragged. */
+.react-flow__node.dragging.krnl-kind-habit--lane .habit-lane-drophint {
+  opacity: 1 !important;
+}
 
 /* Hide React Flow's group-selection bounding box. The user-facing selection
    indicator is the per-node ring; the wrapping rect just adds visual noise

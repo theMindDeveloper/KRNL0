@@ -746,12 +746,26 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       proOptions={{ hideAttribution: true }}
       style={{ background: 'var(--paper)' }}
     >
-      {/* Dotted grid background — replaces the radial gradient from Canvas */}
+      {/* Wave-B (LifeOS UI refresh) — dual-density dot grid mirroring the
+          source: 160 px major dots layered over 32 px minor dots so pan/zoom
+          gets a visible coarse rhythm and a fine rhythm at the same time.
+          The major layer renders FIRST (under the minor layer) so the
+          smaller dots punch through visually. */}
       <Background
+        id="krnl-grid-major"
+        variant={BackgroundVariant.Dots}
+        gap={160}
+        size={3}
+        color="var(--grid-strong)"
+        offset={0}
+      />
+      <Background
+        id="krnl-grid-minor"
         variant={BackgroundVariant.Dots}
         gap={32}
-        size={1.5}
-        color="var(--grid-strong)"
+        size={1.2}
+        color="var(--grid)"
+        offset={0}
       />
 
       {/* Controls — zoom in/out, fit view */}
