@@ -13,6 +13,7 @@ import { useEffect, Component, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
 import { Orb } from './components/Orb';
+import { AmbientRadio } from './components/AmbientRadio';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
 import { useBoardStore } from './store/boardStore';
@@ -115,6 +116,7 @@ export function App() {
           <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
             <Canvas />
             <Orb />
+            <AmbientRadio />
           </div>
           <StatusBar />
           <RadialChooserHost />

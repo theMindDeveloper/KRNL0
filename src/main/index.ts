@@ -40,6 +40,7 @@ function createWindow(): BrowserWindow {
     width: 1440,
     height: 900,
     backgroundColor: '#0e0d0b',
+    icon: join(__dirname, '../../build/icon.png'),
     titleBarStyle: 'hidden',
     titleBarOverlay: {
       color: '#1a1814',
