@@ -21,6 +21,7 @@ interface Props {
   // Reorder callbacks from CanvasFlow
   onReorderDrop?: ((fromSlotIndex: number, toSlotIndex: number) => void) | undefined;
   onReorderHover?: ((candidateSlotIndex: number) => void) | undefined;
+  onReorderEnd?: (() => void) | undefined;
   // Slot x-centers in flow coords (sorted by slot order) for candidate detection.
   slotCentersX?: readonly number[] | undefined;
 }
@@ -45,6 +46,7 @@ export function MotherFrame({
   minHeight = MOTHER_HEIGHT,
   onReorderDrop,
   onReorderHover,
+  onReorderEnd,
   slotCentersX,
 }: Props) {
   const setHoveredNodeId = useBoardStore((s) => s.setHoveredNodeId);
@@ -57,7 +59,7 @@ export function MotherFrame({
   const [snapping, setSnapping] = useState(false);
   const pointerStartFlowX = useRef<number>(0);
   const candidateSlotRef = useRef<number>(slotIndex - 1); // 0-based
-  const { screenToFlowPosition, getViewport } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
 
   // Convert a candidate 0-based slot index from pointer position in flow coords.
   function findCandidateSlot(flowX: number): number {
@@ -103,9 +105,11 @@ export function MotherFrame({
     if (!dragging) return;
     e.stopPropagation();
 
-    const { zoom } = getViewport();
     const flowCurrent = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    const deltaPx = (flowCurrent.x - pointerStartFlowX.current) * zoom;
+    // Flow coords are pre-scale (the viewport scale(zoom) sits above this div),
+    // so translateX(N flow units) already produces N*zoom screen pixels.
+    // Do NOT multiply by zoom again — that was the doubled-scale bug.
+    const deltaPx = flowCurrent.x - pointerStartFlowX.current;
     setDx(deltaPx);
 
     // Candidate slot: find nearest slot center to the card's current flow center.
@@ -137,6 +141,8 @@ export function MotherFrame({
     if (fromSlot !== toSlot) {
       onReorderDrop?.(fromSlot, toSlot);
     }
+    // Always notify parent that drag ended so it can clear the ghost slot.
+    onReorderEnd?.();
   }
 
   function onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
@@ -146,6 +152,8 @@ export function MotherFrame({
     setSnapping(false);
     setDx(0);
     document.body.classList.remove('krnl-reordering');
+    // Notify parent that drag ended (cancelled) so ghost slot is cleared.
+    onReorderEnd?.();
   }
 
   return (

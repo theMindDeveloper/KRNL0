@@ -13,9 +13,10 @@ export interface NodeProps<TState = unknown, TConfig = unknown> {
   // Slot reorder props — only provided for mother nodes.
   slotIndex?: number | undefined;
   slotTotal?: number | undefined;
-  // Drag-to-reorder: MotherFrame calls these when a reorder gesture completes.
+  // Drag-to-reorder: MotherFrame calls these during and after a reorder gesture.
   onReorderDrop?: (fromSlotIndex: number, toSlotIndex: number) => void;
   onReorderHover?: (candidateSlotIndex: number) => void;
+  onReorderEnd?: () => void;
   // Sorted x-center of each slot in flow coords (for nearest-slot detection).
   slotCentersX?: readonly number[] | undefined;
 }

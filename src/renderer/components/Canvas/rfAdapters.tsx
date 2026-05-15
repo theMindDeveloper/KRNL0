@@ -30,6 +30,7 @@ export interface RFNodeData extends Record<string, unknown> {
   slotTotal?: number | undefined;
   onReorderDrop?: ((fromSlotIndex: number, toSlotIndex: number) => void) | undefined;
   onReorderHover?: ((candidateSlotIndex: number) => void) | undefined;
+  onReorderEnd?: (() => void) | undefined;
   slotCentersX?: readonly number[] | undefined;
 }
 
@@ -72,13 +73,18 @@ export function toRfNode(
     slotTotal?: number | undefined;
     onReorderDrop?: ((fromSlotIndex: number, toSlotIndex: number) => void) | undefined;
     onReorderHover?: ((candidateSlotIndex: number) => void) | undefined;
+    onReorderEnd?: (() => void) | undefined;
     slotCentersX?: readonly number[] | undefined;
   }
 ): KrnlRFNode {
   // Decision 22.2 Fix 5 — add a CSS class keyed on node.kind so the todo-family
   // selection ring can be scoped in reactflow-theme.css without inline style overrides.
   // node.kind may contain "." (e.g. "todo.task") — replace with "--" for a valid class name.
-  const kindClass = `krnl-kind-${node.kind.replace('.', '--')}`;
+  // Add "krnl-mother" class so the body.krnl-reordering slide-animation CSS rule
+  // can target all mother nodes during a reorder gesture.
+  const kindClass = node.isMother
+    ? `krnl-kind-${node.kind.replace('.', '--')} krnl-mother`
+    : `krnl-kind-${node.kind.replace('.', '--')}`;
   const initialDims = INITIAL_DIMS_BY_KIND[node.kind];
   // Prefer state.width/height when the node stores its own size (text, image)
   // so the RF wrapper — and therefore the NodeResizer ring + left/right
@@ -108,6 +114,7 @@ export function toRfNode(
       slotTotal: ctx.slotTotal,
       onReorderDrop: ctx.onReorderDrop,
       onReorderHover: ctx.onReorderHover,
+      onReorderEnd: ctx.onReorderEnd,
       slotCentersX: ctx.slotCentersX,
     },
   };
@@ -166,7 +173,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
 ): ComponentType<RFNodeProps<KrnlRFNode>> {
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
-    const { node, onCommand, onSelect, slotIndex, slotTotal, onReorderDrop, onReorderHover, slotCentersX } = data;
+    const { node, onCommand, onSelect, slotIndex, slotTotal, onReorderDrop, onReorderHover, onReorderEnd, slotCentersX } = data;
     // Mother nodes don't connect — render zero handles. Children get
     // interactive handles so users can wire edges between them.
     const showHandles = !node.isMother;
@@ -189,6 +196,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
           {...(slotTotal !== undefined ? { slotTotal: slotTotal as number } : {})}
           {...(onReorderDrop !== undefined ? { onReorderDrop: onReorderDrop as (fromSlotIndex: number, toSlotIndex: number) => void } : {})}
           {...(onReorderHover !== undefined ? { onReorderHover: onReorderHover as (candidateSlotIndex: number) => void } : {})}
+          {...(onReorderEnd !== undefined ? { onReorderEnd: onReorderEnd as () => void } : {})}
           {...(slotCentersX !== undefined ? { slotCentersX: slotCentersX as readonly number[] } : {})}
         />
         {showHandles && (
