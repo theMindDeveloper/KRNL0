@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol } from 'electron';
+import { app, BrowserWindow, Menu, protocol } from 'electron';
 import { join } from 'path';
 import { mkdirSync, copyFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
@@ -34,10 +34,18 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function createWindow(): BrowserWindow {
+  Menu.setApplicationMenu(null);
+
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
-    backgroundColor: '#f5f1e8', // --paper light
+    backgroundColor: '#0e0d0b',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#1a1814',
+      symbolColor: '#c9f158',
+      height: 44,
+    },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

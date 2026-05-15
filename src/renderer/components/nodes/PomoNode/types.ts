@@ -28,14 +28,14 @@ export interface PomoState {
   pausedElapsedMs: number;
 }
 
-export type TimerFace = 'ring' | 'ascii' | 'lcd' | 'blocks' | 'vapor';
+export type TimerFace = 'ascii' | 'lcd' | 'blocks' | 'vapor';
 
 export interface PomoConfig {
   sessionMin: number;
   shortBreakMin: number;
   longBreakMin: number;
   longBreakEvery: number;
-  /** Timer face variant — defaults to 'ring' if missing (PR4). */
+  /** Timer face variant — defaults to 'vapor' if missing. */
   face?: TimerFace;
 }
 

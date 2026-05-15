@@ -71,7 +71,7 @@
 .react-flow__node.dragging.krnl-kind-habit--lane > div:not(.react-flow__handle) {
   transform: rotate(-1.4deg);
   box-shadow:
-    0 0 0 1.5px var(--acid),
+    0 0 0 1.5px var(--rust),
     0 18px 40px rgba(0, 0, 0, 0.35) !important;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
@@ -132,12 +132,14 @@
    of the node body for non-mother nodes, so `> div:first-of-type` would land
    on the left handle, not the card. Exclude handles with :not(). */
 
-/* Acid ring for mother kinds (pomo / habit / terminal) and habit.lane child. */
+/* Acid ring for pomo / terminal. Rust ring for habit / habit.lane. */
 .react-flow__node.selected.krnl-kind-pomo > div:not(.react-flow__handle),
-.react-flow__node.selected.krnl-kind-habit > div:not(.react-flow__handle),
-.react-flow__node.selected.krnl-kind-terminal > div:not(.react-flow__handle),
-.react-flow__node.selected.krnl-kind-habit--lane > div:not(.react-flow__handle) {
+.react-flow__node.selected.krnl-kind-terminal > div:not(.react-flow__handle) {
   box-shadow: 0 0 0 2px var(--acid), 0 0 16px rgba(201, 241, 88, 0.35) !important;
+}
+.react-flow__node.selected.krnl-kind-habit > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-habit--lane > div:not(.react-flow__handle) {
+  box-shadow: 0 0 0 2px var(--rust), 0 0 16px rgba(200, 85, 61, 0.35) !important;
 }
 
 /* Cyan ring for the Todo mother and Task children. */
