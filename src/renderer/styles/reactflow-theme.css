@@ -96,8 +96,7 @@ body.krnl-reordering .react-flow__node.krnl-mother {
 .react-flow__node:hover > div:not(.react-flow__handle) {
   box-shadow:
     inset 0 0 0 1px rgba(255,255,255,0.12),
-    0 0 14px rgba(255,255,255,0.06),
-    0 2px 8px rgba(0,0,0,0.28) !important;
+    0 0 14px rgba(255,255,255,0.06) !important;
   transition: box-shadow 120ms ease;
 }
 
