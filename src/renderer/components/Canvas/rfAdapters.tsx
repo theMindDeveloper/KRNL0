@@ -26,10 +26,9 @@ export interface RFNodeData extends Record<string, unknown> {
   node: Node;
   onCommand: (command: string, args?: Record<string, unknown>) => void;
   onSelect: () => void;
+  // Slot props are forwarded to mother nodes for the slot-badge label.
   slotIndex?: number | undefined;
   slotTotal?: number | undefined;
-  onMoveLeft?: ((() => void) | undefined);
-  onMoveRight?: ((() => void) | undefined);
 }
 
 // Convenience alias for the full RF node type with our data.
@@ -41,16 +40,23 @@ export type KrnlRFNode = RFNode<RFNodeData>;
 // node that is not initialized") when a freshly-added node is dragged before
 // the ResizeObserver has fired its first measurement. These are approximate
 // — RF replaces them with measured values once the ResizeObserver delivers.
+//
+// Wave C (LifeOS UI refresh) — mother kinds bumped to 500×500 so mothers
+// read as primary canvas anchors against the 220×120 child task cards.
+// Sync point: MOTHER_WIDTH / MOTHER_HEIGHT in
+// src/renderer/components/nodes/MotherFrame/index.tsx + seed positions in
+// src/main/persistence/board.ts. A mismatch makes the RF selection ring
+// sit off the visible card edge — see ADR 0006.
 const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = {
   'todo.task':   { width: 220, height: 120 },
-  'todo':        { width: 380, height: 600 },
-  'pomo':        { width: 380, height: 600 },
-  'ai':          { width: 380, height: 600 },
-  'habit':       { width: 380, height: 600 },
-  'terminal':    { width: 380, height: 600 },
-  'calendar':    { width: 380, height: 600 },
-  'clock':       { width: 380, height: 600 },
-  'habit.lane':  { width: 200, height: 120 },
+  'todo':        { width: 500, height: 500 },
+  'pomo':        { width: 500, height: 500 },
+  'ai':          { width: 500, height: 500 },
+  'habit':       { width: 500, height: 500 },
+  'terminal':    { width: 500, height: 500 },
+  'calendar':    { width: 500, height: 500 },
+  'clock':       { width: 500, height: 500 },
+  'habit.lane':  { width: 280, height: 170 },
   'text':        { width: 260, height: 120 },
   'image':       { width: 240, height: 180 },
 };
@@ -62,14 +68,15 @@ export function toRfNode(
     onSelect: () => void;
     slotIndex?: number | undefined;
     slotTotal?: number | undefined;
-    onMoveLeft?: ((() => void) | undefined);
-    onMoveRight?: ((() => void) | undefined);
   }
 ): KrnlRFNode {
   // Decision 22.2 Fix 5 — add a CSS class keyed on node.kind so the todo-family
   // selection ring can be scoped in reactflow-theme.css without inline style overrides.
   // node.kind may contain "." (e.g. "todo.task") — replace with "--" for a valid class name.
-  const kindClass = `krnl-kind-${node.kind.replace('.', '--')}`;
+  // "krnl-mother" class lets CSS scope rules to mother nodes specifically.
+  const kindClass = node.isMother
+    ? `krnl-kind-${node.kind.replace('.', '--')} krnl-mother`
+    : `krnl-kind-${node.kind.replace('.', '--')}`;
   const initialDims = INITIAL_DIMS_BY_KIND[node.kind];
   // Prefer state.width/height when the node stores its own size (text, image)
   // so the RF wrapper — and therefore the NodeResizer ring + left/right
@@ -97,8 +104,6 @@ export function toRfNode(
       onSelect: ctx.onSelect,
       slotIndex: ctx.slotIndex,
       slotTotal: ctx.slotTotal,
-      onMoveLeft: ctx.onMoveLeft,
-      onMoveRight: ctx.onMoveRight,
     },
   };
 }
@@ -118,10 +123,14 @@ export function toRfEdge(
     source: edge.from.nodeId,
     target: edge.to.nodeId,
     type: isTaskFlow ? 'task-flow' : 'default',
-    // Decision 22.2 Fix 6 — re-enable the dash march for task-flow edges.
-    // The keyframe in reactflow-theme.css is period-matched (22 units) so the
-    // loop is seamless. Default-typed edges remain static.
-    animated: isTaskFlow,
+    // animated:false on task-flow edges so RF does NOT attach its `.animated`
+    // class. RF's default `dashdraw` keyframe sweeps stroke-dashoffset 10 → 0
+    // over 0.5s, which is a 10-unit sweep on our 22-unit `strokeDasharray`
+    // ('14 8'). Mismatched period → visible snap every 0.5s = the stutter
+    // bug. Instead, our period-matched `krnl-task-flow-dash` keyframe in
+    // reactflow-theme.css runs on the task-flow edge path directly (1.6s,
+    // 22 → 0) so the dash march loops seamlessly without RF's interference.
+    animated: false,
     data: { edge },
   };
 }
@@ -152,7 +161,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
 ): ComponentType<RFNodeProps<KrnlRFNode>> {
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
-    const { node, onCommand, onSelect, slotIndex, slotTotal, onMoveLeft, onMoveRight } = data;
+    const { node, onCommand, onSelect, slotIndex, slotTotal } = data;
     // Mother nodes don't connect — render zero handles. Children get
     // interactive handles so users can wire edges between them.
     const showHandles = !node.isMother;
@@ -171,10 +180,8 @@ export function createNodeAdapter<S = unknown, C = unknown>(
           selected={selected === true}
           onCommand={onCommand}
           onSelect={onSelect}
-          slotIndex={slotIndex as number | undefined}
-          slotTotal={slotTotal as number | undefined}
-          onMoveLeft={onMoveLeft as (() => void) | undefined}
-          onMoveRight={onMoveRight as (() => void) | undefined}
+          {...(slotIndex !== undefined ? { slotIndex: slotIndex as number } : {})}
+          {...(slotTotal !== undefined ? { slotTotal: slotTotal as number } : {})}
         />
         {showHandles && (
           <Handle

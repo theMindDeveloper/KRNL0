@@ -10,7 +10,7 @@ import type { ContextMenuItem } from '../../ContextMenu';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 
-export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL, onMoveLeft, onMoveRight }: NodeProps<TodoState, TodoConfig>) {
+export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
   const config = rawConfig ?? defaultTodoConfig();
 
@@ -138,6 +138,22 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const doneBucket = rawItems.filter((i) => i.done);
   const items = [...sortByChain(undoneBucket), ...sortByChain(doneBucket)];
 
+  // PR8 — count items whose scheduled-end has passed and are still undone.
+  // Same isPast rule as the per-row graying below, lifted into a reduce so
+  // we can show an overdue badge in the header. Recomputed on every render
+  // (cheap — items <= ~50 typical) so it updates with the 60s nowMs tick.
+  const overdueCount = items.reduce<number>((acc, item) => {
+    if (item.done) return acc;
+    const sched = item.taskNodeId !== null
+      ? taskScheduledInfo.get(item.taskNodeId)
+      : item.scheduledFor
+        ? { scheduledFor: item.scheduledFor, durationMin: 25 }
+        : undefined;
+    const isPast = sched !== undefined
+      && new Date(sched.scheduledFor).getTime() + sched.durationMin * 60_000 <= nowMs;
+    return isPast ? acc + 1 : acc;
+  }, 0);
+
   const undoneCount = state.items.filter((i) => !i.done).length;
   const hasDone = state.items.some((i) => i.done);
 
@@ -253,7 +269,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   return (
-    <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
+    <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         <div
@@ -273,6 +289,22 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           <span data-testid="todo-header">
             <span style={{ color: 'var(--cyan)' }}>●</span>
             {` Todos (${undoneCount})`}
+            {/* PR8 — overdue count badge in rust. Only visible when at least
+                one undone item's scheduled-end has passed. */}
+            {overdueCount > 0 && (
+              <span
+                data-testid="todo-overdue-badge"
+                style={{
+                  color: 'var(--rust)',
+                  marginLeft: 8,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  letterSpacing: '0.06em',
+                }}
+              >
+                ● {overdueCount} OVERDUE
+              </span>
+            )}
           </span>
           {/* F6: clear done button — visible when ≥1 done item */}
           {hasDone && (
@@ -350,6 +382,23 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   cursor: 'grab',
                 }}
               >
+                {/* PR8 — rust overdue dot. Only on items whose scheduled end
+                    has passed and that are still undone. Sits at the start
+                    of the row so the eye catches it before content. */}
+                {isPast && !item.done && (
+                  <span
+                    aria-label="overdue"
+                    data-testid={`todo-overdue-dot-${item.id}`}
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: '50%',
+                      background: 'var(--rust)',
+                      flexShrink: 0,
+                      boxShadow: '0 0 6px rgba(200, 85, 61, 0.45)',
+                    }}
+                  />
+                )}
                 {/* F3: checkbox — dispatches todo.toggle */}
                 <button
                   type="button"

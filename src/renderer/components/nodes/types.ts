@@ -10,9 +10,8 @@ export interface NodeProps<TState = unknown, TConfig = unknown> {
   onSelect: () => void;
   // Drag is only enabled for child nodes; mothers ignore drag handlers.
   onDragStart?: (e: ReactPointerEvent) => void;
-  // Slot reorder props — only provided for mother nodes.
+  // Slot props — only provided for mother nodes (1-based index, total count).
+  // Used by MotherFrame to render the "01 · spine · 06" badge.
   slotIndex?: number | undefined;
   slotTotal?: number | undefined;
-  onMoveLeft?: ((() => void) | undefined);
-  onMoveRight?: ((() => void) | undefined);
 }

@@ -88,7 +88,10 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
 
   const activeToolBtn: React.CSSProperties = {
     ...btnBase,
-    background: 'var(--ink)',
+    // Hardcode — --ink flips to light in dark mode, which made the active
+    // button render as acid-green on cream (poor contrast). The active
+    // state should always be acid-on-black.
+    background: '#1a1814',
     color: 'var(--acid)',
   };
 

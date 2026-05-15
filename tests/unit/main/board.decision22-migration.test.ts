@@ -268,8 +268,10 @@ describe('Decision 22 — board migration', () => {
     expect(clock).toBeDefined();
     expect(clock!.kind).toBe('clock');
     expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
-    // Position matches NEW_MOTHER_POSITIONS entry for mother-clock (Decision 23.1)
-    expect((clock as { position?: { x: number; y: number } }).position).toMatchObject({ x: 1252, y: 0 });
+    // Position matches NEW_MOTHER_POSITIONS entry for mother-clock — bumped
+    // 1252 → 1300 (PR2.1, 520px spacing for 440-wide mothers) → 1350
+    // (Wave C, 540px spacing for 500-wide mothers).
+    expect((clock as { position?: { x: number; y: number } }).position).toMatchObject({ x: 1350, y: 0 });
   });
 
   it('Decision 23.1: migrateAddClockMother is idempotent — no duplicate mother-clock on double load', () => {
@@ -301,18 +303,19 @@ describe('Decision 22 — board migration', () => {
 
   // ── AC1 — Fresh seed (Decision 23.1) ─────────────────────────────────────────
 
-  it('AC1: seedBoard() produces exactly 6 mothers including mother-clock at (1252, 0)', () => {
+  it('AC1: seedBoard() produces exactly 6 mothers including mother-clock at the canonical x', () => {
     const board = seedBoard();
 
     // Exactly 6 nodes (the 6 permanent mothers)
     expect(board.nodes).toHaveLength(6);
 
-    // mother-clock is in the seed
+    // mother-clock seed x: 1252 (orig) → 1300 (PR2.1, 520px spacing for 440-wide)
+    // → 1350 (Wave C, 540px spacing for 500-wide mothers).
     const clock = (board.nodes as Array<{ id: string; kind: string; position: { x: number; y: number }; isMother: boolean; state: Record<string, unknown>; config: Record<string, unknown> }>)
       .find((n) => n.id === 'mother-clock');
     expect(clock).toBeDefined();
     expect(clock!.kind).toBe('clock');
-    expect(clock!.position).toEqual({ x: 1252, y: 0 });
+    expect(clock!.position).toEqual({ x: 1350, y: 0 });
     expect(clock!.isMother).toBe(true);
     // ADR 0004 §3 — selectedDate defaults to today (local) in the seed.
     expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });

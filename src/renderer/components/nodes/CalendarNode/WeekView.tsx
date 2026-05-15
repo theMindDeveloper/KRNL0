@@ -2,7 +2,7 @@
 // ADR 0002 — Habit drag-to-schedule integration + habit block visualisation.
 // Renders a 7-column × N-row hour grid. Supports drag-to-schedule from TodoNode
 // rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
-// RadialChooser. NowLine is rendered as an overlay.
+// HabitSwapModal. NowLine is rendered as an overlay.
 
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
@@ -15,9 +15,9 @@ import type { CalendarConfig, CalendarState } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
-import { useRadialChooser } from '../../ui/RadialChooser';
-import type { RadialOption } from '../../ui/RadialChooser';
+import { HabitSwapModal } from '../../ui/HabitSwapModal';
 import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
+import { calcStreak } from '../HabitNode/commands';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -148,28 +148,7 @@ interface WeekViewProps {
 const GUTTER_WIDTH = 36; // px — time gutter width
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
 
-// Radial chooser options for habit scheduling (ADR 0002 A1 + A2 binding).
-// Weekly: purple (#a78bfa via --purple), Daily: cyan (#22d3ee via --cyan).
 type HabitScheduleKind = 'weekly' | 'daily';
-
-function makeHabitChooserOptions(): RadialOption<HabitScheduleKind>[] {
-  return [
-    {
-      id: 'weekly',
-      label: 'EVERY WEEK',
-      icon: '↺',
-      color: 'var(--purple)',
-      value: 'weekly',
-    },
-    {
-      id: 'daily',
-      label: 'EVERY DAY',
-      icon: '◉',
-      color: 'var(--cyan)',
-      value: 'daily',
-    },
-  ];
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -337,28 +316,16 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   // Column width fallback for NowLine.
   const NOMINAL_COLUMN_WIDTH = 40;
 
-  // ── RadialChooser for habit drops (ADR 0002 A1) ─────────────────────────────
+  // ── HabitSwapModal for habit drops (ADR 0002 A1) ────────────────────────────
 
-  // dropCellRef captures the exact cell (dayYMD + hour) where the user released
-  // the drag, AND the habit payload at drop time. Both are set ONLY in onDrop.
-  // We snapshot the habit here (not in onPick) because the HTML5 drag sequence
-  // fires `drop` → `dragend`, and `dragend` clears the habitDrag singleton —
-  // so by the time the user clicks a wedge to confirm, getHabitDrag() returns
-  // null. Snapshotting at drop time keeps the payload alive for onPick.
-  const dropCellRef = useRef<{
+  // swapModal: set when a habit is dropped onto a cell; cleared on confirm/cancel.
+  // Snapshots drop context at drop time because `dragend` fires after `drop`
+  // and clears the habitDrag singleton — the payload must be captured here.
+  const [swapModal, setSwapModal] = useState<{
     dayYMD: string;
     hour: number;
     habit: HabitDragPayload;
-  } | null>(null);
-
-  // After the user picks weekly/daily, we hold a prompt for the duration (in
-  // minutes). The prompt is rendered inline at the drop coordinates. On Enter
-  // we dispatch calendar.scheduleHabit; on Escape we cancel.
-  const [durationPrompt, setDurationPrompt] = useState<{
-    kind: HabitScheduleKind;
-    cell: { dayYMD: string; hour: number };
-    habit: HabitDragPayload;
-    origin: { x: number; y: number };
+    isoDow: IsoDow;
   } | null>(null);
 
   const dispatchSchedule = useCallback(
@@ -366,9 +333,9 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       kind: HabitScheduleKind,
       cell: { dayYMD: string; hour: number },
       habit: HabitDragPayload,
+      timeOfDay: string,
       durationMin: number,
     ) => {
-      const timeOfDay = `${String(cell.hour).padStart(2, '0')}:00`;
       const isoDow = ymdToIsoDow(cell.dayYMD);
       const schedule: HabitSchedule =
         kind === 'daily'
@@ -383,34 +350,25 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     [onCommand],
   );
 
-  const chooser = useRadialChooser<HabitScheduleKind>({
-    radius: 88,
-    innerRadius: 24,
-    onPick: useCallback(
-      (kind: HabitScheduleKind) => {
-        const cell = dropCellRef.current;
-        // Clear the cell ref immediately so stale data doesn't leak.
-        dropCellRef.current = null;
-        if (!cell) return;
-        // Compute the chooser origin for the duration prompt — same drop point.
-        // Hand off to the duration prompt instead of dispatching directly.
-        setDurationPrompt({
-          kind,
-          cell: { dayYMD: cell.dayYMD, hour: cell.hour },
-          habit: cell.habit,
-          origin: lastDropOriginRef.current ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-        });
-      },
-      [],
-    ),
-    onCancel: useCallback(() => {
-      dropCellRef.current = null;
-    }, []),
-  });
-
-  // Tracks the most recent drop coordinates so the chooser onPick callback can
-  // position the follow-up duration prompt without re-reading the event.
-  const lastDropOriginRef = useRef<{ x: number; y: number } | null>(null);
+  // Resolve the habit record and mother-node index for the HabitSwapModal header.
+  // Reads directly from store state — no re-render subscription needed since
+  // the modal is only mounted momentarily after a drop.
+  function resolveHabitMeta(
+    habitId: string,
+    habitMotherId: string,
+  ): { habitRecord: Habit | null; habitIndex: number } {
+    const board = useBoardStore.getState().board;
+    if (!board) return { habitRecord: null, habitIndex: 0 };
+    const motherNode = board.nodes.find((n) => n.id === habitMotherId);
+    if (!motherNode || motherNode.kind !== 'habit') return { habitRecord: null, habitIndex: 0 };
+    const habitState = motherNode.state as { habits?: Habit[] };
+    const habits = habitState.habits ?? [];
+    const idx = habits.findIndex((h) => h.id === habitId);
+    return {
+      habitRecord: idx >= 0 ? (habits[idx] ?? null) : null,
+      habitIndex: idx,
+    };
+  }
 
   // ── Drop target handler factory (ADR 0002 A1) ──────────────────────────────
 
@@ -440,20 +398,18 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         e.currentTarget.removeAttribute('data-drop-target');
 
         // A1: habit drop — capture cell context AND habit payload at drop time,
-        // then open chooser. We snapshot the habit here because `dragend` (which
-        // clears the habitDrag singleton) fires AFTER drop but BEFORE the user
-        // can click a wedge to confirm.
+        // then open HabitSwapModal. We snapshot the habit here because `dragend`
+        // (which clears the habitDrag singleton) fires AFTER drop but BEFORE the
+        // user can click a card to confirm.
         if (e.dataTransfer.types.includes('application/krnl-habit')) {
           const habit = getHabitDrag();
           if (!habit) return;
-          dropCellRef.current = { dayYMD, hour, habit };
-          // Remember drop point for the follow-up duration prompt.
-          lastDropOriginRef.current = { x: e.clientX, y: e.clientY };
-          // Open chooser at drop coordinates. onPick reads dropCellRef.
-          chooser.open(
-            { x: e.clientX, y: e.clientY },
-            makeHabitChooserOptions(),
-          );
+          setSwapModal({
+            dayYMD,
+            hour,
+            habit,
+            isoDow: ymdToIsoDow(dayYMD),
+          });
           return;
         }
 
@@ -924,9 +880,43 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             flex: 1,
             display: 'flex',
             position: 'relative',
+            // Force the cols container to the natural content height (24 *
+            // rowHeight) instead of stretching to gridBodyRef's clientHeight.
+            // Without this, the cols container is a flex child of an overflow-
+            // scroll container and align-items:stretch (default) sizes it to
+            // the visible viewport — so day-separator borders only span the
+            // visible portion, terminating at the scrollbar bottom. Hour cells
+            // inside still overflow below (they have explicit rowHeight each),
+            // but separator lines are tied to col height. Setting minHeight
+            // matches scrollHeight and lets the overlay span the full grid.
+            minHeight: rowCount * rowHeight,
           }}
         >
-          {weekDays.map((dayYMD, colIdx) => {
+          {/* Day-separator lines overlay — absolute layer sized to the full
+              content height so the lines never truncate at the scrollbar
+              edge. pointer-events:none so drop handlers underneath still fire.
+              Bug fix 2026-05-15. */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          >
+            {Array.from({ length: 7 }, (_, i) => (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  borderLeft: i > 0 ? '1px solid rgba(154, 145, 128, 0.25)' : undefined,
+                }}
+              />
+            ))}
+          </div>
+          {weekDays.map((dayYMD, _colIdx) => {
             const isToday = dayYMD === today;
             return (
               <div
@@ -936,7 +926,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                   flex: 1,
                   position: 'relative',
                   background: isToday ? 'rgba(201, 241, 88, 0.08)' : 'transparent',
-                  borderLeft: colIdx > 0 ? '1px solid var(--paper-3)' : undefined,
+                  // borderLeft moved to the absolute overlay above so lines
+                  // span the full scroll content, not just clientHeight.
                 }}
               >
                 {/* Hour rows — drop targets (15-min snap computed from mouse Y at drop time) */}
@@ -956,7 +947,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                       style={{
                         height: rowHeight,
                         boxSizing: 'border-box',
-                        borderBottom: '1px solid var(--paper-3)',
+                        borderBottom: '1px solid rgba(154, 145, 128, 0.25)',
                       }}
                     />
                   );
@@ -1143,178 +1134,41 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       );
       })()}
 
-      {/* Duration prompt (ADR 0002 §A3) — appears after the user picks
-          weekly/daily, asking for the habit's duration in minutes. */}
-      {durationPrompt && (
-        <HabitDurationPrompt
-          origin={durationPrompt.origin}
-          accent={durationPrompt.kind === 'daily' ? 'var(--cyan)' : 'var(--purple)'}
-          kindLabel={durationPrompt.kind === 'daily' ? 'EVERY DAY' : 'EVERY WEEK'}
-          onConfirm={(durationMin) => {
-            dispatchSchedule(
-              durationPrompt.kind,
-              durationPrompt.cell,
-              durationPrompt.habit,
-              durationMin,
-            );
-            setDurationPrompt(null);
-          }}
-          onCancel={() => setDurationPrompt(null)}
-        />
-      )}
+      {/* HabitSwapModal — shown after a habit is dropped on a cell.
+          Collects kind, time, and duration in one step. */}
+      {swapModal && (() => {
+        const { habitRecord, habitIndex } = resolveHabitMeta(
+          swapModal.habit.habitId,
+          swapModal.habit.habitMotherId,
+        );
+        const todayStr = todayYMD();
+        const defaultTimeOfDay = `${String(swapModal.hour).padStart(2, '0')}:00`;
+        return (
+          <HabitSwapModal
+            habitName={habitRecord?.name ?? swapModal.habit.name}
+            habitIcon={habitRecord?.icon}
+            habitNumber={habitIndex + 1}
+            streakDays={habitRecord ? calcStreak(habitRecord.log, todayStr) : 0}
+            dropDayYMD={swapModal.dayYMD}
+            isoDow={swapModal.isoDow}
+            defaultTimeOfDay={defaultTimeOfDay}
+            defaultDurationMin={25}
+            onConfirm={(kind, timeOfDay, durationMin) => {
+              const snap = swapModal;
+              setSwapModal(null);
+              dispatchSchedule(
+                kind,
+                { dayYMD: snap.dayYMD, hour: snap.hour },
+                snap.habit,
+                timeOfDay,
+                durationMin,
+              );
+            }}
+            onCancel={() => setSwapModal(null)}
+          />
+        );
+      })()}
     </div>
-  );
-}
-
-// ── HabitDurationPrompt ────────────────────────────────────────────────────────
-// Small inline numeric input rendered at the drop point. Auto-focuses on mount.
-// Enter confirms; Escape or click-outside cancels.
-
-interface HabitDurationPromptProps {
-  origin: { x: number; y: number };
-  accent: string;          // CSS color for ring + button (purple/cyan)
-  kindLabel: string;       // "EVERY DAY" or "EVERY WEEK"
-  onConfirm: (durationMin: number) => void;
-  onCancel: () => void;
-}
-
-function HabitDurationPrompt({ origin, accent, kindLabel, onConfirm, onCancel }: HabitDurationPromptProps) {
-  const [value, setValue] = useState('25');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
-
-  // Cancel on click outside.
-  useEffect(() => {
-    const onDocPointer = (e: PointerEvent) => {
-      const root = rootRef.current;
-      if (!root) return;
-      if (e.target instanceof Node && root.contains(e.target)) return;
-      onCancel();
-    };
-    // Defer one tick so the click that opened the prompt doesn't immediately close it.
-    const id = setTimeout(() => {
-      window.addEventListener('pointerdown', onDocPointer, true);
-    }, 0);
-    return () => {
-      clearTimeout(id);
-      window.removeEventListener('pointerdown', onDocPointer, true);
-    };
-  }, [onCancel]);
-
-  function confirm() {
-    const n = parseInt(value, 10);
-    if (Number.isFinite(n) && n >= 1 && n <= 480) {
-      onConfirm(n);
-    } else {
-      onCancel();
-    }
-  }
-
-  // Width ~150px, height ~56px. Centre on origin.
-  const W = 150;
-  const H = 56;
-  const ox = Number.isFinite(origin.x) ? origin.x : window.innerWidth / 2;
-  const oy = Number.isFinite(origin.y) ? origin.y : window.innerHeight / 2;
-  const left = Math.max(8, Math.min(window.innerWidth - W - 8, ox - W / 2));
-  const top = Math.max(8, Math.min(window.innerHeight - H - 8, oy - H / 2));
-
-  return createPortal(
-    <div
-      ref={rootRef}
-      data-testid="habit-duration-prompt"
-      style={{
-        position: 'fixed',
-        left,
-        top,
-        width: W,
-        height: H,
-        zIndex: 10010,
-        background: 'rgba(20, 18, 16, 0.92)',
-        backdropFilter: 'blur(16px) saturate(160%)',
-        WebkitBackdropFilter: 'blur(16px) saturate(160%)',
-        border: `1.5px solid ${accent}`,
-        borderRadius: 10,
-        boxShadow: `0 8px 24px rgba(0,0,0,0.45), 0 0 12px ${accent}`,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '6px 10px',
-        gap: 2,
-        fontFamily: 'var(--font-mono)',
-      }}
-    >
-      <div
-        style={{
-          fontSize: 8,
-          letterSpacing: '0.10em',
-          color: accent,
-          textTransform: 'uppercase',
-          fontWeight: 700,
-        }}
-      >
-        {kindLabel} · DURATION
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <input
-          ref={inputRef}
-          data-testid="habit-duration-input"
-          type="number"
-          min={1}
-          max={480}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              confirm();
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-              onCancel();
-            }
-          }}
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            color: '#fff',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 18,
-            fontWeight: 700,
-            padding: 0,
-            width: 0, // let flex take over
-            minWidth: 0,
-          }}
-        />
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.06em' }}>
-          MIN
-        </span>
-        <button
-          type="button"
-          data-testid="habit-duration-confirm"
-          onClick={confirm}
-          style={{
-            background: accent,
-            border: 'none',
-            color: '#0e0d0b',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            fontWeight: 700,
-            padding: '2px 8px',
-            borderRadius: 4,
-            cursor: 'pointer',
-            lineHeight: 1.4,
-          }}
-        >
-          OK
-        </button>
-      </div>
-    </div>,
-    document.body,
   );
 }
 

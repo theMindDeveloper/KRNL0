@@ -53,15 +53,21 @@ interface BoardStore {
   viewport: BoardViewport;
   theme: 'light' | 'dark';
   selectedNodeId: string | null;
+  // Transient UI state — which node is currently hovered. Used to bold outgoing
+  // edges from the hovered mother (and any node). Stored as a primitive string
+  // so Zustand's Object.is check stays stable when null→null between renders.
+  hoveredNodeId: string | null;
   history: Board[];
   future: Board[];
   setBoard: (board: Board) => void;
+  setHoveredNodeId: (id: string | null) => void;
   updateNode: (id: string, patch: Partial<Node>, opts?: { skipHistory?: boolean }) => void;
   addNode: (node: Node) => void;
   removeNode: (id: string) => void;
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
   swapMotherSlots: (idA: string, idB: string) => void;
+  reorderMotherSlots: (motherId: string, toSlotIndex: number) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setViewport: (v: BoardViewport) => void;
   panBy: (dx: number, dy: number) => void;
@@ -101,9 +107,11 @@ export const useBoardStore = create<BoardStore>((set) => ({
   viewport: INITIAL_VIEWPORT,
   theme: 'light',
   selectedNodeId: null,
+  hoveredNodeId: null,
   history: [],
   future: [],
   selectNode: (id) => set({ selectedNodeId: id }),
+  setHoveredNodeId: (id) => set({ hoveredNodeId: id }),
 
   setBoard: (board) => set({ board, viewport: board.viewport, history: [], future: [] }),
 
@@ -197,6 +205,46 @@ export const useBoardStore = create<BoardStore>((set) => ({
             if (n.id === idA) return { ...n, position: posB };
             if (n.id === idB) return { ...n, position: posA };
             return n;
+          }),
+        },
+      };
+    }),
+
+  // Drag-to-reorder: move motherId to the given 0-based toSlotIndex, shifting
+  // other mothers to fill the gap. A single position-batch mutation so undo
+  // captures the entire reorder in one history entry.
+  reorderMotherSlots: (motherId, toSlotIndex) =>
+    set((s) => {
+      if (!s.board) return s;
+      const mothers = s.board.nodes
+        .filter((n) => n.isMother)
+        .slice()
+        .sort((a, b) => a.position.x - b.position.x);
+      const fromSlot = mothers.findIndex((n) => n.id === motherId);
+      if (fromSlot === -1 || fromSlot === toSlotIndex) return s;
+
+      // Build new order by removing from old slot and inserting at new slot.
+      const reordered = mothers.slice();
+      const [moved] = reordered.splice(fromSlot, 1);
+      if (!moved) return s;
+      reordered.splice(toSlotIndex, 0, moved);
+
+      // Collect the canonical x positions (sorted order).
+      const slotXs = mothers.map((n) => n.position.x);
+
+      // Map each mother id → its new x-position.
+      const newXByNodeId = new Map<string, number>(
+        reordered.map((n, i) => [n.id, slotXs[i]!])
+      );
+
+      return {
+        ...pushHistory(s),
+        board: {
+          ...s.board,
+          nodes: s.board.nodes.map((n) => {
+            const newX = newXByNodeId.get(n.id);
+            if (newX === undefined) return n;
+            return { ...n, position: { x: newX, y: n.position.y } };
           }),
         },
       };
