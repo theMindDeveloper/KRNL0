@@ -66,7 +66,9 @@ export function StatusBar() {
       data-testid="statusbar"
       style={{
         height: 28,
-        background: 'var(--ink)',
+        /* Hardcoded dark — --ink flips to light in dark mode, which would
+           wash out the bar. The statusbar is always-black by design. */
+        background: '#0c0a08',
         borderTop: '1px solid var(--paper-3)',
         display: 'flex',
         alignItems: 'center',

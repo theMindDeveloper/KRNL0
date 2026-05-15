@@ -443,122 +443,124 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
                 />
               )}
 
-              {/* PR7 — out-of-month cells render no content (day number,
-                  chips, dots all skipped). The cell still occupies its
-                  grid slot so the calendar alignment stays intact. */}
+              {/* PR7.1 — Day number ALWAYS shows (faded for out-of-month,
+                  per the LifeOS reference). Chips and habit dots only
+                  render for current-month cells. */}
+              <div
+                className={isToday ? 'krnl-month-cell__day' : undefined}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  color: isToday
+                    ? '#1a1814'
+                    : inCurrentMonth
+                      ? 'var(--ink-1)'
+                      : 'var(--ink-4)',
+                  opacity: inCurrentMonth ? 1 : 0.35,
+                  textAlign: 'right',
+                  lineHeight: 1,
+                  marginBottom: 2,
+                  position: 'relative',
+                  zIndex: 1,
+                  fontWeight: isToday ? 600 : 400,
+                }}
+              >
+                {dayNum}
+              </div>
+
+              {/* Task chips — current month only */}
               {inCurrentMonth && (
-                <>
-                  {/* Date number — top-right */}
-                  <div
-                    className={isToday ? 'krnl-month-cell__day' : undefined}
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
-                      color: isToday ? '#1a1814' : 'var(--ink-1)',
-                      textAlign: 'right',
-                      lineHeight: 1,
-                      marginBottom: 2,
-                      position: 'relative',
-                      zIndex: 1,
-                      fontWeight: isToday ? 600 : 400,
-                    }}
-                  >
-                    {dayNum}
-                  </div>
-
-                  {/* Task chips */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1,
-                      flex: 1,
-                      overflow: 'hidden',
-                      position: 'relative',
-                      zIndex: 1,
-                    }}
-                  >
-                    {visible.map((task) => (
-                      <div
-                        key={task.id}
-                        title={task.text}
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 10,
-                          color: isToday ? '#1a1814' : 'var(--ink-1)',
-                          background: isToday
-                            ? 'rgba(26, 24, 20, 0.12)'
-                            : 'var(--paper-3)',
-                          borderRadius: 2,
-                          padding: '1px 3px',
-                          overflow: 'hidden',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                          lineHeight: '1.3',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {truncateLabel(task.text)}
-                      </div>
-                    ))}
-                    {overflow > 0 && (
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 9,
-                          color: isToday ? '#1a1814' : 'var(--ink-3)',
-                          lineHeight: '1.3',
-                        }}
-                      >
-                        +{overflow} more
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Habit dots (ADR 0002 §6) */}
-                  {cellHabits.length > 0 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                    flex: 1,
+                    overflow: 'hidden',
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                >
+                  {visible.map((task) => (
                     <div
-                      data-testid={`month-habit-dots-${ymd}`}
+                      key={task.id}
+                      title={task.text}
                       style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        gap: 2,
-                        alignItems: 'center',
-                        position: 'relative',
-                        zIndex: 1,
-                        marginTop: 1,
-                        pointerEvents: 'none',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 10,
+                        color: isToday ? '#1a1814' : 'var(--ink-1)',
+                        background: isToday
+                          ? 'rgba(26, 24, 20, 0.12)'
+                          : 'var(--paper-3)',
+                        borderRadius: 2,
+                        padding: '1px 3px',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        lineHeight: '1.3',
+                        cursor: 'pointer',
                       }}
                     >
-                      {visibleDots.map((h) => (
-                        <div
-                          key={h.id}
-                          data-testid={`month-habit-dot-${h.id}-${ymd}`}
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            background: `var(--${h.color})`,
-                            opacity: 0.85,
-                            flexShrink: 0,
-                          }}
-                        />
-                      ))}
-                      {dotOverflow > 0 && (
-                        <span
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 8,
-                            color: isToday ? '#1a1814' : 'var(--ink-3)',
-                            lineHeight: 1,
-                          }}
-                        >
-                          +{dotOverflow + 1}
-                        </span>
-                      )}
+                      {truncateLabel(task.text)}
+                    </div>
+                  ))}
+                  {overflow > 0 && (
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 9,
+                        color: isToday ? '#1a1814' : 'var(--ink-3)',
+                        lineHeight: '1.3',
+                      }}
+                    >
+                      +{overflow} more
                     </div>
                   )}
-                </>
+                </div>
+              )}
+
+              {/* Habit dots — current month only (ADR 0002 §6) */}
+              {inCurrentMonth && cellHabits.length > 0 && (
+                <div
+                  data-testid={`month-habit-dots-${ymd}`}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: 2,
+                    alignItems: 'center',
+                    position: 'relative',
+                    zIndex: 1,
+                    marginTop: 1,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {visibleDots.map((h) => (
+                    <div
+                      key={h.id}
+                      data-testid={`month-habit-dot-${h.id}-${ymd}`}
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: `var(--${h.color})`,
+                        opacity: 0.85,
+                        flexShrink: 0,
+                      }}
+                    />
+                  ))}
+                  {dotOverflow > 0 && (
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 8,
+                        color: isToday ? '#1a1814' : 'var(--ink-3)',
+                        lineHeight: 1,
+                      }}
+                    >
+                      +{dotOverflow + 1}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           );
