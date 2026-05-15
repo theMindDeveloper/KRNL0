@@ -1018,6 +1018,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       fitView={false}
       minZoom={0.25}
       maxZoom={4}
+      zoomOnDoubleClick={false}
       // Perf + terminal-keyboard fix: stop RF from grabbing focus or arrow keys
       // away from xterm/inputs inside nodes.
       nodesFocusable={false}
