@@ -20,6 +20,7 @@ import { useBoardStore } from './store/boardStore';
 import { useBoardChannel } from './store/useBoardChannel';
 import { RadialChooserHost } from './components/ui/RadialChooser';    
 import { useCliDispatch } from './store/useCliDispatch';
+import { sfxEngine } from './sfx/sfxEngine';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
 // This is the only code path that satisfies "before first paint" for F6b.
@@ -88,6 +89,10 @@ export function App() {
   const setBoard = useBoardStore((s) => s.setBoard);
   useBoardChannel();
   useCliDispatch();
+
+  useEffect(() => {
+    sfxEngine.play('krnl0startup').catch(() => {/* autoplay blocked is fine */});
+  }, []);
 
   useEffect(() => {
     // window.krnl?.boardLoad() returns undefined when krnl bridge is absent;
