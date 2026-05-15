@@ -6,7 +6,7 @@
  * useMemo from board.nodes / board.edges. RF runs in controlled mode.
  */
 
-import { useMemo, useCallback, useState, useEffect, useRef, createContext, useContext } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef, createContext, useContext, type ComponentType } from 'react';
 import {
   ReactFlow,
   Background,
@@ -24,6 +24,7 @@ import {
   type Viewport,
   type EdgeProps,
   type OnSelectionChangeParams,
+  type NodeProps as RFNodeProps,
   SelectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -182,6 +183,34 @@ const EDGE_TYPES = {
   default: DefaultEdge,
 };
 
+// ── Ghost slot node — rendered at the candidate drop position during a mother ─
+// reorder drag. 500×500 to match MOTHER_WIDTH/MOTHER_HEIGHT. Acid dashed
+// outline, no background fill, no handles, no interactions.
+function GhostSlotNode() {
+  return (
+    <div
+      style={{
+        width: 500,
+        height: 500,
+        border: '1.5px dashed var(--acid)',
+        borderRadius: 6,
+        background: 'rgba(201, 241, 88, 0.04)',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+// Merge ghost type into NODE_TYPES so RF can resolve it.
+// Cast to satisfy RF's ComponentType<RFNodeProps<KrnlRFNode>> constraint — the
+// ghost doesn't use RFNodeProps data so the loose cast is safe.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ALL_NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> = {
+  ...NODE_TYPES,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ghost: GhostSlotNode as ComponentType<any>,
+};
+
 // Stable empty fallback for the nodes-selector when board is null. Sharing
 // one reference prevents the selector from returning a fresh `[]` per call.
 const EMPTY_NODES: KrnlNode[] = [];
@@ -278,6 +307,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const reorderMotherSlots = useBoardStore((s) => s.reorderMotherSlots);
   const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
   const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
+
+  // Ghost slot — tracks candidate drop position during mother reorder drag.
+  // Cleared by onReorderEnd (fired unconditionally on pointer-up/cancel).
+  const [ghostSlot, setGhostSlot] = useState<number | null>(null);
+  const onReorderHoverGlobal = useCallback((slot: number) => setGhostSlot(slot), []);
+  const onReorderEndGlobal = useCallback(() => setGhostSlot(null), []);
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
@@ -633,12 +668,46 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         slotIndex,
         slotTotal,
         onReorderDrop,
+        onReorderHover: onReorderHoverGlobal,
+        onReorderEnd: onReorderEndGlobal,
         slotCentersX,
       });
       rfMotherCache.set(node.id, { src: node, slotIndex, slotTotal, slotCentersXKey, rf });
       return rf;
     });
-  }, [board, selectNode, reorderMotherSlots]);
+  }, [board, selectNode, reorderMotherSlots, onReorderHoverGlobal, onReorderEndGlobal]);
+
+  // ── Ghost slot node — appended to derivedNodes during mother reorder drag ──
+  // Rendered at the candidate drop slot so the user sees where the card will land.
+  // Uses the same slotCentersX derived inside derivedNodes but re-derived here
+  // from the board for simplicity (no cross-memo dependency needed).
+  const derivedNodesWithGhost = useMemo((): KrnlRFNode[] => {
+    if (ghostSlot === null || !board) return derivedNodes;
+
+    const motherNodes = board.nodes
+      .filter((n: KrnlNode) => n.isMother)
+      .slice()
+      .sort((a: KrnlNode, b: KrnlNode) => a.position.x - b.position.x);
+    const slotCentersX = motherNodes.map((n: KrnlNode) => n.position.x + 250);
+    const ghostX = (slotCentersX[ghostSlot] ?? 0) - 250; // left edge of slot
+
+    const ghostNode: KrnlRFNode = {
+      id: '__ghost__',
+      type: 'ghost',
+      position: { x: ghostX, y: 0 },
+      draggable: false,
+      selectable: false,
+      data: {
+        node: {} as KrnlNode,
+        onCommand: () => { /* ghost — no-op */ },
+        onSelect: () => { /* ghost — no-op */ },
+      },
+      width: 500,
+      height: 500,
+      measured: { width: 500, height: 500 },
+    };
+    return [...derivedNodes, ghostNode];
+  }, [derivedNodes, ghostSlot, board]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
   // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that
@@ -654,14 +723,14 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   //     untouched. Zero re-renders outside RF's internal repositioning.
   //   - On drag end → commit final position to Zustand once; the effect's
   //     sync becomes a no-op because the new position already matches.
-  const [nodes, setNodes] = useState<KrnlRFNode[]>(derivedNodes);
+  const [nodes, setNodes] = useState<KrnlRFNode[]>(derivedNodesWithGhost);
   const isDraggingRef = useRef(false);
 
   useEffect(() => {
     if (!isDraggingRef.current) {
-      setNodes(derivedNodes);
+      setNodes(derivedNodesWithGhost);
     }
-  }, [derivedNodes]);
+  }, [derivedNodesWithGhost]);
 
   // ── Derive RF edges from boardStore ──────────────────────────────────────
   // Each edge is memoised by id; cache hits when edge ref + endpoint kinds are
@@ -798,7 +867,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     <ReactFlow
       nodes={nodes}
       edges={rfEdges}
-      nodeTypes={NODE_TYPES}
+      nodeTypes={ALL_NODE_TYPES}
       edgeTypes={EDGE_TYPES}
       defaultViewport={initialViewport}
       onNodesChange={onNodesChange}
