@@ -1,6 +1,7 @@
 {
   "appId": "com.theminddevlab.krnl0",
   "productName": "krnl0",
+  "icon": "build/icon.png",
   "directories": {
     "output": "release"
   },
@@ -12,7 +13,8 @@
     "target": "dmg"
   },
   "win": {
-    "target": "nsis"
+    "target": "nsis",
+    "icon": "build/icon.ico"
   },
   "linux": {
     "target": "AppImage"
