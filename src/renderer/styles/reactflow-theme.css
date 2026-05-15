@@ -23,10 +23,23 @@
   stroke-width: 1.5;
 }
 
-/* ── Task-flow edge hover ────────────────────────────────────────────────────
-   Dash-march animation removed — per-edge GPU compositing was a pan/zoom
-   perf culprit. Hover glow is kept; it only fires on pointer hover and
-   does not impact FPS during pan. */
+/* ── Task-flow edge dash-march ───────────────────────────────────────────────
+   TaskFlowEdge uses stroke-dasharray "14 8" (period 22). RF's built-in
+   `.animated` class runs a default dashdraw keyframe (10-unit sweep over
+   0.5s) which is a period MISMATCH — visually snaps every 0.5s. Wave C
+   stutter regression had `animated:true` running RF's default; the fix is
+   to set `animated:false` in rfAdapters and apply OUR period-matched
+   keyframe directly to the task-flow edge path here. Single CSS rule per
+   visible edge, GPU-driven, zero React/JS work per frame. The drop-shadow
+   filter was removed (it forced per-edge compositing layers and tanked
+   FPS during pan). Hover glow stays — it only fires on pointer hover. */
+@keyframes krnl-task-flow-dash {
+  from { stroke-dashoffset: 22; }
+  to   { stroke-dashoffset: 0; }
+}
+.react-flow__edge-task-flow path.react-flow__edge-path {
+  animation: krnl-task-flow-dash 1.6s linear infinite;
+}
 .react-flow__edge-task-flow path.react-flow__edge-path:hover {
   filter: drop-shadow(0 0 9px rgba(154, 237, 246, 0.85));
 }
