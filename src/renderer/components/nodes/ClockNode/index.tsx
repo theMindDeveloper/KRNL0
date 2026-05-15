@@ -115,10 +115,6 @@ export function ClockNode({
   onCommand,
   slotIndex = 6,
   slotTotal = MOTHER_TOTAL,
-  onReorderDrop,
-  onReorderHover,
-  onReorderEnd,
-  slotCentersX,
 }: NodeProps<ClockState, ClockConfig>) {
   const { linkedTodoId } = node.state;
 
@@ -234,10 +230,6 @@ export function ClockNode({
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
-      onReorderDrop={onReorderDrop}
-      onReorderHover={onReorderHover}
-      onReorderEnd={onReorderEnd}
-      slotCentersX={slotCentersX}
     >
       <div
         style={{

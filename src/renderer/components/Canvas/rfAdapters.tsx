@@ -26,12 +26,9 @@ export interface RFNodeData extends Record<string, unknown> {
   node: Node;
   onCommand: (command: string, args?: Record<string, unknown>) => void;
   onSelect: () => void;
+  // Slot props are forwarded to mother nodes for the slot-badge label.
   slotIndex?: number | undefined;
   slotTotal?: number | undefined;
-  onReorderDrop?: ((fromSlotIndex: number, toSlotIndex: number) => void) | undefined;
-  onReorderHover?: ((candidateSlotIndex: number) => void) | undefined;
-  onReorderEnd?: (() => void) | undefined;
-  slotCentersX?: readonly number[] | undefined;
 }
 
 // Convenience alias for the full RF node type with our data.
@@ -71,17 +68,12 @@ export function toRfNode(
     onSelect: () => void;
     slotIndex?: number | undefined;
     slotTotal?: number | undefined;
-    onReorderDrop?: ((fromSlotIndex: number, toSlotIndex: number) => void) | undefined;
-    onReorderHover?: ((candidateSlotIndex: number) => void) | undefined;
-    onReorderEnd?: (() => void) | undefined;
-    slotCentersX?: readonly number[] | undefined;
   }
 ): KrnlRFNode {
   // Decision 22.2 Fix 5 — add a CSS class keyed on node.kind so the todo-family
   // selection ring can be scoped in reactflow-theme.css without inline style overrides.
   // node.kind may contain "." (e.g. "todo.task") — replace with "--" for a valid class name.
-  // Add "krnl-mother" class so the body.krnl-reordering slide-animation CSS rule
-  // can target all mother nodes during a reorder gesture.
+  // "krnl-mother" class lets CSS scope rules to mother nodes specifically.
   const kindClass = node.isMother
     ? `krnl-kind-${node.kind.replace('.', '--')} krnl-mother`
     : `krnl-kind-${node.kind.replace('.', '--')}`;
@@ -112,10 +104,6 @@ export function toRfNode(
       onSelect: ctx.onSelect,
       slotIndex: ctx.slotIndex,
       slotTotal: ctx.slotTotal,
-      onReorderDrop: ctx.onReorderDrop,
-      onReorderHover: ctx.onReorderHover,
-      onReorderEnd: ctx.onReorderEnd,
-      slotCentersX: ctx.slotCentersX,
     },
   };
 }
@@ -173,7 +161,7 @@ export function createNodeAdapter<S = unknown, C = unknown>(
 ): ComponentType<RFNodeProps<KrnlRFNode>> {
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
-    const { node, onCommand, onSelect, slotIndex, slotTotal, onReorderDrop, onReorderHover, onReorderEnd, slotCentersX } = data;
+    const { node, onCommand, onSelect, slotIndex, slotTotal } = data;
     // Mother nodes don't connect — render zero handles. Children get
     // interactive handles so users can wire edges between them.
     const showHandles = !node.isMother;
@@ -194,10 +182,6 @@ export function createNodeAdapter<S = unknown, C = unknown>(
           onSelect={onSelect}
           {...(slotIndex !== undefined ? { slotIndex: slotIndex as number } : {})}
           {...(slotTotal !== undefined ? { slotTotal: slotTotal as number } : {})}
-          {...(onReorderDrop !== undefined ? { onReorderDrop: onReorderDrop as (fromSlotIndex: number, toSlotIndex: number) => void } : {})}
-          {...(onReorderHover !== undefined ? { onReorderHover: onReorderHover as (candidateSlotIndex: number) => void } : {})}
-          {...(onReorderEnd !== undefined ? { onReorderEnd: onReorderEnd as () => void } : {})}
-          {...(slotCentersX !== undefined ? { slotCentersX: slotCentersX as readonly number[] } : {})}
         />
         {showHandles && (
           <Handle

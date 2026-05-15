@@ -2,11 +2,18 @@
 // Replicates the LifeOS Whiteboard.html `.node.fixed` pattern:
 //   - badge slot tag (top:-11px, left:14px) with spine-hot-colored slot number
 //   - 4 outset corner brackets (inset:-8px, L-shapes)
-//   - drag-to-reorder: hold and drag horizontally to swap positions
-// All mothers use this frame; their bodies render as children.
+//
+// Slot badge clipping note (2026-05-15): the badge needs to overhang the
+// panel's top edge per the LifeOS design, but `.react-flow` has
+// `overflow:hidden` to clip nodes during pan/zoom. When a mother is panned
+// near the canvas top, the negative-top badge gets sliced. The fix is to
+// portal the badge into `document.body` with `position:fixed` so it escapes
+// the canvas's clip context entirely. Position is tracked via rAF +
+// getBoundingClientRect so badge follows the panel during pan/zoom without
+// subscribing to RF store (which would re-render on every viewport tick).
 
-import { useRef, useState, type ReactNode } from 'react';
-import { useReactFlow } from '@xyflow/react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
 
 interface Props {
@@ -18,19 +25,12 @@ interface Props {
   background?: string;     // override (terminal uses --term-bg)
   borderColor?: string;
   minHeight?: number;      // override — must match INITIAL_DIMS_BY_KIND height
-  // Reorder callbacks from CanvasFlow
-  onReorderDrop?: ((fromSlotIndex: number, toSlotIndex: number) => void) | undefined;
-  onReorderHover?: ((candidateSlotIndex: number) => void) | undefined;
-  onReorderEnd?: (() => void) | undefined;
-  // Slot x-centers in flow coords (sorted by slot order) for candidate detection.
-  slotCentersX?: readonly number[] | undefined;
 }
 
 // Wave C (LifeOS UI refresh) — bumped to 500×500 so mothers read as the
-// primary canvas anchor against the 220×120 child task cards. Was 440×440;
-// pre-PR2 was 380×600 portrait. MUST stay in sync with INITIAL_DIMS_BY_KIND
-// in src/renderer/components/Canvas/rfAdapters.tsx and the seed/migration
-// positions in src/main/persistence/board.ts — see ADR 0006.
+// primary canvas anchor against the 220×120 child task cards. MUST stay in
+// sync with INITIAL_DIMS_BY_KIND in rfAdapters.tsx and seed positions in
+// src/main/persistence/board.ts — see ADR 0006.
 export const MOTHER_WIDTH = 500;
 export const MOTHER_HEIGHT = 500;
 export const MOTHER_TOTAL = 6;
@@ -44,163 +44,83 @@ export function MotherFrame({
   background = 'var(--node-bg)',
   borderColor = 'var(--paper-3)',
   minHeight = MOTHER_HEIGHT,
-  onReorderDrop,
-  onReorderHover,
-  onReorderEnd,
-  slotCentersX,
 }: Props) {
   const setHoveredNodeId = useBoardStore((s) => s.setHoveredNodeId);
   const idx = String(slotIndex).padStart(2, '0');
   const total = String(slotTotal).padStart(2, '0');
 
-  // Drag state
-  const [dragging, setDragging] = useState(false);
-  const [dx, setDx] = useState(0);
-  const [snapping, setSnapping] = useState(false);
-  const pointerStartFlowX = useRef<number>(0);
-  const candidateSlotRef = useRef<number>(slotIndex - 1); // 0-based
-  const { screenToFlowPosition } = useReactFlow();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLDivElement>(null);
 
-  // Convert a candidate 0-based slot index from pointer position in flow coords.
-  function findCandidateSlot(flowX: number): number {
-    if (!slotCentersX || slotCentersX.length === 0) return slotIndex - 1;
-    let best = 0;
-    let bestDist = Math.abs(flowX - (slotCentersX[0] ?? 0));
-    for (let i = 1; i < slotCentersX.length; i++) {
-      const dist = Math.abs(flowX - (slotCentersX[i] ?? 0));
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = i;
+  // Single rAF loop per mother that mirrors the panel's top-left screen
+  // position to the portaled badge. getBoundingClientRect forces layout, so
+  // we read once and write once per frame, never inside React's render.
+  useLayoutEffect(() => {
+    let rafId: number | null = null;
+    let lastL = NaN;
+    let lastT = NaN;
+    const tick = () => {
+      const root = rootRef.current;
+      const badge = badgeRef.current;
+      if (root && badge) {
+        const r = root.getBoundingClientRect();
+        // Badge anchored to panel's top-left, offset to overhang by 11px
+        // and indent 14px (matches original LifeOS layout).
+        const l = Math.round(r.left + 14);
+        const t = Math.round(r.top - 11);
+        if (l !== lastL) {
+          badge.style.left = `${l}px`;
+          lastL = l;
+        }
+        if (t !== lastT) {
+          badge.style.top = `${t}px`;
+          lastT = t;
+        }
       }
-    }
-    return best;
-  }
-
-  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    // Only primary button; avoid firing while dragging inside xterm or inputs.
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (
-      target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.tagName === 'BUTTON' ||
-      target.isContentEditable
-    ) return;
-    if (!onReorderDrop) return;
-
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-
-    const flowStart = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    pointerStartFlowX.current = flowStart.x;
-    candidateSlotRef.current = slotIndex - 1;
-
-    // Fire hover immediately so the ghost appears at the source slot from drag start.
-    onReorderHover?.(slotIndex - 1);
-
-    document.body.classList.add('krnl-reordering');
-    setDragging(true);
-    setSnapping(false);
-    setDx(0);
-  }
-
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dragging) return;
-    e.stopPropagation();
-
-    const flowCurrent = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    // Flow coords are pre-scale (the viewport scale(zoom) sits above this div),
-    // so translateX(N flow units) already produces N*zoom screen pixels.
-    // Do NOT multiply by zoom again — that was the doubled-scale bug.
-    const deltaPx = flowCurrent.x - pointerStartFlowX.current;
-    setDx(deltaPx);
-
-    // Candidate slot: find nearest slot center to the card's current flow center.
-    const cardFlowCenter = flowCurrent.x;
-    const candidate = findCandidateSlot(cardFlowCenter);
-    if (candidate !== candidateSlotRef.current) {
-      candidateSlotRef.current = candidate;
-      onReorderHover?.(candidate);
-    }
-  }
-
-  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dragging) return;
-    e.stopPropagation();
-    e.currentTarget.releasePointerCapture(e.pointerId);
-
-    const fromSlot = slotIndex - 1; // 0-based
-    const toSlot = candidateSlotRef.current;
-
-    // Animate snap-back before clearing drag state.
-    setSnapping(true);
-    setDx(0);
-    setTimeout(() => {
-      setDragging(false);
-      setSnapping(false);
-      document.body.classList.remove('krnl-reordering');
-    }, 200);
-
-    if (fromSlot !== toSlot) {
-      onReorderDrop?.(fromSlot, toSlot);
-    }
-    // Always notify parent that drag ended so it can clear the ghost slot.
-    onReorderEnd?.();
-  }
-
-  function onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dragging) return;
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    setDragging(false);
-    setSnapping(false);
-    setDx(0);
-    document.body.classList.remove('krnl-reordering');
-    // Notify parent that drag ended (cancelled) so ghost slot is cleared.
-    onReorderEnd?.();
-  }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   return (
     <div
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
+      ref={rootRef}
       onMouseEnter={() => setHoveredNodeId(nodeId)}
       onMouseLeave={() => setHoveredNodeId(null)}
       style={{
         position: 'relative',
         width,
-        // PR2.1 — pin to a FIXED height matching INITIAL_DIMS_BY_KIND, not
-        // minHeight. Previously some mothers (Terminal, Calendar) grew past
-        // the floor because their content overflowed, breaking the user's
-        // "all the same size" ask. Bodies must overflow internally now.
+        // Pinned fixed height (not minHeight) — see PR2.1 history. Bodies
+        // must overflow internally.
         height: minHeight,
         display: 'flex',
         flexDirection: 'column',
-        background,
+        // Subtle gradient overlay on the base bg for the "panel" feel — top
+        // is slightly lighter so the card has a hint of elevation. Falls back
+        // to plain bg if `background` was overridden (terminal --term-bg).
+        background: background === 'var(--node-bg)'
+          ? 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 30%), var(--node-bg)'
+          : background,
         border: `1px solid ${borderColor}`,
-        borderRadius: 6,
-        // Smaller blur radius: wide-blur box-shadows on large nodes are the
-        // dominant GPU repaint cost during pan. Dropping 12→8px cuts the fill
-        // area the compositor rasterises on every pan frame.
-        boxShadow: '0 2px 8px rgba(0,0,0,0.28)',
+        borderRadius: 8,
+        // Box-shadow only (no outline) so the panel rim is never clipped by
+        // upstream overflow:hidden ancestors. Modest blur (8px) keeps GPU
+        // composite cost low — wide shadows dominate pan repaints.
+        boxShadow:
+          '0 2px 8px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
         // Outer is visible so corner brackets and the slot tag can sit at
         // negative offsets; inner body needs its own overflow handling.
         overflow: 'visible',
         // 'layout paint' limits repaint propagation to this subtree. 'style'
-        // is intentionally excluded — it would block CSS custom-property
-        // inheritance from tokens.css (var(--node-bg) etc.).
+        // is intentionally excluded — would block CSS custom-property
+        // inheritance from tokens.css.
         contain: 'layout paint',
         // Promote each mother to its own GPU compositor layer so pan only
         // uploads texture deltas rather than re-rasterising the whole canvas.
-        // Six 500×500 nodes ≈ 6 × ~1 MB VRAM; acceptable for Electron desktop.
         willChange: 'transform',
-        // Translate card following pointer during drag. Snap-back uses CSS
-        // transition (only active during snapping phase) for 200ms ease.
-        transform: dragging || snapping ? `translateX(${dx}px)` : undefined,
-        transition: snapping ? 'transform 200ms ease' : undefined,
-        cursor: dragging ? 'grabbing' : 'grab',
-        zIndex: dragging ? 10 : undefined,
       }}
     >
       {/* Outset corner brackets — `inset:-8px`, opacity 0.3 base */}
@@ -219,31 +139,40 @@ export function MotherFrame({
         <span style={cornerBase('br')} />
       </div>
 
-      {/* Slot badge — ink bg, paper color, spine-hot number */}
-      <div
-        style={{
-          position: 'absolute',
-          top: -11,
-          left: 14,
-          background: 'var(--paper-2)',
-          color: 'var(--ink-2)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 9,
-          padding: '2.5px 8px 3px',
-          borderRadius: 2,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          fontWeight: 600,
-          border: '1px solid var(--paper-3)',
-          zIndex: 6,
-          pointerEvents: 'none',
-        }}
-      >
-        <span style={{ color: 'var(--spine-hot)', marginRight: 1 }}>{idx}</span>
-        <span> · spine · {total}</span>
-      </div>
-
       {children}
+
+      {/* Slot badge — portal target document.body, position:fixed so it
+          escapes `.react-flow`'s overflow:hidden clip. Initial top/left are
+          off-screen; the rAF loop above writes the real coords on the next
+          paint. Guarded for SSR/non-DOM test envs (no document). */}
+      {typeof document !== 'undefined' && createPortal(
+        <div
+          ref={badgeRef}
+          aria-hidden
+          style={{
+            position: 'fixed',
+            top: -9999,
+            left: -9999,
+            background: 'var(--paper-2)',
+            color: 'var(--ink-2)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9,
+            padding: '2.5px 8px 3px',
+            borderRadius: 2,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+            border: '1px solid var(--paper-3)',
+            zIndex: 5,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span style={{ color: 'var(--spine-hot)', marginRight: 1 }}>{idx}</span>
+          <span> · spine · {total}</span>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@
  * useMemo from board.nodes / board.edges. RF runs in controlled mode.
  */
 
-import { useMemo, useCallback, useState, useEffect, useRef, createContext, useContext, type ComponentType } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
 import {
   ReactFlow,
   Background,
@@ -31,7 +31,7 @@ import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
-import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
+import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapters';
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { ContextMenu } from '../ContextMenu';
@@ -183,32 +183,138 @@ const EDGE_TYPES = {
   default: DefaultEdge,
 };
 
-// ── Ghost slot node — rendered at the candidate drop position during a mother ─
-// reorder drag. 500×500 to match MOTHER_WIDTH/MOTHER_HEIGHT. Acid dashed
-// outline, no background fill, no handles, no interactions.
-function GhostSlotNode() {
-  return (
-    <div
-      style={{
-        width: 500,
-        height: 500,
-        border: '1.5px dashed var(--acid)',
-        borderRadius: 6,
-        background: 'rgba(201, 241, 88, 0.04)',
-        pointerEvents: 'none',
-      }}
-    />
-  );
+// ── SwapButton pseudo-node ────────────────────────────────────────────────────
+// Sits in the gap between every adjacent mother-node pair. Click swaps the two
+// mothers' slot positions. Implemented as a custom RF node so it lives inside
+// the flow transform (pans/zooms with the canvas) without any DOM overlay math.
+// Not draggable, not selectable, no handles — pure UI.
+//
+// data carries { leftId, rightId } so the click handler can dispatch the swap
+// against boardStore without resubscribing to the whole graph.
+interface SwapButtonData extends Record<string, unknown> {
+  leftId: string;
+  rightId: string;
 }
 
-// Merge ghost type into NODE_TYPES so RF can resolve it.
-// Cast to satisfy RF's ComponentType<RFNodeProps<KrnlRFNode>> constraint — the
-// ghost doesn't use RFNodeProps data so the loose cast is safe.
+const SwapButtonNode = memo(function SwapButtonNode({
+  data,
+}: { data: SwapButtonData }) {
+  const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      swapMotherSlots(data.leftId, data.rightId);
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+    },
+    [data.leftId, data.rightId, swapMotherSlots],
+  );
+
+  // stopPropagation on pointer events — RF treats unhandled pointer events as
+  // pan-start under panOnDrag=[1,2]; left-button starts a marquee selection.
+  // Both must be suppressed so a click on the button doesn't start a drag.
+  const stop = useCallback((e: React.PointerEvent | React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  // Proximity reveal — button is invisible + non-interactive by default and
+  // fades in only when the cursor is within PROXIMITY_PX of its center. The
+  // opacity + pointer-events toggle is mutated directly on the DOM via rAF so
+  // mousemove doesn't trigger any React re-render (would re-render the whole
+  // RF node tree at 60fps). The button stays click-through when hidden.
+  useEffect(() => {
+    const PROXIMITY_PX = 140;
+    let rafId: number | null = null;
+    let lastX = 0;
+    let lastY = 0;
+    const tick = () => {
+      rafId = null;
+      const btn = btnRef.current;
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      const dx = lastX - (r.left + r.width / 2);
+      const dy = lastY - (r.top + r.height / 2);
+      const near = (dx * dx + dy * dy) < (PROXIMITY_PX * PROXIMITY_PX);
+      if (near) {
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'all';
+      } else {
+        btn.style.opacity = '0';
+        btn.style.pointerEvents = 'none';
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+      if (rafId === null) rafId = requestAnimationFrame(tick);
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  return (
+    <button
+      ref={btnRef}
+      type="button"
+      onClick={handleClick}
+      onPointerDown={stop}
+      onMouseDown={stop}
+      title="Swap left ↔ right panel"
+      style={{
+        // Cosmetic centering inside the 32×32 RF wrapper — RF positions the
+        // wrapper, this rule ensures the button visually fills it with no
+        // sub-pixel drift if the wrapper ever gets a different size.
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 32,
+        height: 32,
+        borderRadius: '50%',
+        background: 'var(--paper-2)',
+        border: '1px solid var(--paper-3)',
+        color: 'var(--ink-2)',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 13,
+        lineHeight: 1,
+        display: 'grid',
+        placeItems: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+        padding: 0,
+        // Defensive pointer-events:all and z-index — RF's `.react-flow__node`
+        // wrappers do not block clicks by default, but explicit beats default.
+        // Sit above the mother-card layer so a click reaches us first.
+        pointerEvents: 'none',  // overridden by proximity tick when near
+        zIndex: 100,
+        opacity: 0,
+        transition: 'opacity 180ms ease, background 120ms ease, color 120ms ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--acid)';
+        e.currentTarget.style.color = '#1a1814';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'var(--paper-2)';
+        e.currentTarget.style.color = 'var(--ink-2)';
+      }}
+    >
+      ⇄
+    </button>
+  );
+});
+
+// Merge swap-button into NODE_TYPES so RF can resolve it.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ALL_NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> = {
   ...NODE_TYPES,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ghost: GhostSlotNode as ComponentType<any>,
+  'swap-button': SwapButtonNode as ComponentType<any>,
 };
 
 // Stable empty fallback for the nodes-selector when board is null. Sharing
@@ -231,7 +337,6 @@ const rfMotherCache = new Map<
     src: KrnlNode;
     slotIndex: number;
     slotTotal: number;
-    slotCentersXKey: string;
     rf: ReturnType<typeof toRfNode>;
   }
 >();
@@ -304,15 +409,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const updateNode = useBoardStore((s) => s.updateNode);
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
-  const reorderMotherSlots = useBoardStore((s) => s.reorderMotherSlots);
   const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
   const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
-
-  // Ghost slot — tracks candidate drop position during mother reorder drag.
-  // Cleared by onReorderEnd (fired unconditionally on pointer-up/cancel).
-  const [ghostSlot, setGhostSlot] = useState<number | null>(null);
-  const onReorderHoverGlobal = useCallback((slot: number) => setGhostSlot(slot), []);
-  const onReorderEndGlobal = useCallback(() => setGhostSlot(null), []);
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
@@ -612,7 +710,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
-  const derivedNodes = useMemo(() => {
+  // Also appends swap-button pseudo-nodes between every adjacent mother pair
+  // so the user can reorder mothers via a click instead of drag-and-drop.
+  const derivedNodes = useMemo((): KrnlRFNode[] => {
     if (!board) return [];
 
     // Compute slot ordering for mother nodes (sorted by position.x)
@@ -625,13 +725,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
     );
 
-    // Slot x-centers in flow coords (center of each mother card by slot order).
-    const slotCentersX: readonly number[] = motherNodes.map(
-      (n: KrnlNode) => n.position.x + 250 // MOTHER_WIDTH / 2 = 250
-    );
-    const slotCentersXKey = slotCentersX.join(',');
-
-    return board.nodes.map((node: KrnlNode) => {
+    const baseNodes: KrnlRFNode[] = board.nodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
       const onSelect = getSelectHandler(node.id, selectNode);
 
@@ -639,75 +733,63 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         return getMemoizedRfNode(node, { onCommand, onSelect });
       }
 
-      // Mother node: cache by (node ref, slotIndex, slotTotal, slotCentersXKey).
-      // Without this cache, every drag tick built a fresh RFNode for every
-      // mother — fresh `data` object with fresh closures — defeating
-      // React.memo on the adapter and forcing PomoNode / TodoNode / HabitNode /
-      // TerminalNode (with its xterm instance) to re-render 60fps.
+      // Mother node: cache by (node ref, slotIndex, slotTotal).
       const slotIndex = slotIndexMap.get(node.id) ?? 1;
       const cached = rfMotherCache.get(node.id);
       if (
         cached &&
         cached.src === node &&
         cached.slotIndex === slotIndex &&
-        cached.slotTotal === slotTotal &&
-        cached.slotCentersXKey === slotCentersXKey
+        cached.slotTotal === slotTotal
       ) {
         return cached.rf;
       }
-
-      const onReorderDrop = (fromSlotIndex: number, toSlotIndex: number) => {
-        reorderMotherSlots(node.id, toSlotIndex);
-        const updated = useBoardStore.getState().board;
-        if (updated) void window.krnl?.boardSave(updated);
-      };
 
       const rf = toRfNode(node, {
         onCommand,
         onSelect,
         slotIndex,
         slotTotal,
-        onReorderDrop,
-        onReorderHover: onReorderHoverGlobal,
-        onReorderEnd: onReorderEndGlobal,
-        slotCentersX,
       });
-      rfMotherCache.set(node.id, { src: node, slotIndex, slotTotal, slotCentersXKey, rf });
+      rfMotherCache.set(node.id, { src: node, slotIndex, slotTotal, rf });
       return rf;
     });
-  }, [board, selectNode, reorderMotherSlots, onReorderHoverGlobal, onReorderEndGlobal]);
 
-  // ── Ghost slot node — appended to derivedNodes during mother reorder drag ──
-  // Rendered at the candidate drop slot so the user sees where the card will land.
-  // Uses the same slotCentersX derived inside derivedNodes but re-derived here
-  // from the board for simplicity (no cross-memo dependency needed).
-  const derivedNodesWithGhost = useMemo((): KrnlRFNode[] => {
-    if (ghostSlot === null || !board) return derivedNodes;
+    // Swap-button pseudo-nodes — one per adjacent mother pair.
+    // Position: in the gap between the two cards, vertically centered.
+    // MOTHER_WIDTH = 500; gap between motherR.left and motherL.right is
+    // motherR.position.x - (motherL.position.x + 500). Place button at the
+    // midpoint of that gap. Vertical center at motherL.position.y + 250.
+    const swapNodes: KrnlRFNode[] = [];
+    for (let i = 0; i < motherNodes.length - 1; i++) {
+      const left = motherNodes[i]!;
+      const right = motherNodes[i + 1]!;
+      const gapMidX = (left.position.x + 500 + right.position.x) / 2;
+      const cy = left.position.y + 250;
+      swapNodes.push({
+        id: `__swap__${left.id}__${right.id}`,
+        type: 'swap-button',
+        position: { x: gapMidX - 16, y: cy - 16 }, // button is 32×32
+        draggable: false,
+        selectable: false,
+        data: {
+          // RFNodeData shape padding — never read by SwapButtonNode.
+          node: {} as KrnlNode,
+          onCommand: () => { /* no-op */ },
+          onSelect: () => { /* no-op */ },
+          leftId: left.id,
+          rightId: right.id,
+        } as RFNodeData & { leftId: string; rightId: string },
+        width: 32,
+        height: 32,
+        measured: { width: 32, height: 32 },
+        // Sit above mother cards so the button stays clickable.
+        zIndex: 50,
+      });
+    }
 
-    const motherNodes = board.nodes
-      .filter((n: KrnlNode) => n.isMother)
-      .slice()
-      .sort((a: KrnlNode, b: KrnlNode) => a.position.x - b.position.x);
-    const slotCentersX = motherNodes.map((n: KrnlNode) => n.position.x + 250);
-    const ghostX = (slotCentersX[ghostSlot] ?? 0) - 250; // left edge of slot
-
-    const ghostNode: KrnlRFNode = {
-      id: '__ghost__',
-      type: 'ghost',
-      position: { x: ghostX, y: 0 },
-      draggable: false,
-      selectable: false,
-      data: {
-        node: {} as KrnlNode,
-        onCommand: () => { /* ghost — no-op */ },
-        onSelect: () => { /* ghost — no-op */ },
-      },
-      width: 500,
-      height: 500,
-      measured: { width: 500, height: 500 },
-    };
-    return [...derivedNodes, ghostNode];
-  }, [derivedNodes, ghostSlot, board]);
+    return [...baseNodes, ...swapNodes];
+  }, [board, selectNode]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
   // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that
@@ -723,14 +805,14 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   //     untouched. Zero re-renders outside RF's internal repositioning.
   //   - On drag end → commit final position to Zustand once; the effect's
   //     sync becomes a no-op because the new position already matches.
-  const [nodes, setNodes] = useState<KrnlRFNode[]>(derivedNodesWithGhost);
+  const [nodes, setNodes] = useState<KrnlRFNode[]>(derivedNodes);
   const isDraggingRef = useRef(false);
 
   useEffect(() => {
     if (!isDraggingRef.current) {
-      setNodes(derivedNodesWithGhost);
+      setNodes(derivedNodes);
     }
-  }, [derivedNodesWithGhost]);
+  }, [derivedNodes]);
 
   // ── Derive RF edges from boardStore ──────────────────────────────────────
   // Each edge is memoised by id; cache hits when edge ref + endpoint kinds are

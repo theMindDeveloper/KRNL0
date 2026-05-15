@@ -62,10 +62,6 @@ export function PomoNode({
   onCommand,
   slotIndex = 1,
   slotTotal = MOTHER_TOTAL,
-  onReorderDrop,
-  onReorderHover,
-  onReorderEnd,
-  slotCentersX,
 }: NodeProps<PomoState, PomoConfig>) {
   const { state } = node;
   const config = node.config ?? defaultPomoConfig();
@@ -204,7 +200,7 @@ export function PomoNode({
   const overflowPips = pipCount > MAX_PIPS ? pipCount - MAX_PIPS : 0;
 
   return (
-    <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onReorderDrop={onReorderDrop} onReorderHover={onReorderHover} onReorderEnd={onReorderEnd} slotCentersX={slotCentersX}>
+    <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH}>
       {/* vapor-rise and pomo-blink keyframes are globally defined in tokens.css (PR1/PR4) */}
       <style>{`
         .pomo-gear-btn {
