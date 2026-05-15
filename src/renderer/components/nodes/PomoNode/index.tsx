@@ -1,12 +1,17 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { NodeProps } from '../types';
-import type { PomoConfig, PomoState } from './types';
+import type { PomoConfig, PomoState, TimerFace } from './types';
 import { defaultPomoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { TaskState } from '../TaskNode/types';
+import { Ring } from './variants/Ring';
+import { Ascii } from './variants/Ascii';
+import { Lcd } from './variants/Lcd';
+import { Blocks } from './variants/Blocks';
+import { Vapor } from './variants/Vapor';
 
 const TICK_MS = 500;
 
@@ -145,23 +150,19 @@ export function PomoNode({
 
   // F1 — liquid fill height tracks remaining time
   const remainingPct = calcRemainingPct(state.status, remainingMs, totalMs);
+  // Elapsed pct — used by Ring/Blocks/Ascii variants
+  const elapsedPct = 100 - remainingPct;
 
   const clockText = state.status === 'idle' || state.status === 'done'
     ? formatRemaining(state.durationMin * 60_000)
     : formatRemaining(remainingMs);
   const [mm, ss] = clockText.split(':') as [string, string];
 
-  // F2 — bubble positions are stable across renders (NF2: pure CSS animation)
-  const bubbles = useMemo(() => [0, 1, 2, 3].map((i) => ({
-    left: 8 + i * 14,
-    animationDuration: `${3.2 + (i % 2) * 1.4}s`,
-    animationDelay: `${i * 0.7}s`,
-  })), []);
+  // F3 — running flag for variants that animate a blinking colon
+  const running = state.status === 'running';
 
-  // F3 — colon blinks at 1 Hz ONLY while running (halted during paused)
-  const colonAnimation = state.status === 'running'
-    ? 'pomo-blink 1s steps(2) infinite'
-    : 'none';
+  // PR4 — active face, defaulting to 'ring' when config.face is absent
+  const activeFace: TimerFace = config.face ?? 'ring';
 
   const headerLeft = isTaskMode
     ? `TASK · ${truncate(state.label || 'task', 18)}`
@@ -202,23 +203,8 @@ export function PomoNode({
 
   return (
     <MotherFrame slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onMoveLeft={onMoveLeft} onMoveRight={onMoveRight}>
+      {/* vapor-rise and pomo-blink keyframes are globally defined in tokens.css (PR1/PR4) */}
       <style>{`
-        @keyframes vapor-rise {
-          0%   { transform: translateY(0) scale(1); opacity: 0; }
-          10%  { opacity: 0.8; }
-          90%  { opacity: 0.4; }
-          100% { transform: translateY(-220px) scale(0.5); opacity: 0; }
-        }
-        @keyframes pomo-blink { 50% { opacity: 0.3; } }
-        .pomo-bubble {
-          position: absolute;
-          bottom: 0;
-          width: 6px;
-          height: 6px;
-          background: rgba(255,255,255,0.5);
-          border-radius: 50%;
-          animation: vapor-rise linear infinite;
-        }
         .pomo-gear-btn {
           background: transparent;
           border: 1px solid var(--paper-3);
@@ -369,6 +355,53 @@ export function PomoNode({
             </div>
           ))}
 
+          {/* PR4 — face picker: 5 segmented buttons, one per variant */}
+          <div
+            className="pomo-settings-row"
+            style={{ marginTop: 8, borderTop: '1px dashed var(--paper-3)', paddingTop: 10 }}
+          >
+            <span className="pomo-settings-label">Timer face</span>
+          </div>
+          <div
+            data-testid="pomo-face-picker"
+            style={{ display: 'flex', gap: 4, marginBottom: 4 }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {(['ring', 'ascii', 'lcd', 'blocks', 'vapor'] as const).map((face) => {
+              const isActive = (config.face ?? 'ring') === face;
+              return (
+                <button
+                  key={face}
+                  type="button"
+                  data-testid={`pomo-face-${face}`}
+                  aria-pressed={isActive}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCommand('pomo.setFace', { face });
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{
+                    flex: 1,
+                    padding: '5px 2px',
+                    background: isActive ? 'var(--rust)' : 'transparent',
+                    color: isActive ? 'var(--paper)' : 'var(--ink-3)',
+                    border: `1px solid ${isActive ? 'var(--rust)' : 'var(--paper-3)'}`,
+                    borderRadius: 4,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9,
+                    cursor: 'pointer',
+                    letterSpacing: '0.02em',
+                    textTransform: 'uppercase',
+                    transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+                  }}
+                >
+                  {face}
+                </button>
+              );
+            })}
+          </div>
+
           <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
             <button
               type="button"
@@ -416,147 +449,22 @@ export function PomoNode({
         </div>
       ) : (
         <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div
-            className="pomo-vapor"
-            style={{ display: 'flex', gap: 16, alignItems: 'stretch', minHeight: 240 }}
-          >
-            {/* Vapor tube */}
-            <div
-              className="tube"
-              style={{
-                position: 'relative',
-                width: 64,
-                flexShrink: 0,
-                background: 'rgba(0,0,0,0.5)',
-                border: '1.5px solid var(--paper-3)',
-                borderRadius: 32,
-                overflow: 'hidden',
-                boxShadow: 'inset 2px 0 0 rgba(255,255,255,0.04), inset -2px 0 0 rgba(0,0,0,0.12)',
-              }}
-            >
-              <div
-                className="liquid"
-                data-testid="pomo-liquid"
-                style={{
-                  position: 'absolute',
-                  left: 0, right: 0, bottom: 0,
-                  height: `${remainingPct}%`,
-                  background: 'linear-gradient(180deg, var(--acid-glow) 0%, var(--acid) 40%, var(--spine) 100%)',
-                  transition: 'height 0.6s linear',
-                  boxShadow: '0 0 24px var(--acid), inset 0 -8px 16px rgba(0,0,0,0.25)',
-                }}
-              >
-                <div style={{
-                  position: 'absolute',
-                  top: -3, left: 0, right: 0,
-                  height: 6,
-                  background: 'linear-gradient(180deg, var(--acid-glow), transparent)',
-                  filter: 'blur(2px)',
-                }} />
-              </div>
-              <div
-                className="bubbles"
-                style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}
-              >
-                {bubbles.map((b, i) => (
-                  <span
-                    key={i}
-                    className="pomo-bubble"
-                    style={{
-                      left: b.left,
-                      animationDuration: b.animationDuration,
-                      animationDelay: b.animationDelay,
-                    }}
-                  />
-                ))}
-              </div>
-              <div
-                className="ticks"
-                data-testid="pomo-ticks"
-                style={{
-                  position: 'absolute',
-                  top: 0, bottom: 0, right: 6,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  padding: '8px 0',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 7.5,
-                  color: 'var(--ink-3)',
-                  letterSpacing: '0.06em',
-                  pointerEvents: 'none',
-                }}
-              >
-                <span>25</span>
-                <span>20</span>
-                <span>15</span>
-                <span>10</span>
-                <span>05</span>
-                <span>00</span>
-              </div>
-            </div>
-
-            <div
-              className="info"
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                gap: 6,
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              <div
-                className="num"
-                data-testid="pomo-clock"
-                style={{
-                  fontSize: 44,
-                  letterSpacing: '-0.04em',
-                  color: 'var(--ink)',
-                  fontVariantNumeric: 'tabular-nums',
-                  lineHeight: 1,
-                  fontWeight: 300,
-                }}
-              >
-                {mm}
-                <span
-                  className="colon"
-                  data-testid="pomo-colon"
-                  data-running={state.status === 'running'}
-                  style={{
-                    color: 'var(--rust)',
-                    animation: colonAnimation,
-                  }}
-                >:</span>
-                {ss}
-              </div>
-              <div
-                className="label"
-                style={{
-                  fontSize: 9.5,
-                  color: 'var(--ink-3)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                }}
-              >
-                {isTaskMode
-                  ? `${truncate(state.label || 'task', 18)} · phase ${String(sessionsForDisplay + 1).padStart(2, '0')}`
-                  : `${state.label || 'deep work'} · phase 03`}
-              </div>
-              <div
-                className="pct"
-                style={{
-                  fontSize: 11,
-                  color: 'var(--acid)',
-                  marginTop: 4,
-                  textShadow: '0 0 8px rgba(201,241,88,0.45)',
-                }}
-              >
-                {state.status === 'idle' ? 'ready' : `${Math.round(remainingPct)}% reserve`}
-              </div>
-            </div>
-          </div>
+          {/* PR4 — timer face switch: swap inner face without touching outer chrome */}
+          {activeFace === 'ring' && (
+            <Ring m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'ascii' && (
+            <Ascii m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'lcd' && (
+            <Lcd m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'blocks' && (
+            <Blocks m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'vapor' && (
+            <Vapor m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
 
           <div
             className="pomo-pips"
