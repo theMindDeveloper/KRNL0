@@ -462,3 +462,42 @@ The PomoNode FSM gains long-break branching: `pomoComplete` now reads `(sessions
 - **MotherFrame** — removed `willChange: 'transform'` from inline style. Promoting 6 GPU compositor layers cost VRAM with no pan benefit (RF transforms the viewport wrapper during pan, not per-node elements). The CSS `transition: transform 280ms` on `.krnl-mother` is unchanged and still drives the swap animation.
 
 **Tests:** 1080 passing, 0 typecheck errors.
+
+---
+
+## [2026-05-15] — Pan stutter fix pass 2: eliminate all DOM reads from the hot path (viewportBus)
+
+**Type:** Bug Fix / Performance
+**Branch:** `fix/pan-perf`
+**Issue:** #124
+**Commit:** `fefae21`
+**Files changed:**
+- `src/renderer/utils/viewportBus.ts` (new)
+- `src/renderer/components/nodes/MotherFrame/index.tsx`
+- `src/renderer/components/Canvas/CanvasFlow.tsx`
+- `src/renderer/components/nodes/PomoNode/index.tsx`
+- `src/renderer/components/nodes/TodoNode/index.tsx`
+- `src/renderer/components/nodes/HabitNode/index.tsx`
+- `src/renderer/components/nodes/TerminalNode/index.tsx`
+- `src/renderer/components/nodes/CalendarNode/index.tsx`
+- `src/renderer/components/nodes/ClockNode/index.tsx`
+
+**Root cause (deeper).** Pass 1 (rafBatcher) consolidated 11 separate rAF loops into one shared loop with all reads before all writes — one layout flush per frame instead of 11. But the `read()` callbacks still called `getBoundingClientRect()` on each badge and swap-button DOM element. Writing `style.left/top` in the previous frame's `write()` dirtied the layout tree; the next frame's `getBoundingClientRect()` in `read()` forced a sync re-layout to resolve those dirty writes. Even with batching, one layout flush per frame remained.
+
+**Fix.** Introduced `viewportBus.ts` — a module-level singleton that tracks the RF viewport transform `(x, y, zoom)` and the canvas container's screen offset `(canvasLeft, canvasTop)`. Any RF flow-space point `(rfX, rfY)` can be converted to a screen-space pixel position with pure arithmetic:
+
+```
+screenX = canvasLeft + rfX * zoom + vpX
+screenY = canvasTop  + rfY * zoom + vpY
+```
+
+No DOM reads. The formula holds because the RF canvas wrapper does not move during pan — RF translates the viewport using a CSS `transform` on its inner node-layer, and the raw `(x, y, zoom)` values already encode that transform.
+
+- **CanvasFlow** — `onMove` callback calls `updateViewport(x, y, zoom)` every pan/zoom frame (pure module-level write, no React state or Zustand update). A `ResizeObserver` on the canvas container div calls `updateCanvasRect(left, top)` whenever the canvas offset changes (window resize, panel toggle). `initialViewport` is seeded into viewportBus on mount so badges are correct before the first pan gesture.
+- **MotherFrame** — badge tracking replaced: `getBoundingClientRect()` removed. `read()` calls `rfToScreen(position.x + 14, position.y - 11)` (zero DOM access). Badge style changed from `top/left` positioning (layout-dirty) to `transform: translate(X, Y)` (compositor-level, no layout dirty). Badge starts at `transform: translate(-9999px, -9999px)` so it is invisible before the first rAF tick. Accepts a `position: {x, y}` prop (the node's RF flow-space coordinates); re-registers scheduleBatch when the position changes (after a swap).
+- **SwapButtonNode** — proximity detection replaced: `getBoundingClientRect()` removed. `read()` calls `rfToScreen(positionAbsoluteX + 16, positionAbsoluteY + 16)` where `positionAbsoluteX/Y` are the RF-provided flow-space coordinates of the 32×32 button node. Zero DOM reads per frame.
+- **6 mother node files** — each MotherFrame call gains `position={node.position}` so the new prop is satisfied.
+
+**Result:** 0 DOM reads and 0 layout flushes per frame during pan. The only work per rAF tick is arithmetic in the `read()` callbacks and a single `style.transform` write per badge/button in `write()` — both compositor-level operations the GPU handles without involving the layout engine.
+
+**Tests:** 1080 passing, 0 typecheck errors.
