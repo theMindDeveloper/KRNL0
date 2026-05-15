@@ -71,12 +71,11 @@ export function MotherFrame({
       style={{
         position: 'relative',
         width,
-        // Must match INITIAL_DIMS_BY_KIND mother heights in rfAdapters.tsx so
-        // the visible content fills the full RF-tracked node box. A mismatch
-        // (e.g. content 480 vs RF wrapper 600) makes the cyan selection ring
-        // sit on the RF wrapper while the bg fills only part of it — looking
-        // like a doubled / stretched highlight.
-        minHeight,
+        // PR2.1 — pin to a FIXED height matching INITIAL_DIMS_BY_KIND, not
+        // minHeight. Previously some mothers (Terminal, Calendar) grew past
+        // the floor because their content overflowed, breaking the user's
+        // "all the same size" ask. Bodies must overflow internally now.
+        height: minHeight,
         display: 'flex',
         flexDirection: 'column',
         background,
@@ -84,9 +83,9 @@ export function MotherFrame({
         borderRadius: 6,
         // Lighter shadow + contain hint reduces compositor work on pan/drag.
         boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        // Outer is visible so corner brackets and the slot tag can sit at
+        // negative offsets; inner body needs its own overflow handling.
         overflow: 'visible',
-        // `contain: paint` clips slot tag (top:-11) and corner brackets
-        // (inset:-8) regardless of overflow:visible. `layout` alone is safe.
         contain: 'layout',
       }}
     >

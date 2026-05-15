@@ -12,6 +12,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  MiniMap,
   Panel,
   BaseEdge,
   getBezierPath,
@@ -755,6 +756,37 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
       {/* Controls — zoom in/out, fit view */}
       <Controls position="bottom-right" showInteractive={false} />
+
+      {/* PR-wave-A — MiniMap bottom-right, above the Controls. Each node
+          renders as a small colored rect so the user can see the board
+          layout at a glance and click-to-pan to a region. */}
+      <MiniMap
+        position="bottom-right"
+        pannable
+        zoomable
+        nodeColor={(n) => {
+          switch (n.type) {
+            case 'pomo':       return 'var(--rust)';
+            case 'todo':       return 'var(--cyan)';
+            case 'habit':      return 'var(--acid)';
+            case 'terminal':   return 'var(--ink-3)';
+            case 'calendar':   return 'var(--spine)';
+            case 'clock':      return 'var(--plum)';
+            case 'todo.task':  return 'var(--cyan-glow, var(--cyan))';
+            case 'habit.lane': return 'var(--acid-glow, var(--acid))';
+            case 'text':       return 'var(--ink-4)';
+            case 'image':      return 'var(--sand)';
+            default:           return 'var(--ink-3)';
+          }
+        }}
+        nodeStrokeWidth={2}
+        maskColor="rgba(14, 13, 11, 0.55)"
+        style={{
+          width: 160,
+          height: 120,
+          marginBottom: 56, // sit above the Controls stack
+        }}
+      />
 
       {/* Left dock */}
       <Panel position="top-left" style={{ margin: 0, padding: 0 }}>

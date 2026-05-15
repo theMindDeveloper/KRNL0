@@ -109,7 +109,10 @@ export function TopBar() {
               style={{
                 width: 10,
                 height: 10,
-                background: 'var(--ink)',
+                /* Hardcoded — in dark mode --ink flips to a light cream, but
+                   this is meant to be a permanently-black inner block on
+                   the acid square. Don't tokenise. */
+                background: '#1a1814',
                 borderRadius: 1,
               }}
             />

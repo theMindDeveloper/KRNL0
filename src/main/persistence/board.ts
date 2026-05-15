@@ -34,7 +34,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-pomo',
         kind: 'pomo',
-        position: { x: -808, y: 0 },
+        position: { x: -1300, y: 0 },
         isMother: true,
         state: {
           status: 'idle',
@@ -54,7 +54,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-todo',
         kind: 'todo',
-        position: { x: -396, y: 0 },
+        position: { x: -780, y: 0 },
         isMother: true,
         state: { items: [] },
         config: { showCompleted: true, maxVisible: 50 },
@@ -62,7 +62,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-habit',
         kind: 'habit',
-        position: { x: 16, y: 0 },
+        position: { x: -260, y: 0 },
         isMother: true,
         state: { habits: [] },
         config: { maxHabits: 5, weekStartsOn: 'monday', view: 'week' },
@@ -70,7 +70,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-term',
         kind: 'term',
-        position: { x: 428, y: 0 },
+        position: { x: 260, y: 0 },
         isMother: true,
         state: { sessionId: null, title: 'Terminal' },
         config: { shell: 'default', fontSize: 13 },
@@ -79,7 +79,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-calendar',
         kind: 'calendar',
-        position: { x: 840, y: 0 },
+        position: { x: 780, y: 0 },
         isMother: true,
         state: { selectedDate: null, anchorDate: todayLocalYMD() },
         config: {
@@ -94,7 +94,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-clock',
         kind: 'clock',
-        position: { x: 1252, y: 0 },
+        position: { x: 1300, y: 0 },
         isMother: true,
         state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
         config: {},
@@ -104,13 +104,18 @@ export function seedBoard(): PartialBoard {
   };
 }
 
+// PR2.1 (LifeOS UI refresh) — bumped to 520px spacing to accommodate the
+// new 440x440 mother size with ~80px gap. Old spacing was 412px (380-wide
+// + 32 gap). This map is also the migration target: any existing board
+// whose mothers sit at the previous coordinates gets re-snapped on the
+// next load.
 const NEW_MOTHER_POSITIONS: Record<string, { x: number; y: number }> = {
-  'mother-pomo':     { x: -808, y: 0 },
-  'mother-todo':     { x: -396, y: 0 },
-  'mother-habit':    { x:   16, y: 0 },
-  'mother-term':     { x:  428, y: 0 },
-  'mother-calendar': { x:  840, y: 0 }, // ADR 0001 — slot 5
-  'mother-clock':    { x: 1252, y: 0 }, // Decision 23.1 — slot 6
+  'mother-pomo':     { x: -1300, y: 0 },
+  'mother-todo':     { x:  -780, y: 0 },
+  'mother-habit':    { x:  -260, y: 0 },
+  'mother-term':     { x:   260, y: 0 },
+  'mother-calendar': { x:   780, y: 0 }, // ADR 0001 — slot 5
+  'mother-clock':    { x:  1300, y: 0 }, // Decision 23.1 — slot 6
 };
 
 function migrateMotherPositions(board: unknown): Record<string, unknown> {
@@ -309,7 +314,7 @@ function migrateAddClockMother(board: Record<string, unknown>): Record<string, u
     {
       id: 'mother-clock',
       kind: 'clock',
-      position: { x: 1252, y: 0 },
+      position: { x: 1300, y: 0 },
       isMother: true,
       state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
       config: {},
