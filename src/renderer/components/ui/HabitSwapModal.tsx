@@ -78,8 +78,10 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
   // Keyboard: ← pre-selects weekly, → pre-selects daily. Enter confirms when selected. Esc cancels.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Don't intercept arrow keys when focus is in an input.
-      if (e.target instanceof HTMLInputElement) return;
+      // Arrow left/right card-selection is suppressed when focus is inside an
+      // input (let the cursor move freely). Esc and Enter still work from inputs.
+      const targetIsInput = e.target instanceof HTMLInputElement;
+      if (targetIsInput && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
 
       if (e.key === 'Escape') {
         e.preventDefault();
