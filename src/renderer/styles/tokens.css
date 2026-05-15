@@ -322,6 +322,9 @@ body {
 
 /* ── HabitNode cell classes (perf — avoid per-cell inline styles) ───── */
 .habit-cell {
+  /* `position: relative` is needed for the done-state inner ::after block
+     (PR6 — LifeOS two-color trick). Safe at rest cost. */
+  position: relative;
   flex-shrink: 0;
   box-sizing: border-box;
   padding: 0;
@@ -333,20 +336,56 @@ body {
 .habit-cell--year   { border-radius: 1px; }
 .habit-cell--past   { opacity: 0.4; }
 .habit-cell--future { /* no extra */ }
+
+/* PR6 — done state uses LifeOS's two-color trick: outer is ink (dark),
+   inner ::after is the habit color (acid by default). Gives a small
+   "framed" look instead of a flat block. Year-density variant skips the
+   inner block since 5px cells leave no usable inner area. */
 .habit-cell--done {
-  background: var(--habit-color, var(--acid));
-  opacity: 0.85;
+  background: var(--ink);
+  border-color: var(--ink);
+  opacity: 1;
 }
+.habit-cell--done::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background: var(--habit-color, var(--acid));
+  border-radius: 1px;
+  pointer-events: none;
+}
+.habit-cell--year.habit-cell--done {
+  background: var(--habit-color, var(--acid));
+  border-color: var(--habit-color, var(--acid));
+}
+.habit-cell--year.habit-cell--done::after {
+  display: none;
+}
+/* Dark-mode inversion: outer becomes the habit color, inner becomes paper
+   so the cell still reads against the dark background. */
+[data-theme="dark"] .habit-cell--done {
+  background: var(--habit-color, var(--acid));
+  border-color: var(--habit-color, var(--acid));
+}
+[data-theme="dark"] .habit-cell--done::after {
+  background: var(--paper);
+}
+[data-theme="dark"] .habit-cell--year.habit-cell--done {
+  background: var(--habit-color, var(--acid));
+  border-color: var(--habit-color, var(--acid));
+}
+
 .habit-cell--today {
   background: transparent;
   border-color: var(--ink-3);
   outline: 1px solid var(--habit-color, var(--acid));
   outline-offset: 1px;
 }
+/* Today + done: keep the two-color body but add the today outline so the
+   "today" cue survives the done fill. */
 .habit-cell--done.habit-cell--today {
-  background: var(--habit-color, var(--acid));
-  border-color: transparent;
-  opacity: 1;
+  outline: 1.5px solid var(--habit-color, var(--acid));
+  outline-offset: 1px;
 }
 /* Year-density override: outline+offset is too expensive at 5px cells.
    Use border only for "today" hint. */
