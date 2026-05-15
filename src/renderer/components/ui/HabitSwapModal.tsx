@@ -2,7 +2,7 @@
 // dropped on a calendar day cell. Replaces the RadialChooser for this flow.
 // Renders via createPortal into document.body. Uses inline styles only.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { IsoDow } from '../nodes/HabitNode/types';
 
@@ -40,38 +40,65 @@ export interface HabitSwapModalProps {
   streakDays: number;
   dropDayYMD: string;              // YYYY-MM-DD where they dropped
   isoDow: IsoDow;                  // ISO dow of dropDayYMD
-  onConfirm: (kind: 'weekly' | 'daily') => void;
+  defaultTimeOfDay: string;        // "HH:MM" — derive from drop hour in WeekView
+  defaultDurationMin: number;      // 25 default
+  onConfirm: (kind: 'weekly' | 'daily', timeOfDay: string, durationMin: number) => void;
   onCancel: () => void;
 }
 
 export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
-  const { habitName, habitIcon, habitNumber, streakDays, dropDayYMD, isoDow, onConfirm, onCancel } = props;
+  const {
+    habitName, habitIcon, habitNumber, streakDays,
+    dropDayYMD, isoDow,
+    defaultTimeOfDay, defaultDurationMin,
+    onConfirm, onCancel,
+  } = props;
 
   const weeklyBtnRef = useRef<HTMLButtonElement>(null);
-  const dailyBtnRef = useRef<HTMLButtonElement>(null);
+
+  const [selectedKind, setSelectedKind] = useState<'weekly' | 'daily' | null>(null);
+  const [time, setTime] = useState<string>(defaultTimeOfDay);
+  const [durationMin, setDurationMin] = useState<number>(defaultDurationMin);
 
   // Auto-focus weekly card on mount.
   useEffect(() => {
     weeklyBtnRef.current?.focus();
   }, []);
 
-  // Keyboard: ← weekly, → daily, Esc cancel.
+  // Validate time and duration for the confirm button.
+  const isTimeValid = /^\d{2}:\d{2}$/.test(time);
+  const isDurationValid = Number.isFinite(durationMin) && durationMin >= 5 && durationMin <= 480;
+  const canConfirm = selectedKind !== null && isTimeValid && isDurationValid;
+
+  function handleConfirm() {
+    if (!canConfirm) return;
+    onConfirm(selectedKind!, time, durationMin);
+  }
+
+  // Keyboard: ← pre-selects weekly, → pre-selects daily. Enter confirms when selected. Esc cancels.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Don't intercept arrow keys when focus is in an input.
+      if (e.target instanceof HTMLInputElement) return;
+
       if (e.key === 'Escape') {
         e.preventDefault();
         onCancel();
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        onConfirm('weekly');
+        setSelectedKind('weekly');
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        onConfirm('daily');
+        setSelectedKind('daily');
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleConfirm();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onConfirm, onCancel]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onConfirm, onCancel, selectedKind, time, durationMin, canConfirm]);
 
   // Derive display values from dropDayYMD.
   const dropDate = new Date(dropDayYMD + 'T00:00:00');
@@ -86,23 +113,27 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
 
   // ── Shared sub-card styles ─────────────────────────────────────────────────
 
-  const cardBtnBase: React.CSSProperties = {
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: 10,
-    padding: '22px 14px 16px',
-    background: 'var(--paper-2)',
-    border: '1.5px solid var(--paper-3)',
-    borderRadius: 10,
-    cursor: 'pointer',
-    textAlign: 'center',
-    font: 'inherit',
-    color: 'inherit',
-    overflow: 'hidden',
-    transition: 'transform 0.18s, border-color 0.18s, background 0.18s, box-shadow 0.18s',
-  };
+  function cardBtnStyle(kind: 'weekly' | 'daily'): React.CSSProperties {
+    const isSelected = selectedKind === kind;
+    return {
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      gap: 10,
+      padding: '22px 14px 16px',
+      background: isSelected ? 'var(--node-bg)' : 'var(--paper-2)',
+      border: `1.5px solid ${isSelected ? 'var(--acid)' : 'var(--paper-3)'}`,
+      borderRadius: 10,
+      cursor: 'pointer',
+      textAlign: 'center',
+      font: 'inherit',
+      color: 'inherit',
+      overflow: 'hidden',
+      transition: 'transform 0.18s, border-color 0.18s, background 0.18s, box-shadow 0.18s',
+      boxShadow: isSelected ? '0 12px 28px rgba(0,0,0,0.18)' : undefined,
+    };
+  }
 
   // ── Preview cells ──────────────────────────────────────────────────────────
 
@@ -167,18 +198,48 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
   // ── Hover helpers via onMouseEnter/Leave ───────────────────────────────────
 
   function applyHover(btn: HTMLButtonElement, rotate: number) {
-    btn.style.borderColor = 'var(--ink)';
-    btn.style.background = 'var(--node-bg)';
+    if (selectedKind !== (btn.dataset['kind'] as 'weekly' | 'daily' | null)) {
+      btn.style.borderColor = 'var(--ink)';
+      btn.style.background = 'var(--node-bg)';
+    }
     btn.style.transform = `translateY(-3px) rotate(${rotate}deg)`;
     btn.style.boxShadow = '0 12px 28px rgba(0,0,0,0.18)';
   }
 
   function removeHover(btn: HTMLButtonElement) {
-    btn.style.borderColor = 'var(--paper-3)';
-    btn.style.background = 'var(--paper-2)';
+    const kind = btn.dataset['kind'] as 'weekly' | 'daily' | undefined;
+    const isSelected = selectedKind === kind;
+    if (!isSelected) {
+      btn.style.borderColor = 'var(--paper-3)';
+      btn.style.background = 'var(--paper-2)';
+      btn.style.boxShadow = '';
+    }
     btn.style.transform = '';
-    btn.style.boxShadow = '';
   }
+
+  // Label style for TIME / DURATION inputs
+  const inputLabelStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 9.5,
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    color: 'var(--ink-3)',
+    marginBottom: 3,
+    display: 'block',
+  };
+
+  const inputFieldStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    background: 'var(--paper-2)',
+    border: '1px solid var(--paper-3)',
+    borderRadius: 4,
+    padding: '4px 6px',
+    color: 'var(--ink)',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  };
 
   const modal = (
     // Veil (backdrop) — click outside cancels.
@@ -322,9 +383,10 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
           <button
             ref={weeklyBtnRef}
             data-testid="habit-swap-weekly"
+            data-kind="weekly"
             type="button"
-            style={cardBtnBase}
-            onClick={() => onConfirm('weekly')}
+            style={cardBtnStyle('weekly')}
+            onClick={() => setSelectedKind('weekly')}
             onMouseEnter={(e) => applyHover(e.currentTarget, -1.2)}
             onMouseLeave={(e) => removeHover(e.currentTarget)}
           >
@@ -422,11 +484,11 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
 
           {/* Daily card */}
           <button
-            ref={dailyBtnRef}
             data-testid="habit-swap-daily"
+            data-kind="daily"
             type="button"
-            style={cardBtnBase}
-            onClick={() => onConfirm('daily')}
+            style={cardBtnStyle('daily')}
+            onClick={() => setSelectedKind('daily')}
             onMouseEnter={(e) => applyHover(e.currentTarget, 1.2)}
             onMouseLeave={(e) => removeHover(e.currentTarget)}
           >
@@ -523,6 +585,60 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
           </button>
         </div>
 
+        {/* Time + Duration inputs */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 12,
+            padding: '0 18px 16px',
+          }}
+        >
+          {/* TIME */}
+          <div>
+            <label style={inputLabelStyle}>
+              Time
+            </label>
+            <input
+              data-testid="habit-swap-time-input"
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              style={inputFieldStyle}
+            />
+          </div>
+          {/* DURATION */}
+          <div>
+            <label style={inputLabelStyle}>
+              Duration
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                data-testid="habit-swap-duration-input"
+                type="number"
+                min={5}
+                max={480}
+                step={5}
+                value={durationMin}
+                onChange={(e) => setDurationMin(parseInt(e.target.value, 10))}
+                style={{ ...inputFieldStyle, flex: 1 }}
+              />
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9.5,
+                  color: 'var(--ink-3)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  flexShrink: 0,
+                }}
+              >
+                MIN
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Footer */}
         <div
           style={{
@@ -591,7 +707,6 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
             type="button"
             onClick={onCancel}
             style={{
-              marginLeft: 'auto',
               background: 'transparent',
               border: 'none',
               color: 'var(--ink-3)',
@@ -611,6 +726,30 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
             }}
           >
             cancel drop
+          </button>
+          {/* Confirm button — disabled until kind selected and inputs valid */}
+          <button
+            data-testid="habit-swap-confirm"
+            type="button"
+            disabled={!canConfirm}
+            onClick={handleConfirm}
+            style={{
+              marginLeft: 'auto',
+              background: canConfirm ? 'var(--acid)' : 'var(--paper-3)',
+              border: 'none',
+              color: canConfirm ? 'var(--ink)' : 'var(--ink-4)',
+              cursor: canConfirm ? 'pointer' : 'not-allowed',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9.5,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              padding: '5px 12px',
+              borderRadius: 4,
+              transition: 'background 0.15s, color 0.15s',
+            }}
+          >
+            confirm
           </button>
         </div>
       </div>
