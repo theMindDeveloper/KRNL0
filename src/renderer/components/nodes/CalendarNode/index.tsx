@@ -14,10 +14,6 @@ export function CalendarNode({
   onCommand,
   slotIndex = 5,
   slotTotal = MOTHER_TOTAL,
-  onReorderDrop,
-  onReorderHover,
-  onReorderEnd,
-  slotCentersX,
 }: NodeProps<CalendarState, CalendarConfig>) {
   const config = (node.config ?? defaultCalendarConfig()) as CalendarConfig;
 
@@ -60,10 +56,6 @@ export function CalendarNode({
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
-      onReorderDrop={onReorderDrop}
-      onReorderHover={onReorderHover}
-      onReorderEnd={onReorderEnd}
-      slotCentersX={slotCentersX}
     >
       {/* Header */}
       <div

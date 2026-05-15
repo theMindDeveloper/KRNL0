@@ -9,7 +9,7 @@ import { startTerminalSession } from './session';
 import { MotdBanner } from './MotdBanner';
 import pkg from '../../../../../package.json';
 
-export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL, onReorderDrop, onReorderHover, onReorderEnd, slotCentersX }: NodeProps<TermState, TermConfig>) {
+export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL }: NodeProps<TermState, TermConfig>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -154,10 +154,6 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
       background="var(--term-bg)"
-      onReorderDrop={onReorderDrop}
-      onReorderHover={onReorderHover}
-      onReorderEnd={onReorderEnd}
-      slotCentersX={slotCentersX}
     >
       <style>{`
         @keyframes term-live-pulse {

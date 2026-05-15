@@ -243,10 +243,22 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
     boxSizing: 'border-box',
   };
 
+  // Stop a synthetic React event from bubbling through the portal back to the
+  // canvas (React events bubble through the React tree, NOT the DOM tree — so
+  // a click inside a portal still rises up the parent component tree). Without
+  // this, a click on a button inside the modal also triggered a node-select
+  // on the CalendarNode that opened the modal.
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
   const modal = (
-    // Veil (backdrop) — click outside cancels.
+    // Veil (backdrop) — absorbs ALL pointer events, then on click cancels.
     <div
-      onClick={onCancel}
+      onClick={(e) => { e.stopPropagation(); onCancel(); }}
+      onPointerDown={stop}
+      onPointerUp={stop}
+      onMouseDown={stop}
+      onMouseUp={stop}
+      onContextMenu={stop}
       style={{
         position: 'fixed',
         inset: 0,
@@ -258,10 +270,15 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
         placeItems: 'center',
       }}
     >
-      {/* Card — stop click propagation so clicking inside doesn't close. */}
+      {/* Card — stop ALL events so clicking inside doesn't close OR bubble. */}
       <div
         data-testid="habit-swap-modal"
-        onClick={(e) => e.stopPropagation()}
+        onClick={stop}
+        onPointerDown={stop}
+        onPointerUp={stop}
+        onMouseDown={stop}
+        onMouseUp={stop}
+        onContextMenu={stop}
         style={{
           width: 560,
           maxWidth: 'calc(100vw - 40px)',

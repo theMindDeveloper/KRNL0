@@ -880,9 +880,43 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             flex: 1,
             display: 'flex',
             position: 'relative',
+            // Force the cols container to the natural content height (24 *
+            // rowHeight) instead of stretching to gridBodyRef's clientHeight.
+            // Without this, the cols container is a flex child of an overflow-
+            // scroll container and align-items:stretch (default) sizes it to
+            // the visible viewport — so day-separator borders only span the
+            // visible portion, terminating at the scrollbar bottom. Hour cells
+            // inside still overflow below (they have explicit rowHeight each),
+            // but separator lines are tied to col height. Setting minHeight
+            // matches scrollHeight and lets the overlay span the full grid.
+            minHeight: rowCount * rowHeight,
           }}
         >
-          {weekDays.map((dayYMD, colIdx) => {
+          {/* Day-separator lines overlay — absolute layer sized to the full
+              content height so the lines never truncate at the scrollbar
+              edge. pointer-events:none so drop handlers underneath still fire.
+              Bug fix 2026-05-15. */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          >
+            {Array.from({ length: 7 }, (_, i) => (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  borderLeft: i > 0 ? '1px solid rgba(154, 145, 128, 0.25)' : undefined,
+                }}
+              />
+            ))}
+          </div>
+          {weekDays.map((dayYMD, _colIdx) => {
             const isToday = dayYMD === today;
             return (
               <div
@@ -892,7 +926,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                   flex: 1,
                   position: 'relative',
                   background: isToday ? 'rgba(201, 241, 88, 0.08)' : 'transparent',
-                  borderLeft: colIdx > 0 ? '1px solid rgba(154, 145, 128, 0.25)' : undefined,
+                  // borderLeft moved to the absolute overlay above so lines
+                  // span the full scroll content, not just clientHeight.
                 }}
               >
                 {/* Hour rows — drop targets (15-min snap computed from mouse Y at drop time) */}

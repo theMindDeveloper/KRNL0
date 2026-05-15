@@ -49,15 +49,20 @@
   cursor: grabbing;
 }
 
-/* ── Mother-reorder slide animation ─────────────────────────────────────────
-   When a user drags a mother card to a new slot (body.krnl-reordering is
-   set by MotherFrame onPointerDown, cleared on pointer-up/cancel), all
-   mother RF wrappers animate their transform so they appear to slide when
-   the store updates positions. The dragged card's own translateX is handled
-   by MotherFrame's inline style; the 200ms transition here applies to the
-   RF wrapper-level reposition that happens after the drop. */
-body.krnl-reordering .react-flow__node.krnl-mother {
-  transition: transform 200ms ease;
+/* Mother-swap slide animation — when the user clicks a swap button between
+   two mother cards, the store updates each mother's position. This transition
+   makes the position swap animate as a smooth slide. Only mothers get this
+   rule; child nodes pan/drag at 60fps with no transition.
+   IMPORTANT: this transition is permanent (not gated by a body class) — it
+   must NOT make RF pan jitter. RF transforms the entire viewport via a
+   parent wrapper, NOT by changing each node's transform. Per-node transform
+   only changes when the mother's position changes (= a swap). */
+.react-flow__node.krnl-mother {
+  transition: transform 280ms cubic-bezier(0.4, 0.0, 0.2, 1);
+  /* Negative slot badge (`top:-11px`) lives outside the wrapper's measured
+     bounds. Force overflow:visible so it never gets clipped by ancestor
+     overflow:hidden — see ADR 0006 / bug report from 2026-05-15. */
+  overflow: visible;
 }
 
 /* PR6 — Habit lane card tilts and lifts while being dragged. The rotation
