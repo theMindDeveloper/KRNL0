@@ -44,9 +44,10 @@ import {
   pomoSkipBreak,
   pomoEndBreak,
   pomoSetConfig,
+  pomoSetFace,
   pomoClearActiveTask,
 } from '../nodes/PomoNode/commands';
-import type { PomoConfig, PomoState } from '../nodes/PomoNode/types';
+import type { PomoConfig, PomoState, TimerFace } from '../nodes/PomoNode/types';
 import { defaultPomoConfig } from '../nodes/PomoNode/types';
 
 // ── Todo ──────────────────────────────────────────────────────────────
@@ -185,6 +186,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.skipBreak': return { state: pomoSkipBreak(s as never) };
         case 'pomo.endBreak': return { state: pomoEndBreak(s as never) };
         case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
+        case 'pomo.setFace':   return { config: pomoSetFace(pomoCfg, args as { face: TimerFace }) };
         case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never) };
       }
       break;

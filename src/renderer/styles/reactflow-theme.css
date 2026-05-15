@@ -23,19 +23,24 @@
   stroke-width: 1.5;
 }
 
-/* ── Task-flow animated edge ─────────────────────────────────────────────────
-   TaskFlowEdge uses stroke-dasharray "14 8" (period = 22).
-   RF's default `dashdraw` keyframe sweeps stroke-dashoffset 10 → 0, which is
-   only 10 of our 22-unit period — the loop visibly snaps every 0.5s.
-   Override with a period-matched keyframe so the animation loops seamlessly. */
+/* ── Task-flow edge dash-march ───────────────────────────────────────────────
+   TaskFlowEdge uses stroke-dasharray "14 8" (period 22). RF's built-in
+   `.animated` class runs a default dashdraw keyframe (10-unit sweep over
+   0.5s) which is a period MISMATCH — visually snaps every 0.5s. Wave C
+   stutter regression had `animated:true` running RF's default; the fix is
+   to set `animated:false` in rfAdapters and apply OUR period-matched
+   keyframe directly to the task-flow edge path here. Single CSS rule per
+   visible edge, GPU-driven, zero React/JS work per frame. The drop-shadow
+   filter was removed (it forced per-edge compositing layers and tanked
+   FPS during pan). Hover glow stays — it only fires on pointer hover. */
 @keyframes krnl-task-flow-dash {
   from { stroke-dashoffset: 22; }
   to   { stroke-dashoffset: 0; }
 }
-.react-flow__edge-task-flow.animated path.react-flow__edge-path {
+.react-flow__edge-task-flow path.react-flow__edge-path {
   animation: krnl-task-flow-dash 1.6s linear infinite;
 }
-.react-flow__edge-task-flow.animated path.react-flow__edge-path:hover {
+.react-flow__edge-task-flow path.react-flow__edge-path:hover {
   filter: drop-shadow(0 0 9px rgba(154, 237, 246, 0.85));
 }
 
@@ -44,12 +49,68 @@
   cursor: grabbing;
 }
 
+/* Mother-swap slide animation — when the user clicks a swap button between
+   two mother cards, the store updates each mother's position. This transition
+   makes the position swap animate as a smooth slide. Only mothers get this
+   rule; child nodes pan/drag at 60fps with no transition.
+   IMPORTANT: this transition is permanent (not gated by a body class) — it
+   must NOT make RF pan jitter. RF transforms the entire viewport via a
+   parent wrapper, NOT by changing each node's transform. Per-node transform
+   only changes when the mother's position changes (= a swap). */
+.react-flow__node.krnl-mother {
+  transition: transform 280ms cubic-bezier(0.4, 0.0, 0.2, 1);
+  /* Negative slot badge (`top:-11px`) lives outside the wrapper's measured
+     bounds. Force overflow:visible so it never gets clipped by ancestor
+     overflow:hidden — see ADR 0006 / bug report from 2026-05-15. */
+  overflow: visible;
+}
+
+/* PR6 — Habit lane card tilts and lifts while being dragged. The rotation
+   is on the inner card, not the RF wrapper, so the drag-position transform
+   on the wrapper composes cleanly with the rotation here. */
+.react-flow__node.dragging.krnl-kind-habit--lane > div:not(.react-flow__handle) {
+  transform: rotate(-1.4deg);
+  box-shadow:
+    0 0 0 1.5px var(--acid),
+    0 18px 40px rgba(0, 0, 0, 0.35) !important;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+/* Wave-B — fade the "↘ drop on a calendar day" drop-hint into view only
+   when the lane is being dragged. */
+.react-flow__node.dragging.krnl-kind-habit--lane .habit-lane-drophint {
+  opacity: 1 !important;
+}
+
 /* Hide React Flow's group-selection bounding box. The user-facing selection
    indicator is the per-node ring; the wrapping rect just adds visual noise
    and lingers after a marquee drag completes. */
 .react-flow__nodesselection,
 .react-flow__nodesselection-rect {
   display: none !important;
+}
+
+/* ── Unified node hover highlight ───────────────────────────────────────────
+   Approach: ::after pseudo-element inset ring so box-shadow (elevation) is
+   never touched. box-shadow is a single property — compositing !important
+   over an inline value drops the card's own elevation shadow, causing a
+   visible lift/flatten jump on hover. Rendering the ring via ::after leaves
+   the inline shadow untouched on every card (mothers, tasks, lanes, text,
+   image). border-radius:inherit so the ring tracks each card's own corner
+   radius (6px mothers, 10px children). pointer-events:none so clicks still
+   reach the card. Symmetric 120ms fade in both directions via transition. */
+.react-flow__node > div:not(.react-flow__handle)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.react-flow__node:hover > div:not(.react-flow__handle)::after {
+  opacity: 1;
 }
 
 /* ── Selection ring strategy ────────────────────────────────────────────────
@@ -128,6 +189,19 @@
 @keyframes krnl-today-pulse {
   0%, 100% { opacity: 0.4; }
   50%       { opacity: 0.9; }
+}
+
+/* PR7 — Calendar MonthView today highlight. The user asked for a solid
+   green fill on today's cell so it reads at a glance. Acid (#c9f158) is
+   theme-invariant; the text colour is hard-coded to #1a1814 (cyber light
+   --ink) so it stays readable on acid in both themes. */
+.krnl-month-cell--today {
+  background: var(--acid) !important;
+  color: #1a1814 !important;
+  font-weight: 600;
+}
+.krnl-month-cell--today .krnl-month-cell__day {
+  color: #1a1814 !important;
 }
 
 /* ── Calendar WeekView drop-target highlight ─────────────────────────────── */

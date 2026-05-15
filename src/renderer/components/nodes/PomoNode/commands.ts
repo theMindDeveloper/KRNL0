@@ -1,7 +1,7 @@
 // Decision #9 / Decision #22 — Pomodoro FSM. Pure handlers: (state, args) => state.
 // Time and id sources are injected so tests can pin them.
 
-import type { PomoConfig, PomoSessionRecord, PomoState } from './types';
+import type { PomoConfig, PomoSessionRecord, PomoState, TimerFace } from './types';
 import { defaultPomoConfig } from './types';
 
 export interface PomoEnv {
@@ -174,6 +174,8 @@ export const pomoSetConfig = (
     longBreakMin: clampPositive(args.config.longBreakMin, current.longBreakMin),
     longBreakEvery: clampPositive(args.config.longBreakEvery, current.longBreakEvery),
   };
+  // PR4 — preserve face selection across SAVE; face is optional so only copy when set
+  if (current.face !== undefined) next.face = current.face;
   return next;
 };
 
@@ -184,6 +186,21 @@ export const pomoSetConfig = (
 export const pomoClearActiveTask = (state: PomoState): PomoState => {
   if (state.activeTaskId === null) return state;
   return { ...state, activeTaskId: null, label: '' };
+};
+
+const VALID_FACES: ReadonlyArray<TimerFace> = ['ring', 'ascii', 'lcd', 'blocks', 'vapor'];
+
+/**
+ * PR4 — set the timer face variant on the PomoConfig.
+ * No-op if the requested face is unknown or unchanged.
+ */
+export const pomoSetFace = (
+  config: PomoConfig | null,
+  args: { face: TimerFace },
+): PomoConfig => {
+  const current = config ?? defaultPomoConfig();
+  if (!VALID_FACES.includes(args.face)) return current;
+  return { ...current, face: args.face };
 };
 
 function clampPositive(value: unknown, fallback: number): number {

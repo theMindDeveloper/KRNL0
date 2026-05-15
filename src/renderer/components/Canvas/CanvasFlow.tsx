@@ -6,12 +6,13 @@
  * useMemo from board.nodes / board.edges. RF runs in controlled mode.
  */
 
-import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
 import {
   ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
+  MiniMap,
   Panel,
   BaseEdge,
   getBezierPath,
@@ -23,13 +24,14 @@ import {
   type Viewport,
   type EdgeProps,
   type OnSelectionChangeParams,
+  type NodeProps as RFNodeProps,
   SelectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
-import { toRfNode, toRfEdge, type KrnlRFNode } from './rfAdapters';
+import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapters';
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { ContextMenu } from '../ContextMenu';
@@ -38,11 +40,40 @@ import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
 import type { Connection } from '@xyflow/react';
+import type { TaskState } from '../nodes/TaskNode/types';
+import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
+
+// ── MiniMap node color — module-level to avoid per-paint inline allocation ───
+// Hex literals used instead of CSS var() to skip variable resolution per rect.
+function miniMapNodeColor(n: KrnlRFNode): string {
+  switch (n.type) {
+    case 'pomo':       return '#c8553d';
+    case 'todo':       return '#22d3ee';
+    case 'habit':      return '#c9f158';
+    case 'terminal':   return '#5a5244';
+    case 'calendar':   return '#5e7d1d';
+    case 'clock':      return '#a78bfa';
+    case 'todo.task':  return '#22d3ee';
+    case 'habit.lane': return '#c9f158';
+    case 'text':       return '#9a9180';
+    case 'image':      return '#c2b89c';
+    default:           return '#5a5244';
+  }
+}
+
+// ── BoldSetContext — carries the set of source node IDs whose outgoing edges ──
+// should be bolded. Computed once per hover change in CanvasFlowInner and
+// distributed via context so edge components don't need individual store
+// subscriptions keyed on board.nodes (which would re-subscribe every render).
+// An empty frozen set is the stable default — edges read it as "bold nobody".
+const EMPTY_BOLD_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
+const BoldSetContext = createContext<ReadonlySet<string>>(EMPTY_BOLD_SET);
 
 // ── Edge components ───────────────────────────────────────────────────────────
 
 function TaskFlowEdge({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -50,6 +81,13 @@ function TaskFlowEdge({
   sourcePosition,
   targetPosition,
 }: EdgeProps) {
+  // Bold when this edge's source is in the active bold set. The set is computed
+  // in CanvasFlowInner and covers direct children of the hovered mother node
+  // (todo.task → todo mother, habit.lane → habit mother). Context read is
+  // O(1); no additional store subscription per edge component.
+  const boldSet = useContext(BoldSetContext);
+  const bold = boldSet.has(source);
+
   const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
@@ -92,11 +130,10 @@ function TaskFlowEdge({
         path={edgePath}
         style={{
           stroke: `url(#${gradId})`,
-          strokeWidth: 3,
+          strokeWidth: bold ? 4 : 3,
           strokeDasharray: '14 8',
           strokeLinecap: 'round',
           opacity: 1,
-          filter: 'drop-shadow(0 0 3px rgba(78, 168, 176, 0.30))',
         }}
       />
     </>
@@ -105,6 +142,7 @@ function TaskFlowEdge({
 
 function DefaultEdge({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -113,6 +151,10 @@ function DefaultEdge({
   targetPosition,
   data,
 }: EdgeProps) {
+  // Bold when this edge's source is in the active bold set (same as TaskFlowEdge).
+  const boldSet = useContext(BoldSetContext);
+  const bold = boldSet.has(source);
+
   const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
@@ -128,9 +170,9 @@ function DefaultEdge({
       path={edgePath}
       style={{
         stroke: active ? 'var(--acid)' : 'var(--ink-3)',
-        strokeWidth: active ? 1.5 : 1,
+        strokeWidth: bold ? (active ? 2.5 : 2) : (active ? 1.5 : 1),
         strokeDasharray: active ? undefined : '4 4',
-        opacity: active ? 1 : 0.6,
+        opacity: bold ? 1 : (active ? 1 : 0.6),
       }}
     />
   );
@@ -140,6 +182,144 @@ const EDGE_TYPES = {
   'task-flow': TaskFlowEdge,
   default: DefaultEdge,
 };
+
+// ── SwapButton pseudo-node ────────────────────────────────────────────────────
+// Sits in the gap between every adjacent mother-node pair. Click swaps the two
+// mothers' slot positions. Implemented as a custom RF node so it lives inside
+// the flow transform (pans/zooms with the canvas) without any DOM overlay math.
+// Not draggable, not selectable, no handles — pure UI.
+//
+// data carries { leftId, rightId } so the click handler can dispatch the swap
+// against boardStore without resubscribing to the whole graph.
+interface SwapButtonData extends Record<string, unknown> {
+  leftId: string;
+  rightId: string;
+}
+
+const SwapButtonNode = memo(function SwapButtonNode({
+  data,
+}: { data: SwapButtonData }) {
+  const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      swapMotherSlots(data.leftId, data.rightId);
+      const updated = useBoardStore.getState().board;
+      if (updated) void window.krnl?.boardSave(updated);
+    },
+    [data.leftId, data.rightId, swapMotherSlots],
+  );
+
+  // stopPropagation on pointer events — RF treats unhandled pointer events as
+  // pan-start under panOnDrag=[1,2]; left-button starts a marquee selection.
+  // Both must be suppressed so a click on the button doesn't start a drag.
+  const stop = useCallback((e: React.PointerEvent | React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  // Proximity reveal — button is invisible + non-interactive by default and
+  // fades in only when the cursor is within PROXIMITY_PX of its center. The
+  // opacity + pointer-events toggle is mutated directly on the DOM via rAF so
+  // mousemove doesn't trigger any React re-render (would re-render the whole
+  // RF node tree at 60fps). The button stays click-through when hidden.
+  useEffect(() => {
+    const PROXIMITY_PX = 140;
+    let rafId: number | null = null;
+    let lastX = 0;
+    let lastY = 0;
+    const tick = () => {
+      rafId = null;
+      const btn = btnRef.current;
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      const dx = lastX - (r.left + r.width / 2);
+      const dy = lastY - (r.top + r.height / 2);
+      const near = (dx * dx + dy * dy) < (PROXIMITY_PX * PROXIMITY_PX);
+      if (near) {
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'all';
+      } else {
+        btn.style.opacity = '0';
+        btn.style.pointerEvents = 'none';
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+      if (rafId === null) rafId = requestAnimationFrame(tick);
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  return (
+    <button
+      ref={btnRef}
+      type="button"
+      onClick={handleClick}
+      onPointerDown={stop}
+      onMouseDown={stop}
+      title="Swap left ↔ right panel"
+      style={{
+        // Cosmetic centering inside the 32×32 RF wrapper — RF positions the
+        // wrapper, this rule ensures the button visually fills it with no
+        // sub-pixel drift if the wrapper ever gets a different size.
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 32,
+        height: 32,
+        borderRadius: '50%',
+        background: 'var(--paper-2)',
+        border: '1px solid var(--paper-3)',
+        color: 'var(--ink-2)',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 13,
+        lineHeight: 1,
+        display: 'grid',
+        placeItems: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+        padding: 0,
+        // Defensive pointer-events:all and z-index — RF's `.react-flow__node`
+        // wrappers do not block clicks by default, but explicit beats default.
+        // Sit above the mother-card layer so a click reaches us first.
+        pointerEvents: 'none',  // overridden by proximity tick when near
+        zIndex: 100,
+        opacity: 0,
+        transition: 'opacity 180ms ease, background 120ms ease, color 120ms ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--acid)';
+        e.currentTarget.style.color = '#1a1814';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'var(--paper-2)';
+        e.currentTarget.style.color = 'var(--ink-2)';
+      }}
+    >
+      ⇄
+    </button>
+  );
+});
+
+// Merge swap-button into NODE_TYPES so RF can resolve it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ALL_NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> = {
+  ...NODE_TYPES,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  'swap-button': SwapButtonNode as ComponentType<any>,
+};
+
+// Stable empty fallback for the nodes-selector when board is null. Sharing
+// one reference prevents the selector from returning a fresh `[]` per call.
+const EMPTY_NODES: KrnlNode[] = [];
 
 // ── Per-id stable caches — keep RF/React.memo identity across renders ────────
 // Without these, every store update creates fresh closures → adapter memo
@@ -157,8 +337,6 @@ const rfMotherCache = new Map<
     src: KrnlNode;
     slotIndex: number;
     slotTotal: number;
-    hasLeft: boolean;
-    hasRight: boolean;
     rf: ReturnType<typeof toRfNode>;
   }
 >();
@@ -231,7 +409,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const updateNode = useBoardStore((s) => s.updateNode);
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
-  const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
+  const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
   const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
 
   // Start the debounced viewport persister (Decision #7).
@@ -244,7 +422,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // In that case we fire fitView once so all 5 mothers are visible in the
   // initial view. The didFitRef guard ensures this runs at most once per session.
   const didFitRef = useRef(false);
-  const rfNodes = useBoardStore((s) => s.board?.nodes ?? []);
+  // Stable empty-array fallback so the selector doesn't return a fresh `[]`
+  // every call while board is null — fresh literal would break zustand's
+  // shallow equality check and re-fire downstream renders unnecessarily.
+  const rfNodes = useBoardStore((s) => s.board?.nodes ?? EMPTY_NODES);
 
   useEffect(() => {
     if (didFitRef.current) return;
@@ -529,7 +710,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
-  const derivedNodes = useMemo(() => {
+  // Also appends swap-button pseudo-nodes between every adjacent mother pair
+  // so the user can reorder mothers via a click instead of drag-and-drop.
+  const derivedNodes = useMemo((): KrnlRFNode[] => {
     if (!board) return [];
 
     // Compute slot ordering for mother nodes (sorted by position.x)
@@ -542,7 +725,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
     );
 
-    return board.nodes.map((node: KrnlNode) => {
+    const baseNodes: KrnlRFNode[] = board.nodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
       const onSelect = getSelectHandler(node.id, selectNode);
 
@@ -550,60 +733,63 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         return getMemoizedRfNode(node, { onCommand, onSelect });
       }
 
-      // Mother node: cache by (node ref, slotIndex, slotTotal, hasLeft, hasRight).
-      // Without this cache, every drag tick built a fresh RFNode for every
-      // mother — fresh `data` object with fresh `onMoveLeft`/`onMoveRight`
-      // closures — defeating React.memo on the adapter and forcing PomoNode /
-      // TodoNode / HabitNode / **TerminalNode (with its xterm instance)** to
-      // re-render 60fps. That was the dominant drag-lag cause.
+      // Mother node: cache by (node ref, slotIndex, slotTotal).
       const slotIndex = slotIndexMap.get(node.id) ?? 1;
-      const hasLeft = slotIndex > 1;
-      const hasRight = slotIndex < slotTotal;
       const cached = rfMotherCache.get(node.id);
       if (
         cached &&
         cached.src === node &&
         cached.slotIndex === slotIndex &&
-        cached.slotTotal === slotTotal &&
-        cached.hasLeft === hasLeft &&
-        cached.hasRight === hasRight
+        cached.slotTotal === slotTotal
       ) {
         return cached.rf;
       }
-
-      const onMoveLeft = hasLeft
-        ? () => {
-            const prevMother = motherNodes[slotIndex - 2];
-            if (prevMother) {
-              swapMotherSlots(node.id, prevMother.id);
-              const updated = useBoardStore.getState().board;
-              if (updated) void window.krnl?.boardSave(updated);
-            }
-          }
-        : undefined;
-      const onMoveRight = hasRight
-        ? () => {
-            const nextMother = motherNodes[slotIndex];
-            if (nextMother) {
-              swapMotherSlots(node.id, nextMother.id);
-              const updated = useBoardStore.getState().board;
-              if (updated) void window.krnl?.boardSave(updated);
-            }
-          }
-        : undefined;
 
       const rf = toRfNode(node, {
         onCommand,
         onSelect,
         slotIndex,
         slotTotal,
-        onMoveLeft,
-        onMoveRight,
       });
-      rfMotherCache.set(node.id, { src: node, slotIndex, slotTotal, hasLeft, hasRight, rf });
+      rfMotherCache.set(node.id, { src: node, slotIndex, slotTotal, rf });
       return rf;
     });
-  }, [board, selectNode, swapMotherSlots]);
+
+    // Swap-button pseudo-nodes — one per adjacent mother pair.
+    // Position: in the gap between the two cards, vertically centered.
+    // MOTHER_WIDTH = 500; gap between motherR.left and motherL.right is
+    // motherR.position.x - (motherL.position.x + 500). Place button at the
+    // midpoint of that gap. Vertical center at motherL.position.y + 250.
+    const swapNodes: KrnlRFNode[] = [];
+    for (let i = 0; i < motherNodes.length - 1; i++) {
+      const left = motherNodes[i]!;
+      const right = motherNodes[i + 1]!;
+      const gapMidX = (left.position.x + 500 + right.position.x) / 2;
+      const cy = left.position.y + 250;
+      swapNodes.push({
+        id: `__swap__${left.id}__${right.id}`,
+        type: 'swap-button',
+        position: { x: gapMidX - 16, y: cy - 16 }, // button is 32×32
+        draggable: false,
+        selectable: false,
+        data: {
+          // RFNodeData shape padding — never read by SwapButtonNode.
+          node: {} as KrnlNode,
+          onCommand: () => { /* no-op */ },
+          onSelect: () => { /* no-op */ },
+          leftId: left.id,
+          rightId: right.id,
+        } as RFNodeData & { leftId: string; rightId: string },
+        width: 32,
+        height: 32,
+        measured: { width: 32, height: 32 },
+        // Sit above mother cards so the button stays clickable.
+        zIndex: 50,
+      });
+    }
+
+    return [...baseNodes, ...swapNodes];
+  }, [board, selectNode]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
   // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that
@@ -645,6 +831,55 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       return getMemoizedRfEdge(edge, srcKind, tgtKind);
     });
   }, [board]);
+
+  // ── Bold-set — which source node IDs should bold their outgoing edges ─────
+  // Keyed on [board.nodes, hoveredNodeId]. When a mother is hovered we walk its
+  // children instead of relying on `source === motherId` (mothers have no
+  // handles so no edge ever has a mother as its source).
+  //   todo   mother  → all todo.task nodes whose state.parentTodoId matches
+  //   habit  mother  → all habit.lane nodes whose state.habitId is in the
+  //                    mother habit's habit list
+  //   others (pomo, terminal, calendar, clock) → empty (no child nodes with edges)
+  // When hovering a non-mother: set = {hoveredNodeId} (direct source match).
+  // When nothing hovered: empty set (frozen, stable reference).
+  const boldSet = useMemo<ReadonlySet<string>>(() => {
+    if (!hoveredNodeId || !board) return EMPTY_BOLD_SET;
+    const hoveredNode = board.nodes.find((n: KrnlNode) => n.id === hoveredNodeId);
+    if (!hoveredNode) return EMPTY_BOLD_SET;
+
+    if (hoveredNode.kind === 'todo' && hoveredNode.isMother) {
+      // All task nodes belonging to this todo mother.
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'todo.task') {
+          const ts = n.state as TaskState;
+          if (ts.parentTodoId === hoveredNodeId) ids.add(n.id);
+        }
+      }
+      return ids;
+    }
+
+    if (hoveredNode.kind === 'habit' && hoveredNode.isMother) {
+      // All habit.lane nodes whose habitId is one of this mother's habits.
+      const motherHabitIds = new Set<string>(
+        ((hoveredNode.state as { habits?: Array<{ id: string }> }).habits ?? []).map(
+          (h) => h.id
+        )
+      );
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'habit.lane') {
+          const ls = n.state as HabitLaneState;
+          if (motherHabitIds.has(ls.habitId)) ids.add(n.id);
+        }
+      }
+      return ids;
+    }
+
+    // Non-mother or other mother kinds (pomo, terminal, calendar, clock):
+    // bold edges whose source is the hovered node itself.
+    return new Set<string>([hoveredNodeId]);
+  }, [board, hoveredNodeId]);
 
   // ── onNodesChange — apply every change locally; commit only on drag end ──
   // Local-first: applyNodeChanges absorbs position/dimensions/select changes
@@ -710,10 +945,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   );
 
   return (
+    <BoldSetContext.Provider value={boldSet}>
     <ReactFlow
       nodes={nodes}
       edges={rfEdges}
-      nodeTypes={NODE_TYPES}
+      nodeTypes={ALL_NODE_TYPES}
       edgeTypes={EDGE_TYPES}
       defaultViewport={initialViewport}
       onNodesChange={onNodesChange}
@@ -745,16 +981,39 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       proOptions={{ hideAttribution: true }}
       style={{ background: 'var(--paper)' }}
     >
-      {/* Dotted grid background — replaces the radial gradient from Canvas */}
+      {/* Wave-B (LifeOS UI refresh) — single coarse dot grid at 160 px.
+          The dual-density (32 px minor + 160 px major) approach was causing
+          two stacked SVG repaint layers on every pan frame. One coarse layer
+          reads well at all zoom levels; node cards provide additional anchors. */}
       <Background
+        id="krnl-grid-major"
         variant={BackgroundVariant.Dots}
-        gap={32}
-        size={1.5}
+        gap={160}
+        size={3}
         color="var(--grid-strong)"
+        offset={0}
       />
 
-      {/* Controls — zoom in/out, fit view */}
-      <Controls position="bottom-right" showInteractive={false} />
+      {/* Controls — zoom in/out, fit view. Moved to bottom-left so MiniMap
+          can anchor bottom-right without overlap. */}
+      <Controls position="bottom-left" showInteractive={false} />
+
+      {/* PR-wave-A — MiniMap bottom-right. Each node renders as a small
+          colored rect so the user can see the board layout at a glance and
+          click-to-pan to a region. nodeColor is a module-level function so
+          the browser doesn't allocate a new closure per paint. */}
+      <MiniMap
+        position="bottom-right"
+        pannable
+        zoomable
+        nodeColor={miniMapNodeColor}
+        nodeStrokeWidth={2}
+        maskColor="rgba(14, 13, 11, 0.55)"
+        style={{
+          width: 160,
+          height: 120,
+        }}
+      />
 
       {/* Left dock */}
       <Panel position="top-left" style={{ margin: 0, padding: 0 }}>
@@ -842,6 +1101,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         </div>
       )}
     </ReactFlow>
+    </BoldSetContext.Provider>
   );
 }
 

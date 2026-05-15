@@ -13,7 +13,7 @@
 //   single onClick reads `data-date` from the target. 371 cells per
 //   habit → 1 listener.
 
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
 import { useBoardStore } from '../../../store/boardStore';
@@ -79,8 +79,6 @@ export function HabitNode({
   onCommand,
   slotIndex = 3,
   slotTotal = MOTHER_TOTAL,
-  onMoveLeft,
-  onMoveRight,
 }: NodeProps<HabitState, HabitConfig>) {
   const { state, config } = node;
   const [newName, setNewName] = useState('');
@@ -163,11 +161,10 @@ export function HabitNode({
 
   return (
     <MotherFrame
+      nodeId={node.id}
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
-      onMoveLeft={onMoveLeft}
-      onMoveRight={onMoveRight}
     >
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, flex: 1 }}>
         {/* Header */}
@@ -272,6 +269,14 @@ export function HabitNode({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={handleKeyDown}
+              // Stop click/pointer events at the input so they don't bubble
+              // to RF's onNodeClick → selecting the habit mother → acid
+              // selection ring flash. The input still receives focus and
+              // typing works because React's stopPropagation is for SYNTHETIC
+              // event bubbling, not DOM focus.
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
                 padding: '4px 0',
@@ -729,6 +734,14 @@ interface YearRowProps extends RowCommonProps {
   yearGrid: (string | null)[][];
 }
 
+// Year-grid dimensions, derived once. 53 cols × 7 rows of 5×5 px cells with
+// 1 px gap = total width 317 px, height 41 px. Module-level so the canvas
+// draw fn doesn't recompute.
+const YEAR_COLS = 53;
+const YEAR_ROWS = 7;
+const YEAR_GRID_W = YEAR_COLS * (YEAR_CELL_SIZE + YEAR_CELL_GAP) - YEAR_CELL_GAP;
+const YEAR_GRID_H = YEAR_ROWS * (YEAR_CELL_SIZE + YEAR_CELL_GAP) - YEAR_CELL_GAP;
+
 const YearRow = memo(function YearRow({
   habit,
   habitIdx,
@@ -741,23 +754,72 @@ const YearRow = memo(function YearRow({
 }: YearRowProps) {
   const color = habitColor(habit.color);
   const streak = useMemo(() => calcStreak(habit.log, today), [habit.log, today]);
-  const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Single delegated click handler on the grid. data-date on each cell.
-  const onGridClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const t = e.target as HTMLElement;
-      const date = t.getAttribute('data-date');
-      if (!date) return;
-      if (date > today) return;
-      onToggle(habit.id, date);
-    },
-    [habit.id, today, onToggle],
-  );
+  // Canvas redraw — 371 cells in one DOM node instead of 371 divs. Re-runs
+  // only when log / color / today / yearGrid changes. Resolves CSS-var colors
+  // via getComputedStyle so theme swaps still take effect (a fresh draw fires
+  // when the parent re-renders after theme toggle).
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-  const cellStyle = { width: YEAR_CELL_SIZE, height: YEAR_CELL_SIZE };
-  const emptyCellStyle = { width: YEAR_CELL_SIZE, height: YEAR_CELL_SIZE };
+    const cs = getComputedStyle(canvas);
+    const doneColor = cs.getPropertyValue(`--${color}`).trim() || '#c9f158';
+    const restColor = cs.getPropertyValue('--paper-3').trim() || '#3a3527';
+    const todayBorder = cs.getPropertyValue('--ink-3').trim() || '#5a5244';
+
+    const dpr = window.devicePixelRatio || 1;
+    const W = YEAR_GRID_W;
+    const H = YEAR_GRID_H;
+    if (canvas.width !== W * dpr) {
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = `${W}px`;
+      canvas.style.height = `${H}px`;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const logSet = new Set(habit.log);
+    const step = YEAR_CELL_SIZE + YEAR_CELL_GAP;
+    for (let r = 0; r < YEAR_ROWS; r++) {
+      const rowArr = yearGrid[r];
+      if (!rowArr) continue;
+      for (let c = 0; c < YEAR_COLS; c++) {
+        const day = rowArr[c];
+        if (day === null || day === undefined) continue;
+        if (day > today) continue;             // future suppressed
+        const x = c * step;
+        const y = r * step;
+        const done = logSet.has(day);
+        if (done) {
+          ctx.fillStyle = doneColor;
+          ctx.fillRect(x, y, YEAR_CELL_SIZE, YEAR_CELL_SIZE);
+        } else {
+          // Past undone — faded rest color.
+          ctx.globalAlpha = 0.4;
+          ctx.fillStyle = restColor;
+          ctx.fillRect(x, y, YEAR_CELL_SIZE, YEAR_CELL_SIZE);
+          ctx.globalAlpha = 1;
+        }
+        if (day === today) {
+          ctx.strokeStyle = done ? doneColor : todayBorder;
+          ctx.lineWidth = 1;
+          // 0.5 offset → crisp 1 px stroke aligned to pixel grid.
+          ctx.strokeRect(x + 0.5, y + 0.5, YEAR_CELL_SIZE - 1, YEAR_CELL_SIZE - 1);
+        }
+      }
+    }
+  }, [habit.log, color, today, yearGrid]);
+
+  // Year view is intentionally read-only (2026-05-15 product call). No
+  // click/toggle from year view — feels noisy at 5 px cells; use the week or
+  // month view to toggle. _suppress the unused warning by referencing the prop.
+  void onToggle;
 
   return (
     <div
@@ -811,35 +873,22 @@ const YearRow = memo(function YearRow({
         </div>
       </div>
 
-      <div
-        className="habit-year-grid"
-        onClick={onGridClick}
+      {/* Canvas-based year grid — replaces 371 cell divs with one canvas.
+          ~6× faster mount + repaint at 6+ habits, and a habit-log toggle
+          repaints only one canvas (this row's), not the whole grid tree.
+          pointer-events:none — year view is read-only; toggles happen from
+          the week/month views. */}
+      <canvas
+        ref={canvasRef}
+        data-testid={`habit-year-canvas-${habit.id}`}
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: YEAR_CELL_GAP,
+          display: 'block',
+          cursor: 'default',
+          pointerEvents: 'none',
+          width: YEAR_GRID_W,
+          height: YEAR_GRID_H,
         }}
-      >
-        {yearGrid.map((row, rIdx) => (
-          <div key={rIdx} className="habit-year-row" style={{ display: 'flex', gap: YEAR_CELL_GAP }}>
-            {row.map((dayStr, cIdx) => {
-              if (dayStr === null) {
-                return <div key={cIdx} style={emptyCellStyle} />;
-              }
-              const done = logSet.has(dayStr);
-              const cls = cellClass(dayStr, today, done, 'year');
-              return (
-                <div
-                  key={cIdx}
-                  data-date={dayStr}
-                  className={cls}
-                  style={cellStyle}
-                />
-              );
-            })}
-          </div>
-        ))}
-      </div>
+      />
     </div>
   );
 });

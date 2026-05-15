@@ -1761,6 +1761,222 @@ html, body {
 .task-pomo-btn:hover { background: var(--cyan, #4ea8b0); color: var(--paper); border-color: var(--cyan, #4ea8b0); }
 [data-theme="dark"] .task-pomo-btn { border-color: var(--paper-3); }
 
+/* === CLOCK NODE (12-hour task schedule) ====================== */
+.node.clock { width: 304px; }
+.clock-body {
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.clock-face-wrap {
+  position: relative;
+  width: 244px;
+  height: 244px;
+}
+.clock-face {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.clock-face .face-bg {
+  fill: var(--node-bg);
+  stroke: var(--paper-3);
+  stroke-width: 1;
+}
+[data-theme="dark"] .clock-face .face-bg {
+  fill: #14110c;
+  stroke: var(--paper-3);
+}
+.clock-face .track {
+  stroke: var(--paper-3);
+  opacity: 0.7;
+}
+[data-theme="dark"] .clock-face .track { stroke: var(--paper-3); opacity: 0.5; }
+.clock-face .tick { stroke: var(--ink-3); }
+.clock-face .tick.major { stroke: var(--ink-2); }
+[data-theme="dark"] .clock-face .tick { stroke: var(--ink-3); }
+[data-theme="dark"] .clock-face .tick.major { stroke: var(--ink-2); }
+.clock-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--ink-2);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.clock-12 {
+  fill: var(--rust);
+  font-weight: 700;
+}
+.clock-arc {
+  fill: none;
+  stroke-linecap: round;
+  transition: opacity 0.25s, stroke-width 0.25s;
+}
+.clock-arc.past   { opacity: 0.35; }
+.clock-arc.future { opacity: 0.92; }
+.clock-arc.active {
+  opacity: 1;
+  stroke-width: 16;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+@keyframes clock-arc-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px currentColor); }
+  50%      { filter: drop-shadow(0 0 12px currentColor); }
+}
+.clock-arc.active { animation: clock-arc-pulse 2.4s ease-in-out infinite; }
+.clock-hand-hour {
+  stroke: var(--ink);
+  stroke-linecap: round;
+}
+.clock-hand-min {
+  stroke: var(--ink);
+  stroke-linecap: round;
+}
+.clock-hand-sec {
+  stroke: var(--rust);
+  stroke-linecap: round;
+  opacity: 0.9;
+  transition: transform 0.4s cubic-bezier(.4,2.3,.6,1);
+}
+[data-theme="dark"] .clock-hand-hour,
+[data-theme="dark"] .clock-hand-min { stroke: var(--ink); }
+.clock-hub-outer { fill: var(--ink); }
+.clock-hub-inner { fill: var(--acid); }
+[data-theme="dark"] .clock-hub-outer { fill: var(--ink); }
+[data-theme="dark"] .clock-hub-inner { fill: var(--acid); }
+
+.clock-meridiem {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.clock-meridiem .strong { color: var(--rust); margin-right: 4px; }
+
+.clock-now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  position: relative;
+  overflow: hidden;
+}
+[data-theme="dark"] .clock-now { background: var(--paper-2); border-color: var(--paper-3); }
+.clock-now-progress {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, currentColor 0%, currentColor 100%);
+  opacity: 0.10;
+  pointer-events: none;
+  transform-origin: 0 50%;
+}
+.clock-now-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px currentColor;
+}
+.clock-now-name {
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+.clock-now-name.dim { color: var(--ink-3); text-transform: none; font-weight: 400; }
+.clock-now-time {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.clock-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--font-mono);
+}
+.clock-task {
+  display: grid;
+  grid-template-columns: 4px 56px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  color: var(--ink-2);
+  border-bottom: 1px dashed transparent;
+  font-size: 11px;
+  position: relative;
+}
+.clock-task + .clock-task { border-top: 1px dashed var(--paper-2); }
+[data-theme="dark"] .clock-task + .clock-task { border-top-color: var(--paper-3); }
+.clock-task .bar {
+  width: 4px;
+  height: 16px;
+  border-radius: 1px;
+  align-self: center;
+}
+.clock-task .time {
+  color: var(--ink-3);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.clock-task .name {
+  color: var(--ink);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.clock-task .dur {
+  color: var(--ink-4);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+}
+.clock-task.past { opacity: 0.42; }
+.clock-task.past .name {
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-4);
+}
+.clock-task.on .name { font-weight: 600; }
+.clock-task.on .time { color: var(--rust); }
+.clock-task.on::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px; height: 4px;
+  background: var(--rust);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--rust);
+  animation: blink 1.4s steps(2) infinite;
+}
+
 /* ============================================================ */
 /* === TIMER VARIANTS (5 different ideas, switched via tweak) === */
 /* ============================================================ */
@@ -2052,6 +2268,397 @@ html, body {
   margin-top: 4px;
 }
 [data-theme="dark"] .pomo-vapor .info .pct { color: var(--acid); text-shadow: 0 0 8px rgba(201,241,88,0.45); }
+
+/* === HABIT CHILD NODE (single habit, draggable to calendar) == */
+.node.habit-child { width: 240px; }
+.habit-child-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.habit-child-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.habit-child-glyph {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  background: var(--paper-2);
+  border: 1px dashed var(--paper-3);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  color: var(--spine);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .habit-child-glyph { color: var(--acid); }
+.habit-child-name {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--ink);
+  flex: 1;
+}
+.habit-child-tick {
+  width: 22px; height: 22px;
+  border: 1.5px solid var(--ink-4);
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  color: var(--ink-3);
+  background: var(--node-bg);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 0;
+  transition: all 0.12s;
+}
+.habit-child-tick:hover { border-color: var(--spine); color: var(--spine); }
+.habit-child-tick.done {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--acid);
+  font-weight: 700;
+}
+[data-theme="dark"] .habit-child-tick.done { background: var(--acid); border-color: var(--acid); color: var(--paper); }
+.habit-child-mini {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.habit-child-mini .mc {
+  height: 14px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  border-radius: 2px;
+  position: relative;
+}
+.habit-child-mini .mc.on { background: var(--ink); border-color: var(--ink); }
+.habit-child-mini .mc.on::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--acid);
+  border-radius: 1px;
+}
+.habit-child-mini .mc.today { border-color: var(--rust); border-width: 1.5px; }
+.habit-child-mini .mc.gap { background: transparent; border-style: dashed; }
+.habit-child-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 6px;
+  border-top: 1px dashed var(--paper-3);
+}
+[data-theme="dark"] .habit-child-foot { border-top-color: var(--paper-3); }
+.habit-child-foot .streak { color: var(--rust); font-weight: 600; }
+.habit-child-foot .cadence {
+  color: var(--ink-3);
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.habit-child-foot .cadence::before {
+  content: '↻';
+  color: var(--spine);
+  font-size: 11px;
+  margin-right: 2px;
+}
+[data-theme="dark"] .habit-child-foot .cadence::before { color: var(--acid); }
+.habit-child-drophint {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: -22px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rust);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.node.habit-child.dragging .habit-child-drophint { opacity: 1; }
+.node.habit-child.dragging {
+  box-shadow: 0 0 0 1.5px var(--acid), 0 18px 40px rgba(0,0,0,0.35);
+  transform: rotate(-1.4deg);
+  cursor: grabbing;
+}
+
+/* Calendar cell highlight while a habit is dragged over it */
+.cal-cell.habit-hot {
+  background: var(--acid) !important;
+  color: var(--ink) !important;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--ink), 0 0 14px rgba(201,241,88,0.6);
+  z-index: 2;
+}
+[data-theme="dark"] .cal-cell.habit-hot { color: var(--paper) !important; box-shadow: 0 0 0 2px var(--paper), 0 0 14px rgba(201,241,88,0.7); }
+.cal-cell.habit-hot::before {
+  content: '↘';
+  position: absolute;
+  top: 1px; left: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  opacity: 0.8;
+}
+@keyframes cal-cell-confirm {
+  0%   { box-shadow: 0 0 0 0 var(--acid), 0 0 0 0 rgba(201,241,88,0.7); }
+  35%  { box-shadow: 0 0 0 3px var(--acid), 0 0 16px rgba(201,241,88,0.8); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 0 0 transparent; }
+}
+.cal-cell.habit-set { animation: cal-cell-confirm 1.4s ease-out; }
+
+/* === HABIT SWAP MODAL ======================================== */
+.habit-swap-veil {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 4, 0.55);
+  backdrop-filter: blur(6px);
+  z-index: 250;
+  display: grid;
+  place-items: center;
+  animation: hs-veil-in 0.18s ease;
+}
+@keyframes hs-veil-in { from { opacity: 0; } to { opacity: 1; } }
+.habit-swap-card {
+  width: 560px;
+  max-width: calc(100vw - 40px);
+  background: var(--node-bg);
+  border: 1px solid var(--paper-3);
+  border-radius: 12px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+  overflow: hidden;
+  animation: hs-card-in 0.32s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes hs-card-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+.habit-swap-head {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--paper-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+.habit-swap-head .glyph {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  background: var(--paper-2);
+  border: 1px dashed var(--paper-3);
+  border-radius: 4px;
+  color: var(--spine);
+  font-size: 14px;
+  font-family: var(--font-mono);
+}
+[data-theme="dark"] .habit-swap-head .glyph { color: var(--acid); }
+.habit-swap-head .titleblock {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
+}
+.habit-swap-head .titleblock .name {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+.habit-swap-head .titleblock .sub {
+  color: var(--ink-4);
+}
+.habit-swap-head .date {
+  margin-left: auto;
+  color: var(--ink-2);
+  text-align: right;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.habit-swap-head .date .big {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.habit-swap-q {
+  text-align: center;
+  padding: 16px 18px 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.habit-swap-q .acc { color: var(--rust); }
+.habit-swap-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 10px 18px 18px;
+}
+.habit-swap-opt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 22px 14px 16px;
+  background: var(--paper-2);
+  border: 1.5px solid var(--paper-3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.18s, border-color 0.18s, background 0.18s, box-shadow 0.18s;
+  text-align: center;
+  font: inherit;
+  color: inherit;
+  overflow: hidden;
+}
+.habit-swap-opt:hover, .habit-swap-opt:focus-visible {
+  border-color: var(--ink);
+  background: var(--node-bg);
+  transform: translateY(-3px);
+  outline: none;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+}
+.habit-swap-opt.left:hover  { transform: translateY(-3px) rotate(-1.2deg); }
+.habit-swap-opt.right:hover { transform: translateY(-3px) rotate(1.2deg); }
+.habit-swap-opt .arrow {
+  position: absolute;
+  top: 12px;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-2);
+  background: var(--node-bg);
+  border: 1.5px solid var(--ink-3);
+  transition: all 0.15s;
+}
+.habit-swap-opt.left  .arrow { left: 12px; }
+.habit-swap-opt.right .arrow { right: 12px; }
+.habit-swap-opt:hover .arrow {
+  background: var(--ink);
+  color: var(--acid);
+  border-color: var(--ink);
+}
+.habit-swap-opt .badge {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 100px;
+}
+.habit-swap-opt.left  .badge { background: var(--rust);  color: var(--paper); }
+.habit-swap-opt.right .badge { background: var(--spine); color: var(--paper); }
+[data-theme="dark"] .habit-swap-opt.right .badge { background: var(--acid); color: var(--paper); }
+.habit-swap-opt h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.05;
+  padding: 0 16px;
+}
+.habit-swap-opt .preview {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  padding: 0 16px;
+}
+.habit-swap-opt .preview .dl {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--ink-4);
+  text-align: center;
+  padding-bottom: 3px;
+  text-transform: uppercase;
+}
+.habit-swap-opt .pv-cell {
+  height: 16px;
+  border-radius: 2px;
+  background: var(--paper-3);
+  border: 1px solid var(--paper-3);
+}
+.habit-swap-opt .pv-cell.hit { background: var(--ink); border-color: var(--ink); position: relative; }
+.habit-swap-opt .pv-cell.hit::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--acid);
+  border-radius: 1px;
+}
+.habit-swap-opt .pv-cell.dim { opacity: 0.35; }
+.habit-swap-opt .blurb {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-align: center;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+  padding: 0 8px;
+}
+.habit-swap-opt .meter {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0 12px;
+  margin-top: -2px;
+}
+.habit-swap-opt .meter .v { color: var(--ink-2); font-weight: 600; }
+.habit-swap-foot {
+  padding: 10px 18px 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-top: 1px dashed var(--paper-3);
+}
+.habit-swap-foot kbd {
+  font-family: var(--font-mono);
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  border-radius: 2px;
+  padding: 1px 5px;
+  color: var(--ink-2);
+  margin-right: 5px;
+}
+.habit-swap-foot .cancel {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.habit-swap-foot .cancel:hover { color: var(--ink); background: var(--paper-2); }
 
 /* ============================================================ */
 /* === DESIGN VIBES (overall design overhaul, switchable)     == */
@@ -2585,7 +3192,11 @@ function CalendarNode({ node, onPortDown }) {
         <div className="cal-grid">
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <div key={'h' + i} className="cal-dow">{d}</div>)}
           {cells.map((c, i) =>
-          <div key={i} className={`cal-cell ${c.muted ? 'muted' : ''} ${c.today ? 'today' : ''} ${c.event ? 'event' : ''}`}>
+          <div
+            key={i}
+            className={`cal-cell ${c.muted ? 'muted' : ''} ${c.today ? 'today' : ''} ${c.event ? 'event' : ''}`}
+            data-day={c.muted ? '' : c.n}
+            data-dow={i % 7}>
               {c.n}
             </div>
           )}
@@ -2635,6 +3246,386 @@ function TaskNode({ node, onPortDown, onToggleDone, onSpawnPomo, pomoCount }) {
       <Ports onPortDown={onPortDown} nodeId={node.id} />
     </>);
 
+}
+
+// --- HABIT CHILD (single habit, draggable to calendar) ---
+// Same layered role as TaskNode (a child of the habit tracker / dock spawn),
+// but with its own visual vocabulary: glyph cell, mini-week, streak/cadence
+// foot, and a circular "did today" tick. Drag from the header onto any cal
+// day cell to reveal the cadence swap modal.
+function HabitChildNode({ node, onPortDown, onToggleToday }) {
+  const d = node.data || {};
+  const days = d.days || [1, 0, 1, 1, 0, 1, 1];
+  const cadence = d.cadence || 'unscheduled';
+  const cadenceShort = d.cadenceShort || 'set ↘ day';
+  const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  return (
+    <>
+      <div className="node-head" data-drag-handle>
+        <span className="dot" style={{ background: 'var(--acid)' }} />
+        <span className="title">habit · #{String(d.num || 1).padStart(2, '0')}</span>
+        <span style={{ color: 'var(--ink-4)', marginLeft: 4 }}>↻ {cadenceShort}</span>
+        <div className="actions">
+          <button title="More">⋯</button>
+        </div>
+      </div>
+      <div className="habit-child-body" data-drag-handle>
+        <div className="habit-child-row">
+          <span className="habit-child-glyph">{d.glyph || '◍'}</span>
+          <span className="habit-child-name">{d.text || 'untitled habit'}</span>
+          <button
+            className={`habit-child-tick ${d.doneToday ? 'done' : ''}`}
+            onClick={(e) => { e.stopPropagation(); onToggleToday?.(); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            title="Mark today">
+            {d.doneToday ? '✓' : '○'}
+          </button>
+        </div>
+        <div className="habit-child-mini" title="last 7 days">
+          {days.map((x, i) => (
+            <div
+              key={i}
+              className={`mc ${x ? 'on' : ''} ${i === 6 ? 'today' : ''}`}
+              title={`${dayLabels[i]} · ${x ? 'done' : 'missed'}`}
+            />
+          ))}
+        </div>
+        <div className="habit-child-foot">
+          <span className="streak">▲ {d.streak || 0}d streak</span>
+          <span className="cadence">{cadence}</span>
+        </div>
+        <div className="habit-child-drophint">↘ drop on a calendar day</div>
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
+
+}
+
+// --- HABIT SWAP MODAL (after dropping habit on a calendar day) ---
+// Two cards: ← weekly (every <weekday>)  ·  → daily (every day).
+// Confirm with click or ←/→ arrow keys; Esc cancels.
+function HabitSwapModal({ habit, day, dow, onConfirm, onCancel }) {
+  const dowFull = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const dowShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const safeDow = ((dow ?? 0) + 7) % 7;
+  const wday = dowShort[safeDow];
+  const wdayFull = dowFull[safeDow];
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+      else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        onConfirm({ kind: 'weekly', long: `every ${wday}`, short: wday.toLowerCase(), dow: safeDow });
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        onConfirm({ kind: 'daily', long: 'every day', short: 'daily' });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onConfirm, onCancel, wday, safeDow]);
+
+  const d = habit?.data || {};
+
+  return (
+    <div className="habit-swap-veil" onClick={onCancel}>
+      <div className="habit-swap-card" onClick={(e) => e.stopPropagation()}>
+        <div className="habit-swap-head">
+          <span className="glyph">{d.glyph || '◍'}</span>
+          <div className="titleblock">
+            <span className="name">{d.text || 'untitled habit'}</span>
+            <span className="sub">habit · #{String(d.num || 1).padStart(2, '0')}  ·  streak {d.streak || 0}d</span>
+          </div>
+          <div className="date">
+            <span>MAY 2026</span>
+            <span className="big">{String(day).padStart(2, '0')} · {wday}</span>
+          </div>
+        </div>
+        <div className="habit-swap-q">
+          drop landed on a day — <span className="acc">swap left or right</span> to set cadence
+        </div>
+        <div className="habit-swap-cards">
+          <button
+            className="habit-swap-opt left"
+            autoFocus
+            onClick={() => onConfirm({ kind: 'weekly', long: `every ${wday}`, short: wday.toLowerCase(), dow: safeDow })}>
+            <span className="arrow">←</span>
+            <span className="badge">weekly</span>
+            <h3>Every<br/>{wdayFull}</h3>
+            <div className="preview">
+              {dowShort.map((lbl, i) => <div key={'l' + i} className="dl">{lbl[0]}</div>)}
+              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className={`pv-cell ${i === safeDow ? 'hit' : 'dim'}`} />
+              ))}
+            </div>
+            <div className="meter">
+              <span>cadence</span>
+              <span className="v">1× / wk</span>
+            </div>
+            <div className="blurb">repeats on {wday} only</div>
+          </button>
+          <button
+            className="habit-swap-opt right"
+            onClick={() => onConfirm({ kind: 'daily', long: 'every day', short: 'daily' })}>
+            <span className="arrow">→</span>
+            <span className="badge">daily</span>
+            <h3>Every<br/>day</h3>
+            <div className="preview">
+              {dowShort.map((lbl, i) => <div key={'l' + i} className="dl">{lbl[0]}</div>)}
+              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="pv-cell hit" />
+              ))}
+            </div>
+            <div className="meter">
+              <span>cadence</span>
+              <span className="v">7× / wk</span>
+            </div>
+            <div className="blurb">repeats every day · daily streak</div>
+          </button>
+        </div>
+        <div className="habit-swap-foot">
+          <span><kbd>←</kbd>weekly</span>
+          <span><kbd>→</kbd>daily</span>
+          <span><kbd>esc</kbd>cancel</span>
+          <button className="cancel" onClick={onCancel}>cancel drop</button>
+        </div>
+      </div>
+    </div>);
+
+}
+
+// --- CLOCK (12-hour task schedule) ---
+// A 12h analog face overlaid with colored arcs for each scheduled task.
+// AM/PM is folded onto the same dial (your day's hours stack on top of each other),
+// but every task carries its own absolute start/end so the legend stays unambiguous.
+function ClockNode({ node, onPortDown }) {
+  const tasks = node.data?.tasks ?? [
+    { start: 8.5,  end: 9.5,  name: 'Standup · core',     tone: 'rust' },
+    { start: 9.5,  end: 12,   name: 'Deep work · v0.4',   tone: 'acid' },
+    { start: 13,   end: 14.5, name: 'Design review',      tone: 'cyan' },
+    { start: 15,   end: 16.5, name: 'Q2 planning',        tone: 'plum' },
+    { start: 17,   end: 18,   name: 'Email + plan tmrw',  tone: 'rust-deep' },
+  ];
+
+  // Tick clock once a second so the second-hand sweeps and the "now" cursor moves.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const hours = now.getHours();
+  const mins  = now.getMinutes();
+  const secs  = now.getSeconds();
+  const nowFloat = hours + mins / 60 + secs / 3600;
+
+  // Geometry. The face is a 240×240 SVG centered at (120,120).
+  const CX = 120, CY = 120;
+  const R_ARC = 102;        // task-arc radius
+  const R_FACE = 86;        // inner clock face
+  const R_TICK_OUT = 84;    // outer tick
+  const R_TICK_IN = 76;     // inner tick (minor)
+  const R_TICK_IN_MAJ = 72; // inner tick (hour)
+  const R_NUM = 60;         // numeral radius
+
+  // Map an hour 0–24 onto its angle around a 12-hour face. 12 sits at top.
+  const hourToRad = (h) => ((h % 12) / 12) * Math.PI * 2 - Math.PI / 2;
+  const pt = (h, r) => {
+    const a = hourToRad(h);
+    return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) };
+  };
+  function arcPath(startH, endH, r) {
+    // Always sweep CW from start → end. Clamp tiny arcs so the rounded caps still render.
+    const span = Math.max(0.05, endH - startH);
+    const a1 = hourToRad(startH);
+    const a2 = hourToRad(startH + span);
+    const x1 = CX + r * Math.cos(a1);
+    const y1 = CY + r * Math.sin(a1);
+    const x2 = CX + r * Math.cos(a2);
+    const y2 = CY + r * Math.sin(a2);
+    const large = span > 6 ? 1 : 0;
+    return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+  }
+
+  const toneColor = {
+    rust:        'var(--rust)',
+    acid:        'var(--spine)',   // deeper green reads better against the cream face
+    cyan:        'var(--cyan)',
+    plum:        'var(--plum)',
+    'rust-deep': 'var(--rust-deep)',
+  };
+
+  // Which task is "now"?
+  const activeIdx = tasks.findIndex(t => nowFloat >= t.start && nowFloat < t.end);
+
+  // Hand angles (deg from 12 o'clock, CW)
+  const hourAng = ((hours % 12) + mins / 60) / 12 * 360;
+  const minAng  = (mins + secs / 60) / 60 * 360;
+  const secAng  = secs / 60 * 360;
+
+  function fmtTime(h) {
+    const hr = Math.floor(h);
+    const m = Math.round((h - hr) * 60);
+    const ampm = hr >= 12 && hr < 24 ? 'pm' : 'am';
+    const hr12 = ((hr + 11) % 12) + 1;
+    return `${hr12}:${String(m).padStart(2, '0')}${ampm}`;
+  }
+  function fmtDur(h) {
+    const total = Math.round(h * 60);
+    if (total >= 60) {
+      const hr = Math.floor(total / 60), mn = total % 60;
+      return mn ? `${hr}h${mn}` : `${hr}h`;
+    }
+    return `${total}m`;
+  }
+
+  // Active-task progress, 0–1
+  const activeProgress = activeIdx >= 0
+    ? (nowFloat - tasks[activeIdx].start) / (tasks[activeIdx].end - tasks[activeIdx].start)
+    : 0;
+  const activeColor = activeIdx >= 0 ? toneColor[tasks[activeIdx].tone] : 'var(--ink-3)';
+
+  // Numerals to render (1–12). We highlight 12.
+  const numerals = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+  return (
+    <>
+      <NodeHead kind="clk.12h" title="Today · schedule" dotColor="var(--cyan)" />
+      <div className="clock-body">
+        <div className="clock-face-wrap">
+          <svg className="clock-face" viewBox="0 0 240 240">
+            {/* Outer arc track */}
+            <circle className="track" cx={CX} cy={CY} r={R_ARC} fill="none" strokeWidth="14" />
+
+            {/* Task arcs */}
+            {tasks.map((t, i) => {
+              const ended  = nowFloat >= t.end;
+              const active = i === activeIdx;
+              const cls = ['clock-arc', ended ? 'past' : active ? 'active' : 'future'].join(' ');
+              return (
+                <path key={i}
+                  d={arcPath(t.start, t.end, R_ARC)}
+                  className={cls}
+                  stroke={toneColor[t.tone] || 'var(--ink-2)'}
+                  strokeWidth="14"
+                  style={{ color: toneColor[t.tone] }}
+                />
+              );
+            })}
+
+            {/* "Now" notch on the arc track */}
+            {(() => {
+              const p = pt(nowFloat, R_ARC);
+              const pIn = pt(nowFloat, R_ARC - 11);
+              const pOut = pt(nowFloat, R_ARC + 11);
+              return (
+                <>
+                  <line x1={pIn.x} y1={pIn.y} x2={pOut.x} y2={pOut.y}
+                    stroke="var(--rust)" strokeWidth="1.5" opacity="0.85" />
+                  <circle cx={p.x} cy={p.y} r="3" fill="var(--rust)" />
+                </>
+              );
+            })()}
+
+            {/* Inner face */}
+            <circle className="face-bg" cx={CX} cy={CY} r={R_FACE} />
+
+            {/* Tick marks (60 minutes) */}
+            {Array.from({ length: 60 }).map((_, i) => {
+              const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
+              const isHour = i % 5 === 0;
+              const r1 = isHour ? R_TICK_IN_MAJ : R_TICK_IN;
+              const r2 = R_TICK_OUT;
+              return (
+                <line key={i}
+                  x1={CX + r1 * Math.cos(a)} y1={CY + r1 * Math.sin(a)}
+                  x2={CX + r2 * Math.cos(a)} y2={CY + r2 * Math.sin(a)}
+                  className={isHour ? 'tick major' : 'tick'}
+                  strokeWidth={isHour ? 1.5 : 0.8}
+                />
+              );
+            })}
+
+            {/* Numerals */}
+            {numerals.map((n) => {
+              const p = pt(n, R_NUM);
+              return (
+                <text key={n}
+                  x={p.x} y={p.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  className={`clock-num ${n === 12 ? 'clock-12' : ''}`}
+                >{n}</text>
+              );
+            })}
+
+            {/* Hands. Rendered horizontally and rotated. */}
+            <g transform={`rotate(${hourAng - 90} ${CX} ${CY})`}>
+              <line className="clock-hand-hour"
+                x1={CX - 8} y1={CY} x2={CX + 38} y2={CY}
+                strokeWidth="3.2" />
+            </g>
+            <g transform={`rotate(${minAng - 90} ${CX} ${CY})`}>
+              <line className="clock-hand-min"
+                x1={CX - 10} y1={CY} x2={CX + 56} y2={CY}
+                strokeWidth="2" />
+            </g>
+            <g transform={`rotate(${secAng - 90} ${CX} ${CY})`}>
+              <line className="clock-hand-sec"
+                x1={CX - 14} y1={CY} x2={CX + 62} y2={CY}
+                strokeWidth="1" />
+              <circle cx={CX + 60} cy={CY} r="2" fill="var(--rust)" />
+            </g>
+
+            {/* Hub */}
+            <circle className="clock-hub-outer" cx={CX} cy={CY} r="5" />
+            <circle className="clock-hub-inner" cx={CX} cy={CY} r="1.6" />
+          </svg>
+
+          <div className="clock-meridiem">
+            <span className="strong">{hours >= 12 ? 'PM' : 'AM'}</span>
+            {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
+          </div>
+        </div>
+
+        {/* Now-playing strip */}
+        <div className="clock-now" style={{ color: activeColor }}>
+          <div className="clock-now-progress" style={{ transform: `scaleX(${activeProgress})` }} />
+          {activeIdx >= 0 ? (
+            <>
+              <span className="clock-now-dot" style={{ background: activeColor }} />
+              <span className="clock-now-name">{tasks[activeIdx].name}</span>
+              <span className="clock-now-time">
+                {fmtTime(tasks[activeIdx].start)} → {fmtTime(tasks[activeIdx].end)}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="clock-now-dot" style={{ background: 'var(--ink-3)' }} />
+              <span className="clock-now-name dim">free · {fmtTime(nowFloat)}</span>
+            </>
+          )}
+        </div>
+
+        {/* Schedule list */}
+        <div className="clock-list">
+          {tasks.map((t, i) => {
+            const ended = nowFloat >= t.end;
+            const on    = i === activeIdx;
+            return (
+              <div key={i} className={`clock-task ${ended ? 'past' : ''} ${on ? 'on' : ''}`}>
+                <span className="bar" style={{ background: toneColor[t.tone] }} />
+                <span className="time">{fmtTime(t.start)}</span>
+                <span className="name">{t.name}</span>
+                <span className="dur">{fmtDur(t.end - t.start)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <Ports onPortDown={onPortDown} nodeId={node.id} />
+    </>);
 }
 
 // --- TEXT ---
@@ -2802,12 +3793,14 @@ function TerminalNode({ node, onPortDown }) {
 }
 
 // --- Dispatcher ---
-function NodeBody({ node, onPortDown, onAddTask, onToggleDone, onSpawnPomo, pomoCount }) {
+function NodeBody({ node, onPortDown, onAddTask, onToggleDone, onSpawnPomo, pomoCount, onToggleHabitDone }) {
   switch (node.kind) {
     case 'pomodoro':return <PomodoroNode node={node} onPortDown={onPortDown} />;
     case 'habit':return <HabitNode node={node} onPortDown={onPortDown} />;
+    case 'habit-child':return <HabitChildNode node={node} onPortDown={onPortDown} onToggleToday={onToggleHabitDone} />;
     case 'todo':return <TodoNode node={node} onPortDown={onPortDown} onAddTask={onAddTask} />;
     case 'calendar':return <CalendarNode node={node} onPortDown={onPortDown} />;
+    case 'clock':return <ClockNode node={node} onPortDown={onPortDown} />;
     case 'task':return <TaskNode node={node} onPortDown={onPortDown} onToggleDone={onToggleDone} onSpawnPomo={onSpawnPomo} pomoCount={pomoCount} />;
     case 'text':return <TextNode node={node} onPortDown={onPortDown} />;
     case 'image':return <ImageNode node={node} onPortDown={onPortDown} />;
@@ -3067,7 +4060,25 @@ const INITIAL_NODES = [
 // free notes — text + ascii images
 { id: 'n-note1', kind: 'text', x: -340, y: 120, data: { text: 'Today is a system day. Less doing, more shaping. Make the loops cleaner — then everything downstream gets easier.' } },
 { id: 'n-img1', kind: 'image', x: -320, y: 380, data: { kind: 'mountain', name: 'morning.ascii' } },
+{ id: 'n-clock', kind: 'clock', x: 1020, y: 80, data: {} },
 { id: 'n-note2', kind: 'text', x: 1820, y: 480, data: { text: 'remember: the chain is the work — one task hands the next its baton.' } },
+
+// free habit-children — single-habit cards. Drag onto calendar to set cadence.
+{ id: 'hc-1', kind: 'habit-child', x: -300, y: 820, data: {
+    num: 1, text: 'Morning pages', glyph: '✎', streak: 12,
+    days: [1, 1, 1, 0, 1, 1, 1], cadence: 'every day', cadenceShort: 'daily',
+    doneToday: true,
+  } },
+{ id: 'hc-2', kind: 'habit-child', x: -40,  y: 820, data: {
+    num: 2, text: 'Run · move 30m', glyph: '↗', streak: 4,
+    days: [1, 0, 1, 1, 1, 0, 0], cadence: 'unscheduled', cadenceShort: 'set ↘ day',
+    doneToday: false,
+  } },
+{ id: 'hc-3', kind: 'habit-child', x: 220,  y: 820, data: {
+    num: 3, text: 'Read 20 pages', glyph: '⌬', streak: 7,
+    days: [0, 1, 1, 1, 0, 1, 1], cadence: 'every Tue', cadenceShort: 'tue',
+    doneToday: false,
+  } },
 
 // Layered task DAG anchored under todo. NO connection back to the todo node
 // — the chain is its own organism. Reordering todo's slot drags it along.
@@ -3096,7 +4107,9 @@ const NODE_SIZE = {
   terminal: { w: FIXED_W, h: FIXED_H },
   text: { w: 260, h: 150 },
   image: { w: 240, h: 210 },
-  task: { w: 220, h: 130 }
+  task: { w: 220, h: 130 },
+  'habit-child': { w: 240, h: 168 },
+  clock: { w: 304, h: 470 }
 };
 // task DAG layout (anchored below todo)
 const TASK_LAYER_GAP = 80; // horizontal between layers
@@ -3171,6 +4184,7 @@ function Whiteboard() {
   const [tweaks, setTweaks] = useState({ density: 'comfy', accent: 'acid', dots: 'on', theme: 'dark', timerStyle: 'ring', vibe: 'cyber' });
   const [tool, setTool] = useState('select');
   const [measuredSizes, setMeasuredSizes] = useState({});
+  const [pendingHabitDrop, setPendingHabitDrop] = useState(null); // {habitId, day, dow}
 
   const wrapRef = useRef(null);
   const panState = useRef(null);
@@ -3214,7 +4228,20 @@ function Whiteboard() {
       if (ds) {
         const dx = (e.clientX - ds.sx) / view.k;
         const dy = (e.clientY - ds.sy) / view.k;
+        if (Math.abs(e.clientX - ds.sx) + Math.abs(e.clientY - ds.sy) > 3) ds.didMove = true;
         setNodes((ns) => ns.map((n) => n.id === ds.id ? { ...n, x: ds.nx + dx, y: ds.ny + dy } : n));
+
+        // Habit-child drag: paint the calendar day under the pointer.
+        // Use elementsFromPoint because the dragged node sits ON TOP of the cell.
+        if (ds.kind === 'habit-child') {
+          const els = document.elementsFromPoint(e.clientX, e.clientY);
+          const cell = els.find((el) => el.classList && el.classList.contains('cal-cell') && !el.classList.contains('muted'));
+          document.querySelectorAll('.cal-cell.habit-hot').forEach((c) => { if (c !== cell) c.classList.remove('habit-hot'); });
+          if (cell) cell.classList.add('habit-hot');
+          // Reflect "dragging" state on the node for visual styling.
+          const nodeEl = document.querySelector(`.node[data-id="${ds.id}"]`);
+          if (nodeEl && !nodeEl.classList.contains('dragging')) nodeEl.classList.add('dragging');
+        }
       }
       if (pendingEdge) {
         const w = screenToWorld(e.clientX, e.clientY);
@@ -3224,7 +4251,29 @@ function Whiteboard() {
     const onUp = (e) => {
       if (panState.current) {panState.current = null;setPanning(false);}
       if (resizeState.current) {resizeState.current = null;}
-      if (dragState.current) {dragState.current = null;}
+      if (dragState.current) {
+        const ds = dragState.current;
+        // Habit-child release on a calendar day → open the cadence swap modal,
+        // and snap the node back to where it started so the calendar stays the
+        // "anchor of truth" for scheduling.
+        if (ds.kind === 'habit-child') {
+          document.querySelectorAll('.cal-cell.habit-hot').forEach((c) => c.classList.remove('habit-hot'));
+          const nodeEl = document.querySelector(`.node[data-id="${ds.id}"]`);
+          if (nodeEl) nodeEl.classList.remove('dragging');
+          if (ds.didMove) {
+            const els = document.elementsFromPoint(e.clientX, e.clientY);
+            const cell = els.find((el) => el.classList && el.classList.contains('cal-cell') && !el.classList.contains('muted') && el.dataset.day);
+            if (cell) {
+              const day = parseInt(cell.dataset.day, 10);
+              const dow = parseInt(cell.dataset.dow, 10);
+              // Snap the node back so it doesn't sit on top of the calendar.
+              setNodes((ns) => ns.map((n) => n.id === ds.id ? { ...n, x: ds.nx, y: ds.ny } : n));
+              setPendingHabitDrop({ habitId: ds.id, day, dow });
+            }
+          }
+        }
+        dragState.current = null;
+      }
       if (pendingEdge) {
         // Try to drop on a port
         const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -3271,7 +4320,7 @@ function Whiteboard() {
     e.stopPropagation();
     setSelected(node.id);
     if (node.fixed) return; // anchored — bail before staging a drag
-    dragState.current = { id: node.id, sx: e.clientX, sy: e.clientY, nx: node.x, ny: node.y };
+    dragState.current = { id: node.id, kind: node.kind, sx: e.clientX, sy: e.clientY, nx: node.x, ny: node.y, didMove: false };
   };
 
   // --- Reorder fixed slots (left/right) ---
@@ -3390,7 +4439,16 @@ function Whiteboard() {
   const addNode = (kind) => {
     const id = 'n' + Date.now();
     const center = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
-    setNodes((ns) => [...ns, { id, kind, x: center.x - 100, y: center.y - 80, data: {} }]);
+    let data = {};
+    if (kind === 'habit-child') {
+      const num = nodes.filter((n) => n.kind === 'habit-child').length + 1;
+      data = {
+        num, text: 'New habit', glyph: '◍', streak: 0,
+        days: [0, 0, 0, 0, 0, 0, 0], cadence: 'unscheduled', cadenceShort: 'set ↘ day',
+        doneToday: false,
+      };
+    }
+    setNodes((ns) => [...ns, { id, kind, x: center.x - 100, y: center.y - 80, data }]);
     setSelected(id);
   };
 
@@ -3465,6 +4523,37 @@ function Whiteboard() {
     // when a task is checked, flash the chain ahead so users see the baton pass
     const node = nodes.find((n) => n.id === id);
     if (node && !node.data?.done) flashChainAhead(id);
+  };
+
+  const toggleHabitDone = (id) => {
+    setNodes((ns) => ns.map((n) => n.id === id ?
+    { ...n, data: { ...n.data, doneToday: !n.data?.doneToday } } :
+    n));
+  };
+
+  // Commit the habit-cadence choice from the swap modal.
+  // cadence: { kind: 'daily'|'weekly', long, short, dow? }
+  const applyHabitCadence = (habitId, day, cadence) => {
+    setNodes((ns) => ns.map((n) => n.id === habitId ?
+      { ...n, data: { ...n.data, cadence: cadence.long, cadenceShort: cadence.short, cadenceKind: cadence.kind, scheduledDay: day, scheduledDow: cadence.dow } } :
+    n));
+    setPendingHabitDrop(null);
+    // Flash the cell + (if daily) the entire week, then fade
+    setTimeout(() => {
+      if (cadence.kind === 'daily') {
+        document.querySelectorAll('.cal-cell[data-day]').forEach((c) => {
+          c.classList.add('habit-set');
+          setTimeout(() => c.classList.remove('habit-set'), 1500);
+        });
+      } else if (cadence.kind === 'weekly' && cadence.dow != null) {
+        document.querySelectorAll(`.cal-cell[data-dow="${cadence.dow}"]`).forEach((c) => {
+          if (!c.classList.contains('muted')) {
+            c.classList.add('habit-set');
+            setTimeout(() => c.classList.remove('habit-set'), 1500);
+          }
+        });
+      }
+    }, 30);
   };
 
   const removeNode = (id) => {
@@ -3584,7 +4673,7 @@ function Whiteboard() {
         onMouseDown={onWrapMouseDown}
         onWheel={onWheel}>
         
-        <div className="canvas-bg" style={bgStyle} />
+        <div className="canvas-bg" style={bgStyle} data-comment-anchor="20ec6e2aca-div-1195-9" />
         <div className="canvas" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})` }}>
           <svg className="connections" style={{ overflow: 'visible' }}>
             <defs>
@@ -3650,6 +4739,7 @@ function Whiteboard() {
                   onAddTask={node.kind === 'todo' ? addTaskFromTodo : null}
                   onToggleDone={node.kind === 'task' ? () => toggleTaskDone(node.id) : null}
                   onSpawnPomo={node.kind === 'task' ? () => addPomoForTask(node.id) : null}
+                  onToggleHabitDone={node.kind === 'habit-child' ? () => toggleHabitDone(node.id) : null}
                   pomoCount={node.kind === 'task' ? edges.filter((e) => e.from === node.id && e.kind === 'pomo').length : 0} />
                 
                 {selected === node.id && !node.fixed &&
@@ -3672,6 +4762,12 @@ function Whiteboard() {
         </button>
         <button className="dock-btn" data-tip="Image / ASCII" onClick={() => addNode('image')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="1" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-9 9" /></svg>
+        </button>
+        <button className="dock-btn" data-tip="12-hour clock" onClick={() => addNode('clock')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        </button>
+        <button className="dock-btn" data-tip="Habit · drag onto a day" onClick={() => addNode('habit-child')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M4 12h16M4 17h10" /><path d="M18 14l3 3-3 3" /></svg>
         </button>
         <div className="dock-divider" />
         <button className="dock-btn" data-tip="Connect">
@@ -3769,6 +4865,17 @@ function Whiteboard() {
           })}
         </div>
       </div>
+
+      {/* Habit-cadence swap modal — shown after a habit-child is dropped on a calendar day */}
+      {pendingHabitDrop && (
+        <HabitSwapModal
+          habit={nodes.find((n) => n.id === pendingHabitDrop.habitId)}
+          day={pendingHabitDrop.day}
+          dow={pendingHabitDrop.dow}
+          onConfirm={(cadence) => applyHabitCadence(pendingHabitDrop.habitId, pendingHabitDrop.day, cadence)}
+          onCancel={() => setPendingHabitDrop(null)}
+        />
+      )}
 
       {/* AI Assistant Blob */}
       <AIBlob />
