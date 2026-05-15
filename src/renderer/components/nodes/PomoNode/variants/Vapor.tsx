@@ -1,10 +1,5 @@
-// TimerVapor — vertical glass-tube pill with acid liquid draining (PR4 face variant 5).
-// Design source: frontendref/LifeOS Whiteboard.html lines 3019-3049 (TimerVapor)
-// and the .pomo-vapor CSS rules (lines 2175-2270).
-//
-// Extracted from the existing PomoNode body (was the sole default face before PR4).
-// Bubbles rise via the vapor-rise keyframe defined in tokens.css.
-// Respects prefers-reduced-motion: bubbles are paused when motion is reduced.
+// TimerVapor — CSS glass tube, flat open top, rounded sealed bottom.
+// Info (clock + reserve %) sits below the tube; pips and controls follow naturally.
 
 import { useMemo } from 'react';
 import type { TimerFaceProps } from './types';
@@ -16,11 +11,10 @@ interface BubbleConfig {
 }
 
 export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
-  // F2 — bubble positions are stable across renders (useMemo with no deps).
   const bubbles: BubbleConfig[] = useMemo(
     () =>
       [0, 1, 2, 3].map((i) => ({
-        left: 8 + i * 14,
+        left: 12 + i * 16,
         animationDuration: `${3.2 + (i % 2) * 1.4}s`,
         animationDelay: `${i * 0.7}s`,
       })),
@@ -33,9 +27,9 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
       style={{
         width: '100%',
         display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
         gap: 14,
-        alignItems: 'stretch',
-        minHeight: 200,
       }}
     >
       <style>{`
@@ -44,21 +38,23 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
         }
       `}</style>
 
-      {/* Glass tube */}
+      {/* Glass tube — flat top, rounded bottom */}
       <div
         className="tube"
         style={{
           position: 'relative',
-          width: 64,
+          width: 88,
+          height: 200,
           flexShrink: 0,
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.12))',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.18) 100%)',
           border: '1.5px solid var(--ink-3)',
-          borderRadius: 32,
+          borderRadius: '3px 3px 44px 44px',
           overflow: 'hidden',
-          boxShadow: 'inset 2px 0 0 rgba(255,255,255,0.04), inset -2px 0 0 rgba(0,0,0,0.12)',
+          boxShadow:
+            'inset 3px 0 0 rgba(255,255,255,0.05), inset -3px 0 0 rgba(0,0,0,0.18), 0 12px 32px rgba(0,0,0,0.35)',
         }}
       >
-        {/* Liquid fill — rises from the bottom, height = remainingPct */}
+        {/* Liquid fill */}
         <div
           className="liquid"
           data-testid="pomo-liquid"
@@ -68,22 +64,23 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
             right: 0,
             bottom: 0,
             height: `${remainingPct}%`,
-            background: 'linear-gradient(180deg, var(--acid-glow) 0%, var(--acid) 40%, var(--spine) 100%)',
+            background:
+              'linear-gradient(180deg, var(--acid-glow) 0%, var(--acid) 40%, var(--spine) 100%)',
             transition: 'height 0.6s linear',
-            boxShadow: '0 0 24px var(--acid), inset 0 -8px 16px rgba(0,0,0,0.25)',
+            boxShadow: '0 0 28px var(--acid), inset 0 -8px 16px rgba(0,0,0,0.25)',
           }}
         >
-          {/* Meniscus glow at the top of the liquid */}
+          {/* Meniscus */}
           <div
             aria-hidden="true"
             style={{
               position: 'absolute',
-              top: -3,
+              top: -4,
               left: 0,
               right: 0,
-              height: 6,
+              height: 7,
               background: 'linear-gradient(180deg, var(--acid-glow), transparent)',
-              filter: 'blur(2px)',
+              filter: 'blur(3px)',
             }}
           />
         </div>
@@ -91,12 +88,7 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
         {/* Rising bubbles */}
         <div
           className="bubbles"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            overflow: 'hidden',
-          }}
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}
         >
           {bubbles.map((b, i) => (
             <span
@@ -106,9 +98,9 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
                 position: 'absolute',
                 bottom: 0,
                 left: b.left,
-                width: 6,
-                height: 6,
-                background: 'rgba(255,255,255,0.5)',
+                width: 5,
+                height: 5,
+                background: 'rgba(255,255,255,0.55)',
                 borderRadius: '50%',
                 animationName: 'vapor-rise',
                 animationTimingFunction: 'linear',
@@ -120,7 +112,24 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
           ))}
         </div>
 
-        {/* Minute tick marks along the right edge */}
+        {/* Glass reflection strip */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 9,
+            width: 13,
+            bottom: '12%',
+            background:
+              'linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
+            borderRadius: '0 0 6px 6px',
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        />
+
+        {/* Tick marks */}
         <div
           className="ticks"
           data-testid="pomo-ticks"
@@ -128,7 +137,7 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
             position: 'absolute',
             top: 0,
             bottom: 0,
-            right: 6,
+            right: 9,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -149,22 +158,20 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
         </div>
       </div>
 
-      {/* Info panel — clock + label + reserve % */}
+      {/* Info below tube */}
       <div
         className="info"
         style={{
-          flex: 1,
+          width: '100%',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
-          gap: 6,
+          gap: 5,
           fontFamily: 'var(--font-mono)',
         }}
       >
         <div
-          className="num"
           style={{
-            fontSize: 44,
+            fontSize: 42,
             letterSpacing: '-0.04em',
             color: 'var(--ink)',
             fontVariantNumeric: 'tabular-nums',
@@ -173,12 +180,11 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
           }}
         >
           {m}
-          <span className="colon" style={{ color: 'var(--rust)' }}>:</span>
+          <span style={{ color: 'var(--rust)' }}>:</span>
           {s}
         </div>
 
         <div
-          className="label"
           style={{
             fontSize: 9.5,
             color: 'var(--ink-3)',
@@ -189,15 +195,7 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
           deep work · phase 03
         </div>
 
-        <div
-          className="pct"
-          style={{
-            fontSize: 11,
-            color: 'var(--acid)',
-            marginTop: 4,
-            textShadow: '0 0 8px rgba(201,241,88,0.45)',
-          }}
-        >
+        <div style={{ fontSize: 11, color: 'var(--acid)', textShadow: '0 0 8px rgba(201,241,88,0.4)' }}>
           {Math.round(remainingPct)}% reserve
         </div>
       </div>
