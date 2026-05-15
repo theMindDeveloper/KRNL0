@@ -159,6 +159,10 @@ const EDGE_TYPES = {
   default: DefaultEdge,
 };
 
+// Stable empty fallback for the nodes-selector when board is null. Sharing
+// one reference prevents the selector from returning a fresh `[]` per call.
+const EMPTY_NODES: KrnlNode[] = [];
+
 // ── Per-id stable caches — keep RF/React.memo identity across renders ────────
 // Without these, every store update creates fresh closures → adapter memo
 // breaks → all nodes re-render every frame (the lag bug).
@@ -262,7 +266,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // In that case we fire fitView once so all 5 mothers are visible in the
   // initial view. The didFitRef guard ensures this runs at most once per session.
   const didFitRef = useRef(false);
-  const rfNodes = useBoardStore((s) => s.board?.nodes ?? []);
+  // Stable empty-array fallback so the selector doesn't return a fresh `[]`
+  // every call while board is null — fresh literal would break zustand's
+  // shallow equality check and re-fire downstream renders unnecessarily.
+  const rfNodes = useBoardStore((s) => s.board?.nodes ?? EMPTY_NODES);
 
   useEffect(() => {
     if (didFitRef.current) return;
