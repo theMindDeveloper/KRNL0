@@ -63,6 +63,9 @@ export type SysCommand =
   | { kind: 'whoami' }
   | { kind: 'say'; text: string }
   | { kind: 'hear' }
+  | { kind: 'sfx'; sub: 'play'; clipId: string | undefined }
+  | { kind: 'sfx'; sub: 'stop' }
+  | { kind: 'sfx'; sub: 'list' }
   | { kind: 'help'; group: string | undefined; sub: string | undefined };
 
 function flag(args: string[], name: string): string | undefined {
@@ -392,6 +395,12 @@ export class SysParser {
       if (sub === 'set') {
         return { kind: 'theme', sub: 'set', value: rest[0] };
       }
+    }
+
+    if (cmd === 'sfx') {
+      if (sub === 'play') return { kind: 'sfx', sub: 'play', clipId: rest[0] };
+      if (sub === 'stop') return { kind: 'sfx', sub: 'stop' };
+      if (sub === 'list') return { kind: 'sfx', sub: 'list' };
     }
 
     return null;
