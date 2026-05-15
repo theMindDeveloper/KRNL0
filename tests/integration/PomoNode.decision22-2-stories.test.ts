@@ -782,9 +782,14 @@ describe('Story 6 — Animated task-flow edges (Decision 22.2 Fix 6)', () => {
     };
   }
 
-  it('T6.1: toRfEdge for a todo.task → todo.task connection returns animated=true, type="task-flow"', () => {
+  it('T6.1: toRfEdge for a todo.task → todo.task connection returns type="task-flow" with animated=false (Wave C+ — CSS keyframe replaces RF default to avoid period mismatch stutter)', () => {
     const rfEdge = toRfEdge(makeEdge('e1'), 'todo.task', 'todo.task');
-    expect(rfEdge.animated).toBe(true);
+    // Wave C+ stutter fix: RF's built-in `.animated` class runs a 10-unit
+    // dashdraw sweep that mismatches our 22-unit strokeDasharray, causing a
+    // visible snap every 0.5s. We now set `animated: false` and run a
+    // period-matched `krnl-task-flow-dash` keyframe in reactflow-theme.css
+    // directly on the task-flow edge path instead.
+    expect(rfEdge.animated).toBe(false);
     expect(rfEdge.type).toBe('task-flow');
   });
 

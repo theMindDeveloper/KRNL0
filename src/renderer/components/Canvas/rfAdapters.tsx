@@ -125,10 +125,14 @@ export function toRfEdge(
     source: edge.from.nodeId,
     target: edge.to.nodeId,
     type: isTaskFlow ? 'task-flow' : 'default',
-    // Decision 22.2 Fix 6 — re-enable the dash march for task-flow edges.
-    // The keyframe in reactflow-theme.css is period-matched (22 units) so the
-    // loop is seamless. Default-typed edges remain static.
-    animated: isTaskFlow,
+    // animated:false on task-flow edges so RF does NOT attach its `.animated`
+    // class. RF's default `dashdraw` keyframe sweeps stroke-dashoffset 10 → 0
+    // over 0.5s, which is a 10-unit sweep on our 22-unit `strokeDasharray`
+    // ('14 8'). Mismatched period → visible snap every 0.5s = the stutter
+    // bug. Instead, our period-matched `krnl-task-flow-dash` keyframe in
+    // reactflow-theme.css runs on the task-flow edge path directly (1.6s,
+    // 22 → 0) so the dash march loops seamlessly without RF's interference.
+    animated: false,
     data: { edge },
   };
 }

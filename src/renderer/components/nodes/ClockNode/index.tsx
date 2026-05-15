@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { NodeProps } from '../types';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
@@ -120,22 +120,36 @@ export function ClockNode({
 }: NodeProps<ClockState, ClockConfig>) {
   const { linkedTodoId } = node.state;
 
-  // 1-second tick for the second hand.
+  // PERF (Wave C+): the previous 1-second setInterval re-rendered this
+  // entire SVG (60 ticks + 12 numerals + arcs + 3 hands + meridiem + task
+  // list) every second via React reconciliation — a once-per-second frame
+  // hitch that contributed to the canvas stutter. Replaced with:
+  //   1. A 30-second state tick that drives hour/minute hands, meridiem,
+  //      active-task highlight, and the "now notch" position. Minute
+  //      precision is unaffected (still updates twice per minute).
+  //   2. A pure CSS rotation animation on the second hand (60s linear
+  //      infinite) with `animation-delay: -${initialSeconds}s` so the
+  //      starting position is correct without any per-frame React work.
+  //      The hand sweeps continuously, GPU-composited, zero JS cost.
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+    const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
 
+  // Initial seconds offset for the CSS-driven second-hand sweep. Captured
+  // once at mount; the hand continues sweeping via CSS regardless of React.
+  const initialSecOffsetRef = useRef<number>(new Date().getSeconds());
+
   const hours = now.getHours();
   const mins  = now.getMinutes();
-  const secs  = now.getSeconds();
-  const nowFloat = hours + mins / 60 + secs / 3600;
+  // No `secs` here — second-hand position comes from CSS animation.
+  // nowFloat uses minute granularity which is fine for activeIdx / now notch.
+  const nowFloat = hours + mins / 60;
 
   // Hand angles (degrees from 12, CW)
   const hourAng = ((hours % 12) + mins / 60) / 12 * 360;
-  const minAng  = (mins + secs / 60) / 60 * 360;
-  const secAng  = secs / 60 * 360;
+  const minAng  = mins / 60 * 360;
 
   // Board + selectors
   const board = useBoardStore((s) => s.board);
@@ -436,8 +450,17 @@ export function ClockNode({
               />
             </g>
 
-            {/* Second hand */}
-            <g transform={`rotate(${secAng - 90} ${CX} ${CY})`}>
+            {/* Second hand — CSS keyframe sweep (60s linear infinite).
+                Continuous, GPU-composited, zero React work per frame.
+                animation-delay aligns the starting angle to the current
+                seconds at mount. */}
+            <g
+              style={{
+                transformOrigin: `${CX}px ${CY}px`,
+                animation: 'clock-sec-sweep 60s linear infinite',
+                animationDelay: `-${initialSecOffsetRef.current}s`,
+              }}
+            >
               <line
                 x1={CX - 14} y1={CY} x2={CX + 62} y2={CY}
                 stroke="var(--rust)"
