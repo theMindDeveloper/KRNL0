@@ -2,10 +2,10 @@
  * Orb — viewport-fixed AI assistant orb (PR9, LifeOS UI refresh).
  *
  * Visual: SVG ball with a radial gradient (white -> acid -> deep green ->
- * near-black), three stacked drop-shadow glows on the host button, an
- * internal swirl band that rotates independently of the bob, and a small
- * specular highlight at the top-left. Listening overlays three pulse rings
- * with staggered animation-delay (the "sonar" effect). Thinking shifts the
+ * near-black), a single drop-shadow glow on the host button, an internal
+ * swirl band that rotates independently of the bob, and a small specular
+ * highlight at the top-left. Listening overlays three pulse rings with
+ * staggered animation-delay (the "sonar" effect). Thinking shifts the
  * glow toward purple.
  *
  * Behaviour:
@@ -17,12 +17,16 @@
  *   to design-review the chrome; replace mockReply() with the real call
  *   when the brain wire lands.
  * - Esc closes the panel.
+ * - Orb is draggable. Position is persisted to localStorage. On drag-end a
+ *   spring-bounce settle animation plays via key bump on the root div.
+ *   Click is distinguished from drag by mouse delta threshold (< 4px = click).
  */
 
 import {
   useState,
   useEffect,
   useRef,
+  useCallback,
   type FormEvent,
   type CSSProperties,
 } from 'react';
@@ -46,6 +50,57 @@ function mockReply(): string {
   return MOCK_REPLIES[i] ?? MOCK_REPLIES[0]!;
 }
 
+// ── Orb position helpers ──────────────────────────────────────────────────────
+const ORB_SIZE = 64;
+const ORB_MARGIN = 12;
+const STORAGE_KEY = 'krnl0-orb-pos';
+
+interface OrbPos { x: number; y: number }
+
+function defaultPos(): OrbPos {
+  return {
+    x: 22,
+    y: window.innerHeight - ORB_SIZE - 56,
+  };
+}
+
+function clampPos(pos: OrbPos): OrbPos {
+  return {
+    x: Math.max(ORB_MARGIN, Math.min(window.innerWidth - ORB_SIZE - ORB_MARGIN, pos.x)),
+    y: Math.max(ORB_MARGIN, Math.min(window.innerHeight - ORB_SIZE - ORB_MARGIN, pos.y)),
+  };
+}
+
+function loadPos(): OrbPos {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        'x' in parsed &&
+        'y' in parsed &&
+        typeof (parsed as { x: unknown }).x === 'number' &&
+        typeof (parsed as { y: unknown }).y === 'number'
+      ) {
+        return clampPos({ x: (parsed as OrbPos).x, y: (parsed as OrbPos).y });
+      }
+    }
+  } catch {
+    // corrupted storage — fall through to default
+  }
+  return defaultPos();
+}
+
+function savePos(pos: OrbPos): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
+  } catch {
+    // ignore quota errors
+  }
+}
+
 export function Orb() {
   const [orbState, setOrbState] = useState<OrbState>('idle');
   const [open, setOpen] = useState(false);
@@ -53,6 +108,84 @@ export function Orb() {
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── Drag state ────────────────────────────────────────────────────────────
+  const [pos, setPos] = useState<OrbPos>(loadPos);
+  // Key bumped on drag-end to replay the orb-drop-settle keyframe.
+  const [settleKey, setSettleKey] = useState(0);
+  const draggingRef = useRef(false);
+  const dragMovedRef = useRef(false);
+  const dragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Clamp position when the window resizes (orb may drift off-screen).
+  useEffect(() => {
+    const onResize = () => {
+      setPos((p) => {
+        const clamped = clampPos(p);
+        savePos(clamped);
+        return clamped;
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const onMouseDown = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    // Only primary button starts a drag.
+    if (e.button !== 0) return;
+    // Don't prevent default here — onClick still needs to fire for clicks.
+    draggingRef.current = true;
+    dragMovedRef.current = false;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    // Offset from orb top-left to mouse pointer.
+    dragOffsetRef.current = {
+      dx: e.clientX - pos.x,
+      dy: e.clientY - pos.y,
+    };
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const absDx = Math.abs(ev.clientX - dragStartRef.current.x);
+      const absDy = Math.abs(ev.clientY - dragStartRef.current.y);
+      if (absDx + absDy >= 4) {
+        dragMovedRef.current = true;
+      }
+      const newPos = clampPos({
+        x: ev.clientX - dragOffsetRef.current.dx,
+        y: ev.clientY - dragOffsetRef.current.dy,
+      });
+      setPos(newPos);
+    };
+
+    const onMouseUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      if (dragMovedRef.current) {
+        // Save final position and trigger spring-settle animation.
+        setPos((p) => {
+          savePos(p);
+          return p;
+        });
+        setSettleKey((k) => k + 1);
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [pos.x, pos.y]);
+
+  const onOrbClick = useCallback(() => {
+    // If the mouse moved enough during mousedown→mouseup, this was a drag, not a click.
+    if (dragMovedRef.current) {
+      dragMovedRef.current = false;
+      return;
+    }
+    setOpen((o) => !o);
+  }, []);
 
   // Push-to-talk on Space — never intercept when the user is typing.
   useEffect(() => {
@@ -129,17 +262,16 @@ export function Orb() {
     if (text && !thinking) submitMock(text);
   };
 
-  // ── Visual state ─────────────────────────────────────────────────────
-  // Three-layer drop-shadow stack creates the ambient halo. Inner radius
-  // gives the "bright core" cue, mid radius the "spread", and the dark
-  // shadow at the bottom roots the orb on whatever surface.
+  // ── Visual state ─────────────────────────────────────────────────────────
+  // Single drop-shadow per state — triple-stacked filters were forcing their
+  // own composited GPU layer on every frame.
   const isPurple = orbState === 'thinking' || thinking;
   const isHot = orbState === 'listening';
   const glowFilter = isHot
-    ? 'drop-shadow(0 0 28px rgba(201,241,88,1)) drop-shadow(0 0 70px rgba(201,241,88,0.55)) drop-shadow(0 8px 24px rgba(0,0,0,0.5))'
+    ? 'drop-shadow(0 0 28px rgba(201,241,88,0.95))'
     : isPurple
-      ? 'drop-shadow(0 0 26px rgba(180,140,240,0.9)) drop-shadow(0 0 60px rgba(180,140,240,0.4)) drop-shadow(0 8px 24px rgba(0,0,0,0.5))'
-      : 'drop-shadow(0 0 18px rgba(201,241,88,0.55)) drop-shadow(0 0 40px rgba(201,241,88,0.25)) drop-shadow(0 8px 24px rgba(0,0,0,0.5))';
+      ? 'drop-shadow(0 0 26px rgba(180,140,240,0.85))'
+      : 'drop-shadow(0 0 22px rgba(201,241,88,0.45))';
 
   const showRings = isHot;
 
@@ -150,21 +282,28 @@ export function Orb() {
     border: 0,
     padding: 0,
     background: 'transparent',
-    cursor: 'pointer',
+    cursor: draggingRef.current ? 'grabbing' : 'pointer',
     display: 'block',
     filter: glowFilter,
-    animation: 'ai-float 6s ease-in-out infinite',
+    // ai-float paused when chat panel is open — reduces constant repaint
+    // while the user is typing/reading.
+    animation: open ? 'none' : 'ai-float 6s ease-in-out infinite',
     transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease',
   };
 
   return (
+    // Root div carries the orb-drop-settle keyframe via key bump on settleKey.
+    // Using `top`/`left` for position (not bottom) so position state maps
+    // cleanly to viewport coords with no flip arithmetic.
     <div
+      key={settleKey}
       style={{
         position: 'fixed',
-        left: 22,
-        bottom: 56,
+        left: pos.x,
+        top: pos.y,
         zIndex: 200,
         fontFamily: 'var(--font-mono)',
+        animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
       }}
     >
       {/* Chat panel — anchored above the orb, slides in via ai-panel-in. */}
@@ -282,7 +421,7 @@ export function Orb() {
                         cursor: 'pointer',
                       }}
                     >
-                      › {s}
+                      {`> ${s}`}
                     </button>
                   ))}
                 </div>
@@ -301,7 +440,7 @@ export function Orb() {
                     marginRight: 4,
                   }}
                 >
-                  {m.role === 'user' ? '›' : '◆'}
+                  {m.role === 'user' ? '>' : '◆'}
                 </span>
                 {m.text}
               </div>
@@ -373,7 +512,8 @@ export function Orb() {
         data-testid="orb-button"
         aria-label={`AI assistant — ${orbState}. Click to ${open ? 'close' : 'open'} chat, hold Space to talk.`}
         aria-live="polite"
-        onClick={() => setOpen((o) => !o)}
+        onMouseDown={onMouseDown}
+        onClick={onOrbClick}
         style={orbButtonStyle}
       >
         <svg viewBox="0 0 80 80" width="64" height="64">
