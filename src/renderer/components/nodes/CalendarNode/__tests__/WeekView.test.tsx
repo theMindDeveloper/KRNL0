@@ -20,14 +20,12 @@ import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import type { CalendarState, CalendarConfig } from '../types';
-import { radialBus } from '../../../ui/RadialChooser/bus';
 import { setHabitDrag, clearHabitDrag } from '../../../../dnd/habitDrag';
 
 afterEach(() => {
   cleanup();
   useBoardStore.setState({ board: null });
   clearHabitDrag();
-  radialBus.close();
 });
 
 // ── Factories ─────────────────────────────────────────────────────────────────
@@ -54,7 +52,7 @@ function makeConfig(overrides: Partial<CalendarConfig> = {}): CalendarConfig {
 
 const noop = () => undefined;
 
-// Helper: after the chooser onPick fires, a duration prompt appears.
+// Helper: after picking a swap option, a duration prompt appears.
 // This sets the input value and presses Enter to commit.
 function commitDurationPrompt(value: number) {
   const input = document.querySelector(
@@ -63,6 +61,14 @@ function commitDurationPrompt(value: number) {
   if (!input) throw new Error('habit-duration-input not found in DOM');
   fireEvent.change(input, { target: { value: String(value) } });
   fireEvent.keyDown(input, { key: 'Enter' });
+}
+
+// Helper: click the weekly or daily card in the HabitSwapModal.
+function pickSwapOption(kind: 'weekly' | 'daily') {
+  const testId = kind === 'weekly' ? 'habit-swap-weekly' : 'habit-swap-daily';
+  const btn = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
+  if (!btn) throw new Error(`${testId} button not found in DOM`);
+  fireEvent.click(btn);
 }
 
 function setEmptyBoard() {
@@ -422,7 +428,7 @@ describe('WeekView — early-morning task (PR #122 24h grid)', () => {
 });
 
 // ── ADR 0002 A1 — Habit drag-to-schedule (WeekView) ──────────────────────────
-// A1 binding: chooser opens on DROP (not dragover). Cell context = drop cell.
+// A1 binding: HabitSwapModal opens on DROP (not dragover). Cell context = drop cell.
 
 describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
   // Anchor: 2026-05-11 (Monday). Week: Mon=05-11 … Sun=05-17.
@@ -431,7 +437,7 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
 
   beforeEach(() => setEmptyBoard());
 
-  it('dragover habit MIME does NOT open chooser (A1)', () => {
+  it('dragover habit MIME does NOT open modal (A1)', () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -443,7 +449,7 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
 
     setHabitDrag({ habitId: 'h1', habitMotherId: 'hm1', color: 'acid', name: 'Run' });
 
-    // Drag over Monday cell — chooser must NOT open.
+    // Drag over Monday cell — modal must NOT open.
     const monCell = document.querySelector('[data-testid="week-cell-2026-05-11-09"]');
     expect(monCell).toBeTruthy();
 
@@ -454,12 +460,12 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
       },
     });
 
-    // A1: chooser must still be closed after dragover.
-    expect(radialBus.session).toBeNull();
+    // A1: modal must still be closed after dragover.
+    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeNull();
     expect(onCommand).not.toHaveBeenCalled();
   });
 
-  it('drop on cell opens chooser; onPick("daily") dispatches calendar.scheduleHabit', () => {
+  it('drop on cell opens modal; picking daily dispatches calendar.scheduleHabit', () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -476,21 +482,20 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     const cell = document.querySelector('[data-testid="week-cell-2026-05-13-09"]');
     expect(cell).toBeTruthy();
 
-    fireEvent.drop(cell!, {
-      dataTransfer: {
-        types: ['application/krnl-habit'],
-        getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
-      },
+    act(() => {
+      fireEvent.drop(cell!, {
+        dataTransfer: {
+          types: ['application/krnl-habit'],
+          getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
+        },
+      });
     });
 
-    // The chooser should now be open (dropCellRef populated, bus has session).
-    expect(radialBus.session).not.toBeNull();
+    // The modal should now be open.
+    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
 
-    // Simulate the user clicking the daily wedge.
-    const session = radialBus.session!;
-    const dailyOpt = session.options.find((o) => o.value === 'daily');
-    expect(dailyOpt).toBeTruthy();
-    act(() => { session.onPick(dailyOpt!.value, dailyOpt!); });
+    // Simulate the user clicking the daily card.
+    act(() => { pickSwapOption('daily'); });
 
     // The duration prompt should now be open; commit 30 min.
     commitDurationPrompt(30);
@@ -502,7 +507,7 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     });
   });
 
-  it('onPick("weekly") dispatches calendar.scheduleHabit with correct IsoDow for the drop cell', () => {
+  it('picking weekly dispatches calendar.scheduleHabit with correct IsoDow for the drop cell', () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -518,17 +523,17 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     const cell = document.querySelector('[data-testid="week-cell-2026-05-14-07"]');
     expect(cell).toBeTruthy();
 
-    fireEvent.drop(cell!, {
-      dataTransfer: {
-        types: ['application/krnl-habit'],
-        getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
-      },
+    act(() => {
+      fireEvent.drop(cell!, {
+        dataTransfer: {
+          types: ['application/krnl-habit'],
+          getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
+        },
+      });
     });
 
-    const session = radialBus.session!;
-    const weeklyOpt = session.options.find((o) => o.value === 'weekly');
-    expect(weeklyOpt).toBeTruthy();
-    act(() => { session.onPick(weeklyOpt!.value, weeklyOpt!); });
+    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
+    act(() => { pickSwapOption('weekly'); });
     commitDurationPrompt(45);
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
@@ -539,10 +544,10 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
   });
 
   // Regression: HTML5 drag fires `drop` → then `dragend` (source clears the
-  // habitDrag singleton). The chooser stays open until the user clicks a wedge.
+  // habitDrag singleton). The modal stays open until the user clicks a card.
   // The pick must still dispatch correctly because the payload was snapshotted
   // at drop time, not read live at pick time.
-  it('onPick still dispatches after dragend has cleared the habitDrag singleton', () => {
+  it('modal still dispatches after dragend has cleared the habitDrag singleton', () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -556,20 +561,20 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
 
     const cell = document.querySelector('[data-testid="week-cell-2026-05-12-09"]');
     expect(cell).toBeTruthy();
-    fireEvent.drop(cell!, {
-      dataTransfer: {
-        types: ['application/krnl-habit'],
-        getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
-      },
+    act(() => {
+      fireEvent.drop(cell!, {
+        dataTransfer: {
+          types: ['application/krnl-habit'],
+          getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
+        },
+      });
     });
 
     // Simulate the dragend clearing the singleton between drop and click.
     clearHabitDrag();
 
-    const session = radialBus.session!;
-    const dailyOpt = session.options.find((o) => o.value === 'daily');
-    expect(dailyOpt).toBeTruthy();
-    act(() => { session.onPick(dailyOpt!.value, dailyOpt!); });
+    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
+    act(() => { pickSwapOption('daily'); });
     commitDurationPrompt(20);
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
@@ -602,26 +607,25 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
       },
     });
 
-    // Chooser must NOT open during dragover.
-    expect(radialBus.session).toBeNull();
+    // Modal must NOT open during dragover.
+    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeNull();
 
     // Now drop on Wednesday — completely different cell.
     const wedCell = document.querySelector('[data-testid="week-cell-2026-05-13-14"]');
     expect(wedCell).toBeTruthy();
-    fireEvent.drop(wedCell!, {
-      dataTransfer: {
-        types: ['application/krnl-habit'],
-        getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
-      },
+    act(() => {
+      fireEvent.drop(wedCell!, {
+        dataTransfer: {
+          types: ['application/krnl-habit'],
+          getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
+        },
+      });
     });
 
-    expect(radialBus.session).not.toBeNull();
+    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
 
     // Pick weekly — should use Wednesday (ISO dow 3), NOT Monday (ISO dow 1).
-    const session = radialBus.session!;
-    const weeklyOpt = session.options.find((o) => o.value === 'weekly');
-    expect(weeklyOpt).toBeTruthy();
-    act(() => { session.onPick(weeklyOpt!.value, weeklyOpt!); });
+    act(() => { pickSwapOption('weekly'); });
     commitDurationPrompt(15);
 
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
