@@ -40,6 +40,24 @@ import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
 import type { Connection } from '@xyflow/react';
 
+// ── MiniMap node color — module-level to avoid per-paint inline allocation ───
+// Hex literals used instead of CSS var() to skip variable resolution per rect.
+function miniMapNodeColor(n: KrnlRFNode): string {
+  switch (n.type) {
+    case 'pomo':       return '#c8553d';
+    case 'todo':       return '#22d3ee';
+    case 'habit':      return '#c9f158';
+    case 'terminal':   return '#5a5244';
+    case 'calendar':   return '#5e7d1d';
+    case 'clock':      return '#a78bfa';
+    case 'todo.task':  return '#22d3ee';
+    case 'habit.lane': return '#c9f158';
+    case 'text':       return '#9a9180';
+    case 'image':      return '#c2b89c';
+    default:           return '#5a5244';
+  }
+}
+
 // ── Edge components ───────────────────────────────────────────────────────────
 
 function TaskFlowEdge({
@@ -97,7 +115,6 @@ function TaskFlowEdge({
           strokeDasharray: '14 8',
           strokeLinecap: 'round',
           opacity: 1,
-          filter: 'drop-shadow(0 0 3px rgba(78, 168, 176, 0.30))',
         }}
       />
     </>
@@ -746,11 +763,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       proOptions={{ hideAttribution: true }}
       style={{ background: 'var(--paper)' }}
     >
-      {/* Wave-B (LifeOS UI refresh) — dual-density dot grid mirroring the
-          source: 160 px major dots layered over 32 px minor dots so pan/zoom
-          gets a visible coarse rhythm and a fine rhythm at the same time.
-          The major layer renders FIRST (under the minor layer) so the
-          smaller dots punch through visually. */}
+      {/* Wave-B (LifeOS UI refresh) — single coarse dot grid at 160 px.
+          The dual-density (32 px minor + 160 px major) approach was causing
+          two stacked SVG repaint layers on every pan frame. One coarse layer
+          reads well at all zoom levels; node cards provide additional anchors. */}
       <Background
         id="krnl-grid-major"
         variant={BackgroundVariant.Dots}
@@ -759,46 +775,25 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         color="var(--grid-strong)"
         offset={0}
       />
-      <Background
-        id="krnl-grid-minor"
-        variant={BackgroundVariant.Dots}
-        gap={32}
-        size={1.2}
-        color="var(--grid)"
-        offset={0}
-      />
 
-      {/* Controls — zoom in/out, fit view */}
-      <Controls position="bottom-right" showInteractive={false} />
+      {/* Controls — zoom in/out, fit view. Moved to bottom-left so MiniMap
+          can anchor bottom-right without overlap. */}
+      <Controls position="bottom-left" showInteractive={false} />
 
-      {/* PR-wave-A — MiniMap bottom-right, above the Controls. Each node
-          renders as a small colored rect so the user can see the board
-          layout at a glance and click-to-pan to a region. */}
+      {/* PR-wave-A — MiniMap bottom-right. Each node renders as a small
+          colored rect so the user can see the board layout at a glance and
+          click-to-pan to a region. nodeColor is a module-level function so
+          the browser doesn't allocate a new closure per paint. */}
       <MiniMap
         position="bottom-right"
         pannable
         zoomable
-        nodeColor={(n) => {
-          switch (n.type) {
-            case 'pomo':       return 'var(--rust)';
-            case 'todo':       return 'var(--cyan)';
-            case 'habit':      return 'var(--acid)';
-            case 'terminal':   return 'var(--ink-3)';
-            case 'calendar':   return 'var(--spine)';
-            case 'clock':      return 'var(--plum)';
-            case 'todo.task':  return 'var(--cyan-glow, var(--cyan))';
-            case 'habit.lane': return 'var(--acid-glow, var(--acid))';
-            case 'text':       return 'var(--ink-4)';
-            case 'image':      return 'var(--sand)';
-            default:           return 'var(--ink-3)';
-          }
-        }}
+        nodeColor={miniMapNodeColor}
         nodeStrokeWidth={2}
         maskColor="rgba(14, 13, 11, 0.55)"
         style={{
           width: 160,
           height: 120,
-          marginBottom: 56, // sit above the Controls stack
         }}
       />
 

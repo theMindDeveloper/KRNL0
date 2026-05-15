@@ -23,19 +23,11 @@
   stroke-width: 1.5;
 }
 
-/* ── Task-flow animated edge ─────────────────────────────────────────────────
-   TaskFlowEdge uses stroke-dasharray "14 8" (period = 22).
-   RF's default `dashdraw` keyframe sweeps stroke-dashoffset 10 → 0, which is
-   only 10 of our 22-unit period — the loop visibly snaps every 0.5s.
-   Override with a period-matched keyframe so the animation loops seamlessly. */
-@keyframes krnl-task-flow-dash {
-  from { stroke-dashoffset: 22; }
-  to   { stroke-dashoffset: 0; }
-}
-.react-flow__edge-task-flow.animated path.react-flow__edge-path {
-  animation: krnl-task-flow-dash 1.6s linear infinite;
-}
-.react-flow__edge-task-flow.animated path.react-flow__edge-path:hover {
+/* ── Task-flow edge hover ────────────────────────────────────────────────────
+   Dash-march animation removed — per-edge GPU compositing was a pan/zoom
+   perf culprit. Hover glow is kept; it only fires on pointer hover and
+   does not impact FPS during pan. */
+.react-flow__edge-task-flow path.react-flow__edge-path:hover {
   filter: drop-shadow(0 0 9px rgba(154, 237, 246, 0.85));
 }
 
