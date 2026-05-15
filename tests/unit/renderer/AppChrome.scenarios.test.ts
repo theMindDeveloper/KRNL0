@@ -70,9 +70,15 @@ function renderWithWrapper(element: React.ReactElement) {
 // ── F1 — Topbar left content ──────────────────────────────────────────────────
 
 describe('F1 — Topbar left content', () => {
-  it('renders the brand-mark "■"', () => {
+  // PR3 (LifeOS UI refresh) — the brand mark is now a nested-block graphic
+  // (acid outer square + ink inner block), not the inline "■" glyph. Check
+  // the graphic exists and the wordmark still renders alongside it.
+  it('renders the brand-mark as nested acid+ink blocks', () => {
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-brand').textContent).toContain('■');
+    const mark = screen.getByTestId('topbar-brand-mark');
+    expect(mark).toBeTruthy();
+    // The outer acid block contains an inner ink block.
+    expect(mark.children.length).toBeGreaterThan(0);
   });
 
   it('renders the wordmark "KRNL0"', () => {
@@ -175,24 +181,50 @@ describe('F4 — Dock button dispatches board.addNode intent', () => {
 
 // ── F5 — Statusbar content ────────────────────────────────────────────────────
 
-describe('F5 — Statusbar reads "3 nodes · 1 edge · deep-work"', () => {
-  it('shows correct node count, edge count, and board name', () => {
+describe('F5 — Statusbar items', () => {
+  // PR3 (LifeOS UI refresh) — statusbar split from a single counts string
+  // into discrete items: workspace · claude · pomo · day · nodes · edges
+  // · zoom · version. Tests now check each item by its testid.
+  it('shows node count "3"', () => {
     renderWithWrapper(React.createElement(StatusBar));
-    const text = screen.getByTestId('statusbar-counts').textContent ?? '';
-    expect(text).toBe('3 nodes · 1 edge · deep-work');
+    expect(screen.getByTestId('statusbar-nodes').textContent ?? '').toContain('3');
   });
 
-  it('pluralizes "1 node" correctly', () => {
-    // Re-mock useBoardStore for this test with 1 node / 0 edges
-    // We'll test the pluralize helper indirectly via a fresh render.
-    // The mock above is module-level; we test via the component logic.
-    // A manual unit test of the pluralization rule:
-    const pluralize = (count: number, singular: string) =>
-      `${count} ${count === 1 ? singular : singular + 's'}`;
-    expect(pluralize(1, 'node')).toBe('1 node');
-    expect(pluralize(2, 'node')).toBe('2 nodes');
-    expect(pluralize(0, 'edge')).toBe('0 edges');
-    expect(pluralize(1, 'edge')).toBe('1 edge');
+  it('shows edge count "1"', () => {
+    renderWithWrapper(React.createElement(StatusBar));
+    expect(screen.getByTestId('statusbar-edges').textContent ?? '').toContain('1');
+  });
+
+  it('shows workspace path containing the board name', () => {
+    renderWithWrapper(React.createElement(StatusBar));
+    expect(screen.getByTestId('statusbar-workspace').textContent ?? '').toContain('deep-work');
+  });
+
+  it('shows zoom percentage with %', () => {
+    renderWithWrapper(React.createElement(StatusBar));
+    expect(screen.getByTestId('statusbar-zoom').textContent ?? '').toContain('100%');
+  });
+
+  it('shows claude connection status', () => {
+    renderWithWrapper(React.createElement(StatusBar));
+    expect(screen.getByTestId('statusbar-claude').textContent ?? '').toContain('connected');
+  });
+
+  it('shows pomo state defaulting to "idle"', () => {
+    renderWithWrapper(React.createElement(StatusBar));
+    expect(screen.getByTestId('statusbar-pomo').textContent ?? '').toContain('idle');
+  });
+
+  it('shows current day label', () => {
+    renderWithWrapper(React.createElement(StatusBar));
+    const day = screen.getByTestId('statusbar-day').textContent ?? '';
+    // toLocaleDateString returns "MAY 15" / "JAN 03" etc — month abbrev + day.
+    expect(day.length).toBeGreaterThan(0);
+  });
+
+  it('shows app version', () => {
+    renderWithWrapper(React.createElement(StatusBar));
+    expect(screen.getByTestId('statusbar-version').textContent ?? '').toContain('v0.');
   });
 });
 

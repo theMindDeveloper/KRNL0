@@ -79,19 +79,52 @@ export function TopBar() {
     >
       {/* Left: brand + breadcrumb + live badge */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        {/* Brand mark + wordmark */}
+        {/* Brand mark: acid outer + ink inner block + KRNL0 wordmark.
+            PR3 (LifeOS UI refresh) — replaces the previous "■ KRNL0" inline
+            text with a nested-block graphic. The "0" of KRNL0 is dimmed to
+            match the LifeOS source treatment. */}
         <span
           data-testid="topbar-brand"
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: '0.06em',
-            color: 'var(--acid)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
             userSelect: 'none',
           }}
         >
-          ■ KRNL0
+          <span
+            aria-hidden
+            data-testid="topbar-brand-mark"
+            style={{
+              width: 22,
+              height: 22,
+              background: 'var(--acid)',
+              display: 'grid',
+              placeItems: 'center',
+              borderRadius: 3,
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                background: 'var(--ink)',
+                borderRadius: 1,
+              }}
+            />
+          </span>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              color: 'var(--ink)',
+            }}
+          >
+            KRNL<span style={{ color: 'var(--ink-3)' }}>0</span>
+          </span>
         </span>
 
         {/* Breadcrumb */}
