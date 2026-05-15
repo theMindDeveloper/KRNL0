@@ -85,19 +85,15 @@ body.krnl-reordering .react-flow__node.krnl-mother {
 }
 
 /* ── Unified node hover highlight ───────────────────────────────────────────
-   Approach: ::after pseudo-element ring so box-shadow (elevation) is never
-   touched. box-shadow is a single property — compositing !important over the
-   inline value drops the card's own elevation shadow, causing a visible jump.
-   The ::after sits at z-index 1 inside the card (above content bg, below
-   interactive children) and inherits border-radius so the ring tracks the
-   card's rounded corners regardless of per-node values (6px mothers, 10px
-   children). pointer-events:none so it doesn't block clicks. The outer glow
-   is applied via filter:drop-shadow on the pseudo-element itself (not on the
-   card wrapper, which would composite the whole subtree). */
-.react-flow__node:hover > div:not(.react-flow__handle) {
-  position: relative; /* needed for ::after positioning */
-}
-.react-flow__node:hover > div:not(.react-flow__handle)::after {
+   Approach: ::after pseudo-element inset ring so box-shadow (elevation) is
+   never touched. box-shadow is a single property — compositing !important
+   over an inline value drops the card's own elevation shadow, causing a
+   visible lift/flatten jump on hover. Rendering the ring via ::after leaves
+   the inline shadow untouched on every card (mothers, tasks, lanes, text,
+   image). border-radius:inherit so the ring tracks each card's own corner
+   radius (6px mothers, 10px children). pointer-events:none so clicks still
+   reach the card. Symmetric 120ms fade in both directions via transition. */
+.react-flow__node > div:not(.react-flow__handle)::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -106,10 +102,10 @@ body.krnl-reordering .react-flow__node.krnl-mother {
   pointer-events: none;
   z-index: 1;
   opacity: 0;
-  animation: krnl-hover-ring-in 120ms ease forwards;
+  transition: opacity 120ms ease;
 }
-@keyframes krnl-hover-ring-in {
-  to { opacity: 1; }
+.react-flow__node:hover > div:not(.react-flow__handle)::after {
+  opacity: 1;
 }
 
 /* ── Selection ring strategy ────────────────────────────────────────────────
