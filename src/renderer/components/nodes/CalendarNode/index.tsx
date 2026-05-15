@@ -56,6 +56,7 @@ export function CalendarNode({
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
+      position={node.position}
     >
       {/* Header */}
       <div
