@@ -8,6 +8,7 @@
 
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
 import { scheduleBatch } from '../../utils/rafBatcher';
+import { rfToScreen, updateViewport, updateCanvasRect } from '../../utils/viewportBus';
 import {
   ReactFlow,
   Background,
@@ -199,7 +200,9 @@ interface SwapButtonData extends Record<string, unknown> {
 
 const SwapButtonNode = memo(function SwapButtonNode({
   data,
-}: { data: SwapButtonData }) {
+  positionAbsoluteX,
+  positionAbsoluteY,
+}: { data: SwapButtonData; positionAbsoluteX: number; positionAbsoluteY: number }) {
   const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
   const btnRef = useRef<HTMLButtonElement>(null);
 
@@ -220,11 +223,10 @@ const SwapButtonNode = memo(function SwapButtonNode({
     e.stopPropagation();
   }, []);
 
-  // Proximity reveal — button is invisible + non-interactive by default and
-  // fades in only when the cursor is within PROXIMITY_PX of its center. The
-  // opacity + pointer-events toggle is mutated directly on the DOM via the
-  // shared rafBatcher so all swap-button BCR reads happen in the same batch
-  // pass as the badge reads — one layout flush per frame instead of 5 extra.
+  // Proximity reveal — zero DOM reads. positionAbsoluteX/Y are RF flow-space
+  // coords; rfToScreen() converts to screen coords from the module-level
+  // viewport scalars that updateViewport() refreshes on every onMove tick.
+  // Dependency on positionAbsoluteX/Y ensures closure re-captures after swap.
   useLayoutEffect(() => {
     const PROXIMITY_SQ = 140 * 140;
     let cursorX = 0;
@@ -232,19 +234,19 @@ const SwapButtonNode = memo(function SwapButtonNode({
     let btnCX = 0;
     let btnCY = 0;
 
-    const onMove = (e: PointerEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       cursorX = e.clientX;
       cursorY = e.clientY;
     };
-    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
 
     const unschedule = scheduleBatch({
       read() {
-        const btn = btnRef.current;
-        if (!btn) return;
-        const r = btn.getBoundingClientRect();
-        btnCX = r.left + r.width / 2;
-        btnCY = r.top + r.height / 2;
+        // Button is 32×32 placed at (positionAbsoluteX, positionAbsoluteY) in
+        // flow space. Center = (+16, +16). rfToScreen() — no DOM reads.
+        const s = rfToScreen(positionAbsoluteX + 16, positionAbsoluteY + 16);
+        btnCX = s.x;
+        btnCY = s.y;
       },
       write() {
         const btn = btnRef.current;
@@ -258,10 +260,10 @@ const SwapButtonNode = memo(function SwapButtonNode({
     });
 
     return () => {
-      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointermove', onPointerMove);
       unschedule();
     };
-  }, []);
+  }, [positionAbsoluteX, positionAbsoluteY]);
 
   return (
     <button
@@ -420,6 +422,29 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
+
+  // Seed viewportBus with initialViewport so rfToScreen() is accurate before
+  // the first onMove tick (which only fires after the user starts panning).
+  useLayoutEffect(() => {
+    updateViewport(initialViewport.x, initialViewport.y, initialViewport.zoom);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // canvasContainerRef + ResizeObserver keep _canvasLeft/_canvasTop in sync
+  // across window resize / layout shifts. Fires rarely — not per-frame.
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      updateCanvasRect(r.left, r.top);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // ── Fit-view on first launch (Architect Amendment B) ──────────────────────
   // When the persisted viewport equals the legacy seed sentinel {0, 220, 1},
@@ -939,6 +964,17 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     [setViewport]
   );
 
+  // ── onMove — refresh viewportBus scalars every pan/zoom frame ─────────────
+  // Pure module-level write — no React state, no Zustand, no re-renders.
+  // Badges and swap-buttons call rfToScreen() inside their rAF read() slots
+  // and see the updated numbers without triggering any component updates.
+  const onMove = useCallback(
+    (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+      updateViewport(viewport.x, viewport.y, viewport.zoom);
+    },
+    []
+  );
+
   // ── onSelectionChange — mirror to store only when a single node is picked.
   // For marquee multi-select we leave the store's selectedNodeId as null so
   // single-node-aware features (StatusBar, sys CLI) don't get a confusing
@@ -951,6 +987,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   );
 
   return (
+    <div ref={canvasContainerRef} style={{ width: '100%', height: '100%' }}>
     <BoldSetContext.Provider value={boldSet}>
     <ReactFlow
       nodes={nodes}
@@ -967,6 +1004,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onPaneContextMenu={closeCtxMenu}
       onDrop={onDrop}
       onDragOver={onDragOver}
+      onMove={onMove}
       onMoveEnd={onMoveEnd}
       onSelectionChange={onSelectionChange}
       deleteKeyCode={null}
@@ -1108,6 +1146,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       )}
     </ReactFlow>
     </BoldSetContext.Provider>
+    </div>
   );
 }
 
