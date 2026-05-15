@@ -244,6 +244,84 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
         </button>
       </div>
 
+      {/* PR7 — Today's tasks strip. Sits between the month header and the
+          weekday row so today's agenda is visible without hunting the grid
+          for the green cell. Only renders if there is at least one task
+          scheduled today. */}
+      {(() => {
+        const todaysTasks = tasksByDay.get(todayYMD) ?? [];
+        if (todaysTasks.length === 0) return null;
+        return (
+          <div
+            data-testid="month-today-strip"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '4px 10px 6px',
+              borderBottom: '1px dashed var(--paper-3)',
+              overflow: 'hidden',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                color: 'var(--ink-3)',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                flexShrink: 0,
+              }}
+            >
+              today ·
+            </span>
+            <div
+              style={{
+                display: 'flex',
+                gap: 4,
+                overflow: 'hidden',
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              {todaysTasks.slice(0, 3).map((t) => (
+                <span
+                  key={t.id}
+                  title={t.text}
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    color: 'var(--ink-2)',
+                    background: 'var(--paper-2)',
+                    borderRadius: 2,
+                    padding: '1px 5px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    flexShrink: 0,
+                    maxWidth: 90,
+                  }}
+                >
+                  {truncateLabel(t.text)}
+                </span>
+              ))}
+              {todaysTasks.length > 3 && (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9,
+                    color: 'var(--ink-3)',
+                    flexShrink: 0,
+                  }}
+                >
+                  +{todaysTasks.length - 3}
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Weekday header row */}
       <div
         style={{
@@ -305,46 +383,59 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
           const visibleDots = cellHabits.slice(0, MAX_DOTS - 1);
           const dotOverflow = cellHabits.length - visibleDots.length;
 
+          // PR7 — out-of-month cells render empty (no day number, no chips,
+          // no hover/click). Today cell uses the `krnl-month-cell--today`
+          // class for the solid green fill + readable dark text.
           return (
             <div
               key={ymd}
               data-testid={`month-cell-${ymd}`}
               data-date={ymd}
               data-today={isToday ? 'true' : undefined}
-              onClick={() => handleCellClick(ymd)}
+              className={isToday ? 'krnl-month-cell--today' : undefined}
+              onClick={inCurrentMonth ? () => handleCellClick(ymd) : undefined}
               style={{
                 position: 'relative',
-                background: isSelected ? 'var(--paper-2)' : 'transparent',
+                background: isSelected && !isToday ? 'var(--paper-2)' : 'transparent',
                 border: isSelected
                   ? '1px solid var(--acid)'
                   : '1px solid transparent',
                 borderRadius: 3,
                 padding: '2px 3px',
-                cursor: 'pointer',
+                cursor: inCurrentMonth ? 'pointer' : 'default',
                 display: 'flex',
                 flexDirection: 'column',
                 minHeight: 0,
                 overflow: 'hidden',
               }}
-              onMouseEnter={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.background = 'var(--paper-2)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.background = 'transparent';
-                }
-              }}
+              onMouseEnter={
+                inCurrentMonth
+                  ? (e) => {
+                      if (!isSelected && !isToday) {
+                        e.currentTarget.style.background = 'var(--paper-2)';
+                      }
+                    }
+                  : undefined
+              }
+              onMouseLeave={
+                inCurrentMonth
+                  ? (e) => {
+                      if (!isSelected && !isToday) {
+                        e.currentTarget.style.background = 'transparent';
+                      }
+                    }
+                  : undefined
+              }
             >
-              {/* Today ring */}
+              {/* Today ring — pulses around today's cell, on top of the
+                  solid green fill. */}
               {isToday && (
                 <div
                   style={{
                     position: 'absolute',
                     inset: 0,
                     borderRadius: 3,
-                    border: '1.5px solid var(--acid)',
+                    border: '1.5px solid var(--ink)',
                     animation: 'krnl-today-pulse 2s ease-in-out infinite',
                     pointerEvents: 'none',
                     zIndex: 0,
@@ -352,121 +443,122 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
                 />
               )}
 
-              {/* Date number — top-right */}
-              <div
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  color: inCurrentMonth
-                    ? isToday
-                      ? 'var(--acid)'
-                      : 'var(--ink-1)'
-                    : 'var(--ink-faint)',
-                  textAlign: 'right',
-                  lineHeight: 1,
-                  marginBottom: 2,
-                  position: 'relative',
-                  zIndex: 1,
-                }}
-              >
-                {dayNum}
-              </div>
-
-              {/* Task chips */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1,
-                  flex: 1,
-                  overflow: 'hidden',
-                  position: 'relative',
-                  zIndex: 1,
-                }}
-              >
-                {visible.map((task) => (
+              {/* PR7 — out-of-month cells render no content (day number,
+                  chips, dots all skipped). The cell still occupies its
+                  grid slot so the calendar alignment stays intact. */}
+              {inCurrentMonth && (
+                <>
+                  {/* Date number — top-right */}
                   <div
-                    key={task.id}
-                    title={task.text}
+                    className={isToday ? 'krnl-month-cell__day' : undefined}
                     style={{
                       fontFamily: 'var(--font-mono)',
-                      fontSize: 10,
-                      color: 'var(--ink-1)',
-                      background: 'var(--paper-3)',
-                      borderRadius: 2,
-                      padding: '1px 3px',
+                      fontSize: 11,
+                      color: isToday ? '#1a1814' : 'var(--ink-1)',
+                      textAlign: 'right',
+                      lineHeight: 1,
+                      marginBottom: 2,
+                      position: 'relative',
+                      zIndex: 1,
+                      fontWeight: isToday ? 600 : 400,
+                    }}
+                  >
+                    {dayNum}
+                  </div>
+
+                  {/* Task chips */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      flex: 1,
                       overflow: 'hidden',
-                      whiteSpace: 'nowrap',
-                      textOverflow: 'ellipsis',
-                      lineHeight: '1.3',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--paper-2)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'var(--paper-3)';
+                      position: 'relative',
+                      zIndex: 1,
                     }}
                   >
-                    {truncateLabel(task.text)}
+                    {visible.map((task) => (
+                      <div
+                        key={task.id}
+                        title={task.text}
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 10,
+                          color: isToday ? '#1a1814' : 'var(--ink-1)',
+                          background: isToday
+                            ? 'rgba(26, 24, 20, 0.12)'
+                            : 'var(--paper-3)',
+                          borderRadius: 2,
+                          padding: '1px 3px',
+                          overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          lineHeight: '1.3',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {truncateLabel(task.text)}
+                      </div>
+                    ))}
+                    {overflow > 0 && (
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 9,
+                          color: isToday ? '#1a1814' : 'var(--ink-3)',
+                          lineHeight: '1.3',
+                        }}
+                      >
+                        +{overflow} more
+                      </div>
+                    )}
                   </div>
-                ))}
-                {overflow > 0 && (
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 9,
-                      color: 'var(--ink-3)',
-                      lineHeight: '1.3',
-                    }}
-                  >
-                    +{overflow} more
-                  </div>
-                )}
-              </div>
 
-              {/* Habit dots (ADR 0002 §6) */}
-              {cellHabits.length > 0 && (
-                <div
-                  data-testid={`month-habit-dots-${ymd}`}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    gap: 2,
-                    alignItems: 'center',
-                    position: 'relative',
-                    zIndex: 1,
-                    marginTop: 1,
-                    pointerEvents: 'none',
-                  }}
-                >
-                  {visibleDots.map((h) => (
+                  {/* Habit dots (ADR 0002 §6) */}
+                  {cellHabits.length > 0 && (
                     <div
-                      key={h.id}
-                      data-testid={`month-habit-dot-${h.id}-${ymd}`}
+                      data-testid={`month-habit-dots-${ymd}`}
                       style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: `var(--${h.color})`,
-                        opacity: 0.85,
-                        flexShrink: 0,
-                      }}
-                    />
-                  ))}
-                  {dotOverflow > 0 && (
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 8,
-                        color: 'var(--ink-3)',
-                        lineHeight: 1,
+                        display: 'flex',
+                        flexDirection: 'row',
+                        gap: 2,
+                        alignItems: 'center',
+                        position: 'relative',
+                        zIndex: 1,
+                        marginTop: 1,
+                        pointerEvents: 'none',
                       }}
                     >
-                      +{dotOverflow + 1}
-                    </span>
+                      {visibleDots.map((h) => (
+                        <div
+                          key={h.id}
+                          data-testid={`month-habit-dot-${h.id}-${ymd}`}
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            background: `var(--${h.color})`,
+                            opacity: 0.85,
+                            flexShrink: 0,
+                          }}
+                        />
+                      ))}
+                      {dotOverflow > 0 && (
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 8,
+                            color: isToday ? '#1a1814' : 'var(--ink-3)',
+                            lineHeight: 1,
+                          }}
+                        >
+                          +{dotOverflow + 1}
+                        </span>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           );
