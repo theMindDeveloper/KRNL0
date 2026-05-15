@@ -289,6 +289,11 @@ export function Orb() {
     // while the user is typing/reading.
     animation: open ? 'none' : 'ai-float 6s ease-in-out infinite',
     transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease',
+    // Keep the orb on a stable GPU layer so its drop-shadow filter doesn't
+    // trigger a repaint of the canvas stacking context during pan. The orb
+    // is position:fixed and doesn't move with the canvas, but without a
+    // dedicated layer the filter still invalidates the paint region it sits in.
+    willChange: 'filter, transform',
   };
 
   return (

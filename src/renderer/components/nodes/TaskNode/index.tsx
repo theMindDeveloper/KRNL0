@@ -573,9 +573,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               flexShrink: 0,
               width: 15,
               height: 15,
-              border: `1.5px solid ${state.done ? 'var(--ink)' : 'var(--ink-4)'}`,
+              border: `1.5px solid ${state.done ? 'var(--acid)' : 'var(--ink-4)'}`,
               borderRadius: 3,
-              background: state.done ? 'var(--ink)' : 'transparent',
+              background: state.done ? 'var(--acid)' : 'transparent',
               cursor: 'pointer',
               display: 'grid',
               placeItems: 'center',
@@ -586,7 +586,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             aria-label={state.done ? 'Mark undone' : 'Mark done'}
           >
             {state.done && (
-              <span style={{ fontSize: 11, color: 'var(--acid)', fontWeight: 700, lineHeight: 1 }}>✓</span>
+              /* Hardcoded #1a1814 — checkmark must be permanently dark on
+                 acid green; --ink flips to a cream in dark theme which
+                 produced the "green-on-white" look the user reported. */
+              <span style={{ fontSize: 11, color: '#1a1814', fontWeight: 700, lineHeight: 1 }}>✓</span>
             )}
           </button>
 
