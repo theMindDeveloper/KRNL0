@@ -10,7 +10,7 @@ import type { ContextMenuItem } from '../../ContextMenu';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 
-export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL, onReorderDrop, onReorderHover, slotCentersX }: NodeProps<TodoState, TodoConfig>) {
+export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL, onReorderDrop, onReorderHover, onReorderEnd, slotCentersX }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
   const config = rawConfig ?? defaultTodoConfig();
 
@@ -269,7 +269,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   return (
-    <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onReorderDrop={onReorderDrop} onReorderHover={onReorderHover} slotCentersX={slotCentersX}>
+    <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} onReorderDrop={onReorderDrop} onReorderHover={onReorderHover} onReorderEnd={onReorderEnd} slotCentersX={slotCentersX}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         <div
