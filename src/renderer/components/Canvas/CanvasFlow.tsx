@@ -6,7 +6,7 @@
  * useMemo from board.nodes / board.edges. RF runs in controlled mode.
  */
 
-import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef, createContext, useContext } from 'react';
 import {
   ReactFlow,
   Background,
@@ -39,6 +39,8 @@ import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
 import type { Connection } from '@xyflow/react';
+import type { TaskState } from '../nodes/TaskNode/types';
+import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
 // Hex literals used instead of CSS var() to skip variable resolution per rect.
@@ -58,6 +60,14 @@ function miniMapNodeColor(n: KrnlRFNode): string {
   }
 }
 
+// ── BoldSetContext — carries the set of source node IDs whose outgoing edges ──
+// should be bolded. Computed once per hover change in CanvasFlowInner and
+// distributed via context so edge components don't need individual store
+// subscriptions keyed on board.nodes (which would re-subscribe every render).
+// An empty frozen set is the stable default — edges read it as "bold nobody".
+const EMPTY_BOLD_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
+const BoldSetContext = createContext<ReadonlySet<string>>(EMPTY_BOLD_SET);
+
 // ── Edge components ───────────────────────────────────────────────────────────
 
 function TaskFlowEdge({
@@ -70,10 +80,12 @@ function TaskFlowEdge({
   sourcePosition,
   targetPosition,
 }: EdgeProps) {
-  // Bold when the source node is hovered. Primitive string selector keeps the
-  // subscription stable (null===null between pan frames → no extra re-renders).
-  const hoveredId = useBoardStore((s) => s.hoveredNodeId);
-  const bold = hoveredId !== null && source === hoveredId;
+  // Bold when this edge's source is in the active bold set. The set is computed
+  // in CanvasFlowInner and covers direct children of the hovered mother node
+  // (todo.task → todo mother, habit.lane → habit mother). Context read is
+  // O(1); no additional store subscription per edge component.
+  const boldSet = useContext(BoldSetContext);
+  const bold = boldSet.has(source);
 
   const [edgePath] = getBezierPath({
     sourceX,
@@ -138,10 +150,9 @@ function DefaultEdge({
   targetPosition,
   data,
 }: EdgeProps) {
-  // Bold when the source node is hovered. Primitive string selector keeps the
-  // subscription stable (null===null between pan frames → no extra re-renders).
-  const hoveredId = useBoardStore((s) => s.hoveredNodeId);
-  const bold = hoveredId !== null && source === hoveredId;
+  // Bold when this edge's source is in the active bold set (same as TaskFlowEdge).
+  const boldSet = useContext(BoldSetContext);
+  const bold = boldSet.has(source);
 
   const [edgePath] = getBezierPath({
     sourceX,
@@ -265,6 +276,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const reorderMotherSlots = useBoardStore((s) => s.reorderMotherSlots);
+  const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
   const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
 
   // Start the debounced viewport persister (Decision #7).
@@ -669,6 +681,55 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     });
   }, [board]);
 
+  // ── Bold-set — which source node IDs should bold their outgoing edges ─────
+  // Keyed on [board.nodes, hoveredNodeId]. When a mother is hovered we walk its
+  // children instead of relying on `source === motherId` (mothers have no
+  // handles so no edge ever has a mother as its source).
+  //   todo   mother  → all todo.task nodes whose state.parentTodoId matches
+  //   habit  mother  → all habit.lane nodes whose state.habitId is in the
+  //                    mother habit's habit list
+  //   others (pomo, terminal, calendar, clock) → empty (no child nodes with edges)
+  // When hovering a non-mother: set = {hoveredNodeId} (direct source match).
+  // When nothing hovered: empty set (frozen, stable reference).
+  const boldSet = useMemo<ReadonlySet<string>>(() => {
+    if (!hoveredNodeId || !board) return EMPTY_BOLD_SET;
+    const hoveredNode = board.nodes.find((n: KrnlNode) => n.id === hoveredNodeId);
+    if (!hoveredNode) return EMPTY_BOLD_SET;
+
+    if (hoveredNode.kind === 'todo' && hoveredNode.isMother) {
+      // All task nodes belonging to this todo mother.
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'todo.task') {
+          const ts = n.state as TaskState;
+          if (ts.parentTodoId === hoveredNodeId) ids.add(n.id);
+        }
+      }
+      return ids;
+    }
+
+    if (hoveredNode.kind === 'habit' && hoveredNode.isMother) {
+      // All habit.lane nodes whose habitId is one of this mother's habits.
+      const motherHabitIds = new Set<string>(
+        ((hoveredNode.state as { habits?: Array<{ id: string }> }).habits ?? []).map(
+          (h) => h.id
+        )
+      );
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'habit.lane') {
+          const ls = n.state as HabitLaneState;
+          if (motherHabitIds.has(ls.habitId)) ids.add(n.id);
+        }
+      }
+      return ids;
+    }
+
+    // Non-mother or other mother kinds (pomo, terminal, calendar, clock):
+    // bold edges whose source is the hovered node itself.
+    return new Set<string>([hoveredNodeId]);
+  }, [board, hoveredNodeId]);
+
   // ── onNodesChange — apply every change locally; commit only on drag end ──
   // Local-first: applyNodeChanges absorbs position/dimensions/select changes
   // into the live RF nodes array without touching Zustand. This is what makes
@@ -733,6 +794,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   );
 
   return (
+    <BoldSetContext.Provider value={boldSet}>
     <ReactFlow
       nodes={nodes}
       edges={rfEdges}
@@ -888,6 +950,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         </div>
       )}
     </ReactFlow>
+    </BoldSetContext.Provider>
   );
 }
 
