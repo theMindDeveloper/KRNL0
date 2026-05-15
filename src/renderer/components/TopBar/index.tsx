@@ -48,16 +48,6 @@ export function TopBar() {
     rf.fitView({ padding: 0.2, duration: 300 });
   };
 
-  const handleTweaks = () => {
-    console.log('[topbar] tweaks');
-    // TODO Phase 6: open tweaks panel
-  };
-
-  const handleShare = () => {
-    console.log('[topbar] share');
-    // TODO Phase 6: share board URL
-  };
-
   const themeLabel = theme === 'dark' ? '☾ DARK' : '☀ LIGHT';
 
   return (
@@ -72,13 +62,15 @@ export function TopBar() {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 16px',
+        paddingRight: 158,
         flexShrink: 0,
         zIndex: 100,
         boxSizing: 'border-box',
-      }}
+        WebkitAppRegion: 'drag',
+      } as React.CSSProperties}
     >
       {/* Left: brand + breadcrumb + live badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {/* Brand mark — Wave C (LifeOS UI refresh).
             Source: user's logo-snippet.html — dashed halo ring + rounded
             block mark (ink in light theme / acid in dark theme) + ■ glyph +
@@ -167,11 +159,9 @@ export function TopBar() {
       </div>
 
       {/* Right: action buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
         <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
-        <TopBarButton label="TWEAKS" onClick={handleTweaks} testId="topbar-tweaks" />
-        <TopBarButton label="SHARE" onClick={handleShare} testId="topbar-share" />
       </div>
     </div>
   );
@@ -201,7 +191,8 @@ function TopBarButton({ label, onClick, testId }: TopBarButtonProps) {
         letterSpacing: '0.04em',
         textTransform: 'uppercase' as const,
         whiteSpace: 'nowrap' as const,
-      }}
+        WebkitAppRegion: 'no-drag',
+      } as React.CSSProperties}
     >
       {label}
     </button>

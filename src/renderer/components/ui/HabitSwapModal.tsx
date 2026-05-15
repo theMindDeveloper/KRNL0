@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { IsoDow } from '../nodes/HabitNode/types';
+import { NumberStepper } from './NumberStepper';
 
 // ISO dow (1=Mon…7=Sun) → 0-based index for array lookup.
 function isoDowToIdx(dow: IsoDow): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
@@ -632,15 +633,13 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
               Duration
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                data-testid="habit-swap-duration-input"
-                type="number"
+              <NumberStepper
+                value={durationMin}
+                onChange={setDurationMin}
                 min={5}
                 max={480}
                 step={5}
-                value={durationMin}
-                onChange={(e) => setDurationMin(parseInt(e.target.value, 10))}
-                style={{ ...inputFieldStyle, flex: 1 }}
+                testId="habit-swap-duration-input"
               />
               <span
                 style={{

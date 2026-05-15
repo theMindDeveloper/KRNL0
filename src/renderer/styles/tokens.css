@@ -419,6 +419,36 @@ button.habit-cell {
   outline-color: var(--habit-color, var(--acid));
 }
 
+/* ── NumberStepper — strip native spinner; style custom arrow buttons ──── */
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.krnl-stepper-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-4);
+  font-size: 5.5px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 80ms, color 80ms;
+  user-select: none;
+}
+.krnl-stepper-btn:hover {
+  background: var(--paper-3);
+  color: var(--ink-2);
+}
+.krnl-stepper-btn:active {
+  background: var(--paper-2);
+}
+
 /* Year grid containment: isolate paint/layout per habit row.
    3,710 cells across 10 habits → without this, any toggle re-paints
    the entire grid. */

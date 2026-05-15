@@ -108,13 +108,13 @@ export function TextNode({
         maxHeight={2000}
         onResizeEnd={onResizeEnd}
         handleStyle={{
-          width: 14,
-          height: 14,
-          background: 'var(--acid)',
-          border: '1.5px solid var(--ink)',
-          borderRadius: 3,
+          width: 8,
+          height: 8,
+          background: '#0e0d0b',
+          border: '1.5px solid var(--acid)',
+          borderRadius: '50%',
         }}
-        lineStyle={{ borderColor: 'var(--acid)', borderWidth: 1.5 }}
+        lineStyle={{ borderColor: 'rgba(201,241,88,0.4)', borderWidth: 1 }}
       />
       {editing ? (
         <textarea

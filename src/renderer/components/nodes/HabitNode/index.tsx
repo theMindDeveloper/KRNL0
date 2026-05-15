@@ -509,7 +509,9 @@ const WeekRow = memo(function WeekRow({
                 className={cls}
                 style={size}
                 title={`${habit.name} ${dayStr} — click to toggle`}
-                onClick={() => onToggle(habit.id, dayStr)}
+                onClick={(e) => { e.stopPropagation(); onToggle(habit.id, dayStr); }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
                 aria-pressed={done}
               />
             );
@@ -524,7 +526,7 @@ const WeekRow = memo(function WeekRow({
           paddingLeft: 22,
           fontFamily: 'var(--font-mono)',
           fontSize: 9.5,
-          color: streak > 0 ? 'var(--acid)' : 'var(--rust)',
+          color: 'var(--rust)',
           letterSpacing: '0.04em',
         }}
       >
@@ -610,6 +612,7 @@ const MonthRow = memo(function MonthRow({
 
   const onRowClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      e.stopPropagation();
       const t = e.target as HTMLElement;
       const date = t.getAttribute('data-date');
       if (!date) return;
@@ -670,7 +673,7 @@ const MonthRow = memo(function MonthRow({
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 9.5,
-            color: streak > 0 ? 'var(--acid)' : 'var(--rust)',
+            color: 'var(--rust)',
             letterSpacing: '0.04em',
           }}
         >
@@ -680,6 +683,8 @@ const MonthRow = memo(function MonthRow({
 
       <div
         onClick={onRowClick}
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
         style={{ display: 'flex', gap: MONTH_CELL_GAP, flexWrap: 'nowrap' }}
       >
         {monthDays.map((dayStr) => {
@@ -866,7 +871,7 @@ const YearRow = memo(function YearRow({
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 9.5,
-            color: streak > 0 ? 'var(--acid)' : 'var(--rust)',
+            color: 'var(--rust)',
             letterSpacing: '0.04em',
           }}
         >

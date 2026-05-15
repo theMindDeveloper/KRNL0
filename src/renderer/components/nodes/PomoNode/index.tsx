@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
 import { defaultPomoConfig } from './types';
@@ -7,7 +7,6 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { TaskState } from '../TaskNode/types';
-import { Ring } from './variants/Ring';
 import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
@@ -159,8 +158,8 @@ export function PomoNode({
   // F3 — running flag for variants that animate a blinking colon
   const running = state.status === 'running';
 
-  // PR4 — active face, defaulting to 'ring' when config.face is absent
-  const activeFace: TimerFace = config.face ?? 'ring';
+  // PR4 — active face, defaulting to 'vapor' when config.face is absent
+  const activeFace: TimerFace = config.face ?? 'vapor';
 
   const headerLeft = isTaskMode
     ? `TASK · ${truncate(state.label || 'task', 18)}`
@@ -188,11 +187,7 @@ export function PomoNode({
   };
 
   const updateDraft = (key: keyof PomoConfig) =>
-    (e: ChangeEvent<HTMLInputElement>) => {
-      const raw = Number(e.target.value);
-      const clamped = Number.isFinite(raw) ? Math.max(1, Math.round(raw)) : draftConfig[key];
-      setDraftConfig((d) => ({ ...d, [key]: clamped }));
-    };
+    (val: number) => setDraftConfig((d) => ({ ...d, [key]: val }));
 
   // A.5 — pip cap: show at most 8 pips; append "+N more" when pipCount > 8
   const MAX_PIPS = 8;
@@ -238,21 +233,7 @@ export function PomoNode({
           text-transform: uppercase;
           letter-spacing: 0.04em;
         }
-        .pomo-settings-input {
-          width: 56px;
-          padding: 4px 6px;
-          background: var(--paper);
-          border: 1px solid var(--paper-3);
-          border-radius: 4px;
-          font-family: var(--font-mono);
-          font-size: 12px;
-          color: var(--ink);
-          text-align: right;
-          outline: none;
-        }
-        .pomo-settings-input:focus {
-          border-color: var(--acid);
-        }
+
       `}</style>
 
       {/* Header — title + bullet + gear (A.1: gear is last flex child = right side) */}
@@ -339,16 +320,12 @@ export function PomoNode({
           ] as Array<[keyof PomoConfig, string]>).map(([key, label]) => (
             <div key={key} className="pomo-settings-row">
               <span className="pomo-settings-label">{label}</span>
-              <input
-                type="number"
-                min={1}
-                className="pomo-settings-input"
-                data-testid={`pomo-settings-${key}`}
+              <NumberStepper
                 value={draftConfig[key]}
                 onChange={updateDraft(key)}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
+                min={1}
+                max={key === 'longBreakEvery' ? 12 : 120}
+                testId={`pomo-settings-${key}`}
               />
             </div>
           ))}
@@ -366,8 +343,8 @@ export function PomoNode({
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {(['ring', 'ascii', 'lcd', 'blocks', 'vapor'] as const).map((face) => {
-              const isActive = (config.face ?? 'ring') === face;
+            {(['ascii', 'lcd', 'blocks', 'vapor'] as const).map((face) => {
+              const isActive = (config.face ?? 'vapor') === face;
               return (
                 <button
                   key={face}
@@ -448,9 +425,6 @@ export function PomoNode({
       ) : (
         <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* PR4 — timer face switch: swap inner face without touching outer chrome */}
-          {activeFace === 'ring' && (
-            <Ring m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
-          )}
           {activeFace === 'ascii' && (
             <Ascii m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
           )}
@@ -467,7 +441,7 @@ export function PomoNode({
           <div
             className="pomo-pips"
             data-testid="pomo-pips"
-            style={{ display: 'flex', gap: 8, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap' }}
+            style={{ display: 'flex', gap: 8, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: 10 }}
           >
             {/* A.5 — render at most 8 pips */}
             {Array.from({ length: visiblePipCount }).map((_, i) => {
