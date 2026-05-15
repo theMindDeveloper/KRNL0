@@ -200,7 +200,7 @@ export function PomoNode({
   const overflowPips = pipCount > MAX_PIPS ? pipCount - MAX_PIPS : 0;
 
   return (
-    <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH}>
+    <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
       {/* vapor-rise and pomo-blink keyframes are globally defined in tokens.css (PR1/PR4) */}
       <style>{`
         .pomo-gear-btn {

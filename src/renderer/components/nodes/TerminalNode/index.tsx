@@ -154,6 +154,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
       background="var(--term-bg)"
+      position={node.position}
     >
       <style>{`
         @keyframes term-live-pulse {
