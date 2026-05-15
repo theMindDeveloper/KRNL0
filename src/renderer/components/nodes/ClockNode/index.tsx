@@ -6,6 +6,7 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectTimeline } from '../../../store/timelineSelector';
 import { selectSchedule } from '../../../store/scheduleSelector';
+import { useTick } from '../../../hooks/useTick';
 import type { TaskState } from '../TaskNode/types';
 
 // ADR 0004 §4 — concentric parallel rings.
@@ -146,6 +147,9 @@ export function ClockNode({
       parallelBranchIndex: number | null;
       arcLength: number;
       startOffset: number;
+      // PR5 — wall-clock window of the arc, for active-arc detection vs nowMinOfDay
+      windowStartMin: number;
+      windowEndMin: number;
     }> = [];
     for (const p of placementsMap.values()) {
       if (taskInfo.get(p.taskId)?.parentTodoId !== linkedTodoId) continue;
@@ -180,6 +184,8 @@ export function ClockNode({
         parallelBranchIndex: p.parallelBranchIndex,
         arcLength,
         startOffset,
+        windowStartMin: winStart,
+        windowEndMin: winEnd,
       });
     }
     return out;
@@ -282,6 +288,27 @@ export function ClockNode({
   const isToday = selectedDate === todayLocalYMD();
   const weekday = weekdayShortOf(selectedDate);
   const isEmpty = linkedTodoId !== null && arcs.length === 0;
+
+  // PR5 — live time elements. useTick is a singleton 500ms shared interval;
+  // calling it here adds no new timer. The component already re-renders on
+  // every board mutation, so the tick is a small additional driver. The
+  // returned value is discarded — its only purpose is to subscribe so the
+  // component re-renders periodically.
+  void useTick();
+  const now = new Date();
+  const nowHours = now.getHours();
+  const nowMins = now.getMinutes();
+  const nowMinOfDay = nowHours * 60 + nowMins;
+  // Hands and "now" notch are gated on viewing today AND the current minute
+  // falling inside the displayed 12h window.
+  const showLiveHands = isToday && nowMinOfDay >= windowStart && nowMinOfDay < windowEnd;
+  const hourFrac = (nowMinOfDay - windowStart) / TOTAL_MIN;
+  const minFrac = nowMins / 60;
+  // SVG: top = -π/2, clockwise positive. (frac * 2π) - π/2.
+  const hourAngleRad = hourFrac * 2 * Math.PI - Math.PI / 2;
+  const minAngleRad = minFrac * 2 * Math.PI - Math.PI / 2;
+  const meridiem = nowHours < 12 ? 'AM' : 'PM';
+  const nowLocalStr = `${String(nowHours).padStart(2, '0')}:${String(nowMins).padStart(2, '0')}`;
 
   return (
     <MotherFrame
@@ -480,7 +507,9 @@ export function ClockNode({
             );
           })}
 
-          {/* ADR 0004 §4 — Task arcs with concentric parallel rings */}
+          {/* ADR 0004 §4 — Task arcs with concentric parallel rings.
+              PR5 — active arc (the one wall-clock-now intersects) pulses via
+              the `clock-arc-pulse` keyframe (defined in tokens.css PR1). */}
           {arcs.map((a) => {
             const isParallel = a.parallelGroupId !== null;
             const branchIdx = a.parallelBranchIndex ?? 0;
@@ -498,6 +527,16 @@ export function ClockNode({
             const scaledArcLength = (a.arcLength / CIRCUMFERENCE) * arcCircumference;
             const scaledStartOffset = (a.startOffset / CIRCUMFERENCE) * arcCircumference;
 
+            const isActive =
+              showLiveHands
+              && !done
+              && nowMinOfDay >= a.windowStartMin
+              && nowMinOfDay < a.windowEndMin;
+
+            const arcStyle: React.CSSProperties = {};
+            if (useMultiply) arcStyle.mixBlendMode = 'multiply' as const;
+            if (isActive) arcStyle.animation = 'clock-arc-pulse 2.4s ease-in-out infinite';
+
             return (
               <g key={`${a.taskId}-w${viewWindow}-${selectedDate}`}>
                 <title>{`task ${a.taskId.slice(-8)} · ${info?.plannedMin ?? 0}m`}</title>
@@ -512,7 +551,7 @@ export function ClockNode({
                   strokeDashoffset={-scaledStartOffset}
                   transform="rotate(-90 150 150)"
                   opacity={done ? 0.4 : 1}
-                  style={useMultiply ? { mixBlendMode: 'multiply' as const } : undefined}
+                  style={Object.keys(arcStyle).length > 0 ? arcStyle : undefined}
                 />
               </g>
             );
@@ -543,8 +582,73 @@ export function ClockNode({
             </g>
           ))}
 
-          {/* Center dot */}
-          <circle cx={150} cy={150} r={3} fill="var(--ink-2)" />
+          {/* PR5 — Live time elements (only when viewing today). The minute
+              and hour hands snap once per minute; useTick (500ms) just
+              keeps the component subscribed so it picks up the change
+              without a per-component setInterval. */}
+          {showLiveHands && (
+            <>
+              {/* "Now" notch on the outer ring — rust marker at the current
+                  wall-clock position. */}
+              <line
+                x1={150 + Math.cos(hourAngleRad) * (R - 6)}
+                y1={150 + Math.sin(hourAngleRad) * (R - 6)}
+                x2={150 + Math.cos(hourAngleRad) * (R + 14)}
+                y2={150 + Math.sin(hourAngleRad) * (R + 14)}
+                stroke="var(--rust)"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+              />
+              {/* Hour hand — shorter, thicker. Inks at full strength so it
+                  reads against the arc colors. */}
+              <line
+                x1={150}
+                y1={150}
+                x2={150 + Math.cos(hourAngleRad) * 50}
+                y2={150 + Math.sin(hourAngleRad) * 50}
+                stroke="var(--ink)"
+                strokeWidth={4}
+                strokeLinecap="round"
+                style={{ transition: 'transform 0.4s cubic-bezier(.4,2.3,.6,1)' }}
+              />
+              {/* Minute hand — longer, thinner. */}
+              <line
+                x1={150}
+                y1={150}
+                x2={150 + Math.cos(minAngleRad) * 85}
+                y2={150 + Math.sin(minAngleRad) * 85}
+                stroke="var(--ink-2)"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                style={{ transition: 'transform 0.4s cubic-bezier(.4,2.3,.6,1)' }}
+              />
+              {/* Inner hub — covers hand origin with a small two-color cap. */}
+              <circle cx={150} cy={150} r={5} fill="var(--ink)" />
+              <circle cx={150} cy={150} r={2} fill="var(--acid)" />
+            </>
+          )}
+          {!showLiveHands && (
+            /* Center dot — only when hands are not drawn (the hub above
+               supersedes it when live). */
+            <circle cx={150} cy={150} r={3} fill="var(--ink-2)" />
+          )}
+
+          {/* PR5 — Meridiem readout, top-right of dial. Shown when viewing
+              today so the user knows the current wall time at a glance. */}
+          {isToday && (
+            <text
+              x={272}
+              y={32}
+              textAnchor="end"
+              fontSize={10}
+              fontFamily="var(--font-mono)"
+              fill="var(--ink-2)"
+              letterSpacing="0.06em"
+            >
+              <tspan fill="var(--acid)" fontWeight={600}>{meridiem}</tspan>
+              <tspan dx={4}>{nowLocalStr}</tspan>
+            </text>
+          )}
         </svg>
 
         {/* ADR 0004 §3.6 — empty-day hint. Only when a todo is linked and
