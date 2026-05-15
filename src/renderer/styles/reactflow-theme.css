@@ -49,6 +49,17 @@
   cursor: grabbing;
 }
 
+/* ── Mother-reorder slide animation ─────────────────────────────────────────
+   When a user drags a mother card to a new slot (body.krnl-reordering is
+   set by MotherFrame onPointerDown, cleared on pointer-up/cancel), all
+   mother RF wrappers animate their transform so they appear to slide when
+   the store updates positions. The dragged card's own translateX is handled
+   by MotherFrame's inline style; the 200ms transition here applies to the
+   RF wrapper-level reposition that happens after the drop. */
+body.krnl-reordering .react-flow__node.krnl-mother {
+  transition: transform 200ms ease;
+}
+
 /* PR6 — Habit lane card tilts and lifts while being dragged. The rotation
    is on the inner card, not the RF wrapper, so the drag-position transform
    on the wrapper composes cleanly with the rotation here. */
