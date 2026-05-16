@@ -11,6 +11,7 @@
 
 import { useEffect } from 'react';
 import { useBoardStore } from './boardStore';
+import { emit } from './eventLog';
 import { deleteTaskNodesCascade } from '../components/Canvas/commandDispatch';
 import { sfxEngine } from '../sfx/sfxEngine';
 import type { Board } from '../../shared/types';
@@ -150,6 +151,12 @@ export function useCliDispatch(): void {
       } catch (err) {
         ok = false;
         message = err instanceof Error ? err.message : String(err);
+      }
+
+      if (ok) {
+        emit('sys.cmd', `cli: ${command}`, { severity: 'info' });
+      } else {
+        emit('sys.error', `cli ${command} failed: ${message}`, { severity: 'err' });
       }
 
       bridge.cliDispatchReply!(id, ok, message);

@@ -26,6 +26,7 @@
  */
 
 import { useBoardStore } from '../../store/boardStore';
+import { emit } from '../../store/eventLog';
 import type { Node } from '@shared/types/node';
 import type { Edge } from '@shared/types/edge';
 import {
@@ -641,8 +642,28 @@ function loadTaskIntoPomo(
  * Returns an onCommand handler bound to a specific node id.
  * Call once per rendered node (stable reference via useCallback with [nodeId]).
  */
+/** Short id for log lines — keeps text under the 120-char cap. */
+function shortId(id: string): string {
+  return id.startsWith('mother-') ? id : id.slice(0, 10);
+}
+
 export function makeCommandHandler(nodeId: string) {
   return (command: string, args: Args = {}): void => {
+    try {
+      _dispatch(nodeId, command, args);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      emit('sys.error', `dispatch '${command}' on ${shortId(nodeId)} failed: ${msg}`, {
+        severity: 'err',
+        refId: nodeId,
+      });
+      throw err;
+    }
+  };
+}
+
+function _dispatch(nodeId: string, command: string, args: Args): void {
+  {
     const { board, updateNode } = useBoardStore.getState();
     if (!board) return;
 
@@ -666,6 +687,7 @@ export function makeCommandHandler(nodeId: string) {
         }
       }
       loadTaskIntoPomo(nodeId, { autoStart: true });
+      emit('pomo.start', `pomo session started for task ${shortId(nodeId)}`, { refId: nodeId });
       return;
     }
 
@@ -716,6 +738,7 @@ export function makeCommandHandler(nodeId: string) {
 
       const saved = useBoardStore.getState().board;
       if (saved) void window.krnl?.boardSave(saved);
+      emit('pomo.stop', `pomo paused for task ${shortId(nodeId)}`, { severity: 'info', refId: nodeId });
       return;
     }
 
@@ -750,6 +773,7 @@ export function makeCommandHandler(nodeId: string) {
       deleteTaskNodesCascade([nodeId]);
       const final = useBoardStore.getState().board;
       if (final) void window.krnl?.boardSave(final);
+      emit('task.deleted', `task ${shortId(nodeId)} deleted`, { severity: 'warn', refId: nodeId });
       return;
     }
 
@@ -846,6 +870,7 @@ export function makeCommandHandler(nodeId: string) {
       addEdge(edge);
       const updated = useBoardStore.getState().board;
       if (updated) void window.krnl?.boardSave(updated);
+      emit('task.created', `subtask ${shortId(childNodeId)} added under ${shortId(nodeId)}`, { refId: childNodeId });
       return;
     }
 
@@ -939,6 +964,7 @@ export function makeCommandHandler(nodeId: string) {
       addEdge(edge);
       const updated = useBoardStore.getState().board;
       if (updated) void window.krnl?.boardSave(updated);
+      emit('task.created', `next task ${shortId(newNodeId)} after ${shortId(nodeId)}`, { refId: newNodeId });
       return;
     }
 
@@ -969,6 +995,7 @@ export function makeCommandHandler(nodeId: string) {
       addNode(lane);
       const updated = useBoardStore.getState().board;
       if (updated) void window.krnl?.boardSave(updated);
+      emit('node.added', `habit.lane spawned for habit ${habitId.slice(0, 8)}`, { refId: lane.id });
       return;
     }
 
@@ -983,11 +1010,13 @@ export function makeCommandHandler(nodeId: string) {
       switch (command) {
         case 'habit.lane.toggleToday': {
           mutateMotherHabit(mother.id, (s) => habitToggleDay(s, { id: habitId }));
+          emit('habit.checkin', `habit ${habitId.slice(0, 8)} toggled (lane)`, { refId: habitId });
           break;
         }
         // Edge target — same as toggleToday but idempotent.
         case 'habit.markDone': {
           mutateMotherHabit(mother.id, (s) => habitMarkDone(s, { id: habitId }));
+          emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, { refId: habitId });
           break;
         }
         case 'habit.lane.rename': {
@@ -1250,6 +1279,7 @@ export function makeCommandHandler(nodeId: string) {
 
       const finalBoard = useBoardStore.getState().board;
       if (finalBoard) void window.krnl?.boardSave(finalBoard);
+      emit('task.created', `task ${shortId(taskNodeId)} added via todo`, { refId: taskNodeId });
       return;
     }
 
@@ -1345,6 +1375,11 @@ export function makeCommandHandler(nodeId: string) {
       const prevTask = node.state as TaskState;
       const nextTask = result.state as TaskState;
       updateNode(nodeId, { state: nextTask });
+      if (prevTask.done !== nextTask.done) {
+        emit('task.completed', `task ${shortId(nodeId)} ${nextTask.done ? 'completed' : 'reopened'}`, {
+          refId: nodeId,
+        });
+      }
 
       if (prevTask.todoItemId !== null && prevTask.done !== nextTask.done) {
         const todoNode = useBoardStore
@@ -1454,6 +1489,11 @@ export function makeCommandHandler(nodeId: string) {
         return;
       }
       updateNode(nodeId, { state: nextPomo });
+      if (command === 'pomo.complete') {
+        emit('pomo.complete', `pomo session ${nextPomo.sessionsCompleted} completed`);
+      } else {
+        emit('pomo.stop', `pomo session cancelled`, { severity: 'warn' });
+      }
 
       const justCompleted = command === 'pomo.complete';
       const newest = nextPomo.history[nextPomo.history.length - 1];
@@ -1487,6 +1527,28 @@ export function makeCommandHandler(nodeId: string) {
       const updated = useBoardStore.getState().board;
       if (updated) void window.krnl?.boardSave(updated);
       return;
+    }
+
+    // ── Generic per-command emits for commands handled via the simple
+    //    applyCommand fall-through. Keeps log coverage broad without
+    //    requiring an emit on every dedicated branch above.
+    if (command === 'pomo.start' && node.kind === 'pomo' && result.state !== undefined) {
+      emit('pomo.start', `pomo session started`, {
+        refId: (result.state as PomoState).activeTaskId ?? undefined,
+      });
+    } else if (command === 'habit.toggleDay' && node.kind === 'habit') {
+      const habitId = typeof args['id'] === 'string' ? args['id'] : '';
+      emit('habit.checkin', `habit ${habitId.slice(0, 8)} toggled`, { refId: habitId || undefined });
+    } else if (command === 'habit.markDone' && node.kind === 'habit') {
+      const habitId = typeof args['id'] === 'string' ? args['id'] : '';
+      emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, { refId: habitId || undefined });
+    } else if (command === 'habit.add' && node.kind === 'habit') {
+      emit('habit.created', `habit added on ${shortId(nodeId)}`);
+    } else if (command === 'habit.remove' && node.kind === 'habit') {
+      const habitId = typeof args['id'] === 'string' ? args['id'] : '';
+      emit('habit.deleted', `habit ${habitId.slice(0, 8)} removed`, { severity: 'warn' });
+    } else if (command === 'frame.setSize' && node.kind === 'frame') {
+      emit('frame.resized', `frame ${shortId(nodeId)} resized`, { refId: nodeId });
     }
 
     // ── All other commands ────────────────────────────────────────────────
