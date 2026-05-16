@@ -112,6 +112,14 @@ import {
 } from '../nodes/ClockNode/commands';
 import type { ClockState } from '../nodes/ClockNode/types';
 
+// ── Frame ─────────────────────────────────────────────────────────────
+import {
+  frameSetLabel,
+  frameSetSize,
+  frameSetChildren,
+  frameSetTint,
+} from '../nodes/FrameNode/commands';
+
 // ── Text + Image ──────────────────────────────────────────────────────
 import { textSetText, textSetSize } from '../nodes/TextNode/commands';
 import {
@@ -285,6 +293,15 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'image.setSize':  return { state: imageSetSize(s as never, args as never) };
         case 'image.setAlt':   return { state: imageSetAlt(s as never, args as never) };
         case 'image.clear':    return { state: imageClear(s as never) };
+      }
+      break;
+    }
+    case 'frame': {
+      switch (command) {
+        case 'frame.setLabel':    return { state: frameSetLabel(s as never, args as never) };
+        case 'frame.setSize':     return { state: frameSetSize(s as never, args as never) };
+        case 'frame.setChildren': return { state: frameSetChildren(s as never, args as never) };
+        case 'frame.setTint':     return { config: frameSetTint(c as never, args as never) };
       }
       break;
     }
@@ -1140,10 +1157,21 @@ export function makeCommandHandler(nodeId: string) {
       });
       const n = siblingTaskNodes.length + 1;
 
-      const position =
-        siblingTaskNodes.length === 0
-          ? { x: todoNode.position.x, y: todoNode.position.y + 420 }
-          : { x: todoNode.position.x + (n - 1) * 252, y: todoNode.position.y + 420 };
+      // Spawn rule: if siblings exist, place right next to the most recently
+      // added one (chronological tail). If no siblings yet, drop the first
+      // task below the parent mother (540px tall + 40px gap).
+      let position: { x: number; y: number };
+      if (siblingTaskNodes.length === 0) {
+        position = { x: todoNode.position.x, y: todoNode.position.y + 580 };
+      } else {
+        const last = siblingTaskNodes
+          .slice()
+          .sort((a, b) =>
+            (a.state as TaskState).createdAt.localeCompare((b.state as TaskState).createdAt),
+          )
+          .at(-1)!;
+        position = { x: last.position.x + 252, y: last.position.y };
+      }
 
       const addedItem = nextState.items[nextState.items.length - 1];
       // Use stripped text from the item (todoAdd already received the stripped text).

@@ -52,8 +52,8 @@
   --term-rust:  #e87a5f;
 
   /* Grid */
-  --grid:        rgba(26, 24, 20, 0.06);
-  --grid-strong: rgba(26, 24, 20, 0.12);
+  --grid:        rgba(26, 24, 20, 0.10);
+  --grid-strong: rgba(26, 24, 20, 0.20);
   --grid-minor:  32px;
   --grid-major:  160px;
 
@@ -82,26 +82,26 @@
 
 /* ── Cyber — dark ───────────────────────────────────────────────────── */
 [data-theme="dark"] {
-  --paper:   #0e0d0b;
-  --paper-2: #1a1814;
-  --paper-3: #2a2620;
-  --node-bg: #18160f;
+  --paper:   #131210;
+  --paper-2: #1f1d18;
+  --paper-3: #2f2b24;
+  --node-bg: #1c1a13;
 
-  --ink:   #f0ebdd;
-  --ink-2: #d4cfc0;
-  --ink-3: #8a8270;
-  --ink-4: #5a5244;
+  --ink:   #f4efe2;
+  --ink-2: #ddd6c6;
+  --ink-3: #968d7a;
+  --ink-4: #6a6253;
 
-  --spine:     #6e8f25;
-  --spine-hot: #9ac33c;
-  --rust:      #e87a5f;
-  --rust-deep: #c8553d;
+  --spine:     #7ea22b;
+  --spine-hot: #a8d244;
+  --rust:      #ee8466;
+  --rust-deep: #d05f47;
 
   --term-bg:   #05040a;
   --term-bg-2: #0a0812;
 
-  --grid:        rgba(240, 235, 221, 0.05);
-  --grid-strong: rgba(240, 235, 221, 0.10);
+  --grid:        rgba(240, 235, 221, 0.09);
+  --grid-strong: rgba(240, 235, 221, 0.18);
 }
 
 /* ── Noir (additional) — light ──────────────────────────────────────── */
