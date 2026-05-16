@@ -551,6 +551,10 @@ function loadTaskIntoPomo(
   const taskNode = board.nodes.find((n) => n.id === taskNodeId);
   if (!taskNode || taskNode.kind !== 'todo.task') return;
 
+  // Decision 28: event-kind tasks never load into the pomo. Defense in depth
+  // for any caller that bypasses the dblclick gate (e.g., TodoItem row clicks).
+  if ((taskNode.state as TaskState).kind === 'event') return;
+
   const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
   if (!pomoNode) return;
 
@@ -770,16 +774,22 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const newKind = ts.kind === 'focus' ? 'event' : 'focus';
 
       if (newKind === 'event') {
-        // Check whether this task is the currently active pomo task.
+        // Clean handoff: if this task is the pomo's active task in ANY status,
+        // clear it. Cancel an in-flight session first so the partial run is
+        // recorded; then clearActiveTask flips back to idle. This avoids the
+        // pomo continuing to show pips/sessions for a task that is no longer
+        // a pomodoro task.
         const freshBoard = useBoardStore.getState().board;
         const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
         if (pomoNode) {
           const ps = pomoNode.state as PomoState;
-          if (ps.activeTaskId === nodeId && (ps.status === 'running' || ps.status === 'paused')) {
-            // Cancel the pomo (records partial session) then clear activeTaskId.
-            let cancelledState = pomoCancel(ps);
-            cancelledState = pomoClearActiveTask(cancelledState);
-            updateNode(pomoNode.id, { state: cancelledState });
+          if (ps.activeTaskId === nodeId) {
+            let nextState = ps;
+            if (ps.status === 'running' || ps.status === 'paused') {
+              nextState = pomoCancel(nextState);
+            }
+            nextState = pomoClearActiveTask(nextState);
+            updateNode(pomoNode.id, { state: nextState });
           }
         }
       }
