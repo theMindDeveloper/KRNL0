@@ -25,6 +25,7 @@ import {
 import {
   deleteTaskCascade,
   renumberSiblings as sharedRenumberSiblings,
+  stampCompletedAt,
 } from '../../shared/dispatch/task';
 import {
   resolveNodeRef,
@@ -272,7 +273,8 @@ export async function taskToggle(
   taskId = taskNode.id;
 
   const prevState = taskNode.state as TaskState;
-  const nextState = fsmTaskToggle(prevState);
+  const env = { uuid: () => randomUUID(), now: () => new Date().toISOString() };
+  const nextState = stampCompletedAt(prevState, fsmTaskToggle(prevState), env);
   updateNode(board, taskId, { ...taskNode, state: nextState });
 
   // Mirror to linked TodoItem
@@ -282,7 +284,6 @@ export async function taskToggle(
       const todoState = todoMother.state as TodoState;
       const item = todoState.items.find((i) => i.id === prevState.todoItemId);
       if (item && item.done !== nextState.done) {
-        const env = { uuid: () => randomUUID(), now: () => new Date().toISOString() };
         const newTodo = fsmTodoToggle(todoState, { id: prevState.todoItemId }, env);
         updateNode(board, todoMother.id, { ...todoMother, state: newTodo });
       }

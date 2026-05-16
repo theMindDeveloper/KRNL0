@@ -69,6 +69,12 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
         fireNode('frame');
         return;
       }
+      // Issue #134 — analytics node is spawnable via 'A' but intentionally not
+      // shown in the dock toolbar.
+      if (e.key === 'a' || e.key === 'A') {
+        fireNode('analytics');
+        return;
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
