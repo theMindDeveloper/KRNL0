@@ -40,18 +40,14 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
 
       {/* Glass tube — flat top, rounded bottom */}
       <div
-        className="tube"
+        className="pomo-vapor-tube"
         style={{
           position: 'relative',
           width: 88,
           height: 200,
           flexShrink: 0,
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.18) 100%)',
-          border: '1.5px solid var(--ink-3)',
           borderRadius: '3px 3px 44px 44px',
           overflow: 'hidden',
-          boxShadow:
-            'inset 3px 0 0 rgba(255,255,255,0.05), inset -3px 0 0 rgba(0,0,0,0.18), 0 12px 32px rgba(0,0,0,0.35)',
         }}
       >
         {/* Liquid fill */}

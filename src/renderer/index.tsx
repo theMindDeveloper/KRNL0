@@ -7,6 +7,7 @@ import {
 } from './store/eventLog';
 import './styles/tokens.css';
 import './styles/reactflow-theme.css';
+import './styles/chassis.css';
 import '@xterm/xterm/css/xterm.css';
 
 installGlobalErrorCapture();

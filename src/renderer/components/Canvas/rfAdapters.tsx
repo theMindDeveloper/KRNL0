@@ -172,7 +172,8 @@ export function createNodeAdapter<S = unknown, C = unknown>(
     const { node, onCommand, onSelect, slotIndex, slotTotal } = data;
     // Mother nodes don't connect — render zero handles. Children get
     // interactive handles so users can wire edges between them.
-    const showHandles = !node.isMother;
+    // Analytics is a read-only dashboard — no edges, no handles.
+    const showHandles = !node.isMother && node.kind !== 'analytics';
     return (
       <>
         {showHandles && (

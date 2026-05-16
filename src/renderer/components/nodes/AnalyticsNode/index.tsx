@@ -1,14 +1,17 @@
 /**
  * AnalyticsNode — free-floating child node hosting the KRNL analytics dashboard.
  *
- * Not a mother. Spawns from the dock's keyboard shortcut ('A') without a
- * dock button (Issue #134 — "normal child floating node and not in the
- * dock"). Reads from the analytics engine via useAnalytics(); all numbers
- * are derived from board.nodes — no parallel storage, no event log.
+ * Not a mother. Spawns from the dock button or 'A' shortcut. Reads from the
+ * analytics engine via useAnalytics(); all numbers are derived from
+ * board.nodes — no parallel storage, no event log.
+ *
+ * UI: dark glass card with a gradient titlebar, four pill-tabs, a compact
+ * range strip, and section cards for each chart. No connectors — analytics
+ * is a read-only dashboard (handles suppressed in rfAdapters by kind check).
  */
 
 import { useMemo } from 'react';
-import { NodeResizer } from '@xyflow/react';
+import { NodeResizeControl } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import {
   ActivityStrip,
@@ -18,7 +21,6 @@ import {
   MonthBars,
   TotalsPanel,
   lastNDays,
-  yearRange,
   useAnalytics,
   todayLocal,
 } from '../../../analytics';
@@ -35,69 +37,142 @@ const VIEW_LABELS: Record<AnalyticsView, string> = {
 
 const RANGE_PRESETS = [7, 30, 90, 365] as const;
 
-const headerStyle: React.CSSProperties = {
+const METRIC_LABELS: Record<'taskCount' | 'habitCount' | 'focusMin' | 'sessions', string> = {
+  taskCount: 'tasks',
+  habitCount: 'habits',
+  focusMin: 'focus',
+  sessions: 'sessions',
+};
+
+// ── chrome ────────────────────────────────────────────────────────────────────
+
+const rootStyle: React.CSSProperties = {
+  width: '100%',
+  height: '100%',
+  background:
+    'linear-gradient(180deg, #16181a 0%, #0e1012 100%)',
+  border: '1px solid #2a2e33',
+  borderRadius: 10,
+  boxShadow:
+    '0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)',
+  display: 'flex',
+  flexDirection: 'column',
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+  color: '#cfd3d8',
+};
+
+const titlebarStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
+  gap: 10,
   padding: '8px 12px',
-  borderBottom: '1px solid var(--paper-3)',
+  background:
+    'linear-gradient(180deg, #1f2226 0%, #16181a 100%)',
+  borderBottom: '1px solid #0a0c0e',
+  boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
   fontFamily: 'var(--font-mono)',
   fontSize: 10,
-  color: 'var(--ink-3)',
+  letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  letterSpacing: '0.08em',
+  color: '#9aa1a8',
+  flexShrink: 0,
 };
 
-const tabsStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 2,
-  padding: '6px 12px 0',
+const dotStyle: React.CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+  background: 'var(--acid, #c9f158)',
+  boxShadow: '0 0 6px rgba(201,241,88,0.7)',
 };
 
-const tabButton = (active: boolean): React.CSSProperties => ({
+const summaryChipStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 9.5,
-  textTransform: 'uppercase',
   letterSpacing: '0.06em',
-  padding: '4px 8px',
-  border: '1px solid var(--paper-3)',
-  borderBottom: active ? '1px solid var(--node-bg)' : '1px solid var(--paper-3)',
-  borderRadius: '4px 4px 0 0',
-  background: active ? 'var(--node-bg)' : 'var(--paper-2)',
-  color: active ? 'var(--acid)' : 'var(--ink-3)',
+  padding: '2px 7px',
+  border: '1px solid #2a2e33',
+  borderRadius: 999,
+  background: 'rgba(20,22,24,0.6)',
+  color: '#cfd3d8',
+};
+
+const tabsBarStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  padding: '8px 12px 0',
+  flexShrink: 0,
+};
+
+const tabPill = (active: boolean): React.CSSProperties => ({
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  padding: '4px 10px',
+  border: '1px solid ' + (active ? '#3a4048' : '#23262a'),
+  borderRadius: 999,
+  background: active
+    ? 'linear-gradient(180deg, #2a2e33 0%, #1c1f23 100%)'
+    : 'transparent',
+  color: active ? 'var(--acid, #c9f158)' : '#7d848b',
   cursor: 'pointer',
+  boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.04)' : 'none',
+  transition: 'all 120ms',
 });
 
 const chipBtn = (active: boolean): React.CSSProperties => ({
   fontFamily: 'var(--font-mono)',
   fontSize: 9,
   letterSpacing: '0.04em',
-  padding: '2px 6px',
-  border: '1px solid var(--paper-3)',
-  borderRadius: 3,
-  background: active ? 'var(--acid)' : 'var(--paper-2)',
-  color: active ? '#1a1814' : 'var(--ink-3)',
+  padding: '2px 7px',
+  border: '1px solid ' + (active ? '#3a4048' : '#23262a'),
+  borderRadius: 4,
+  background: active ? 'var(--acid, #c9f158)' : 'transparent',
+  color: active ? '#0e1012' : '#9aa1a8',
   cursor: 'pointer',
+  fontWeight: active ? 700 : 500,
 });
 
-const sectionStyle: React.CSSProperties = {
+const cardStyle: React.CSSProperties = {
+  background: 'linear-gradient(180deg, #1a1d20 0%, #131517 100%)',
+  border: '1px solid #23262a',
+  borderRadius: 6,
+  padding: '10px 12px',
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  gap: 6,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
+};
+
+const cardGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 8,
   padding: '8px 12px',
 };
 
 const sectionLabelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 9,
-  color: 'var(--ink-4)',
+  color: '#6c727a',
   textTransform: 'uppercase',
-  letterSpacing: '0.08em',
+  letterSpacing: '0.1em',
+};
+
+const bodyStyle: React.CSSProperties = {
+  flex: 1,
+  overflow: 'auto',
+  padding: '8px 0 14px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
 };
 
 export function AnalyticsNode({
   node,
-  selected,
   onCommand,
 }: NodeProps<AnalyticsState, AnalyticsConfig>) {
   const state: AnalyticsState = { ...defaultAnalyticsState(), ...(node.state ?? {}) };
@@ -124,52 +199,60 @@ export function AnalyticsNode({
   };
 
   return (
-    <div
-      data-testid="analytics-node-root"
-      style={{
-        width: '100%',
-        height: '100%',
-        background: 'var(--node-bg)',
-        border: '1px solid var(--paper-3)',
-        borderRadius: 8,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-      }}
-    >
-      <NodeResizer
-        isVisible={selected === true}
-        minWidth={420}
-        minHeight={320}
+    <div data-testid="analytics-node-root" style={rootStyle}>
+      <NodeResizeControl
+        position="bottom-right"
+        minWidth={460}
+        minHeight={340}
         maxWidth={1400}
         maxHeight={1400}
         onResizeEnd={onResizeEnd}
-        handleStyle={{
-          width: 8,
-          height: 8,
-          background: '#0e0d0b',
-          border: '1.5px solid var(--acid)',
-          borderRadius: '50%',
+        style={{
+          background: 'transparent',
+          border: 'none',
+          width: 18,
+          height: 18,
+          right: 2,
+          bottom: 2,
         }}
-        lineStyle={{ borderColor: 'rgba(201,241,88,0.4)', borderWidth: 1 }}
-      />
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          style={{
+            position: 'absolute',
+            right: 2,
+            bottom: 2,
+            cursor: 'nwse-resize',
+            color: '#4a4f55',
+            pointerEvents: 'none',
+          }}
+          aria-hidden
+        >
+          <path d="M13 5L5 13M13 9L9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      </NodeResizeControl>
 
-      <div style={headerStyle}>
-        <span>
-          <span style={{ color: 'var(--cyan)' }}>●</span>
-          {' analytics · '}
-          <span style={{ color: 'var(--ink-2)' }}>{sources.length} sources</span>
+      {/* Titlebar */}
+      <div style={titlebarStyle}>
+        <span style={dotStyle} aria-hidden />
+        <span style={{ color: '#e6e9ec', fontWeight: 600 }}>Analytics</span>
+        <span style={{ color: '#4a4f55' }}>·</span>
+        <span style={{ color: '#7d848b' }}>{sources.length} sources</span>
+        <div style={{ flex: 1 }} />
+        <span style={summaryChipStyle}>
+          <span style={{ color: '#6c727a' }}>done </span>
+          <span style={{ color: '#e6e9ec' }}>{tot.tasksDone}</span>
         </span>
-        <span style={{ color: 'var(--ink-4)' }}>
-          {streaks.longestHabitStreak > 0
-            ? `streak · ${streaks.longestHabitStreak}d`
-            : `${tot.tasksDone} done`}
+        <span style={summaryChipStyle}>
+          <span style={{ color: '#6c727a' }}>streak </span>
+          <span style={{ color: 'var(--acid, #c9f158)' }}>{streaks.longestHabitStreak}d</span>
         </span>
       </div>
 
-      <div style={tabsStyle}>
+      {/* Tabs + range chips */}
+      <div style={tabsBarStyle}>
         {ANALYTICS_VIEWS.map((v) => (
           <button
             key={v}
@@ -180,13 +263,13 @@ export function AnalyticsNode({
               onCommand('analytics.setView', { view: v });
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            style={tabButton(view === v)}
+            style={tabPill(view === v)}
           >
             {VIEW_LABELS[v]}
           </button>
         ))}
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-end', paddingBottom: 4 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
           {RANGE_PRESETS.map((days) => (
             <button
               key={days}
@@ -205,147 +288,173 @@ export function AnalyticsNode({
         </div>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '4px 4px 12px' }}>
+      <div style={bodyStyle}>
         {view === 'overview' && (
           <>
-            <div style={sectionStyle}>
-              <span style={sectionLabelStyle}>Totals · last {state.rangeDays} days</span>
-              <TotalsPanel totals={tot} open={open} rangeLabel={`${range.start} → ${range.end}`} />
-            </div>
-            <div style={sectionStyle}>
-              <span style={sectionLabelStyle}>Activity strip</span>
-              <ActivityStrip data={byDay} metric={state.metric} width={580} height={48} />
-              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                {(['taskCount', 'habitCount', 'focusMin', 'sessions'] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    data-testid={`analytics-metric-${m}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCommand('analytics.setMetric', { metric: m });
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    style={chipBtn(state.metric === m)}
-                  >
-                    {m}
-                  </button>
-                ))}
+            <div style={{ padding: '0 12px' }}>
+              <div style={cardStyle}>
+                <span style={sectionLabelStyle}>
+                  Totals · last {state.rangeDays} days
+                </span>
+                <TotalsPanel
+                  totals={tot}
+                  open={open}
+                  rangeLabel={`${range.start} → ${range.end}`}
+                />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, padding: '4px 12px' }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ padding: '0 12px' }}>
+              <div style={cardStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={sectionLabelStyle}>Activity · {METRIC_LABELS[state.metric]}</span>
+                  <div style={{ flex: 1 }} />
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {(['taskCount', 'habitCount', 'focusMin', 'sessions'] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        data-testid={`analytics-metric-${m}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCommand('analytics.setMetric', { metric: m });
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        style={chipBtn(state.metric === m)}
+                      >
+                        {METRIC_LABELS[m]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <ActivityStrip data={byDay} metric={state.metric} width={580} height={52} />
+              </div>
+            </div>
+            <div style={cardGridStyle}>
+              <div style={cardStyle}>
                 <span style={sectionLabelStyle}>By weekday</span>
-                <DowBars data={dow} metric="tasks" width={280} height={110} />
+                <DowBars data={dow} metric="tasks" width={280} height={120} />
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={cardStyle}>
                 <span style={sectionLabelStyle}>By hour</span>
-                <HourLine data={hour} metric="tasks" width={280} height={110} />
+                <HourLine data={hour} metric="tasks" width={280} height={120} />
               </div>
             </div>
           </>
         )}
 
         {view === 'calendar' && (
-          <div style={sectionStyle}>
-            <span style={sectionLabelStyle}>
-              Calendar heatmap · last {state.rangeDays} days · {state.metric}
-            </span>
-            <div style={{ overflowX: 'auto' }}>
-              <CalendarHeatmap data={byDay} metric={state.metric} />
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              {(['taskCount', 'habitCount', 'focusMin', 'sessions'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCommand('analytics.setMetric', { metric: m });
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={chipBtn(state.metric === m)}
-                >
-                  {m}
-                </button>
-              ))}
+          <div style={{ padding: '0 12px' }}>
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={sectionLabelStyle}>
+                  Calendar · last {state.rangeDays}d · {METRIC_LABELS[state.metric]}
+                </span>
+                <div style={{ flex: 1 }} />
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['taskCount', 'habitCount', 'focusMin', 'sessions'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCommand('analytics.setMetric', { metric: m });
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={chipBtn(state.metric === m)}
+                    >
+                      {METRIC_LABELS[m]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <CalendarHeatmap data={byDay} metric={state.metric} />
+              </div>
             </div>
           </div>
         )}
 
         {view === 'patterns' && (
           <>
-            <div style={sectionStyle}>
-              <span style={sectionLabelStyle}>By weekday · tasks</span>
-              <DowBars data={dow} metric="tasks" width={580} height={120} />
+            <div style={{ padding: '0 12px' }}>
+              <div style={cardStyle}>
+                <span style={sectionLabelStyle}>By weekday · tasks</span>
+                <DowBars data={dow} metric="tasks" width={580} height={130} />
+              </div>
             </div>
-            <div style={sectionStyle}>
-              <span style={sectionLabelStyle}>By hour · tasks</span>
-              <HourLine data={hour} metric="tasks" width={580} height={120} />
+            <div style={{ padding: '0 12px' }}>
+              <div style={cardStyle}>
+                <span style={sectionLabelStyle}>By hour · tasks</span>
+                <HourLine data={hour} metric="tasks" width={580} height={130} />
+              </div>
             </div>
-            <div style={sectionStyle}>
-              <span style={sectionLabelStyle}>By month · {year}</span>
-              <MonthBars data={months} metric="tasks" width={580} height={120} />
+            <div style={{ padding: '0 12px' }}>
+              <div style={cardStyle}>
+                <span style={sectionLabelStyle}>By month · {year}</span>
+                <MonthBars data={months} metric="tasks" width={580} height={130} />
+              </div>
             </div>
           </>
         )}
 
         {view === 'sources' && (
-          <div style={sectionStyle}>
-            <span style={sectionLabelStyle}>Registered data sources</span>
-            <table
-              style={{
-                width: '100%',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--ink-2)',
-                borderCollapse: 'collapse',
-              }}
-            >
-              <thead>
-                <tr style={{ color: 'var(--ink-4)', textAlign: 'left' }}>
-                  <th style={{ padding: '4px 6px' }}>id</th>
-                  <th style={{ padding: '4px 6px' }}>label</th>
-                  <th style={{ padding: '4px 6px', textAlign: 'right' }}>events</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sources.map((s) => {
-                  const count = analytics.events().filter((e) => e.source === s.id).length;
-                  return (
-                    <tr key={s.id} style={{ borderTop: '1px solid var(--paper-3)' }}>
-                      <td style={{ padding: '4px 6px' }}>{s.id}</td>
-                      <td style={{ padding: '4px 6px' }}>{s.label}</td>
-                      <td style={{ padding: '4px 6px', textAlign: 'right' }}>{count}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div style={{ padding: '0 12px' }}>
+            <div style={cardStyle}>
+              <span style={sectionLabelStyle}>Registered data sources</span>
+              <table
+                style={{
+                  width: '100%',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  color: '#cfd3d8',
+                  borderCollapse: 'collapse',
+                }}
+              >
+                <thead>
+                  <tr style={{ color: '#6c727a', textAlign: 'left' }}>
+                    <th style={{ padding: '4px 6px' }}>id</th>
+                    <th style={{ padding: '4px 6px' }}>label</th>
+                    <th style={{ padding: '4px 6px', textAlign: 'right' }}>events</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sources.map((s) => {
+                    const count = analytics.events().filter((e) => e.source === s.id).length;
+                    return (
+                      <tr key={s.id} style={{ borderTop: '1px solid #23262a' }}>
+                        <td style={{ padding: '4px 6px' }}>{s.id}</td>
+                        <td style={{ padding: '4px 6px' }}>{s.label}</td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right' }}>{count}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
             {streaks.perHabit.length > 0 && (
-              <>
-                <span style={{ ...sectionLabelStyle, marginTop: 8 }}>Habit streaks</span>
+              <div style={{ ...cardStyle, marginTop: 8 }}>
+                <span style={sectionLabelStyle}>Habit streaks</span>
                 <table
                   style={{
                     width: '100%',
                     fontFamily: 'var(--font-mono)',
                     fontSize: 10,
-                    color: 'var(--ink-2)',
+                    color: '#cfd3d8',
                     borderCollapse: 'collapse',
                   }}
                 >
                   <tbody>
                     {streaks.perHabit.map((h) => (
-                      <tr key={h.habitId} style={{ borderTop: '1px solid var(--paper-3)' }}>
+                      <tr key={h.habitId} style={{ borderTop: '1px solid #23262a' }}>
                         <td style={{ padding: '4px 6px' }}>{h.label}</td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--acid)' }}>
+                        <td style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--acid, #c9f158)' }}>
                           {h.streak}d
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </>
+              </div>
             )}
           </div>
         )}

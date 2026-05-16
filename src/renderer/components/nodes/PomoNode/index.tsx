@@ -158,8 +158,15 @@ export function PomoNode({
   // F3 — running flag for variants that animate a blinking colon
   const running = state.status === 'running';
 
-  // PR4 — active face, defaulting to 'vapor' when config.face is absent
-  const activeFace: TimerFace = config.face ?? 'vapor';
+  // PR4 — active face. When the user hasn't explicitly picked a face,
+  // pick a default per theme: 'blocks' on light, 'vapor' on dark. The
+  // user's explicit choice is preserved across theme toggles since we
+  // only fall back when config.face is undefined.
+  const themeIsDark =
+    typeof document !== 'undefined' &&
+    document.documentElement.getAttribute('data-theme') === 'dark';
+  const defaultFace: TimerFace = themeIsDark ? 'vapor' : 'blocks';
+  const activeFace: TimerFace = config.face ?? defaultFace;
 
   const headerLeft = isTaskMode
     ? `TASK · ${truncate(state.label || 'task', 18)}`
@@ -344,7 +351,7 @@ export function PomoNode({
             onMouseDown={(e) => e.stopPropagation()}
           >
             {(['ascii', 'lcd', 'blocks', 'vapor'] as const).map((face) => {
-              const isActive = (config.face ?? 'vapor') === face;
+              const isActive = (config.face ?? defaultFace) === face;
               return (
                 <button
                   key={face}
@@ -407,15 +414,17 @@ export function PomoNode({
               style={{
                 flex: 1,
                 padding: '8px',
-                background: 'var(--acid)',
-                color: 'var(--paper)',
+                background: 'var(--btn-primary-bg)',
+                color: 'var(--btn-primary-fg)',
                 border: 'none',
                 borderRadius: 5,
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
+                fontWeight: 700,
                 cursor: 'pointer',
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
+                boxShadow: '0 0 0 1px var(--btn-primary-ring)',
               }}
             >
               SAVE
@@ -525,15 +534,17 @@ export function PomoNode({
               style={{
                 flex: 1,
                 padding: '10px 8px',
-                background: 'var(--acid)',
-                color: 'var(--paper)',
+                background: 'var(--btn-primary-bg)',
+                color: 'var(--btn-primary-fg)',
                 border: 'none',
                 borderRadius: 5,
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
+                fontWeight: 700,
                 cursor: 'pointer',
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
+                boxShadow: '0 0 0 1px var(--btn-primary-ring)',
               }}
             >
               {buttonLabel}
