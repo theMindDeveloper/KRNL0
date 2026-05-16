@@ -3,6 +3,7 @@
 
 import type { PomoConfig, PomoSessionRecord, PomoState, TimerFace } from './types';
 import { defaultPomoConfig } from './types';
+import { isLongBreakAfter } from './pomoRules';
 
 export interface PomoEnv {
   now: () => number;
@@ -114,7 +115,7 @@ export const pomoComplete = (
   if (now - Date.parse(state.startedAt) < state.durationMin * 60_000) return state;
   const config = args.config ?? defaultPomoConfig();
   const nextSessions = state.sessionsCompleted + 1;
-  const isLong = nextSessions % config.longBreakEvery === 0;
+  const isLong = isLongBreakAfter(state.sessionsCompleted, config);
   const breakMin = isLong ? config.longBreakMin : config.shortBreakMin;
   const record: PomoSessionRecord = {
     id: env.uuid(),
@@ -188,7 +189,7 @@ export const pomoClearActiveTask = (state: PomoState): PomoState => {
   return { ...state, activeTaskId: null, label: '' };
 };
 
-const VALID_FACES: ReadonlyArray<TimerFace> = ['ring', 'ascii', 'lcd', 'blocks', 'vapor'];
+const VALID_FACES: ReadonlyArray<TimerFace> = ['ascii', 'lcd', 'blocks', 'vapor'];
 
 /**
  * PR4 — set the timer face variant on the PomoConfig.

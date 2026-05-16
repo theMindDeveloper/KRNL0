@@ -10,20 +10,51 @@
 // Supersedes the ADR 0003 "earliest anchor wins" model. Multiple anchors per
 // chain are now correct by design, not a migration target.
 //
-// Memoized at module level on (board.nodes, board.edges) reference identity,
-// same pattern as selectTimelines.
+// Decision 28 §4: the selector is now break-aware for focus tasks.
+// - For kind === 'focus': cursor advance = effectiveMin (work + breaks),
+//   so the next task starts after breaks complete.
+//   scheduledDurationMin on a focus task is a WORK-TIME override; the total
+//   block height = work-time + breaks derived from that work time.
+// - For kind === 'event': cursor advance = plannedMin (no breaks).
+//   scheduledDurationMin on an event task is a TOTAL-TIME override (no breaks).
+//
+// Memoized at module level on (board.nodes, board.edges, pomoConfig) by
+// reference identity. Config edits create a new node array (immutable updates)
+// so reference identity is sufficient and cheap.
 
 import type { Board, Node } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
+import type { TaskKind } from '../components/nodes/TaskNode/types';
+import type { PomoConfig } from '../components/nodes/PomoNode/types';
+import { defaultPomoConfig } from '../components/nodes/PomoNode/types';
 import { buildChainIndex, walkChain, type WalkUnit } from './chainWalker';
+import { breakdownPomoTime, type PomoBreakdown } from './pomoSchedule';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+/**
+ * A single placed task with its break breakdown.
+ *
+ * `breakdown` semantics:
+ *   - null when kind === 'event' (no pomo decomposition).
+ *   - non-null when kind === 'focus'. If the task has only one session
+ *     (plannedMin ≤ sessionMin), breakdown.breakMin === 0 and
+ *     breakdown.segments has length 1 — renderers must not emit tail/sub-arc
+ *     DOM when breakMin === 0.
+ *
+ * `scheduledDurationMin` override semantics:
+ *   - Under kind === 'focus': work-time override. Effective block height =
+ *     workMin + breakMin (total wall-clock consumption includes breaks).
+ *   - Under kind === 'event': total-time override, no break expansion.
+ *
+ * Renderers (WeekView, ClockNode) consume `breakdown` directly — they MUST NOT
+ * recompute breakdownPomoTime. This is enforced by code review, not types.
+ */
 export interface ScheduledTaskPlacement {
   taskId: string;
   /** ISO 8601 local datetime "YYYY-MM-DDTHH:MM" */
   startISO: string;
-  /** startISO + scheduledDurationMin (anchor only) or plannedMin (successors). */
+  /** startISO + effectiveMin (focus) or plannedMin/override (event). */
   endISO: string;
   /** The task whose scheduledFor produced this chain's placement. */
   anchorTaskId: string;
@@ -37,6 +68,10 @@ export interface ScheduledTaskPlacement {
   parallelBranchIndex: number | null;
   /** True iff this placement is the chain's anchor (taskId === anchorTaskId). */
   isAnchor: boolean;
+  /** Mirror of task.kind for renderer convenience. */
+  kind: TaskKind;
+  /** Null iff kind === 'event'. Non-null for focus tasks (may have breakMin=0). */
+  breakdown: PomoBreakdown | null;
 }
 
 export interface ScheduleResult {
@@ -46,20 +81,27 @@ export interface ScheduleResult {
 
 // ── Memoization ───────────────────────────────────────────────────────────────
 
-let _cacheKey: { nodes: unknown; edges: unknown } | null = null;
+let _cacheKey: { nodes: unknown; edges: unknown; pomoConfig: unknown } | null = null;
 let _cache: ScheduleResult = { placements: new Map(), computedAt: 0 };
 
 export function selectSchedule(board: Board | null): ScheduleResult {
   if (!board) return _cache;
+
+  // Locate PomoNode for config (board invariant: at most one).
+  const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
+  const pomoConfig: PomoConfig =
+    (pomoNode?.config as PomoConfig | null | undefined) ?? defaultPomoConfig();
+
   if (
     _cacheKey !== null &&
     _cacheKey.nodes === board.nodes &&
-    _cacheKey.edges === board.edges
+    _cacheKey.edges === board.edges &&
+    _cacheKey.pomoConfig === pomoConfig
   ) {
     return _cache;
   }
-  _cacheKey = { nodes: board.nodes, edges: board.edges };
-  _cache = build(board);
+  _cacheKey = { nodes: board.nodes, edges: board.edges, pomoConfig };
+  _cache = build(board, pomoConfig);
   return _cache;
 }
 
@@ -143,7 +185,57 @@ interface TaskInfo {
   todoId: string;
 }
 
-function build(board: Board): ScheduleResult {
+/**
+ * Compute effective block minutes, cursor advance, and breakdown for a task placement.
+ *
+ * For kind==='event':
+ *   - effectiveMin (endISO) = scheduledDurationMin override (if set on anchor) or plannedMin.
+ *   - cursorAdvanceMin = plannedMin (cursor always advances by work time, not visual override).
+ *     This preserves the ADR 0003 §3.7 rule: successor start uses plannedMin, not override.
+ *   - breakdown = null.
+ *
+ * For kind==='focus':
+ *   - effectiveMin = workMin + breakMin (from breakdownPomoTime).
+ *   - cursorAdvanceMin = effectiveMin (next task starts after this task's breaks complete).
+ *   - scheduledDurationMin is a WORK-TIME override; total block = work + breaks.
+ *   - breakdown = the PomoBreakdown.
+ */
+function computeEffective(
+  ts: TaskState,
+  isAnchor: boolean,
+  cfg: PomoConfig,
+): { effectiveMin: number; cursorAdvanceMin: number; breakdown: PomoBreakdown | null } {
+  const kind = ts.kind ?? 'focus';
+  const plannedMin = clampPlanned(ts.plannedMin);
+
+  if (kind === 'event') {
+    // effectiveMin is used for endISO (visual block height).
+    // cursorAdvanceMin is always plannedMin — successor starts after work time, not visual override.
+    const effectiveMin = isAnchor
+      ? clampPlanned(ts.scheduledDurationMin ?? plannedMin)
+      : plannedMin;
+    return { effectiveMin, cursorAdvanceMin: plannedMin, breakdown: null };
+  }
+
+  // kind === 'focus'
+  // Work-time override: if scheduledDurationMin set on anchor, that is the
+  // work budget; total block expands by adding breaks on top.
+  const workBudget = isAnchor
+    ? clampPlanned(ts.scheduledDurationMin ?? plannedMin)
+    : plannedMin;
+
+  const completed = ts.pomoSessionsCompleted ?? 0;
+  const secondsAccumulated = ts.secondsAccumulated ?? 0;
+  // remainingMin = workBudget minus already-accumulated work (in minutes).
+  const remainingMin = Math.max(0, workBudget - Math.floor(secondsAccumulated / 60));
+  const breakdown = breakdownPomoTime(remainingMin, completed, cfg);
+  const effectiveMin = Math.max(1, breakdown.effectiveMin);
+
+  // For focus tasks, cursor advances by effectiveMin (work + breaks).
+  return { effectiveMin, cursorAdvanceMin: effectiveMin, breakdown };
+}
+
+function build(board: Board, cfg: PomoConfig): ScheduleResult {
   const placements = new Map<string, ScheduledTaskPlacement>();
 
   const chainIndex = buildChainIndex(board.edges);
@@ -222,36 +314,43 @@ function build(board: Board): ScheduleResult {
           const ts = info.taskState;
           const isAnchor =
             typeof ts.scheduledFor === 'string' && ts.scheduledFor.length > 0;
+          const taskKind: TaskKind = ts.kind ?? 'focus';
 
           if (isAnchor) {
             // Explicit anchor: reset cursor to scheduledFor.
             cursor = ts.scheduledFor as string;
             cursorAnchorId = unit.taskId;
-            const durMin = clampPlanned(ts.scheduledDurationMin ?? ts.plannedMin);
+
+            const { effectiveMin, cursorAdvanceMin, breakdown } = computeEffective(ts, true, cfg);
             placements.set(unit.taskId, {
               taskId: unit.taskId,
               startISO: cursor,
-              endISO: addMinutesISO(cursor, durMin),
+              endISO: addMinutesISO(cursor, effectiveMin),
               anchorTaskId: unit.taskId,
               parallelGroupId: null,
               parallelBranchIndex: null,
               isAnchor: true,
+              kind: taskKind,
+              breakdown,
             });
-            // Cursor advance always uses plannedMin (not scheduledDurationMin).
-            cursor = addMinutesISO(cursor, unit.plannedMin);
+            // cursorAdvanceMin: for focus = effectiveMin (includes breaks),
+            // for event = plannedMin (ADR 0003 §3.7 — cursor advances by work time only).
+            cursor = addMinutesISO(cursor, cursorAdvanceMin);
           } else if (cursor !== null && cursorAnchorId !== null) {
             // Derived: emit at current cursor.
-            const durMin = unit.plannedMin;
+            const { effectiveMin, cursorAdvanceMin, breakdown } = computeEffective(ts, false, cfg);
             placements.set(unit.taskId, {
               taskId: unit.taskId,
               startISO: cursor,
-              endISO: addMinutesISO(cursor, durMin),
+              endISO: addMinutesISO(cursor, effectiveMin),
               anchorTaskId: cursorAnchorId,
               parallelGroupId: null,
               parallelBranchIndex: null,
               isAnchor: false,
+              kind: taskKind,
+              breakdown,
             });
-            cursor = addMinutesISO(cursor, unit.plannedMin);
+            cursor = addMinutesISO(cursor, cursorAdvanceMin);
           }
           // else: predecessor of first anchor — skip.
         } else {
@@ -287,34 +386,52 @@ function build(board: Board): ScheduleResult {
           }
 
           // Emit each branch.
-          let maxPlannedMin = 0;
+          let maxEffectiveMin = 0;
           for (const { branch, idx } of branchesInComponent) {
             const ts = taskInfoById.get(branch.taskId)?.taskState;
-            const isAnchor =
+            const isBranchAnchor =
               ts !== undefined &&
               typeof ts.scheduledFor === 'string' &&
               ts.scheduledFor.length > 0;
-            const branchStart = isAnchor ? (ts!.scheduledFor as string) : groupStart!;
-            const branchAnchorId = isAnchor ? branch.taskId : (groupAnchorId ?? cursorAnchorId ?? branch.taskId);
-            const durMin = isAnchor
-              ? clampPlanned(ts!.scheduledDurationMin ?? ts!.plannedMin)
-              : branch.plannedMin;
+            const branchStart = isBranchAnchor ? (ts!.scheduledFor as string) : groupStart!;
+            const branchAnchorId = isBranchAnchor
+              ? branch.taskId
+              : (groupAnchorId ?? cursorAnchorId ?? branch.taskId);
+            const taskKind: TaskKind = ts?.kind ?? 'focus';
+
+            let effectiveMin: number;
+            let cursorAdvanceMin: number;
+            let breakdown: PomoBreakdown | null;
+            if (ts) {
+              const computed = computeEffective(ts, isBranchAnchor, cfg);
+              effectiveMin = computed.effectiveMin;
+              cursorAdvanceMin = computed.cursorAdvanceMin;
+              breakdown = computed.breakdown;
+            } else {
+              // Fallback: no task state available.
+              effectiveMin = clampPlanned(branch.plannedMin);
+              cursorAdvanceMin = effectiveMin;
+              breakdown = null;
+            }
+
             placements.set(branch.taskId, {
               taskId: branch.taskId,
               startISO: branchStart,
-              endISO: addMinutesISO(branchStart, durMin),
+              endISO: addMinutesISO(branchStart, effectiveMin),
               anchorTaskId: branchAnchorId,
               parallelGroupId: unit.groupId,
               parallelBranchIndex: idx,
-              isAnchor,
+              isAnchor: isBranchAnchor,
+              kind: taskKind,
+              breakdown,
             });
-            if (branch.plannedMin > maxPlannedMin) maxPlannedMin = branch.plannedMin;
+            if (cursorAdvanceMin > maxEffectiveMin) maxEffectiveMin = cursorAdvanceMin;
           }
 
-          // Advance cursor by max(branch.plannedMin) from groupStart.
+          // Advance cursor by max(branch.cursorAdvanceMin) from groupStart.
           // cursorAnchorId after the group = anchor that determined groupStart.
           // (ADR 0005: if no anchored branch in group, cursorAnchorId carries over.)
-          cursor = addMinutesISO(groupStart!, maxPlannedMin);
+          cursor = addMinutesISO(groupStart!, maxEffectiveMin);
           if (groupAnchorId !== null) cursorAnchorId = groupAnchorId;
         }
       }

@@ -216,12 +216,13 @@ describe('task.addNext — creates a sibling-level sequential successor', () => 
     )!;
     const next = inRange.find((p) => p.taskId === newTask.id)!;
 
-    // Source: anchored at 10:00, 25min planned → ends 10:25.
+    // Source: anchored at 10:00, 25min focus (1 session, no breaks) → ends 10:25.
     expect(source.startISO).toBe('2026-05-20T10:00');
     expect(source.endISO).toBe('2026-05-20T10:25');
     // Next: starts exactly when source ends.
+    // Decision 28: new task is kind='focus', 30 min = 25+5+5=35 effective → ends 11:00.
     expect(next.startISO).toBe('2026-05-20T10:25');
-    expect(next.endISO).toBe('2026-05-20T10:55');
+    expect(next.endISO).toBe('2026-05-20T11:00');
   });
 
   it('no-op when text is empty / whitespace', () => {

@@ -175,10 +175,11 @@ describe('Test 3 — Parallel fork sharing start time', () => {
     _taskSeq = 0;
     const todoId = 'todo-C';
     // t1 anchored, then fork to t2a/t2b (parallel), then converge to t3.
-    const t1 = makeTaskNode('t1', todoId, 25, { scheduledFor: '2026-05-20T09:00' });
-    const t2a = makeTaskNode('t2a', todoId, 30);
-    const t2b = makeTaskNode('t2b', todoId, 15);
-    const t3 = makeTaskNode('t3', todoId, 10);
+    // All tasks kind='event' to preserve the pre-Decision-28 timing expectations.
+    const t1 = makeTaskNode('t1', todoId, 25, { scheduledFor: '2026-05-20T09:00', kind: 'event' });
+    const t2a = makeTaskNode('t2a', todoId, 30, { kind: 'event' });
+    const t2b = makeTaskNode('t2b', todoId, 15, { kind: 'event' });
+    const t3 = makeTaskNode('t3', todoId, 10, { kind: 'event' });
     const board = makeBoard(
       [makeTodoNode(todoId), t1, t2a, t2b, t3],
       [
@@ -211,10 +212,11 @@ describe('Test 4 — Multiple todos with independent anchors', () => {
     _taskSeq = 0;
     const todoA = 'todo-A';
     const todoB = 'todo-B';
-    const a1 = makeTaskNode('a1', todoA, 25, { scheduledFor: '2026-05-19T08:00' });
-    const a2 = makeTaskNode('a2', todoA, 25);
-    const b1 = makeTaskNode('b1', todoB, 50, { scheduledFor: '2026-05-22T15:00' });
-    const b2 = makeTaskNode('b2', todoB, 10);
+    // kind='event' to preserve pre-Decision-28 timing expectations.
+    const a1 = makeTaskNode('a1', todoA, 25, { scheduledFor: '2026-05-19T08:00', kind: 'event' });
+    const a2 = makeTaskNode('a2', todoA, 25, { kind: 'event' });
+    const b1 = makeTaskNode('b1', todoB, 50, { scheduledFor: '2026-05-22T15:00', kind: 'event' });
+    const b2 = makeTaskNode('b2', todoB, 10, { kind: 'event' });
     const board = makeBoard(
       [makeTodoNode(todoA), makeTodoNode(todoB), a1, a2, b1, b2],
       [makeEdge('a1', 'a2'), makeEdge('b1', 'b2')],
@@ -293,11 +295,14 @@ describe('Test 7 — scheduledDurationMin override on anchor', () => {
   it('anchor endISO uses override; successor still uses anchor.plannedMin offset', () => {
     _taskSeq = 0;
     const todoId = 'todo-override';
+    // kind='event' to preserve pre-Decision-28 timing expectations.
+    // (Under focus, scheduledDurationMin is a work-time override that adds breaks.)
     const t1 = makeTaskNode('t1', todoId, 25, {
       scheduledFor: '2026-05-20T10:00',
       scheduledDurationMin: 45, // anchor block visually spans 45 min
+      kind: 'event',
     });
-    const t2 = makeTaskNode('t2', todoId, 25);
+    const t2 = makeTaskNode('t2', todoId, 25, { kind: 'event' });
     const board = makeBoard(
       [makeTodoNode(todoId), t1, t2],
       [makeEdge('t1', 't2')],
