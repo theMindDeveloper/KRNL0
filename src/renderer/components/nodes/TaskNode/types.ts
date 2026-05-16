@@ -1,3 +1,6 @@
+// Decision 28 — task kind discriminator.
+export type TaskKind = 'focus' | 'event';
+
 export interface TaskState {
   text: string;
   done: boolean;
@@ -22,6 +25,8 @@ export interface TaskState {
   // Issue #134 — set when done flips false→true; cleared when true→false.
   // Legacy `done: true` rows lack this field; analytics buckets exclude them.
   completedAt?: string;          // ISO 8601
+  // Decision 28 — kind discriminator. Default 'focus' for back-compat (migration in board.ts).
+  kind: TaskKind;
 }
 
 export interface TaskConfig {

@@ -367,6 +367,25 @@ function migrateNodeStates(board: Record<string, unknown>): Record<string, unkno
 }
 
 /**
+ * Decision 28 — backfill `kind` on existing task nodes that pre-date the field.
+ * Any `kind` that is absent or not 'focus'|'event' is rewritten to 'focus'.
+ * Silent — no version bump required (string default is structural).
+ */
+function migrateTaskKind(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return n;
+    const node = n as { kind?: string; state?: Record<string, unknown> | null };
+    if (node.kind !== 'todo.task') return n;
+    const s = (node.state ?? {}) as Record<string, unknown>;
+    if (s['kind'] === 'focus' || s['kind'] === 'event') return n;
+    return { ...node, state: { ...s, kind: 'focus' } };
+  });
+  return board;
+}
+
+/**
  * Decision 22 — backfill `plannedMin` on existing task nodes that pre-date
  * the field. Use the existing `durationMin` if present so the budget shows
  * something meaningful instead of the global default. `secondsAccumulated`
@@ -474,9 +493,13 @@ export function loadBoardFrom(boardPath: string): unknown {
                 // migrateAddCalendarMother (same reason — before migrateNodeStates).
                 migrateAddClockMother(
                   migrateAddCalendarMother(
-                    migrateTaskPlannedMin(
-                      migratePomoConfig(
-                        migrateMotherPositions(parsed),
+                    // Decision 28: migrateTaskKind runs after migrateTaskPlannedMin
+                    // so both fields are settled before migrateNodeStates spreads.
+                    migrateTaskKind(
+                      migrateTaskPlannedMin(
+                        migratePomoConfig(
+                          migrateMotherPositions(parsed),
+                        ),
                       ),
                     ),
                   ),

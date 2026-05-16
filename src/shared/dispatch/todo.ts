@@ -125,6 +125,7 @@ export function createTodoTaskPair(
     plannedMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
+    kind: 'focus',
   };
   const taskNode: AnyNode = {
     id: taskNodeId,

@@ -763,6 +763,39 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       return;
     }
 
+    // ── task.toggleKind: flip 'focus' ↔ 'event' (Decision 28 §5) ──────────
+    // Clean handoff rule: if toggling focus→event and the pomo is currently
+    // running this task, cancel the pomo first (preserving pomo history) and
+    // clear the activeTaskId so the FSM is in a clean idle state.
+    // pomoSessionsCompleted and secondsAccumulated are intentionally preserved
+    // so toggling back to focus resumes from the same checkpoint.
+    if (command === 'task.toggleKind') {
+      if (node.kind !== 'todo.task') return;
+      const ts = node.state as TaskState;
+      const newKind = ts.kind === 'focus' ? 'event' : 'focus';
+
+      if (newKind === 'event') {
+        // Check whether this task is the currently active pomo task.
+        const freshBoard = useBoardStore.getState().board;
+        const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
+        if (pomoNode) {
+          const ps = pomoNode.state as PomoState;
+          if (ps.activeTaskId === nodeId && (ps.status === 'running' || ps.status === 'paused')) {
+            // Cancel the pomo (records partial session) then clear activeTaskId.
+            let cancelledState = pomoCancel(ps);
+            cancelledState = pomoClearActiveTask(cancelledState);
+            updateNode(pomoNode.id, { state: cancelledState });
+          }
+        }
+      }
+
+      updateNode(nodeId, { state: { ...ts, kind: newKind } });
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+      emit('task.toggleKind', `task ${shortId(nodeId)} kind flipped to ${newKind}`, { refId: nodeId });
+      return;
+    }
+
     // ── todo.startPomoForItem: resolve itemId → taskNodeId → auto-start ───
     if (command === 'todo.startPomoForItem') {
       const todoState = node.state as TodoState;
@@ -865,6 +898,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         plannedMin: childPlannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
+        kind: 'focus',
       };
 
       const childNode: Node = {
@@ -961,6 +995,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         plannedMin: newPlannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
+        kind: 'focus',
       };
 
       const newNode: Node = {
