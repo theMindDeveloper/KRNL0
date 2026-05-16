@@ -49,7 +49,7 @@ KRNL0 puts every primitive on one canvas as a node, and lets them communicate. D
 **One file (`board.json`) is the only persisted state. Every view derives from it.**
 
 <div align="center">
-<img src="docs/assets/ref1.png" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges" width="94%" />
+<img src="docs/assets/update0.8.0.png" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges" width="94%" />
 </div>
 
 ---
