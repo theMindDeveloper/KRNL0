@@ -190,11 +190,30 @@ export async function taskAdd(
     taskNodeId: taskId,
   });
 
+  // Spawn rule: place new task next to the most recently added sibling.
+  // If no siblings yet, drop the first task below the parent mother
+  // (540px tall + 40px gap).
+  let spawnPos: { x: number; y: number };
+  if (siblings.length === 0) {
+    spawnPos = { x: baseX, y: baseY + 580 };
+  } else {
+    const last = siblings
+      .slice()
+      .sort((a, b) =>
+        (a.state as TaskState).createdAt.localeCompare((b.state as TaskState).createdAt),
+      )
+      .at(-1)!;
+    const lastNode = last as AnyNode & { position?: { x: number; y: number } };
+    const lx = lastNode.position?.x ?? baseX;
+    const ly = lastNode.position?.y ?? baseY + 580;
+    spawnPos = { x: lx + 252, y: ly };
+  }
+
   const taskNode: AnyNode = {
     id: taskId,
     kind: 'todo.task',
     isMother: false,
-    position: { x: baseX + (seq - 1) * 252, y: baseY + 420 },
+    position: spawnPos,
     state: taskState,
     config: { showDuration: true },
   };

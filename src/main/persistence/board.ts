@@ -34,7 +34,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-pomo',
         kind: 'pomo',
-        position: { x: -1350, y: 0 },
+        position: { x: -1400, y: 0 },
         isMother: true,
         state: {
           status: 'idle',
@@ -54,7 +54,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-todo',
         kind: 'todo',
-        position: { x: -810, y: 0 },
+        position: { x: -840, y: 0 },
         isMother: true,
         state: { items: [] },
         config: { showCompleted: true, maxVisible: 50 },
@@ -62,7 +62,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-habit',
         kind: 'habit',
-        position: { x: -270, y: 0 },
+        position: { x: -280, y: 0 },
         isMother: true,
         state: { habits: [] },
         config: { maxHabits: 5, weekStartsOn: 'monday', view: 'week' },
@@ -70,7 +70,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-term',
         kind: 'term',
-        position: { x: 270, y: 0 },
+        position: { x: 280, y: 0 },
         isMother: true,
         state: { sessionId: null, title: 'Terminal' },
         config: { shell: 'default', fontSize: 13 },
@@ -79,7 +79,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-calendar',
         kind: 'calendar',
-        position: { x: 810, y: 0 },
+        position: { x: 840, y: 0 },
         isMother: true,
         state: { selectedDate: null, anchorDate: todayLocalYMD() },
         config: {
@@ -94,7 +94,7 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-clock',
         kind: 'clock',
-        position: { x: 1350, y: 0 },
+        position: { x: 1400, y: 0 },
         isMother: true,
         state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
         config: {},
@@ -110,12 +110,12 @@ export function seedBoard(): PartialBoard {
 // migration target: any existing board whose mothers sit at the previous
 // coordinates gets re-snapped on the next load.
 const NEW_MOTHER_POSITIONS: Record<string, { x: number; y: number }> = {
-  'mother-pomo':     { x: -1350, y: 0 },
-  'mother-todo':     { x:  -810, y: 0 },
-  'mother-habit':    { x:  -270, y: 0 },
-  'mother-term':     { x:   270, y: 0 },
-  'mother-calendar': { x:   810, y: 0 }, // ADR 0001 — slot 5
-  'mother-clock':    { x:  1350, y: 0 }, // Decision 23.1 — slot 6
+  'mother-pomo':     { x: -1400, y: 0 },
+  'mother-todo':     { x:  -840, y: 0 },
+  'mother-habit':    { x:  -280, y: 0 },
+  'mother-term':     { x:   280, y: 0 },
+  'mother-calendar': { x:   840, y: 0 }, // ADR 0001 — slot 5
+  'mother-clock':    { x:  1400, y: 0 }, // Decision 23.1 — slot 6
 };
 
 function migrateMotherPositions(board: unknown): Record<string, unknown> {
@@ -194,6 +194,10 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     mimeType: null,
     alt: '',
   }),
+  // Frame container node: glassy 3D box that softly groups child nodes by
+  // bounds. childIds persists the group membership so a reload preserves
+  // which nodes move with the frame.
+  frame: () => ({ label: '', width: 360, height: 240, childIds: [] }),
 };
 
 // Decision #14 — back-fill v2 config defaults on existing habit mother nodes
@@ -216,6 +220,7 @@ const CONFIG_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     showPomoHeatmap: true,
     hourRange: { start: 6, end: 23 },
   }),
+  frame: () => ({ tint: 'neutral' }),
 };
 
 // Decision 22 — heal pre-v2 PomoConfig shapes into the canonical fields.

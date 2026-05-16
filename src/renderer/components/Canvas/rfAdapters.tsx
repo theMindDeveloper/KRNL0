@@ -49,16 +49,17 @@ export type KrnlRFNode = RFNode<RFNodeData>;
 // sit off the visible card edge — see ADR 0006.
 const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = {
   'todo.task':   { width: 220, height: 120 },
-  'todo':        { width: 500, height: 500 },
-  'pomo':        { width: 500, height: 500 },
-  'ai':          { width: 500, height: 500 },
-  'habit':       { width: 500, height: 500 },
-  'terminal':    { width: 500, height: 500 },
-  'calendar':    { width: 500, height: 500 },
-  'clock':       { width: 500, height: 500 },
+  'todo':        { width: 540, height: 540 },
+  'pomo':        { width: 540, height: 540 },
+  'ai':          { width: 540, height: 540 },
+  'habit':       { width: 540, height: 540 },
+  'terminal':    { width: 540, height: 540 },
+  'calendar':    { width: 540, height: 540 },
+  'clock':       { width: 540, height: 540 },
   'habit.lane':  { width: 280, height: 170 },
   'text':        { width: 260, height: 120 },
   'image':       { width: 240, height: 180 },
+  'frame':       { width: 360, height: 240 },
 };
 
 export function toRfNode(
@@ -90,6 +91,11 @@ export function toRfNode(
     w !== undefined && h !== undefined
       ? { width: w, height: h, measured: { width: w, height: h } }
       : {};
+  // Frame containers sit behind everything else so child nodes dropped inside
+  // are never visually hidden by the frame body. Negative zIndex on the RF
+  // wrapper keeps the frame below all other node wrappers regardless of array
+  // order, selection state, or RF's elevateNodesOnSelect behavior.
+  const zIndex = node.kind === 'frame' ? -1 : undefined;
   return {
     id: node.id,
     type: node.kind,
@@ -97,6 +103,7 @@ export function toRfNode(
     draggable: !node.isMother,
     selectable: true,
     className: kindClass,
+    ...(zIndex !== undefined ? { zIndex } : {}),
     ...sizeFields,
     data: {
       node,
