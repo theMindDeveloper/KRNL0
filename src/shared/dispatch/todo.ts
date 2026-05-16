@@ -80,12 +80,23 @@ export function createTodoTaskPair(
   });
   const seq = siblings.length + 1;
 
+  // Spawn rule: place new task next to the most recently added sibling.
+  // If no siblings yet, drop the first task below the parent mother
+  // (540px tall + 40px gap).
   const baseX = todoNode.position?.x ?? 0;
   const baseY = todoNode.position?.y ?? 0;
-  const position =
-    siblings.length === 0
-      ? { x: baseX, y: baseY + 420 }
-      : { x: baseX + (seq - 1) * 252, y: baseY + 420 };
+  let position: { x: number; y: number };
+  if (siblings.length === 0) {
+    position = { x: baseX, y: baseY + 580 };
+  } else {
+    const last = siblings
+      .slice()
+      .sort((a, b) =>
+        (a.state as TaskState).createdAt.localeCompare((b.state as TaskState).createdAt),
+      )
+      .at(-1)!;
+    position = { x: (last.position?.x ?? baseX) + 252, y: last.position?.y ?? baseY + 580 };
+  }
 
   // ── 3. Pomo session minutes drive durationMin (renderer semantics) ───────
   const pomoNode = findPomoNode(board);

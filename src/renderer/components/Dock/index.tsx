@@ -65,6 +65,10 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
         fireNode('image');
         return;
       }
+      if (e.key === 'f' || e.key === 'F') {
+        fireNode('frame');
+        return;
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -165,6 +169,23 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
           <rect x="3" y="4" width="18" height="16" rx="1" />
           <circle cx="9" cy="10" r="2" />
           <path d="M21 16l-5-5-9 9" />
+        </svg>
+      </button>
+
+      {/* Frame — F. Glassy 3D container that softly groups whatever is dropped
+          inside its bounds. Drag the frame and its contents move with it. */}
+      <button
+        type="button"
+        data-testid="dock-btn-frame"
+        title="Frame [F]"
+        aria-label="Add frame (F)"
+        onClick={() => fireNode('frame')}
+        style={pressed === 'frame' ? { ...btnBase, background: 'var(--paper-2)', color: 'var(--ink)' } : btnBase}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 9h18" opacity="0.55" />
+          <path d="M6 5v14" opacity="0.35" />
         </svg>
       </button>
 

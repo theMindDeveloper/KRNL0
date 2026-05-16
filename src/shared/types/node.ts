@@ -35,7 +35,8 @@ export type NodeKind =
   | 'habit.day'
   | 'text'
   | 'image'
-  | 'clock';
+  | 'clock'
+  | 'frame';
 
 // Spec a node-kind module exports to the kernel (commands, events, schema).
 // Renamed from `NodeKind` to avoid shadowing the literal union above.

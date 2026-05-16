@@ -8,7 +8,15 @@ KRNL0 is an Electron + Vite + React + TypeScript infinite-canvas productivity ap
 
 ## Hard rules (non-negotiable)
 
-1. **Never add Codex / AI co-author or contributor attribution to commits or PRs.** No `Co-Authored-By: Codex`, no "Generated with Codex", no AI tags in commit trailers, PR descriptions, branch names, or anywhere else. Ever. The git user `theMindDeveloper` is the sole author of every commit.
+1. **🚫 NEVER add ANY AI / assistant attribution to commits, PRs, or anywhere else. ZERO-TOLERANCE RULE.** Applies to every AI coding tool without exception — Claude, Claude Code, Codex, Copilot, Cursor, Gemini, any other present or future model. Forbidden patterns include but are not limited to:
+   - `Co-Authored-By: Claude …` / `Co-Authored-By: Codex …` / `Co-Authored-By: <any AI / model / tool name>`
+   - `🤖 Generated with [Claude Code]…` / "Generated with …" / "Created with …" / "Authored by …" footers in commit messages **and** PR bodies
+   - `noreply@anthropic.com`, `noreply@openai.com`, or any other AI-vendor email in trailers
+   - AI tags or model names in commit messages, PR titles, PR descriptions, PR comments, issue comments, branch names, file headers, or code comments
+
+   Even when a default template (e.g. `gh pr create` boilerplate, an SDK preset, a slash-command output, a `cat <<'EOF'` block copied from a guide) suggests the line — **strip it before sending**. "It was the default" / "the command suggested it" is not an excuse. Re-read this rule before every `git commit` and every `gh pr create`.
+
+   The git user `theMindDeveloper` is the **sole author** of every commit. If you have already created a commit or PR with an AI attribution, fix it **before doing anything else**: amend the commit to remove the trailer (`git commit --amend` → `git push --force-with-lease`) and edit the PR body to remove the line (`gh pr edit <n> --body …`).
 2. **Every merge to `main` must be documented in [docs/08-history/HISTORY.md](docs/08-history/HISTORY.md)** before the PR is merged. Append a new dated section in the existing format (Type, PRs/Commits, Files changed, Summary).
 3. `**docs/` is the source of truth.** When you have a question — about a node contract, a requirement, a decision, the visual system, the roadmap — read the relevant doc first. Do not guess.
 4. **TypeScript strict, no `any`.** `npm run typecheck` must be zero errors. `npm test` must be all green.
