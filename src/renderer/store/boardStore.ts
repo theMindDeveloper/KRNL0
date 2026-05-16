@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { saveBoard } from './eventLog';
 import type { Board, BoardViewport, Node, Edge } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
@@ -458,6 +459,6 @@ export const useBoardStore = create<BoardStore>((set) => ({
     });
 
     const updated = useBoardStore.getState().board;
-    if (updated) void window.krnl?.boardSave(updated);
+    if (updated) void saveBoard(updated);
   },
 }));

@@ -27,15 +27,15 @@ import {
 } from './types';
 
 // Frame chrome should fade into the background — no tinted glows, no colored
-// fills. Edge is a near-neutral hairline so the container still reads as a
-// region without competing with anything inside it. `tag` is the only
-// remaining color cue (small label dot + accent on the resize handles).
+// fills. Edge uses a theme-aware CSS var so it stays visible against either
+// the warm cream paper (light) or the near-black canvas (dark). `tag` is
+// the only remaining color cue (small label dot + accent on resize handles).
 const TINT_RGBA: Record<FrameTint, { edge: string; tag: string }> = {
-  cyan:    { edge: 'rgba(212,207,192,0.18)', tag: 'var(--cyan)' },
-  spine:   { edge: 'rgba(212,207,192,0.18)', tag: 'var(--spine-hot)' },
-  rust:    { edge: 'rgba(212,207,192,0.18)', tag: 'var(--rust)' },
-  plum:    { edge: 'rgba(212,207,192,0.18)', tag: 'var(--purple)' },
-  neutral: { edge: 'rgba(212,207,192,0.18)', tag: 'var(--ink-3)' },
+  cyan:    { edge: 'var(--frame-edge)', tag: 'var(--cyan)' },
+  spine:   { edge: 'var(--frame-edge)', tag: 'var(--spine-hot)' },
+  rust:    { edge: 'var(--frame-edge)', tag: 'var(--rust)' },
+  plum:    { edge: 'var(--frame-edge)', tag: 'var(--purple)' },
+  neutral: { edge: 'var(--frame-edge)', tag: 'var(--ink-3)' },
 };
 
 export function FrameNode({
@@ -86,14 +86,13 @@ export function FrameNode({
         position: 'relative',
         boxSizing: 'border-box',
         borderRadius: 12,
-        // Quiet background: very faint vertical wash for subtle depth, nothing
-        // more. Stays out of the way of whatever nodes the user puts inside.
-        background:
-          'linear-gradient(180deg, rgba(255,255,255,0.012) 0%, rgba(0,0,0,0.02) 100%)',
-        // Hairline neutral edge so the container reads as a region without
-        // adding chroma to the canvas.
+        // Quiet background + theme-aware edge. Background uses var(--frame-bg)
+        // so the interior reads against either paper or canvas dark; border
+        // uses var(--frame-edge) for the same reason. Box-shadow gives the
+        // frame a soft lift so it floats above the cream paper in light mode.
+        background: 'var(--frame-bg)',
         border: `1px solid ${tint.edge}`,
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+        boxShadow: 'var(--frame-shadow)',
         overflow: 'visible',
         transition: 'border-color 120ms ease',
       }}

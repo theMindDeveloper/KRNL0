@@ -11,7 +11,7 @@
 
 import { useEffect } from 'react';
 import { useBoardStore } from './boardStore';
-import { emit } from './eventLog';
+import { emit, saveBoard } from './eventLog';
 import { deleteTaskNodesCascade } from '../components/Canvas/commandDispatch';
 import { sfxEngine } from '../sfx/sfxEngine';
 import type { Board } from '../../shared/types';
@@ -86,7 +86,7 @@ export function useCliDispatch(): void {
             if (!node) { message = `No node with id "${id}"`; break; }
             updateNode(id, { position: { x, y } } as Partial<Node>);
             const updated = store.getState().board;
-            if (updated) void window.krnl?.boardSave(updated);
+            if (updated) void saveBoard(updated);
             ok = true;
             message = `Node ${id.slice(0, 8)} moved to (${x}, ${y})`;
             break;
@@ -115,7 +115,7 @@ export function useCliDispatch(): void {
             if (taskIds.length > 0) {
               deleteTaskNodesCascade(taskIds);
               const updated = store.getState().board as Board | null;
-              if (updated) void window.krnl?.boardSave(updated);
+              if (updated) void saveBoard(updated);
             }
             ok = true;
             message = `Marquee deleted ${taskIds.length} task(s)`;
