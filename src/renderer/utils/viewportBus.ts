@@ -48,3 +48,8 @@ export function rfToScreen(rfX: number, rfY: number): { x: number; y: number } {
     y: Math.round(_canvasTop + rfY * _zoom + _vpY),
   };
 }
+
+/** Current RF zoom — for components that need to scale with the viewport. */
+export function getZoom(): number {
+  return _zoom;
+}

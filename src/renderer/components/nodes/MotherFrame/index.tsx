@@ -18,7 +18,7 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
 import { scheduleBatch } from '../../../utils/rafBatcher';
-import { rfToScreen } from '../../../utils/viewportBus';
+import { rfToScreen, getZoom } from '../../../utils/viewportBus';
 
 interface Props {
   nodeId: string;          // reports hover to boardStore so edges can bold on hover
@@ -40,8 +40,8 @@ interface Props {
 // primary canvas anchor against the 220×120 child task cards. MUST stay in
 // sync with INITIAL_DIMS_BY_KIND in rfAdapters.tsx and seed positions in
 // src/main/persistence/board.ts — see ADR 0006.
-export const MOTHER_WIDTH = 500;
-export const MOTHER_HEIGHT = 500;
+export const MOTHER_WIDTH = 540;
+export const MOTHER_HEIGHT = 540;
 export const MOTHER_TOTAL = 6;
 
 export function MotherFrame({
@@ -74,8 +74,10 @@ export function MotherFrame({
   useLayoutEffect(() => {
     let cachedX = NaN;
     let cachedY = NaN;
+    let cachedZ = NaN;
     let liveX = NaN;
     let liveY = NaN;
+    let liveZ = 1;
 
     return scheduleBatch({
       read() {
@@ -83,14 +85,18 @@ export function MotherFrame({
         const s = rfToScreen(position.x + 14, position.y - 11);
         liveX = s.x;
         liveY = s.y;
+        // Scale badge with the canvas zoom so it doesn't appear oversized
+        // relative to the mother card when zooming out.
+        liveZ = getZoom();
       },
       write() {
         const badge = badgeRef.current;
         if (!badge) return;
-        if (liveX !== cachedX || liveY !== cachedY) {
-          badge.style.transform = `translate(${liveX}px, ${liveY}px)`;
+        if (liveX !== cachedX || liveY !== cachedY || liveZ !== cachedZ) {
+          badge.style.transform = `translate(${liveX}px, ${liveY}px) scale(${liveZ})`;
           cachedX = liveX;
           cachedY = liveY;
+          cachedZ = liveZ;
         }
       },
     });
@@ -152,6 +158,7 @@ export function MotherFrame({
             position: 'fixed',
             top: 0,
             left: 0,
+            transformOrigin: '0 0',
             // Start far offscreen — rAF writes the real transform on first paint.
             transform: 'translate(-9999px, -9999px)',
             background: 'var(--paper-2)',

@@ -44,6 +44,9 @@ import type { Edge as KrnlEdge } from '../../../shared/types/edge';
 import type { Connection } from '@xyflow/react';
 import type { TaskState } from '../nodes/TaskNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
+import type { FrameState } from '../nodes/FrameNode/types';
+import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
+import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
 // Hex literals used instead of CSS var() to skip variable resolution per rect.
@@ -122,9 +125,10 @@ function TaskFlowEdge({
           x2={targetX}
           y2={targetY}
         >
-          <stop offset="0%" stopColor="var(--cyan)" stopOpacity="0.18" />
-          <stop offset="45%" stopColor="var(--cyan)" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="var(--cyan)" stopOpacity="1" />
+          <stop offset="0%" stopColor="var(--cyan)" stopOpacity="0.35" />
+          <stop offset="45%" stopColor="var(--cyan-glow)" stopOpacity="0.85" />
+          <stop offset="100%" stopColor="var(--cyan-glow)" stopOpacity="1" />
+
         </linearGradient>
       </defs>
       <BaseEdge
@@ -656,13 +660,17 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
       text: { text: '' },
       image: {},
+      frame: defaultFrameState() as unknown as Record<string, unknown>,
+    };
+    const defaultConfigByKind: Partial<Record<NodeKind, Record<string, unknown>>> = {
+      frame: defaultFrameConfig() as unknown as Record<string, unknown>,
     };
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       kind: args.kind,
       position: { x: center.x, y: center.y },
       state: defaultState[args.kind],
-      config: {},
+      config: defaultConfigByKind[args.kind] ?? {},
       isMother: false,
     };
     addNode(newNode);
@@ -788,15 +796,15 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
     // Swap-button pseudo-nodes — one per adjacent mother pair.
     // Position: in the gap between the two cards, vertically centered.
-    // MOTHER_WIDTH = 500; gap between motherR.left and motherL.right is
-    // motherR.position.x - (motherL.position.x + 500). Place button at the
-    // midpoint of that gap. Vertical center at motherL.position.y + 250.
+    // gap between motherR.left and motherL.right is
+    // motherR.position.x - (motherL.position.x + MOTHER_WIDTH). Place button
+    // at the midpoint of that gap; vertical center at half MOTHER_HEIGHT.
     const swapNodes: KrnlRFNode[] = [];
     for (let i = 0; i < motherNodes.length - 1; i++) {
       const left = motherNodes[i]!;
       const right = motherNodes[i + 1]!;
-      const gapMidX = (left.position.x + 500 + right.position.x) / 2;
-      const cy = left.position.y + 250;
+      const gapMidX = (left.position.x + MOTHER_WIDTH + right.position.x) / 2;
+      const cy = left.position.y + MOTHER_HEIGHT / 2;
       swapNodes.push({
         id: `__swap__${left.id}__${right.id}`,
         type: 'swap-button',
@@ -919,35 +927,186 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // node re-render per frame. Zustand is touched only when:
   //   - drag ends (commit final position + persist)
   //   - selection changes (mirror to store for sys/CLI integration)
+  // Bump-animation guard so the keyframe replays only after each gesture
+  // finishes its previous run — avoids animation-flicker when collision is
+  // sustained across many drag ticks.
+  const bumpingRef = useRef<Set<string>>(new Set());
+  const triggerBump = useCallback((id: string) => {
+    if (bumpingRef.current.has(id)) return;
+    bumpingRef.current.add(id);
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`.react-flow__node[data-id="${id}"]`);
+      if (el) el.setAttribute('data-bump', '1');
+      setTimeout(() => {
+        const el2 = document.querySelector(`.react-flow__node[data-id="${id}"]`);
+        if (el2) el2.removeAttribute('data-bump');
+        bumpingRef.current.delete(id);
+      }, 280);
+    });
+  }, []);
+
   const onNodesChange = useCallback(
     (changes: NodeChange<KrnlRFNode>[]) => {
-      setNodes((nds) => applyNodeChanges<KrnlRFNode>(changes, nds));
+      const collidedIds: string[] = [];
+
+      setNodes((nds) => {
+        // Mother AABBs — frames cannot overlap any mother. Mothers are pinned
+        // (draggable:false) so their bounds never change mid-drag.
+        const motherBounds: Array<{ x: number; y: number; w: number; h: number }> = [];
+        for (const n of nds) {
+          if (n.data?.node?.isMother !== true) continue;
+          const w = (n.measured?.width ?? n.width ?? 0) as number;
+          const h = (n.measured?.height ?? n.height ?? 0) as number;
+          if (w <= 0 || h <= 0) continue;
+          motherBounds.push({ x: n.position.x, y: n.position.y, w, h });
+        }
+
+        // For each frame position change, resolve overlap against every
+        // mother by iteratively pushing along the smaller-overlap axis.
+        // Output: resolved position + the actually-applied delta (children
+        // move by the resolved delta, not the un-resolved requested one).
+        const frameOverrides = new Map<string, { x: number; y: number; dx: number; dy: number; childIds: Set<string> }>();
+        for (const change of changes) {
+          if (change.type !== 'position' || !change.position) continue;
+          const prev = nds.find((n) => n.id === change.id);
+          if (!prev || prev.data?.node?.kind !== 'frame') continue;
+          const fw = (prev.measured?.width ?? prev.width ?? 0) as number;
+          const fh = (prev.measured?.height ?? prev.height ?? 0) as number;
+          let x = change.position.x;
+          let y = change.position.y;
+          let collided = false;
+          // Up to 6 resolver passes — converges in 1–2 in practice; cap is
+          // a safety net for pathological mother configurations.
+          for (let pass = 0; pass < 6; pass++) {
+            let bumped = false;
+            for (const m of motherBounds) {
+              const overlapX = Math.min(x + fw, m.x + m.w) - Math.max(x, m.x);
+              const overlapY = Math.min(y + fh, m.y + m.h) - Math.max(y, m.y);
+              if (overlapX <= 0 || overlapY <= 0) continue;
+              bumped = true;
+              collided = true;
+              if (overlapX < overlapY) {
+                if (x + fw / 2 < m.x + m.w / 2) x = m.x - fw;
+                else x = m.x + m.w;
+              } else {
+                if (y + fh / 2 < m.y + m.h / 2) y = m.y - fh;
+                else y = m.y + m.h;
+              }
+            }
+            if (!bumped) break;
+          }
+          const dx = x - prev.position.x;
+          const dy = y - prev.position.y;
+          const fs = prev.data.node.state as FrameState;
+          frameOverrides.set(change.id, { x, y, dx, dy, childIds: new Set(fs.childIds ?? []) });
+          if (collided) collidedIds.push(change.id);
+        }
+
+        const next = applyNodeChanges<KrnlRFNode>(changes, nds);
+        if (frameOverrides.size === 0) return next;
+        return next.map((n) => {
+          const ov = frameOverrides.get(n.id);
+          if (ov) {
+            // Frame itself — override the un-resolved requested position with
+            // the collision-resolved one.
+            return { ...n, position: { x: ov.x, y: ov.y } };
+          }
+          // Child of a moved frame — translate by the resolved delta. RF did
+          // not issue a position change for children, so `n.position` here is
+          // the pre-tick child position; add the frame's actual delta.
+          let x = n.position.x;
+          let y = n.position.y;
+          let touched = false;
+          for (const ovi of frameOverrides.values()) {
+            if (ovi.childIds.has(n.id)) {
+              x += ovi.dx;
+              y += ovi.dy;
+              touched = true;
+            }
+          }
+          return touched ? { ...n, position: { x, y } } : n;
+        });
+      });
+
+      // Bumps fire outside setNodes so the DOM attr write happens AFTER React
+      // commits the new position — keeps the keyframe synced to the visible
+      // collision.
+      for (const id of collidedIds) triggerBump(id);
 
       for (const change of changes) {
         if (change.type === 'position') {
-          // Track drag state so the store-sync effect doesn't clobber local
-          // nodes mid-drag.
           if (change.dragging === true) {
             isDraggingRef.current = true;
           } else if (change.dragging === false) {
             isDraggingRef.current = false;
             if (change.position) {
-              updateNode(change.id, { position: change.position });
-              const updated = useBoardStore.getState().board;
-              if (updated) void window.krnl?.boardSave(updated);
+              commitDragEnd(change.id);
             }
           }
         }
-        // 'select' changes are handled by onSelectionChange below — calling
-        // selectNode per-change here would clobber multi-selection (last
-        // selected id wins, others lost from the store's point of view).
-        // 'dimensions' — absorbed by applyNodeChanges above; this is what
-        // resolves RF error #015 ("trying to drag a node that is not
-        // initialized"). Without it RF takes a slow non-measured drag path.
       }
     },
-    [updateNode]
+    // commitDragEnd is stable (declared just below via useCallback)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [updateNode, triggerBump]
   );
+
+  // ── commitDragEnd ─────────────────────────────────────────────────────────
+  // Runs once per drag gesture. Pulls the latest positions from RF (getNodes)
+  // and persists them through the store. For a frame: also persists all child
+  // positions. For a non-frame: recomputes which frame (if any) contains the
+  // dragged node's center and rewrites the affected frames' childIds.
+  const commitDragEnd = useCallback((draggedId: string) => {
+    const all = getNodes() as KrnlRFNode[];
+    const dragged = all.find((n) => n.id === draggedId);
+    if (!dragged) return;
+    const draggedKind = dragged.data?.node?.kind;
+
+    updateNode(draggedId, { position: dragged.position });
+
+    if (draggedKind === 'frame') {
+      const fs = dragged.data.node.state as FrameState;
+      for (const cid of fs.childIds ?? []) {
+        const child = all.find((n) => n.id === cid);
+        if (child) updateNode(cid, { position: child.position });
+      }
+    } else if (draggedKind && draggedKind !== 'frame') {
+      // Skip mothers — they are not eligible to be soft-grouped.
+      const isMother = dragged.data?.node?.isMother === true;
+      if (!isMother) {
+        const w = (dragged.measured?.width ?? dragged.width ?? 0) as number;
+        const h = (dragged.measured?.height ?? dragged.height ?? 0) as number;
+        const cx = dragged.position.x + w / 2;
+        const cy = dragged.position.y + h / 2;
+        let newParent: string | null = null;
+        for (const n of all) {
+          if (n.data?.node?.kind !== 'frame') continue;
+          const fw = (n.measured?.width ?? n.width ?? 0) as number;
+          const fh = (n.measured?.height ?? n.height ?? 0) as number;
+          if (cx >= n.position.x && cx <= n.position.x + fw &&
+              cy >= n.position.y && cy <= n.position.y + fh) {
+            newParent = n.id;
+            break;
+          }
+        }
+        for (const n of all) {
+          if (n.data?.node?.kind !== 'frame') continue;
+          const fs = n.data.node.state as FrameState;
+          const cur = fs.childIds ?? [];
+          const had = cur.includes(draggedId);
+          const should = n.id === newParent;
+          if (had && !should) {
+            updateNode(n.id, { state: { ...fs, childIds: cur.filter((id) => id !== draggedId) } });
+          } else if (!had && should) {
+            updateNode(n.id, { state: { ...fs, childIds: [...cur, draggedId] } });
+          }
+        }
+      }
+    }
+
+    const updated = useBoardStore.getState().board;
+    if (updated) void window.krnl?.boardSave(updated);
+  }, [getNodes, updateNode]);
 
   // ── onEdgesChange — ignored for v1 (no edge create/delete UX) ────────────
   const onEdgesChange = useCallback((_changes: EdgeChange[]) => {
@@ -1026,15 +1185,22 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       proOptions={{ hideAttribution: true }}
       style={{ background: 'var(--paper)' }}
     >
-      {/* Wave-B (LifeOS UI refresh) — single coarse dot grid at 160 px.
-          The dual-density (32 px minor + 160 px major) approach was causing
-          two stacked SVG repaint layers on every pan frame. One coarse layer
-          reads well at all zoom levels; node cards provide additional anchors. */}
+      {/* Dual-density dot grid — minor (32px, small dots) + major (160px,
+          larger dots). Both layers use a brighter shade than --grid-strong so
+          dots read clearly without dominating the canvas. */}
+      <Background
+        id="krnl-grid-minor"
+        variant={BackgroundVariant.Dots}
+        gap={32}
+        size={1.6}
+        color="var(--grid)"
+        offset={0}
+      />
       <Background
         id="krnl-grid-major"
         variant={BackgroundVariant.Dots}
         gap={160}
-        size={3}
+        size={3.6}
         color="var(--grid-strong)"
         offset={0}
       />
