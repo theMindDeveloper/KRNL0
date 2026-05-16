@@ -633,25 +633,42 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const pos = pendingImageDropPos.current ?? screenToFlowPosition({
+    // If the user explicitly dropped an image at a screen point (drag-drop
+    // path), honor that. Otherwise default to the dock-spawn lane: well
+    // below the mother row.
+    const pos = pendingImageDropPos.current ?? defaultDockSpawnPos();
+    pendingImageDropPos.current = null;
+    await spawnImageNodeFromFile(file, pos);
+    // defaultDockSpawnPos is declared just below — closure captures binding,
+    // callback body only executes after both are initialised.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spawnImageNodeFromFile]);
+
+  // ── defaultDockSpawnPos ───────────────────────────────────────────────────
+  // Mothers sit at y=0 with height 540 (the bottom edge is at y=540). New
+  // text / image / frame nodes spawned from the dock should land WELL below
+  // that band so they don't visually collide with the mother row. The X is
+  // the current viewport center in flow space so the spawn lands in the
+  // user's view horizontally; the Y is clamped to at least 1100 (≈560 px
+  // below the mother bottom) so the node is unmistakably outside the
+  // mother strip even when the user is panned up to it.
+  const defaultDockSpawnPos = useCallback((): { x: number; y: number } => {
+    const center = screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
     });
-    pendingImageDropPos.current = null;
-    await spawnImageNodeFromFile(file, pos);
-  }, [screenToFlowPosition, spawnImageNodeFromFile]);
+    const BELOW_MOTHERS_Y = 1100;
+    return { x: center.x, y: Math.max(center.y, BELOW_MOTHERS_Y) };
+  }, [screenToFlowPosition]);
 
-  // ── Dock add-node handler — text spawns at canvas center; image opens
-  //   the OS file picker. No empty placeholder nodes for images.
+  // ── Dock add-node handler — text/frame land in the dock-spawn lane below
+  //   the mother row; image opens the OS file picker (same lane on default).
   const handleAddNode = useCallback((args: { kind: NodeKind }) => {
     if (args.kind === 'image') {
       imageFileInputRef.current?.click();
       return;
     }
-    const center = screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    });
+    const pos = defaultDockSpawnPos();
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
       // clock is a permanent mother — never spawnable via handleAddNode.
@@ -668,7 +685,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       kind: args.kind,
-      position: { x: center.x, y: center.y },
+      position: pos,
       state: defaultState[args.kind],
       config: defaultConfigByKind[args.kind] ?? {},
       isMother: false,
@@ -676,7 +693,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     addNode(newNode);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
-  }, [addNode, screenToFlowPosition]);
+  }, [addNode, defaultDockSpawnPos]);
 
   // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
