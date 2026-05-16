@@ -20,6 +20,10 @@ function resolveUrl(clipId: string): string | undefined {
   return _stemToUrl[stem];
 }
 
+// Slightly attenuated so the recording's noise floor sits lower in the mix.
+// Drops perceived hiss without losing intelligibility. Tune here if needed.
+const VOICE_VOLUME = 0.85;
+
 export class VoicePlayer {
   private cache = new Map<string, HTMLAudioElement>();
   private current: HTMLAudioElement | null = null;
@@ -31,6 +35,7 @@ export class VoicePlayer {
       if (url) {
         const audio = new Audio(url);
         audio.preload = 'auto';
+        audio.volume = VOICE_VOLUME;
         this.cache.set(id, audio);
       }
     }
@@ -52,6 +57,7 @@ export class VoicePlayer {
       this.stop();
       this.current = audio;
 
+      audio.volume = VOICE_VOLUME;
       audio.currentTime = 0;
       audio.onended = () => {
         this.current = null;
