@@ -9,6 +9,7 @@
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
 import { scheduleBatch } from '../../utils/rafBatcher';
 import { rfToScreen, updateViewport, updateCanvasRect } from '../../utils/viewportBus';
+import { useCameraEnsureVisible } from '../../utils/cameraEnsureVisible';
 import {
   ReactFlow,
   Background,
@@ -437,6 +438,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // canvasContainerRef + ResizeObserver keep _canvasLeft/_canvasTop in sync
   // across window resize / layout shifts. Fires rarely — not per-frame.
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Reusable "ensure this flow-space rect is comfortably visible" helper.
+  // Used by every spawn path; also available to future features that need to
+  // focus the camera on a particular thing (search jump, chain head, etc.).
+  const ensureVisible = useCameraEnsureVisible(canvasContainerRef);
   useLayoutEffect(() => {
     const el = canvasContainerRef.current;
     if (!el) return;
@@ -627,31 +632,49 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     addNode(newNode);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
-  }, [addNode]);
+    ensureVisible({ x: pos.x, y: pos.y, width, height });
+  }, [addNode, ensureVisible]);
 
   const onPickImageFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const pos = pendingImageDropPos.current ?? screenToFlowPosition({
+    // If the user explicitly dropped an image at a screen point (drag-drop
+    // path), honor that. Otherwise default to the dock-spawn lane: well
+    // below the mother row.
+    const pos = pendingImageDropPos.current ?? defaultDockSpawnPos();
+    pendingImageDropPos.current = null;
+    await spawnImageNodeFromFile(file, pos);
+    // defaultDockSpawnPos is declared just below — closure captures binding,
+    // callback body only executes after both are initialised.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spawnImageNodeFromFile]);
+
+  // ── defaultDockSpawnPos ───────────────────────────────────────────────────
+  // Mothers sit at y=0 with height 540 (the bottom edge is at y=540). New
+  // text / image / frame nodes spawned from the dock should land WELL below
+  // that band so they don't visually collide with the mother row. The X is
+  // the current viewport center in flow space so the spawn lands in the
+  // user's view horizontally; the Y is clamped to at least 1100 (≈560 px
+  // below the mother bottom) so the node is unmistakably outside the
+  // mother strip even when the user is panned up to it.
+  const defaultDockSpawnPos = useCallback((): { x: number; y: number } => {
+    const center = screenToFlowPosition({
       x: window.innerWidth / 2,
       y: window.innerHeight / 2,
     });
-    pendingImageDropPos.current = null;
-    await spawnImageNodeFromFile(file, pos);
-  }, [screenToFlowPosition, spawnImageNodeFromFile]);
+    const BELOW_MOTHERS_Y = 1100;
+    return { x: center.x, y: Math.max(center.y, BELOW_MOTHERS_Y) };
+  }, [screenToFlowPosition]);
 
-  // ── Dock add-node handler — text spawns at canvas center; image opens
-  //   the OS file picker. No empty placeholder nodes for images.
+  // ── Dock add-node handler — text/frame land in the dock-spawn lane below
+  //   the mother row; image opens the OS file picker (same lane on default).
   const handleAddNode = useCallback((args: { kind: NodeKind }) => {
     if (args.kind === 'image') {
       imageFileInputRef.current?.click();
       return;
     }
-    const center = screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    });
+    const pos = defaultDockSpawnPos();
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
       // clock is a permanent mother — never spawnable via handleAddNode.
@@ -668,7 +691,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       kind: args.kind,
-      position: { x: center.x, y: center.y },
+      position: pos,
       state: defaultState[args.kind],
       config: defaultConfigByKind[args.kind] ?? {},
       isMother: false,
@@ -676,7 +699,17 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     addNode(newNode);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
-  }, [addNode, screenToFlowPosition]);
+
+    // Pan/zoom-out the camera if the spawn site is not comfortably in view.
+    // Use the kind's initial dimensions so we don't have to wait for RF's
+    // ResizeObserver to measure the freshly-mounted node.
+    const sizes: Partial<Record<NodeKind, { width: number; height: number }>> = {
+      text:  { width: 260, height: 120 },
+      frame: { width: 360, height: 240 },
+    };
+    const sz = sizes[args.kind];
+    if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });
+  }, [addNode, defaultDockSpawnPos, ensureVisible]);
 
   // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
