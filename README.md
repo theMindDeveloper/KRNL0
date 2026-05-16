@@ -1,13 +1,13 @@
 <div align="center">
 
 <img src="docs/assets/krnl0d1.jpg" alt="KRNL0 — Life OS" width="100%" />
-
+<img src="docs/assets/dockupdate.png" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges"/>
 <br /><br />
 
 # KRNL0
 
 #### One canvas. Every productivity app. Single source of truth.
-Pomodoro, Todos, Tasks, Habits, Calendar, Clock, and a real Terminal anchored as connectable nodes on one infinite whiteboard, all derived from a single `board.json`.
+Pomodoro, Todos, Tasks, Habits, Calendar, Clock, and a real Terminal anchored as connectable nodes on one infinite whiteboard.
 
 <br />
 
