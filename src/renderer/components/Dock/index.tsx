@@ -189,24 +189,6 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
         </svg>
       </button>
 
-      {/* Divider */}
-      <div aria-hidden style={divider} />
-
-      {/* Connect tool */}
-      <button
-        type="button"
-        data-testid="dock-btn-connect"
-        title="Connect"
-        aria-label="Connect tool"
-        onClick={() => handleTool('connect')}
-        style={activeTool === 'connect' ? activeToolBtn : btnBase}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <circle cx="6" cy="12" r="2" />
-          <circle cx="18" cy="12" r="2" />
-          <path d="M8 12h8" />
-        </svg>
-      </button>
     </div>
   );
 }

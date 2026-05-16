@@ -9,6 +9,7 @@
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
 import { scheduleBatch } from '../../utils/rafBatcher';
 import { rfToScreen, updateViewport, updateCanvasRect } from '../../utils/viewportBus';
+import { useCameraEnsureVisible } from '../../utils/cameraEnsureVisible';
 import {
   ReactFlow,
   Background,
@@ -437,6 +438,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // canvasContainerRef + ResizeObserver keep _canvasLeft/_canvasTop in sync
   // across window resize / layout shifts. Fires rarely — not per-frame.
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Reusable "ensure this flow-space rect is comfortably visible" helper.
+  // Used by every spawn path; also available to future features that need to
+  // focus the camera on a particular thing (search jump, chain head, etc.).
+  const ensureVisible = useCameraEnsureVisible(canvasContainerRef);
   useLayoutEffect(() => {
     const el = canvasContainerRef.current;
     if (!el) return;
@@ -627,7 +632,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     addNode(newNode);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
-  }, [addNode]);
+    ensureVisible({ x: pos.x, y: pos.y, width, height });
+  }, [addNode, ensureVisible]);
 
   const onPickImageFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -693,7 +699,17 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     addNode(newNode);
     const updated = useBoardStore.getState().board;
     if (updated) void window.krnl?.boardSave(updated);
-  }, [addNode, defaultDockSpawnPos]);
+
+    // Pan/zoom-out the camera if the spawn site is not comfortably in view.
+    // Use the kind's initial dimensions so we don't have to wait for RF's
+    // ResizeObserver to measure the freshly-mounted node.
+    const sizes: Partial<Record<NodeKind, { width: number; height: number }>> = {
+      text:  { width: 260, height: 120 },
+      frame: { width: 360, height: 240 },
+    };
+    const sz = sizes[args.kind];
+    if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });
+  }, [addNode, defaultDockSpawnPos, ensureVisible]);
 
   // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
