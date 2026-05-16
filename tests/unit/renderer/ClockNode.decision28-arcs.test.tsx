@@ -3,7 +3,7 @@
  * Decision 28 §7 — ClockNode sub-arc render tests.
  *
  * Covers:
- *   - Multi-session focus task: break sub-arcs rendered with stroke=var(--ink-3).
+ *   - Multi-session focus task: break sub-arcs rendered with stroke=var(--paper) (white overlay).
  *   - Event task: no break arcs.
  *   - 1-session focus task (no breaks): no break arcs.
  *   - Active-task highlight applies to the full task span, not per-segment.
@@ -161,7 +161,7 @@ afterEach(() => {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
-  it('multi-session focus task renders break sub-arcs with stroke=var(--ink-3)', () => {
+  it('multi-session focus task renders break sub-arcs with stroke=var(--paper)', () => {
     const todoId = 'todo-arcs-1';
     // 75-min focus task = 3 work sessions + 2 short breaks = 5 segments.
     const t1 = makeTaskNode('t1', todoId, {
@@ -176,9 +176,9 @@ describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
     const breakArcs = getBreakArcs();
     // 2 break segments → 2 break arcs.
     expect(breakArcs.length).toBe(2);
-    // All break arcs must have stroke=var(--ink-3).
+    // All break arcs must have stroke=var(--paper).
     for (const arc of breakArcs) {
-      expect(arc.getAttribute('stroke')).toBe('var(--ink-3)');
+      expect(arc.getAttribute('stroke')).toBe('var(--paper)');
     }
   });
 
@@ -228,13 +228,15 @@ describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
     const allArcs = getAllArcPaths();
-    const workArcs = allArcs.filter((a) => a.getAttribute('stroke') !== 'var(--ink-3)');
+    const breakArcs = getBreakArcs();
+    const workArcs = allArcs.filter((a) => !breakArcs.includes(a as SVGPathElement));
 
-    // 3 work segments → 3 work arcs.
-    expect(workArcs.length).toBe(3);
+    // Single-worm model: 1 base arc in task tone + 2 break overlays.
+    // Base arc != ink-3 (uses task tone), so workArcs.length === 1.
+    expect(workArcs.length).toBe(1);
   });
 
-  it('total arc count for 75-min focus = 5 segments (3 work + 2 break)', () => {
+  it('total arc count for 75-min focus = 1 base + 2 break overlays', () => {
     const todoId = 'todo-arcs-5';
     const t1 = makeTaskNode('t1', todoId, {
       plannedMin: 75,
@@ -245,7 +247,8 @@ describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
+    // 1 base arc (task tone, full span) + 2 break overlays (white, butt caps).
     const allArcs = getAllArcPaths();
-    expect(allArcs.length).toBe(5);
+    expect(allArcs.length).toBe(3);
   });
 });

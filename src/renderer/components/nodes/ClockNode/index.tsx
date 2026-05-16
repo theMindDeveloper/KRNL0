@@ -380,29 +380,40 @@ export function ClockNode({
                 ];
               }
 
-              // Multi-segment focus: walk segments, compute hour-float extents.
+              // Multi-segment focus: single worm with break overlays.
+              // 1. Base arc t.start→t.end in task tone, round caps.
+              // 2. White butt-cap overlays at each break interval.
               const arcs: React.ReactElement[] = [];
+              arcs.push(
+                <path
+                  key={`${t.id}-base`}
+                  d={arcPath(t.start, t.end, R_ARC)}
+                  fill="none"
+                  stroke={TONE_VAR[t.tone]}
+                  strokeWidth={sw}
+                  strokeLinecap="round"
+                  opacity={opacity}
+                  style={activeStyle}
+                />,
+              );
               let segCursor = t.start;
               for (let s = 0; s < breakdown.segments.length; s++) {
                 const seg = breakdown.segments[s]!;
                 const segEnd = segCursor + seg.min / 60;
-                const isWork = seg.kind === 'work';
-                const stroke = isWork ? TONE_VAR[t.tone] : 'var(--ink-3)';
-                const segStyle: React.CSSProperties =
-                  active && isWork ? activeStyle : {};
-                arcs.push(
-                  <path
-                    key={`${t.id}-seg-${s}`}
-                    {...(!isWork ? { 'data-testid': 'clock-task-break-arc' } : {})}
-                    d={arcPath(segCursor, segEnd, R_ARC)}
-                    fill="none"
-                    stroke={stroke}
-                    strokeWidth={sw}
-                    strokeLinecap="round"
-                    opacity={opacity}
-                    style={segStyle}
-                  />,
-                );
+                if (seg.kind !== 'work') {
+                  arcs.push(
+                    <path
+                      key={`${t.id}-seg-${s}`}
+                      data-testid="clock-task-break-arc"
+                      d={arcPath(segCursor, segEnd, R_ARC)}
+                      fill="none"
+                      stroke="var(--paper)"
+                      strokeWidth={sw}
+                      strokeLinecap="butt"
+                      opacity={opacity}
+                    />,
+                  );
+                }
                 segCursor = segEnd;
               }
               return arcs;
