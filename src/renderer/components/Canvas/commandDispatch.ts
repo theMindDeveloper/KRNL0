@@ -32,6 +32,7 @@ import type { Edge } from '@shared/types/edge';
 import {
   deleteTaskCascade,
   collectDescendants,
+  stampCompletedAt,
 } from '../../../shared/dispatch/task';
 import type { BoardShape } from '../../../shared/dispatch/types';
 
@@ -140,6 +141,15 @@ import {
   termSetShell,
 } from '../nodes/TerminalNode/commands';
 import type { TermState, TermConfig } from '../nodes/TerminalNode/types';
+
+// ── Analytics (Issue #134) ────────────────────────────────────────────
+import {
+  analyticsSetView,
+  analyticsSetRangeDays,
+  analyticsSetMetric,
+  analyticsSetYear,
+  analyticsSetSize,
+} from '../nodes/AnalyticsNode/commands';
 
 // ── dispatch ──────────────────────────────────────────────────────────
 
@@ -303,6 +313,17 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'frame.setSize':     return { state: frameSetSize(s as never, args as never) };
         case 'frame.setChildren': return { state: frameSetChildren(s as never, args as never) };
         case 'frame.setTint':     return { config: frameSetTint(c as never, args as never) };
+      }
+      break;
+    }
+    // Issue #134 — AnalyticsNode commands. Pure FSM, no side effects.
+    case 'analytics': {
+      switch (command) {
+        case 'analytics.setView':      return { state: analyticsSetView(s as never, args as never) };
+        case 'analytics.setRangeDays': return { state: analyticsSetRangeDays(s as never, args as never) };
+        case 'analytics.setMetric':    return { state: analyticsSetMetric(s as never, args as never) };
+        case 'analytics.setYear':      return { state: analyticsSetYear(s as never, args as never) };
+        case 'analytics.setSize':      return { state: analyticsSetSize(s as never, args as never) };
       }
       break;
     }
@@ -1300,9 +1321,13 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           if (taskNode) {
             const ts = taskNode.state as TaskState;
             if (ts.done !== nextItem.done) {
-              updateNode(prevItem.taskNodeId, {
-                state: { ...ts, done: nextItem.done },
-              });
+              // Issue #134 — stamp completedAt on the mirrored TaskNode too.
+              const mirrored = stampCompletedAt(
+                ts,
+                { ...ts, done: nextItem.done },
+                { uuid: () => crypto.randomUUID(), now: () => new Date().toISOString() },
+              );
+              updateNode(prevItem.taskNodeId, { state: mirrored });
             }
           }
         }
@@ -1373,7 +1398,11 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     // ── task.toggle: mirror done state to linked TodoItem (+ pomo cancel if active)
     if (node.kind === 'todo.task' && command === 'task.toggle' && result.state !== undefined) {
       const prevTask = node.state as TaskState;
-      const nextTask = result.state as TaskState;
+      // Issue #134 — stamp completedAt at the call site (pure fsmTaskToggle has no clock).
+      const nextTask = stampCompletedAt(prevTask, result.state as TaskState, {
+        uuid: () => crypto.randomUUID(),
+        now: () => new Date().toISOString(),
+      });
       updateNode(nodeId, { state: nextTask });
       if (prevTask.done !== nextTask.done) {
         emit('task.completed', `task ${shortId(nodeId)} ${nextTask.done ? 'completed' : 'reopened'}`, {

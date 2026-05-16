@@ -47,6 +47,7 @@ import type { TaskState } from '../nodes/TaskNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
 import type { FrameState } from '../nodes/FrameNode/types';
 import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
+import { defaultAnalyticsState, defaultAnalyticsConfig } from '../nodes/AnalyticsNode/types';
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
@@ -684,9 +685,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       text: { text: '' },
       image: {},
       frame: defaultFrameState() as unknown as Record<string, unknown>,
+      analytics: defaultAnalyticsState() as unknown as Record<string, unknown>,
     };
     const defaultConfigByKind: Partial<Record<NodeKind, Record<string, unknown>>> = {
       frame: defaultFrameConfig() as unknown as Record<string, unknown>,
+      analytics: defaultAnalyticsConfig() as unknown as Record<string, unknown>,
     };
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -706,6 +709,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const sizes: Partial<Record<NodeKind, { width: number; height: number }>> = {
       text:  { width: 260, height: 120 },
       frame: { width: 360, height: 240 },
+      analytics: { width: 620, height: 520 },
     };
     const sz = sizes[args.kind];
     if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });

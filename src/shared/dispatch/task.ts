@@ -164,6 +164,24 @@ export function deleteTaskCascade(
   return { board, removedCount: allDescendants.size, pomoCancelled };
 }
 
+// ── stampCompletedAt ──────────────────────────────────────────────────────
+// Issue #134 — applied at every task.toggle call site (renderer, sys CLI,
+// taskToggleMirror) so analytics buckets can date completions.
+
+export function stampCompletedAt(
+  prev: TaskState,
+  next: TaskState,
+  ctx: DispatchCtx,
+): TaskState {
+  if (!prev.done && next.done) return { ...next, completedAt: ctx.now() };
+  if (prev.done && !next.done) {
+    const { completedAt: _ca, ...rest } = next;
+    void _ca;
+    return rest;
+  }
+  return next;
+}
+
 // ── taskToggleMirror ──────────────────────────────────────────────────────
 
 export interface ToggleTaskResult {
@@ -183,7 +201,7 @@ export function taskToggleMirror(
   if (!taskNode) return null;
 
   const prevState = taskNode.state as TaskState;
-  const nextState = fsmTaskToggle(prevState);
+  const nextState = stampCompletedAt(prevState, fsmTaskToggle(prevState), ctx);
 
   const taskIdx = board.nodes.indexOf(taskNode);
   board.nodes[taskIdx] = { ...taskNode, state: nextState };
