@@ -54,12 +54,17 @@ function mockReply(): string {
 // ── Orb position helpers ──────────────────────────────────────────────────────
 const ORB_SIZE = 64;
 const ORB_MARGIN = 12;
-const STORAGE_KEY = 'krnl0-orb-pos';
+// v2: bump invalidates the old saved orb position so users get the new
+// tight bottom-left default on next launch. Old key cleaned up below.
+const STORAGE_KEY = 'krnl0-orb-pos-v2';
+const LEGACY_STORAGE_KEY = 'krnl0-orb-pos';
 
 interface OrbPos { x: number; y: number }
 
+// Tight bottom-left corner — sits above the 28px status bar with a small
+// gap and hugs the left edge.
 function defaultPos(): OrbPos {
-  return { x: 22, y: window.innerHeight - ORB_SIZE - 56 };
+  return { x: 16, y: window.innerHeight - ORB_SIZE - 40 };
 }
 
 function clampPos(pos: OrbPos): OrbPos {
@@ -71,6 +76,11 @@ function clampPos(pos: OrbPos): OrbPos {
 
 function loadPos(): OrbPos {
   try {
+    // One-shot cleanup: drop the pre-v2 key so it can't keep resurrecting
+    // a stale corner position on future loads.
+    if (localStorage.getItem(LEGACY_STORAGE_KEY) !== null) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as unknown;
