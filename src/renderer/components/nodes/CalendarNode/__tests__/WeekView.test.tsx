@@ -145,6 +145,7 @@ function makeTask(id: string, scheduledFor: string, plannedMin = 25) {
       plannedMin,
       secondsAccumulated: 0,
       currentSessionElapsedSec: 0,
+      kind: 'focus' as const,
     },
     config: { showDuration: true },
   };

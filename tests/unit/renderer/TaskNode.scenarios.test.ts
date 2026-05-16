@@ -42,6 +42,7 @@ function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
     plannedMin: 45,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
+    kind: 'focus',
     ...overrides,
   };
 }

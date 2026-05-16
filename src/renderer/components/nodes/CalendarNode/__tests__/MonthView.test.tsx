@@ -259,6 +259,7 @@ describe('MonthView — task chips', () => {
               plannedMin: 25,
               secondsAccumulated: 0,
               currentSessionElapsedSec: 0,
+              kind: 'focus',
             },
             config: { showDuration: true },
           },
@@ -303,6 +304,7 @@ describe('MonthView — task chips', () => {
         plannedMin: 25,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
+        kind: 'focus',
       },
       config: { showDuration: true },
     });

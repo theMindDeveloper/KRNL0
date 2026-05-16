@@ -183,6 +183,7 @@ export async function taskAdd(
     plannedMin: durationMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
+    kind: 'focus',
   };
 
   // Link taskNodeId on the TodoItem
@@ -383,6 +384,7 @@ export async function taskSubtask(
     plannedMin: parentTs.plannedMin ?? parentTs.durationMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
+    kind: 'focus',
   };
 
   const childNode: AnyNode = {
@@ -489,6 +491,7 @@ export async function taskSibling(
     plannedMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
+    kind: 'focus',
   };
 
   const newNode: AnyNode = {
@@ -799,6 +802,7 @@ export async function taskAddNext(
     plannedMin: effectiveDuration,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
+    kind: 'focus',
   };
 
   const newNode: AnyNode = {
