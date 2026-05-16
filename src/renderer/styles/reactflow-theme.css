@@ -18,13 +18,14 @@
   opacity: 1;
 }
 
-/* Image + text node connectors auto-hide. The default handle opacity
- * (0.7) reads as visual noise on top of image/text content; these kinds
- * rarely participate in task-flow chains, so we hide both handles
- * unless the user is pointing at the node. `!important` is needed
- * because rfAdapters.tsx applies an inline `opacity: 0.7` to the handle. */
+/* Image + text + frame node connectors auto-hide. The default handle
+ * opacity (0.7) reads as visual noise on top of these node bodies, and
+ * they rarely participate in task-flow chains. Hide both handles by
+ * default; reveal on hover/selection. `!important` is needed because
+ * rfAdapters.tsx applies an inline `opacity: 0.7` to the handle. */
 .krnl-kind-image .react-flow__handle,
-.krnl-kind-text  .react-flow__handle {
+.krnl-kind-text  .react-flow__handle,
+.krnl-kind-frame .react-flow__handle {
   opacity: 0 !important;
   transition: opacity 160ms ease;
 }
@@ -33,7 +34,10 @@
 .krnl-kind-image .react-flow__handle:hover,
 .krnl-kind-text:hover .react-flow__handle,
 .krnl-kind-text.selected .react-flow__handle,
-.krnl-kind-text .react-flow__handle:hover {
+.krnl-kind-text .react-flow__handle:hover,
+.krnl-kind-frame:hover .react-flow__handle,
+.krnl-kind-frame.selected .react-flow__handle,
+.krnl-kind-frame .react-flow__handle:hover {
   opacity: 0.85 !important;
 }
 
