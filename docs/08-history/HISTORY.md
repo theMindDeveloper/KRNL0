@@ -520,3 +520,13 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Summary:** Added a startup sound that plays when the renderer mounts, plus a thin shared SFX engine (`sfxEngine`) for app-level sound effects. The engine follows the same `import.meta.glob` + HTML5 Audio + caching pattern as the existing VoicePlayer in the Assistant component, but lives independently in `src/renderer/sfx/` so any component can use it without coupling to Assistant internals. The startup sound is a simple fire-and-forget play on App mount; autoplay-policy rejections are silently swallowed. Three sys CLI commands added: `krnl sfx play <clipId>`, `krnl sfx stop`, `krnl sfx list` — all renderer-coupled via the existing cliDispatch bridge.
 
 **Tests:** Pre-existing 2 AppChrome test failures and 1 typecheck error in PomoNode (both on main before this change). No regressions introduced.
+
+
+---
+
+## [2026-05-16] — fix(boot): boardSaveLogging crashed on contextBridge frozen `window.krnl`
+
+**Type:** Bug Fix
+**Branch:** `fix/board-save-logging-readonly`
+**Files changed:** `src/renderer/store/eventLog/boardSaveLogging.ts`
+**Summary:** App failed to launch with `TypeError: Cannot assign to read only property 'boardSave' of object '#<Object>'` because `installBoardSaveLogging` tried to mutate `window.krnl.boardSave` in place. `contextBridge.exposeInMainWorld` freezes the bridge object, so the property assignment threw. Replaced the in-place monkey-patch with a Proxy wrapper that intercepts `boardSave` and routes every other key through to the original bridge, installed via `Object.defineProperty(window, 'krnl', …)` so the renderer keeps booting even on Electron versions where the bridge is non-configurable.
