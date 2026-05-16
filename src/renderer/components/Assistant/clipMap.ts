@@ -20,6 +20,7 @@ export const CLIP_MAP: Record<string, string> = {
   'click_whats_up2': "what'sup2",
   'click_yeah':      'yeah',
   'click_leave':     'canyouleavemelaone',
+  'click_see_you_later': 'click_see_you_later',
 
   // ── audio/intro/ — welcome tour ────────────────────────────────────────────
   'intro_01': "Welcome to KRNL0. I'm your system assistant. jen",
@@ -29,19 +30,6 @@ export const CLIP_MAP: Record<string, string> = {
   'intro_06': "Down here in the corner — that's me. Click me anytime. Or hold Space to talk",
   'intro_07': "Pick something from the menu and I'll walk you through it",
 
-  // ── audio/flows/whatNext/ ──────────────────────────────────────────────────
-  'work_01':   "Let me scan your board",
-  'work_02':   "Alright. I can see your open items",
-  'work_03':   "Based on what's here, focus on this one first. It's open and it's been sitting",
-  'work_05':   "You've got this",
-  'work_none': "Your board looks clear. Nothing open right now. Maybe it's time to add something new",
-
-  // ── audio/flows/summarize/ ─────────────────────────────────────────────────
-  'summary_01':     "Here's what I see",
-  'summary_tasks':  "You have open tasks on the board",
-  'summary_habits': "Your habit tracker is running. Keep your streak going today",
-  'summary_done':   "That's the overview. Anything you want to dig into",
-
   // ── audio/flows/focus/ ─────────────────────────────────────────────────────
   'focus_01':    "Alright. Let's lock in",
   'focus_02':    "I'm starting a twenty-five minute focus timer",
@@ -49,24 +37,60 @@ export const CLIP_MAP: Record<string, string> = {
   'focus_none':  "I don't see a Pomodoro timer on your board yet. Let me add one",
   'focus_added': "Done. Your timer is ready. Hit start when you are",
 
-  // ── audio/tutorial/ ────────────────────────────────────────────────────────
-  'tut_intro':         "Let's build a tiny project together. Three tasks, chained, dropped on your calendar.",
-  'tut_find_todo':     "First  find your Todo node Its the green one Click the plus on it to add a task",
-  'tut_task_1':        "Type the first one Review notes. Then press enter.",
-  'tut_nice':          "nice",
-  'tut_task_2':        "Now another. Write the draft",
-  // 'tut_task_3' — not yet recorded; falls back to caption timing
-  'tut_chain_now':     "tut_chain_now",  // not yet recorded
-  'tut_chain_done':    "See those flowing edges The chain is live. The next task fires when the previous one finishes",
-  'tut_drop_it':       "Now grab Review notes and drop it on a calendar slot. KRNL0 will auto-place the rest after it",
-  'tut_calendar_look': "tut_calendar_look",  // not yet recorded
-  'tut_clock_look':    "Your clock shows the active task too",
-  'tut_done':          "That's a real schedule. Made by you, in thirty seconds",
-  'tut_waiting':       "Im waiting on you Take your time",
-  'tut_still_waiting': "tut_still_waiting",  // not yet recorded
-  'tut_skip_ok':       "No worries. We can come back to this",
-  // Bonus reaction clip — "That's a chain..." — used when user creates first chain.
-  'react_first_chain': "That's a chain. Drop the head into the calendar and the rest follow",
+  // ── audio/tutorial/ — Tutorial 1: Pomodoro & Tasks ─────────────────────────
+  // Cold-open (music choreography)
+  'tut1_00a': 'tut1_00a_know_tutorials_are_boring',
+  'tut1_00b': 'tut1_00b_ill_make_it_more_fun',
+  'tut1_00c': 'tut1_00c_lets_play_some_music',
+  'tut1_00d': 'tut1_00d_nah_not_this',
+  'tut1_00e': 'tut1_00e_okay_thats_better',
+  // Main script
+  'tut1_01': 'tut1_01_hey_again_im_jen',
+  'tut1_02': 'tut1_02_this_tutorial_pomo_and_tasks',
+  'tut1_03': 'tut1_03_look_at_the_left',
+  'tut1_04': 'tut1_04_thats_the_pomodoro_node',
+  'tut1_05': 'tut1_05_works_like_any_pomodoro',
+  'tut1_06': 'tut1_06_see_the_gear_icon',
+  'tut1_07': 'tut1_07_click_it_to_tweak',
+  'tut1_08': 'tut1_08_i_know_boring',
+  'tut1_09': 'tut1_09_heres_the_twist',
+  'tut1_10': 'tut1_10_krnl_combines_pomo_and_todo',
+  'tut1_11': 'tut1_11_add_a_new_task',
+  'tut1_12': 'tut1_12_call_it_learn_machine_learning',
+  'tut1_13': 'tut1_13_give_it_sixty_minutes',
+  'tut1_14': 'tut1_14_im_waiting',
+  'tut1_15': 'tut1_15_nice_task_spawned',
+  'tut1_16': 'tut1_16_now_connect_to_pomo',
+  'tut1_17': 'tut1_17_double_click_the_task',
+  'tut1_18': 'tut1_18_see_it_turned_green',
+  'tut1_19': 'tut1_19_krnl_split_into_sessions',
+  'tut1_20': 'tut1_20_lets_make_it_interesting',
+  'tut1_21': 'tut1_21_add_a_second_task',
+  'tut1_22': 'tut1_22_ninety_minutes',
+  'tut1_23': 'tut1_23_im_waiting_again',
+  'tut1_24': 'tut1_24_look_a_chain_appeared',
+  'tut1_25': 'tut1_25_chain_is_your_day_as_pipeline',
+  'tut1_26': 'tut1_26_want_to_see_on_calendar',
+  'tut1_27': 'tut1_27_calendar_and_clock_already_there',
+  'tut1_28': 'tut1_28_weekly_monthly_yearly',
+  'tut1_29': 'tut1_29_switch_to_weekly',
+  'tut1_30': 'tut1_30_red_line_is_now',
+  'tut1_31': 'tut1_31_drag_first_task_onto_today',
+  'tut1_32': 'tut1_32_there_it_is',
+  'tut1_33': 'tut1_33_both_tasks_landed_in_order',
+  'tut1_34': 'tut1_34_calendar_and_clock_in_sync',
+  'tut1_35': 'tut1_35_one_bonus',
+  'tut1_36': 'tut1_36_you_can_run_in_parallel',
+  'tut1_37': 'tut1_37_right_click_add_parallel',
+  'tut1_38': 'tut1_38_call_it_listen_to_music',
+  'tut1_39': 'tut1_39_two_tasks_side_by_side',
+  'tut1_40': 'tut1_40_thats_the_whole_flow',
+  'tut1_41': 'tut1_41_if_youre_lazy_use_ai_terminal',
+  'tut1_42': 'tut1_42_but_thats_another_tutorial',
+  'tut1_43': 'tut1_43_for_now_go_build_your_day',
+  'tut1_wait_take_your_time': 'tut1_wait_take_your_time',
+  'tut1_wait_still_here':     'tut1_wait_still_here',
+  'tut1_skip_no_worries':     'tut1_skip_no_worries',
 
   // ── audio/commander/ ───────────────────────────────────────────────────────
   'cmd_open':       "Commander online.",
@@ -102,13 +126,11 @@ export const CLIP_MAP: Record<string, string> = {
   'pa_past_midnight':     "past midnight",
 
   // ── audio/misc/ — utility ──────────────────────────────────────────────────
-  'misc_thinking':   "Let me check that",
   'misc_done':       "Done",
   'misc_error':      "Something went wrong. Check the terminal for details",
   'misc_wait':       "Give me a second",
   'misc_not_found':  "I didn't find anything for that",
   'misc_running':    "Running",
-  'misc_bye':        "Got it. I'm here if you need me",
 };
 
 /** Pool of clips played randomly when the orb is clicked while idle. */

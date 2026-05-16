@@ -114,6 +114,7 @@ function getBoardSnapshot(): BoardSnapshot {
       scheduledTaskCount: 0, chainedTaskCount: 0,
       taskTexts: [], firstTaskText: null,
       viewport,
+      nodePositions: {},
     };
   }
   const tasks  = board.nodes.filter((n) => n.kind === 'todo.task');
@@ -134,6 +135,12 @@ function getBoardSnapshot(): BoardSnapshot {
     .map((n) => (n.state as { text?: string }).text ?? '')
     .filter((t) => t.length > 0);
 
+  const posOf = (kind: string): { x: number; y: number } | undefined => {
+    const n = board.nodes.find((nd) => nd.kind === kind);
+    const p = (n as { position?: { x: number; y: number } } | undefined)?.position;
+    return p && typeof p.x === 'number' && typeof p.y === 'number' ? { x: p.x, y: p.y } : undefined;
+  };
+
   return {
     nodeCount: board.nodes.length,
     taskCount: tasks.length,
@@ -142,6 +149,12 @@ function getBoardSnapshot(): BoardSnapshot {
     hasTodo: board.nodes.some((n) => n.kind === 'todo'),
     hasCalendar: board.nodes.some((n) => n.kind === 'calendar'),
     hasClock: board.nodes.some((n) => n.kind === 'clock'),
+    nodePositions: {
+      pomo:     posOf('pomo'),
+      todo:     posOf('todo'),
+      calendar: posOf('calendar'),
+      clock:    posOf('clock'),
+    },
     scheduledTaskCount,
     chainedTaskCount,
     taskTexts,
@@ -191,10 +204,16 @@ export function Orb() {
   }, []);
 
   // ── Startup greeting ─────────────────────────────────────────────────────
-  // ONE clip on mount, picked by time of day. No subscriptions, no triggers,
-  // no daemons. The proactive engine was removed — everything else the
-  // assistant says is user-prompted (click acks, flow narration, commander).
+  // ONE clip on mount, picked by time of day. Guarded by sessionStorage so
+  // StrictMode double-mounts, HMR reloads, and remounts from other state
+  // changes don't retrigger the greeting within the same window session.
   useEffect(() => {
+    const GREETED_KEY = 'krnl0-orb-greeted';
+    try {
+      if (sessionStorage.getItem(GREETED_KEY)) return;
+      sessionStorage.setItem(GREETED_KEY, '1');
+    } catch { /* sessionStorage unavailable — fall through and greet */ }
+
     const hour = new Date().getHours();
     let pick: { clip: string; text: string };
     if (hour >= 0 && hour < 5) {
@@ -265,8 +284,14 @@ export function Orb() {
     if (dragMovedRef.current) { dragMovedRef.current = false; return; }
 
     if (activeFlowId) {
-      // Stop running flow on click.
+      // Stop running flow on click — abort, then give a goodbye line.
       runnerRef.current?.abort();
+      setOrbState('speaking');
+      setCaption('Ok, see you later then.');
+      voicePlayer
+        .play('click_see_you_later')
+        .catch(() => new Promise<void>((r) => setTimeout(r, 1500)))
+        .then(() => { setCaption(null); setOrbState('idle'); });
       return;
     }
 

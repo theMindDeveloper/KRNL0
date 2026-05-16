@@ -346,7 +346,9 @@ export function AmbientRadio() {
   const [edge, setEdge] = useState<EdgeState>('none');
   const [pos, setPos] = useState<Pos>(loadPos);
   const [isDragging, setIsDragging] = useState(false);
-  const [closed, setClosed] = useState(false);
+  // Visual-only hide. Keeps the YT iframe and audio engine alive so music
+  // continues playing while the panel disappears (driven by the Jen bridge).
+  const [hidden, setHidden] = useState(false);
   const [ytUrl, setYtUrl] = useState('');
   const [ytError, setYtError] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -740,11 +742,100 @@ export function AmbientRadio() {
     }
   }, [focusedId]);
 
-  if (closed) return null;
+  // ── External control bridge (driven by Jen / ScriptRunner) ──────────────
+  // Listens for window CustomEvents so the assistant can drive the radio
+  // during a tutorial without exposing a global mutable API.
+  useEffect(() => {
+    const onMoveToCenter = () => {
+      const x = Math.round((window.innerWidth  - WIDTH)  / 2);
+      const y = Math.round((window.innerHeight - HEIGHT) / 2);
+      const next = { x, y };
+      setPos(next); savePos(next); setEdge('none');
+      // Pre-fetch the YT IFrame API now — if Jen is centering the radio
+      // she's almost certainly about to call play-youtube next, and
+      // loadYouTubeVideo() polls forever if the script isn't loaded.
+      loadYTScript();
+    };
+
+    const onAddLayer = (ev: Event) => {
+      const id = (ev as CustomEvent<{ id: LayerId }>).detail?.id;
+      if (!id || activeLayersRef.current.has(id)) return;
+      toggleLayer(id);
+    };
+
+    const onRemoveLayer = (ev: Event) => {
+      const id = (ev as CustomEvent<{ id: LayerId }>).detail?.id;
+      if (!id || !activeLayersRef.current.has(id)) return;
+      toggleLayer(id);
+    };
+
+    const onPlayYouTube = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ url: string; volume?: number }>).detail;
+      const url = detail?.url;
+      if (!url) return;
+      const vid = extractYouTubeId(url);
+      if (!vid) return;
+      setYtUrl(url);
+
+      // Apply optional per-layer volume override BEFORE loading the video
+      // so the iframe starts at the right level (no momentary loud blast).
+      const ytLv = typeof detail?.volume === 'number'
+        ? Math.max(0, Math.min(100, Math.round(detail.volume)))
+        : (layerVolumes.yt ?? 80);
+      if (typeof detail?.volume === 'number') {
+        setLayerVolumes((prev) => ({ ...prev, yt: ytLv }));
+      }
+      const combined = Math.round((volume / 100) * (ytLv / 100) * 100);
+      // Guarantee the IFrame API is loading before we ask for a video.
+      // loadYouTubeVideo polls for window.YT.Player for ~12s then gives up.
+      loadYTScript();
+      loadYouTubeVideo(vid, combined, 'krnl0-ambient-radio-yt-iframe');
+      ytSetVolume(combined);
+
+      if (!activeLayersRef.current.has('yt')) {
+        setActiveLayers((prev) => new Set(prev).add('yt'));
+      }
+      if (!playingRef.current) setPlaying(true);
+    };
+
+    // Visual hide — keeps audio + iframe playing, just removes the UI.
+    // (Different from the X button, which fully closes and stops everything.)
+    const onHide = () => {
+      setHidden(true);
+    };
+
+    // Snap to the right edge so only a thin peek is visible. User can
+    // click it to bring the panel back. Used when Jen wants the radio
+    // out of the way but still discoverable.
+    const onSnapToEdge = () => {
+      setPos((p) => {
+        const next: Pos = { x: window.innerWidth - PEEK_PX, y: p.y };
+        savePos(next);
+        return next;
+      });
+      setEdge('right');
+    };
+
+    window.addEventListener('krnl:radio:move-to-center', onMoveToCenter);
+    window.addEventListener('krnl:radio:add-layer',      onAddLayer);
+    window.addEventListener('krnl:radio:remove-layer',   onRemoveLayer);
+    window.addEventListener('krnl:radio:play-youtube',   onPlayYouTube);
+    window.addEventListener('krnl:radio:hide',           onHide);
+    window.addEventListener('krnl:radio:snap-to-edge',   onSnapToEdge);
+    return () => {
+      window.removeEventListener('krnl:radio:move-to-center', onMoveToCenter);
+      window.removeEventListener('krnl:radio:add-layer',      onAddLayer);
+      window.removeEventListener('krnl:radio:remove-layer',   onRemoveLayer);
+      window.removeEventListener('krnl:radio:play-youtube',   onPlayYouTube);
+      window.removeEventListener('krnl:radio:hide',           onHide);
+      window.removeEventListener('krnl:radio:snap-to-edge',   onSnapToEdge);
+    };
+  }, [toggleLayer, volume, layerVolumes.yt]);
 
   // ── Styles ───────────────────────────────────────────────────────────────
   const wrap: CSSProperties = {
     position: 'fixed',
+    display: hidden ? 'none' : undefined,
     left: pos.x,
     top: pos.y,
     width: WIDTH,
@@ -890,12 +981,6 @@ export function AmbientRadio() {
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
               <button type="button" data-testid="ambient-radio-gear" title="Settings" onClick={() => setSettingsOpen((o) => !o)} style={headerBtn(settingsOpen)}>⚙</button>
               <button type="button" title="Snap to edge" onClick={snapToNearestEdge} style={headerBtn(false)}>−</button>
-              <button
-                type="button"
-                title="Close"
-                onClick={() => { audioEngine.stopAll(); ytStop(); setClosed(true); }}
-                style={headerBtn(false)}
-              >×</button>
             </div>
           </div>
 

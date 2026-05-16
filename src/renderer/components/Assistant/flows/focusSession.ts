@@ -29,13 +29,8 @@ export const focusSessionFlow: Flow = {
       { kind: 'speak', clip: 'focus_01', text: 'Alright. Let\'s lock in.' },
       { kind: 'wait', ms: 300 },
 
-      // Move to the pomo node area (center of board, pomo is usually near top)
-      {
-        kind: 'camera',
-        x: board.viewport.x,
-        y: board.viewport.y - 80,
-        zoom: 1.1,
-      },
+      // Pan to the actual Pomodoro node — resolved at runtime from the board.
+      { kind: 'cameraToNode', nodeKind: 'pomo', zoom: 1.0 },
 
       {
         kind: 'speak',
