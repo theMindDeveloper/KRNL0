@@ -54,17 +54,19 @@ function mockReply(): string {
 // ── Orb position helpers ──────────────────────────────────────────────────────
 const ORB_SIZE = 64;
 const ORB_MARGIN = 12;
-// v2: bump invalidates the old saved orb position so users get the new
-// tight bottom-left default on next launch. Old key cleaned up below.
-const STORAGE_KEY = 'krnl0-orb-pos-v2';
-const LEGACY_STORAGE_KEY = 'krnl0-orb-pos';
+// v3: bump invalidates the old saved orb position so users get the new
+// bottom-left default that clears the RF Controls column. Old keys cleaned
+// up below.
+const STORAGE_KEY = 'krnl0-orb-pos-v3';
+const LEGACY_STORAGE_KEYS = ['krnl0-orb-pos', 'krnl0-orb-pos-v2'];
 
 interface OrbPos { x: number; y: number }
 
-// Tight bottom-left corner — sits above the 28px status bar with a small
-// gap and hugs the left edge.
+// Bottom-left, shifted right of the RF Controls column (zoom +/- /fit
+// buttons sit at left ≈ 15 px, width ≈ 28 px). 72 px keeps the orb clearly
+// past the controls so they remain clickable.
 function defaultPos(): OrbPos {
-  return { x: 16, y: window.innerHeight - ORB_SIZE - 40 };
+  return { x: 72, y: window.innerHeight - ORB_SIZE - 40 };
 }
 
 function clampPos(pos: OrbPos): OrbPos {
@@ -76,10 +78,10 @@ function clampPos(pos: OrbPos): OrbPos {
 
 function loadPos(): OrbPos {
   try {
-    // One-shot cleanup: drop the pre-v2 key so it can't keep resurrecting
-    // a stale corner position on future loads.
-    if (localStorage.getItem(LEGACY_STORAGE_KEY) !== null) {
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    // One-shot cleanup: drop pre-v3 keys so they can't keep resurrecting
+    // a stale position on future loads.
+    for (const k of LEGACY_STORAGE_KEYS) {
+      if (localStorage.getItem(k) !== null) localStorage.removeItem(k);
     }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
