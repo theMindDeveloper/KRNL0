@@ -19,6 +19,9 @@ export interface TaskState {
   // existing boards load unchanged (absence = unscheduled).
   scheduledFor?: string;         // ISO 8601 local datetime, e.g. "2026-05-20T14:30"
   scheduledDurationMin?: number; // optional override for calendar block height
+  // Issue #134 — set when done flips false→true; cleared when true→false.
+  // Legacy `done: true` rows lack this field; analytics buckets exclude them.
+  completedAt?: string;          // ISO 8601
 }
 
 export interface TaskConfig {
