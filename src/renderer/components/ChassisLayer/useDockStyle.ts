@@ -13,10 +13,12 @@ export const DOCK_STYLES: DockStyle[] = ['classic', 'synthesizer', 'telemetry', 
 
 const STORAGE_KEY = 'krnl0-dock-style';
 
+const DEFAULT_DOCK_STYLE: DockStyle = 'telemetry';
+
 function readStored(): DockStyle {
-  if (typeof localStorage === 'undefined') return 'classic';
+  if (typeof localStorage === 'undefined') return DEFAULT_DOCK_STYLE;
   const v = localStorage.getItem(STORAGE_KEY);
-  return DOCK_STYLES.includes(v as DockStyle) ? (v as DockStyle) : 'classic';
+  return DOCK_STYLES.includes(v as DockStyle) ? (v as DockStyle) : DEFAULT_DOCK_STYLE;
 }
 
 function apply(style: DockStyle) {
