@@ -87,6 +87,7 @@ interface Layer { handle: PresetHandle; gain: GainNode }
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private analyser: AnalyserNode | null = null;
   private layers: Map<PresetId, Layer> = new Map();
 
   private init(): boolean {
@@ -98,6 +99,26 @@ class AudioEngine {
     this.master.gain.value = 0.6;
     this.master.connect(this.ctx.destination);
     return true;
+  }
+
+  /** Parallel FFT tap off the master bus. Returns null until the engine has
+   *  been initialised (no audio context yet). Used by external visualisers
+   *  (e.g. the synth dock VU meter) — does not affect audible output. */
+  getAnalyser(): AnalyserNode | null {
+    if (!this.ctx || !this.master) return null;
+    if (!this.analyser) {
+      const a = this.ctx.createAnalyser();
+      a.fftSize = 64;          // 32 freq bins — plenty for a 12-LED VU
+      a.smoothingTimeConstant = 0.75;
+      this.master.connect(a);  // parallel tap; analyser is a sink only
+      this.analyser = a;
+    }
+    return this.analyser;
+  }
+
+  /** True when any preset layer is currently active. */
+  hasActiveLayer(): boolean {
+    return this.layers.size > 0;
   }
 
   /** Start a preset as a new layer. Idempotent — re-calling with the same id

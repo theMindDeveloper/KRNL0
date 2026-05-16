@@ -8,17 +8,19 @@
 
 /* ── Cyber (native) — light ─────────────────────────────────────────── */
 :root {
-  /* Surface */
-  --paper:    #f5f1e8;
-  --paper-2:  #ede7d6;
-  --paper-3:  #e3dcc7;
-  --node-bg:  #fdfaf2;
+  /* Surface — warm "Macintosh retro" cream. Pushed further toward
+   * butter-yellow per Wave-D #2: still readable, still warm, but now
+   * unmistakably *not* white. */
+  --paper:    #ebe1c2;
+  --paper-2:  #ddd0a7;
+  --paper-3:  #cbba85;
+  --node-bg:  #f6efd0;
 
-  /* Ink */
-  --ink:      #1a1814;
-  --ink-2:    #3d362b;
-  --ink-3:    #6b6354;
-  --ink-4:    #9a9180;
+  /* Ink — slightly deeper so type stays readable on the warmer paper. */
+  --ink:      #1a1612;
+  --ink-2:    #38302a;
+  --ink-3:    #6e6450;
+  --ink-4:    #998d72;
 
   /* Signal — invariant across light/dark */
   --acid:       #c9f158;
@@ -51,9 +53,10 @@
   --term-acid:  #c9f158;
   --term-rust:  #e87a5f;
 
-  /* Grid */
-  --grid:        rgba(26, 24, 20, 0.10);
-  --grid-strong: rgba(26, 24, 20, 0.20);
+  /* Grid — darker dots on light mode so the small (minor) dots remain
+   * visible against the warmer paper. Was 0.10/0.20 → 0.22/0.40. */
+  --grid:        rgba(26, 22, 16, 0.22);
+  --grid-strong: rgba(26, 22, 16, 0.40);
   --grid-minor:  32px;
   --grid-major:  160px;
 
@@ -61,10 +64,29 @@
   --radius:    6px;
   --radius-lg: 10px;
 
-  /* Shadow */
-  --shadow-1:    0 1px 0 rgba(26,24,20,.04), 0 2px 6px rgba(26,24,20,.06);
-  --shadow-2:    0 2px 0 rgba(26,24,20,.04), 0 8px 24px rgba(26,24,20,.10);
+  /* Shadow — warm-tinted (sepia-tinged black) so drop shadows match the
+   * cream paper instead of looking like soot. */
+  --shadow-1:    0 1px 0 rgba(60,40,18,.05), 0 2px 6px rgba(60,40,18,.09);
+  --shadow-2:    0 2px 0 rgba(60,40,18,.06), 0 10px 28px rgba(60,40,18,.14);
   --shadow-glow: 0 0 0 1px var(--acid), 0 0 24px rgba(201,241,88,.25);
+
+  /* Frame node — light-mode defaults. Darker edge so the container is
+   * clearly visible against the cream paper; warm background tint + soft
+   * drop shadow give it depth without color noise. */
+  --frame-edge:   rgba(60, 50, 30, 0.45);
+  --frame-bg:     linear-gradient(180deg,
+    rgba(60,50,30,0.06) 0%,
+    rgba(60,50,30,0.10) 100%);
+  --frame-shadow: 0 2px 6px rgba(60,50,30,0.10), 0 10px 24px rgba(60,50,30,0.12), inset 0 1px 0 rgba(255,255,255,0.45);
+
+  /* Primary action button (Pomo START, SAVE, etc). Theme-aware.
+   * Light mode: dark "console" button — acid bg blends with cream paper,
+   * so use deep ink with an acid-glow on hover. Dark mode keeps the
+   * original acid-on-paper-text combo. */
+  --btn-primary-bg:        #1a1612;
+  --btn-primary-bg-hover:  #2a261e;
+  --btn-primary-fg:        var(--acid);
+  --btn-primary-ring:      rgba(201,241,88,0.45);
 
   /* Typography */
   --font-mono:  'JetBrains Mono', ui-monospace, monospace;
@@ -102,6 +124,19 @@
 
   --grid:        rgba(240, 235, 221, 0.09);
   --grid-strong: rgba(240, 235, 221, 0.18);
+
+  /* Frame node — dark-mode defaults. Back to the original near-invisible
+   * hairline + faint wash since the container reads fine against the dark
+   * canvas without needing extra contrast. */
+  --frame-edge:   rgba(212, 207, 192, 0.18);
+  --frame-bg:     linear-gradient(180deg, rgba(255,255,255,0.012) 0%, rgba(0,0,0,0.02) 100%);
+  --frame-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+
+  /* Primary action — dark mode keeps acid-on-dark with original feel. */
+  --btn-primary-bg:        var(--acid);
+  --btn-primary-bg-hover:  var(--acid-glow);
+  --btn-primary-fg:        #1a1612;
+  --btn-primary-ring:      rgba(201,241,88,0.45);
 }
 
 /* ── Noir (additional) — light ──────────────────────────────────────── */
@@ -284,6 +319,30 @@
   100% { transform: translateY(-180px) scale(0.6); opacity: 0;   }
 }
 
+/* Vapor face — glass tube. Theme-aware: light mode has NO outer drop
+ * shadow (was a black smudge on cream paper); the inner highlight + tinted
+ * gradient carry the volume. Dark mode keeps the heavy black so the tube
+ * still pops off the dark panel. */
+.pomo-vapor-tube {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.55) 0%,
+    rgba(214,201,158,0.35) 60%,
+    rgba(173,154,108,0.30) 100%);
+  border: 1.5px solid var(--ink-3);
+  box-shadow:
+    inset 3px 0 0 rgba(255,255,255,0.55),
+    inset -3px 0 0 rgba(110,90,55,0.18);
+}
+[data-theme="dark"] .pomo-vapor-tube {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.02) 0%,
+    rgba(0,0,0,0.18) 100%);
+  box-shadow:
+    inset 3px 0 0 rgba(255,255,255,0.05),
+    inset -3px 0 0 rgba(0,0,0,0.18),
+    0 12px 32px rgba(0,0,0,0.35);
+}
+
 /* ── KRNL0 Crazy own mode — stub (wired in PR10) ──────────────────────
    Placeholder for [data-vibe="krnl0"]. Implemented after Phases 1-9
    land — see docs/03-adr/0006-lifeos-ui-refresh.md. */
@@ -301,8 +360,24 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
+  /* Body weight stays at 400 — bumping it to 500 broke xterm.js glyph
+   * width measurement in the terminal mother (FitAddon caches cell width
+   * from the container's computed font-weight at init). Bold UI labels
+   * are handled per-component instead. */
+  font-weight: 400;
   overflow: hidden;
   user-select: none;
+  /* Subpixel antialiasing keeps type crisp on retina. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
+
+/* Safety net — terminal contents are always 400, regardless of any later
+ * overrides. xterm + FitAddon need a stable container weight. */
+.xterm, .xterm *, .term-body, .term-body * {
+  font-weight: 400 !important;
 }
 
 /* ── Minimal scrollbars (app-wide) ──────────────────────────────────── */
@@ -338,6 +413,46 @@ body {
 .term-body *::-webkit-scrollbar-thumb:hover,
 [data-term] *::-webkit-scrollbar-thumb:hover {
   background: var(--term-fg);
+}
+
+/* ── TaskNode checkbox — light: green box w/ dark check ; dark: dark
+   box w/ green check (Wave-D fix: user reported the dark-mode rendering
+   looked like "green-on-white" — switching to green-on-black so the
+   checked state stays readable against the dark node body). */
+.task-check {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  padding: 0;
+  margin-top: 2px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1.5px solid var(--ink-4);
+  transition: background 0.12s, border-color 0.12s;
+}
+.task-check:hover { border-color: var(--ink-3); }
+.task-check--done {
+  background: var(--acid);
+  border-color: var(--acid);
+}
+.task-check__mark {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  color: #1a1814;
+}
+[data-theme="dark"] .task-check--done {
+  /* Green-on-black: dark fill, acid border, acid checkmark. */
+  background: #0a0908;
+  border-color: var(--acid);
+  box-shadow: 0 0 6px rgba(201,241,88,0.35);
+}
+[data-theme="dark"] .task-check--done .task-check__mark {
+  color: var(--acid);
+  text-shadow: 0 0 4px rgba(201,241,88,0.5);
 }
 
 /* ── HabitNode cell classes (perf — avoid per-cell inline styles) ───── */

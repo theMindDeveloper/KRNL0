@@ -1,0 +1,2216 @@
+/* chassis.css — Mother-row dock chassis variants.
+ *
+ * Ported from `Synthesizer Module Frame.html` and `Telemetry Module Frame.html`
+ * + phosphor-node style from `krnl-dock.html`.
+ *
+ * Three variants, toggled via `data-dock` on <html>:
+ *   - synthesizer  : eurorack chassis (top rail + bottom rail w/ knobs)
+ *   - telemetry    : mission-control chassis (5 instrument cells + bays + log)
+ *   - phosphor     : per-node green CRT bezel only (no chassis)
+ *
+ * "classic" (no `data-dock` attr) = the original MotherFrame look.
+ *
+ * Visual-only. No state, no logic. The chrome inside the chassis is decorative.
+ */
+
+/* ============================================================
+   PER-NODE BEZEL — hide classic decorations when any dock is on
+   ============================================================ */
+
+/* Classic MotherFrame badge + corners hidden under all dock variants. */
+[data-dock] .mother-frame__corners,
+[data-dock] .mother-frame__badge { display: none !important; }
+
+/* Synth GRID knob toggle — hides both background dot layers when off. */
+html[data-grid="off"] .react-flow__background { display: none !important; }
+
+/* Synthesizer per-node bezel — anodized rail look */
+[data-dock="synthesizer"] .mother-frame {
+  border-radius: 2px !important;
+  border: 0 !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.6),
+    0 0 0 1px rgba(255,255,255,0.04) !important;
+}
+[data-theme="dark"][data-dock="synthesizer"] .mother-frame {
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.7),
+    inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+
+/* Telemetry per-node bezel — phosphor-glow border */
+[data-dock="telemetry"] .mother-frame {
+  border-radius: 3px !important;
+  border: 0 !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(201,241,88,0.18),
+    inset 0 0 0 2px rgba(0,0,0,0.5),
+    0 0 0 3px rgba(0,0,0,0.35),
+    0 0 24px -6px rgba(201,241,88,0.12) !important;
+}
+[data-theme="dark"][data-dock="telemetry"] .mother-frame {
+  box-shadow:
+    inset 0 0 0 1px rgba(201,241,88,0.22),
+    inset 0 0 0 2px rgba(0,0,0,0.85),
+    0 0 0 3px rgba(0,0,0,0.6) !important;
+}
+
+/* KRNL Dock per-node bezel — minimal warm-dark frame.
+ * Background lighter than pure black so the cyan/acid/grey content text
+ * inside the mother (Pomo timer, Todo rows, etc.) reads against a softer
+ * panel. Single hairline border, sharp drop-shadow, no overlays. */
+/* KRNL Dock per-node bezel — square-cornered hardware panel with a
+ * multi-layer brushed-pewter frame.
+ *
+ * Why pseudo-element: child content (notably the terminal mother's xterm
+ * canvas, which absolute-fills the panel) paints on top of inset box-shadow
+ * applied to the parent. Moving the frame to a `::before` overlay with
+ * `z-index: 10` + `pointer-events: none` paints the metal frame ON TOP of
+ * every child, so the bezel is visible on all six mothers including term.
+ *
+ * Frame layout (inset box-shadow rings, smaller spread declared first so it
+ * paints on top of larger rings):
+ *   0-1px from edge : dark hairline
+ *   1-2px           : bright metal highlight
+ *   2-4px           : main metal body
+ *   4-5px           : dark inner groove
+ *   5+              : content area (visible through transparent ::before) */
+[data-dock="krnl-dock"] .mother-frame {
+  border-radius: 0 !important;
+  border: 0 !important;
+  background: #1a1814 !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.6) !important;
+  transition: none !important;
+  /* KRNL Dock mothers are permanently dark (rack interior look). In light
+   * mode the global --ink resolves to dark, which made body copy invisible
+   * (dark-on-dark). Force the ink scale local to each mother so children
+   * that read `var(--ink)` resolve to the light scale even on a light
+   * theme. The paper vars also flip so any var(--paper-...) lookup matches
+   * the dark surface. */
+  --paper:   #14130f;
+  --paper-2: #1f1d18;
+  --paper-3: #2f2b24;
+  --node-bg: #1c1a13;
+  --ink:     #f4efe2;
+  --ink-2:   #ddd6c6;
+  --ink-3:   #968d7a;
+  --ink-4:   #6a6253;
+  color: var(--ink);
+}
+[data-dock="krnl-dock"] .mother-frame:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.6) !important;
+  filter: none !important;
+}
+[data-dock="krnl-dock"] .mother-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow:
+    inset 0 0 0 1px #0a0c08,
+    inset 0 0 0 2px #7a7e72,
+    inset 0 0 0 4px #4a4d44,
+    inset 0 0 0 5px #0a0c08,
+    inset 0 2px 0 1px rgba(255,255,255,0.10);
+}
+
+/* Kill the global hover-ring overlay on mothers under any dock variant.
+ * reactflow-theme.css adds a 1px inner white ring on `.react-flow__node > div::after`
+ * that fades in on hover — under the chassis themes it reads as a hazy blur.
+ * Hide it for mother cards specifically so child task/text/image nodes
+ * still get the standard hover affordance. */
+[data-dock] .react-flow__node.krnl-mother > div::after,
+[data-dock] .react-flow__node.krnl-mother:hover > div::after {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+/* ============================================================
+   CHASSIS — shared container
+   ============================================================ */
+.dock-chassis {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-mono);
+  z-index: -1; /* behind nodes; ViewportPortal wraps it in flow-space */
+}
+.dock-chassis svg { display: block; overflow: visible; }
+.dock-chassis .pe { pointer-events: auto; }
+
+/* ============================================================
+   SYNTHESIZER chassis — eurorack panel
+   ============================================================ */
+.dock-chassis.dock-synthesizer {
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.04) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #b8b3a4 0%, #9a9484 40%, #8a857a 100%);
+  border-radius: 6px;
+  /* Heavy outer drop-shadow on top of the existing chrome bevels — the
+   * rack should read as a physical object floating above the canvas paper. */
+  box-shadow:
+    inset 0 0 0 1px #2a261e,
+    inset 0 1px 0 rgba(255,255,255,0.4),
+    inset 0 -2px 4px rgba(0,0,0,0.18),
+    0 6px 14px rgba(0,0,0,0.35),
+    0 24px 48px rgba(0,0,0,0.45),
+    0 48px 90px -10px rgba(0,0,0,0.55);
+}
+[data-theme="dark"] .dock-chassis.dock-synthesizer {
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #3a3530 0%, #2a2620 40%, #1c1812 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.7),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 40px 110px -20px rgba(0,0,0,0.8);
+}
+
+.md-synth-top {
+  position: absolute;
+  top: 6px; left: 6px; right: 6px;
+  height: 38px;
+  background: linear-gradient(180deg, #2a261e 0%, #1c1813 100%);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.5);
+}
+.md-synth-screw {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #d8d4c6 0%, #6a6253 38%, #2a261e 90%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  position: relative;
+}
+.md-synth-screw::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 7px; height: 1px;
+  background: #1a120a;
+  transform: translate(-50%, -50%) rotate(40deg);
+}
+.md-synth-top .brand {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.34em;
+  color: #d4cfc0;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.5);
+}
+.md-synth-top .brand .n { color: var(--acid); text-shadow: 0 0 6px rgba(201,241,88,0.6); }
+.md-synth-top .model {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: rgba(212,207,192,0.55);
+  text-transform: uppercase;
+}
+.md-synth-top .pwr {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--acid);
+  text-transform: uppercase;
+}
+.md-synth-top .pwr .led {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  /* Dim amber when idle — telegraphs "system on, no session running". */
+  background: rgba(218,162,58,0.4);
+  box-shadow: 0 0 3px rgba(218,162,58,0.4), inset 0 0 0 1px rgba(0,0,0,0.4);
+  transition: background 200ms, box-shadow 200ms;
+}
+.md-synth-top .pwr .led.led-on {
+  /* Pulsing acid-green when a pomo session is running. */
+  background: var(--acid);
+  box-shadow: 0 0 8px var(--acid), inset 0 0 0 1px rgba(0,0,0,0.4);
+  animation: md-synth-led-pulse 1.4s ease-in-out infinite;
+}
+@keyframes md-synth-led-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.5); }
+}
+.md-synth-top .grow { flex: 1; }
+.md-synth-top .hp {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: rgba(212,207,192,0.45);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.md-synth-bot {
+  position: absolute;
+  bottom: 6px; left: 6px; right: 6px;
+  height: 76px;
+  background: linear-gradient(180deg, #2a261e 0%, #18140e 100%);
+  border-radius: 3px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.6);
+}
+.md-synth-knobs { display: flex; gap: 12px; align-items: center; }
+.md-synth-knob {
+  position: relative;
+  width: 38px; height: 38px;
+  flex-shrink: 0;
+}
+.md-synth-knob .body {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, #f0eadc 0%, #b8b1a0 30%, #6a6353 65%, #2a261e 95%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.5),
+    inset 0 -2px 2px rgba(0,0,0,0.3),
+    0 2px 4px rgba(0,0,0,0.5);
+}
+.md-synth-knob .indicator {
+  position: absolute;
+  top: 4px; left: 50%;
+  width: 2px; height: 12px;
+  background: #1a120a;
+  transform-origin: 50% 14px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  box-shadow: 0 0 0 0.5px rgba(255,255,255,0.5);
+}
+.md-synth-knob .label {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.22em;
+  color: rgba(212,207,192,0.5);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.md-synth-knob .arc {
+  position: absolute; inset: -3px; pointer-events: none;
+}
+.md-synth-knob .arc svg { width: 100%; height: 100%; }
+.md-synth-knob .arc circle {
+  fill: none;
+  stroke: rgba(212,207,192,0.18);
+  stroke-width: 1.5;
+}
+/* Interactive knobs — clickable cycle controls. Chassis has
+ * `pointer-events:none`; re-enable just on the interactive knobs (and the
+ * indicator+body+arc are passthrough so the wrapper catches the click). */
+.dock-chassis .md-synth-knob-interactive { pointer-events: auto; }
+.md-synth-knob-interactive {
+  cursor: pointer;
+  /* Subtle hover ring — telegraphs "this is clickable". */
+  transition: transform 120ms ease;
+}
+.md-synth-knob-interactive:hover { transform: scale(1.06); }
+.md-synth-knob-interactive:active { transform: scale(0.96); }
+.md-synth-knob-interactive:focus-visible {
+  outline: 1px solid var(--acid);
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+.md-synth-knob-interactive .indicator,
+.md-synth-knob-interactive .body,
+.md-synth-knob-interactive .arc,
+.md-synth-knob-interactive .label {
+  pointer-events: none;
+}
+
+.md-synth-knob .arc .lit {
+  stroke: var(--acid);
+  filter: drop-shadow(0 0 3px rgba(201,241,88,0.6));
+}
+
+.md-synth-vu { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.md-synth-vu .row { display: flex; gap: 2px; align-items: center; }
+.md-synth-vu .row .lbl {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 0.16em;
+  color: rgba(212,207,192,0.45);
+  width: 14px;
+  text-align: right;
+  margin-right: 4px;
+  text-transform: uppercase;
+}
+.md-synth-vu .row span:not(.lbl) {
+  width: 6px; height: 8px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(0,0,0,0.6);
+  border-radius: 0.5px;
+}
+/* Active dots: green for 1-9, amber for 10-12 (peak zone). Driven by
+ * data-active and data-peak so the VU rows reflect live activity instead
+ * of the previous hard-coded :nth-child counts. */
+.md-synth-vu .row span[data-active='true'] {
+  background: var(--acid);
+  box-shadow: 0 0 3px rgba(201,241,88,0.55);
+  border-color: rgba(0,0,0,0.5);
+  transition: background 180ms, box-shadow 180ms;
+}
+.md-synth-vu .row span[data-active='true'][data-peak='true'] {
+  background: #ffd54a;
+  box-shadow: 0 0 3px rgba(255,213,74,0.55);
+}
+
+.md-synth-jacks { display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
+.md-synth-jack {
+  position: relative;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.md-synth-jack .hole {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #050402 0%, #1a1612 60%, #2a2620 100%);
+  box-shadow:
+    inset 0 0 0 1.5px #6a6253,
+    inset 0 2px 4px rgba(0,0,0,0.7),
+    0 1px 0 rgba(255,255,255,0.08);
+  position: relative;
+}
+.md-synth-jack .hole::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #05030a;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.9);
+}
+.md-synth-jack.in .hole::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--acid);
+  box-shadow: 0 0 6px rgba(201,241,88,0.5), inset 0 0 4px rgba(201,241,88,0.4);
+}
+.md-synth-jack .lbl {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  color: rgba(212,207,192,0.55);
+  text-transform: uppercase;
+}
+.md-synth-jacks .arrow {
+  font-family: var(--font-mono);
+  color: rgba(201,241,88,0.6);
+  font-size: 14px;
+}
+
+/* Interactive jacks — clickable patch sockets. */
+.dock-chassis .md-synth-jack-interactive { pointer-events: auto; }
+.md-synth-jack-interactive {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 120ms;
+}
+.md-synth-jack-interactive:hover { transform: translateY(-1px); }
+.md-synth-jack-interactive:hover .hole {
+  box-shadow:
+    inset 0 0 0 1.5px var(--acid),
+    inset 0 2px 4px rgba(0,0,0,0.7),
+    0 0 8px rgba(201,241,88,0.4);
+}
+.md-synth-jack-interactive:active { transform: translateY(0); }
+.md-synth-jack-interactive:active .hole {
+  box-shadow:
+    inset 0 0 0 1.5px var(--acid),
+    inset 0 3px 6px rgba(0,0,0,0.85);
+}
+.md-synth-jack-interactive:focus-visible { outline: 0; }
+.md-synth-jack-interactive:focus-visible .lbl { color: var(--acid); }
+
+.md-synth-serial {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.18em;
+  color: rgba(212,207,192,0.45);
+  text-align: right;
+  text-transform: uppercase;
+}
+.md-synth-serial .id {
+  color: var(--acid);
+  text-shadow: 0 0 4px rgba(201,241,88,0.4);
+}
+.md-synth-serial-link {
+  color: rgba(212,207,192,0.55);
+  text-decoration: none;
+  pointer-events: auto;
+  transition: color 160ms;
+}
+.dock-chassis .md-synth-serial-link { pointer-events: auto; }
+.md-synth-serial-link:hover {
+  color: var(--acid);
+  text-shadow: 0 0 4px rgba(201,241,88,0.3);
+}
+
+/* VU live-mode — when the radio is playing, the bar gap shrinks and bars
+ * grow slightly so the meter reads as a live spectrum display rather than
+ * a static counter. Adds a faint glow to the row to telegraph "music". */
+.md-synth-vu.md-synth-vu-live .row span:not(.lbl) {
+  transition: background 60ms, box-shadow 60ms;
+}
+.md-synth-vu.md-synth-vu-live .row {
+  filter: drop-shadow(0 0 4px rgba(201,241,88,0.15));
+}
+
+/* ============================================================
+   TELEMETRY chassis — mission-control dashboard
+   ============================================================ */
+.dock-chassis.dock-telemetry {
+  background: linear-gradient(180deg, #16140e 0%, #0a0905 100%);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 1px rgba(201,241,88,0.14),
+    inset 0 0 0 2px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    /* layered outer shadow — close/sharp + far/soft for depth */
+    0 6px 14px rgba(0,0,0,0.4),
+    0 24px 48px rgba(0,0,0,0.55),
+    0 48px 100px -10px rgba(0,0,0,0.7),
+    0 0 0 1px rgba(0,0,0,0.5);
+}
+.dock-chassis.dock-telemetry::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg,
+    transparent 0 2px, rgba(201,241,88,0.022) 2px 3px);
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.dock-chassis.dock-telemetry::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, var(--acid) 0 12px, transparent 12px) top left / 12px 1px no-repeat,
+    linear-gradient(180deg, var(--acid) 0 12px, transparent 12px) top left / 1px 12px no-repeat,
+    linear-gradient(270deg, var(--acid) 0 12px, transparent 12px) top right / 12px 1px no-repeat,
+    linear-gradient(180deg, var(--acid) 0 12px, transparent 12px) top right / 1px 12px no-repeat,
+    linear-gradient(90deg, var(--acid) 0 12px, transparent 12px) bottom left / 12px 1px no-repeat,
+    linear-gradient(0deg, var(--acid) 0 12px, transparent 12px) bottom left / 1px 12px no-repeat,
+    linear-gradient(270deg, var(--acid) 0 12px, transparent 12px) bottom right / 12px 1px no-repeat,
+    linear-gradient(0deg, var(--acid) 0 12px, transparent 12px) bottom right / 1px 12px no-repeat;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 4px rgba(201,241,88,0.5));
+}
+
+/* ── Telemetry light-mode — glassy panel override ─────────────────────
+ * In light mode the all-black telemetry chassis read as a brick on the
+ * cream paper. Swap to a glassy translucent panel: warm-tinted blur + soft
+ * cream gradient + spine-green accents in place of phosphor acid.
+ * Cells, bays, log get the same glass treatment so the whole module reads
+ * as one piece of frosted glass. */
+html:not([data-theme="dark"]) .dock-chassis.dock-telemetry {
+  background: linear-gradient(180deg,
+    rgba(255, 248, 220, 0.55) 0%,
+    rgba(230, 215, 170, 0.55) 100%);
+  backdrop-filter: blur(8px) saturate(1.05);
+  -webkit-backdrop-filter: blur(8px) saturate(1.05);
+  box-shadow:
+    inset 0 0 0 1px rgba(94, 125, 29, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(60, 50, 30, 0.10),
+    0 6px 14px rgba(60, 50, 30, 0.10),
+    0 24px 48px rgba(60, 50, 30, 0.14),
+    0 48px 100px -10px rgba(60, 50, 30, 0.18);
+}
+html:not([data-theme="dark"]) .dock-chassis.dock-telemetry::before {
+  background: repeating-linear-gradient(180deg,
+    transparent 0 2px, rgba(94,125,29,0.05) 2px 3px);
+  mix-blend-mode: multiply;
+}
+html:not([data-theme="dark"]) .dock-chassis.dock-telemetry::after {
+  /* Corner brackets stay acid for the on-brand accent, but the drop
+   * shadow gets warmer so they don't look radioactive on cream. */
+  filter: drop-shadow(0 0 3px rgba(94,125,29,0.5));
+}
+html:not([data-theme="dark"]) .md-tel-top {
+  background: rgba(94, 125, 29, 0.18);
+}
+html:not([data-theme="dark"]) .md-tel-cell {
+  background: rgba(255, 250, 230, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+/* Light-mode telemetry text is rendered ON the glass panel rather than on
+ * the dark canvas, so var(--spine) (#5e7d1d) looked washed out against the
+ * cream glass. Drop to a darker chrome-green so the numbers and labels
+ * read sharply at small sizes. */
+html:not([data-theme="dark"]) .md-tel-cell .k { color: rgba(35,30,18,0.85); }
+html:not([data-theme="dark"]) .md-tel-cell .k .num {
+  background: rgba(94,125,29,0.22);
+  color: #2f4012;
+}
+html:not([data-theme="dark"]) .md-tel-cell .v {
+  color: #2f4012;
+  text-shadow: none;
+}
+html:not([data-theme="dark"]) .md-tel-cell .v.rust { color: #8a2f1c; text-shadow: none; }
+html:not([data-theme="dark"]) .md-tel-cell .sub { color: rgba(35,30,18,0.7); }
+html:not([data-theme="dark"]) .md-tel-wave .grid {
+  background-image:
+    linear-gradient(rgba(94,125,29,0.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(94,125,29,0.10) 1px, transparent 1px);
+}
+/* Signal waveform — acid green in dark mode, deep chrome-green in light
+ * so the line reads against the cream glass. */
+.md-tel-wave-line {
+  stroke: var(--acid);
+  filter: drop-shadow(0 0 3px rgba(201,241,88,0.6));
+}
+html:not([data-theme="dark"]) .md-tel-wave-line {
+  stroke: #2f4012;
+  filter: drop-shadow(0 0 1px rgba(47,64,18,0.3));
+}
+html:not([data-theme="dark"]) .md-tel-bars span {
+  background: var(--spine);
+  box-shadow: 0 0 3px rgba(94,125,29,0.5);
+}
+html:not([data-theme="dark"]) .md-tel-bars span[data-on='false'] {
+  background: rgba(94,125,29,0.15);
+  box-shadow: none;
+}
+html:not([data-theme="dark"]) .md-tel-gauge .track {
+  background: rgba(94,125,29,0.10);
+  border-color: rgba(94,125,29,0.30);
+}
+html:not([data-theme="dark"]) .md-tel-gauge .track::before {
+  background: linear-gradient(90deg, var(--rust) 0%, var(--spine) 60%, var(--spine) 100%);
+  box-shadow: 0 0 4px rgba(94,125,29,0.4);
+}
+html:not([data-theme="dark"]) .md-tel-gauge .ticks { color: rgba(60,50,30,0.55); }
+html:not([data-theme="dark"]) .md-tel-bot {
+  background: rgba(255, 250, 230, 0.55);
+  border-color: rgba(94,125,29,0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+html:not([data-theme="dark"]) .md-tel-bays {
+  background: rgba(94, 125, 29, 0.08);
+}
+html:not([data-theme="dark"]) .md-tel-bay {
+  background: rgba(255, 250, 230, 0.7);
+  border-color: rgba(94,125,29,0.30);
+}
+html:not([data-theme="dark"]) .md-tel-bay::before {
+  background: var(--spine);
+  box-shadow: 0 0 4px rgba(94,125,29,0.5);
+}
+html:not([data-theme="dark"]) .md-tel-bay .id { color: rgba(35,30,18,0.75); }
+html:not([data-theme="dark"]) .md-tel-bay .name {
+  color: #2f4012;
+  text-shadow: none;
+}
+html:not([data-theme="dark"]) .md-tel-bay.warn .name { color: #8a2f1c; text-shadow: none; }
+html:not([data-theme="dark"]) .md-tel-bay .meter { background: rgba(94,125,29,0.18); }
+html:not([data-theme="dark"]) .md-tel-bay .meter::before { background: #2f4012; box-shadow: 0 0 3px rgba(94,125,29,0.3); }
+html:not([data-theme="dark"]) .md-tel-bay .bay-metric { color: #2f4012; text-shadow: none; }
+html:not([data-theme="dark"]) .md-tel-bay .bay-metric .bay-sub { color: rgba(35,30,18,0.7); }
+html:not([data-theme="dark"]) .md-tel-bay-interactive:hover {
+  border-color: var(--spine);
+  box-shadow: 0 0 10px rgba(94,125,29,0.20);
+}
+html:not([data-theme="dark"]) .md-tel-log {
+  border-left-color: rgba(94,125,29,0.20);
+  color: rgba(35,30,18,0.8);
+}
+html:not([data-theme="dark"]) .md-tel-log .head { color: #2f4012; }
+html:not([data-theme="dark"]) .md-tel-log .row .ts { color: #2f4012; }
+html:not([data-theme="dark"]) .md-tel-side { border-left-color: rgba(94,125,29,0.20); }
+html:not([data-theme="dark"]) .md-tel-side .head { color: #2f4012; }
+html:not([data-theme="dark"]) .md-tel-side .big {
+  color: #2f4012;
+  text-shadow: none;
+}
+html:not([data-theme="dark"]) .md-tel-side .row { color: rgba(35,30,18,0.8); }
+html:not([data-theme="dark"]) .md-tel-credit { color: #2f4012; }
+html:not([data-theme="dark"]) .md-tel-credit:hover { text-shadow: 0 0 4px rgba(94,125,29,0.3); }
+
+/* Telemetry per-node bezel — switch the phosphor-green border for spine
+ * in light mode so the mother frames don't glow neon-green on cream. */
+html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
+  box-shadow:
+    inset 0 0 0 1px rgba(94,125,29,0.30),
+    inset 0 0 0 2px rgba(255,255,255,0.45),
+    0 0 0 3px rgba(60,50,30,0.10),
+    0 0 24px -6px rgba(94,125,29,0.18) !important;
+}
+
+.md-tel-top {
+  position: absolute;
+  top: 6px; left: 6px; right: 6px;
+  height: 64px;
+  display: grid;
+  grid-template-columns: 1.1fr 2.2fr 1.3fr 1.1fr 1fr;
+  gap: 1px;
+  background: rgba(201,241,88,0.12);
+  padding: 1px;
+  border-radius: 3px;
+}
+.md-tel-cell {
+  background: #0a0805;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.md-tel-cell .k {
+  font-size: 7.5px;
+  letter-spacing: 0.22em;
+  color: rgba(212,207,192,0.5);
+  text-transform: uppercase;
+  display: flex; gap: 6px;
+}
+.md-tel-cell .k .num {
+  background: rgba(201,241,88,0.15);
+  color: var(--acid);
+  padding: 0 4px;
+  border-radius: 1px;
+  letter-spacing: 0.1em;
+}
+.md-tel-cell .v {
+  font-size: 17px;
+  color: var(--acid);
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  text-shadow: 0 0 6px rgba(201,241,88,0.45);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.md-tel-cell .v.rust { color: var(--rust); text-shadow: 0 0 6px rgba(200,85,61,0.5); }
+.md-tel-cell .v .colon { animation: tel-blink 1.05s steps(2) infinite; }
+.md-tel-cell .v .flick { animation: tel-flick 2.4s steps(1) infinite; display: inline-block; }
+@keyframes tel-flick { 0%, 92% { opacity: 1; } 93%, 96% { opacity: 0.3; } 97%, 100% { opacity: 1; } }
+@keyframes tel-blink { 50% { opacity: 0.3; } }
+.md-tel-cell .sub {
+  font-size: 7.5px;
+  letter-spacing: 0.2em;
+  color: rgba(212,207,192,0.42);
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+.md-tel-wave { position: relative; padding: 8px 10px !important; }
+.md-tel-wave svg { width: 100%; height: 32px; }
+.md-tel-wave .grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(201,241,88,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201,241,88,0.06) 1px, transparent 1px);
+  background-size: 14px 8px;
+  pointer-events: none;
+}
+.md-tel-bars { display: flex; gap: 3px; align-items: flex-end; height: 22px; margin-top: 6px; }
+.md-tel-bars span {
+  width: 5px;
+  background: var(--acid);
+  box-shadow: 0 0 4px rgba(201,241,88,0.6);
+  border-radius: 1px;
+}
+.md-tel-bars span:nth-child(1) { height: 30%; }
+.md-tel-bars span:nth-child(2) { height: 55%; }
+.md-tel-bars span:nth-child(3) { height: 75%; }
+.md-tel-bars span:nth-child(4) { height: 90%; }
+.md-tel-bars span:nth-child(5) { height: 100%; }
+/* When the bar's slot is below the current streak count, it dims out so
+ * the lit/un-lit count reflects real data. data-on='true' = lit. */
+.md-tel-bars span[data-on='false'] {
+  background: rgba(201,241,88,0.08);
+  box-shadow: none;
+}
+.md-tel-gauge { position: relative; margin-top: 4px; }
+.md-tel-gauge .track {
+  height: 6px;
+  background: rgba(201,241,88,0.08);
+  border: 1px solid rgba(201,241,88,0.18);
+  border-radius: 1px;
+  overflow: hidden;
+  position: relative;
+}
+.md-tel-gauge .track::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: var(--fill, 72%);
+  background: linear-gradient(90deg, var(--rust) 0%, var(--acid) 60%, var(--acid) 100%);
+  box-shadow: 0 0 6px rgba(201,241,88,0.5);
+  transition: width 320ms ease;
+}
+.md-tel-gauge .ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 6.5px;
+  color: rgba(212,207,192,0.4);
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+
+.md-tel-bot {
+  position: absolute;
+  bottom: 6px; left: 6px; right: 6px;
+  height: 58px;
+  background: #0a0805;
+  border: 1px solid rgba(201,241,88,0.12);
+  border-radius: 3px;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+.md-tel-bays {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 4px 8px;
+  background: rgba(201,241,88,0.04);
+  /* 6 bays × ~104px = 624 + gutters. Stable on any chassis width. */
+}
+.md-tel-bay {
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(201,241,88,0.18);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  line-height: 1.05;
+}
+.md-tel-bay::before {
+  content: '';
+  position: absolute;
+  top: 4px; right: 6px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 6px var(--acid);
+}
+.md-tel-bay.warn::before {
+  background: var(--rust); box-shadow: 0 0 6px var(--rust);
+  animation: tel-blink 1.4s steps(2) infinite;
+}
+.md-tel-bay .id {
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  color: rgba(212,207,192,0.5);
+  text-transform: uppercase;
+  padding-right: 12px;       /* keep pip from overlapping text */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-tel-bay .name {
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--acid);
+  text-shadow: 0 0 4px rgba(201,241,88,0.4);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-tel-bay.warn .name { color: var(--rust); text-shadow: 0 0 4px rgba(200,85,61,0.4); }
+.md-tel-bay .meter {
+  margin-top: 3px;
+  height: 3px;
+  background: rgba(201,241,88,0.1);
+  border-radius: 1px;
+  overflow: hidden;
+  position: relative;
+}
+.md-tel-bay .meter::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--acid);
+  box-shadow: 0 0 4px var(--acid);
+}
+.md-tel-bay .meter::before { width: 100%; opacity: 0.6; }
+.md-tel-bay.warn .meter::before { background: var(--rust); box-shadow: 0 0 4px var(--rust); }
+
+/* Bay live-metric line — replaces the dummy meter widths. Sits below the
+ * mother name, tiny faded-acid number + units suffix. */
+.md-tel-bay .bay-metric {
+  margin-top: 1px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: rgba(201,241,88,0.85);
+  text-shadow: 0 0 3px rgba(201,241,88,0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-tel-bay .bay-metric .bay-sub {
+  color: rgba(212,207,192,0.45);
+  font-size: 7.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-left: 4px;
+}
+.md-tel-bay.warn .bay-metric { color: var(--rust); text-shadow: 0 0 3px rgba(200,85,61,0.3); }
+
+/* Bays as clickable buttons — jumps the camera to the matching mother. */
+.dock-chassis .md-tel-bay-interactive { pointer-events: auto; }
+.md-tel-bay-interactive {
+  border: 1px solid rgba(201,241,88,0.18);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 140ms, border-color 140ms, box-shadow 140ms;
+}
+.md-tel-bay-interactive:hover {
+  transform: translateY(-1px);
+  border-color: var(--acid);
+  box-shadow: 0 0 12px rgba(201,241,88,0.2);
+}
+.md-tel-bay-interactive:active { transform: translateY(0); }
+.md-tel-bay-interactive:focus-visible { outline: 1px solid var(--acid); outline-offset: 2px; }
+
+/* Warn-severity log row — rust color for err/warn entries. */
+.md-tel-log .row.tel-sev-warn { color: var(--rust); }
+.md-tel-log .row.tel-sev-warn .ts { color: rgba(200,85,61,0.75); }
+
+/* Side credit link — github handle under the AOS readout. */
+.md-tel-credit {
+  color: var(--acid);
+  text-decoration: none;
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  transition: text-shadow 160ms;
+  pointer-events: auto;
+}
+.dock-chassis .md-tel-credit { pointer-events: auto; }
+.md-tel-credit:hover { text-shadow: 0 0 5px rgba(201,241,88,0.5); }
+
+.md-tel-log {
+  flex: 1 1 0;
+  min-width: 0;
+  border-left: 1px solid rgba(201,241,88,0.12);
+  padding: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  color: rgba(212,207,192,0.5);
+  gap: 1px;
+}
+.md-tel-log .row { line-height: 1.25; }
+.md-tel-log .head {
+  font-size: 7px;
+  letter-spacing: 0.24em;
+  color: rgba(201,241,88,0.7);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.md-tel-log .row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-tel-log .row .ts { color: rgba(201,241,88,0.65); margin-right: 6px; }
+.md-tel-log .row .rust { color: var(--rust); }
+
+/* Side panel — horizontal layout. Wider, shallower so content sits in one
+ * line: [AOS·LOS] [00:02] [idle] [@theMind]. */
+.md-tel-side {
+  width: 220px;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(201,241,88,0.12);
+  padding: 0 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+.md-tel-side .head {
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  color: rgba(201,241,88,0.7);
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.md-tel-side .big {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--acid);
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 5px rgba(201,241,88,0.45);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.md-tel-side .row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 7.5px;
+  color: rgba(212,207,192,0.55);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-end;
+}
+.md-tel-side .row > span:first-child {
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.md-tel-side .row .md-tel-credit {
+  font-size: 7.5px;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.md-tel-side .row .pip {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 4px var(--acid);
+  align-self: center;
+}
+
+/* ============================================================
+   SWAP-BUTTON — slot reorder disc between adjacent mothers.
+   Dark glassy disc with subtle halo on hover. Theme-aware so it stays
+   visible on cream paper (light) and reads as a polished accent on the
+   black canvas (dark).
+   ============================================================ */
+.krnl-swap-btn {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: opacity 180ms ease, transform 160ms ease;
+}
+.krnl-swap-btn__halo {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,241,88,0.22) 0%, transparent 65%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.krnl-swap-btn__disc {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #2a261e 0%, #14110d 100%);
+  border: 1px solid rgba(201,241,88,0.30);
+  color: var(--acid);
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.35),
+    0 6px 14px rgba(0,0,0,0.20),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.krnl-swap-btn:hover .krnl-swap-btn__disc {
+  transform: scale(1.10) rotate(180deg);
+  border-color: var(--acid);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.4),
+    0 10px 20px rgba(0,0,0,0.28),
+    0 0 0 1px var(--acid),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+}
+.krnl-swap-btn:hover .krnl-swap-btn__halo { opacity: 1; }
+.krnl-swap-btn:active .krnl-swap-btn__disc {
+  transform: scale(0.95) rotate(180deg);
+}
+.krnl-swap-btn:focus-visible .krnl-swap-btn__disc {
+  outline: 0;
+  border-color: var(--acid);
+  box-shadow:
+    0 0 0 2px var(--acid),
+    0 2px 6px rgba(0,0,0,0.35);
+}
+
+/* ============================================================
+   DOCK-STYLE PICKER (in Dock toolbar)
+   Sleek tile-flyout replaces the original flat menu.
+   ============================================================ */
+
+/* Trigger button — square in the left dock, sized to match other dock
+ * buttons (36×36) but with a 22px glyph + a tiny caret to telegraph the
+ * popup. Armed (active style ≠ classic) lights the acid border; open
+ * state inverts to acid-on-black. */
+.krnl-dock-style-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms, transform 120ms, box-shadow 120ms;
+}
+.krnl-dock-style-btn:hover {
+  background: var(--paper-3);
+  color: var(--ink);
+}
+.krnl-dock-style-btn.is-armed {
+  /* When a non-classic style is selected, the trigger gets a permanent
+   * acid hairline so the user can see "a frame is on" at a glance. */
+  border-color: rgba(201,241,88,0.45);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(201,241,88,0.08);
+}
+.krnl-dock-style-btn.is-open {
+  background: #1a1814;
+  color: var(--acid);
+  border-color: var(--acid);
+  box-shadow: 0 0 0 2px rgba(201,241,88,0.18);
+}
+.krnl-dock-style-btn:focus-visible {
+  outline: 1px solid var(--acid);
+  outline-offset: 2px;
+}
+.krnl-dock-style-btn__glyph { display: flex; }
+.krnl-dock-style-btn__caret {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 6px;
+  height: 6px;
+  opacity: 0.6;
+  transition: transform 160ms, opacity 160ms;
+}
+.krnl-dock-style-btn.is-open .krnl-dock-style-btn__caret {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+
+/* Flyout — 2×2 tile grid sitting to the right of the trigger. */
+.dock-style-picker-flyout {
+  position: absolute;
+  left: 60px;
+  bottom: 12px;
+  width: 248px;
+  background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper) 100%);
+  border: 1px solid var(--paper-3);
+  border-radius: 10px;
+  box-shadow:
+    0 8px 18px rgba(60,40,18,0.10),
+    0 24px 48px rgba(60,40,18,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.55);
+  padding: 10px;
+  z-index: 100;
+  font-family: var(--font-mono);
+  animation: dsp-pop 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: left bottom;
+}
+@keyframes dsp-pop {
+  from { opacity: 0; transform: translateY(4px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+.dsp-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-3);
+  padding: 0 4px 8px;
+  border-bottom: 1px dashed var(--paper-3);
+  margin-bottom: 8px;
+}
+.dsp-head__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 6px rgba(201,241,88,0.55);
+}
+
+.dsp-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.dsp-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 10px 8px;
+  border-radius: 7px;
+  background: var(--node-bg);
+  border: 1px solid var(--paper-3);
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: transform 120ms, border-color 140ms, background 140ms, color 140ms, box-shadow 140ms;
+  overflow: hidden;
+}
+.dsp-tile::after {
+  /* Subtle gradient sheen that brightens on hover. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.20) 0%, transparent 55%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms;
+}
+.dsp-tile:hover {
+  transform: translateY(-1px);
+  border-color: var(--ink-3);
+  color: var(--ink);
+  box-shadow: 0 4px 12px rgba(60,40,18,0.10);
+}
+.dsp-tile:hover::after { opacity: 1; }
+.dsp-tile:active { transform: translateY(0); }
+.dsp-tile.is-active {
+  background: #1a1814;
+  border-color: var(--acid);
+  color: var(--acid);
+  box-shadow: 0 0 0 1px var(--acid), 0 0 14px rgba(201,241,88,0.20);
+}
+.dsp-tile.is-active::after {
+  background: linear-gradient(135deg, rgba(201,241,88,0.10) 0%, transparent 55%);
+  opacity: 1;
+}
+.dsp-tile:focus-visible {
+  outline: 1px solid var(--acid);
+  outline-offset: 2px;
+}
+
+.dsp-tile__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  background: rgba(0,0,0,0.04);
+  color: var(--ink-3);
+  margin-bottom: 2px;
+  transition: background 140ms, color 140ms;
+}
+.dsp-tile:hover .dsp-tile__glyph { color: var(--ink); }
+.dsp-tile.is-active .dsp-tile__glyph {
+  background: rgba(201,241,88,0.10);
+  color: var(--acid);
+  box-shadow: inset 0 0 0 1px rgba(201,241,88,0.35);
+}
+
+.dsp-tile__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.dsp-tile__sub {
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  line-height: 1;
+}
+.dsp-tile.is-active .dsp-tile__sub { color: rgba(201,241,88,0.55); }
+
+.dsp-tile__check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--acid);
+  color: #1a1814;
+  box-shadow: 0 0 6px rgba(201,241,88,0.4);
+}
+
+/* Dark-theme adjustment — flyout uses paper tokens which already flip. */
+[data-theme="dark"] .dsp-tile { background: var(--node-bg); }
+[data-theme="dark"] .dsp-tile__glyph { background: rgba(255,255,255,0.04); }
+
+/* ============================================================
+   KRNL-DOCK chassis — full rack (top rail + bottom rail)
+   Ported from krnl-dock.html, prefixed `dk-` to avoid global clashes.
+   Local color tokens are scoped via .dock-chassis.dock-krnl-dock.
+   ============================================================ */
+.dock-chassis.dock-krnl-dock {
+  /* Force the dark ink scale on the chassis itself too — any descendant
+   * that reads var(--ink) resolves to a light shade even in light theme,
+   * since the rack interior is always near-black. */
+  --paper:   #14130f;
+  --paper-2: #1f1d18;
+  --paper-3: #2f2b24;
+  --node-bg: #1c1a13;
+  --ink:     #f4efe2;
+  --ink-2:   #ddd6c6;
+  --ink-3:   #968d7a;
+  --ink-4:   #6a6253;
+  color: var(--ink);
+
+  --dk-ch-1: #43463f;
+  --dk-ch-2: #3a3d36;
+  --dk-ch-3: #2f322c;
+  --dk-phos: #b8d957;
+  --dk-phos-dim: #5a6b3a;
+  --dk-phos-glow: #b8d95740;
+  --dk-amber: #d9a23a;
+  --dk-amber-dim: #6b4f1c;
+  /* Rack interior — dark brushed metal. Same hi-frequency vertical brush
+   * pattern as the rails but in much darker tones so the (dark, minimal)
+   * mother panels read as sitting INSIDE the rack rather than on top of it. */
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,0.45) 0 1px, transparent 1px 2px,
+      rgba(255,255,255,0.018) 2px 3px, transparent 3px 5px),
+    linear-gradient(180deg,
+      #1a1c18 0%, #14161300 8%, #0e100d 38%, #050605 62%, #020302 100%),
+    #050605;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    inset 0 16px 32px rgba(0,0,0,0.75),
+    inset 0 -16px 32px rgba(0,0,0,0.75),
+    /* outer drop-shadow — rack lifts off the canvas paper */
+    0 6px 14px rgba(0,0,0,0.4),
+    0 24px 48px rgba(0,0,0,0.55),
+    0 48px 100px -10px rgba(0,0,0,0.7);
+}
+/* Canvas-corner crosshairs framing the mother row inside the chassis. */
+.dock-chassis.dock-krnl-dock .dk-canvas-corner {
+  position: absolute;
+  width: 14px; height: 14px;
+  border: 1px solid #2a3318; /* --phos-deep */
+  pointer-events: none;
+  z-index: 1;
+}
+.dock-chassis.dock-krnl-dock .dk-canvas-corner.dk-c-tl { top: 100px; left: 14px; border-right: 0; border-bottom: 0; }
+.dock-chassis.dock-krnl-dock .dk-canvas-corner.dk-c-tr { top: 100px; right: 14px; border-left: 0; border-bottom: 0; }
+.dock-chassis.dock-krnl-dock .dk-canvas-corner.dk-c-bl { bottom: 100px; left: 14px; border-right: 0; border-top: 0; }
+.dock-chassis.dock-krnl-dock .dk-canvas-corner.dk-c-br { bottom: 100px; right: 14px; border-left: 0; border-top: 0; }
+
+/* ----- rails ----- */
+.dk-rail {
+  position: absolute;
+  left: 0; right: 0;
+  background:
+    repeating-linear-gradient(90deg,
+      #00000010 0 1px, transparent 1px 2px,
+      #ffffff06 2px 3px, transparent 3px 5px),
+    linear-gradient(180deg,
+      #5a5d54 0%, #4a4d44 8%, #3a3d36 38%, #2f322c 62%, #252823 100%),
+    linear-gradient(180deg, var(--dk-ch-1) 0%, var(--dk-ch-3) 100%);
+  box-shadow:
+    inset 0 1px 0 #7a7e72,
+    inset 0 2px 0 #0000003d,
+    inset 0 -1px 0 #0a0c08,
+    0 0 0 1px #000;
+}
+.dk-rail.dk-top { top: 0; height: 96px; border-bottom: 2px solid #000; }
+.dk-rail.dk-bottom { bottom: 0; height: 96px; border-top: 2px solid #000; }
+
+/* screws */
+.dk-screw {
+  position: absolute;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #8b8f83 0%, #4a4d44 35%, #252823 75%),
+    radial-gradient(circle at 50% 50%, #1a1c18 0%, #0a0c08 70%, #000 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(0,0,0,0.5),
+    inset 0 -1px 1px rgba(255,255,255,0.12),
+    0 1px 1px rgba(0,0,0,0.38);
+}
+.dk-screw::after {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(135deg, transparent 46%, rgba(0,0,0,0.5) 47% 53%, transparent 54%),
+    linear-gradient(45deg, transparent 46%, rgba(0,0,0,0.5) 47% 53%, transparent 54%);
+}
+.dk-screw.dk-tl { top: 8px; left: 10px; }
+.dk-screw.dk-tr { top: 8px; right: 10px; }
+.dk-screw.dk-bl { bottom: 8px; left: 10px; }
+.dk-screw.dk-br { bottom: 8px; right: 10px; }
+
+/* vents */
+.dk-vents {
+  position: absolute;
+  top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 3px;
+  pointer-events: none;
+}
+.dk-vents.dk-left { left: 34px; }
+.dk-vents.dk-right { right: 34px; }
+.dk-vents span {
+  display: block;
+  width: 18px; height: 2px;
+  background: #0a0c08;
+  box-shadow: inset 0 1px 0 rgba(0,0,0,0.5), 0 1px 0 rgba(106,109,98,0.25);
+}
+
+/* badge */
+.dk-badge {
+  position: absolute;
+  font-family: 'Stardos Stencil', var(--font-mono), monospace;
+  letter-spacing: 0.22em;
+  color: #1a1c18;
+  text-shadow: 0 1px 0 rgba(122,126,114,0.5), 0 -1px 0 rgba(0,0,0,0.38);
+  user-select: none;
+  font-size: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.dk-badge-top { bottom: 2px; }
+.dk-badge-bottom { top: 2px; }
+
+/* top + bottom grids */
+.dk-top-grid {
+  position: absolute; inset: 6px 64px;
+  display: grid;
+  grid-template-columns: 12fr 32fr 28fr 14fr;
+  gap: 8px;
+}
+.dk-bottom-grid {
+  position: absolute; inset: 6px 64px;
+  display: grid;
+  grid-template-columns: 38fr 38fr 16fr;
+  gap: 10px;
+}
+
+/* recessed module */
+.dk-mod {
+  position: relative;
+  background: linear-gradient(180deg, #1a1c18 0%, #0e100d 100%);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 #000,
+    inset 0 -1px 0 rgba(90,93,84,0.25),
+    inset 0 0 0 1px #0a0c08,
+    0 1px 0 rgba(106,109,98,0.25);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.dk-mod-tag {
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8a8e82;
+  padding: 3px 8px 1px;
+  background: linear-gradient(180deg, #2a2d27 0%, #1a1c18 100%);
+  border-bottom: 1px solid #0a0c08;
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+.dk-mod-tag.dk-mod-tag-flat {
+  background: transparent;
+  border: 0;
+  padding: 0 2px 4px;
+}
+.dk-mod-tag .dk-id {
+  color: #0a0c08;
+  background: #8a8e82;
+  padding: 0 4px;
+  font-weight: 700;
+  border-radius: 1px;
+  letter-spacing: 0.05em;
+}
+.dk-mod-tag .dk-right { margin-left: auto; color: var(--dk-phos-dim); }
+.dk-pulse {
+  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--dk-phos);
+  box-shadow: 0 0 4px var(--dk-phos-glow);
+  animation: dk-pulse 1.6s infinite;
+}
+@keyframes dk-pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+.dk-screen {
+  flex: 1;
+  background:
+    radial-gradient(ellipse 120% 100% at 50% 50%, #0a0e08 0%, #050605 75%),
+    #020302;
+  position: relative;
+  overflow: hidden;
+  padding: 6px 10px;
+  display: flex; flex-direction: column;
+}
+.dk-screen-flush { padding: 0; }
+.dk-screen::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.13) 2px 3px);
+  pointer-events: none; opacity: 0.55;
+}
+.dk-screen::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 100% 80% at 50% 50%, transparent 35%, rgba(0,0,0,0.38) 100%);
+  pointer-events: none;
+}
+
+/* clock */
+.dk-clk-digits {
+  font-family: 'VT323', var(--font-mono), monospace;
+  font-size: 30px;
+  line-height: 0.9;
+  color: var(--dk-phos);
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 4px var(--dk-phos-glow), 0 0 10px rgba(184,217,87,0.19);
+  font-variant-numeric: tabular-nums;
+  margin-top: auto;
+}
+.dk-clk-digits .dk-colon { animation: dk-blink 1.2s infinite steps(1, end); }
+.dk-clk-sub {
+  font-size: 8px; letter-spacing: 0.18em; color: var(--dk-phos-dim);
+  margin-top: 3px;
+}
+@keyframes dk-blink { 50% { opacity: 0.3; } }
+
+/* ECG */
+.dk-ecg-wrap {
+  flex: 1; position: relative;
+  background: linear-gradient(0deg, #0a0e08 0%, #060805 100%);
+}
+.dk-ecg-wrap::before {
+  content: ''; position: absolute; inset: 0;
+  background-image:
+    linear-gradient(#1a200f 1px, transparent 1px),
+    linear-gradient(90deg, #1a200f 1px, transparent 1px);
+  background-size: 100% 14px, 28px 100%;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* readouts */
+.dk-readouts {
+  flex: 1;
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  padding: 6px;
+}
+.dk-cell {
+  background: linear-gradient(180deg, #0a0e08 0%, #050605 100%);
+  border: 1px solid #1a1c18;
+  box-shadow: inset 0 0 0 1px #0a0c08, inset 0 8px 12px rgba(0,0,0,0.67);
+  border-radius: 2px;
+  padding: 4px 7px 5px;
+  display: flex; flex-direction: column;
+  gap: 1px;
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+}
+.dk-cell::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.13) 2px 3px);
+  pointer-events: none; opacity: 0.5;
+}
+.dk-cell-top {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 7px; letter-spacing: 0.18em; color: var(--dk-phos-dim);
+}
+.dk-cell-top .dk-id {
+  color: #0a0c08; background: var(--dk-phos-dim);
+  padding: 0 3px; font-weight: 700; border-radius: 1px;
+}
+.dk-cell-value {
+  font-family: 'VT323', var(--font-mono), monospace;
+  font-size: 22px; line-height: 1;
+  color: var(--dk-phos);
+  text-shadow: 0 0 4px var(--dk-phos-glow);
+  margin-top: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.dk-cell-unit {
+  font-size: 10px; color: var(--dk-phos-dim);
+  margin-left: 2px; letter-spacing: 0.1em; text-shadow: none;
+}
+.dk-cell-meter {
+  height: 3px; margin-top: auto;
+  background: #050605; border: 1px solid #1a1c18;
+  position: relative; overflow: hidden;
+}
+.dk-cell-meter-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: linear-gradient(90deg, var(--dk-phos-dim), var(--dk-phos));
+  box-shadow: 0 0 4px var(--dk-phos-glow);
+  transition: width 0.5s ease-out;
+}
+.dk-cell-spark { height: 12px; margin-top: auto; position: relative; }
+.dk-cell-amber .dk-cell-value { color: var(--dk-amber); text-shadow: 0 0 4px rgba(217,162,58,0.25); }
+.dk-cell-amber .dk-cell-meter-fill {
+  background: linear-gradient(90deg, var(--dk-amber-dim), var(--dk-amber));
+  box-shadow: 0 0 4px rgba(217,162,58,0.25);
+}
+
+/* IO strip */
+.dk-io-strip {
+  position: relative;
+  background: linear-gradient(180deg, #4a4d44 0%, #2f322c 100%);
+  border: 1px solid #0a0c08;
+  box-shadow: inset 0 1px 0 #6a6d62, inset 0 -1px 0 rgba(0,0,0,0.5);
+  border-radius: 3px;
+  padding: 6px 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.dk-knob-wrap { display: flex; flex-direction: column; align-items: center; }
+.dk-knob {
+  position: relative;
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+}
+.dk-knob-skirt {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #d8dad2 0%, #b8bab2 25%, #8a8d84 60%, #4a4d44 100%);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.4),
+    inset 0 -2px 3px rgba(0,0,0,0.38),
+    inset 0 1px 1px rgba(255,255,255,0.38);
+}
+.dk-knob-skirt::before {
+  content: '';
+  position: absolute; inset: 1px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(106,109,98,0.25) 0deg 6deg, transparent 6deg 12deg);
+  opacity: 0.4;
+}
+.dk-knob-indicator {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 2px; height: 13px;
+  background: #1a1c18;
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -100%) rotate(var(--ang, -130deg));
+  border-radius: 1px;
+  box-shadow: 0 0 1px rgba(0,0,0,0.5);
+}
+.dk-knob-label {
+  font-family: 'Stardos Stencil', var(--font-mono), monospace;
+  font-size: 7px; letter-spacing: 0.15em;
+  color: #1a1c18; text-shadow: 0 1px 0 rgba(122,126,114,0.5);
+  text-align: center;
+  margin-top: 3px;
+}
+.dk-vu {
+  position: relative;
+  background: linear-gradient(180deg, #050605 0%, #020302 100%);
+  border: 1px solid #0a0c08;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.75), inset 0 0 0 1px #1a1c18;
+  border-radius: 2px;
+  padding: 4px 5px;
+  display: flex; align-items: center; gap: 2px;
+  height: 26px;
+  flex: 1;
+}
+.dk-vu span {
+  display: block;
+  flex: 1;
+  height: 100%;
+  background: #0a0e08;
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5);
+}
+.dk-vu .dk-vu-on {
+  background: linear-gradient(180deg, #d8ff5a 0%, var(--dk-phos) 50%, #6a8a2a 100%);
+  box-shadow: 0 0 4px var(--dk-phos-glow), inset 0 0 0 1px rgba(0,0,0,0.25);
+}
+.dk-vu .dk-vu-hot {
+  background: linear-gradient(180deg, #ff7a4a 0%, var(--dk-amber) 100%);
+  box-shadow: 0 0 4px rgba(217,162,58,0.38);
+}
+.dk-jack-wrap { display: flex; flex-direction: column; align-items: center; }
+.dk-jack {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #050605 0%, #050605 35%, #1a1c18 36%, #1a1c18 50%, #4a4d44 51%, #2a2d27 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(0,0,0,0.5),
+    inset 0 -1px 0 rgba(106,109,98,0.25),
+    0 1px 1px rgba(0,0,0,0.4);
+  position: relative;
+}
+.dk-jack.dk-jack-lit::after {
+  content: '';
+  position: absolute; inset: 3px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--dk-phos) 0%, #5a6b3a 60%, transparent 100%);
+  box-shadow: 0 0 6px var(--dk-phos-glow);
+}
+.dk-jack-label {
+  font-family: 'Stardos Stencil', var(--font-mono), monospace;
+  font-size: 6px; letter-spacing: 0.12em;
+  color: #1a1c18; margin-top: 2px;
+  text-shadow: 0 1px 0 rgba(122,126,114,0.5);
+}
+
+/* ----- bottom rail: switches ----- */
+.dk-switches-panel {
+  position: relative;
+  background: linear-gradient(180deg, #1a1c18 0%, #0e100d 100%);
+  border: 1px solid #0a0c08;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(106,109,98,0.25);
+  border-radius: 3px;
+  padding: 4px 10px 4px;
+  display: flex; flex-direction: column;
+  /* Clip content to the panel so even mis-sized children don't bleed past
+   * the bottom rail's bottom edge (visible-bug fix from screenshot). */
+  overflow: hidden;
+}
+/* Switch — illuminated rectangular rocker (the classic black-housing,
+ * red-paddle electrical rocker — see reference image). Reuses the four
+ * existing nested elements in KrnlDockChrome:
+ *   .dk-sw-bezel    -> black plastic housing
+ *   .dk-sw-well     -> deep recessed cutout behind the rocker
+ *   .dk-sw-bat      -> flex column holding the two paddle halves
+ *   .dk-sw-bat-stem -> top half of the paddle (recessed, dark red)
+ *   .dk-sw-bat-tip  -> bottom half of the paddle (forward, lit bright red)
+ *   .dk-sw-led      -> hidden; the lit paddle IS the indicator. */
+.dk-sw-cell {
+  position: relative;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  user-select: none;
+}
+.dk-sw-id {
+  font-family: var(--font-mono);
+  font-size: 6px;
+  letter-spacing: 0.16em;
+  color: rgba(138,142,130,0.55);
+  font-weight: 500;
+}
+
+/* Black plastic housing — shrunk a touch so the cell (id + bezel + label)
+ * fits inside the bottom rail's 96px height alongside the panel's tag bar. */
+.dk-sw-bezel {
+  position: relative;
+  width: 24px; height: 30px;
+  background:
+    linear-gradient(180deg, #1c1c1c 0%, #0a0a0a 55%, #050505 100%);
+  border: 1px solid #000;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.7),
+    inset 0 0 0 1px rgba(0,0,0,0.5),
+    0 2px 3px rgba(0,0,0,0.7);
+  padding: 3px;
+}
+
+/* Dark cutout — pure black void behind the paddle */
+.dk-sw-well {
+  position: relative;
+  width: 100%; height: 100%;
+  background: #000;
+  border-radius: 1.5px;
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.95),
+    inset 0 0 0 1px #1a1a1a;
+}
+
+/* The rocker paddle — flex column, two halves */
+.dk-sw-bat {
+  position: absolute;
+  inset: 1px;
+  display: flex; flex-direction: column;
+  border-radius: 1px;
+}
+
+/* Top half — recessed back, dark red */
+.dk-sw-bat-stem {
+  position: static;
+  flex: 1;
+  width: auto; height: auto;
+  transform: none;
+  background:
+    linear-gradient(180deg, #3a0606 0%, #5a1010 60%, #6a1818 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(0,0,0,0.6),
+    inset 0 -1px 0 rgba(0,0,0,0.85);
+  border-radius: 1px 1px 0 0;
+}
+
+/* Bottom half — forward, glowing red (the lit "on" half). Subtle horizontal
+ * ridges via repeating gradient give the textured plastic feel of real
+ * indicator rockers. */
+.dk-sw-bat-tip {
+  position: relative;
+  flex: 1;
+  width: auto; height: auto;
+  transform: none;
+  background:
+    repeating-linear-gradient(180deg,
+      transparent 0 2px,
+      rgba(0,0,0,0.10) 2px 3px),
+    linear-gradient(180deg, #ff5a3a 0%, #ff7a4a 45%, #e8482a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,200,180,0.5),
+    inset 0 -2px 2px rgba(0,0,0,0.45),
+    0 0 6px rgba(255,90,60,0.45);
+  border-radius: 0 0 1px 1px;
+}
+
+/* The hinge line between the two halves */
+.dk-sw-bat::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.85);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* The rocker glow IS the indicator — hide the separate phosphor LED */
+.dk-sw-led { display: none; }
+
+.dk-sw-label {
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.14em;
+  color: rgba(138,142,130,0.7);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* OFF state — rocker flipped down. Top half becomes the lit-but-DIM face
+ * (power-down indicator), bottom half is the recessed dark one. Swap is
+ * achieved by re-painting the two halves; no transform / no animation. */
+.dk-sw-cell.dk-sw-off { opacity: 0.85; }
+.dk-sw-cell.dk-sw-off .dk-sw-bat-stem {
+  background:
+    repeating-linear-gradient(180deg,
+      transparent 0 2px,
+      rgba(0,0,0,0.10) 2px 3px),
+    linear-gradient(180deg, #9a2828 0%, #7a1818 50%, #5a0a0a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,140,140,0.3),
+    inset 0 -2px 2px rgba(0,0,0,0.45);
+}
+.dk-sw-cell.dk-sw-off .dk-sw-bat-tip {
+  background: linear-gradient(180deg, #5a0808 0%, #4a0404 60%, #3a0202 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(0,0,0,0.7),
+    inset 0 -1px 0 rgba(0,0,0,0.85);
+}
+
+/* Bottom-rail switches are clickable — `.dock-chassis` has
+ * `pointer-events: none` so the chassis doesn't block canvas pans. Re-enable
+ * just on switch cells. */
+.dock-chassis .dk-sw-cell,
+.dock-chassis .dk-nuke,
+.dock-chassis .dk-nuke-cover,
+.dock-chassis .dk-nuke-button { pointer-events: auto; }
+
+/* ============================================================
+   NUKE — armed delete-all-tasks button.
+   Yellow/black hazard cover flips up to expose a red dome
+   underneath; the dome lights when armed; click fires the action.
+   ============================================================ */
+.dk-nuke {
+  position: relative;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  user-select: none;
+}
+.dk-nuke-id {
+  font-family: var(--font-mono);
+  font-size: 5.5px;
+  letter-spacing: 0.08em;
+  color: rgba(218,162,58,0.7);   /* amber id, hints at "warning" */
+  font-weight: 600;
+  text-transform: uppercase;
+  max-width: 44px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  text-align: center;
+}
+.dk-nuke-housing {
+  position: relative;
+  width: 40px; height: 40px;
+  background:
+    radial-gradient(circle at 50% 50%, #1a1a1a 0%, #050505 70%, #000 100%);
+  border: 1px solid #000;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.75),
+    inset 0 -1px 0 rgba(255,255,255,0.05),
+    0 2px 3px rgba(0,0,0,0.7);
+  /* Stronger perspective → more foreshortening = more obvious 3D when the
+   * cover swings on its hinge. */
+  perspective: 200px;
+  perspective-origin: 50% 30%;
+  transform-style: preserve-3d;
+}
+
+/* Hinge pin at the top edge — visual anchor for the swing motion. Two small
+ * silvery dots flanking the cover so it reads as "this is the pivot". */
+.dk-nuke-housing::before,
+.dk-nuke-housing::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d8d8d8 0%, #6a6a6a 60%, #2a2a2a 100%);
+  box-shadow: 0 1px 1px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.4);
+  z-index: 3;
+}
+.dk-nuke-housing::before { left: 8px; }
+.dk-nuke-housing::after  { right: 8px; }
+
+/* The red dome button beneath the cover. Disabled (greyed-out) until armed. */
+.dk-nuke-button {
+  position: absolute; inset: 3px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at 40% 32%,
+      #ff8a4a 0%, #e63a3a 28%, #a01818 72%, #5a0808 100%);
+  box-shadow:
+    inset 0 -3px 4px rgba(0,0,0,0.55),
+    inset 0 2px 0 rgba(255,180,160,0.4),
+    0 1px 1px rgba(0,0,0,0.55);
+  z-index: 1;
+  transition: box-shadow 200ms ease, transform 80ms ease;
+}
+.dk-nuke[data-armed="true"] .dk-nuke-button {
+  /* Pulsing red glow when armed — call to action. */
+  animation: dk-nuke-pulse 1.05s ease-in-out infinite;
+}
+.dk-nuke[data-armed="true"] .dk-nuke-button:hover {
+  /* Slight depress on hover when armed, telegraphs "ready to fire". */
+  transform: scale(0.96);
+}
+.dk-nuke[data-armed="true"] .dk-nuke-button:active {
+  transform: scale(0.92);
+}
+.dk-nuke-button:disabled {
+  cursor: not-allowed;
+}
+.dk-nuke-dome {
+  /* Decorative inner highlight on the dome — gives it 3D depth */
+  display: block; width: 100%; height: 100%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 20%,
+      rgba(255,255,255,0.35) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+@keyframes dk-nuke-pulse {
+  0%,100% {
+    box-shadow:
+      inset 0 -3px 4px rgba(0,0,0,0.55),
+      inset 0 2px 0 rgba(255,180,160,0.4),
+      0 1px 1px rgba(0,0,0,0.55),
+      0 0 6px rgba(230,58,58,0.45);
+  }
+  50% {
+    box-shadow:
+      inset 0 -3px 4px rgba(0,0,0,0.55),
+      inset 0 2px 0 rgba(255,200,180,0.55),
+      0 1px 1px rgba(0,0,0,0.55),
+      0 0 14px rgba(255,80,60,0.85);
+  }
+}
+
+/* Safety cover — hinged at the top edge, swings UP and BACKWARD on arm.
+ *
+ * Animation design (rewritten to feel like a physical lift, not a
+ * disappearing flip):
+ *   - rest position : flat, flush with housing top (rotateX 0deg)
+ *   - armed position: swung back to -82deg + lifted forward via translateZ
+ *     so the cover floats above the dome rather than folding into nothing
+ *   - 82deg (not 115/180) keeps the front face visible the entire way; the
+ *     viewer sees the cover tilted back like a real spring-loaded shield
+ *   - back face is rendered as a thin metal underside via ::after pinned
+ *     2px behind the front (preserve-3d) so the cover has visible THICKNESS
+ *   - easing: cubic-bezier overshoot so it snaps open and settles slightly
+ *
+ * Hazard stripes (yellow/black diagonal) sell "this can hurt you". */
+.dk-nuke-cover {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 2;
+  /* Hinge at the top edge, slightly offset upward so the cover swings
+   * AROUND a virtual pivot above itself — more like a real spring-loaded
+   * hinge than folding from its own edge. */
+  transform-origin: 50% -2px;
+  transform: rotateX(0deg) translateZ(0);
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+  /* Snap-open with a touch of overshoot — feels like a sprung lid. */
+  transition: transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  background:
+    repeating-linear-gradient(45deg,
+      #f7c54a 0 4px,
+      #1a1a1a 4px 7px);
+  border: 1px solid #2a2a2a;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,0.22),
+    inset 0 -3px 4px rgba(0,0,0,0.55),
+    0 1px 2px rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Visible UNDERSIDE — dark brushed-metal layer 2px behind the front face.
+ * Gives the cover real thickness so when it rotates back you see depth.
+ * Without this the cover reads as paper-thin. */
+.dk-nuke-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 40%, #3a3a3a 0%, #1a1a1a 60%, #0a0a0a 100%);
+  box-shadow: inset 0 0 0 1px #000, inset 0 0 4px rgba(0,0,0,0.6);
+  /* push behind the front face along the local Z axis */
+  transform: translateZ(-2px);
+}
+
+/* Cover hover — keep the yellow hazard stripes locked in (filter
+ * brightness on a transform-style:preserve-3d element rasterised the
+ * background and let the dark ::after back-face bleed through, which
+ * read as the texture vanishing). Use a box-shadow accent instead so
+ * the cover doesn't enter a new compositor layer on hover. */
+.dk-nuke-cover:hover {
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,0.32),
+    inset 0 -3px 4px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(247,197,74,0.8),
+    0 1px 2px rgba(0,0,0,0.6);
+}
+.dk-nuke-cover-label {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #1a1a1a;
+  background: rgba(247,197,74,0.92);
+  padding: 0 4px;
+  border-radius: 1px;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+  position: relative;
+  z-index: 1;
+}
+
+.dk-nuke[data-armed="true"] .dk-nuke-cover {
+  /* Lift forward (translateZ) + swing back (rotateX). The Z lift makes the
+   * cover physically clear the dome before tilting back, which sells the
+   * "spring up and tilt" motion much better than a pure fold. Stopping at
+   * -82deg keeps the cover edge-on instead of disappearing behind itself. */
+  transform: translateZ(6px) rotateX(-82deg);
+  pointer-events: none;
+}
+/* While armed, dim the LIFT label so the dome reads as the focal point. */
+.dk-nuke[data-armed="true"] .dk-nuke-cover-label {
+  opacity: 0;
+  transition: opacity 200ms ease-out 120ms;
+}
+.dk-nuke-cover-label {
+  transition: opacity 200ms ease-in;
+}
+
+.dk-nuke-label {
+  font-family: var(--font-mono);
+  font-size: 5.5px;
+  letter-spacing: 0.06em;
+  color: rgba(138,142,130,0.7);
+  font-weight: 600;
+  text-transform: uppercase;
+  max-width: 44px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: center;
+}
+.dk-nuke[data-armed="true"] .dk-nuke-label {
+  color: #e63a3a;
+  text-shadow: 0 0 4px rgba(230,58,58,0.5);
+  animation: dk-nuke-blink 0.8s steps(2) infinite;
+}
+@keyframes dk-nuke-blink {
+  50% { opacity: 0.5; }
+}
+
+/* Make the switch row evenly distribute the 3 layer switches on the left
+ * and the nuke on the right. Use space-between so the nuke is visually
+ * separated. */
+.dk-switches-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+/* ----- bottom rail: terminal ----- */
+.dk-term {
+  position: relative;
+  background: #020302;
+  border: 1px solid #0a0c08;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.4),
+    inset 0 0 0 1px #1a1c18,
+    inset 0 0 30px rgba(0,0,0,0.75);
+  border-radius: 3px;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.dk-term::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.13) 2px 3px);
+  pointer-events: none; opacity: 0.55;
+}
+.dk-term-bar {
+  height: 18px;
+  background: linear-gradient(180deg, #2a2d27 0%, #1a1c18 100%);
+  border-bottom: 1px solid #050605;
+  box-shadow: inset 0 -1px 0 rgba(106,109,98,0.25);
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 8px;
+  flex-shrink: 0;
+  position: relative; z-index: 1;
+}
+.dk-traffic { display: flex; gap: 4px; }
+.dk-traffic span {
+  width: 7px; height: 7px; border-radius: 50%;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.5), inset 0 -1px 1px rgba(255,255,255,0.12);
+}
+.dk-traffic span:nth-child(1) { background: #c93838; }
+.dk-traffic span:nth-child(2) { background: #d9a23a; }
+.dk-traffic span:nth-child(3) { background: #5a9a3a; }
+.dk-term-title {
+  font-size: 9px; letter-spacing: 0.16em; color: #8a8e82;
+  margin-left: 4px;
+}
+.dk-term-title .dk-dot { color: #3a3d36; margin: 0 4px; }
+.dk-term-title .dk-live { color: var(--dk-phos); }
+.dk-term-stamp {
+  margin-left: auto;
+  font-size: 8px; letter-spacing: 0.18em; color: var(--dk-phos-dim);
+  display: flex; align-items: center; gap: 5px;
+}
+.dk-term-stamp::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--dk-phos); box-shadow: 0 0 4px var(--dk-phos-glow);
+  animation: dk-pulse 1.6s infinite;
+}
+.dk-term-body {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--dk-phos);
+  padding: 5px 10px;
+  overflow: hidden;
+  position: relative;
+  text-shadow: 0 0 3px var(--dk-phos-glow);
+}
+.dk-term-line {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.85;
+}
+.dk-term-t { color: var(--dk-phos-dim); margin-right: 6px; }
+.dk-term-ok { color: #9ad97a; }
+.dk-term-arrow { color: var(--dk-phos); }
+.dk-term-warn { color: var(--dk-amber); }
+
+/* ----- bottom rail: uplink ----- */
+.dk-uplink {
+  position: relative;
+  background: linear-gradient(180deg, #1a1c18 0%, #0a0c08 100%);
+  border: 1px solid #0a0c08;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(106,109,98,0.25);
+  border-radius: 3px;
+  padding: 4px 10px;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.dk-uplink-head {
+  display: flex; justify-content: space-between;
+  font-size: 8px; letter-spacing: 0.2em; color: var(--dk-phos-dim);
+  text-transform: uppercase;
+}
+.dk-uplink-time {
+  flex: 1;
+  display: flex; align-items: flex-end;
+  font-family: 'VT323', var(--font-mono), monospace;
+  font-size: 28px; line-height: 0.9;
+  color: var(--dk-phos);
+  text-shadow: 0 0 4px var(--dk-phos-glow);
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+.dk-uplink-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 8px; letter-spacing: 0.18em; color: var(--dk-phos-dim);
+  margin-top: 2px;
+}
+.dk-uplink-led {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #5aff7a;
+  box-shadow: 0 0 4px rgba(90,255,122,0.5), inset 0 0 2px #1a4a1a;
+  animation: dk-pulse 1.4s infinite;
+}

@@ -11,8 +11,10 @@
  *   - Connect (no shortcut) — sets connect tool mode
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NodeKind } from '../../../shared/types/node';
+import { DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
+import { useBoardStore } from '../../store/boardStore';
 
 type ToolMode = 'select' | 'connect';
 
@@ -21,11 +23,87 @@ export interface DockProps {
   onAddNode: (args: { kind: NodeKind }) => void;
   /** Called when the user clicks a tool-mode button. */
   onToolChange?: (tool: ToolMode) => void;
+  /** Current mother-row chassis variant. */
+  dockStyle?: DockStyle;
+  /** Setter for the chassis variant. */
+  onDockStyleChange?: (s: DockStyle) => void;
 }
 
-export function Dock({ onAddNode, onToolChange }: DockProps) {
+const DOCK_STYLE_LABELS: Record<DockStyle, string> = {
+  classic: 'Classic',
+  synthesizer: 'Synthesizer',
+  telemetry: 'Telemetry',
+  'krnl-dock': 'KRNL Dock',
+};
+
+const DOCK_STYLE_SUB: Record<DockStyle, string> = {
+  classic: 'Default frame',
+  synthesizer: 'Eurorack panel',
+  telemetry: 'Mission control',
+  'krnl-dock': 'Rack chassis',
+};
+
+/** Mini-glyph per dock style — a tiny visual signature shown in the picker
+ *  flyout. Composed inside a 24×24 viewBox so all four sit on a shared grid. */
+const DOCK_STYLE_GLYPHS: Record<DockStyle, React.ReactNode> = {
+  classic: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M7 10h10M7 14h6" opacity="0.7" />
+    </svg>
+  ),
+  synthesizer: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="1.5" />
+      <circle cx="7"  cy="14" r="1.6" />
+      <circle cx="12" cy="14" r="1.6" />
+      <circle cx="17" cy="14" r="1.6" />
+      <path d="M5 8h14" opacity="0.5" />
+    </svg>
+  ),
+  telemetry: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="1.5" />
+      <path d="M4 13l3-3 3 2 4-5 3 4 3-2" />
+      <circle cx="7" cy="10" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="14" cy="7" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  'krnl-dock': (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="1" />
+      <path d="M3 8h18M3 16h18" />
+      <circle cx="6" cy="6" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="6" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="18" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="18" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+};
+
+export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: DockProps) {
   const [activeTool, setActiveTool] = useState<ToolMode>('select');
   const [pressed, setPressedKind] = useState<NodeKind | null>(null);
+  const [dockMenuOpen, setDockMenuOpen] = useState(false);
+  const dockBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Analytics is a singleton — button reflects whether one is on the board.
+  const analyticsOpen = useBoardStore((s) =>
+    (s.board?.nodes ?? []).some((n) => n.kind === 'analytics'),
+  );
+
+  // Close picker on outside click.
+  useEffect(() => {
+    if (!dockMenuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (dockBtnRef.current && !dockBtnRef.current.contains(e.target as Node)) {
+        const menu = document.querySelector('.dock-style-picker-flyout');
+        if (!menu || !menu.contains(e.target as Node)) setDockMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [dockMenuOpen]);
 
   const handleTool = (tool: ToolMode) => {
     setActiveTool(tool);
@@ -69,8 +147,6 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
         fireNode('frame');
         return;
       }
-      // Issue #134 — analytics node is spawnable via 'A' but intentionally not
-      // shown in the dock toolbar.
       if (e.key === 'a' || e.key === 'A') {
         fireNode('analytics');
         return;
@@ -178,6 +254,26 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
         </svg>
       </button>
 
+      {/* Analytics — A. Singleton dashboard: click to spawn, click again to hide. */}
+      <button
+        type="button"
+        data-testid="dock-btn-analytics"
+        title={analyticsOpen ? 'Hide analytics [A]' : 'Show analytics [A]'}
+        aria-label={analyticsOpen ? 'Hide analytics dashboard (A)' : 'Show analytics dashboard (A)'}
+        aria-pressed={analyticsOpen}
+        onClick={() => fireNode('analytics')}
+        style={analyticsOpen ? activeToolBtn : (pressed === 'analytics' ? { ...btnBase, background: 'var(--paper-2)', color: 'var(--ink)' } : btnBase)}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 3v18h18" />
+          <path d="M7 15l4-4 3 3 5-6" />
+          <circle cx="7" cy="15" r="1" fill="currentColor" stroke="none" />
+          <circle cx="11" cy="11" r="1" fill="currentColor" stroke="none" />
+          <circle cx="14" cy="14" r="1" fill="currentColor" stroke="none" />
+          <circle cx="19" cy="8" r="1" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+
       {/* Frame — F. Glassy 3D container that softly groups whatever is dropped
           inside its bounds. Drag the frame and its contents move with it. */}
       <button
@@ -195,6 +291,68 @@ export function Dock({ onAddNode, onToolChange }: DockProps) {
         </svg>
       </button>
 
+      {/* Mother-row chassis-style picker — opens a tile flyout. Button shows
+          the active style's glyph; flyout has 4 rich tiles to switch styles. */}
+      {dockStyle !== undefined && onDockStyleChange ? (
+        <>
+          <div aria-hidden style={divider} />
+          <button
+            ref={dockBtnRef}
+            type="button"
+            data-testid="dock-btn-dock-style"
+            className={`krnl-dock-style-btn${dockStyle !== 'classic' ? ' is-armed' : ''}${dockMenuOpen ? ' is-open' : ''}`}
+            title={`Frame style: ${DOCK_STYLE_LABELS[dockStyle]} — click to change`}
+            aria-label="Pick mother-row frame style"
+            aria-expanded={dockMenuOpen}
+            onClick={() => setDockMenuOpen((o) => !o)}
+          >
+            <span className="krnl-dock-style-btn__glyph">{DOCK_STYLE_GLYPHS[dockStyle]}</span>
+          </button>
+
+          {dockMenuOpen && (
+            <div
+              className="dock-style-picker-flyout"
+              data-testid="dock-style-picker-menu"
+              role="menu"
+            >
+              <div className="dsp-head">
+                <span className="dsp-head__dot" aria-hidden />
+                <span>Frame style</span>
+              </div>
+              <div className="dsp-tiles">
+                {DOCK_STYLES.map((s) => {
+                  const isActive = s === dockStyle;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                      className={`dsp-tile${isActive ? ' is-active' : ''}`}
+                      data-testid={`dock-style-${s}`}
+                      onClick={() => {
+                        onDockStyleChange(s);
+                        setDockMenuOpen(false);
+                      }}
+                    >
+                      <span className="dsp-tile__glyph">{DOCK_STYLE_GLYPHS[s]}</span>
+                      <span className="dsp-tile__label">{DOCK_STYLE_LABELS[s]}</span>
+                      <span className="dsp-tile__sub">{DOCK_STYLE_SUB[s]}</span>
+                      {isActive && (
+                        <span className="dsp-tile__check" aria-hidden>
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1.5 5.5l2.5 2.5L8.5 2.5" />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }

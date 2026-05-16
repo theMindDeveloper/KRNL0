@@ -32,11 +32,15 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
+import { saveBoard } from '../../store/eventLog';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapters';
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
+import { ChassisLayer } from '../ChassisLayer';
+import { useDockStyle } from '../ChassisLayer/useDockStyle';
+import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
 import { ContextMenu } from '../ContextMenu';
 import { ingestImageFile, initialDisplaySize } from './dropImage';
 import type { Node as KrnlNode } from '../../../shared/types/node';
@@ -217,7 +221,7 @@ const SwapButtonNode = memo(function SwapButtonNode({
       e.stopPropagation();
       swapMotherSlots(data.leftId, data.rightId);
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
     },
     [data.leftId, data.rightId, swapMotherSlots],
   );
@@ -279,46 +283,29 @@ const SwapButtonNode = memo(function SwapButtonNode({
       onPointerDown={stop}
       onMouseDown={stop}
       title="Swap left ↔ right panel"
+      aria-label="Swap adjacent mothers"
+      className="krnl-swap-btn"
       style={{
-        // Cosmetic centering inside the 32×32 RF wrapper — RF positions the
-        // wrapper, this rule ensures the button visually fills it with no
-        // sub-pixel drift if the wrapper ever gets a different size.
+        // RF positions the 32×32 wrapper; this absolute-center rule keeps
+        // the button visually centered no matter the wrapper's size drift.
         position: 'absolute',
         left: '50%',
         top: '50%',
         transform: 'translate(-50%, -50%)',
-        width: 32,
-        height: 32,
-        borderRadius: '50%',
-        background: 'var(--paper-2)',
-        border: '1px solid var(--paper-3)',
-        color: 'var(--ink-2)',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 13,
-        lineHeight: 1,
-        display: 'grid',
-        placeItems: 'center',
-        cursor: 'pointer',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-        padding: 0,
-        // Defensive pointer-events:all and z-index — RF's `.react-flow__node`
-        // wrappers do not block clicks by default, but explicit beats default.
-        // Sit above the mother-card layer so a click reaches us first.
-        pointerEvents: 'none',  // overridden by proximity tick when near
+        // Defensive pointer-events:none until the proximity tick switches
+        // it to 'all' — keeps a hidden button from blocking canvas drags.
+        pointerEvents: 'none',
         zIndex: 100,
         opacity: 0,
-        transition: 'opacity 180ms ease, background 120ms ease, color 120ms ease',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--acid)';
-        e.currentTarget.style.color = '#1a1814';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'var(--paper-2)';
-        e.currentTarget.style.color = 'var(--ink-2)';
       }}
     >
-      ⇄
+      <span className="krnl-swap-btn__halo" aria-hidden />
+      <span className="krnl-swap-btn__disc" aria-hidden>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 5h10M3 5l2.5-2.5M3 5l2.5 2.5" />
+          <path d="M13 11H3M13 11l-2.5 2.5M13 11l-2.5-2.5" />
+        </svg>
+      </span>
     </button>
   );
 });
@@ -425,6 +412,16 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const addNode = useBoardStore((s) => s.addNode);
   const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
   const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
+
+  // Dock-frame variant (classic | synthesizer | telemetry | phosphor).
+  // Hook applies `data-dock` to <html> and persists in localStorage.
+  const [dockStyle, setDockStyle] = useDockStyle();
+
+  // Canvas-wide layer filters — KRNL Dock bottom-rail switches flip these
+  // and the RF node mapping sets `hidden: true` for nodes whose layer is off.
+  const layerTasks = useLayerVisibility((s) => s.tasks);
+  const layerTexts = useLayerVisibility((s) => s.texts);
+  const layerImages = useLayerVisibility((s) => s.images);
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
@@ -568,7 +565,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
     for (const id of otherIds) removeNode(id);
     const updated = useBoardStore.getState().board;
-    if (updated) void window.krnl?.boardSave(updated);
+    if (updated) void saveBoard(updated);
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
 
@@ -586,12 +583,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         e.preventDefault();
         useBoardStore.getState().undo();
         const updated = useBoardStore.getState().board;
-        if (updated) void window.krnl?.boardSave(updated);
+        if (updated) void saveBoard(updated);
       } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
         e.preventDefault();
         useBoardStore.getState().redo();
         const updated = useBoardStore.getState().board;
-        if (updated) void window.krnl?.boardSave(updated);
+        if (updated) void saveBoard(updated);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -632,7 +629,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     };
     addNode(newNode);
     const updated = useBoardStore.getState().board;
-    if (updated) void window.krnl?.boardSave(updated);
+    if (updated) void saveBoard(updated);
     ensureVisible({ x: pos.x, y: pos.y, width, height });
   }, [addNode, ensureVisible]);
 
@@ -671,9 +668,29 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // ── Dock add-node handler — text/frame land in the dock-spawn lane below
   //   the mother row; image opens the OS file picker (same lane on default).
   const handleAddNode = useCallback((args: { kind: NodeKind }) => {
+    // Auto-enable the layer filter for the spawned kind so the new node is
+    // immediately visible. Without this, toggling TEXTS / IMAGES off on the
+    // KRNL Dock then clicking "add text" silently spawned a hidden node and
+    // looked broken.
+    const layer = kindToLayer(args.kind);
+    if (layer) useLayerVisibility.getState().setLayer(layer, true);
+
     if (args.kind === 'image') {
       imageFileInputRef.current?.click();
       return;
+    }
+    // Analytics is a singleton dashboard — clicking the dock button (or
+    // pressing 'A') toggles: spawn if none exists, otherwise hide every
+    // analytics node currently on the board.
+    if (args.kind === 'analytics') {
+      const current = useBoardStore.getState().board;
+      const existing = current?.nodes.filter((n) => n.kind === 'analytics') ?? [];
+      if (existing.length > 0) {
+        for (const n of existing) removeNode(n.id);
+        const after = useBoardStore.getState().board;
+        if (after) void saveBoard(after);
+        return;
+      }
     }
     const pos = defaultDockSpawnPos();
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
@@ -701,7 +718,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     };
     addNode(newNode);
     const updated = useBoardStore.getState().board;
-    if (updated) void window.krnl?.boardSave(updated);
+    if (updated) void saveBoard(updated);
 
     // Pan/zoom-out the camera if the spawn site is not comfortably in view.
     // Use the kind's initial dimensions so we don't have to wait for RF's
@@ -713,7 +730,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     };
     const sz = sizes[args.kind];
     if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });
-  }, [addNode, defaultDockSpawnPos, ensureVisible]);
+  }, [addNode, removeNode, defaultDockSpawnPos, ensureVisible]);
 
   // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -781,7 +798,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
     addEdge(edge);
     const updated = useBoardStore.getState().board;
-    if (updated) void window.krnl?.boardSave(updated);
+    if (updated) void saveBoard(updated);
   }, [addEdge]);
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
@@ -864,8 +881,24 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       });
     }
 
-    return [...baseNodes, ...swapNodes];
-  }, [board, selectNode]);
+    // Apply canvas-wide layer filters from useLayerVisibility. Only nodes
+    // whose kind has a registered layer (tasks / texts / images) are affected;
+    // mothers + frames + habits stay visible regardless. Spread-clone only the
+    // ones that need `hidden:true` so identity is preserved for unaffected nodes.
+    const filteredBase = baseNodes.map((rf, idx) => {
+      const node = board.nodes[idx];
+      if (!node) return rf;
+      const layer = kindToLayer(node.kind);
+      if (!layer) return rf;
+      const visible = layer === 'tasks' ? layerTasks
+        : layer === 'texts' ? layerTexts
+        : layerImages;
+      if (visible) return rf;
+      return { ...rf, hidden: true };
+    });
+
+    return [...filteredBase, ...swapNodes];
+  }, [board, selectNode, layerTasks, layerTexts, layerImages]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
   // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that
@@ -1142,7 +1175,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     }
 
     const updated = useBoardStore.getState().board;
-    if (updated) void window.krnl?.boardSave(updated);
+    if (updated) void saveBoard(updated);
   }, [getNodes, updateNode]);
 
   // ── onEdgesChange — ignored for v1 (no edge create/delete UX) ────────────
@@ -1263,9 +1296,14 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         }}
       />
 
+      {/* Mother-row chassis (synthesizer / telemetry variants).
+          Renders in flow coordinates behind the 6 fixed mother nodes via
+          ViewportPortal so it pans/zooms with the canvas. */}
+      <ChassisLayer dockStyle={dockStyle} />
+
       {/* Left dock */}
       <Panel position="top-left" style={{ margin: 0, padding: 0 }}>
-        <Dock onAddNode={handleAddNode} />
+        <Dock onAddNode={handleAddNode} dockStyle={dockStyle} onDockStyleChange={setDockStyle} />
       </Panel>
 
       {/* Hidden file picker for the dock's "image" button (no placeholder
@@ -1290,7 +1328,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
             onSelect: () => {
               removeEdge(edgeCtxMenu.edgeId);
               const updated = useBoardStore.getState().board;
-              if (updated) void window.krnl?.boardSave(updated);
+              if (updated) void saveBoard(updated);
             },
           }]}
           onDismiss={() => setEdgeCtxMenu(null)}
