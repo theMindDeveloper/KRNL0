@@ -57,16 +57,18 @@ const ORB_MARGIN = 12;
 // v3: bump invalidates the old saved orb position so users get the new
 // bottom-left default that clears the RF Controls column. Old keys cleaned
 // up below.
-const STORAGE_KEY = 'krnl0-orb-pos-v3';
-const LEGACY_STORAGE_KEYS = ['krnl0-orb-pos', 'krnl0-orb-pos-v2'];
+const STORAGE_KEY = 'krnl0-orb-pos-v4';
+const LEGACY_STORAGE_KEYS = ['krnl0-orb-pos', 'krnl0-orb-pos-v2', 'krnl0-orb-pos-v3'];
 
 interface OrbPos { x: number; y: number }
 
-// Bottom-left, shifted right of the RF Controls column (zoom +/- /fit
-// buttons sit at left ≈ 15 px, width ≈ 28 px). 72 px keeps the orb clearly
-// past the controls so they remain clickable.
+// Bottom-left, well clear of the RF Controls column. The +/-/fit buttons
+// stack vertically at the left edge and the previous 72 px x-offset still
+// dropped the orb on top of them in some viewports. 120 px gives the
+// controls a wide, unambiguous clickable lane while keeping the orb in the
+// bottom-left corner area.
 function defaultPos(): OrbPos {
-  return { x: 72, y: window.innerHeight - ORB_SIZE - 40 };
+  return { x: 120, y: window.innerHeight - ORB_SIZE - 24 };
 }
 
 function clampPos(pos: OrbPos): OrbPos {
