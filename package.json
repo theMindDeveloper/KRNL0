@@ -1,6 +1,6 @@
 {
   "name": "krnl0",
-  "version": "0.2.0",
+  "version": "0.8.0",
   "description": "krnl0 — voice-driven canvas for personal planning",
   "main": "out/main/index.js",
   "scripts": {
