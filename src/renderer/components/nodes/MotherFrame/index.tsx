@@ -105,6 +105,7 @@ export function MotherFrame({
 
   return (
     <div
+      className="mother-frame"
       onMouseEnter={() => setHoveredNodeId(nodeId)}
       onMouseLeave={() => setHoveredNodeId(null)}
       style={{
@@ -128,8 +129,11 @@ export function MotherFrame({
         // the viewport wrapper, not individual node elements.
       }}
     >
-      {/* Outset corner brackets — `inset:-8px`, opacity 0.3 base */}
+      {/* Outset corner brackets — `inset:-8px`, opacity 0.3 base.
+          `.mother-frame__corners` class so chassis.css can hide them under
+          any active dock variant via `[data-dock]` selector. */}
       <div
+        className="mother-frame__corners"
         aria-hidden
         style={{
           position: 'absolute',
@@ -153,6 +157,7 @@ export function MotherFrame({
       {typeof document !== 'undefined' && createPortal(
         <div
           ref={badgeRef}
+          className="mother-frame__badge"
           aria-hidden
           style={{
             position: 'fixed',

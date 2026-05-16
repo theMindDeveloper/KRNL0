@@ -26,7 +26,7 @@
  */
 
 import { useBoardStore } from '../../store/boardStore';
-import { emit } from '../../store/eventLog';
+import { emit, saveBoard } from '../../store/eventLog';
 import type { Node } from '@shared/types/node';
 import type { Edge } from '@shared/types/edge';
 import {
@@ -654,7 +654,7 @@ function loadTaskIntoPomo(
   // history so Ctrl+Z doesn't undo "I clicked on this task to see its timer".
   updateNode(pomoNode.id, { state: nextPomoState }, { skipHistory: true });
   const updated = useBoardStore.getState().board;
-  if (updated) void window.krnl?.boardSave(updated);
+  if (updated) void saveBoard(updated);
 }
 
 // ── makeCommandHandler ─────────────────────────────────────────────────────────
@@ -703,7 +703,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         if (ps.activeTaskId === nodeId && ps.status === 'paused') {
           updateNode(pomoNode.id, { state: pomoResume(ps) });
           const updated = useBoardStore.getState().board;
-          if (updated) void window.krnl?.boardSave(updated);
+          if (updated) void saveBoard(updated);
           return;
         }
       }
@@ -758,7 +758,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       }
 
       const saved = useBoardStore.getState().board;
-      if (saved) void window.krnl?.boardSave(saved);
+      if (saved) void saveBoard(saved);
       emit('pomo.stop', `pomo paused for task ${shortId(nodeId)}`, { severity: 'info', refId: nodeId });
       return;
     }
@@ -793,7 +793,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     if (command === 'task.delete') {
       deleteTaskNodesCascade([nodeId]);
       const final = useBoardStore.getState().board;
-      if (final) void window.krnl?.boardSave(final);
+      if (final) void saveBoard(final);
       emit('task.deleted', `task ${shortId(nodeId)} deleted`, { severity: 'warn', refId: nodeId });
       return;
     }
@@ -890,7 +890,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       addNode(childNode);
       addEdge(edge);
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       emit('task.created', `subtask ${shortId(childNodeId)} added under ${shortId(nodeId)}`, { refId: childNodeId });
       return;
     }
@@ -984,7 +984,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       addNode(newNode);
       addEdge(edge);
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       emit('task.created', `next task ${shortId(newNodeId)} after ${shortId(nodeId)}`, { refId: newNodeId });
       return;
     }
@@ -1015,7 +1015,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const { addNode } = useBoardStore.getState();
       addNode(lane);
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       emit('node.added', `habit.lane spawned for habit ${habitId.slice(0, 8)}`, { refId: lane.id });
       return;
     }
@@ -1066,7 +1066,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           return;
       }
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1085,7 +1085,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const nextTaskState = taskActivate(targetTask.state as TaskState);
       updateNode(actArgs.taskId, { state: nextTaskState });
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1125,7 +1125,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         }
       }
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1149,7 +1149,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       });
       updateNode(habitMother.id, { state: nextHabitState });
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1299,7 +1299,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       }
 
       const finalBoard = useBoardStore.getState().board;
-      if (finalBoard) void window.krnl?.boardSave(finalBoard);
+      if (finalBoard) void saveBoard(finalBoard);
       emit('task.created', `task ${shortId(taskNodeId)} added via todo`, { refId: taskNodeId });
       return;
     }
@@ -1334,7 +1334,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       }
 
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1365,7 +1365,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       }
 
       const final = useBoardStore.getState().board;
-      if (final) void window.krnl?.boardSave(final);
+      if (final) void saveBoard(final);
       return;
     }
 
@@ -1391,7 +1391,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       }
 
       const final = useBoardStore.getState().board;
-      if (final) void window.krnl?.boardSave(final);
+      if (final) void saveBoard(final);
       return;
     }
 
@@ -1463,7 +1463,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       }
 
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1490,7 +1490,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         }
       }
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1514,7 +1514,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       if (prevPomo.history.length === nextPomo.history.length) {
         updateNode(nodeId, { state: nextPomo });
         const u = useBoardStore.getState().board;
-        if (u) void window.krnl?.boardSave(u);
+        if (u) void saveBoard(u);
         return;
       }
       updateNode(nodeId, { state: nextPomo });
@@ -1554,7 +1554,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       }
 
       const updated = useBoardStore.getState().board;
-      if (updated) void window.krnl?.boardSave(updated);
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1587,6 +1587,6 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     if (Object.keys(patch).length > 0) updateNode(nodeId, patch);
 
     const updatedBoard = useBoardStore.getState().board;
-    if (updatedBoard) void window.krnl?.boardSave(updatedBoard);
+    if (updatedBoard) void saveBoard(updatedBoard);
   };
 }

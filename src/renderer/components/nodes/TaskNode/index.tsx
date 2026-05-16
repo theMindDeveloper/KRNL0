@@ -563,34 +563,15 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
           <button
             type="button"
-            className="task-check"
+            className={`task-check${state.done ? ' task-check--done' : ''}`}
             onClick={(e) => {
               e.stopPropagation();
               onCommand('task.toggle');
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              flexShrink: 0,
-              width: 15,
-              height: 15,
-              border: `1.5px solid ${state.done ? 'var(--acid)' : 'var(--ink-4)'}`,
-              borderRadius: 3,
-              background: state.done ? 'var(--acid)' : 'transparent',
-              cursor: 'pointer',
-              display: 'grid',
-              placeItems: 'center',
-              padding: 0,
-              marginTop: 2,
-              transition: 'all 0.12s',
-            }}
             aria-label={state.done ? 'Mark undone' : 'Mark done'}
           >
-            {state.done && (
-              /* Hardcoded #1a1814 — checkmark must be permanently dark on
-                 acid green; --ink flips to a cream in dark theme which
-                 produced the "green-on-white" look the user reported. */
-              <span style={{ fontSize: 11, color: '#1a1814', fontWeight: 700, lineHeight: 1 }}>✓</span>
-            )}
+            {state.done && <span className="task-check__mark">✓</span>}
           </button>
 
           {/* F4: done text styling; double-click enters inline edit */}

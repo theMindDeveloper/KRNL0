@@ -67,19 +67,11 @@ export function seedBoard(): PartialBoard {
         state: { habits: [] },
         config: { maxHabits: 5, weekStartsOn: 'monday', view: 'week' },
       },
-      {
-        id: 'mother-term',
-        kind: 'term',
-        position: { x: 280, y: 0 },
-        isMother: true,
-        state: { sessionId: null, title: 'Terminal' },
-        config: { shell: 'default', fontSize: 13 },
-      },
-      // ADR 0001 — fifth mother: Calendar
+      // ADR 0001 — fourth mother: Calendar (terminal moved to rightmost slot)
       {
         id: 'mother-calendar',
         kind: 'calendar',
-        position: { x: 840, y: 0 },
+        position: { x: 280, y: 0 },
         isMother: true,
         state: { selectedDate: null, anchorDate: todayLocalYMD() },
         config: {
@@ -90,14 +82,24 @@ export function seedBoard(): PartialBoard {
           hourRange: { start: 6, end: 23 },
         },
       },
-      // Decision 24.2 — sixth mother: Clock (12-hour visualization, viewWindow replaces windowStartHour)
+      // Decision 24.2 — fifth mother: Clock (12-hour visualization, viewWindow replaces windowStartHour)
       {
         id: 'mother-clock',
         kind: 'clock',
-        position: { x: 1400, y: 0 },
+        position: { x: 840, y: 0 },
         isMother: true,
         state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
         config: {},
+      },
+      // Terminal — rightmost (Wave-D default): the shell lives at the tight
+      // edge of the rack so it doesn't sit between data mothers.
+      {
+        id: 'mother-term',
+        kind: 'term',
+        position: { x: 1400, y: 0 },
+        isMother: true,
+        state: { sessionId: null, title: 'Terminal' },
+        config: { shell: 'default', fontSize: 13 },
       },
     ],
     edges: [],
@@ -113,9 +115,9 @@ const NEW_MOTHER_POSITIONS: Record<string, { x: number; y: number }> = {
   'mother-pomo':     { x: -1400, y: 0 },
   'mother-todo':     { x:  -840, y: 0 },
   'mother-habit':    { x:  -280, y: 0 },
-  'mother-term':     { x:   280, y: 0 },
-  'mother-calendar': { x:   840, y: 0 }, // ADR 0001 — slot 5
-  'mother-clock':    { x:  1400, y: 0 }, // Decision 23.1 — slot 6
+  'mother-calendar': { x:   280, y: 0 }, // Wave-D — moved up to slot 4
+  'mother-clock':    { x:   840, y: 0 }, // Wave-D — moved up to slot 5
+  'mother-term':     { x:  1400, y: 0 }, // Wave-D — terminal pinned rightmost
 };
 
 function migrateMotherPositions(board: unknown): Record<string, unknown> {
