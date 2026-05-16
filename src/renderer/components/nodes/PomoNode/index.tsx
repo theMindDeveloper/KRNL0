@@ -324,11 +324,11 @@ export function PomoNode({
             ['shortBreakMin', 'Short break (min)'],
             ['longBreakMin', 'Long break (min)'],
             ['longBreakEvery', 'Long break every'],
-          ] as Array<[keyof PomoConfig, string]>).map(([key, label]) => (
+          ] as Array<[Exclude<keyof PomoConfig, 'face'>, string]>).map(([key, label]) => (
             <div key={key} className="pomo-settings-row">
               <span className="pomo-settings-label">{label}</span>
               <NumberStepper
-                value={draftConfig[key]}
+                value={draftConfig[key] as number}
                 onChange={updateDraft(key)}
                 min={1}
                 max={key === 'longBreakEvery' ? 12 : 120}

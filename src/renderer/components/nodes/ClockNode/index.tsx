@@ -6,6 +6,7 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import type { TaskState } from '../TaskNode/types';
+import type { PomoBreakdown } from '../../../store/pomoSchedule';
 
 // Kept for backward-compat — timelineSelector.colorTokens.test.ts imports this.
 // The new analog design no longer renders break arcs, but the tokens must still
@@ -108,6 +109,8 @@ interface TaskEntry {
   name: string;
   tone: ToneToken;
   plannedMin: number;
+  /** Decision 28: null for event tasks, non-null for focus tasks. */
+  breakdown: PomoBreakdown | null;
 }
 
 export function ClockNode({
@@ -203,6 +206,7 @@ export function ClockNode({
         name: info.text,
         tone: colorFor(p.taskId),
         plannedMin: info.plannedMin,
+        breakdown: p.breakdown,
       });
     }
     // Sort by start time
@@ -339,27 +343,69 @@ export function ClockNode({
               opacity={0.7}
             />
 
-            {/* Task arcs */}
-            {tasks.map((t, i) => {
+            {/* Task arcs — Decision 28 §7.
+                For kind==='event' or breakdown===null or single-segment focus:
+                  single arc using the task tone (existing behaviour).
+                For multi-segment focus tasks:
+                  walk breakdown.segments, emitting sub-arcs.
+                  Work segments → task tone. Break segments → var(--ink-3).
+                Active-task highlight and ended-task dimming apply to the full
+                task span (t.start/t.end), not per-segment. */}
+            {tasks.flatMap((t, i) => {
               const ended  = nowFloat >= t.end;
               const active = i === activeIdx;
               const opacity = ended ? 0.35 : active ? 1 : 0.92;
               const sw = active ? 16 : 14;
-              const style: React.CSSProperties = active
+              const activeStyle: React.CSSProperties = active
                 ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: TONE_VAR[t.tone] }
                 : {};
-              return (
-                <path
-                  key={t.id}
-                  d={arcPath(t.start, t.end, R_ARC)}
-                  fill="none"
-                  stroke={TONE_VAR[t.tone]}
-                  strokeWidth={sw}
-                  strokeLinecap="round"
-                  opacity={opacity}
-                  style={style}
-                />
-              );
+              const breakdown = t.breakdown;
+
+              // Single-arc path: event tasks, null breakdown, or 1-segment focus.
+              if (
+                breakdown === null ||
+                breakdown.segments.length <= 1
+              ) {
+                return [
+                  <path
+                    key={t.id}
+                    d={arcPath(t.start, t.end, R_ARC)}
+                    fill="none"
+                    stroke={TONE_VAR[t.tone]}
+                    strokeWidth={sw}
+                    strokeLinecap="round"
+                    opacity={opacity}
+                    style={activeStyle}
+                  />,
+                ];
+              }
+
+              // Multi-segment focus: walk segments, compute hour-float extents.
+              const arcs: React.ReactElement[] = [];
+              let segCursor = t.start;
+              for (let s = 0; s < breakdown.segments.length; s++) {
+                const seg = breakdown.segments[s]!;
+                const segEnd = segCursor + seg.min / 60;
+                const isWork = seg.kind === 'work';
+                const stroke = isWork ? TONE_VAR[t.tone] : 'var(--ink-3)';
+                const segStyle: React.CSSProperties =
+                  active && isWork ? activeStyle : {};
+                arcs.push(
+                  <path
+                    key={`${t.id}-seg-${s}`}
+                    {...(!isWork ? { 'data-testid': 'clock-task-break-arc' } : {})}
+                    d={arcPath(segCursor, segEnd, R_ARC)}
+                    fill="none"
+                    stroke={stroke}
+                    strokeWidth={sw}
+                    strokeLinecap="round"
+                    opacity={opacity}
+                    style={segStyle}
+                  />,
+                );
+                segCursor = segEnd;
+              }
+              return arcs;
             })}
 
             {/* Now notch */}

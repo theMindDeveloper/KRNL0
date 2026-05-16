@@ -11,6 +11,8 @@ import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
+import type { PomoBreakdown } from '../../../store/pomoSchedule';
+import type { TaskKind } from '../TaskNode/types';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -83,6 +85,8 @@ interface ScheduledTask {
   scheduledDurationMin: number; // calendar block duration (fallback: plannedMin or durationMin)
   plannedMin: number;           // for drag payload
   isAnchor: boolean;            // ADR 0003: true iff the user explicitly anchored this task
+  kind: TaskKind;               // Decision 28: 'focus' | 'event'
+  breakdown: PomoBreakdown | null; // Decision 28: null iff kind === 'event'
 }
 
 // One day's slice of a (potentially multi-day) task. `sliceStartMin` and
@@ -226,11 +230,15 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           durationMin?: number;
         };
         const plannedMin = st.plannedMin ?? st.durationMin ?? 25;
-        // Successors get their plannedMin as their block height; only the
-        // anchor honours scheduledDurationMin (ADR 0003 §3.7).
-        const blockDurationMin = p.isAnchor
-          ? (st.scheduledDurationMin ?? plannedMin)
-          : plannedMin;
+        // Decision 28: block duration comes from placement endISO - startISO
+        // (effectiveMin for focus tasks, which already includes breaks).
+        // For event tasks and legacy cases, fall back to plannedMin.
+        const startMs = new Date(p.startISO).getTime();
+        const endMs = new Date(p.endISO).getTime();
+        const blockDurationMin =
+          Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+            ? Math.round((endMs - startMs) / 60_000)
+            : plannedMin;
         out.push({
           id: p.taskId,
           text: typeof st.text === 'string' ? st.text : '',
@@ -239,6 +247,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           scheduledDurationMin: blockDurationMin,
           plannedMin,
           isAnchor: p.isAnchor,
+          kind: p.kind,
+          breakdown: p.breakdown,
         });
       }
       return out;
@@ -565,6 +575,20 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const borderBottomLeftRadius = hasContinuation ? 0 : 4;
       const borderBottomRightRadius = hasContinuation ? 0 : 4;
 
+      // Decision 28 §6 — break tail sub-region.
+      // Render only when kind==='focus' AND breakdown.breakMin > 0.
+      // §8: zero-breakMin → no DOM (not even a zero-height node, which would
+      // produce a visible 1px hairline from the border).
+      const breakdown = task.breakdown;
+      const showTail =
+        task.kind === 'focus' &&
+        breakdown !== null &&
+        breakdown.breakMin > 0 &&
+        breakdown.effectiveMin > 0;
+
+      // Tone colour: acid for now (WeekView uses a single colour for all tasks).
+      const taskTone = isGrayed ? 'var(--ink-4)' : 'var(--acid)';
+
       return (
         <div
           key={`${task.id}-${isContinuation ? 'cont' : 'head'}`}
@@ -629,6 +653,42 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               ↓
             </span>
           )}
+          {/* Decision 28 §6 — work/break sub-regions.
+              Only rendered when showTail is true (focus task with break time > 0).
+              The entire block height is effectiveMin (workMin + breakMin).
+              Top region = workMin fraction of blockHeight (task tone colour).
+              Bottom region = breakMin fraction of blockHeight (paper-3 + tone border).
+              §8: when breakMin === 0, showTail is false and no sub-region DOM is emitted. */}
+          {showTail && breakdown !== null && (
+            <>
+              {/* Work region — overlays the top fraction of the block */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: `${(breakdown.workMin / breakdown.effectiveMin) * 100}%`,
+                  background: isGrayed ? 'var(--paper-3)' : 'var(--acid-faint)',
+                  pointerEvents: 'none',
+                }}
+              />
+              {/* Break tail — bottom fraction of the block */}
+              <div
+                data-testid="calendar-task-break-tail"
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: `${(breakdown.breakMin / breakdown.effectiveMin) * 100}%`,
+                  background: 'var(--paper-3)',
+                  borderTop: `1px solid ${taskTone}`,
+                  pointerEvents: 'none',
+                }}
+              />
+            </>
+          )}
           {heightPx >= 12 && (
             <span
               style={{
@@ -641,6 +701,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 display: 'block',
                 paddingLeft: isContinuation ? 10 : 0,
                 pointerEvents: 'none',
+                position: 'relative',
+                zIndex: 1,
               }}
             >
               {task.text}

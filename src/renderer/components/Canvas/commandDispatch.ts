@@ -51,6 +51,7 @@ import {
 } from '../nodes/PomoNode/commands';
 import type { PomoConfig, PomoState, TimerFace } from '../nodes/PomoNode/types';
 import { defaultPomoConfig } from '../nodes/PomoNode/types';
+import { computeCurrentSessionMin } from '../nodes/PomoNode/pomoRules';
 
 // ── Todo ──────────────────────────────────────────────────────────────
 import {
@@ -608,17 +609,11 @@ function loadTaskIntoPomo(
     workingState = pomoSkipBreak(workingState);
   }
 
-  // Step 5: compute current session minutes using the clamp rule.
-  // min(plannedMin - pomoSessionsCompleted * sessionMin, sessionMin), never < 1.
-  // If remainder <= 0 (over budget), fall back to sessionMin.
+  // Step 5: compute current session minutes using the shared clamp rule
+  // (Decision 28 §2 — computeCurrentSessionMin is the single source of truth).
   const taskState = taskNode.state as TaskState;
-  const sessionMin = cfg.sessionMin;
   const completed = taskState.pomoSessionsCompleted ?? 0;
-  const remainder = taskState.plannedMin - completed * sessionMin;
-  const currentSessionMin = Math.max(
-    1,
-    Math.min(remainder > 0 ? remainder : sessionMin, sessionMin),
-  );
+  const currentSessionMin = computeCurrentSessionMin(taskState.plannedMin, completed, cfg);
 
   // Step 6: read the checkpoint (in-flight elapsed) from the new task.
   const checkpointMs = (taskState.currentSessionElapsedSec ?? 0) * 1000;
@@ -1291,6 +1286,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         plannedMin: parsedPlanned,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
+        kind: 'focus',
       };
 
       const taskNodeId = `task-${crypto.randomUUID()}`;

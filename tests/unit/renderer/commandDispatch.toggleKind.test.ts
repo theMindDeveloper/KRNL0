@@ -273,4 +273,33 @@ describe('task.toggleKind — active running task (clean handoff)', () => {
     const ts = getTaskState();
     expect(ts.kind).toBe('event');
   });
+
+  // PR-A tester nit: secondsAccumulated must survive an active-cancel toggle.
+  it('secondsAccumulated is preserved after active-cancel toggle', () => {
+    const board = makeBoard({
+      taskState: {
+        kind: 'focus',
+        pomoSessionsCompleted: 2,
+        secondsAccumulated: 3000, // 50 minutes accumulated
+      },
+      pomoState: {
+        status: 'running',
+        activeTaskId: 'task-a',
+        startedAt: new Date(Date.now() - 30_000).toISOString(),
+        durationMin: 25,
+      },
+    });
+    useBoardStore.getState().setBoard(board);
+
+    const handler = makeCommandHandler('task-a');
+    handler('task.toggleKind');
+
+    const ts = getTaskState();
+    expect(ts.kind).toBe('event');
+    // secondsAccumulated must not be zeroed — it's preserved for focus-resume.
+    // The pomoCancel only affects PomoState (adds to history), NOT TaskState.secondsAccumulated.
+    expect(ts.secondsAccumulated).toBe(3000);
+    // pomoSessionsCompleted is also preserved.
+    expect(ts.pomoSessionsCompleted).toBe(2);
+  });
 });
