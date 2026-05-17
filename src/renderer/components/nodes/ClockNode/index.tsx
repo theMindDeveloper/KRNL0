@@ -403,32 +403,17 @@ export function ClockNode({
             viewBox="0 0 240 240"
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
           >
-            {/* Outer arc track */}
-            <circle
-              cx={CX} cy={CY} r={R_ARC}
-              fill="none"
-              stroke="var(--paper-3)"
-              strokeWidth={14}
-              opacity={0.7}
-            />
-
-            {/* Task arcs — Decision 28 §7 (revised).
-                - Concentric rings for parallel branches (parallelBranchIndex).
-                - Round caps INSET into the time interval so they never extend
-                  past adjacent slots (fixes sequential-task overlap).
-                - Breaks rendered as semi-transparent white overlays — the task
-                  tone shows through faintly so the worm reads as one task. */}
+            {/* Train-track concentric lanes.
+                One gray "track" circle per overlapping-task lane.
+                Tasks ride their assigned lane's track.
+                Stroke width auto-shrinks as lanes are added so all rings
+                fit within the outer band without crossing the numerals. */}
             {(() => {
-              // Compute per-task ring offset (Apple-fitness style concentric rings).
-              // Lane assignment uses interval-graph coloring on TIME OVERLAP, not
-              // just graph-parallel edges. Any two tasks whose [start, end) ranges
-              // intersect get pushed to different lanes.
-              const RING_GAP = 6;
+              // ── Lane assignment (interval-graph coloring on time overlap) ──
               const sortedByStart = [...tasks].sort((a, b) => a.start - b.start);
-              const laneEnds: number[] = []; // laneEnds[i] = end-time of last task placed in lane i
+              const laneEnds: number[] = [];
               const laneByTaskId = new Map<string, number>();
               for (const t of sortedByStart) {
-                // Pick the lowest lane whose last task ended at-or-before this start.
                 let lane = laneEnds.findIndex((end) => end <= t.start);
                 if (lane === -1) {
                   lane = laneEnds.length;
@@ -438,33 +423,54 @@ export function ClockNode({
                 }
                 laneByTaskId.set(t.id, lane);
               }
-              const ringOffset = (t: TaskEntry): number =>
-                (laneByTaskId.get(t.id) ?? 0) * RING_GAP;
-              return tasks.flatMap((t, i) => {
-                const ended  = nowFloat >= t.end;
+              const totalLanes = Math.max(1, laneEnds.length);
+
+              // ── Geometry: shared outer band, auto-shrinking stroke ──
+              const BAND_OUTER = R_ARC;        // 102
+              const BAND_INNER = R_NUM + 10;   // 70 — leave numerals clear
+              const BAND = BAND_OUTER - BAND_INNER; // 32
+              const LANE_GAP = 2;
+              const stroke = Math.max(
+                4,
+                (BAND - (totalLanes - 1) * LANE_GAP) / totalLanes,
+              );
+              const radiusForLane = (lane: number): number =>
+                BAND_OUTER - lane * (stroke + LANE_GAP) - stroke / 2;
+              const radiusFor = (t: TaskEntry): number =>
+                radiusForLane(laneByTaskId.get(t.id) ?? 0);
+
+              // ── Gray train tracks, one per lane in use ──
+              const tracks: React.ReactElement[] = [];
+              for (let lane = 0; lane < totalLanes; lane++) {
+                tracks.push(
+                  <circle
+                    key={`track-${lane}`}
+                    cx={CX} cy={CY} r={radiusForLane(lane)}
+                    fill="none"
+                    stroke="var(--paper-3)"
+                    strokeWidth={stroke}
+                    opacity={0.55}
+                  />,
+                );
+              }
+
+              // ── Task arcs riding their lane's track ──
+              const arcs = tasks.flatMap((t, i) => {
+                const ended = nowFloat >= t.end;
                 const active = i === activeIdx;
-                const opacity = ended ? 0.35 : active ? 1 : 0.92;
-                const sw = active ? 16 : 14;
-                const r = R_ARC - ringOffset(t);
+                const opacity = ended ? 0.4 : 1;
+                const sw = stroke;
+                const r = radiusFor(t);
                 const activeStyle: React.CSSProperties = active
                   ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: TONE_VAR[t.tone] }
                   : {};
                 const breakdown = t.breakdown;
 
-                // Inset start/end so round caps stay within [t.start, t.end].
-                // sw/2 in pixels → convert to hour-float via arc length = r * theta.
-                // theta_per_hour = 2π/12; px_per_hour = r * 2π/12 → 1px = (12/(r·2π)) h.
-                // Half a cap = sw/2 px → inset_h = (sw/2) * 12 / (r·2π) hours.
-                const insetHours = (sw / 2) * 12 / (r * 2 * Math.PI);
-                const cappedStart = Math.min(t.start + insetHours, (t.start + t.end) / 2);
-                const cappedEnd = Math.max(t.end - insetHours, (t.start + t.end) / 2);
-
-                // Single-arc path: event tasks, null breakdown, or 1-segment focus.
                 if (breakdown === null || breakdown.segments.length <= 1) {
                   return [
                     <path
                       key={t.id}
-                      d={arcPath(cappedStart, cappedEnd, r)}
+                      d={arcPath(t.start, t.end, r)}
                       fill="none"
                       stroke={TONE_VAR[t.tone]}
                       strokeWidth={sw}
@@ -475,13 +481,11 @@ export function ClockNode({
                   ];
                 }
 
-                // Multi-segment focus: base arc (task tone, round caps inset)
-                // + semi-transparent white break overlays (butt caps, no insets).
-                const arcs: React.ReactElement[] = [];
-                arcs.push(
+                const out: React.ReactElement[] = [];
+                out.push(
                   <path
                     key={`${t.id}-base`}
-                    d={arcPath(cappedStart, cappedEnd, r)}
+                    d={arcPath(t.start, t.end, r)}
                     fill="none"
                     stroke={TONE_VAR[t.tone]}
                     strokeWidth={sw}
@@ -493,12 +497,9 @@ export function ClockNode({
                 let segCursor = t.start;
                 for (let s = 0; s < breakdown.segments.length; s++) {
                   const seg = breakdown.segments[s]!;
-                  const segEnd = segCursor + seg.min / 60;
-                  if (seg.kind !== 'work') {
-                    // Semi-transparent white — task tone shows through. Long
-                    // breaks slightly more opaque than short to read distinctly.
-                    const breakOpacity = seg.kind === 'long' ? 0.85 : 0.65;
-                    arcs.push(
+                  const segEnd = Math.min(segCursor + seg.min / 60, t.end);
+                  if (seg.kind !== 'work' && segEnd > segCursor) {
+                    out.push(
                       <path
                         key={`${t.id}-seg-${s}`}
                         data-testid="clock-task-break-arc"
@@ -508,14 +509,16 @@ export function ClockNode({
                         stroke="var(--paper)"
                         strokeWidth={sw}
                         strokeLinecap="butt"
-                        opacity={breakOpacity * opacity}
+                        opacity={opacity}
                       />,
                     );
                   }
                   segCursor = segEnd;
                 }
-                return arcs;
+                return out;
               });
+
+              return [...tracks, ...arcs];
             })()}
 
             {/* Now notch */}
