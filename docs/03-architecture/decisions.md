@@ -2148,3 +2148,194 @@ Active-task highlight, ended-task dimming, and the "now notch" remain unchanged 
 - Modified: `src/renderer/components/nodes/ClockNode/index.tsx` (sub-arc render).
 
 ---
+
+## Decision 29 — CLI extension surface: kind toggle, notes, habit lifecycle, frames, analytics, log (2026-05-17)
+
+**Date:** 2026-05-17
+**Status:** Accepted
+**Author:** architect
+
+### Context
+
+Core philosophy: every UI action must be reachable from the `krnl` CLI so the in-app terminal and Claude can drive the canvas headlessly. An audit identified gaps: Decision 28 added `task.kind` and `task.note` with no CLI route; Decision 14 added habit rename/icon/note/schedule/pin with only color/done/streak/remove exposed; FrameNode shipped without any CLI; AnalyticsNode and the EventLog ring buffer have no CLI read surface. The plan submitted by pm-docs/inference proposed ~25 new subcommands across 8 groups plus inference-side docs.
+
+This decision pins the contract before backend-dev writes any code. The biggest unresolved questions in the proposal were (a) `PomoConfig` scope (board vs task), (b) where new commands run when no renderer is attached, (c) whether `habit pin` duplicates renderer logic or routes through it, and (d) how strictly the weekly-schedule csv is parsed.
+
+### Decision
+
+Accept the proposal with five binding modifications and one rejection. Document the renderer-attached vs headless dispatch rule so backend-dev does not pick a path silently. Sequence the docs rewrite after the commands ship — not before.
+
+### Contract
+
+#### 1. Dispatch rule (binding for every new command)
+
+CLI commands that mutate state route through the renderer's `cli:dispatch` IPC channel when a renderer is attached. Only the renderer path emits to the EventLog ring buffer and triggers the canvas re-render. When no renderer is attached, mutations fall back to the file-layer write path (`loadBoardFrom` → mutate → `saveBoardTo`) and **do not** emit EventLog entries (the buffer is in-renderer memory). Help text for renderer-only commands states "requires open renderer (exit 2)" explicitly.
+
+Per-group renderer requirement:
+- **Renderer-required (exit 2 if detached):** `habit pin`, `habit unpin`, `log tail`, `log stats`, `theme show` (read), plus every existing renderer-coupled command (`viewport`, `undo`, `redo`, `theme set`).
+- **Both paths supported:** `task kind`, `task note`, `habit rename|icon|note|schedule|unschedule|archive|show`, `frame add|label|resize|tint|list|contents`, `pomo config`, `analytics show|totals|streaks`.
+
+Pure read commands (`analytics`, `theme show`, `frame list`, `frame contents`, `habit show`) work file-only.
+
+#### 2. PomoConfig is board-scoped (REJECT `task pomo-config`)
+
+`PomoConfig` lives on the mother PomoNode (`{sessionMin, shortBreakMin, longBreakMin, longBreakEvery, face}`). It is **never** per-task. The proposed `krnl task pomo-config` is mis-scoped — REJECT.
+
+Replacement command shape:
+```
+krnl pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor]
+```
+Resolves the single mother PomoNode by `kind === 'pomo' && isMother === true`. Per-task duration override stays as the existing `task duration <id> <min>` (writes `plannedMin`, Decision 22).
+
+#### 3. Task kind + note (NEW)
+
+```
+krnl task kind <ref> <focus|event>
+krnl task note <ref> "<text>"
+krnl task note <ref> --clear
+```
+
+Dispatch: routes `task.toggleKind` (already in `EventKind` union) and `task.setNote` through commandDispatch when renderer is attached. Headless path mutates `node.state.kind` / `node.state.note` directly. Empty-trimmed note drops the field (mirrors `habitSetNote` semantics). `task kind` MUST cancel an active pomo when toggling `'focus' → 'event'` on the active task (Decision 28 §5 binding) — backend-dev calls `pomoCancel` first when the renderer path is unavailable; if file-only, the command refuses with exit 1 ("cannot toggle kind on active pomo task — open the app or stop pomo first") rather than silently corrupting FSM state.
+
+#### 4. Habit lifecycle (NEW — wires existing pure handlers)
+
+```
+krnl habit rename <ref> "<new>"
+krnl habit icon <ref> <icon>
+krnl habit icon <ref> --clear
+krnl habit note <ref> "<text>"
+krnl habit note <ref> --clear
+krnl habit schedule <ref> --daily   --at HH:MM [--duration N]
+krnl habit schedule <ref> --weekly  --days <csv> --at HH:MM [--duration N]
+krnl habit schedule <ref> --weekdays --at HH:MM [--duration N]
+krnl habit unschedule <ref>
+krnl habit archive <ref>
+krnl habit show <ref> [--json]
+krnl habit pin <ref>                   # requires renderer (exit 2)
+krnl habit unpin <ref>                 # requires renderer (exit 2)
+```
+
+`<ref>` accepts: exact id, ≥4-char id prefix, or exact-name (case-insensitive). Same as existing `resolveHabit` in `src/sys/commands/habit.ts`.
+
+Schedule csv parsing (HIGH-RISK — binding):
+- `--weekly` REQUIRES `--days` as a comma-separated list of ISO 1–7 integers (1=Mon … 7=Sun). String day names ("mon", "monday") are REJECTED with usage message + exit 1.
+- Tokens MUST match `/^[1-7]$/`. "0", "8", "1,", trailing commas, whitespace tokens — all rejected up front in the parser.
+- Duplicates are accepted by the CLI (the pure `habitSetSchedule` dedupes + sorts).
+- Empty after dedupe == unschedule (already handled by pure handler).
+- `--at HH:MM` is validated against `TIME_OF_DAY_RE` from `HabitNode/types.ts` BEFORE entering the pure handler. CLI exits 1 with the offending value if it fails. Note the format collision: `task schedule --at YYYY-MM-DDTHH:MM` and `habit schedule --at HH:MM` use the same flag with different formats. Help text for each MUST state the expected format explicitly.
+
+`habit pin` and `habit unpin` are renderer-coupled (exit 2 if detached). Pin dispatches `habit.spawnLane` (existing handler at `commandDispatch.ts:1085`). Unpin removes the single `habit.lane` node whose `state.habitId === resolved.habit.id` (dedup invariant already enforced by `spawnLane`). If zero matches, exit 1 "habit not pinned". If multiple match (should be impossible), remove all and warn.
+
+#### 5. Frame CRUD (NEW)
+
+```
+krnl frame add [--label "..."] [--at x,y] [--w N] [--h N] [--tint cyan|spine|rust|plum|neutral] [--near <ref>]
+krnl frame label <ref> "<text>"
+krnl frame resize <ref> --w N --h N
+krnl frame tint <ref> <tint>
+krnl frame list [--json]
+krnl frame contents <ref> [--json]
+```
+
+Headless creation is permitted: FrameNode is pure data with `defaultFrameState()` / `defaultFrameConfig()`. Default placement when neither `--at` nor `--near` is given: viewport center if known (read from `settings.viewport`), else `(0, 0)`. Defaults: `w=360, h=240, tint='neutral', label=''`.
+
+**`--near <ref>` for frame:** the frame is positioned such that the referenced node's center lies inside the frame bounds (frame's top-left = `srcCenter - (w/2, h/2)`). Additionally, `state.childIds` is seeded with `[sourceId]` at creation so the grouping is deterministic regardless of subsequent renderer-side spatial recomputation. This is the **only** create-time seeding of `childIds`; subsequent drift is handled by the renderer's existing center-containment recompute.
+
+**`--near <ref>` for `text add` / `image add`:** place new node at `srcX + srcW + 24, srcY`. No special grouping behavior — these are not frame-aware.
+
+`frame contents <ref>` reads `state.childIds` (the persisted soft-group). It does NOT recompute spatial containment; that is the renderer's job. Commits this as the contract: **read commands read state, never re-derive geometry**.
+
+#### 6. Analytics + log reads (NEW)
+
+```
+krnl analytics show   [--view overview|calendar|patterns|sources] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]
+krnl analytics totals [--range N] [--json]
+krnl analytics streaks [--json]
+krnl log tail   [--limit N] [--json]      # renderer-only, exit 2 if detached
+krnl log stats  [--json]                  # renderer-only, exit 2 if detached
+```
+
+Analytics dispatch: call `buildAnalytics(board)` from `src/renderer/analytics/engine.ts` directly. Engine is pure (`useAnalytics` is just a `useMemo` wrapper) so the CLI imports `buildAnalytics` + `registerBuiltinSources` and runs the same code path file-only. No React context dependency exists in `engine.ts` — confirmed.
+
+`log tail` and `log stats` MUST be renderer-coupled. The EventLog (`EVENT_LOG_MAX = 200`) is an in-renderer ring buffer; it does not persist. Help text MUST state: "Reads in-memory ring buffer (200 entries max, cleared on reload)." Otherwise AI agents will trust stale-feeling data after restart.
+
+#### 7. `theme show` (NEW)
+
+```
+krnl theme show [--json]
+```
+Read-only from `settings.theme`. Headless-capable.
+
+#### 8. REJECT `krnl node kind <ref>`
+
+Redundant. `krnl node read <ref> --json | jq .kind` already covers this. Rejecting prevents one-trick command bloat in the registry.
+
+#### 9. Event emission map
+
+CLI mutations that flow through the renderer dispatch path automatically emit the existing EventKind entry. Headless mutations do not emit. Required emissions when renderer is attached:
+
+| Command            | EventKind                              |
+| ------------------ | -------------------------------------- |
+| `task kind`        | `task.toggleKind` (exists)             |
+| `task note`        | (no kind yet — do not invent one)      |
+| `habit rename|icon|note` | (no kind yet — do not invent one) |
+| `habit schedule|unschedule` | (no kind yet — do not invent)   |
+| `habit archive`    | `habit.deleted` (existing — re-used)   |
+| `habit pin|unpin`  | `node.added` / `node.removed`          |
+| `frame add`        | `frame.created` (exists)               |
+| `frame resize`     | `frame.resized` (exists)               |
+| `pomo config`      | `sys.cmd`                              |
+
+Backend-dev does NOT add new EventKind values in this decision. If telemetry needs them later, that is a separate decision (extending the union touches analytics).
+
+#### 10. Parser conventions (binding)
+
+- `<ref>` is always the first positional after the subcommand, before any flags. Matches existing convention (`task schedule <ref> --at ...`).
+- Habit refs accept `id|name`. Task refs accept `id|text-prefix`. This asymmetry is documented in CLAUDE.md, not "fixed" — the resolvers already differ.
+- All new commands MUST add entries to `src/shared/cli/commandRegistry.ts` AND a parser case in `src/sys/parser.ts` AND a `SysCommand` union member. TNF8 (no hand-maintained HELP_TEXT) remains the rule.
+
+#### 11. Docs sequencing (binding for pm-docs)
+
+`claude/CLAUDE.md` and `claude/skills/*.md` are NOT updated in the same PR as the implementation. Sequence:
+1. This decision (Decision 29) — done.
+2. Backend-dev implements: parser + SysCommand union + registry entries + dispatch handlers + headless fallbacks + tests.
+3. Tester verifies via `krnl help` + integration tests against an attached renderer + detached file-only mode.
+4. pm-docs rewrites CLAUDE.md and authors new skill files referencing ONLY commands that shipped.
+
+Documenting unbuilt commands is how AI agents learn to hallucinate them. The gate order is non-negotiable.
+
+### Consequences
+
+**Enables:**
+- Every Decision 28 (task kind/note) and Decision 14 (habit lifecycle) feature becomes headless-drivable.
+- Frames join the CLI surface; AI can spatially group nodes without a renderer.
+- Analytics + EventLog reads close the "I don't know what the user just did" feedback gap for AI.
+- A single, written rule for renderer-attached vs file-only dispatch — no silent path forks.
+
+**Forecloses:**
+- Per-task PomoConfig override via CLI. (Stays foreclosed by Decision 28 §1.)
+- String day names in `--weekly --days`. ISO-1-7 only.
+- Read commands re-deriving geometry. `frame contents` reads persisted `childIds`; never recomputes.
+- New `EventKind` values in this slice.
+
+**Rejected alternatives:**
+- `krnl task pomo-config` — wrong scope (PomoConfig is board-scoped).
+- `krnl node kind` — redundant with `node read --json`.
+- Headless `habit pin` — would duplicate `commandDispatch.ts:1085` logic and drift; renderer-only keeps spawnLane single-sourced.
+- Mixing the docs rewrite into the implementation PR — docs of unbuilt commands cause hallucination.
+
+### Files affected (for backend-dev)
+
+- Modified: `src/sys/parser.ts` (SysCommand union + parse cases for `task kind|note`, `habit rename|icon|note|schedule|unschedule|archive|show|pin|unpin`, `frame add|label|resize|tint|list|contents`, `pomo config`, `analytics show|totals|streaks`, `log tail|stats`, `theme show`, `text add --near`, `image add --near`).
+- Modified: `src/shared/cli/commandRegistry.ts` (registry entries for every new command; remove `task pomo-config` if it was added prematurely).
+- Modified: `src/sys/SysFacade.ts` (dispatch cases routing renderer vs file paths).
+- Modified: `src/sys/commands/habit.ts` (new file-path handlers + renderer-path `cli:dispatch` calls).
+- New: `src/sys/commands/task.ts` additions (kind/note handlers).
+- New: `src/sys/commands/frame.ts` (file-path frame CRUD).
+- New: `src/sys/commands/pomo.ts` additions (`config` handler).
+- New: `src/sys/commands/analytics.ts` (calls `buildAnalytics`).
+- New: `src/sys/commands/log.ts` (renderer-coupled tail/stats).
+- New: `src/sys/commands/theme.ts` (read).
+- Modified: `src/renderer/components/Canvas/commandDispatch.ts` (new `cli:dispatch` cases for `task.setNote`, `habit.unpinLane`).
+
+---
