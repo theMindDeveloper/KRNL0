@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { IsoDow } from '../nodes/HabitNode/types';
 import { NumberStepper } from './NumberStepper';
-import { bestTextOnVar } from '../../utils/contrastText';
 
 // ISO dow (1=Mon…7=Sun) → 0-based index for array lookup.
 function isoDowToIdx(dow: IsoDow): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
@@ -232,11 +231,6 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
     display: 'block',
   };
 
-  // Runtime contrast picks for the bright-bg pills. Recomputed each
-  // render but the picker memoises by (theme, var) under the hood.
-  const textOnRust = bestTextOnVar('--rust');
-  const textOnAcid = bestTextOnVar('--acid');
-
   // ── Time picker (HH:MM) ────────────────────────────────────────────────────
   // Native <input type="time"> opens an OS-level picker (the chunky blue
   // scroll wheel on Windows) which is jarring against the KRNL0 chrome.
@@ -421,9 +415,10 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
                 that read as a back/forward button. Card click is the only
                 affordance now. */}
 
-            {/* Badge — runtime contrast pick so the pill stays readable
-                whether --rust resolves to orange (default themes) or
-                near-black (high-contrast theme). */}
+            {/* Badge — locked-dark text on the rust pill so it stays
+                readable across every theme (light / dark / high-contrast).
+                Previous `color: var(--paper)` rendered as white-on-bright
+                in some themes and failed contrast. */}
             <div style={{ alignSelf: 'center' }}>
               <span
                 style={{
@@ -435,7 +430,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
                   padding: '3px 9px',
                   borderRadius: 100,
                   background: 'var(--rust)',
-                  color: textOnRust,
+                  color: '#0a0908',
                 }}
               >
                 weekly
@@ -506,7 +501,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
           >
             {/* (Removed) corner arrow chip — see weekly card. */}
 
-            {/* Badge — runtime contrast pick (see weekly card). */}
+            {/* Badge — locked-dark text for the same theme-safety reason. */}
             <div style={{ alignSelf: 'center' }}>
               <span
                 style={{
@@ -518,7 +513,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
                   padding: '3px 9px',
                   borderRadius: 100,
                   background: 'var(--acid)',
-                  color: textOnAcid,
+                  color: '#0a0908',
                 }}
               >
                 daily
@@ -760,8 +755,9 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
             cancel drop
           </button>
           {/* Confirm button — disabled until kind selected and inputs valid.
-              Text colour is a runtime contrast pick against --acid so the
-              label stays readable across every theme variant. */}
+              Active state locks the text to a paper-invariant dark hex so
+              "CONFIRM" reads black-on-green in every theme (KRNL0 rule:
+              never white-on-bright-green). */}
           <button
             data-testid="habit-swap-confirm"
             type="button"
@@ -771,7 +767,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
               marginLeft: 'auto',
               background: canConfirm ? 'var(--acid)' : 'var(--paper-3)',
               border: 'none',
-              color: canConfirm ? textOnAcid : 'var(--ink-4)',
+              color: canConfirm ? '#0a0908' : 'var(--ink-4)',
               cursor: canConfirm ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--font-mono)',
               fontSize: 9.5,
