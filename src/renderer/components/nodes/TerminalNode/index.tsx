@@ -58,68 +58,70 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
-    term.open(containerRef.current);
 
-    // Issue #73: switch to a GPU-accelerated renderer. The default DOM
-    // renderer thrashes layout when running TUI apps like `claude` (heavy
-    // ANSI redraws + frequent cursor moves), causing visible lag and lost
-    // keystrokes. WebGL is preferred; fall back to 2D canvas if the GL
-    // context can't be created. Dynamic import keeps these browser-only
-    // modules out of Node/SSR test environments.
-    void (async () => {
-      try {
-        const { WebglAddon } = await import('@xterm/addon-webgl');
-        const webgl = new WebglAddon();
-        webgl.onContextLoss(() => webgl.dispose());
-        term.loadAddon(webgl);
-      } catch {
-        try {
-          const { CanvasAddon } = await import('@xterm/addon-canvas');
-          term.loadAddon(new CanvasAddon());
-        } catch {
-          // last resort: stick with the DOM renderer
-        }
-      }
-      // WebGL/Canvas addons load async via dynamic import. The initial
-      // fit() ran on the DOM renderer's cell metrics; after the GPU
-      // renderer is in place we have to re-fit so its canvas dimensions
-      // match the container — otherwise the bottom of the node renders
-      // as an unstyled black gap below the last row. Also force a
-      // redraw so the new renderer paints every row immediately.
-      try {
-        fit.fit();
-        term.refresh(0, term.rows - 1);
-        const s = sessionIdRef.current;
-        if (s) window.krnl?.ptyResize(s, term.cols, term.rows);
-      } catch {
-        // container not yet sized — the ResizeObserver below will catch it
-      }
-    })();
-
-    termRef.current = term;
-    fitRef.current = fit;
+    // Renderer choice. The DOM renderer thrashes layout under heavy TUI
+    // ANSI traffic so we want a GPU-backed renderer (issue #73). The
+    // earlier implementation loaded WebGL *after* term.open() and *after*
+    // the initial fit(), which introduced a cols/rows drift that broke
+    // TUIs:
+    //
+    //   1. DOM-renderer fit measures the container → cols = N₁
+    //   2. PTY is spawned at cols = N₁
+    //   3. WebGL addon loads ~50-100ms later, re-fits against subtly
+    //      different WebGL cell metrics → cols = N₂
+    //   4. ptyResize is sent. PTY now thinks cols = N₂. claude reads N₂
+    //      from TIOCGWINSZ and renders assuming N₂ columns.
+    //   5. Visible xterm rendering drifts a column away from what claude
+    //      writes — text wraps in the middle of words ("specifically
+    //      running" → "running\ns Claude"), input boxes shift, table
+    //      borders collapse. (User report 2026-05-17.)
+    //
+    // Fix: load the renderer addon *before* term.open() and *before*
+    // startTerminalSession's first fit + ptyCreate runs. One measure, one
+    // PTY spawn, no drift. We use dynamic import (kept jsdom-safe — these
+    // modules touch `self` at module-load and crash in node test envs) and
+    // gate term.open() + session start behind the same async boundary.
+    //
+    // Canvas renderer is the default — fast enough for TUIs, stable under
+    // Electron's BrowserView paint pipeline, avoids GL-context lifetime
+    // issues when nodes go offscreen. WebGL was the prior choice but its
+    // async load created the cols/rows drift this commit fixes; if it's
+    // ever re-introduced as an opt-in, do it via a preload bridge flag
+    // (window.krnl.config), NOT process.env — `process` is undefined in
+    // the renderer context and crashes the init promise (user report
+    // 2026-05-17: "process is not defined", terminal renders as black).
 
     let cancelled = false;
     let sessionCleanup: (() => void) | null = null;
 
-    // Defer initial fit + pty creation until the container has real dimensions.
-    // On absolute-positioned nodes, layout may not be measured synchronously.
-    const raf = requestAnimationFrame(() => {
-      startTerminalSession({
+    const init = async () => {
+      try {
+        const { CanvasAddon } = await import('@xterm/addon-canvas');
+        term.loadAddon(new CanvasAddon());
+      } catch { /* fall through to DOM */ }
+
+      if (cancelled || !containerRef.current) return;
+      term.open(containerRef.current);
+
+      sessionCleanup = await startTerminalSession({
         term,
         fit,
         krnl: window.krnl,
         onCommand,
         setSessionId: (id) => { sessionIdRef.current = id; setActiveSessionId(id); },
         isCancelled: () => cancelled,
-      }).then((cleanup) => {
-        if (cancelled) {
-          cleanup();
-        } else {
-          sessionCleanup = cleanup;
-        }
       });
-    });
+      if (cancelled) sessionCleanup?.();
+    };
+
+    termRef.current = term;
+    fitRef.current = fit;
+
+    // Defer the renderer-load → open → session-start sequence to the next
+    // animation frame so the container has real dimensions before the
+    // first fit() runs (absolute-positioned nodes may not be measured
+    // synchronously).
+    const raf = requestAnimationFrame(() => { void init(); });
 
     const ro = new ResizeObserver(() => {
       try { fitRef.current?.fit(); } catch { /* ignore */ }
