@@ -98,14 +98,18 @@ describe('sys task addNext', () => {
     expect(next).toBeDefined();
   });
 
-  it('positions the new task beside the source (x + 252)', async () => {
+  it('positions the new task beside the source (TASK_STEP_X)', async () => {
+    // TASK_STEP_X = TASK_W (220) + TASK_GAP_X (80) = 300 (see src/sys/layout.ts).
+    // Bumped from the previous 252 (32 px gap) so AI-generated pipelines
+    // sit cleaner on the canvas and frames around them don't visually
+    // collide with their contents.
     await taskAdd(ctx, TODO_MOTHER_ID, 'first task');
     const source = findTasks()[0]!;
     const sourceX = source.position?.x ?? 0;
     const sourceY = source.position?.y ?? 0;
     await taskAddNext(ctx, source.id, 'next task');
     const next = findTasks().find((t) => (t.state as TaskState).text === 'next task')!;
-    expect(next.position?.x).toBe(sourceX + 252);
+    expect(next.position?.x).toBe(sourceX + 300);
     expect(next.position?.y).toBe(sourceY);
   });
 

@@ -92,7 +92,9 @@ describe('sys task parallel', () => {
     expect(findTasks()).toHaveLength(2);
   });
 
-  it('positions the new node below the source (y + 240, same x)', async () => {
+  it('positions the new node below the source (TASK_STEP_Y, same x)', async () => {
+    // TASK_STEP_Y = TASK_H (140) + TASK_GAP_Y (120) = 260 (see src/sys/layout.ts).
+    // Bumped from 240 so parallel forks visibly breathe.
     await taskAdd(ctx, TODO_MOTHER_ID, 'source');
     const source = findTasks()[0]!;
     const sourceX = source.position?.x ?? 0;
@@ -100,7 +102,7 @@ describe('sys task parallel', () => {
     await taskParallel(ctx, source.id);
     const parallel = findTasks().find((t) => t.id !== source.id)!;
     expect(parallel.position?.x).toBe(sourceX);
-    expect(parallel.position?.y).toBe(sourceY + 240);
+    expect(parallel.position?.y).toBe(sourceY + 260);
   });
 
   it('adds a TodoItem to the parent TodoNode', async () => {

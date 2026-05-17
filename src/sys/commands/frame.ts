@@ -14,6 +14,7 @@ import {
   defaultFrameConfig,
 } from '../../renderer/components/nodes/FrameNode/types';
 import type { FrameState, FrameConfig, FrameTint } from '../../renderer/components/nodes/FrameNode/types';
+import { FRAME_PADDING, FRAME_MIN_W, FRAME_MIN_H } from '../layout';
 
 export interface FrameCtx {
   boardPath: string;
@@ -132,15 +133,22 @@ export async function frameAdd(
 
   // Validate tint
   const tintVal: FrameTint = isFrameTint(opts.tint) ? opts.tint : 'neutral';
-  const width = (typeof opts.w === 'number' && opts.w > 0) ? Math.round(opts.w) : 360;
-  const height = (typeof opts.h === 'number' && opts.h > 0) ? Math.round(opts.h) : 240;
+  const explicitW = typeof opts.w === 'number' && opts.w > 0;
+  const explicitH = typeof opts.h === 'number' && opts.h > 0;
+  let width = explicitW ? Math.round(opts.w as number) : 360;
+  let height = explicitH ? Math.round(opts.h as number) : 240;
   const label = opts.label ?? '';
 
   let position: { x: number; y: number };
   let childIds: string[] = [];
 
   if (opts.near) {
-    // --near: center frame on the source node's center; seed childIds
+    // --near: position frame so the source node's center sits inside it,
+    // seed childIds with [sourceId]. When --w / --h aren't given, size
+    // the frame so it actually CONTAINS the source plus comfortable
+    // padding — the old fixed 360×240 default was often smaller than the
+    // source it was anchoring, which read as a layout bug in
+    // AI-generated pipelines.
     const srcGeo = resolveSourceGeometry(board.nodes, opts.near);
     if (!srcGeo) {
       return { ok: false, message: `--near: no node matching "${opts.near}"` };
@@ -153,6 +161,13 @@ export async function frameAdd(
     } else if (opts.near.length >= 4) {
       const prefixed = board.nodes.filter((n) => n.id.startsWith(opts.near!));
       if (prefixed.length === 1) srcId = prefixed[0]!.id;
+    }
+
+    if (!explicitW) {
+      width = Math.max(FRAME_MIN_W, srcGeo.w + 2 * FRAME_PADDING);
+    }
+    if (!explicitH) {
+      height = Math.max(FRAME_MIN_H, srcGeo.h + 2 * FRAME_PADDING);
     }
 
     const srcCenterX = srcGeo.x + srcGeo.w / 2;
@@ -281,6 +296,92 @@ export async function frameList(ctx: FrameCtx, json = false): Promise<SysResult>
     return `  ${n.id.slice(0, 13)}  "${s.label}"  ${s.width}×${s.height}  tint=${tint}  pos=(${pos.x},${pos.y})  children=${s.childIds.length}`;
   });
   return { ok: true, message: `frames (${frames.length}):\n${lines.join('\n')}`, data: frames.map((n) => n.id) };
+}
+
+/**
+ * `krnl frame fit <ref> [--padding N]` — resize & reposition a frame so it
+ * wraps all its persisted childIds with the given padding (default
+ * FRAME_PADDING = 40 px per side).
+ *
+ * Headless-capable. Reads each child node's position + best-effort size
+ * via resolveSourceGeometry (TaskNode = 220×140, frame defaults to its
+ * own width/height, text/image read state.width/height, etc.) and
+ * computes a bounding box, then sets the frame's position + width +
+ * height to enclose the box.
+ *
+ * If childIds is empty (or all stale), the command leaves the frame
+ * unchanged and reports it — there's nothing useful to fit to. This is
+ * the AI-facing automation for the user's "frames are smaller than
+ * their contents" complaint.
+ */
+export async function frameFit(
+  ctx: FrameCtx,
+  ref: string | undefined,
+  paddingArg: number | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'frame fit requires <ref>' };
+  const padding = (typeof paddingArg === 'number' && paddingArg >= 0)
+    ? Math.round(paddingArg)
+    : FRAME_PADDING;
+
+  const board = loadBoard(ctx);
+  const resolved = resolveFrame(board.nodes, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  const frameNode = resolved.node;
+  const state = frameNode.state as FrameState;
+  const childIds = state.childIds ?? [];
+  if (childIds.length === 0) {
+    return {
+      ok: false,
+      message: `frame ${frameNode.id.slice(0, 8)} has no childIds — nothing to fit. Use 'frame contents <ref>' to inspect, or move nodes into the frame's bounds and let the renderer recompute first.`,
+    };
+  }
+
+  // Compute bounding box of all valid children.
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let resolved_count = 0;
+  for (const childId of childIds) {
+    const geo = resolveSourceGeometry(board.nodes, childId);
+    if (!geo) continue;
+    resolved_count++;
+    if (geo.x < minX) minX = geo.x;
+    if (geo.y < minY) minY = geo.y;
+    if (geo.x + geo.w > maxX) maxX = geo.x + geo.w;
+    if (geo.y + geo.h > maxY) maxY = geo.y + geo.h;
+  }
+  if (resolved_count === 0) {
+    return {
+      ok: false,
+      message: `frame ${frameNode.id.slice(0, 8)}: none of the ${childIds.length} childId(s) resolve to live nodes.`,
+    };
+  }
+
+  const newX = Math.round(minX - padding);
+  const newY = Math.round(minY - padding);
+  const newW = Math.max(FRAME_MIN_W, Math.round((maxX - minX) + 2 * padding));
+  const newH = Math.max(FRAME_MIN_H, Math.round((maxY - minY) + 2 * padding));
+
+  const nextState: FrameState = { ...state, width: newW, height: newH };
+  board.nodes = board.nodes.map((n) =>
+    n.id === frameNode.id
+      ? { ...n, position: { x: newX, y: newY }, state: nextState }
+      : n,
+  );
+  saveBoard(ctx, board);
+
+  return {
+    ok: true,
+    message: `frame ${frameNode.id.slice(0, 8)}: fitted to ${resolved_count}/${childIds.length} children → pos=(${newX},${newY}) size=${newW}×${newH} padding=${padding}`,
+    data: {
+      id: frameNode.id,
+      position: { x: newX, y: newY },
+      width: newW,
+      height: newH,
+      padding,
+      childrenResolved: resolved_count,
+      childrenTotal: childIds.length,
+    },
+  };
 }
 
 export async function frameContents(
