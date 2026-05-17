@@ -1,8 +1,9 @@
-import { app, BrowserWindow, Menu, protocol, net } from 'electron';
-import { join, normalize, sep } from 'path';
+import { app, BrowserWindow, Menu, protocol } from 'electron';
+import { join, normalize, sep, extname } from 'path';
 import { mkdirSync, copyFileSync, existsSync, chmodSync } from 'fs';
+import { readFile, stat } from 'fs/promises';
 import { tmpdir } from 'os';
-import { pathToFileURL } from 'url';
+import { createServer, type Server } from 'http';
 import { registerHandlers, getCliDispatch } from './ipc/handlers';
 import {
   registerAssetHandlers,
@@ -18,17 +19,9 @@ if (process.env['KRNL0_USER_DATA']) {
   app.setPath('userData', process.env['KRNL0_USER_DATA']);
 }
 
-// Privileged scheme registration MUST happen before app.whenReady() so
-// Chromium treats responses from these schemes as standard, secure-origin
-// content.
-//
-// krnl-asset:// — used for <img src="krnl-asset://...">.
-// krnl-app://   — used to serve the renderer in packaged builds instead of
-//                  file://. Third-party embeds (YouTube iframe, Stripe, …)
-//                  refuse to handshake with file:// parents because the
-//                  origin is not "secure". krnl-app:// gives the renderer a
-//                  proper origin so embeds work. Dev keeps using
-//                  http://localhost:<port>.
+// krnl-asset:// — used for <img src="krnl-asset://..."> (Decision 21).
+// MUST be registered before app.whenReady() so Chromium treats responses as
+// standard, secure-origin content.
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'krnl-asset',
@@ -36,17 +29,6 @@ protocol.registerSchemesAsPrivileged([
       standard: true,
       secure: true,
       supportFetchAPI: true,
-      stream: true,
-      bypassCSP: false,
-    },
-  },
-  {
-    scheme: 'krnl-app',
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      corsEnabled: true,
       stream: true,
       bypassCSP: false,
     },
@@ -68,6 +50,94 @@ function resolveWindowIcon(): string {
   const fallback = join(buildDir, 'icon.png');
   return existsSync(fallback) ? fallback : preferred;
 }
+
+// ── Local renderer HTTP server ─────────────────────────────────────────────
+// In dev the renderer is served by Vite on http://localhost:<port>. In
+// packaged builds it used to load via win.loadFile (→ file://), which broke
+// the YouTube embed: YouTube's iframe rejects the postMessage handshake
+// from any non-http(s) parent origin (even Chromium-"secure" custom
+// schemes like app:// or krnl-app://). Spinning up a real loopback HTTP
+// server gives the renderer a true http://127.0.0.1:<port>/ origin that
+// YouTube — and every other third-party embed — accepts.
+//
+// Bound to 127.0.0.1 only, so no firewall prompt and not reachable off
+// the box. Port is 0 (OS-assigned) so two instances never collide.
+
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.htm':  'text/html; charset=utf-8',
+  '.js':   'application/javascript; charset=utf-8',
+  '.mjs':  'application/javascript; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif':  'image/gif',
+  '.ico':  'image/x-icon',
+  '.mp3':  'audio/mpeg',
+  '.wav':  'audio/wav',
+  '.ogg':  'audio/ogg',
+  '.webm': 'video/webm',
+  '.mp4':  'video/mp4',
+  '.woff2':'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf':  'font/ttf',
+  '.txt':  'text/plain; charset=utf-8',
+  '.map':  'application/json; charset=utf-8',
+};
+
+let rendererServer: Server | undefined;
+
+async function startRendererServer(): Promise<number> {
+  const rendererRoot = join(__dirname, '../renderer');
+  const rootWithSep = rendererRoot.endsWith(sep) ? rendererRoot : rendererRoot + sep;
+
+  return new Promise<number>((resolve, reject) => {
+    const server = createServer((req, res) => {
+      void (async () => {
+        try {
+          const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+          let pathname = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+          if (pathname === '' || pathname.endsWith('/')) pathname += 'index.html';
+          const filePath = normalize(join(rendererRoot, pathname));
+          if (filePath !== rendererRoot && !filePath.startsWith(rootWithSep)) {
+            res.writeHead(403); res.end('forbidden'); return;
+          }
+          let s;
+          try { s = await stat(filePath); }
+          catch { res.writeHead(404); res.end('not found'); return; }
+          if (!s.isFile()) { res.writeHead(404); res.end('not found'); return; }
+          const mime = MIME_TYPES[extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+          const bytes = await readFile(filePath);
+          res.writeHead(200, {
+            'Content-Type': mime,
+            'Content-Length': bytes.length.toString(),
+            'Cache-Control': 'no-cache',
+          });
+          res.end(bytes);
+        } catch (err) {
+          console.warn('[renderer-server]', err);
+          try { res.writeHead(500); res.end('error'); } catch { /* response already sent */ }
+        }
+      })();
+    });
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address();
+      if (addr && typeof addr === 'object') {
+        rendererServer = server;
+        resolve(addr.port);
+      } else {
+        reject(new Error('renderer-server: listen failed'));
+      }
+    });
+  });
+}
+
+let rendererPort = 0;
 
 function createWindow(): BrowserWindow {
   Menu.setApplicationMenu(null);
@@ -95,41 +165,10 @@ function createWindow(): BrowserWindow {
     void win.loadURL(`http://localhost:${devPort}`);
     win.webContents.openDevTools();
   } else {
-    void win.loadURL('krnl-app://krnl0/index.html');
+    void win.loadURL(`http://127.0.0.1:${rendererPort}/index.html`);
   }
 
   return win;
-}
-
-// Serve the built renderer over krnl-app:// instead of file://. Without this,
-// the renderer's origin is file:// — YouTube's embed iframe refuses the
-// postMessage handshake from file:// parents and the player never starts.
-// The `oembed` fetch also fails CORS preflight from file://. krnl-app:// is
-// treated as a standard, secure origin by Chromium, fixing both.
-function registerAppProtocol(): void {
-  const rendererRoot = join(__dirname, '../renderer');
-  try {
-    protocol.handle('krnl-app', async (req) => {
-      try {
-        const url = new URL(req.url);
-        // Default `/` and trailing-slash requests to index.html.
-        let pathname = url.pathname.replace(/^\/+/, '');
-        if (pathname === '' || pathname.endsWith('/')) pathname += 'index.html';
-        // Resolve and clamp to rendererRoot so a crafted ../../ can't escape.
-        const filePath = normalize(join(rendererRoot, pathname));
-        const rootWithSep = rendererRoot.endsWith(sep) ? rendererRoot : rendererRoot + sep;
-        if (filePath !== rendererRoot && !filePath.startsWith(rootWithSep)) {
-          return new Response('forbidden', { status: 403 });
-        }
-        return net.fetch(pathToFileURL(filePath).toString());
-      } catch (err) {
-        console.warn('[krnl-app] handler failed:', err);
-        return new Response('', { status: 500 });
-      }
-    });
-  } catch (err) {
-    console.warn('[krnl-app] protocol.handle registration failed:', err);
-  }
 }
 
 // ── CLI dir setup + RPC server ─────────────────────────────────────────────
@@ -172,7 +211,7 @@ function setupCliDir(): string {
 
 let rpcServer: RpcServer | undefined;
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Windows taskbar icon — without a unique AppUserModelID, Windows groups
   // our window under Electron's generic model ID and pins the default
   // Electron icon to the taskbar even when BrowserWindow({ icon }) is set.
@@ -191,7 +230,17 @@ app.whenReady().then(() => {
   registerHandlers(rpcServer);
   registerAssetHandlers();
   registerAssetProtocol();
-  registerAppProtocol();
+
+  // Only the packaged path needs the local renderer server; dev uses Vite.
+  if (process.env['NODE_ENV'] !== 'development') {
+    try {
+      rendererPort = await startRendererServer();
+    } catch (err) {
+      console.error('[renderer-server] failed to start:', err);
+      // Window will fail to load — surfaced visibly rather than silently.
+    }
+  }
+
   createWindow();
 
   app.on('activate', () => {
@@ -206,4 +255,5 @@ app.on('window-all-closed', () => {
 // TNF1: teardown on quit
 app.on('before-quit', () => {
   rpcServer?.close();
+  rendererServer?.close();
 });

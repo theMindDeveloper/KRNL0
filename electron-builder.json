@@ -11,6 +11,9 @@
     "build/icon.*",
     "claude/**/*"
   ],
+  "asarUnpack": [
+    "claude/**/*"
+  ],
   "mac": {
     "target": "dmg"
   },
