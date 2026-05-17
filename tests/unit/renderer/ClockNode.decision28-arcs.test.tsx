@@ -161,7 +161,7 @@ afterEach(() => {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
-  it('multi-session focus task renders break sub-arcs with translucent white stroke', () => {
+  it('multi-session focus task renders break sub-arcs with track-color stroke', () => {
     const todoId = 'todo-arcs-1';
     // 75-min focus task = 3 work sessions + 2 short breaks = 5 segments.
     const t1 = makeTaskNode('t1', todoId, {
@@ -176,10 +176,9 @@ describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
     const breakArcs = getBreakArcs();
     // 2 break segments → 2 break arcs.
     expect(breakArcs.length).toBe(2);
-    // Glass-look breaks use rgba white with low opacity.
+    // Breaks now use the track color (paper-3) to match calendar language.
     for (const arc of breakArcs) {
-      const stroke = arc.getAttribute('stroke') ?? '';
-      expect(stroke).toMatch(/^rgba\(255,255,255,/);
+      expect(arc.getAttribute('stroke')).toBe('var(--paper-3)');
     }
   });
 

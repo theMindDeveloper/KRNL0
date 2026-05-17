@@ -522,19 +522,21 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             style={{
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 4,
               padding: '2px 6px',
+              width: 60,          // fixed width — label change doesn't reflow neighbors
+              boxSizing: 'border-box',
               fontFamily: 'var(--font-mono)',
               fontSize: 8.5,
-              color: state.kind === 'focus' ? 'var(--acid)' : 'var(--ink-3)',
+              color: 'var(--ink-3)',
               background: 'var(--paper-2)',
-              border: `1px solid ${state.kind === 'focus' ? 'var(--acid)' : 'var(--paper-3)'}`,
+              border: '1px solid var(--paper-3)',
               borderRadius: 3,
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
               cursor: 'pointer',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 0 rgba(0,0,0,0.15)',
-              opacity: 0.95,
+              opacity: 0.9,
               lineHeight: 1,
             }}
           >
@@ -543,10 +545,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
                 width: 5,
                 height: 5,
                 borderRadius: '50%',
-                background: state.kind === 'focus' ? 'var(--acid)' : 'var(--ink-3)',
-                boxShadow: state.kind === 'focus'
-                  ? '0 0 4px var(--acid)'
-                  : 'none',
+                background: state.kind === 'focus' ? 'var(--acid)' : 'var(--ink-4)',
+                flexShrink: 0,
               }}
             />
             {state.kind === 'focus' ? 'POMO' : 'EVENT'}
