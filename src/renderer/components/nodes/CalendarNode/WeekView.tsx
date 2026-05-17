@@ -791,7 +791,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 fontSize: 8,
                 lineHeight: 1,
                 flexShrink: 0,
-                color: 'var(--paper)',
+                color: '#0a0908', // theme-locked dark — readable on every habit color
               }}
             >
               {habit.icon}
