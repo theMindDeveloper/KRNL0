@@ -397,8 +397,9 @@ export function ClockNode({
           </button>
         </div>
 
-        {/* Clock face */}
-        <div style={{ position: 'relative', width: 244, height: 244, margin: '0 auto' }}>
+        {/* Clock face — container wider than SVG viewBox so outward-growing
+            train tracks don't clip on the parent div edge. */}
+        <div style={{ position: 'relative', width: 244, height: 244, margin: '0 auto', overflow: 'visible' }}>
           <svg
             viewBox="0 0 240 240"
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
@@ -425,19 +426,19 @@ export function ClockNode({
               }
               const totalLanes = Math.max(1, laneEnds.length);
 
-              // ── Geometry: shared outer band, auto-shrinking stroke ──
-              const BAND_OUTER = R_ARC;        // 102
-              const BAND_INNER = R_NUM + 10;   // 70 — leave numerals clear
-              const BAND = BAND_OUTER - BAND_INNER; // 32
-              const LANE_GAP = 2;
-              const stroke = Math.max(
-                4,
-                (BAND - (totalLanes - 1) * LANE_GAP) / totalLanes,
-              );
+              // ── Geometry: tracks grow OUTWARD from the clock edge ──
+              // Lane 0 = innermost, sits just outside the clock face.
+              // Each new lane stacks further outward (larger radius).
+              // Thin uniform stroke — no shrinking; the clock has free space
+              // around it for many tracks before overflowing the node bounds.
+              const STROKE = 5;           // thin train track
+              const CLOCK_GAP = 4;        // small gap between clock edge and innermost track
+              const LANE_GAP = 2;         // gap between adjacent tracks
               const radiusForLane = (lane: number): number =>
-                BAND_OUTER - lane * (stroke + LANE_GAP) - stroke / 2;
+                R_ARC + CLOCK_GAP + STROKE / 2 + lane * (STROKE + LANE_GAP);
               const radiusFor = (t: TaskEntry): number =>
                 radiusForLane(laneByTaskId.get(t.id) ?? 0);
+              const stroke = STROKE;
 
               // ── Gray train tracks, one per lane in use ──
               const tracks: React.ReactElement[] = [];
@@ -521,21 +522,21 @@ export function ClockNode({
               return [...tracks, ...arcs];
             })()}
 
-            {/* Now notch */}
+            {/* Now notch — INSIDE the clock face, on the tick belt */}
             {(() => {
-              const p    = pt(nowFloat, R_ARC);
-              const pIn  = pt(nowFloat, R_ARC - 11);
-              const pOut = pt(nowFloat, R_ARC + 11);
+              const pIn  = pt(nowFloat, R_TICK_IN);
+              const pOut = pt(nowFloat, R_TICK_OUT);
+              const pDot = pt(nowFloat, R_TICK_OUT - 2);
               return (
                 <>
                   <line
                     x1={pIn.x} y1={pIn.y}
                     x2={pOut.x} y2={pOut.y}
                     stroke="var(--rust)"
-                    strokeWidth={1.5}
-                    opacity={0.85}
+                    strokeWidth={2}
+                    opacity={0.9}
                   />
-                  <circle cx={p.x} cy={p.y} r={3} fill="var(--rust)" />
+                  <circle cx={pDot.x} cy={pDot.y} r={2.5} fill="var(--rust)" />
                 </>
               );
             })()}
