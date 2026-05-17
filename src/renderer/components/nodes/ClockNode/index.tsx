@@ -410,18 +410,14 @@ export function ClockNode({
                 - Breaks rendered as semi-transparent white overlays — the task
                   tone shows through faintly so the worm reads as one task. */}
             {(() => {
-              // Compute per-task ring offset (Apple-fitness style concentric rings).
-              // Lane assignment uses interval-graph coloring on TIME OVERLAP, not
-              // just graph-parallel edges. Any two tasks whose [start, end) ranges
-              // intersect get pushed to different lanes.
-              // RING_GAP must be ≥ strokeWidth + small padding so rings don't kiss.
-              const TRACK_STROKE = 14;
-              const RING_GAP = TRACK_STROKE + 4; // 18px — visible gap between rings
+              // Apple-fitness style concentric rings — N lanes share a fixed
+              // outer band (R_ARC inward to just above numerals). Stroke width
+              // SHRINKS as lanes grow so they all fit without extending inward
+              // past the clock face. 1 lane = thick ring; 4 lanes = thin rings.
               const sortedByStart = [...tasks].sort((a, b) => a.start - b.start);
               const laneEnds: number[] = []; // laneEnds[i] = end-time of last task placed in lane i
               const laneByTaskId = new Map<string, number>();
               for (const t of sortedByStart) {
-                // Pick the lowest lane whose last task ended at-or-before this start.
                 let lane = laneEnds.findIndex((end) => end <= t.start);
                 if (lane === -1) {
                   lane = laneEnds.length;
@@ -431,20 +427,34 @@ export function ClockNode({
                 }
                 laneByTaskId.set(t.id, lane);
               }
-              const ringOffset = (t: TaskEntry): number =>
-                (laneByTaskId.get(t.id) ?? 0) * RING_GAP;
+              const totalLanes = Math.max(1, laneEnds.length);
+
+              // Reserved band: outer edge at R_ARC (102), inner edge just above
+              // numerals (R_NUM=60 plus padding). Band thickness = 38px.
+              const BAND_OUTER = R_ARC;             // 102
+              const BAND_INNER = R_NUM + 10;        // 70
+              const BAND_THICKNESS = BAND_OUTER - BAND_INNER; // 32
+              const LANE_GAP = 2;                   // 2px gap between adjacent lanes
+              const laneStroke = Math.max(
+                4, // minimum readable stroke
+                (BAND_THICKNESS - (totalLanes - 1) * LANE_GAP) / totalLanes,
+              );
+              // Radius of lane i = outer edge minus (i lanes + half this lane).
+              const radiusForLane = (lane: number): number =>
+                BAND_OUTER - lane * (laneStroke + LANE_GAP) - laneStroke / 2;
+              const radiusFor = (t: TaskEntry): number =>
+                radiusForLane(laneByTaskId.get(t.id) ?? 0);
 
               // Render a gray background track for every lane used.
-              const totalLanes = Math.max(1, laneEnds.length);
               const trackElements: React.ReactElement[] = [];
               for (let lane = 0; lane < totalLanes; lane++) {
                 trackElements.push(
                   <circle
                     key={`track-${lane}`}
-                    cx={CX} cy={CY} r={R_ARC - lane * RING_GAP}
+                    cx={CX} cy={CY} r={radiusForLane(lane)}
                     fill="none"
                     stroke="var(--paper-3)"
-                    strokeWidth={TRACK_STROKE}
+                    strokeWidth={laneStroke}
                     opacity={0.7}
                   />,
                 );
@@ -454,8 +464,9 @@ export function ClockNode({
                 const ended  = nowFloat >= t.end;
                 const active = i === activeIdx;
                 const opacity = ended ? 0.35 : active ? 1 : 0.92;
-                const sw = active ? 16 : 14;
-                const r = R_ARC - ringOffset(t);
+                // Stroke width = laneStroke. Active task gets a small bump.
+                const sw = active ? laneStroke + 2 : laneStroke;
+                const r = radiusFor(t);
                 const activeStyle: React.CSSProperties = active
                   ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: TONE_VAR[t.tone] }
                   : {};
