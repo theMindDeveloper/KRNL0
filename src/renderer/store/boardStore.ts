@@ -356,6 +356,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
         plannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
+        kind: 'focus',
       };
 
       const newNode: Node = {

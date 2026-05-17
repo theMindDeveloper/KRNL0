@@ -1930,3 +1930,221 @@ A chain may carry **any number of anchors**. The selector walks the chain forwar
 These are internals (not user-visible). They are documented here so future selector refactors don't accidentally regress them.
 
 ---
+
+## Decision 28 — Task `kind` ('focus' | 'event') + break-aware scheduling (2026-05-16)
+
+**Date:** 2026-05-16
+**Status:** Accepted
+**Author:** architect
+
+### Context
+
+Today every TaskNode is implicitly a pomodoro task. Two problems flow from that:
+
+1. There is no honest way to express a calendar-only block ("go to university"); users either fake it with a 1-session pomo or skip the calendar entirely.
+2. The schedule selector counts only work time. A 75-minute "focus" task with `sessionMin=25`, `shortBreakMin=5`, `longBreakEvery=4` actually consumes 75 + 5 + 5 = 85 wall-clock minutes. WeekView and ClockNode both under-report — the next task visually starts during a break that the FSM will actually take.
+
+The fix is small but it touches three subsystems (TaskNode UX, scheduleSelector, two visualisations). The risk is parity drift: if the FSM and the visualisation walker disagree about *when a long break occurs* or *how the current session is clamped*, the calendar will lie. The contract below pins both predicates to one source.
+
+### Decision
+
+Add a discriminator on TaskState (`kind: 'focus' | 'event'`) and route every existing pomo-related code path through it. Extract two shared predicates so the FSM, the dispatcher, and the new schedule walker all consume the same rule. Make the schedule selector break-aware for focus tasks only.
+
+Per-task `kind` toggle, no per-task PomoConfig override. `sessionMin`, `shortBreakMin`, `longBreakMin`, `longBreakEvery` remain global on PomoNode.
+
+### Contract
+
+#### 1. TaskState shape
+
+```ts
+// src/renderer/components/nodes/TaskNode/types.ts
+export type TaskKind = 'focus' | 'event';
+
+export interface TaskState {
+  // ...existing fields...
+  kind: TaskKind;  // NEW — default 'focus' for back-compat
+}
+```
+
+Migration in `src/main/persistence/board.ts`: any task node whose `state.kind` is absent or not `'focus' | 'event'` is rewritten to `'focus'`. Migration is silent (no version bump required — string default is structural). Add a board migration test asserting load-of-pre-Decision-28 board.json yields all-focus tasks.
+
+#### 2. Shared predicates (parity gates)
+
+New file `src/renderer/components/nodes/PomoNode/pomoRules.ts`. **No other module is allowed to inline these rules.** This is the parity contract — the FSM and the visualisation walker MUST consume them.
+
+```ts
+import type { PomoConfig } from './types';
+
+/** True iff the break taken AFTER `sessionsCompletedBefore + 1` work sessions
+ *  is a long break. Used by both `pomoComplete` and `breakdownPomoTime`. */
+export function isLongBreakAfter(
+  sessionsCompletedBefore: number,
+  cfg: PomoConfig,
+): boolean {
+  return (sessionsCompletedBefore + 1) % cfg.longBreakEvery === 0;
+}
+
+/** Clamp rule for the in-flight session's minutes.
+ *  Mirrors the rule currently inlined at commandDispatch.ts:611-621.
+ *  Used by `loadTaskIntoPomo` (commandDispatch) and `breakdownPomoTime`. */
+export function computeCurrentSessionMin(
+  plannedMin: number,
+  pomoSessionsCompleted: number,
+  cfg: PomoConfig,
+): number {
+  const remainder = plannedMin - pomoSessionsCompleted * cfg.sessionMin;
+  return Math.max(1, Math.min(remainder > 0 ? remainder : cfg.sessionMin, cfg.sessionMin));
+}
+```
+
+Required call-site changes:
+- `pomoComplete` (PomoNode/commands.ts:117) replaces the inline `nextSessions % config.longBreakEvery === 0` with `isLongBreakAfter(state.sessionsCompleted, config)`.
+- `commandDispatch.ts:611-621` (`loadTaskIntoPomo`) replaces the inline clamp with `computeCurrentSessionMin(...)`.
+
+Parity test (required, table-driven): feed a deterministic `now()` stub through N iterations of `pomoComplete` and a single call to `breakdownPomoTime(plannedMin, 0, cfg)`. The sequence of `(kind, min)` segments MUST be byte-identical. This test is the gate.
+
+#### 3. Break-math helper
+
+New file `src/renderer/store/pomoSchedule.ts`. Pure, no store/IPC/Date.now.
+
+```ts
+import type { PomoConfig } from '../components/nodes/PomoNode/types';
+import { isLongBreakAfter, computeCurrentSessionMin } from '../components/nodes/PomoNode/pomoRules';
+
+export type PomoSegmentKind = 'work' | 'short' | 'long';
+
+export interface PomoSegment {
+  kind: PomoSegmentKind;
+  min: number;
+  /** 0-based index in the work-session stream this segment belongs to.
+   *  For 'work', it is the index of this work session. For 'short'/'long',
+   *  it is the index of the work session that PRECEDED this break. */
+  sessionIdx: number;
+}
+
+export interface PomoBreakdown {
+  workMin: number;
+  breakMin: number;
+  effectiveMin: number;        // workMin + breakMin
+  segments: ReadonlyArray<PomoSegment>;
+}
+
+/** Walk forward from `alreadyCompletedSessions`, emitting work segments
+ *  that consume `remainingMin` using `computeCurrentSessionMin`, with
+ *  breaks interspersed between work segments (no trailing break). */
+export function breakdownPomoTime(
+  remainingMin: number,
+  alreadyCompletedSessions: number,
+  cfg: PomoConfig,
+): PomoBreakdown;
+```
+
+Rules:
+- `remainingMin <= 0` → empty breakdown (all zeros, no segments).
+- The last segment is always `work` (no trailing break). If a single work segment exhausts `remainingMin`, no break is emitted.
+- A break's kind is `'long'` iff `isLongBreakAfter(alreadyCompletedSessions + segmentNumber, cfg)`, where `segmentNumber` is 1-based for the work session that just finished.
+- For each work segment, its `min` uses `computeCurrentSessionMin(remainingAtThisPoint + completedConsumed, completedSoFar, cfg)` semantics — i.e., the same clamp the runtime would apply when that session starts.
+
+#### 4. Schedule selector
+
+`selectSchedule(board: Board | null): ScheduleResult` signature is unchanged externally. Internally the selector:
+
+1. Locates the single PomoNode on the board (board invariant). If absent, falls back to `defaultPomoConfig()`.
+2. Extends the memoization cache key to `{ nodes, edges, pomoConfig }` where `pomoConfig` is captured by **reference identity** on `pomoNode.state.config`. Config edits already produce a new node array (immutable updates), so reference identity suffices.
+3. For each task placement:
+   - If `kind === 'event'`: cursor advances by `plannedMin`. No breakdown call.
+   - If `kind === 'focus'`: compute `effectiveMin` via `breakdownPomoTime(plannedMin - secondsAccumulated/60, pomoSessionsCompleted, cfg)`; advance cursor by `effectiveMin`. The block's `endISO` uses the same `effectiveMin`. (Past immutability — already-completed sessions do not appear in the breakdown.)
+4. `scheduledDurationMin` semantics under `kind: 'focus'`: **work-time override**. When set, the helper is called with `remainingMin = scheduledDurationMin - secondsAccumulated/60` instead of `plannedMin - ...`. Effective block height = work + breaks. Under `kind: 'event'`, `scheduledDurationMin` overrides plannedMin directly with no breaks. This is documented in the selector JSDoc.
+
+Expose the per-placement breakdown to renderers. Extend `ScheduledTaskPlacement`:
+
+```ts
+export interface ScheduledTaskPlacement {
+  // ...existing...
+  kind: TaskKind;                          // mirror of task.kind for convenience
+  breakdown: PomoBreakdown | null;         // null iff kind === 'event'
+}
+```
+
+Renderers (WeekView, ClockNode) read `breakdown` directly — they MUST NOT recompute it. This is enforced by code review, not type system.
+
+#### 5. UX gates on TaskNode
+
+- `kind === 'focus'`: pip column rendered, START/PAUSE rendered, double-click loads into Pomo (existing behaviour at TaskNode/index.tsx:405-411).
+- `kind === 'event'`: pip column hidden, START/PAUSE hidden, double-click on card surface is a no-op (no toast).
+- A bread/tomato icon at the card's top-right toggles `kind` via a new command `task.toggleKind` dispatched to commandDispatch. The icon is the **only** kind-mutation gesture. Double-click remains a pure view gesture.
+- The toggle button MUST be a real `<button>` (or `role="button"` with `tabIndex={0}` and Space/Enter handlers). No raw `<div onClick>`.
+- Toggling `'focus' → 'event'`: if the task is the active pomo task, dispatcher calls `pomoCancel` first (clean handoff). If the task has `pomoSessionsCompleted > 0`, those fields are preserved (do not zero them) — toggling back to `'focus'` resumes from the same checkpoint.
+
+#### 6. Calendar visualisation (WeekView)
+
+Single block per scheduled task. Sub-regions:
+- **Work region** (top): height proportional to `breakdown.workMin`, current tone-coloured background.
+- **Break region** (bottom tail): height proportional to `breakdown.breakMin`, background `var(--paper-3)` with a 1px tone-coloured top border (visual: "this slot is reserved by this task but is not work").
+
+Hide the tail when `breakdown.breakMin === 0` (1-session task: no DOM node, no border). Zero-height with border is forbidden — it produces a visible 1px hairline.
+
+For `kind === 'event'`: no work/break decomposition, single solid block of height `plannedMin` (or `scheduledDurationMin` if set).
+
+#### 7. Clock visualisation (ClockNode)
+
+Replace the single-arc-per-task render at ClockNode/index.tsx:343-363 with N sub-arcs derived from `placement.breakdown.segments`. Work segments use the task tone (existing `TONE_VAR[t.tone]`). Break segments use `var(--ink-3)` (single neutral, no per-task tint — per-task tint on breaks would imply the break "belongs" to that task's work, which is semantically wrong).
+
+For `kind === 'event'`: single solid arc as today, task tone.
+
+Active-task highlight, ended-task dimming, and the "now notch" remain unchanged — they apply to the full task span, not per-segment.
+
+#### 8. Edge cases (binding)
+
+- 1-session focus task (`plannedMin ≤ sessionMin`): one work segment, no break. Calendar tail not rendered (no DOM). Clock: single arc.
+- `done === true`: selector does not currently filter on `done`. This decision **does not change that.** Done tasks still appear on the calendar/clock with their breakdown.
+- Task with `pomoSessionsCompleted > 0` still scheduled: `breakdownPomoTime` is called with the **remaining** minutes and the **completed** session count. The breakdown reflects what is still to come; past sessions are never re-drawn. Calendar/clock show the *plan from now forward*, not history.
+- PomoConfig edited while tasks are scheduled: cache key changes (pomoConfig reference identity), selector recomputes all placements. In-flight FSM session retains its locked `durationMin` (Decision 9).
+- `kind === 'event'` with `plannedMin > sessionMin`: nothing special. Plain block.
+
+#### 9. PR phasing (binding)
+
+- **PR-A:** Decision 28 §1 (data model + migration) + §5 (UX gates + icon toggle + `task.toggleKind`). No scheduling change. Safe, ships first.
+- **PR-B:** Decision 28 §2 + §3 + §4 + §6 + §7 in one PR. Splitting §4 (longer blocks, no new viz) from §6+§7 (the viz) lands as a visible regression — calendar blocks silently grow with no explanation. They merge together or not at all.
+
+#### 10. Test invariants (required)
+
+1. Parity test (§2): N iterations of `pomoComplete` produce the same `(kind, min)` sequence as `breakdownPomoTime`.
+2. Table-driven `breakdownPomoTime` test: empty, 1-session, mid-session resume, exact `longBreakEvery` boundary, longBreakEvery=1 (every break is long), `remainingMin <= 0`.
+3. Schedule selector test: same chain rendered once with all-focus and once with all-event tasks; effective lengths differ by the expected break overhead.
+4. Migration test: pre-Decision-28 `board.json` loads with all tasks `kind: 'focus'`.
+5. UX test: `kind === 'event'` task — double-click on body fires no command; toggle icon dispatches `task.toggleKind`.
+6. Toggle handoff test: toggling active pomo task `'focus' → 'event'` cancels the FSM; `pomoSessionsCompleted` is preserved.
+
+### Consequences
+
+**Enables:**
+- Honest wall-clock visualisation: a 75-min focus task occupies 85 minutes on the calendar (with `25/5/15/4`), so the next task starts where it actually starts.
+- Calendar-only blocks ("go to university") without a pomo timer fiction.
+- A single source for the long-break and clamp rules — future tweaks (e.g. configurable mid-session break skipping) touch one file.
+- Future `kind` values (`'habit'`, `'milestone'`) without re-migration.
+
+**Forecloses:**
+- Per-task PomoConfig overrides. Out of scope for this decision; if needed later, add an optional `pomoConfigOverride?: Partial<PomoConfig>` on TaskState and thread it through the helper signature.
+- A second "kind-mutation" gesture. Only the corner icon toggles `kind`; double-click is sacrosanct as the view gesture.
+
+**Rejected alternatives:**
+- `pomoEnabled: boolean` — closes the door on `'habit'`/`'milestone'`. String union costs nothing.
+- Tail viz as inline alternation (work/break/work/break stripes) — visually noisy at week-view density. Tail wins on clarity.
+- Per-task-tinted break colour on the clock — implies the break belongs to the task's "work" semantic. Neutral `--ink-3` wins.
+- Splitting PR-B into "selector first, viz later" — produces a visible regression in the middle PR.
+
+### Files affected
+
+- New: `src/renderer/components/nodes/PomoNode/pomoRules.ts` (predicates).
+- New: `src/renderer/store/pomoSchedule.ts` (helper).
+- Modified: `src/renderer/components/nodes/TaskNode/types.ts` (+`kind`).
+- Modified: `src/main/persistence/board.ts` (migration default).
+- Modified: `src/renderer/components/nodes/PomoNode/commands.ts` (use predicate in `pomoComplete`).
+- Modified: `src/renderer/components/Canvas/commandDispatch.ts` (use `computeCurrentSessionMin` in `loadTaskIntoPomo`; new `task.toggleKind` command).
+- Modified: `src/renderer/store/scheduleSelector.ts` (pomo config read, break-aware walk, breakdown in placement).
+- Modified: `src/renderer/components/nodes/TaskNode/index.tsx` (icon toggle, gate START/pips/dblclick).
+- Modified: `src/renderer/components/nodes/CalendarNode/WeekView.tsx` (tail sub-region).
+- Modified: `src/renderer/components/nodes/ClockNode/index.tsx` (sub-arc render).
+
+---

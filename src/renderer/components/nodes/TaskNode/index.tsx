@@ -402,10 +402,12 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   // ── body double-click → refresh pomo with this task's info (no auto-start).
   // Single click is reserved for RF selection (so users can move/connect/marquee
   // freely). Double-click is the explicit "show me this task in the pomo" gesture.
+  // Decision 28: event-kind tasks silently no-op the double-click (no toast).
   const handleBodyDoubleClick = (e: MouseEvent) => {
     // Children that handle their own dblclick (the editable task text) stop
     // propagation, so this handler only fires on the surrounding card surface.
     if (state.done) return;
+    if (state.kind === 'event') return;
     e.stopPropagation();
     onCommand('task.loadIntoPomo');
   };
@@ -443,6 +445,34 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       }}
       onDoubleClick={handleBodyDoubleClick}
     >
+      {/* Decision 28 — kind toggle (top-right). 🍅 = focus, 🍞 = event. */}
+      <button
+        type="button"
+        data-testid="task-kind-toggle"
+        aria-label={state.kind === 'focus' ? 'Toggle to event' : 'Toggle to focus'}
+        onClick={(e) => {
+          e.stopPropagation();
+          onCommand('task.toggleKind');
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute',
+          top: -8,
+          right: -2,
+          padding: '1px 4px',
+          background: 'var(--paper)',
+          border: `1px solid var(--paper-3)`,
+          borderRadius: 4,
+          fontSize: 9,
+          lineHeight: 1,
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+          zIndex: 1,
+        }}
+      >
+        {state.kind === 'focus' ? '🍅' : '🍞'}
+      </button>
+
       {/* Decision 22 F16 — corner timer (top-left) */}
       {showTimer && (
         <span
@@ -500,9 +530,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         {/* Header right slot: START (when not done + not running) or PAUSE
             (only when the timer is actually running). PAUSE suspends but keeps
             the task loaded — pressing START resumes from the checkpoint. To
-            fully abandon a session, press RESET on the parent PomoNode. */}
+            fully abandon a session, press RESET on the parent PomoNode.
+            Decision 28: START/PAUSE hidden for event-kind tasks. */}
         <div style={{ display: 'flex', gap: 4 }}>
-          {!state.done && !isActiveRunning && (
+          {state.kind === 'focus' && !state.done && !isActiveRunning && (
             <button
               type="button"
               data-testid="task-start-btn"
@@ -528,7 +559,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               START
             </button>
           )}
-          {isActiveRunning && (
+          {state.kind === 'focus' && isActiveRunning && (
             <button
               type="button"
               data-testid="task-pause-btn"
