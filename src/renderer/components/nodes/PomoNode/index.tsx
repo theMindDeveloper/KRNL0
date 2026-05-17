@@ -149,8 +149,13 @@ export function PomoNode({
   // For events: workMin = plannedMin, breakMin = 0.
   const taskBreakdown = isTaskMode && activeTaskPlannedMin
     ? (isEventTask
-        ? { workMin: activeTaskPlannedMin, breakMin: 0, effectiveMin: activeTaskPlannedMin }
-        : breakdownPomoTime(activeTaskPlannedMin, 0, config))
+        ? { workMin: activeTaskPlannedMin, shortMin: 0, longMin: 0, breakMin: 0, effectiveMin: activeTaskPlannedMin }
+        : (() => {
+            const bd = breakdownPomoTime(activeTaskPlannedMin, 0, config);
+            const shortMin = bd.segments.filter((s) => s.kind === 'short').reduce((sum, s) => sum + s.min, 0);
+            const longMin = bd.segments.filter((s) => s.kind === 'long').reduce((sum, s) => sum + s.min, 0);
+            return { workMin: bd.workMin, breakMin: bd.breakMin, effectiveMin: bd.effectiveMin, shortMin, longMin };
+          })())
     : null;
 
   // A.6 — when in task mode, use the per-task session counter
@@ -476,27 +481,56 @@ export function PomoNode({
           <div
             className="pomo-pips"
             data-testid="pomo-pips"
-            style={{ display: 'flex', gap: 8, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: 10 }}
+            style={{ display: 'flex', gap: 4, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: 10 }}
           >
-            {/* A.5 — render at most 8 pips */}
+            {/* Pips + break lines between them (Decision 28 follow-up).
+                Short break = thin green line, long break = wide green line.
+                Walks the breakdown.segments to know which break type follows
+                each session; falls back to plain dots in free-pomo mode. */}
             {Array.from({ length: visiblePipCount }).map((_, i) => {
               const ps = pipState(i, completedDots, state.status);
+              // Find the break that follows this session (if any).
+              // breakdown.segments alternates work/break/work/break/.../work.
+              // Session index i corresponds to segment 2*i; following break is 2*i+1.
+              const followingBreak = taskBreakdown && !isEventTask
+                ? (() => {
+                    const breakdown = breakdownPomoTime(activeTaskPlannedMin ?? 0, 0, config);
+                    return breakdown.segments[2 * i + 1] ?? null;
+                  })()
+                : null;
               return (
-                <span
-                  key={i}
-                  className={`pip ${ps}`}
-                  data-pip-index={i}
-                  data-pip-state={ps}
-                  style={{
-                    width: 9, height: 9, borderRadius: '50%',
-                    border: '1.5px solid',
-                    borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
-                    background: ps === 'done' ? 'var(--rust)' : 'transparent',
-                    boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
-                    position: 'relative',
-                    flexShrink: 0,
-                  }}
-                />
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+                  <span
+                    className={`pip ${ps}`}
+                    data-pip-index={i}
+                    data-pip-state={ps}
+                    style={{
+                      width: 9, height: 9, borderRadius: '50%',
+                      border: '1.5px solid',
+                      borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
+                      background: ps === 'done' ? 'var(--rust)' : 'transparent',
+                      boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
+                      flexShrink: 0,
+                    }}
+                  />
+                  {followingBreak && i < visiblePipCount - 1 && (
+                    <span
+                      data-testid="pomo-pip-break"
+                      data-break-kind={followingBreak.kind}
+                      style={{
+                        display: 'inline-block',
+                        height: 2,
+                        // short = 6px line, long = 18px line
+                        width: followingBreak.kind === 'long' ? 18 : 6,
+                        background: 'var(--acid)',
+                        marginLeft: 4,
+                        marginRight: 4,
+                        borderRadius: 1,
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </div>
               );
             })}
             {/* A.5 — overflow indicator */}
@@ -599,9 +633,18 @@ export function PomoNode({
                 <span style={{ color: 'var(--ink-4)' }}>WORK </span>
                 <span style={{ color: 'var(--ink-2)' }}>{taskBreakdown.workMin}m</span>
               </span>
-              <span data-testid="pomo-breakdown-break">
-                <span style={{ color: 'var(--ink-4)' }}>BREAK </span>
-                <span style={{ color: 'var(--ink-2)' }}>{taskBreakdown.breakMin}m</span>
+              <span data-testid="pomo-breakdown-break" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.3 }}>
+                <span>
+                  <span style={{ color: 'var(--ink-4)' }}>BREAK </span>
+                  <span style={{ color: 'var(--ink-2)' }}>{taskBreakdown.breakMin}m</span>
+                </span>
+                {taskBreakdown.breakMin > 0 && (
+                  <span style={{ fontSize: 8, color: 'var(--ink-4)', letterSpacing: '0.06em' }}>
+                    <span data-testid="pomo-breakdown-short">s{taskBreakdown.shortMin}m</span>
+                    <span style={{ opacity: 0.5, padding: '0 3px' }}>·</span>
+                    <span data-testid="pomo-breakdown-long">l{taskBreakdown.longMin}m</span>
+                  </span>
+                )}
               </span>
               <span data-testid="pomo-breakdown-total">
                 <span style={{ color: 'var(--ink-4)' }}>TOTAL </span>

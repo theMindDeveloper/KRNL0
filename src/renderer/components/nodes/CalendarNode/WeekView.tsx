@@ -488,9 +488,14 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         setTaskPopup(null);
+        // BUGFIX: drag payload must carry WORK-time (plannedMin), not block
+        // height. scheduledDurationMin on focus tasks is treated as work-time
+        // override by the selector, which then adds breaks on top. Using the
+        // block height (which already includes breaks) caused exponential
+        // growth on every nudge.
         e.dataTransfer.setData(
           'application/krnl-task',
-          JSON.stringify({ taskId: task.id, durationMin: task.scheduledDurationMin }),
+          JSON.stringify({ taskId: task.id, durationMin: task.plannedMin }),
         );
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
