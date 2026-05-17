@@ -47,7 +47,9 @@ export function HabitContextMenu({
   const inputRef = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(habit.name);
-  const [pickerOpen, setPickerOpen] = useState<'color' | 'icon' | null>(null);
+  const [pickerOpen, setPickerOpen] = useState<'color' | 'icon' | 'note' | null>(null);
+  // Inline note draft — window.prompt() is blocked in Electron renderer.
+  const [noteDraft, setNoteDraft] = useState(habit.note ?? '');
 
   // Close on outside mousedown or Escape.
   useEffect(() => {
@@ -71,7 +73,14 @@ export function HabitContextMenu({
   }, [renaming]);
 
   // Estimate menu height for viewport clamp; cheap upper bound.
-  const estHeight = pickerOpen === 'icon' ? 280 : pickerOpen === 'color' ? 200 : 168;
+  const estHeight =
+    pickerOpen === 'icon'
+      ? 280
+      : pickerOpen === 'color'
+        ? 200
+        : pickerOpen === 'note'
+          ? 260
+          : 168;
   // Clamp against viewport — Math.round prevents fractional positioning
   // (root cause of nested-panel text blur).
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
@@ -315,14 +324,90 @@ export function HabitContextMenu({
       <MenuItem
         label={habit.note && habit.note.length > 0 ? 'Edit note' : 'Add note'}
         onClick={() => {
-          const next = typeof window !== 'undefined'
-            ? window.prompt('Note for this habit:', habit.note ?? '')
-            : null;
-          if (next === null) { onClose(); return; }
-          onSetNote(next);
-          onClose();
+          if (pickerOpen === 'note') {
+            setPickerOpen(null);
+          } else {
+            setNoteDraft(habit.note ?? '');
+            setPickerOpen('note');
+          }
         }}
       />
+      {pickerOpen === 'note' && (
+        <div
+          data-note-editor
+          style={{ padding: '4px 6px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}
+        >
+          <textarea
+            value={noteDraft}
+            autoFocus
+            placeholder="note…"
+            onChange={(e) => setNoteDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // Don't let Enter inside the textarea bubble up to other handlers,
+              // and let the global Escape handler close the menu (acts as cancel).
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                onSetNote(noteDraft.trim());
+                onClose();
+              }
+            }}
+            rows={4}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              resize: 'vertical',
+              minHeight: 70,
+              padding: '6px 8px',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 12,
+              lineHeight: 1.4,
+              color: 'var(--ink-2)',
+              background: 'var(--paper-2)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 3,
+              outline: 'none',
+              caretColor: 'var(--acid)',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => setPickerOpen(null)}
+              style={{
+                padding: '3px 8px',
+                background: 'transparent',
+                border: '1px dashed var(--paper-3)',
+                borderRadius: 3,
+                color: 'var(--ink-3)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                cursor: 'pointer',
+              }}
+            >
+              cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onSetNote(noteDraft.trim());
+                onClose();
+              }}
+              style={{
+                padding: '3px 10px',
+                background: 'var(--paper-2)',
+                border: '1px solid var(--acid)',
+                borderRadius: 3,
+                color: 'var(--acid)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                cursor: 'pointer',
+              }}
+            >
+              save
+            </button>
+          </div>
+        </div>
+      )}
 
       {onPinAsLane && (
         <>

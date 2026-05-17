@@ -335,6 +335,38 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     }
   };
 
+  // ── inline note edit ──────────────────────────────────────────────────────
+  // window.prompt() throws in Electron renderer; use inline textarea instead.
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [noteValue, setNoteValue] = useState('');
+
+  const startNoteEdit = () => {
+    setNoteValue(state.note ?? '');
+    setIsEditingNote(true);
+  };
+
+  const commitNoteEdit = () => {
+    const trimmed = noteValue.trim();
+    // Send trimmed value (empty string drops the field in the dispatch handler).
+    onCommand('task.setNote', { note: trimmed });
+    setIsEditingNote(false);
+  };
+
+  const cancelNoteEdit = () => {
+    setIsEditingNote(false);
+    setNoteValue('');
+  };
+
+  const handleNoteKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      cancelNoteEdit();
+    } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.stopPropagation();
+      commitNoteEdit();
+    }
+  };
+
   // ── context menu ───────────────────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const { getNodes } = useReactFlow();
@@ -383,14 +415,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     },
     {
       label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
-      onSelect: () => {
-        const current = state.note ?? '';
-        const next = typeof window !== 'undefined'
-          ? window.prompt('Note for this task:', current)
-          : null;
-        if (next === null) return; // cancelled
-        onCommand('task.setNote', { note: next });
-      },
+      onSelect: startNoteEdit,
     },
     {
       label: 'Delete',
@@ -523,27 +548,27 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 4,
-              padding: '2px 6px',
-              width: 60,          // fixed width — label change doesn't reflow neighbors
+              gap: 3,
+              padding: '2px 5px',     // match START button footprint
+              width: 54,              // fits "EVENT" + dot at 8.5px; no reflow
               boxSizing: 'border-box',
               fontFamily: 'var(--font-mono)',
               fontSize: 8.5,
               color: 'var(--ink-3)',
-              background: 'var(--paper-2)',
+              background: 'transparent',
               border: '1px solid var(--paper-3)',
               borderRadius: 3,
               textTransform: 'uppercase',
-              letterSpacing: '0.06em',
+              letterSpacing: '0.04em',
               cursor: 'pointer',
-              opacity: 0.9,
+              opacity: 0.85,
               lineHeight: 1,
             }}
           >
             <span
               style={{
-                width: 5,
-                height: 5,
+                width: 4,
+                height: 4,
                 borderRadius: '50%',
                 background: state.kind === 'focus' ? 'var(--acid)' : 'var(--ink-4)',
                 flexShrink: 0,
@@ -670,34 +695,65 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           )}
         </div>
 
-        {/* Note — free-form text under the task body. Click to edit. */}
-        {state.note && state.note.length > 0 && (
-          <div
-            data-testid="task-note"
-            onClick={(e) => {
-              e.stopPropagation();
-              const next = typeof window !== 'undefined'
-                ? window.prompt('Edit note:', state.note ?? '')
-                : null;
-              if (next === null) return;
-              onCommand('task.setNote', { note: next });
-            }}
+        {/* Note — free-form text under the task body. Click to edit.
+            window.prompt() is blocked in Electron renderer, so we use an
+            inline textarea (Enter+Cmd/Ctrl commits, Escape cancels, blur commits). */}
+        {isEditingNote ? (
+          <textarea
+            data-testid="task-note-editor"
+            value={noteValue}
+            autoFocus
+            placeholder="note… (⌘/Ctrl+Enter to save, Esc to cancel)"
+            onChange={(e) => setNoteValue(e.target.value)}
+            onKeyDown={handleNoteKeyDown}
+            onBlur={commitNoteEdit}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            rows={2}
             style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              resize: 'vertical',
+              minHeight: 36,
               fontFamily: 'var(--font-sans)',
               fontSize: 11,
               lineHeight: 1.4,
-              color: 'var(--ink-3)',
               fontStyle: 'italic',
-              padding: '4px 0 2px',
-              borderTop: '1px dashed var(--paper-3)',
-              cursor: 'text',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
+              color: 'var(--ink-2)',
+              background: 'var(--paper-2)',
+              border: '1px solid var(--ink-4)',
+              borderRadius: 3,
+              outline: 'none',
+              caretColor: 'var(--acid)',
+              padding: '4px 6px',
+              marginTop: 2,
             }}
-            title="Click to edit note"
-          >
-            {state.note}
-          </div>
+          />
+        ) : (
+          state.note && state.note.length > 0 && (
+            <div
+              data-testid="task-note"
+              onClick={(e) => {
+                e.stopPropagation();
+                startNoteEdit();
+              }}
+              style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: 11,
+                lineHeight: 1.4,
+                color: 'var(--ink-3)',
+                fontStyle: 'italic',
+                padding: '4px 0 2px',
+                borderTop: '1px dashed var(--paper-3)',
+                cursor: 'text',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+              title="Click to edit note"
+            >
+              {state.note}
+            </div>
+          )
         )}
 
         {/* F5: footer — tag + ETA (B.2: ETA is double-click editable) */}
