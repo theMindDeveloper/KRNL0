@@ -373,14 +373,16 @@ export function ClockNode({
 
         {/* Day selector — ADR 0004 §3.3. Lets the user page through days
             (← / →), jump to any date via native picker (covers month/year),
-            and snap back to today. Disabled when already on today. */}
+            and snap back to today. Disabled when already on today.
+            Buttons share a single `clock-day-btn` class so hover/focus
+            polish lives in tokens.css (rather than 5 inline copies). */}
         <div
           data-testid="clock-day-bar"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 6,
+            gap: 4,
             padding: '2px 0',
             fontFamily: 'var(--font-mono)',
             fontSize: 10,
@@ -390,40 +392,17 @@ export function ClockNode({
         >
           <button
             type="button"
+            className="clock-day-btn"
             data-testid="clock-day-prev"
             onClick={() => onCommand('clock.advanceDay', { delta: -1 })}
             title="Previous day"
-            style={{
-              padding: '3px 8px',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 12,
-              lineHeight: 1,
-            }}
+            aria-label="Previous day"
           >
-            ←
+            ‹
           </button>
           <label
-            style={{
-              position: 'relative',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '3px 8px',
-              background: isToday ? 'transparent' : 'var(--paper-2)',
-              color: 'var(--ink-2)',
-              border: `1px solid ${isToday ? 'var(--paper-3)' : 'var(--rust)'}`,
-              borderRadius: 4,
-              fontFamily: 'inherit',
-              fontSize: 10,
-              letterSpacing: '0.04em',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+            className="clock-day-chip"
+            data-state={isToday ? 'today' : 'other'}
             title="Pick a date"
           >
             <span data-testid="clock-day-label">
@@ -441,26 +420,16 @@ export function ClockNode({
                 const v = e.target.value;
                 if (v) onCommand('clock.setSelectedDate', { date: v });
               }}
-              style={{
-                position: 'absolute',
-                width: 1,
-                height: 1,
-                opacity: 0,
-                pointerEvents: 'none',
-                border: 0,
-                padding: 0,
-                margin: 0,
-              }}
               tabIndex={-1}
             />
             <span
+              className="clock-day-caret"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 const root = (e.currentTarget.parentElement as HTMLElement | null);
                 const input = root?.querySelector<HTMLInputElement>('input[type="date"]') ?? null;
                 if (input) {
-                  // Modern browsers expose showPicker(); fall back to focus+click.
                   const sp = (input as unknown as { showPicker?: () => void }).showPicker;
                   if (typeof sp === 'function') sp.call(input);
                   else {
@@ -469,11 +438,6 @@ export function ClockNode({
                   }
                 }
               }}
-              style={{
-                color: 'var(--ink-3)',
-                fontSize: 11,
-                lineHeight: 1,
-              }}
               title="Pick a different month or year"
             >
               ▾
@@ -481,44 +445,24 @@ export function ClockNode({
           </label>
           <button
             type="button"
+            className="clock-day-btn clock-day-today"
             data-testid="clock-day-today"
+            data-state={isToday ? 'today' : 'other'}
             onClick={() => onCommand('clock.goToday', {})}
             disabled={isToday}
             title="Jump back to today"
-            style={{
-              padding: '3px 8px',
-              background: isToday ? 'transparent' : 'var(--rust)',
-              color: isToday ? 'var(--ink-4)' : 'var(--paper)',
-              border: `1px solid ${isToday ? 'var(--paper-3)' : 'var(--rust)'}`,
-              borderRadius: 4,
-              cursor: isToday ? 'default' : 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 9,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              opacity: isToday ? 0.6 : 1,
-            }}
           >
             Today
           </button>
           <button
             type="button"
+            className="clock-day-btn"
             data-testid="clock-day-next"
             onClick={() => onCommand('clock.advanceDay', { delta: 1 })}
             title="Next day"
-            style={{
-              padding: '3px 8px',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 12,
-              lineHeight: 1,
-            }}
+            aria-label="Next day"
           >
-            →
+            ›
           </button>
         </div>
 
@@ -702,6 +646,15 @@ export function ClockNode({
                 // Break overlays — track-color stroke cuts through the task
                 // arc cleanly (matches the calendar's dashed-border + stripe
                 // language — neutral panel break in the timeline).
+                //
+                // BUGFIX (2026-05-17): the break stroke previously matched
+                // the task arc's stroke-width exactly, which left a 1-px
+                // anti-aliased halo of the tone color around every break
+                // (so each black break had a faint purple/acid edge that
+                // read as the task bleeding through). Bump the overlay
+                // stroke a touch wider than the base so anti-aliasing
+                // fully covers the underlying arc.
+                const breakStroke = sw + 2;
                 let segCursor = t.start;
                 for (let sIdx = 0; sIdx < breakdown.segments.length; sIdx++) {
                   const seg = breakdown.segments[sIdx]!;
@@ -715,7 +668,7 @@ export function ClockNode({
                         d={arcPath(segCursor, segEnd, r)}
                         fill="none"
                         stroke="var(--paper-3)"
-                        strokeWidth={sw}
+                        strokeWidth={breakStroke}
                         strokeLinecap="butt"
                         opacity={opacity}
                       />,

@@ -1206,6 +1206,38 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       return;
     }
 
+    // ── calendar.selectDate: cross-node mirror — sync every clock's day ──
+    // Follow-up to ADR 0004 §3.1. The ADR keeps Clock and Calendar
+    // independent by *default* — but user feedback (2026-05-17) was that
+    // when they click a day in the month view they expect the clock to
+    // hop to that day's schedule without a second click. We honour that:
+    // calendar.selectDate now also broadcasts the new YYYY-MM-DD to every
+    // clock node on the board. Clocks can still be moved independently
+    // via their own ← / → / picker controls — the sync only fires on
+    // explicit calendar clicks, not on every render.
+    if (node.kind === 'calendar' && command === 'calendar.selectDate') {
+      const sel = applyCommand(node, command, args);
+      if (sel?.state !== undefined) {
+        updateNode(nodeId, { state: sel.state });
+      }
+      const date = (args as { date?: unknown }).date;
+      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const fresh = useBoardStore.getState().board;
+        if (fresh) {
+          for (const cn of fresh.nodes) {
+            if (cn.kind !== 'clock') continue;
+            const cs = cn.state as ClockState;
+            if (cs.selectedDate !== date) {
+              updateNode(cn.id, { state: { ...cs, selectedDate: date } });
+            }
+          }
+        }
+      }
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+      return;
+    }
+
     // ── calendar.activateTask: cross-node router — fire task.activate on target ─
     // Slice 3: clicking a scheduled task block in WeekView should activate the
     // task (light up its chain). The block lives inside CalendarNode, so

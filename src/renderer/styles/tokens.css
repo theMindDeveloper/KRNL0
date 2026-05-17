@@ -436,6 +436,105 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   background: var(--term-fg);
 }
 
+/* ── ClockNode day-selector controls (ADR 0004 §3.3) ───────────────────
+   Shared button + chip styling so the row reads as a coherent control
+   instead of four mismatched outlined boxes. Round shape, subtle hover,
+   focus-visible ring; the `data-state="other"` modifier on Today flips
+   it into "you're off today" emphasis. */
+.clock-day-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.clock-day-btn:hover {
+  background: var(--paper-3);
+  color: var(--ink);
+}
+.clock-day-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--rust);
+}
+.clock-day-today {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 10px;
+}
+.clock-day-today[data-state="other"] {
+  background: var(--rust);
+  color: var(--ink-on-bright);
+}
+.clock-day-today[data-state="other"]:hover {
+  background: var(--rust-deep);
+  color: var(--ink-on-bright);
+}
+.clock-day-today:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.clock-day-today:disabled:hover {
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+.clock-day-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+.clock-day-chip:hover {
+  background: var(--paper-3);
+}
+.clock-day-chip[data-state="other"] {
+  border-color: var(--rust);
+}
+.clock-day-chip input[type="date"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+}
+.clock-day-caret {
+  color: var(--ink-3);
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: auto;
+}
+
 /* ── TaskNode checkbox — light: green box w/ dark check ; dark: dark
    box w/ green check (Wave-D fix: user reported the dark-mode rendering
    looked like "green-on-white" — switching to green-on-black so the
