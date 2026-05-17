@@ -1,7 +1,8 @@
-import { app, BrowserWindow, Menu, protocol } from 'electron';
-import { join } from 'path';
+import { app, BrowserWindow, Menu, protocol, net } from 'electron';
+import { join, normalize, sep } from 'path';
 import { mkdirSync, copyFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
+import { pathToFileURL } from 'url';
 import { registerHandlers, getCliDispatch } from './ipc/handlers';
 import {
   registerAssetHandlers,
@@ -18,8 +19,16 @@ if (process.env['KRNL0_USER_DATA']) {
 }
 
 // Privileged scheme registration MUST happen before app.whenReady() so
-// Chromium treats responses from krnl-asset:// as standard, secure-origin
-// content — required for <img src="krnl-asset://..."> under default CSP.
+// Chromium treats responses from these schemes as standard, secure-origin
+// content.
+//
+// krnl-asset:// — used for <img src="krnl-asset://...">.
+// krnl-app://   — used to serve the renderer in packaged builds instead of
+//                  file://. Third-party embeds (YouTube iframe, Stripe, …)
+//                  refuse to handshake with file:// parents because the
+//                  origin is not "secure". krnl-app:// gives the renderer a
+//                  proper origin so embeds work. Dev keeps using
+//                  http://localhost:<port>.
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'krnl-asset',
@@ -27,6 +36,17 @@ protocol.registerSchemesAsPrivileged([
       standard: true,
       secure: true,
       supportFetchAPI: true,
+      stream: true,
+      bypassCSP: false,
+    },
+  },
+  {
+    scheme: 'krnl-app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
       stream: true,
       bypassCSP: false,
     },
@@ -59,10 +79,41 @@ function createWindow(): BrowserWindow {
     void win.loadURL(`http://localhost:${devPort}`);
     win.webContents.openDevTools();
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'));
+    void win.loadURL('krnl-app://krnl0/index.html');
   }
 
   return win;
+}
+
+// Serve the built renderer over krnl-app:// instead of file://. Without this,
+// the renderer's origin is file:// — YouTube's embed iframe refuses the
+// postMessage handshake from file:// parents and the player never starts.
+// The `oembed` fetch also fails CORS preflight from file://. krnl-app:// is
+// treated as a standard, secure origin by Chromium, fixing both.
+function registerAppProtocol(): void {
+  const rendererRoot = join(__dirname, '../renderer');
+  try {
+    protocol.handle('krnl-app', async (req) => {
+      try {
+        const url = new URL(req.url);
+        // Default `/` and trailing-slash requests to index.html.
+        let pathname = url.pathname.replace(/^\/+/, '');
+        if (pathname === '' || pathname.endsWith('/')) pathname += 'index.html';
+        // Resolve and clamp to rendererRoot so a crafted ../../ can't escape.
+        const filePath = normalize(join(rendererRoot, pathname));
+        const rootWithSep = rendererRoot.endsWith(sep) ? rendererRoot : rendererRoot + sep;
+        if (filePath !== rendererRoot && !filePath.startsWith(rootWithSep)) {
+          return new Response('forbidden', { status: 403 });
+        }
+        return net.fetch(pathToFileURL(filePath).toString());
+      } catch (err) {
+        console.warn('[krnl-app] handler failed:', err);
+        return new Response('', { status: 500 });
+      }
+    });
+  } catch (err) {
+    console.warn('[krnl-app] protocol.handle registration failed:', err);
+  }
 }
 
 // ── CLI dir setup + RPC server ─────────────────────────────────────────────
@@ -104,6 +155,7 @@ app.whenReady().then(() => {
   registerHandlers(rpcServer);
   registerAssetHandlers();
   registerAssetProtocol();
+  registerAppProtocol();
   createWindow();
 
   app.on('activate', () => {
