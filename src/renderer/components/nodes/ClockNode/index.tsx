@@ -433,11 +433,10 @@ export function ClockNode({
               // around it for many tracks before overflowing the node bounds.
               const STROKE = 4;           // thin train track
               const LANE_GAP = 2;         // gap between adjacent tracks
-              // Innermost track inner-edge sits exactly at R_ARC (clock radius).
-              // Stroke is centered at R_ARC + STROKE/2 so the ring hugs the
-              // clock's outer perimeter with zero gap.
+              // Aggressively pulled inward — visible clock chassis extends well
+              // past R_ARC, so we anchor first ring at R_TICK_OUT + tiny offset.
               const radiusForLane = (lane: number): number =>
-                R_ARC + STROKE / 2 + lane * (STROKE + LANE_GAP);
+                R_TICK_OUT + 4 + lane * (STROKE + LANE_GAP);
               const radiusFor = (t: TaskEntry): number =>
                 radiusForLane(laneByTaskId.get(t.id) ?? 0);
               const stroke = STROKE;
