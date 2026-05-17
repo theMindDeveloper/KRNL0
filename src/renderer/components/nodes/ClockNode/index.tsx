@@ -343,11 +343,27 @@ export function ClockNode({
                 - Breaks rendered as semi-transparent white overlays — the task
                   tone shows through faintly so the worm reads as one task. */}
             {(() => {
-              // Compute per-task ring offset for parallel stacking.
-              // Each parallel branch shifts inward by RING_GAP.
+              // Compute per-task ring offset (Apple-fitness style concentric rings).
+              // Lane assignment uses interval-graph coloring on TIME OVERLAP, not
+              // just graph-parallel edges. Any two tasks whose [start, end) ranges
+              // intersect get pushed to different lanes.
               const RING_GAP = 6;
+              const sortedByStart = [...tasks].sort((a, b) => a.start - b.start);
+              const laneEnds: number[] = []; // laneEnds[i] = end-time of last task placed in lane i
+              const laneByTaskId = new Map<string, number>();
+              for (const t of sortedByStart) {
+                // Pick the lowest lane whose last task ended at-or-before this start.
+                let lane = laneEnds.findIndex((end) => end <= t.start);
+                if (lane === -1) {
+                  lane = laneEnds.length;
+                  laneEnds.push(t.end);
+                } else {
+                  laneEnds[lane] = t.end;
+                }
+                laneByTaskId.set(t.id, lane);
+              }
               const ringOffset = (t: TaskEntry): number =>
-                t.parallelBranchIndex !== null ? t.parallelBranchIndex * RING_GAP : 0;
+                (laneByTaskId.get(t.id) ?? 0) * RING_GAP;
               return tasks.flatMap((t, i) => {
                 const ended  = nowFloat >= t.end;
                 const active = i === activeIdx;
