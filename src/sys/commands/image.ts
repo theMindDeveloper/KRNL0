@@ -9,7 +9,7 @@
 
 import { readFileSync } from 'fs';
 import { extname } from 'path';
-import { mutateBoard } from '../../main/boardIo';
+import { mutateBoard, readBoardFile } from '../../main/boardIo';
 import { writeAsset } from '../../main/ipc/assets';
 import type { SysResult } from '../SysFacade';
 
@@ -34,11 +34,42 @@ function importAsset(absPath: string): {
   }
 }
 
+/** Resolve --near source geometry for sibling placement: returns position at srcX + srcW + 24, srcY. */
+function resolveNearPosition(near: string): { x: number; y: number } | null {
+  const board = readBoardFile();
+  if (!board) return null;
+  let src: Record<string, unknown> | undefined;
+  src = board.nodes.find((n) => n['id'] === near);
+  if (!src && near.length >= 4) {
+    const matches = board.nodes.filter((n) => typeof n['id'] === 'string' && (n['id'] as string).startsWith(near));
+    if (matches.length === 1) src = matches[0];
+  }
+  if (!src) return null;
+  const pos = (src['position'] as { x: number; y: number } | undefined) ?? { x: 0, y: 0 };
+  const state = (src['state'] as Record<string, unknown> | null | undefined) ?? {};
+  let w = typeof state['width'] === 'number' ? state['width'] : 0;
+  if (w === 0) {
+    switch (src['kind']) {
+      case 'text': w = 200; break;
+      case 'image': w = 240; break;
+      default: w = 280; break;
+    }
+  }
+  return { x: pos.x + w + 24, y: pos.y };
+}
+
 export function imageAdd(
   path: string | undefined,
   at: { x: number; y: number } | undefined,
+  near?: string,
 ): SysResult {
   if (!path) return { ok: false, message: 'sys image add: missing <path>' };
+  let position = at ?? { x: 0, y: 0 };
+  if (near) {
+    const nearPos = resolveNearPosition(near);
+    if (!nearPos) return { ok: false, message: `image add --near: no node matching "${near}"` };
+    position = nearPos;
+  }
   const imported = importAsset(path);
   if (!imported) {
     return { ok: false, message: `sys image add: failed to import "${path}"` };
@@ -48,7 +79,7 @@ export function imageAdd(
     board.nodes.push({
       id,
       kind: 'image',
-      position: at ?? { x: 0, y: 0 },
+      position,
       isMother: false,
       state: {
         assetId: imported.assetId,

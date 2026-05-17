@@ -33,6 +33,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'unschedule', usage: 'task unschedule <ref>', summary: 'Clear the scheduled time from a task' },
       { name: 'addNext', usage: 'task addNext <sourceRef> "<text>" [--duration <min>]', summary: 'Add a sequential successor task after source' },
       { name: 'list', usage: 'task list [<todoId>] [--json]', summary: 'List tasks, optionally filtered by TodoNode. IDs/refs accept ≥4-char prefix or unique text.' },
+      { name: 'kind', usage: 'task kind <ref> <focus|event>', summary: 'Set task kind discriminator (Decision 28). Refuses on active pomo task in headless mode.' },
+      { name: 'note', usage: 'task note <ref> "<text>" | --clear', summary: 'Set or clear a free-form note on a task' },
     ],
   },
   {
@@ -55,6 +57,15 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'remove', usage: 'habit remove <id|name>', summary: 'Remove a habit' },
       { name: 'view', usage: 'habit view <week|month|year>', summary: 'Set habit view mode' },
       { name: 'list', usage: 'habit list [--json]', summary: 'List all habits' },
+      { name: 'rename', usage: 'habit rename <id|name> "<new>"', summary: 'Rename a habit' },
+      { name: 'icon', usage: 'habit icon <id|name> <icon> | --clear', summary: 'Set or clear per-habit icon glyph/emoji' },
+      { name: 'note', usage: 'habit note <id|name> "<text>" | --clear', summary: 'Set or clear a free-form note on a habit' },
+      { name: 'schedule', usage: 'habit schedule <id|name> --daily --at HH:MM [--duration N]', summary: 'Set daily schedule (--daily / --weekly --days 1,2,5 / --weekdays). --at expects HH:MM format.' },
+      { name: 'unschedule', usage: 'habit unschedule <id|name>', summary: 'Clear habit schedule' },
+      { name: 'archive', usage: 'habit archive <id|name>', summary: 'Archive a habit (hidden from grid)' },
+      { name: 'show', usage: 'habit show <id|name> [--json]', summary: 'Show full habit detail including schedule and log count' },
+      { name: 'pin', usage: 'habit pin <id|name>', summary: 'Spawn a habit.lane card on the canvas (requires open renderer, exit 2 if detached)' },
+      { name: 'unpin', usage: 'habit unpin <id|name>', summary: 'Remove the habit.lane card (requires open renderer, exit 2 if detached)' },
     ],
   },
   {
@@ -64,13 +75,14 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'start', usage: 'pomo start [--label "..."] [--minutes 25]', summary: 'Start a pomo session' },
       { name: 'stop', usage: 'pomo stop', summary: 'Stop/cancel the current session' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
+      { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor]', summary: 'Update board-scoped PomoConfig on the mother PomoNode' },
     ],
   },
   {
     group: 'text',
     summary: 'Manage TextNodes on the canvas',
     subcommands: [
-      { name: 'add', usage: 'text add [--text "..."] [--at x,y]', summary: 'Add a text node' },
+      { name: 'add', usage: 'text add [--text "..."] [--at x,y] [--near <ref>]', summary: 'Add a text node. --near positions at srcX + srcW + 24, srcY' },
       { name: 'set', usage: 'text set <id> --text "..."', summary: 'Update text node content' },
       { name: 'resize', usage: 'text resize <id> --w N --h N', summary: 'Resize a text node' },
     ],
@@ -79,10 +91,39 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'image',
     summary: 'Manage ImageNodes on the canvas',
     subcommands: [
-      { name: 'add', usage: 'image add <abs-path> [--at x,y]', summary: 'Add an image node' },
+      { name: 'add', usage: 'image add <abs-path> [--at x,y] [--near <ref>]', summary: 'Add an image node. --near positions at srcX + srcW + 24, srcY' },
       { name: 'replace', usage: 'image replace <id> <abs-path>', summary: 'Replace image asset' },
       { name: 'resize', usage: 'image resize <id> --w N --h N', summary: 'Resize an image node' },
       { name: 'clear', usage: 'image clear <id>', summary: 'Remove image asset from node' },
+    ],
+  },
+  {
+    group: 'frame',
+    summary: 'Manage FrameNodes (grouping containers) on the canvas',
+    subcommands: [
+      { name: 'add', usage: 'frame add [--label "..."] [--at x,y] [--w N] [--h N] [--tint cyan|spine|rust|plum|neutral] [--near <ref>]', summary: 'Add a frame. --near centers frame on source node and seeds childIds' },
+      { name: 'label', usage: 'frame label <ref> "<text>"', summary: 'Update frame label' },
+      { name: 'resize', usage: 'frame resize <ref> --w N --h N', summary: 'Resize a frame' },
+      { name: 'tint', usage: 'frame tint <ref> <cyan|spine|rust|plum|neutral>', summary: 'Change frame tint color' },
+      { name: 'list', usage: 'frame list [--json]', summary: 'List all frames' },
+      { name: 'contents', usage: 'frame contents <ref> [--json]', summary: 'List persisted childIds of a frame (reads state, no geometry recompute)' },
+    ],
+  },
+  {
+    group: 'analytics',
+    summary: 'Analytics reads from board state (headless-capable)',
+    subcommands: [
+      { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
+      { name: 'totals', usage: 'analytics totals [--range N] [--json]', summary: 'Show task/habit/focus totals over N days (default 30)' },
+      { name: 'streaks', usage: 'analytics streaks [--json]', summary: 'Show habit streak data' },
+    ],
+  },
+  {
+    group: 'log',
+    summary: 'EventLog reads (requires open renderer — exit 2 if detached)',
+    subcommands: [
+      { name: 'tail', usage: 'log tail [--limit N] [--json]', summary: 'Tail the in-memory event ring buffer (200 entries max, cleared on reload). Requires open renderer.' },
+      { name: 'stats', usage: 'log stats [--json]', summary: 'Show event log summary stats. Reads in-memory ring buffer (200 entries max, cleared on reload). Requires open renderer.' },
     ],
   },
   {
@@ -175,9 +216,10 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
   },
   {
     group: 'theme',
-    summary: 'UI theme (requires open renderer)',
+    summary: 'UI theme',
     subcommands: [
-      { name: 'set', usage: 'theme set <light|dark>', summary: 'Switch renderer theme' },
+      { name: 'set', usage: 'theme set <light|dark>', summary: 'Switch renderer theme (requires open renderer)' },
+      { name: 'show', usage: 'theme show [--json]', summary: 'Read current theme from settings (headless-capable)' },
     ],
   },
   {

@@ -40,10 +40,10 @@ export type SysCommand =
   | { kind: 'edge'; sub: 'enable' | 'disable'; id: string | undefined }
   | { kind: 'info'; json: boolean }
   | { kind: 'settings'; sub: 'show'; json: boolean }
-  | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined }
+  | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
   | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
-  | { kind: 'image'; sub: 'add'; path: string | undefined; at: { x: number; y: number } | undefined }
+  | { kind: 'image'; sub: 'add'; path: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined }
   | { kind: 'image'; sub: 'replace'; id: string | undefined; path: string | undefined }
   | { kind: 'image'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
   | { kind: 'image'; sub: 'clear'; id: string | undefined }
@@ -66,7 +66,52 @@ export type SysCommand =
   | { kind: 'sfx'; sub: 'play'; clipId: string | undefined }
   | { kind: 'sfx'; sub: 'stop' }
   | { kind: 'sfx'; sub: 'list' }
-  | { kind: 'help'; group: string | undefined; sub: string | undefined };
+  | { kind: 'help'; group: string | undefined; sub: string | undefined }
+  // Decision 29 — new commands
+  | { kind: 'task'; sub: 'kind'; ref: string | undefined; taskKind: 'focus' | 'event' | undefined }
+  | { kind: 'task'; sub: 'note'; ref: string | undefined; text: string | undefined; clear: boolean }
+  | { kind: 'habit'; sub: 'rename'; ref: string | undefined; newName: string | undefined }
+  | { kind: 'habit'; sub: 'icon'; ref: string | undefined; icon: string | undefined; clear: boolean }
+  | { kind: 'habit'; sub: 'note'; ref: string | undefined; text: string | undefined; clear: boolean }
+  | {
+      kind: 'habit';
+      sub: 'schedule';
+      ref: string | undefined;
+      scheduleKind: 'daily' | 'weekly' | 'weekdays';
+      days: number[] | undefined;
+      /** Set to a non-empty string describing the invalid token when strict CSV parsing fails. */
+      invalidDays: string | undefined;
+      at: string | undefined;
+      durationMin: number | undefined;
+    }
+  | { kind: 'habit'; sub: 'unschedule'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'archive'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'show'; ref: string | undefined; json: boolean }
+  | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
+  | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined }
+  | {
+      kind: 'frame';
+      sub: 'add';
+      label: string | undefined;
+      at: { x: number; y: number } | undefined;
+      w: number | undefined;
+      h: number | undefined;
+      tint: string | undefined;
+      near: string | undefined;
+    }
+  | { kind: 'frame'; sub: 'label'; ref: string | undefined; label: string | undefined }
+  | { kind: 'frame'; sub: 'resize'; ref: string | undefined; w: number | undefined; h: number | undefined }
+  | { kind: 'frame'; sub: 'tint'; ref: string | undefined; tint: string | undefined }
+  | { kind: 'frame'; sub: 'list'; json: boolean }
+  | { kind: 'frame'; sub: 'contents'; ref: string | undefined; json: boolean }
+  | { kind: 'analytics'; sub: 'show'; view: string | undefined; range: number | undefined; metric: string | undefined; json: boolean }
+  | { kind: 'analytics'; sub: 'totals'; range: number | undefined; json: boolean }
+  | { kind: 'analytics'; sub: 'streaks'; json: boolean }
+  | { kind: 'log'; sub: 'tail'; limit: number | undefined; json: boolean }
+  | { kind: 'log'; sub: 'stats'; json: boolean }
+  | { kind: 'theme'; sub: 'show'; json: boolean }
+;
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
@@ -160,6 +205,18 @@ export class SysParser {
           minutes: minutesRaw !== undefined ? Number(minutesRaw) : undefined,
         };
       }
+      // Decision 29 — pomo config
+      if (sub === 'config') {
+        const allArgs = rest;
+        return {
+          kind: 'pomo', sub: 'config',
+          session: numFlag(allArgs, 'session'),
+          short: numFlag(allArgs, 'short'),
+          long: numFlag(allArgs, 'long'),
+          every: numFlag(allArgs, 'every'),
+          face: flag(allArgs, 'face'),
+        };
+      }
     }
 
     if (cmd === 'todo') {
@@ -251,6 +308,17 @@ export class SysParser {
           durationMin: durRaw !== undefined ? Number(durRaw) : undefined,
         };
       }
+      if (sub === 'kind') {
+        const kv = rest[1] as string | undefined;
+        const taskKind: 'focus' | 'event' | undefined =
+          kv === 'focus' || kv === 'event' ? kv : undefined;
+        return { kind: 'task', sub: 'kind', ref: rest[0], taskKind };
+      }
+      if (sub === 'note') {
+        const clearFlag = hasFlag(rest, 'clear');
+        // text is the first positional arg after ref (rest[0])
+        return { kind: 'task', sub: 'note', ref: rest[0], text: rest[1], clear: clearFlag };
+      }
     }
 
     if (cmd === 'cal') {
@@ -288,6 +356,66 @@ export class SysParser {
       if (sub === 'view') {
         return { kind: 'habit', sub: 'view', view: rest[0] };
       }
+      // Decision 29 — new habit subcommands
+      if (sub === 'rename') {
+        return { kind: 'habit', sub: 'rename', ref: rest[0], newName: rest[1] };
+      }
+      if (sub === 'icon') {
+        return { kind: 'habit', sub: 'icon', ref: rest[0], icon: rest[1], clear: hasFlag(rest, 'clear') };
+      }
+      if (sub === 'note') {
+        return { kind: 'habit', sub: 'note', ref: rest[0], text: rest[1], clear: hasFlag(rest, 'clear') };
+      }
+      if (sub === 'schedule') {
+        const ref = rest[0];
+        const durRaw = flag(rest, 'duration');
+        const durationMin = durRaw !== undefined ? Number(durRaw) : undefined;
+        const atVal = flag(rest, 'at');
+        if (hasFlag(rest, 'daily')) {
+          return { kind: 'habit', sub: 'schedule', ref, scheduleKind: 'daily', days: undefined, invalidDays: undefined, at: atVal, durationMin };
+        }
+        if (hasFlag(rest, 'weekdays')) {
+          return { kind: 'habit', sub: 'schedule', ref, scheduleKind: 'weekdays', days: undefined, invalidDays: undefined, at: atVal, durationMin };
+        }
+        if (hasFlag(rest, 'weekly')) {
+          const daysStr = flag(rest, 'days');
+          if (!daysStr) {
+            return { kind: 'habit', sub: 'schedule', ref, scheduleKind: 'weekly', days: undefined, invalidDays: 'missing --days', at: atVal, durationMin };
+          }
+          // Strict CSV parsing (Decision 29 §4): each token must match /^[1-7]$/
+          const tokens = daysStr.split(',');
+          const dayNums: number[] = [];
+          let invalidToken: string | undefined;
+          for (const tok of tokens) {
+            if (!/^[1-7]$/.test(tok)) {
+              invalidToken = tok;
+              break;
+            }
+            dayNums.push(Number(tok));
+          }
+          if (invalidToken !== undefined) {
+            return { kind: 'habit', sub: 'schedule', ref, scheduleKind: 'weekly', days: undefined, invalidDays: invalidToken, at: atVal, durationMin };
+          }
+          return { kind: 'habit', sub: 'schedule', ref, scheduleKind: 'weekly', days: dayNums, invalidDays: undefined, at: atVal, durationMin };
+        }
+        // Unknown schedule kind — let handler reject
+        return { kind: 'habit', sub: 'schedule', ref, scheduleKind: 'daily', days: undefined, invalidDays: 'missing --daily/--weekly/--weekdays flag', at: atVal, durationMin };
+      }
+      if (sub === 'unschedule') {
+        return { kind: 'habit', sub: 'unschedule', ref: rest[0] };
+      }
+      if (sub === 'archive') {
+        return { kind: 'habit', sub: 'archive', ref: rest[0] };
+      }
+      if (sub === 'show') {
+        return { kind: 'habit', sub: 'show', ref: rest[0], json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'pin') {
+        return { kind: 'habit', sub: 'pin', ref: rest[0] };
+      }
+      if (sub === 'unpin') {
+        return { kind: 'habit', sub: 'unpin', ref: rest[0] };
+      }
     }
 
     if (cmd === 'edge') {
@@ -311,6 +439,7 @@ export class SysParser {
           kind: 'text', sub: 'add',
           text: flag(rest, 'text'),
           at: atStr ? parseAt(atStr) : undefined,
+          near: flag(rest, 'near'),
         };
       }
       if (sub === 'set') {
@@ -333,6 +462,7 @@ export class SysParser {
           kind: 'image', sub: 'add',
           path: rest[0],
           at: atStr ? parseAt(atStr) : undefined,
+          near: flag(rest, 'near'),
         };
       }
       if (sub === 'replace') {
@@ -394,6 +524,76 @@ export class SysParser {
     if (cmd === 'theme') {
       if (sub === 'set') {
         return { kind: 'theme', sub: 'set', value: rest[0] };
+      }
+      // Decision 29 — theme show (headless-capable read)
+      if (sub === 'show' || sub === undefined) {
+        return { kind: 'theme', sub: 'show', json: hasFlag(rest, 'json') };
+      }
+    }
+
+    // Decision 29 — frame CRUD
+    if (cmd === 'frame') {
+      if (sub === 'add') {
+        const atStr = flag(rest, 'at');
+        return {
+          kind: 'frame', sub: 'add',
+          label: flag(rest, 'label'),
+          at: atStr ? parseAt(atStr) : undefined,
+          w: numFlag(rest, 'w'),
+          h: numFlag(rest, 'h'),
+          tint: flag(rest, 'tint'),
+          near: flag(rest, 'near'),
+        };
+      }
+      if (sub === 'label') {
+        return { kind: 'frame', sub: 'label', ref: rest[0], label: rest[1] };
+      }
+      if (sub === 'resize') {
+        return { kind: 'frame', sub: 'resize', ref: rest[0], w: numFlag(rest, 'w'), h: numFlag(rest, 'h') };
+      }
+      if (sub === 'tint') {
+        return { kind: 'frame', sub: 'tint', ref: rest[0], tint: rest[1] };
+      }
+      if (sub === 'list') {
+        return { kind: 'frame', sub: 'list', json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'contents') {
+        return { kind: 'frame', sub: 'contents', ref: rest[0], json: hasFlag(rest, 'json') };
+      }
+    }
+
+    // Decision 29 — analytics reads
+    if (cmd === 'analytics') {
+      if (sub === 'show') {
+        const rangeRaw = flag(rest, 'range');
+        return {
+          kind: 'analytics', sub: 'show',
+          view: flag(rest, 'view'),
+          range: rangeRaw !== undefined ? Number(rangeRaw) : undefined,
+          metric: flag(rest, 'metric'),
+          json: hasFlag(rest, 'json'),
+        };
+      }
+      if (sub === 'totals') {
+        const rangeRaw = flag(rest, 'range');
+        return {
+          kind: 'analytics', sub: 'totals',
+          range: rangeRaw !== undefined ? Number(rangeRaw) : undefined,
+          json: hasFlag(rest, 'json'),
+        };
+      }
+      if (sub === 'streaks') {
+        return { kind: 'analytics', sub: 'streaks', json: hasFlag(rest, 'json') };
+      }
+    }
+
+    // Decision 29 — log reads (renderer-required)
+    if (cmd === 'log') {
+      if (sub === 'tail') {
+        return { kind: 'log', sub: 'tail', limit: numFlag(rest, 'limit'), json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'stats') {
+        return { kind: 'log', sub: 'stats', json: hasFlag(rest, 'json') };
       }
     }
 

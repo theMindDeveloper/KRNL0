@@ -6,32 +6,43 @@
 import { randomUUID } from 'crypto';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
+import type { CliDispatchFn } from '../SysFacade';
 import {
   habitAdd,
   habitToggleDay,
   habitRemove,
   habitSetColor,
   habitSetView,
+  habitRename,
+  habitSetIcon,
+  habitSetNote,
+  habitArchive,
+  habitSetSchedule,
   calcStreak,
 } from '../../renderer/components/nodes/HabitNode/commands';
 import type {
   Habit,
   HabitColor,
   HabitConfig,
+  HabitSchedule,
   HabitState,
   HabitView,
+  IsoDow,
 } from '../../renderer/components/nodes/HabitNode/types';
 import {
   HABIT_COLORS,
   HABIT_VIEWS,
   isHabitColor,
   isHabitView,
+  isValidTimeOfDay,
   todayLocal,
 } from '../../renderer/components/nodes/HabitNode/types';
 
 export interface HabitCtx {
   boardPath: string;
   onBoardChanged?: () => void;
+  /** Phase 2: renderer-coupled dispatch for renderer-required commands. */
+  cliDispatch?: CliDispatchFn;
 }
 
 interface MotherHabitNode {
@@ -301,6 +312,312 @@ export async function cliList(ctx: HabitCtx, json = false): Promise<SysResult> {
     message: `habits (view: ${mother.config.view ?? 'week'}):\n${lines}`,
     data: { view: mother.config.view ?? 'week', habits: rows },
   };
+}
+
+// ── Decision 29 — new habit lifecycle commands ───────────────────────────────
+
+export async function cliRename(
+  ctx: HabitCtx,
+  ref: string | undefined,
+  newName: string | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit rename requires <id|name>' };
+  if (!newName || !newName.trim()) return { ok: false, message: 'habit rename requires "<new>"' };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  mother.state = habitRename(mother.state, { id: resolved.habit.id, name: newName });
+  writeBoard(ctx, board, mother);
+  return {
+    ok: true,
+    message: `habit renamed: "${resolved.habit.name}" → "${newName.trim()}"`,
+    data: { id: resolved.habit.id, name: newName.trim() },
+  };
+}
+
+export async function cliIcon(
+  ctx: HabitCtx,
+  ref: string | undefined,
+  icon: string | undefined,
+  clear: boolean,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit icon requires <id|name>' };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  const iconValue = clear ? '' : (icon ?? '');
+  mother.state = habitSetIcon(mother.state, { id: resolved.habit.id, icon: iconValue });
+  writeBoard(ctx, board, mother);
+  const action = clear || !iconValue.trim() ? 'cleared' : `set to "${iconValue.trim()}"`;
+  return {
+    ok: true,
+    message: `habit icon for "${resolved.habit.name}" ${action}`,
+    data: { id: resolved.habit.id },
+  };
+}
+
+export async function cliNote(
+  ctx: HabitCtx,
+  ref: string | undefined,
+  text: string | undefined,
+  clear: boolean,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit note requires <id|name>' };
+  if (!clear && text === undefined) {
+    return { ok: false, message: 'habit note requires "<text>" or --clear' };
+  }
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  const noteValue = clear ? '' : (text ?? '');
+  mother.state = habitSetNote(mother.state, { id: resolved.habit.id, note: noteValue });
+  writeBoard(ctx, board, mother);
+  const trimmed = noteValue.trim();
+  const action = trimmed ? `set to "${trimmed}"` : 'cleared';
+  return {
+    ok: true,
+    message: `habit note for "${resolved.habit.name}" ${action}`,
+    data: { id: resolved.habit.id },
+  };
+}
+
+export async function cliSchedule(
+  ctx: HabitCtx,
+  ref: string | undefined,
+  scheduleKind: 'daily' | 'weekly' | 'weekdays',
+  days: number[] | undefined,
+  at: string | undefined,
+  durationMin: number | undefined,
+  invalidDays: string | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit schedule requires <id|name>' };
+
+  // Check for CSV parse error flagged by the parser
+  if (invalidDays !== undefined) {
+    return {
+      ok: false,
+      message: [
+        `habit schedule --weekly: invalid --days value "${invalidDays}".`,
+        'Usage: habit schedule <ref> --weekly --days <csv> --at HH:MM [--duration N]',
+        '--days must be a comma-separated list of ISO 1–7 integers (1=Mon … 7=Sun).',
+        'String day names are not accepted. Each token must match /^[1-7]$/.',
+      ].join('\n'),
+      data: { exitCode: 1 },
+    };
+  }
+
+  if (!at) {
+    return { ok: false, message: 'habit schedule requires --at HH:MM' };
+  }
+  if (!isValidTimeOfDay(at)) {
+    return {
+      ok: false,
+      message: `habit schedule: invalid --at value "${at}". Expected HH:MM (24-hour, e.g. 09:30).`,
+      data: { exitCode: 1 },
+    };
+  }
+
+  if (scheduleKind === 'weekly') {
+    if (!days || days.length === 0) {
+      return {
+        ok: false,
+        message: 'habit schedule --weekly requires --days <csv>. Each token must match /^[1-7]$/.',
+      };
+    }
+  }
+
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+
+  let schedule: HabitSchedule;
+  if (scheduleKind === 'daily') {
+    schedule = {
+      kind: 'daily',
+      timeOfDay: at,
+      ...(durationMin !== undefined ? { durationMin } : {}),
+    };
+  } else if (scheduleKind === 'weekdays') {
+    schedule = {
+      kind: 'weekdays',
+      timeOfDay: at,
+      ...(durationMin !== undefined ? { durationMin } : {}),
+    };
+  } else {
+    // weekly — days is validated above
+    schedule = {
+      kind: 'weekly',
+      timeOfDay: at,
+      days: (days as IsoDow[]),
+      ...(durationMin !== undefined ? { durationMin } : {}),
+    };
+  }
+
+  mother.state = habitSetSchedule(mother.state, { habitId: resolved.habit.id, schedule });
+  writeBoard(ctx, board, mother);
+  return {
+    ok: true,
+    message: `habit "${resolved.habit.name}" scheduled: ${JSON.stringify(schedule)}`,
+    data: { id: resolved.habit.id, schedule },
+  };
+}
+
+export async function cliUnschedule(
+  ctx: HabitCtx,
+  ref: string | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit unschedule requires <id|name>' };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  mother.state = habitSetSchedule(mother.state, { habitId: resolved.habit.id, schedule: null });
+  writeBoard(ctx, board, mother);
+  return {
+    ok: true,
+    message: `habit "${resolved.habit.name}" unscheduled`,
+    data: { id: resolved.habit.id },
+  };
+}
+
+export async function cliArchive(
+  ctx: HabitCtx,
+  ref: string | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit archive requires <id|name>' };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  if (resolved.habit.archived) {
+    return { ok: true, message: `habit "${resolved.habit.name}" is already archived`, data: { id: resolved.habit.id } };
+  }
+  mother.state = habitArchive(mother.state, { id: resolved.habit.id });
+  writeBoard(ctx, board, mother);
+  return {
+    ok: true,
+    message: `habit archived: "${resolved.habit.name}"`,
+    data: { id: resolved.habit.id },
+  };
+}
+
+export async function cliShow(
+  ctx: HabitCtx,
+  ref: string | undefined,
+  json = false,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit show requires <id|name>' };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  const h = resolved.habit;
+  const today = todayLocal();
+  const streak = calcStreak(h.log, today);
+
+  const data: {
+    id: string;
+    name: string;
+    color: string;
+    icon?: string;
+    archived: boolean;
+    createdAt: string;
+    streak: number;
+    logCount: number;
+    recentLog: string[];
+    schedule?: HabitSchedule;
+    note?: string;
+  } = {
+    id: h.id,
+    name: h.name,
+    color: h.color,
+    ...(h.icon !== undefined ? { icon: h.icon } : {}),
+    archived: h.archived,
+    createdAt: h.createdAt,
+    streak,
+    logCount: h.log.length,
+    recentLog: h.log.slice(0, 5),
+    ...(h.schedule !== undefined ? { schedule: h.schedule } : {}),
+    ...(h.note !== undefined ? { note: h.note } : {}),
+  };
+
+  if (json) {
+    return { ok: true, message: JSON.stringify(data), data };
+  }
+
+  const lines = [
+    `habit: ${h.name}  (${h.id})`,
+    `  color    : ${h.color}${h.icon ? `  icon: ${h.icon}` : ''}`,
+    `  archived : ${h.archived}`,
+    `  created  : ${h.createdAt}`,
+    `  streak   : ${streak} day${streak === 1 ? '' : 's'}`,
+    `  log count: ${h.log.length}`,
+    `  recent   : ${data.recentLog.join(', ') || '(none)'}`,
+  ];
+  if (h.schedule) lines.push(`  schedule : ${JSON.stringify(h.schedule)}`);
+  if (h.note) lines.push(`  note     : ${h.note}`);
+
+  return { ok: true, message: lines.join('\n'), data };
+}
+
+/**
+ * `krnl habit pin <ref>` — renderer-required (exit 2 if detached).
+ * Dispatches `habit.spawnLane` through the renderer's cli:dispatch channel.
+ */
+export async function cliPin(
+  ctx: HabitCtx,
+  ref: string | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit pin requires <id|name>' };
+  if (!ctx.cliDispatch) {
+    return {
+      ok: false,
+      message: 'habit pin requires an open renderer window (exit 2 = no renderer)',
+      data: { exitCode: 2 },
+    };
+  }
+  // We need to resolve the habit to get its id. Load the board file-side to resolve.
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  return ctx.cliDispatch('habit.spawnLane', { habitId: resolved.habit.id });
+}
+
+/**
+ * `krnl habit unpin <ref>` — renderer-required (exit 2 if detached).
+ * Dispatches `habit.unpinLane` to remove the habit.lane node for this habit.
+ */
+export async function cliUnpin(
+  ctx: HabitCtx,
+  ref: string | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit unpin requires <id|name>' };
+  if (!ctx.cliDispatch) {
+    return {
+      ok: false,
+      message: 'habit unpin requires an open renderer window (exit 2 = no renderer)',
+      data: { exitCode: 2 },
+    };
+  }
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  return ctx.cliDispatch('habit.unpinLane', { habitId: resolved.habit.id });
 }
 
 // ── Legacy stubs (kept for back-compat with any caller importing them
