@@ -291,6 +291,13 @@
   50%      { filter: drop-shadow(0 0 10px currentColor); }
 }
 
+/* HabitSwapModal — time picker mount-in animation. Small fade + slide up so
+   the picker doesn't pop into place when the modal opens or re-renders. */
+@keyframes krnl-time-picker-in {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
 /* ClockNode — continuous 60s sweep for the second hand. CSS-driven so the
    hand glides smoothly without forcing a 1Hz React re-render of the whole
    clock SVG (the Wave C+ stutter fix). The wrapping <g> sets
