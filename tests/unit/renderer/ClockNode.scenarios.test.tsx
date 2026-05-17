@@ -326,11 +326,15 @@ describe('Removed elements are absent', () => {
     expect(hasWindowBtn).toBe(false);
   });
 
-  it('does NOT render day-selector buttons', () => {
+  // ADR 0004 §3.3 — the day selector was re-introduced (prev/next/today
+  // + a hidden native date input for month/year jumps). These elements
+  // are now expected to exist on every render.
+  it('renders day-selector controls (ADR 0004)', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
-    expect(document.querySelector('[data-testid="clock-day-next"]')).toBeNull();
-    expect(document.querySelector('[data-testid="clock-day-prev"]')).toBeNull();
-    expect(document.querySelector('[data-testid="clock-day-today"]')).toBeNull();
+    expect(document.querySelector('[data-testid="clock-day-next"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="clock-day-prev"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="clock-day-today"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="clock-day-input"]')).not.toBeNull();
   });
 });
