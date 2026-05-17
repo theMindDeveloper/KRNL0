@@ -1244,6 +1244,23 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       selectionMode={SelectionMode.Partial}
       panOnDrag={[1, 2]}
       multiSelectionKeyCode={['Control', 'Meta', 'Shift']}
+      // Trackpad-first gestures:
+      //   • Two-finger drag on a trackpad fires wheel events with deltaX/deltaY
+      //     — `panOnScroll` makes those events pan the canvas the way macOS
+      //     Maps / Figma / Miro do.
+      //   • Pinch fires `wheel` with ctrlKey synthesised by the OS;
+      //     `zoomOnPinch` (default) catches it.
+      //   • Cmd (macOS) / Ctrl (Win/Linux) + scroll wheel = zoom. The default
+      //     activation key list is ['Meta','Control'], which matches the macOS
+      //     and Windows mental model.
+      //   • Plain mouse-wheel without modifier pans vertically — for users
+      //     without a trackpad, hold Cmd/Ctrl to zoom.
+      panOnScroll
+      panOnScrollSpeed={0.8}
+      zoomOnScroll
+      zoomOnPinch
+      zoomActivationKeyCode={['Meta', 'Control']}
+      panActivationKeyCode={null}
       fitView={false}
       minZoom={0.25}
       maxZoom={4}

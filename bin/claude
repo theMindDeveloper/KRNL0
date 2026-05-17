@@ -1,0 +1,53 @@
+#!/bin/sh
+# krnl0 — claude shim.
+#
+# When the embedded TerminalNode launches a POSIX shell (zsh/bash/fish on
+# macOS or Linux), the user typing `claude` should land inside the project's
+# claude/ directory so Claude Code auto-discovers claude/CLAUDE.md (the krnl
+# CLI reference). KRNL0_CLAUDE_HOME is set by the main process to that path.
+#
+# This mirrors the PowerShell wrap in krnl-init.ps1. We can't rely on shell
+# rc files because users may have arbitrary $SHELL / $ZDOTDIR setups; placing
+# a `claude` executable inside $KRNL0_CLI_DIR (which is prepended to PATH
+# when the pty spawns) wins over the real binary in any POSIX shell.
+#
+# The shim:
+#   1. Resolves the real `claude` binary on PATH, skipping this shim.
+#   2. cd's into $KRNL0_CLAUDE_HOME (if it exists) for the child process only.
+#   3. Execs the real binary with all forwarded args.
+#
+# Pass-through behaviour: if KRNL0_CLAUDE_HOME is unset or doesn't exist, or
+# the real claude binary can't be located, the shim falls back gracefully.
+
+set -e
+
+self="$0"
+self_dir="$(cd "$(dirname "$self")" && pwd)"
+
+# Find the real claude binary on PATH, skipping anything that lives in our
+# CLI dir (which is this shim).
+real=""
+IFS=:
+for dir in $PATH; do
+  case "$dir" in
+    "$self_dir"|"$KRNL0_CLI_DIR") continue ;;
+  esac
+  candidate="$dir/claude"
+  if [ -x "$candidate" ] && [ ! -d "$candidate" ]; then
+    real="$candidate"
+    break
+  fi
+done
+unset IFS
+
+if [ -z "$real" ]; then
+  echo "krnl0: claude executable not found on PATH" >&2
+  echo "       install Claude Code, then try again: https://docs.claude.com/claude-code" >&2
+  exit 127
+fi
+
+if [ -n "$KRNL0_CLAUDE_HOME" ] && [ -d "$KRNL0_CLAUDE_HOME" ]; then
+  cd "$KRNL0_CLAUDE_HOME"
+fi
+
+exec "$real" "$@"

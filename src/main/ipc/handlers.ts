@@ -223,6 +223,21 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     }
     childEnv['KRNL0_MAIN_PID'] = String(process.pid);
 
+    // Make the shell behave like a modern terminal (iTerm2 / Ghostty / Alacritty).
+    // xterm.js renders 24-bit colour, but ncurses-based tools read $TERM and
+    // $COLORTERM to decide whether to emit true-colour escape sequences. Without
+    // these the shell falls back to the 8/16-colour palette and tools like
+    // `claude`, `htop`, `nvim`, and `bat` look washed out.
+    if (!isWin) {
+      childEnv['TERM'] = childEnv['TERM'] ?? 'xterm-256color';
+      childEnv['COLORTERM'] = 'truecolor';
+      // Identifies the host terminal to apps that adapt UI per terminal
+      // (e.g. claude, gh, fzf). Mirroring the iTerm convention is the
+      // most-compatible option.
+      childEnv['TERM_PROGRAM'] = 'KRNL0';
+      childEnv['LANG'] = childEnv['LANG'] ?? 'en_US.UTF-8';
+    }
+
     // Tell krnl-init.ps1 where claude/CLAUDE.md lives so the wrapped
     // `claude` function runs the real binary with CWD = <project>/claude.
     // Claude Code auto-discovers CLAUDE.md from the CWD upward, so a CWD
@@ -290,7 +305,9 @@ export function registerHandlers(rpcServer?: RpcServer): void {
         rows,
         cwd,
         env: childEnv,
-        name: 'xterm-color',
+        // 256-colour terminfo entry — matches the COLORTERM=truecolor hint
+        // and unlocks the rich colour palette used by claude, fzf, nvim, etc.
+        name: 'xterm-256color',
       });
     } catch (err) {
       const e = err as NodeJS.ErrnoException;

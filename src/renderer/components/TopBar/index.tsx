@@ -11,6 +11,15 @@ import { useReactFlow } from '@xyflow/react';
 
 type Theme = 'light' | 'dark';
 
+// macOS traffic lights (red/yellow/green) live in the top-left of the window
+// because main uses `titleBarStyle: 'hidden'`. Their click area extends to
+// roughly 72-78px. Without an offset, the KRNL0 logo and brand chip render
+// directly under them and the lights eclipse the mark.
+const IS_MAC =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+const MAC_TRAFFIC_LIGHT_INSET = 78;
+
 function readStoredTheme(): Theme {
   try {
     const val = localStorage.getItem('krnl0-theme');
@@ -61,7 +70,13 @@ export function TopBar() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 16px',
+        // Left padding clears the macOS traffic-light cluster so the brand
+        // mark and breadcrumb never sit underneath the red/yellow/green
+        // controls. Windows/Linux render controls on the right, so the
+        // standard 16px inset is fine.
+        paddingTop: 0,
+        paddingBottom: 0,
+        paddingLeft: IS_MAC ? MAC_TRAFFIC_LIGHT_INSET : 16,
         paddingRight: 158,
         flexShrink: 0,
         zIndex: 100,
