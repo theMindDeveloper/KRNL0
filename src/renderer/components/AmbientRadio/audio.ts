@@ -71,7 +71,10 @@ interface YTNamespace {
       width: string | number;
       videoId: string;
       playerVars?: Record<string, string | number>;
-      events?: { onReady?: (e: { target: YTPlayer }) => void };
+      events?: {
+        onReady?: (e: { target: YTPlayer }) => void;
+        onStateChange?: (e: { target: YTPlayer; data: number }) => void;
+      };
     },
   ) => YTPlayer;
 }
@@ -649,19 +652,27 @@ export function loadYouTubeVideo(videoId: string, volume0to100: number, mountId:
     ytPlayer = new YT.Player(mountId, {
       height: '1', width: '1', videoId,
       // Chromium blocks unmuted autoplay unless the page has high
-      // media-engagement signals (e.g. the second tutorial track works
-      // in our flow but the rickroll doesn't). Starting muted is always
-      // allowed; we unMute() inside onReady so the user hears the track
-      // anyway. enablejsapi=1 is set automatically by YT.Player.
-      playerVars: { autoplay: 1, controls: 0, playsinline: 1, mute: 1 },
+      // media-engagement signals. Starting muted is always allowed; we
+      // unMute() once the player actually reaches PLAYING state via
+      // onStateChange — much more reliable than a fixed setTimeout.
+      // `origin` lets YouTube validate the postMessage handshake against
+      // our loopback HTTP origin (otherwise some videos refuse to start).
+      // enablejsapi=1 is set automatically by YT.Player.
+      playerVars: {
+        autoplay: 1,
+        controls: 0,
+        playsinline: 1,
+        mute: 1,
+        origin: window.location.origin,
+      },
       events: {
         onReady: (e) => {
           e.target.setVolume(volume0to100);
           e.target.playVideo();
-          // Tiny delay so play() takes effect under the muted policy
-          // before we lift the mute. Without the delay some browsers
-          // race the events and stall the player at frame 0.
-          setTimeout(() => e.target.unMute(), 80);
+        },
+        onStateChange: (e) => {
+          // YT.PlayerState.PLAYING === 1
+          if (e.data === 1) e.target.unMute();
         },
       },
     });

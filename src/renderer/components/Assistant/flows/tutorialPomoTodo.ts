@@ -53,11 +53,17 @@ export const tutorialPomoTodoFlow: Flow = {
       // before we try to mount a player.
       { kind: 'wait', ms: 2500 },
 
-      // The bait — play the rickroll at the user's current YT volume
+      // The bait — play the rickroll at the user's current YT volume.
+      // NOTE: if this stops landing because YouTube changes embed rules
+      // for dQw4w9WgXcQ, swap RICKROLL_YT_URL above to any video that
+      // still embeds — extractYouTubeId() handles both /watch?v= and
+      // youtu.be/ short URLs.
       { kind: 'radioPlayYouTube', url: RICKROLL_YT_URL },
-      // Short dwell — long enough for the user to register what's playing,
-      // not so long that the joke overstays its welcome.
-      { kind: 'wait', ms: 2800 },
+      // Dwell long enough for the IFrame to mount, the mute->unMute
+      // handshake to complete, AND for the user to register what's
+      // playing. Old 2800ms was tight enough that a slow YT init in
+      // packaged Electron made the bait inaudible before the swap.
+      { kind: 'wait', ms: 5000 },
 
       // Jen catches herself
       { kind: 'speak', clip: 'tut1_00d', text: 'Nah — not this. Sorry.' },

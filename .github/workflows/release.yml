@@ -84,11 +84,18 @@ jobs:
 
       # Package via electron-builder. GitHub renders unset secrets as the
       # empty string, and electron-builder treats CSC_LINK="" as "user
-      # provided a cert" then errors out trying to read an empty path. So
-      # we strip empty CSC vars at runtime before calling electron-builder,
-      # and disable mac keychain auto-discovery when no signing cert is
-      # present. To enable signing, add these repo secrets and they will
-      # flow through unchanged:
+      # provided a cert" then errors out trying to read an empty path.
+      # So we strip empty CSC vars at runtime before invoking the build.
+      #
+      # NOTE: do NOT set CSC_IDENTITY_AUTO_DISCOVERY=false. That would
+      # disable electron-builder's ad-hoc signing fallback on macOS, and
+      # Apple Silicon (arm64) refuses to launch apps with zero signature
+      # ("KRNL0.app is damaged and cant be opened"). With auto-discovery
+      # left enabled and no real cert present, electron-builder falls back
+      # to ad-hoc signing, which IS enough to satisfy arm64's "must have
+      # SOME signature" Gatekeeper check.
+      #
+      # To enable real signing later, add these repo secrets:
       #   macOS: MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD, APPLE_ID,
       #          APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
       #   Windows: WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD
@@ -99,7 +106,6 @@ jobs:
           for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
             if [ -z "${!v}" ]; then unset "$v"; fi
           done
-          if [ -z "${CSC_LINK:-}" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
           npx electron-builder ${{ matrix.ebuild_args }} --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
