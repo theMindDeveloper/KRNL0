@@ -11,10 +11,11 @@
  */
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { NodeResizer } from '@xyflow/react';
+import { NodeResizeControl } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { ImageState, ImageConfig } from './types';
 import { ingestImageFile } from '../../Canvas/dropImage';
+import { useCornerProximity } from '../../../hooks/useCornerProximity';
 
 export function ImageNode({
   node,
@@ -75,12 +76,19 @@ export function ImageNode({
 
   const hasAsset = Boolean(assetId) && !imgFailed;
 
+  // Proximity reveal for the corner resize handle — invisible until the
+  // cursor is within ~48px of the bottom-right corner.
+  const corner = useCornerProximity({ threshold: 48 });
+  const showHandle = corner.near || selected === true;
+
   return (
     <div
+      ref={corner.rootRef}
       className="krnl-image-node"
       data-testid="image-node-root"
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseLeave={() => { setHover(false); corner.onMouseLeave(); }}
+      onMouseMove={corner.onMouseMove}
       style={{
         width: '100%',
         height: '100%',
@@ -97,25 +105,45 @@ export function ImageNode({
         borderRadius: 'var(--radius-lg, 10px)',
       }}
     >
-      <NodeResizer
-        isVisible={selected === true}
+      {/* Resize handle — single bottom-right control with the same
+          diagonal-stripe glyph AnalyticsNode uses. Shift held during drag
+          keeps the aspect ratio locked. */}
+      <NodeResizeControl
+        position="bottom-right"
         minWidth={120}
         minHeight={80}
         maxWidth={1600}
         maxHeight={1600}
         keepAspectRatio={shiftHeld}
         onResizeEnd={onResizeEnd}
-        handleStyle={{
-          width: 14,
-          height: 14,
-          background: 'var(--acid)',
-          border: '1.5px solid var(--ink)',
-          borderRadius: 3,
-          // Extra hit area without resizing the visible glyph.
-          boxShadow: '0 0 0 6px rgba(0,0,0,0)',
+        style={{
+          background: 'transparent',
+          border: 'none',
+          width: 18,
+          height: 18,
+          right: 2,
+          bottom: 2,
         }}
-        lineStyle={{ borderColor: 'var(--acid)', borderWidth: 1.5 }}
-      />
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          style={{
+            position: 'absolute',
+            right: 2,
+            bottom: 2,
+            cursor: 'nwse-resize',
+            color: '#7d848b',
+            pointerEvents: 'none',
+            opacity: showHandle ? 1 : 0,
+            transition: 'opacity 140ms ease',
+          }}
+          aria-hidden
+        >
+          <path d="M13 5L5 13M13 9L9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      </NodeResizeControl>
 
       <input
         ref={fileInputRef}

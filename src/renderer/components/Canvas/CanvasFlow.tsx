@@ -506,6 +506,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     edgeId: string;
   } | null>(null);
 
+  // Empty-pane right-click menu — lets the user spawn a text / image / frame
+  // node at the click point without reaching for the dock. Carries both
+  // screen coords (for positioning the menu) and flow coords (for placing
+  // the spawned node in the canvas coordinate space).
+  const [paneCtxMenu, setPaneCtxMenu] = useState<{
+    x: number;
+    y: number;
+    flowX: number;
+    flowY: number;
+  } | null>(null);
+  const closePaneCtxMenu = useCallback(() => setPaneCtxMenu(null), []);
+
   const onNodeContextMenu = useCallback(
     (event: React.MouseEvent, rfNode: KrnlRFNode) => {
       event.preventDefault();
@@ -538,6 +550,23 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     e.stopPropagation();
     setEdgeCtxMenu({ x: e.clientX, y: e.clientY, edgeId: edge.id });
   }, []);
+
+  const handlePaneContextMenu = useCallback(
+    (e: React.MouseEvent | MouseEvent) => {
+      e.preventDefault();
+      // Close any other open menu so two never overlap.
+      closeCtxMenu();
+      setEdgeCtxMenu(null);
+      const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      setPaneCtxMenu({
+        x: e.clientX,
+        y: e.clientY,
+        flowX: flow.x,
+        flowY: flow.y,
+      });
+    },
+    [closeCtxMenu, screenToFlowPosition],
+  );
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -665,9 +694,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     return { x: center.x, y: Math.max(center.y, BELOW_MOTHERS_Y) };
   }, [screenToFlowPosition]);
 
-  // ── Dock add-node handler — text/frame land in the dock-spawn lane below
-  //   the mother row; image opens the OS file picker (same lane on default).
-  const handleAddNode = useCallback((args: { kind: NodeKind }) => {
+  // ── Dock / pane-menu add-node handler — text/frame land in the dock-spawn
+  //   lane below the mother row by default, OR at the caller-supplied `at`
+  //   position (used by the empty-canvas right-click menu so spawns appear
+  //   right where the user clicked). image opens the OS file picker; the
+  //   `at` position is stashed in pendingImageDropPos so the spawn after the
+  //   picker resolves at the click point too.
+  const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number } }) => {
     // Auto-enable the layer filter for the spawned kind so the new node is
     // immediately visible. Without this, toggling TEXTS / IMAGES off on the
     // KRNL Dock then clicking "add text" silently spawned a hidden node and
@@ -676,6 +709,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (layer) useLayerVisibility.getState().setLayer(layer, true);
 
     if (args.kind === 'image') {
+      // Stash the desired spawn position so onPickImageFile uses it instead
+      // of the default dock lane. Cleared after the picker resolves.
+      if (args.at) pendingImageDropPos.current = args.at;
       imageFileInputRef.current?.click();
       return;
     }
@@ -692,7 +728,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         return;
       }
     }
-    const pos = defaultDockSpawnPos();
+    const pos = args.at ?? defaultDockSpawnPos();
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
       // clock is a permanent mother — never spawnable via handleAddNode.
@@ -1229,8 +1265,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onConnect={onConnect}
       onNodeContextMenu={onNodeContextMenu}
       onEdgeContextMenu={handleEdgeContextMenu}
-      onPaneClick={closeCtxMenu}
-      onPaneContextMenu={closeCtxMenu}
+      onPaneClick={() => { closeCtxMenu(); closePaneCtxMenu(); setEdgeCtxMenu(null); }}
+      onPaneContextMenu={handlePaneContextMenu}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onMove={onMove}
@@ -1255,8 +1291,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       //     and Windows mental model.
       //   • Plain mouse-wheel without modifier pans vertically — for users
       //     without a trackpad, hold Cmd/Ctrl to zoom.
+      //
+      // `panOnScrollSpeed` is the wheel-delta → flow-units multiplier. macOS
+      // trackpads emit small deltas (≈ 1-4 px / frame) so values < 1 feel
+      // sluggish; 1.25 produces a snappy ratio that matches Figma / Miro on
+      // the same hardware without overshooting on long flicks.
       panOnScroll
-      panOnScrollSpeed={0.8}
+      panOnScrollSpeed={1.25}
       zoomOnScroll
       zoomOnPinch
       zoomActivationKeyCode={['Meta', 'Control']}
@@ -1349,6 +1390,40 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
             },
           }]}
           onDismiss={() => setEdgeCtxMenu(null)}
+        />
+      )}
+
+      {/* Empty-pane right-click — quick spawn at the click point. Mirrors
+          the dock's create buttons but anchors the new node to where the
+          user actually right-clicked instead of the dock-spawn lane. */}
+      {paneCtxMenu !== null && (
+        <ContextMenu
+          x={paneCtxMenu.x}
+          y={paneCtxMenu.y}
+          items={[
+            {
+              label: '+ Text note',
+              onSelect: () => handleAddNode({
+                kind: 'text',
+                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
+              }),
+            },
+            {
+              label: '+ Image…',
+              onSelect: () => handleAddNode({
+                kind: 'image',
+                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
+              }),
+            },
+            {
+              label: '+ Frame',
+              onSelect: () => handleAddNode({
+                kind: 'frame',
+                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
+              }),
+            },
+          ]}
+          onDismiss={closePaneCtxMenu}
         />
       )}
 

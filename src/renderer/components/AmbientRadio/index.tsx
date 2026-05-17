@@ -410,6 +410,12 @@ export function AmbientRadio() {
   const activeLayersRef = useRef(activeLayers);
   const vuPhaseRef = useRef(0);
   const vuRef = useRef<HTMLDivElement | null>(null);
+  // Visibility gates for the render loop — the rAF callback short-circuits
+  // when the widget is collapsed (`hidden=true` → display:none) or the
+  // window is in the background. Reads through refs so toggling them
+  // doesn't re-create the rAF closure (which would briefly drop a frame).
+  const hiddenRef = useRef(false);
+  const docHiddenRef = useRef(typeof document !== 'undefined' && document.hidden);
 
   const draggingRef = useRef(false);
   const dragMovedRef = useRef(false);
@@ -418,6 +424,16 @@ export function AmbientRadio() {
   useEffect(() => { playingRef.current = playing; }, [playing]);
   useEffect(() => { focusedIdRef.current = focusedId; }, [focusedId]);
   useEffect(() => { activeLayersRef.current = activeLayers; }, [activeLayers]);
+  useEffect(() => { hiddenRef.current = hidden; }, [hidden]);
+
+  // Page Visibility — pause the rAF when the window is minimised or in the
+  // background. Costs ~0% when the user is doing anything else; saves a full
+  // 60fps canvas paint when they alt-tab away.
+  useEffect(() => {
+    const onVis = () => { docHiddenRef.current = document.hidden; };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
 
   // Persist state on relevant changes
   useEffect(() => {
@@ -445,6 +461,15 @@ export function AmbientRadio() {
     let raf = 0;
 
     const draw = () => {
+      // Skip the whole canvas pass when the widget is offscreen (collapsed
+      // chip / display:none) or the window is in the background. The rAF
+      // callback still re-arms itself so playback can resume the moment
+      // the widget reopens. macOS rAF runs at ~60Hz; without this gate we
+      // burned a full frame on a canvas the user couldn't see.
+      if (hiddenRef.current || docHiddenRef.current) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       const active = activeLayersRef.current;
       const running = playingRef.current;
       const focused = focusedIdRef.current;

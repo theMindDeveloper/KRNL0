@@ -140,6 +140,16 @@
   opacity: 1;
 }
 
+/* Frames opt out of the hover ring. Frames are large containers whose child
+ * nodes render as DOM siblings (not descendants), so as the cursor crosses
+ * onto a child the frame loses its :hover state, then regains it as the
+ * cursor exits the child — producing a strobe that "flashes everything in
+ * it and itself." A solid resting frame is calmer than a hover ring that
+ * can never stay lit while you traverse the area. */
+.react-flow__node.krnl-kind-frame:hover > div:not(.react-flow__handle)::after {
+  opacity: 0;
+}
+
 /* ── Selection ring strategy ────────────────────────────────────────────────
    Every KRNL node renders its visible card as the FIRST child div of the RF
    wrapper, with inline `boxShadow` for elevation/border glow. Inline styles
