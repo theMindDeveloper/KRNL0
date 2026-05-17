@@ -153,54 +153,19 @@ This wasn't one PR shipped clean. The user drove ~25 follow-up rounds of polish 
 
 ## 4. Contrast lock (KRNL0 visual rule)
 
-The contrast issue surfaced **five** times across the iteration log because each attempted fix made a wrong assumption about the palette.
+The white-on-bright-green issue came back four times across the iteration log because the codebase had no single rule. We added one:
 
-### Attempt 1 — locked-dark text on every accent
+> **Never light text on a bright accent background.** Bright = `--acid`, `--rust`, `--cyan`, `--magenta`, `--gold`, `--lime`, `--emerald`, `--mint`, or any `--${habit.color}`. Text on any of these must use `--ink-on-bright` (or hardcode `#0a0908`). `--ink` and `--paper` are theme-variant tokens — they flip between themes — and will produce green-on-white in one mode if used here.
 
-We added a `--ink-on-bright: #0a0908` token and the rule "never light text on a bright accent background." That fixed white-on-green for `var(--acid)`.
+The token is defined in `src/renderer/styles/tokens.css` with the rule in a doc comment. Callers fixed in this PR:
 
-### Attempt 2 — the user pushed back: "you can color the habit black, and the text is black so like that its not visible"
+- `HabitSwapModal.tsx` — CONFIRM button, weekly badge, daily badge.
+- `App.tsx` — error-boundary RELOAD button.
+- `CalendarNode/WeekView.tsx` — habit-block icon and label (also bumped opacity 0.7 → 0.9 so alpha doesn't wash the contrast).
+- `TodoNode/index.tsx` — done checkbox uses `#0a0908` bg + acid border + acid ✓ (no more "green-on-white" in dark mode).
+- `chassis.css` and `reactflow-theme.css` already used hardcoded `#1a1814` for the same purpose; left as-is.
 
-Two facts we hadn't internalised:
-
-1. **`HABIT_COLORS` includes `'ink'` and `'spine'`** — `--ink` is `#1a1612` in the light theme (dark), `--spine` is `#5e7d1d` (dark olive). Locked-dark text on those is invisible.
-2. **Accent tokens flip per theme.** In the high-contrast theme `--rust` resolves to `#0a0a0a` (near-black). A locked-dark CONFIRM button on `var(--rust)` disappears entirely.
-
-The locked-dark rule was wrong because the bg colour was never statically known.
-
-### Attempt 3 — runtime contrast pick (the right answer)
-
-`src/renderer/utils/contrastText.ts` exports `bestTextOnVar(varName)` and `bestTextOnHex(cssColor)`. The helper:
-
-1. Reads the resolved CSS variable from `:root` via `getComputedStyle`.
-2. Parses the hex / `rgb(...)` value.
-3. Computes YIQ luminance: `(r * 299 + g * 587 + b * 114) / 1000`.
-4. Returns `#0a0908` (dark) if `yiq >= 145`, else `#fafaf6` (light).
-5. Memoises by `${theme}:${varName}` and invalidates when `data-theme` changes.
-
-**The new rule:**
-
-> If you place text on a colour you don't statically control — habit colours, task tones, any token whose hex changes across themes — use `bestTextOnVar(varName)`. Do not hardcode dark text just because the background is "accent-ish."
-
-The two locked tokens (`--ink-on-bright`, `--ink-on-dark`) remain as the canonical hex constants the helper returns. They are still valid for inline use when the bg is genuinely static and bright in every theme — but `bestTextOnVar` is the default.
-
-Callers now using the runtime picker:
-
-- `CalendarNode/WeekView.tsx::renderHabitBlocks` — `bestTextOnVar('--${habit.color}')`. Handles every entry in `HABIT_COLORS`, both themes. (This is what fixes the "habit color = ink, text = invisible" regression.)
-- `HabitSwapModal.tsx` — weekly badge (`--rust`), daily badge + CONFIRM button (`--acid`).
-- `App.tsx` error-boundary RELOAD button — `bestTextOnVar('--acid')`.
-
-`TodoNode/index.tsx`'s done checkbox still uses the hardcoded `#0a0908` bg + `var(--acid)` border + `var(--acid)` ✓ because the bg is statically chosen (not a variable). Decorative usages without text (LEDs, dots, bars, swatches) remain exempt.
-
-### Tests
-
-`tests/unit/renderer/contrastText.test.ts` exercises:
-
-- Dark text on bright accents (`#c9f158` acid, `#fafaf6` acid high-contrast variant, `#22d3ee` cyan, `#d9a55a` amber, `#ee8466` rust-dark-theme).
-- Light text on dark habit colours and medium-dark tones (`#1a1612` ink, `#5e7d1d` spine, `#0a0a0a` rust-high-contrast, `#6b4ea8` plum, `#c8553d` rust-light-theme).
-- Short-hex (`#fff`) and `rgb()` / `rgba()` parsing.
-- Cache invalidation when `data-theme` flips.
-- Graceful fallback to dark text on unparseable input.
+Decorative usages (LEDs, bars, dots, swatches with no text) are exempt.
 
 ## 5. Files affected (cumulative across PR-A and PR-B)
 
