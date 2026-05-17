@@ -31,7 +31,7 @@ export function NumberStepper({
 
   return (
     <div
-      data-testid={testId}
+      data-testid={testId ? `${testId}-wrap` : undefined}
       onClick={stop}
       onMouseDown={stop}
       onPointerDown={stop}
@@ -47,8 +47,12 @@ export function NumberStepper({
         flexShrink: 0,
       }}
     >
-      {/* Number field — native spinner hidden via global CSS in tokens.css */}
+      {/* Number field — native spinner hidden via global CSS in tokens.css.
+          The testId lands on the <input> itself so callers can use
+          fireEvent.change to set its .value directly (jsdom only exposes
+          value-setters on actual form fields, not on wrapping divs). */}
       <input
+        data-testid={testId}
         type="number"
         value={value}
         min={min}

@@ -854,17 +854,75 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         >
           ←
         </button>
-        <span
-          data-testid="week-label"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-1)',
-            letterSpacing: '0.06em',
-          }}
-        >
-          Week of {weekLabel}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <span
+            data-testid="week-label"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              color: 'var(--ink-1)',
+              letterSpacing: '0.06em',
+            }}
+          >
+            Week of {weekLabel}
+          </span>
+
+          {/* Legend chip — explains the two block treatments used on the
+              calendar surface: solid = work session, diagonal-stripe with
+              dashed top border = break. Same visual language as the actual
+              calendar-task-break-tail renderer above. */}
+          <div
+            data-testid="week-legend"
+            title="Solid = work session • Striped (dashed top) = break"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '2px 7px',
+              background: 'var(--paper-2)',
+              border: '1px dashed var(--paper-3)',
+              borderRadius: 3,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-3)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 12,
+                  height: 9,
+                  background: 'var(--acid)',
+                  borderRadius: 1,
+                  display: 'inline-block',
+                  opacity: 0.85,
+                }}
+              />
+              session
+            </span>
+            <span style={{ color: 'var(--ink-4)' }}>·</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 12,
+                  height: 9,
+                  borderRadius: 1,
+                  borderTop: '1px dashed var(--acid)',
+                  backgroundImage:
+                    'repeating-linear-gradient(135deg, var(--acid) 0 1px, transparent 1px 4px)',
+                  display: 'inline-block',
+                  opacity: 0.85,
+                }}
+              />
+              break
+            </span>
+          </div>
+        </div>
         <button
           type="button"
           data-testid="week-next"

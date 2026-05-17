@@ -98,6 +98,15 @@
   --font-sans:  'JetBrains Mono', 'Geist', ui-monospace, ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Instrument Serif', Georgia, serif;
 
+  /* Contrast lock.
+   * Theme-invariant near-black for text that sits ON a bright accent
+   * background (--acid, --rust, --cyan, habit colors, etc.). KRNL0 rule:
+   * white-on-bright-green is never allowed. Always use --ink-on-bright
+   * (or hardcode #0a0908) for buttons/badges/blocks whose background is
+   * one of the accent tokens. --ink alone is theme-variant and will flip
+   * to cream in dark mode, producing the green-on-white miscontrast. */
+  --ink-on-bright: #0a0908;
+
   /* Orb */
   --orb-size: 56px;
 
