@@ -280,10 +280,11 @@
   100% { transform: translateY(0);    }
 }
 
-/* ClockNode — active-task arc breathes via drop-shadow blur (PR5). */
+/* ClockNode — active-task arc breathes via subtle opacity pulse.
+   Drop-shadow blur removed (was producing a melty halo on thin rings). */
 @keyframes clock-arc-pulse {
-  0%, 100% { filter: drop-shadow(0 0 4px  currentColor); }
-  50%      { filter: drop-shadow(0 0 10px currentColor); }
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
 }
 
 /* ClockNode — continuous 60s sweep for the second hand. CSS-driven so the
