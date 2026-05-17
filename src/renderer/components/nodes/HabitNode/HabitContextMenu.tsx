@@ -19,6 +19,7 @@ interface Props {
   onRename: (name: string) => void;
   onSetColor: (color: HabitColor) => void;
   onSetIcon: (icon: string) => void;
+  onSetNote: (note: string) => void;
   onDelete: () => void;
   onClose: () => void;
   // v2.2 — only the parent HabitNode passes this; the lane's own menu omits
@@ -36,6 +37,7 @@ export function HabitContextMenu({
   onRename,
   onSetColor,
   onSetIcon,
+  onSetNote,
   onDelete,
   onClose,
   onPinAsLane,
@@ -309,6 +311,18 @@ export function HabitContextMenu({
           </button>
         </div>
       )}
+
+      <MenuItem
+        label={habit.note && habit.note.length > 0 ? 'Edit note' : 'Add note'}
+        onClick={() => {
+          const next = typeof window !== 'undefined'
+            ? window.prompt('Note for this habit:', habit.note ?? '')
+            : null;
+          if (next === null) { onClose(); return; }
+          onSetNote(next);
+          onClose();
+        }}
+      />
 
       {onPinAsLane && (
         <>

@@ -27,6 +27,8 @@ export interface TaskState {
   completedAt?: string;          // ISO 8601
   // Decision 28 — kind discriminator. Default 'focus' for back-compat (migration in board.ts).
   kind: TaskKind;
+  // Free-form text note shown under the task body. Empty/missing = no note.
+  note?: string;
 }
 
 export interface TaskConfig {
