@@ -431,7 +431,7 @@ export function ClockNode({
               // Each new lane stacks further outward (larger radius).
               // Thin uniform stroke — no shrinking; the clock has free space
               // around it for many tracks before overflowing the node bounds.
-              const STROKE = 4;           // thin train track
+              const STROKE = 7;           // train track width
               const LANE_GAP = 2;         // gap between adjacent tracks
               // Aggressively pulled inward — visible clock chassis extends well
               // past R_ARC, so we anchor first ring at R_TICK_OUT + tiny offset.
