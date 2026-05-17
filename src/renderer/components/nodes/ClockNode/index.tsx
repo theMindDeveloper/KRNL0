@@ -209,6 +209,27 @@ export function ClockNode({
 
   const activeIdx = tasks.findIndex((t) => nowFloat >= t.start && nowFloat < t.end);
 
+  // Hoisted track-geometry constants — also consumed by the now-pointer
+  // so it spans exactly from the innermost ring inner-edge to the outermost
+  // ring outer-edge (no spill under the clock, no overshoot past max ring).
+  const TRACK_STROKE = 7;
+  const TRACK_LANE_GAP = 2;
+  const trackBaseR = R_TICK_OUT + 8; // center radius of lane 0
+  const trackTotalLanes = (() => {
+    // Re-run the same overlap lane assignment used inside the SVG IIFE
+    // to know how many concentric tracks exist.
+    const sorted = [...tasks].sort((a, b) => a.start - b.start);
+    const ends: number[] = [];
+    for (const t of sorted) {
+      const lane = ends.findIndex((end) => end <= t.start);
+      if (lane === -1) ends.push(t.end);
+      else ends[lane] = t.end;
+    }
+    return Math.max(1, ends.length);
+  })();
+  const trackInnerEdge = trackBaseR - TRACK_STROKE / 2;
+  const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
+
   const activeProgress = activeIdx >= 0
     ? (nowFloat - tasks[activeIdx]!.start) / (tasks[activeIdx]!.end - tasks[activeIdx]!.start)
     : 0;
@@ -431,12 +452,12 @@ export function ClockNode({
               // Each new lane stacks further outward (larger radius).
               // Thin uniform stroke — no shrinking; the clock has free space
               // around it for many tracks before overflowing the node bounds.
-              const STROKE = 7;           // train track width
-              const LANE_GAP = 2;         // gap between adjacent tracks
-              // Aggressively pulled inward — visible clock chassis extends well
-              // past R_ARC, so we anchor first ring at R_TICK_OUT + tiny offset.
+              // Track geometry comes from the hoisted constants so the
+              // now-pointer (rendered after this IIFE) can use the same span.
+              const STROKE = TRACK_STROKE;
+              const LANE_GAP = TRACK_LANE_GAP;
               const radiusForLane = (lane: number): number =>
-                R_TICK_OUT + 8 + lane * (STROKE + LANE_GAP);
+                trackBaseR + lane * (STROKE + LANE_GAP);
               const radiusFor = (t: TaskEntry): number =>
                 radiusForLane(laneByTaskId.get(t.id) ?? 0);
               const stroke = STROKE;
@@ -523,16 +544,14 @@ export function ClockNode({
               return [...tracks, ...arcs];
             })()}
 
-            {/* Now-pointer — crosses the train tracks at current time,
-                like the calendar's now-line. Shows where each task arc is
-                relative to the current moment. */}
+            {/* Now-pointer — spans exactly the train-track band.
+                Inner end = innermost ring inner-edge.
+                Outer end = outermost ring outer-edge.
+                With 1 ring: line is exactly the width of that single ring. */}
             {(() => {
-              const innerR = R_TICK_OUT + 2;   // just outside clock face
-              const outerR = R_TICK_OUT + 28;  // well past the outer tracks
-              const dotR   = R_TICK_OUT + 8;   // sits on first track
-              const pIn  = pt(nowFloat, innerR);
-              const pOut = pt(nowFloat, outerR);
-              const pDot = pt(nowFloat, dotR);
+              const pIn  = pt(nowFloat, trackInnerEdge);
+              const pOut = pt(nowFloat, trackOuterEdge);
+              const pDot = pt(nowFloat, trackBaseR);
               return (
                 <>
                   <line
