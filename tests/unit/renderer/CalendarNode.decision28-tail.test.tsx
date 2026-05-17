@@ -201,7 +201,7 @@ describe('WeekView — break tail (Decision 28 §6)', () => {
     expect(tails.length).toBe(0);
   });
 
-  it('break tail has background var(--paper-3)', () => {
+  it('break tail has short zone with background var(--paper-3)', () => {
     const todoId = 'todo-tail-4';
     const t1 = makeTaskNode('t1', todoId, {
       plannedMin: 75,
@@ -213,6 +213,9 @@ describe('WeekView — break tail (Decision 28 §6)', () => {
 
     const tail = document.querySelector('[data-testid="calendar-task-break-tail"]') as HTMLElement;
     expect(tail).not.toBeNull();
-    expect(tail.style.background).toBe('var(--paper-3)');
+    // Follow-up: tail wrapper now contains short + long zones (long is distinct).
+    const shortZone = tail.querySelector('[data-testid="calendar-task-break-short"]') as HTMLElement;
+    expect(shortZone).not.toBeNull();
+    expect(shortZone.style.background).toBe('var(--paper-3)');
   });
 });

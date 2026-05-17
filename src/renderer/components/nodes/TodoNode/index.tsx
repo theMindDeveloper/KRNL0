@@ -9,6 +9,9 @@ import { ContextMenu } from '../../ContextMenu';
 import type { ContextMenuItem } from '../../ContextMenu';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
+import type { PomoConfig } from '../PomoNode/types';
+import { defaultPomoConfig } from '../PomoNode/types';
+import { breakdownPomoTime } from '../../../store/pomoSchedule';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -54,6 +57,28 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         map.set(n.id, st.plannedMin ?? st.durationMin ?? 25);
       }
       return map;
+    }),
+  );
+
+  // Build a map from taskNodeId → kind for the three-numbers display.
+  const taskKindMap = useBoardStore(
+    useShallow((s): Map<string, 'focus' | 'event'> => {
+      if (!s.board) return new Map();
+      const map = new Map<string, 'focus' | 'event'>();
+      for (const n of s.board.nodes) {
+        if (n.kind !== 'todo.task') continue;
+        const st = n.state as { kind?: 'focus' | 'event' };
+        map.set(n.id, st.kind ?? 'focus');
+      }
+      return map;
+    }),
+  );
+
+  // Read PomoConfig for live breakdown calculations.
+  const pomoConfig = useBoardStore(
+    useShallow((s) => {
+      const pomo = s.board?.nodes.find((n) => n.kind === 'pomo');
+      return (pomo?.config as PomoConfig | null) ?? defaultPomoConfig();
     }),
   );
 
@@ -477,6 +502,36 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                     {item.text}
                   </span>
                 )}
+
+                {/* Three-numbers display: work / break / total (mono, right-aligned).
+                    Only shown when item is wired to a task node (has taskNodeId). */}
+                {item.taskNodeId !== null && (() => {
+                  const planned = taskPlannedMin.get(item.taskNodeId) ?? 25;
+                  const kind = taskKindMap.get(item.taskNodeId) ?? 'focus';
+                  const bd = kind === 'event'
+                    ? { workMin: planned, breakMin: 0, effectiveMin: planned }
+                    : breakdownPomoTime(planned, 0, pomoConfig);
+                  return (
+                    <span
+                      data-testid="todo-item-breakdown"
+                      title={`work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m`}
+                      style={{
+                        flexShrink: 0,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 9,
+                        color: 'var(--ink-4)',
+                        letterSpacing: '0.04em',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span style={{ color: 'var(--ink-3)' }}>{bd.workMin}</span>
+                      <span style={{ opacity: 0.5 }}>·</span>
+                      <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
+                      <span style={{ opacity: 0.5 }}>·</span>
+                      <span style={{ color: 'var(--acid)' }}>{bd.effectiveMin}m</span>
+                    </span>
+                  );
+                })()}
 
                 {/* F2: tag pill — 4-char max, mono uppercase */}
                 {item.tag !== undefined && (

@@ -6,7 +6,8 @@ import { defaultPomoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
-import type { TaskState } from '../TaskNode/types';
+import type { TaskState, TaskKind } from '../TaskNode/types';
+import { breakdownPomoTime } from '../../../store/pomoSchedule';
 import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
@@ -107,25 +108,50 @@ export function PomoNode({
 
   // Decision 22 §4 + F10 + A.6 — derive plannedSessions from the active task's
   // plannedMin, and also read that task's pomoSessionsCompleted for the per-task counter.
-  const { activeTaskPlannedMin, activeTaskPomoSessionsCompleted } = useBoardStore(
+  // Also expose kind for event-vs-focus rendering decisions.
+  const { activeTaskPlannedMin, activeTaskPomoSessionsCompleted, activeTaskKind } = useBoardStore(
     useShallow((s) => {
       const id = state.activeTaskId;
       if (!id || !s.board) {
-        return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
+        return {
+          activeTaskPlannedMin: null,
+          activeTaskPomoSessionsCompleted: 0,
+          activeTaskKind: 'focus' as TaskKind,
+        };
       }
       const t = s.board.nodes.find((n) => n.id === id);
-      if (!t) return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
+      if (!t) {
+        return {
+          activeTaskPlannedMin: null,
+          activeTaskPomoSessionsCompleted: 0,
+          activeTaskKind: 'focus' as TaskKind,
+        };
+      }
       const ts = t.state as TaskState;
       return {
         activeTaskPlannedMin: ts.plannedMin ?? null,
         activeTaskPomoSessionsCompleted: ts.pomoSessionsCompleted ?? 0,
+        activeTaskKind: (ts.kind ?? 'focus') as TaskKind,
       };
     }),
   );
 
+  const isEventTask = isTaskMode && activeTaskKind === 'event';
+
   const pipCount = isTaskMode && activeTaskPlannedMin
-    ? Math.max(1, Math.ceil(activeTaskPlannedMin / config.sessionMin))
+    ? (isEventTask
+        ? 1
+        : Math.max(1, Math.ceil(activeTaskPlannedMin / config.sessionMin)))
     : config.longBreakEvery;
+
+  // Three-numbers breakdown for the active task (Decision 28 follow-up).
+  // Computed from the current PomoConfig so it tracks gear edits live.
+  // For events: workMin = plannedMin, breakMin = 0.
+  const taskBreakdown = isTaskMode && activeTaskPlannedMin
+    ? (isEventTask
+        ? { workMin: activeTaskPlannedMin, breakMin: 0, effectiveMin: activeTaskPlannedMin }
+        : breakdownPomoTime(activeTaskPlannedMin, 0, config))
+    : null;
 
   // A.6 — when in task mode, use the per-task session counter
   const sessionsForDisplay = isTaskMode
@@ -550,6 +576,39 @@ export function PomoNode({
               {buttonLabel}
             </button>
           </div>
+
+          {/* Three-numbers breakdown — work / break / total — for the active task.
+              Hidden in free-pomo mode (no active task). Updates live as PomoConfig changes. */}
+          {taskBreakdown !== null && (
+            <div
+              data-testid="pomo-breakdown"
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                color: 'var(--ink-3)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginTop: 4,
+                paddingTop: 8,
+                borderTop: '1px dashed var(--paper-3)',
+              }}
+            >
+              <span data-testid="pomo-breakdown-work">
+                <span style={{ color: 'var(--ink-4)' }}>WORK </span>
+                <span style={{ color: 'var(--ink-2)' }}>{taskBreakdown.workMin}m</span>
+              </span>
+              <span data-testid="pomo-breakdown-break">
+                <span style={{ color: 'var(--ink-4)' }}>BREAK </span>
+                <span style={{ color: 'var(--ink-2)' }}>{taskBreakdown.breakMin}m</span>
+              </span>
+              <span data-testid="pomo-breakdown-total">
+                <span style={{ color: 'var(--ink-4)' }}>TOTAL </span>
+                <span style={{ color: 'var(--acid)' }}>{taskBreakdown.effectiveMin}m</span>
+              </span>
+            </div>
+          )}
         </div>
       )}
     </MotherFrame>

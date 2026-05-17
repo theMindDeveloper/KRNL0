@@ -673,20 +673,60 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                   pointerEvents: 'none',
                 }}
               />
-              {/* Break tail — bottom fraction of the block */}
-              <div
-                data-testid="calendar-task-break-tail"
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: `${(breakdown.breakMin / breakdown.effectiveMin) * 100}%`,
-                  background: 'var(--paper-3)',
-                  borderTop: `1px solid ${taskTone}`,
-                  pointerEvents: 'none',
-                }}
-              />
+              {/* Break tail — bottom fraction of the block.
+                  Split into short-break (top of tail, lighter) and long-break
+                  (bottom of tail, ink-3) zones so long breaks read distinctly. */}
+              {(() => {
+                const shortTotal = breakdown.segments
+                  .filter((seg) => seg.kind === 'short')
+                  .reduce((sum, seg) => sum + seg.min, 0);
+                const longTotal = breakdown.segments
+                  .filter((seg) => seg.kind === 'long')
+                  .reduce((sum, seg) => sum + seg.min, 0);
+                const tailPct = (breakdown.breakMin / breakdown.effectiveMin) * 100;
+                const shortFrac = breakdown.breakMin > 0
+                  ? shortTotal / breakdown.breakMin
+                  : 0;
+                const longFrac = breakdown.breakMin > 0
+                  ? longTotal / breakdown.breakMin
+                  : 0;
+                return (
+                  <div
+                    data-testid="calendar-task-break-tail"
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: `${tailPct}%`,
+                      borderTop: `1px solid ${taskTone}`,
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                  >
+                    {shortTotal > 0 && (
+                      <div
+                        data-testid="calendar-task-break-short"
+                        style={{
+                          flexBasis: `${shortFrac * 100}%`,
+                          background: 'var(--paper-3)',
+                        }}
+                      />
+                    )}
+                    {longTotal > 0 && (
+                      <div
+                        data-testid="calendar-task-break-long"
+                        style={{
+                          flexBasis: `${longFrac * 100}%`,
+                          background: 'var(--ink-4)',
+                          opacity: 0.6,
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })()}
             </>
           )}
           {heightPx >= 12 && (
