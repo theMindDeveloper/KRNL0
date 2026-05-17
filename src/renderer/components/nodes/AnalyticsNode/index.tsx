@@ -59,7 +59,7 @@ const rootStyle: React.CSSProperties = {
   flexDirection: 'column',
   boxSizing: 'border-box',
   overflow: 'hidden',
-  color: '#cfd3d8',
+  color: '#eef1f4',
 };
 
 const titlebarStyle: React.CSSProperties = {
@@ -75,7 +75,7 @@ const titlebarStyle: React.CSSProperties = {
   fontSize: 10,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  color: '#9aa1a8',
+  color: '#c8cdd3',
   flexShrink: 0,
 };
 
@@ -95,7 +95,7 @@ const summaryChipStyle: React.CSSProperties = {
   border: '1px solid #2a2e33',
   borderRadius: 999,
   background: 'rgba(20,22,24,0.6)',
-  color: '#cfd3d8',
+  color: '#eef1f4',
 };
 
 const tabsBarStyle: React.CSSProperties = {
@@ -117,7 +117,7 @@ const tabPill = (active: boolean): React.CSSProperties => ({
   background: active
     ? 'linear-gradient(180deg, #2a2e33 0%, #1c1f23 100%)'
     : 'transparent',
-  color: active ? 'var(--acid, #c9f158)' : '#7d848b',
+  color: active ? 'var(--acid, #c9f158)' : '#aab0b7',
   cursor: 'pointer',
   boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.04)' : 'none',
   transition: 'all 120ms',
@@ -131,7 +131,7 @@ const chipBtn = (active: boolean): React.CSSProperties => ({
   border: '1px solid ' + (active ? '#3a4048' : '#23262a'),
   borderRadius: 4,
   background: active ? 'var(--acid, #c9f158)' : 'transparent',
-  color: active ? '#0e1012' : '#9aa1a8',
+  color: active ? '#0e1012' : '#c8cdd3',
   cursor: 'pointer',
   fontWeight: active ? 700 : 500,
 });
@@ -157,7 +157,7 @@ const cardGridStyle: React.CSSProperties = {
 const sectionLabelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 9,
-  color: '#6c727a',
+  color: '#9aa1a8',
   textTransform: 'uppercase',
   letterSpacing: '0.1em',
 };
@@ -225,7 +225,7 @@ export function AnalyticsNode({
             right: 2,
             bottom: 2,
             cursor: 'nwse-resize',
-            color: '#4a4f55',
+            color: '#7d848b',
             pointerEvents: 'none',
           }}
           aria-hidden
@@ -237,16 +237,16 @@ export function AnalyticsNode({
       {/* Titlebar */}
       <div style={titlebarStyle}>
         <span style={dotStyle} aria-hidden />
-        <span style={{ color: '#e6e9ec', fontWeight: 600 }}>Analytics</span>
-        <span style={{ color: '#4a4f55' }}>·</span>
-        <span style={{ color: '#7d848b' }}>{sources.length} sources</span>
+        <span style={{ color: '#f4f6f8', fontWeight: 600 }}>Analytics</span>
+        <span style={{ color: '#7d848b' }}>·</span>
+        <span style={{ color: '#aab0b7' }}>{sources.length} sources</span>
         <div style={{ flex: 1 }} />
         <span style={summaryChipStyle}>
-          <span style={{ color: '#6c727a' }}>done </span>
-          <span style={{ color: '#e6e9ec' }}>{tot.tasksDone}</span>
+          <span style={{ color: '#9aa1a8' }}>done </span>
+          <span style={{ color: '#f4f6f8' }}>{tot.tasksDone}</span>
         </span>
         <span style={summaryChipStyle}>
-          <span style={{ color: '#6c727a' }}>streak </span>
+          <span style={{ color: '#9aa1a8' }}>streak </span>
           <span style={{ color: 'var(--acid, #c9f158)' }}>{streaks.longestHabitStreak}d</span>
         </span>
       </div>
@@ -406,12 +406,12 @@ export function AnalyticsNode({
                   width: '100%',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 10,
-                  color: '#cfd3d8',
+                  color: '#eef1f4',
                   borderCollapse: 'collapse',
                 }}
               >
                 <thead>
-                  <tr style={{ color: '#6c727a', textAlign: 'left' }}>
+                  <tr style={{ color: '#9aa1a8', textAlign: 'left' }}>
                     <th style={{ padding: '4px 6px' }}>id</th>
                     <th style={{ padding: '4px 6px' }}>label</th>
                     <th style={{ padding: '4px 6px', textAlign: 'right' }}>events</th>
@@ -439,7 +439,7 @@ export function AnalyticsNode({
                     width: '100%',
                     fontFamily: 'var(--font-mono)',
                     fontSize: 10,
-                    color: '#cfd3d8',
+                    color: '#eef1f4',
                     borderCollapse: 'collapse',
                   }}
                 >
