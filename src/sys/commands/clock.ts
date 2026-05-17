@@ -136,10 +136,17 @@ export async function clockShow(
   const { placements } = selectSchedule(boardAsBoard);
 
   // Filter to selectedDate + viewWindow.
+  // Include cross-midnight tasks: tasks that started the previous day but extend into selectedDate,
+  // or tasks that start on selectedDate but extend past midnight into the next day.
+  const dayStart = `${selectedDate}T00:00`;
+  const nextDate = new Date(new Date(selectedDate).getTime() + 86400000).toISOString().slice(0, 10);
+  const dayEnd = `${nextDate}T00:00`;
   const filtered: ScheduledTaskPlacement[] = [];
   for (const p of placements.values()) {
-    if (p.startISO.slice(0, 10) !== selectedDate) continue;
-    // Check overlap with window.
+    // Skip if task doesn't overlap this day at all.
+    if (p.endISO <= dayStart) continue;
+    if (p.startISO >= dayEnd) continue;
+    // Check overlap with the viewWindow inside the day.
     if (p.endISO <= windowStartISO) continue;
     if (p.startISO >= windowEndISO) continue;
     filtered.push(p);

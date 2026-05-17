@@ -72,7 +72,7 @@ function fmtDur(h: number): string {
   return `${total}m`;
 }
 
-/** Parse a "YYYY-MM-DDTHH:MM" local-ISO into hour-float. */
+/** Parse a "YYYY-MM-DDTHH:MM" local-ISO into hour-float (0–24, ignores date). */
 function isoToHourFloat(iso: string): number | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
   if (!m) return null;
@@ -80,6 +80,22 @@ function isoToHourFloat(iso: string): number | null {
   const mm = Number.parseInt(m[5]!, 10);
   if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
   return hh + mm / 60;
+}
+
+/**
+ * Return hours elapsed since midnight of referenceDate (YYYY-MM-DD).
+ * Cross-midnight tasks get negative startH (started yesterday) or endH > 24 (ends tomorrow).
+ */
+function isoHoursFromDayStart(iso: string, referenceDate: string): number | null {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(iso);
+  if (!m) return null;
+  const isoDate = m[1]!;
+  const hh = Number.parseInt(m[2]!, 10);
+  const mm = Number.parseInt(m[3]!, 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  const dayOffsetMs = new Date(isoDate).getTime() - new Date(referenceDate).getTime();
+  const dayOffset = Math.round(dayOffsetMs / 86400000);
+  return dayOffset * 24 + hh + mm / 60;
 }
 
 // Numerals 1–12. 12 at index 0 so hourToRad(12)=top.
@@ -246,15 +262,17 @@ export function ClockNode({
     const out: TaskEntry[] = [];
 
     // 1) Scheduled tasks from the selector.
+    // Use day-relative hours so cross-midnight tasks (startH<0 or endH>24) are handled correctly.
     for (const p of placementsMap.values()) {
       const info = taskInfo.get(p.taskId);
       if (!info) continue;
-      const startDate = p.startISO.slice(0, 10);
-      if (startDate !== selectedDate) continue;
-      const startH = isoToHourFloat(p.startISO);
+      const startH = isoHoursFromDayStart(p.startISO, selectedDate);
       if (startH === null) continue;
-      const endH = isoToHourFloat(p.endISO) ?? startH + info.plannedMin / 60;
+      const endHRaw = isoHoursFromDayStart(p.endISO, selectedDate);
+      const endH = endHRaw !== null ? endHRaw : startH + info.plannedMin / 60;
       if (endH <= startH) continue;
+      // Skip if the task doesn't overlap this day at all (0–24).
+      if (endH <= 0 || startH >= 24) continue;
       if (endH <= winLo || startH >= winHi) continue;
       out.push({
         id: p.taskId,
