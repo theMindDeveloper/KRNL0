@@ -300,6 +300,23 @@
   50%      { filter: drop-shadow(0 0 10px currentColor); }
 }
 
+/* ClockNode — now-pointer centre dot pulses so the "current time" beacon
+   stays visible against rust-toned task arcs sitting on its track.
+   transform-origin via transform-box: fill-box keeps the scale centred on
+   the SVG circle rather than the page origin. */
+@keyframes clock-now-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px var(--rust));
+  }
+  50% {
+    transform: scale(1.22);
+    filter:
+      drop-shadow(0 0 5px var(--rust))
+      drop-shadow(0 0 10px rgba(200, 85, 61, 0.55));
+  }
+}
+
 /* HabitSwapModal — time picker mount-in animation. Small fade + slide up so
    the picker doesn't pop into place when the modal opens or re-renders. */
 @keyframes krnl-time-picker-in {
@@ -492,13 +509,14 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   color: var(--ink-2);
 }
 
+/* Static date readout — the calendar node is the canonical day picker,
+   so this chip is display-only. `data-state="other"` highlights it when
+   the clock is parked on a non-today day. */
 .clock-day-chip {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   height: 22px;
-  padding: 0 8px;
+  padding: 0 10px;
   border-radius: 999px;
   background: var(--paper-2);
   color: var(--ink);
@@ -506,33 +524,12 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   font: inherit;
   font-size: 10px;
   letter-spacing: 0.04em;
-  cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s;
-}
-.clock-day-chip:hover {
-  background: var(--paper-3);
+  cursor: default;
+  user-select: none;
 }
 .clock-day-chip[data-state="other"] {
   border-color: var(--rust);
-}
-.clock-day-chip input[type="date"] {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  pointer-events: none;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-}
-.clock-day-caret {
-  color: var(--ink-3);
-  font-size: 10px;
-  line-height: 1;
-  pointer-events: auto;
 }
 
 /* ── TaskNode checkbox — light: green box w/ dark check ; dark: dark

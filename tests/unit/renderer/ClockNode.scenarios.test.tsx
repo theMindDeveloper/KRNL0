@@ -326,15 +326,19 @@ describe('Removed elements are absent', () => {
     expect(hasWindowBtn).toBe(false);
   });
 
-  // ADR 0004 §3.3 — the day selector was re-introduced (prev/next/today
-  // + a hidden native date input for month/year jumps). These elements
-  // are now expected to exist on every render.
+  // ADR 0004 §3.3 — the day selector consists of prev/next/today
+  // buttons + a static date label. (The native <input type="date">
+  // was removed 2026-05-17 in favour of the calendar node as the
+  // canonical day picker — calendar.selectDate mirrors to clocks via
+  // commandDispatch.ts.)
   it('renders day-selector controls (ADR 0004)', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
     expect(document.querySelector('[data-testid="clock-day-next"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="clock-day-prev"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="clock-day-today"]')).not.toBeNull();
-    expect(document.querySelector('[data-testid="clock-day-input"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="clock-day-label"]')).not.toBeNull();
+    // No competing in-clock date picker — the calendar node is the picker.
+    expect(document.querySelector('[data-testid="clock-day-input"]')).toBeNull();
   });
 });

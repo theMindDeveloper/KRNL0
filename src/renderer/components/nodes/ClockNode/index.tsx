@@ -400,49 +400,24 @@ export function ClockNode({
           >
             ‹
           </button>
-          <label
+          {/* Static date label.
+              The native <input type="date"> picker was removed in favour of
+              the canonical day-selection path: click a day in the Calendar
+              node, which mirrors to every clock via calendar.selectDate
+              (commandDispatch.ts). Two date pickers competing on one screen
+              was the wrong UX — the calendar IS the picker. */}
+          <span
             className="clock-day-chip"
             data-state={isToday ? 'today' : 'other'}
-            title="Pick a date"
+            data-testid="clock-day-label"
+            title="Click a day on the calendar to change"
           >
-            <span data-testid="clock-day-label">
-              {selectedDateObj.toLocaleDateString(undefined, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
-            </span>
-            <input
-              type="date"
-              data-testid="clock-day-input"
-              value={selectedDate}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v) onCommand('clock.setSelectedDate', { date: v });
-              }}
-              tabIndex={-1}
-            />
-            <span
-              className="clock-day-caret"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const root = (e.currentTarget.parentElement as HTMLElement | null);
-                const input = root?.querySelector<HTMLInputElement>('input[type="date"]') ?? null;
-                if (input) {
-                  const sp = (input as unknown as { showPicker?: () => void }).showPicker;
-                  if (typeof sp === 'function') sp.call(input);
-                  else {
-                    input.focus();
-                    input.click();
-                  }
-                }
-              }}
-              title="Pick a different month or year"
-            >
-              ▾
-            </span>
-          </label>
+            {selectedDateObj.toLocaleDateString(undefined, {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
           <button
             type="button"
             className="clock-day-btn clock-day-today"
@@ -647,13 +622,11 @@ export function ClockNode({
                 // arc cleanly (matches the calendar's dashed-border + stripe
                 // language — neutral panel break in the timeline).
                 //
-                // BUGFIX (2026-05-17): the break stroke previously matched
-                // the task arc's stroke-width exactly, which left a 1-px
-                // anti-aliased halo of the tone color around every break.
-                // Bump the overlay stroke by exactly 1px — just enough for
-                // anti-aliasing to cover the underlying arc without
-                // visibly thickening the black band.
-                const breakStroke = sw + 1;
+                // Break overlay stroke matches the task arc exactly.
+                // (Earlier polish bumped this to +2 and then +1 to kill an
+                // AA halo, but the user judged both visibly too thick — a
+                // faint edge of tone is the acceptable trade.)
+                const breakStroke = sw;
                 let segCursor = t.start;
                 for (let sIdx = 0; sIdx < breakdown.segments.length; sIdx++) {
                   const seg = breakdown.segments[sIdx]!;
@@ -683,24 +656,75 @@ export function ClockNode({
 
             {/* Now-pointer — spans exactly the train-track band.
                 Only rendered when viewing today; on any other day `now`
-                has no meaningful position relative to the day's arcs. */}
+                has no meaningful position relative to the day's arcs.
+
+                The pointer paints in --rust, the same family the user's
+                rust-toned tasks paint in, so without contrast the
+                pointer disappears over a rust task arc. To restore the
+                "this is RIGHT NOW" signal we (a) render a soft warm
+                halo behind the line via SVG <filter>, (b) wrap the line
+                in a brighter outer stroke + a near-white inner stroke
+                (double-stroke trick — no extra DOM nodes), and (c)
+                pulse the centre dot so it reads as alive even when its
+                track is the same hue. */}
             {isToday && (() => {
               const pIn  = pt(nowFloat, trackInnerEdge);
               const pOut = pt(nowFloat, trackOuterEdge);
               const pDot = pt(nowFloat, trackBaseR);
               return (
-                <>
+                <g style={{ filter: 'url(#clock-now-glow)' }}>
+                  {/* Bright outer stroke — wider, full-strength rust. */}
                   <line
                     x1={pIn.x} y1={pIn.y}
                     x2={pOut.x} y2={pOut.y}
                     stroke="var(--rust)"
-                    strokeWidth={1.5}
-                    opacity={0.9}
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    opacity={0.95}
                   />
-                  <circle cx={pDot.x} cy={pDot.y} r={3} fill="var(--rust)" />
-                </>
+                  {/* Inner highlight — near-white core so the pointer
+                      always reads against any rust-family task arc. */}
+                  <line
+                    x1={pIn.x} y1={pIn.y}
+                    x2={pOut.x} y2={pOut.y}
+                    stroke="#fff5ec"
+                    strokeWidth={1}
+                    strokeLinecap="round"
+                    opacity={0.95}
+                  />
+                  {/* Outer halo ring on the dot — fades out continuously. */}
+                  <circle
+                    cx={pDot.x} cy={pDot.y} r={6}
+                    fill="var(--rust)"
+                    opacity={0.35}
+                  />
+                  <circle
+                    cx={pDot.x} cy={pDot.y} r={3.5}
+                    fill="var(--rust)"
+                    stroke="#fff5ec"
+                    strokeWidth={1.2}
+                    style={{
+                      animation: 'clock-now-pulse 1.6s ease-in-out infinite',
+                      transformBox: 'fill-box',
+                      transformOrigin: 'center',
+                    }}
+                  />
+                </g>
               );
             })()}
+
+            {/* Filter def for the now-pointer halo — kept inline so the
+                ClockNode is self-contained and other SVGs can't accidentally
+                inherit the id. */}
+            <defs>
+              <filter id="clock-now-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="1.4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
             {/* Inner face */}
             <circle
