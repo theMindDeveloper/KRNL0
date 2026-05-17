@@ -24,8 +24,27 @@ try {
 if ($env:KRNL0_CLAUDE_HOME -and (Test-Path -LiteralPath $env:KRNL0_CLAUDE_HOME)) {
     function claude {
         # Resolve the real claude executable (skipping this function).
-        $real = Get-Command claude -CommandType Application -ErrorAction SilentlyContinue |
-                Select-Object -First 1
+        #
+        # npm-installed claude on Windows drops THREE shims into the npm bin dir:
+        #   - claude            (extensionless sh script — Linux/macOS shape)
+        #   - claude.cmd        (Windows cmd wrapper)
+        #   - claude.ps1        (PowerShell wrapper)
+        #
+        # `Get-Command -CommandType Application` can return all three. If it
+        # picks the extensionless `claude` first, `& $real.Source @args` asks
+        # Windows to execute a file with no extension — Windows pops up the
+        # "How do you want to open this file?" / "Pick an app" dialog, and
+        # the user can never actually invoke claude.
+        #
+        # Filter to extensions Windows knows how to run directly (.cmd / .exe /
+        # .bat) and prefer .cmd because it's the npm canonical shim. Fall back
+        # to whatever Get-Command returned if no preferred extension exists.
+        $all = @(Get-Command claude -CommandType Application -All -ErrorAction SilentlyContinue)
+        $preferred = $all | Where-Object {
+            $_.Extension -and $_.Extension.ToLower() -in '.cmd','.exe','.bat'
+        }
+        $real = ($preferred | Select-Object -First 1)
+        if (-not $real) { $real = ($all | Select-Object -First 1) }
         if (-not $real) {
             Write-Error "claude executable not found in PATH"
             return
