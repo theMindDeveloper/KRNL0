@@ -754,7 +754,10 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
           >
             cancel drop
           </button>
-          {/* Confirm button — disabled until kind selected and inputs valid */}
+          {/* Confirm button — disabled until kind selected and inputs valid.
+              Active state locks the text to a paper-invariant dark hex so
+              "CONFIRM" reads black-on-green in every theme (KRNL0 rule:
+              never white-on-bright-green). */}
           <button
             data-testid="habit-swap-confirm"
             type="button"
@@ -764,7 +767,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
               marginLeft: 'auto',
               background: canConfirm ? 'var(--acid)' : 'var(--paper-3)',
               border: 'none',
-              color: canConfirm ? 'var(--ink)' : 'var(--ink-4)',
+              color: canConfirm ? '#0a0908' : 'var(--ink-4)',
               cursor: canConfirm ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--font-mono)',
               fontSize: 9.5,

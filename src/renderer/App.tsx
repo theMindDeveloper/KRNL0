@@ -70,7 +70,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
             type="button"
             onClick={this.handleReset}
             style={{
-              background: 'var(--acid)', color: 'var(--paper)', border: 'none',
+              background: 'var(--acid)', color: '#0a0908', border: 'none',
               borderRadius: 'var(--radius)', padding: '8px 20px',
               fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer',
               letterSpacing: '0.04em', textTransform: 'uppercase',
