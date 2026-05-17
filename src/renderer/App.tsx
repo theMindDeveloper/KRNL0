@@ -21,6 +21,7 @@ import { useBoardChannel } from './store/useBoardChannel';
 import { RadialChooserHost } from './components/ui/RadialChooser';    
 import { useCliDispatch } from './store/useCliDispatch';
 import { sfxEngine } from './sfx/sfxEngine';
+import { bestTextOnVar } from './utils/contrastText';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
 // This is the only code path that satisfies "before first paint" for F6b.
@@ -70,7 +71,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
             type="button"
             onClick={this.handleReset}
             style={{
-              background: 'var(--acid)', color: '#0a0908', border: 'none',
+              // Runtime contrast pick against --acid (see utils/contrastText.ts):
+              // some themes flip --acid to near-white, others keep it green;
+              // either way the label stays readable.
+              background: 'var(--acid)', color: bestTextOnVar('--acid'), border: 'none',
               borderRadius: 'var(--radius)', padding: '8px 20px',
               fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer',
               letterSpacing: '0.04em', textTransform: 'uppercase',

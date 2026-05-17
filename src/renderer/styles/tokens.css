@@ -99,13 +99,24 @@
   --font-serif: 'Instrument Serif', Georgia, serif;
 
   /* Contrast lock.
-   * Theme-invariant near-black for text that sits ON a bright accent
-   * background (--acid, --rust, --cyan, habit colors, etc.). KRNL0 rule:
-   * white-on-bright-green is never allowed. Always use --ink-on-bright
-   * (or hardcode #0a0908) for buttons/badges/blocks whose background is
-   * one of the accent tokens. --ink alone is theme-variant and will flip
-   * to cream in dark mode, producing the green-on-white miscontrast. */
+   *
+   * For text placed on a colour you don't statically control — habit
+   * colours (HABIT_COLORS includes 'ink' and 'spine', which are DARK in
+   * the light theme), task tones, or accent tokens whose value changes
+   * across themes (--rust flips between #c8553d, #ee8466, and even
+   * #0a0a0a depending on the theme) — DO NOT hardcode dark text. Use
+   * the runtime helper `bestTextOnVar(varName)` from
+   * src/renderer/utils/contrastText.ts. It reads the CSS variable's
+   * currently resolved value, computes YIQ luminance, and returns the
+   * higher-contrast of #0a0908 / #fafaf6 for THIS theme.
+   *
+   * The two tokens below are the canonical dark/light text colours the
+   * helper returns. Use them directly only when the background is
+   * statically known to be bright (e.g. an inline acid pill that you
+   * also know never flips in any theme). When in doubt, use
+   * bestTextOnVar — it's a Map lookup after the first call. */
   --ink-on-bright: #0a0908;
+  --ink-on-dark:   #fafaf6;
 
   /* Orb */
   --orb-size: 56px;
