@@ -74,6 +74,57 @@ function resolveFrame(
   return { error: `No frame matching "${ref}"` };
 }
 
+/**
+ * Walk the task chain reachable from `startTaskId` via `task.next` edges
+ * in BOTH directions, returning every connected task node id (including
+ * the start). Restricted to `todo.task` kind. Cycle-safe.
+ *
+ * Used by `frame add --near <taskId>` so the auto-sized frame wraps the
+ * whole pipeline the user is anchoring on, not just the single seed task.
+ * Walks backward too so anchoring on a middle task still pulls in the
+ * full chain.
+ */
+function collectChainTaskIds(
+  nodes: AnyNode[],
+  edges: unknown[],
+  startTaskId: string,
+): string[] {
+  type RawEdge = {
+    from?: { nodeId?: unknown; event?: unknown };
+    to?: { nodeId?: unknown };
+  };
+  const taskIds = new Set<string>();
+  for (const n of nodes) {
+    if (n.kind === 'todo.task') taskIds.add(n.id);
+  }
+  if (!taskIds.has(startTaskId)) return [];
+
+  const visited = new Set<string>([startTaskId]);
+  const queue: string[] = [startTaskId];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const raw of edges) {
+      if (typeof raw !== 'object' || raw === null) continue;
+      const e = raw as RawEdge;
+      if (e.from?.event !== 'task.next') continue;
+      const fromId = e.from?.nodeId;
+      const toId = e.to?.nodeId;
+      if (typeof fromId !== 'string' || typeof toId !== 'string') continue;
+      // Forward edge: cur → next
+      if (fromId === cur && taskIds.has(toId) && !visited.has(toId)) {
+        visited.add(toId);
+        queue.push(toId);
+      }
+      // Backward edge: prev → cur
+      if (toId === cur && taskIds.has(fromId) && !visited.has(fromId)) {
+        visited.add(fromId);
+        queue.push(fromId);
+      }
+    }
+  }
+  return Array.from(visited);
+}
+
 /** Read source node geometry for --near positioning. */
 function resolveSourceGeometry(
   nodes: AnyNode[],
@@ -143,41 +194,83 @@ export async function frameAdd(
   let childIds: string[] = [];
 
   if (opts.near) {
-    // --near: position frame so the source node's center sits inside it,
-    // seed childIds with [sourceId]. When --w / --h aren't given, size
-    // the frame so it actually CONTAINS the source plus comfortable
-    // padding — the old fixed 360×240 default was often smaller than the
-    // source it was anchoring, which read as a layout bug in
-    // AI-generated pipelines.
+    // --near: anchor on a source node. Two modes:
+    //
+    //   (a) Source is a `todo.task` → walk the full chain reachable via
+    //       task.next edges (both directions), seed childIds with every
+    //       task in that chain, and auto-size to the bounding box plus
+    //       padding. This is the AI-pipeline shape: claude calls
+    //       `frame add --near task-FIRST` after spawning the chain and
+    //       expects the frame to wrap the whole pipeline, not just the
+    //       first task. The previous single-node default forced a
+    //       manual `frame resize` + `frame fit` two-step (user report
+    //       2026-05-17 r2).
+    //
+    //   (b) Source is anything else (text, image, frame, etc.) → seed
+    //       childIds with just that node and size to it. Same as the
+    //       old behaviour.
+    //
+    // Explicit --w / --h always override the computed size.
     const srcGeo = resolveSourceGeometry(board.nodes, opts.near);
     if (!srcGeo) {
       return { ok: false, message: `--near: no node matching "${opts.near}"` };
     }
-    // Resolve the actual source node id (for childIds seeding)
-    let srcId: string | undefined;
-    const exactSrc = board.nodes.find((n) => n.id === opts.near);
-    if (exactSrc) {
-      srcId = exactSrc.id;
-    } else if (opts.near.length >= 4) {
+    // Resolve the actual source node (for childIds seeding + kind check).
+    let srcNode: AnyNode | undefined;
+    srcNode = board.nodes.find((n) => n.id === opts.near);
+    if (!srcNode && opts.near.length >= 4) {
       const prefixed = board.nodes.filter((n) => n.id.startsWith(opts.near!));
-      if (prefixed.length === 1) srcId = prefixed[0]!.id;
+      if (prefixed.length === 1) srcNode = prefixed[0];
     }
 
-    if (!explicitW) {
-      width = Math.max(FRAME_MIN_W, srcGeo.w + 2 * FRAME_PADDING);
-    }
-    if (!explicitH) {
-      height = Math.max(FRAME_MIN_H, srcGeo.h + 2 * FRAME_PADDING);
-    }
+    if (srcNode && srcNode.kind === 'todo.task') {
+      // Chain mode: collect every task connected via task.next edges.
+      const chainIds = collectChainTaskIds(board.nodes, board.edges, srcNode.id);
+      childIds = chainIds.length > 0 ? chainIds : [srcNode.id];
 
-    const srcCenterX = srcGeo.x + srcGeo.w / 2;
-    const srcCenterY = srcGeo.y + srcGeo.h / 2;
-    // Frame top-left = srcCenter - (frameW/2, frameH/2)
-    position = {
-      x: Math.round(srcCenterX - width / 2),
-      y: Math.round(srcCenterY - height / 2),
-    };
-    if (srcId) childIds = [srcId];
+      // Bounding box over the whole chain.
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const id of childIds) {
+        const geo = resolveSourceGeometry(board.nodes, id);
+        if (!geo) continue;
+        if (geo.x < minX) minX = geo.x;
+        if (geo.y < minY) minY = geo.y;
+        if (geo.x + geo.w > maxX) maxX = geo.x + geo.w;
+        if (geo.y + geo.h > maxY) maxY = geo.y + geo.h;
+      }
+      // resolveSourceGeometry always returns truthy for known kinds; this
+      // guard is just defensive in case a chain id is somehow missing.
+      if (!Number.isFinite(minX)) {
+        minX = srcGeo.x; minY = srcGeo.y;
+        maxX = srcGeo.x + srcGeo.w; maxY = srcGeo.y + srcGeo.h;
+      }
+
+      if (!explicitW) {
+        width = Math.max(FRAME_MIN_W, Math.round((maxX - minX) + 2 * FRAME_PADDING));
+      }
+      if (!explicitH) {
+        height = Math.max(FRAME_MIN_H, Math.round((maxY - minY) + 2 * FRAME_PADDING));
+      }
+      position = {
+        x: Math.round(minX - FRAME_PADDING),
+        y: Math.round(minY - FRAME_PADDING),
+      };
+    } else {
+      // Single-node mode: size to the anchor + padding, center on it.
+      if (!explicitW) {
+        width = Math.max(FRAME_MIN_W, srcGeo.w + 2 * FRAME_PADDING);
+      }
+      if (!explicitH) {
+        height = Math.max(FRAME_MIN_H, srcGeo.h + 2 * FRAME_PADDING);
+      }
+      const srcCenterX = srcGeo.x + srcGeo.w / 2;
+      const srcCenterY = srcGeo.y + srcGeo.h / 2;
+      position = {
+        x: Math.round(srcCenterX - width / 2),
+        y: Math.round(srcCenterY - height / 2),
+      };
+      if (srcNode) childIds = [srcNode.id];
+    }
   } else if (opts.at) {
     position = opts.at;
   } else {
@@ -217,9 +310,14 @@ export async function frameAdd(
   board.nodes = [...board.nodes, node];
   saveBoard(ctx, board);
 
+  const childSummary = childIds.length === 0
+    ? ''
+    : childIds.length === 1
+      ? ` childIds=[${childIds[0]!.slice(0, 8)}…]`
+      : ` childIds=[${childIds[0]!.slice(0, 8)}…+${childIds.length - 1} more]`;
   return {
     ok: true,
-    message: `frame added: ${id.slice(0, 13)}… at (${position.x}, ${position.y}) size ${width}×${height} tint=${tintVal}${childIds.length > 0 ? ` childIds=[${childIds[0]!.slice(0, 8)}…]` : ''}`,
+    message: `frame added: ${id.slice(0, 13)}… at (${position.x}, ${position.y}) size ${width}×${height} tint=${tintVal}${childSummary}`,
     data: { id, position, width, height, tint: tintVal, childIds },
   };
 }
@@ -299,20 +397,26 @@ export async function frameList(ctx: FrameCtx, json = false): Promise<SysResult>
 }
 
 /**
- * `krnl frame fit <ref> [--padding N]` — resize & reposition a frame so it
- * wraps all its persisted childIds with the given padding (default
- * FRAME_PADDING = 40 px per side).
+ * `krnl frame fit <ref> [--padding N]` — resize, reposition, AND gather.
  *
- * Headless-capable. Reads each child node's position + best-effort size
- * via resolveSourceGeometry (TaskNode = 220×140, frame defaults to its
- * own width/height, text/image read state.width/height, etc.) and
- * computes a bounding box, then sets the frame's position + width +
- * height to enclose the box.
+ * Two-phase contract:
+ *   1. Gather — walk every non-frame, non-mother node on the board. Any
+ *      whose center sits inside the frame's CURRENT bounds is added to
+ *      the frame's `state.childIds` (if not already there). This is the
+ *      headless analogue of the renderer's drag-end spatial recompute:
+ *      after a CLI chain spawns into a frame, those tasks are inside
+ *      the frame's rect but `childIds` is still just the original
+ *      `--near` seed. Without the gather step the user's drag-frame-
+ *      moves-children behaviour silently drops everything but the seed.
+ *   2. Fit — compute the bounding box of every resolved child, then
+ *      resize and reposition the frame so it wraps the box with
+ *      `padding` (default FRAME_PADDING = 40 px) on every side.
  *
- * If childIds is empty (or all stale), the command leaves the frame
- * unchanged and reports it — there's nothing useful to fit to. This is
- * the AI-facing automation for the user's "frames are smaller than
- * their contents" complaint.
+ * If childIds is empty AND gather found nothing inside the frame, the
+ * command leaves the frame unchanged and reports it.
+ *
+ * This is the AI-facing automation for the user's "frames don't actually
+ * own the things inside them" complaint (2026-05-17 feedback round 2).
  */
 export async function frameFit(
   ctx: FrameCtx,
@@ -329,30 +433,58 @@ export async function frameFit(
   if ('error' in resolved) return { ok: false, message: resolved.error };
   const frameNode = resolved.node;
   const state = frameNode.state as FrameState;
-  const childIds = state.childIds ?? [];
-  if (childIds.length === 0) {
+
+  // Phase 1: gather any non-frame, non-mother node whose center lies
+  // inside the frame's current bounds. Mothers are excluded because
+  // they shouldn't be inside frames; frames are excluded because nested
+  // frames are not in our model.
+  const frameX = frameNode.position?.x ?? 0;
+  const frameY = frameNode.position?.y ?? 0;
+  const frameW = state.width;
+  const frameH = state.height;
+  const frameRight = frameX + frameW;
+  const frameBottom = frameY + frameH;
+  const existing = new Set(state.childIds ?? []);
+  const gathered: string[] = [];
+  for (const candidate of board.nodes) {
+    if (candidate.id === frameNode.id) continue;
+    if (candidate.kind === 'frame') continue;
+    if (candidate.isMother) continue;
+    if (existing.has(candidate.id)) continue;
+    const geo = resolveSourceGeometry(board.nodes, candidate.id);
+    if (!geo) continue;
+    const cx = geo.x + geo.w / 2;
+    const cy = geo.y + geo.h / 2;
+    if (cx >= frameX && cx <= frameRight && cy >= frameY && cy <= frameBottom) {
+      gathered.push(candidate.id);
+      existing.add(candidate.id);
+    }
+  }
+  const mergedChildIds = [...(state.childIds ?? []), ...gathered];
+
+  if (mergedChildIds.length === 0) {
     return {
       ok: false,
-      message: `frame ${frameNode.id.slice(0, 8)} has no childIds — nothing to fit. Use 'frame contents <ref>' to inspect, or move nodes into the frame's bounds and let the renderer recompute first.`,
+      message: `frame ${frameNode.id.slice(0, 8)} has no childIds and nothing inside its bounds — nothing to fit. Move nodes so their centers are inside the frame, then re-run.`,
     };
   }
 
-  // Compute bounding box of all valid children.
+  // Phase 2: bounding box over all resolved children.
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  let resolved_count = 0;
-  for (const childId of childIds) {
+  let resolvedCount = 0;
+  for (const childId of mergedChildIds) {
     const geo = resolveSourceGeometry(board.nodes, childId);
     if (!geo) continue;
-    resolved_count++;
+    resolvedCount++;
     if (geo.x < minX) minX = geo.x;
     if (geo.y < minY) minY = geo.y;
     if (geo.x + geo.w > maxX) maxX = geo.x + geo.w;
     if (geo.y + geo.h > maxY) maxY = geo.y + geo.h;
   }
-  if (resolved_count === 0) {
+  if (resolvedCount === 0) {
     return {
       ok: false,
-      message: `frame ${frameNode.id.slice(0, 8)}: none of the ${childIds.length} childId(s) resolve to live nodes.`,
+      message: `frame ${frameNode.id.slice(0, 8)}: none of the ${mergedChildIds.length} childId(s) resolve to live nodes.`,
     };
   }
 
@@ -361,7 +493,7 @@ export async function frameFit(
   const newW = Math.max(FRAME_MIN_W, Math.round((maxX - minX) + 2 * padding));
   const newH = Math.max(FRAME_MIN_H, Math.round((maxY - minY) + 2 * padding));
 
-  const nextState: FrameState = { ...state, width: newW, height: newH };
+  const nextState: FrameState = { ...state, width: newW, height: newH, childIds: mergedChildIds };
   board.nodes = board.nodes.map((n) =>
     n.id === frameNode.id
       ? { ...n, position: { x: newX, y: newY }, state: nextState }
@@ -371,15 +503,16 @@ export async function frameFit(
 
   return {
     ok: true,
-    message: `frame ${frameNode.id.slice(0, 8)}: fitted to ${resolved_count}/${childIds.length} children → pos=(${newX},${newY}) size=${newW}×${newH} padding=${padding}`,
+    message: `frame ${frameNode.id.slice(0, 8)}: fitted to ${resolvedCount}/${mergedChildIds.length} children (${gathered.length} newly gathered) → pos=(${newX},${newY}) size=${newW}×${newH} padding=${padding}`,
     data: {
       id: frameNode.id,
       position: { x: newX, y: newY },
       width: newW,
       height: newH,
       padding,
-      childrenResolved: resolved_count,
-      childrenTotal: childIds.length,
+      childrenResolved: resolvedCount,
+      childrenTotal: mergedChildIds.length,
+      childrenGathered: gathered,
     },
   };
 }

@@ -34,7 +34,14 @@ function hhmm(iso: string): string {
 /**
  * `krnl cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]`
  * Prints all cascade-scheduled task placements, sorted by startISO.
- * --from / --to filter by date prefix (inclusive/exclusive boundary on the ISO string).
+ *
+ * Both --from and --to are INCLUSIVE date bounds (compared against the
+ * YYYY-MM-DD prefix of startISO). `--from 2026-05-18 --to 2026-05-18`
+ * returns every task whose start date is 2026-05-18. The earlier
+ * exclusive-upper-bound behaviour was a footgun: same-day --from/--to
+ * pairs returned [], which was the exact filter shape the AI assistant
+ * reaches for when asked "show me tomorrow's calendar" (user report
+ * 2026-05-17 r2).
  */
 export async function calShow(
   ctx: CalCtx,
@@ -57,13 +64,14 @@ export async function calShow(
     taskMeta.set(node.id, { text: ts.text, parentTodoId: ts.parentTodoId });
   }
 
-  // Filter by date range if provided (lexicographic comparison on ISO prefix).
+  // Filter by date range if provided. Both bounds are inclusive on the
+  // YYYY-MM-DD date prefix of startISO. --from matches `startISO >= from`
+  // (already inclusive because "2026-05-18" <= "2026-05-18T07:00"). --to
+  // must use `<=` on the date prefix so same-day windows like
+  // `--from 2026-05-18 --to 2026-05-18` actually return that day.
   let filtered: ScheduledTaskPlacement[] = [...placements.values()];
   if (from) filtered = filtered.filter((p) => p.startISO >= from);
-  if (to) {
-    // Treat --to as exclusive upper bound (day prefix: "YYYY-MM-DD" < startISO date).
-    filtered = filtered.filter((p) => p.startISO.slice(0, 10) < to);
-  }
+  if (to) filtered = filtered.filter((p) => p.startISO.slice(0, 10) <= to);
   filtered.sort((a, b) => a.startISO.localeCompare(b.startISO));
 
   if (json) {

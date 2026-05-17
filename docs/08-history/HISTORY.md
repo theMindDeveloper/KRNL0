@@ -560,3 +560,30 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - WeekView legend chip explains the two block treatments (solid = session, striped = break).
 
 **Tests:** New: parity test, table-driven breakdown test, selector kind test, migration test, kind-toggle UX test, toggle-handoff test, ClockNode break-arc test. Pre-existing 4 ClockNode-renderer test failures (stale assertions from earlier glassy-arc design) and 5 stale "Add subtask" tests are not regressions from this PR; tracked as follow-ups.
+
+
+---
+
+## [2026-05-17] — fix(canvas): habit-lane CLI path, frame --near chain walk, cal show inclusive --to
+
+**Type:** Bug Fix
+**Branch:** `fix/canvas-layout-and-inference-scope-pt2`
+**PR:** [#154](https://github.com/theMindDeveloper/KRNL0/pull/154)
+**Files changed:**
+- `src/renderer/store/useCliDispatch.ts` (HABIT_LANE_OFFSET_Y on the CLI dispatch path)
+- `src/sys/commands/frame.ts` (collectChainTaskIds + chain-mode --near in frameAdd)
+- `src/sys/commands/cal.ts` (inclusive --to bound)
+- `tests/unit/sys/cal.test.ts` (flipped exclusive-to test, added same-day regression test)
+- `tests/unit/sys/frame.test.ts` (new chain-walk test block)
+
+**Summary:** Three follow-on fixes from the layout/inference PR after benchmark feedback:
+
+1. **Habit lanes still landed at the dock band on `krnl habit pin`.** PR #154's first pass only fixed the renderer's `commandDispatch.ts` (used by the in-UI mother-habit menu). The CLI command `krnl habit pin` actually dispatches through `useCliDispatch.ts`, which still used the old inline `540` offset. Bumped that path to the same `HABIT_LANE_OFFSET_Y = 1300` and added a comment pointing back to `src/sys/layout.ts` so both renderer dispatch paths stay in sync.
+
+2. **`frame add --near <task>` only seeded `childIds` with the single anchor task.** AI-built pipelines would create a 4-task chain and call `frame add --near <first>`, then have to manually `frame resize` + `frame fit` to actually wrap the chain. `frameAdd` now detects `--near` resolving to a `todo.task`, walks `task.next` edges in both directions to collect the connected component, and auto-sizes the frame to the bounding box plus `FRAME_PADDING`. Non-task `--near` sources (text, image, frame) keep the old single-node behaviour. Explicit `--w` / `--h` overrides still win.
+
+3. **`krnl cal show --from X --to X` returned empty even when tasks were scheduled for that day.** The `--to` filter used `<` on the date prefix (exclusive upper bound), which silently dropped every task on `--to`'s own date. Same-day windows like "show me tomorrow's calendar" are the most common AI-assistant shape, so this was a real footgun. Switched to `<=` (inclusive).
+
+**Why:** Benchmark run on 2026-05-17 r3 exposed all three — habit lanes overlapping the dock row, frames anchored only on the seed task, and a confusing "no scheduled tasks" output despite a fresh schedule. Each fix is small and isolated; bundling them keeps the PR-#154 churn focused.
+
+**Tests:** sys + shared suites green (360/360 in-scope). Pre-existing renderer scenario failures (AppChrome, ClockNode, ImageNode, PomoNode, TextNode, TaskNode.new, board.decision22-migration) are unchanged.

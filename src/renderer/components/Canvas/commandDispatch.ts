@@ -961,9 +961,12 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const childNode: Node = {
         id: childNodeId,
         kind: 'todo.task',
+        // Mirror CLI spacing constants (src/sys/layout.ts TASK_STEP_X = 300,
+        // TASK_H + GAP_Y ≈ 200 for layer-down). Previously 252 / 160 which
+        // produced visibly cramped chains.
         position: {
-          x: node.position.x + (seq - 1) * 252,
-          y: node.position.y + 160,
+          x: node.position.x + (seq - 1) * 300,
+          y: node.position.y + 200,
         },
         isMother: false,
         state: childState,
@@ -1091,10 +1094,16 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       );
       if (existing) return;
 
+      // Spawn habit lanes in their own Y band, well below the typical task
+      // chain band (motherY + 760 .. ~+1100). HABIT_LANE_OFFSET_Y is in
+      // src/sys/layout.ts. Previously this was motherY + 540 which collided
+      // with task chains spawning at motherY + 580 — habit lanes and tasks
+      // fought for the same horizontal strip (user report 2026-05-17).
       const laneCount = board.nodes.filter((n) => n.kind === 'habit.lane').length;
+      const HABIT_LANE_OFFSET_Y = 1300; // mirror of src/sys/layout.ts constant
       const position = {
         x: node.position.x + (laneCount % 3) * 300,
-        y: node.position.y + 540 + Math.floor(laneCount / 3) * 160,
+        y: node.position.y + HABIT_LANE_OFFSET_Y + Math.floor(laneCount / 3) * 160,
       };
       const lane: Node = {
         id: `habit-lane-${crypto.randomUUID()}`,

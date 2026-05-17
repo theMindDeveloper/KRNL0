@@ -191,17 +191,33 @@ describe('sys cal show', () => {
     expect(res.message).toMatch(/No scheduled tasks/);
   });
 
-  it('filters by --to date (exclusive)', async () => {
+  it('filters by --to date (inclusive — same-day match returns the task)', async () => {
     seedBoardWithScheduledTasks();
-    // --to is the day of the scheduled tasks — so startISO.slice(0,10) < '2026-05-15' → empty
+    // --to is the same day as the task. The pre-2026-05-17 behaviour was
+    // exclusive on the upper bound, which silently emptied "show me
+    // today" queries — that bug is what this test guards against.
     const res = await calShow(ctx, undefined, '2026-05-15', false);
+    expect(res.ok).toBe(true);
+    expect(res.message).toMatch(/anchor task/);
+  });
+
+  it('excludes the task when --to is the day BEFORE it', async () => {
+    seedBoardWithScheduledTasks();
+    const res = await calShow(ctx, undefined, '2026-05-14', false);
     expect(res.ok).toBe(true);
     expect(res.message).toMatch(/No scheduled tasks/);
   });
 
-  it('includes the task on the boundary when --to is after it', async () => {
+  it('includes the task when --to is the day AFTER it', async () => {
     seedBoardWithScheduledTasks();
     const res = await calShow(ctx, undefined, '2026-05-16', false);
+    expect(res.ok).toBe(true);
+    expect(res.message).toMatch(/anchor task/);
+  });
+
+  it('same-day --from/--to returns tasks on that day (regression: was empty under exclusive --to)', async () => {
+    seedBoardWithScheduledTasks();
+    const res = await calShow(ctx, '2026-05-15', '2026-05-15', false);
     expect(res.ok).toBe(true);
     expect(res.message).toMatch(/anchor task/);
   });

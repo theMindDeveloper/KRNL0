@@ -199,9 +199,15 @@ export function useCliDispatch(): void {
               break;
             }
             const laneCount = currentBoard.nodes.filter((n) => n.kind === 'habit.lane').length;
+            // HABIT_LANE_OFFSET_Y must mirror src/sys/layout.ts. Bumped from
+            // the old inline 540 (which collided with the task-chain band
+            // starting at MOTHER_OFFSET_Y = 760, plus parallel-fork sprawl
+            // down to ~1200) so habit lanes land in their own band below
+            // the deepest realistic task chain. User report 2026-05-17 r2.
+            const HABIT_LANE_OFFSET_Y = 1300;
             const position = {
               x: habitMother.position.x + (laneCount % 3) * 300,
-              y: habitMother.position.y + 540 + Math.floor(laneCount / 3) * 160,
+              y: habitMother.position.y + HABIT_LANE_OFFSET_Y + Math.floor(laneCount / 3) * 160,
             };
             const lane: Node = {
               id: `habit-lane-${crypto.randomUUID()}`,
