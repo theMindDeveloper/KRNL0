@@ -136,6 +136,120 @@ describe('frame add', () => {
   });
 });
 
+describe('frame add --near <todo.task> walks the chain', () => {
+  // Build a 3-task chain: task-A → task-B → task-C connected by task.next
+  // edges, mirroring what `krnl task addNext` produces. Task layout uses
+  // TASK_W=220, TASK_H=140 (see src/sys/layout.ts).
+  function seedTaskChain(): void {
+    const board = {
+      version: 1,
+      schemaVersion: 1,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        // A todo mother so the cli paths don't barf
+        {
+          id: 'mother-todo',
+          kind: 'todo',
+          isMother: true,
+          position: { x: 0, y: 0 },
+          state: { items: [] },
+          config: { showCompleted: true, maxVisible: 50 },
+        },
+        {
+          id: 'task-A',
+          kind: 'todo.task',
+          isMother: false,
+          position: { x: 0, y: 1000 },
+          state: { text: 'A', done: false, parentTodoId: 'mother-todo', parentTaskId: null, sequenceNumber: 1, layer: 0 },
+          config: {},
+        },
+        {
+          id: 'task-B',
+          kind: 'todo.task',
+          isMother: false,
+          position: { x: 300, y: 1000 },
+          state: { text: 'B', done: false, parentTodoId: 'mother-todo', parentTaskId: null, sequenceNumber: 2, layer: 0 },
+          config: {},
+        },
+        {
+          id: 'task-C',
+          kind: 'todo.task',
+          isMother: false,
+          position: { x: 600, y: 1000 },
+          state: { text: 'C', done: false, parentTodoId: 'mother-todo', parentTaskId: null, sequenceNumber: 3, layer: 0 },
+          config: {},
+        },
+      ],
+      edges: [
+        { id: 'e-AB', from: { nodeId: 'task-A', event: 'task.next' }, to: { nodeId: 'task-B', command: 'task.activate' }, enabled: true },
+        { id: 'e-BC', from: { nodeId: 'task-B', event: 'task.next' }, to: { nodeId: 'task-C', command: 'task.activate' }, enabled: true },
+      ],
+    };
+    writeFileSync(boardPath, JSON.stringify(board), 'utf-8');
+  }
+
+  it('--near <first-task> seeds childIds with the whole chain', async () => {
+    seedTaskChain();
+    const res = await frameAdd(ctx, { near: 'task-A', tint: 'cyan', label: 'Chain' });
+    expect(res.ok).toBe(true);
+    const frame = getFrames()[0]!;
+    expect(frame.state.childIds).toHaveLength(3);
+    expect(frame.state.childIds).toEqual(expect.arrayContaining(['task-A', 'task-B', 'task-C']));
+  });
+
+  it('--near <middle-task> still seeds the whole chain (walks backward too)', async () => {
+    seedTaskChain();
+    const res = await frameAdd(ctx, { near: 'task-B', tint: 'cyan' });
+    expect(res.ok).toBe(true);
+    const frame = getFrames()[0]!;
+    expect(frame.state.childIds).toHaveLength(3);
+    expect(frame.state.childIds).toEqual(expect.arrayContaining(['task-A', 'task-B', 'task-C']));
+  });
+
+  it('--near <chain> auto-sizes width to wrap all tasks + padding', async () => {
+    seedTaskChain();
+    // bbox of chain: x range = [0, 600 + 220] = [0, 820], width = 820
+    // Expected frame width = 820 + 2*40 (FRAME_PADDING) = 900
+    // Expected frame height = 140 + 2*40 = 220, but FRAME_MIN_H=200 already <= 220
+    const res = await frameAdd(ctx, { near: 'task-A' });
+    expect(res.ok).toBe(true);
+    const frame = getFrames()[0]!;
+    expect(frame.state.width).toBe(900);
+    expect(frame.state.height).toBe(220);
+    // Frame top-left = bbox.min - FRAME_PADDING
+    expect(frame.position!.x).toBe(-40);
+    expect(frame.position!.y).toBe(960);
+  });
+
+  it('--near <chain> respects explicit --w / --h overrides', async () => {
+    seedTaskChain();
+    const res = await frameAdd(ctx, { near: 'task-A', w: 1200, h: 400 });
+    expect(res.ok).toBe(true);
+    const frame = getFrames()[0]!;
+    expect(frame.state.width).toBe(1200);
+    expect(frame.state.height).toBe(400);
+    // childIds still seeded with the full chain
+    expect(frame.state.childIds).toHaveLength(3);
+  });
+
+  it('--near <single unconnected task> seeds childIds with just that task', async () => {
+    // Seed a single isolated task with no edges.
+    const board = {
+      version: 1, schemaVersion: 1, viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        { id: 'mother-todo', kind: 'todo', isMother: true, position: { x: 0, y: 0 }, state: { items: [] }, config: {} },
+        { id: 'task-solo', kind: 'todo.task', isMother: false, position: { x: 500, y: 1000 },
+          state: { text: 'solo', done: false, parentTodoId: 'mother-todo', parentTaskId: null, sequenceNumber: 1, layer: 0 }, config: {} },
+      ],
+      edges: [],
+    };
+    writeFileSync(boardPath, JSON.stringify(board), 'utf-8');
+    const res = await frameAdd(ctx, { near: 'task-solo' });
+    expect(res.ok).toBe(true);
+    expect(getFrames()[0]!.state.childIds).toEqual(['task-solo']);
+  });
+});
+
 describe('frame label', () => {
   it('updates frame label', async () => {
     await frameAdd(ctx, {});
