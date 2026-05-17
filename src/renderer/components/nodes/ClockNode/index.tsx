@@ -403,6 +403,15 @@ export function ClockNode({
             viewBox="0 0 240 240"
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
           >
+            {/* Outer arc track */}
+            <circle
+              cx={CX} cy={CY} r={R_ARC}
+              fill="none"
+              stroke="var(--paper-3)"
+              strokeWidth={14}
+              opacity={0.7}
+            />
+
             {/* Task arcs — Decision 28 §7 (revised).
                 - Concentric rings for parallel branches (parallelBranchIndex).
                 - Round caps INSET into the time interval so they never extend
@@ -414,9 +423,7 @@ export function ClockNode({
               // Lane assignment uses interval-graph coloring on TIME OVERLAP, not
               // just graph-parallel edges. Any two tasks whose [start, end) ranges
               // intersect get pushed to different lanes.
-              // RING_GAP must be ≥ strokeWidth + small padding so rings don't kiss.
-              const TRACK_STROKE = 14;
-              const RING_GAP = TRACK_STROKE + 4; // 18px — visible gap between rings
+              const RING_GAP = 6;
               const sortedByStart = [...tasks].sort((a, b) => a.start - b.start);
               const laneEnds: number[] = []; // laneEnds[i] = end-time of last task placed in lane i
               const laneByTaskId = new Map<string, number>();
@@ -433,24 +440,7 @@ export function ClockNode({
               }
               const ringOffset = (t: TaskEntry): number =>
                 (laneByTaskId.get(t.id) ?? 0) * RING_GAP;
-
-              // Render a gray background track for every lane used.
-              const totalLanes = Math.max(1, laneEnds.length);
-              const trackElements: React.ReactElement[] = [];
-              for (let lane = 0; lane < totalLanes; lane++) {
-                trackElements.push(
-                  <circle
-                    key={`track-${lane}`}
-                    cx={CX} cy={CY} r={R_ARC - lane * RING_GAP}
-                    fill="none"
-                    stroke="var(--paper-3)"
-                    strokeWidth={TRACK_STROKE}
-                    opacity={0.7}
-                  />,
-                );
-              }
-
-              const arcElements = tasks.flatMap((t, i) => {
+              return tasks.flatMap((t, i) => {
                 const ended  = nowFloat >= t.end;
                 const active = i === activeIdx;
                 const opacity = ended ? 0.35 : active ? 1 : 0.92;
@@ -526,8 +516,6 @@ export function ClockNode({
                 }
                 return arcs;
               });
-
-              return [...trackElements, ...arcElements];
             })()}
 
             {/* Now notch */}
