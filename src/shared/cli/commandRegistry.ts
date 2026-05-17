@@ -101,12 +101,13 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'frame',
     summary: 'Manage FrameNodes (grouping containers) on the canvas',
     subcommands: [
-      { name: 'add', usage: 'frame add [--label "..."] [--at x,y] [--w N] [--h N] [--tint cyan|spine|rust|plum|neutral] [--near <ref>]', summary: 'Add a frame. --near centers frame on source node and seeds childIds' },
+      { name: 'add', usage: 'frame add [--label "..."] [--at x,y] [--w N] [--h N] [--tint cyan|spine|rust|plum|neutral] [--near <ref>]', summary: 'Add a frame. --near auto-sizes to fit source + padding and seeds childIds' },
       { name: 'label', usage: 'frame label <ref> "<text>"', summary: 'Update frame label' },
       { name: 'resize', usage: 'frame resize <ref> --w N --h N', summary: 'Resize a frame' },
       { name: 'tint', usage: 'frame tint <ref> <cyan|spine|rust|plum|neutral>', summary: 'Change frame tint color' },
       { name: 'list', usage: 'frame list [--json]', summary: 'List all frames' },
       { name: 'contents', usage: 'frame contents <ref> [--json]', summary: 'List persisted childIds of a frame (reads state, no geometry recompute)' },
+      { name: 'fit', usage: 'frame fit <ref> [--padding N]', summary: 'Resize & reposition the frame to wrap its childIds with N px padding (default 40). Run after spawning tasks into a frame.' },
     ],
   },
   {

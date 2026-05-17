@@ -54,11 +54,16 @@ krnl task note <writing> "thesis chapter 3"
 # 5. Anchor in wall-clock — first task in the chain anchors the rest via cascade.
 krnl task schedule <writing> --at 2026-05-18T07:15
 
-# 6. Frame the cluster
+# 6. Frame the cluster. With --near and no --w/--h, the frame auto-sizes
+#    to contain the writing task + 40 px padding. The triage task lands
+#    inside the frame's bounds when the renderer recomputes containment.
 krnl node list --kind task --json
-krnl frame add --label "Morning" --tint cyan --near <writing> --w 700 --h 320
+krnl frame add --label "Morning" --tint cyan --near <writing>
 
-# 7. Verify
+# 7. Snap the frame around the WHOLE chain (writing + triage), with padding.
+krnl frame fit <frame-ref>
+
+# 8. Verify
 krnl cal show --from 2026-05-18 --to 2026-05-18 --json
 krnl frame contents <frame-ref> --json
 ```
@@ -164,10 +169,7 @@ Read-only. Summarize in 1–2 sentences for the spoken reply.
 User: "Set up workspace for Project Alpha — spec, design, build, test."
 
 ```bash
-# 1. Anchor frame first so subsequent --near targets it.
-krnl frame add --label "Project Alpha" --tint plum --w 800 --h 400 --at 0,0
-
-# 2. Author the chain.
+# 1. Build the chain first — the CLI handles spacing (TASK_STEP_X = 300 px).
 krnl task add "spec" --duration 60
 krnl task list --json
 krnl task addNext <spec> "design" --duration 90
@@ -176,15 +178,13 @@ krnl task addNext <design> "build" --duration 240
 krnl task list --json
 krnl task addNext <build> "test" --duration 120
 
-# 3. Move them into the frame so the renderer auto-groups (or use --near at frame creation).
-#    Easier: re-frame with --near now that the spec exists.
-#    For headless work, set positions explicitly:
-krnl node set-position <spec>   --x 50  --y 50
-krnl node set-position <design> --x 250 --y 50
-krnl node set-position <build>  --x 450 --y 50
-krnl node set-position <test>   --x 650 --y 50
+# 2. Frame near the anchor (auto-sizes to fit the spec task + padding).
+krnl frame add --label "Project Alpha" --tint plum --near <spec>
 
-# 4. (Optional) anchor the chain in time.
+# 3. Snap the frame around the WHOLE chain.
+krnl frame fit <frame-ref>
+
+# 4. (Optional) anchor the chain in wall-clock time. Cascade does the rest.
 krnl task schedule <spec> --at 2026-05-20T09:00
 ```
 
@@ -231,10 +231,13 @@ Bad: assumes 7am, picks meditation + journaling without asking, frames in cyan.
 - ❌ Calling `frame contents` while the renderer is mid-drag — it reads stale state.
 - ❌ Using `task addNext` against a non-existent source. The CLI exits 1; you waste a turn.
 - ❌ Running a pipeline silently. Confirm at the end with `cal show` or `log tail`.
+- ❌ Framing a chain and forgetting `frame fit` — the frame won't wrap everything you just built.
+- ❌ Reading `src/`, `tests/`, `package.json`, or running `npm`/`git`/`find`/`grep`/`cat` to "understand" the app. You are the in-app assistant — those tools are off-limits. The only tools you need are listed in `krnl help`.
 
 ## Right patterns
 
 - ✅ Habits & frames first. Tasks second. Schedules last.
+- ✅ Spawn chain → frame near anchor → `frame fit` → schedule. The CLI does the spacing; `fit` does the wrapping.
 - ✅ Capture ids with `--json` reads between steps — never reuse the same prefix across two unrelated mutations without re-checking.
 - ✅ Verify with one cheap read at the end. "Calendar shows 3 blocks; analytics shows 3 new tasks today."
 - ✅ Tell the user what's still manual (edges don't auto-fire, habit lanes need renderer, etc.).

@@ -105,6 +105,7 @@ export type SysCommand =
   | { kind: 'frame'; sub: 'tint'; ref: string | undefined; tint: string | undefined }
   | { kind: 'frame'; sub: 'list'; json: boolean }
   | { kind: 'frame'; sub: 'contents'; ref: string | undefined; json: boolean }
+  | { kind: 'frame'; sub: 'fit'; ref: string | undefined; padding: number | undefined }
   | { kind: 'analytics'; sub: 'show'; view: string | undefined; range: number | undefined; metric: string | undefined; json: boolean }
   | { kind: 'analytics'; sub: 'totals'; range: number | undefined; json: boolean }
   | { kind: 'analytics'; sub: 'streaks'; json: boolean }
@@ -559,6 +560,9 @@ export class SysParser {
       }
       if (sub === 'contents') {
         return { kind: 'frame', sub: 'contents', ref: rest[0], json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'fit') {
+        return { kind: 'frame', sub: 'fit', ref: rest[0], padding: numFlag(rest, 'padding') };
       }
     }
 

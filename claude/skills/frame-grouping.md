@@ -25,17 +25,40 @@ Defaults: `width=360, height=240, label='', tint='neutral'`.
 ## Create a frame
 
 ```bash
-# At a specific position
+# At a specific position with explicit size
 krnl frame add --label "Morning" --at 200,100 --w 600 --h 320 --tint cyan
 
-# At viewport center (default)
+# At viewport center (default 360×240)
 krnl frame add --label "Morning" --tint cyan
 
-# Centered on an existing node (and seed the source into childIds)
+# Centered on an existing node — auto-sizes to fit source + padding,
+# seeds source into childIds
 krnl frame add --label "Morning" --tint cyan --near <task-ref>
 ```
 
-**`--near <ref>` for frames is special.** The frame is positioned so the source node's center lies inside the frame bounds (`frame top-left = srcCenter - (w/2, h/2)`). At creation, `state.childIds` is seeded with `[sourceId]` so the grouping is deterministic regardless of subsequent renderer spatial recomputation. This is the **only** create-time childIds seeding — further changes come from the renderer's spatial logic.
+**`--near <ref>` for frames is special.** The frame is positioned so the source node's center lies inside the frame bounds (`frame top-left = srcCenter - (w/2, h/2)`). When `--w` / `--h` aren't provided, the frame **auto-sizes** to `max(FRAME_MIN=320×200, source_size + 2×40 px padding)` — so the frame always actually contains the source. `state.childIds` is seeded with `[sourceId]` at creation; this is the only create-time seeding, further changes come from the renderer's spatial logic.
+
+## Fit a frame to its contents — `krnl frame fit <ref>`
+
+After spawning tasks into an existing frame, run:
+
+```bash
+krnl frame fit <frame-ref>              # 40 px padding (default)
+krnl frame fit <frame-ref> --padding 80 # custom padding
+```
+
+`frame fit`:
+1. Reads `state.childIds` (the persisted soft-group)
+2. Looks up every child's position + size
+3. Computes the bounding box of all children
+4. Sets the frame's `position` and `width`/`height` so the box is wrapped with `padding` on every side
+5. Floors at `FRAME_MIN_W = 320` and `FRAME_MIN_H = 200`
+
+Use this whenever you've spawned content into a frame and the user is going to look at it. Without `fit`, the frame likely doesn't visually contain everything it logically owns.
+
+**When `frame fit` refuses:**
+- `"no childIds — nothing to fit"` — `state.childIds` is empty. Either the renderer hasn't recomputed yet (drag-end hasn't fired), or the nodes you want included haven't been moved into the frame's bounds. Re-read with `frame contents <ref> --json` and/or `node move <child-ref> --to x,y` to nudge.
+- `"none of the N childId(s) resolve to live nodes"` — every persisted childId points to a node that no longer exists. The frame is stale; either remove it or rebuild the group.
 
 ---
 
@@ -132,6 +155,7 @@ krnl frame add --label "Inbox" --tint neutral --at 0,0 --w 800 --h 400
 - ❌ Calling `frame contents` and expecting it to recompute. It reads persisted state.
 - ❌ Using a tint as a status indicator that the AI will read later. Tints are aesthetic; they have no semantic meaning the code respects.
 - ❌ Creating frames inside frames. Technically allowed, but the renderer's containment doesn't handle nesting cleanly — keep frames flat.
+- ❌ Spawning a multi-task chain inside a frame and then walking away **without `frame fit`**. The default frame size is conservative — without `fit` the frame won't visually wrap the chain you just built.
 
 ## Right patterns
 

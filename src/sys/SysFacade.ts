@@ -23,6 +23,7 @@ import {
   frameTint,
   frameList,
   frameContents,
+  frameFit,
 } from './commands/frame';
 import type { FrameCtx } from './commands/frame';
 import {
@@ -312,6 +313,7 @@ export class SysFacade {
         case 'tint':     return frameTint(fCtx, command.ref, command.tint);
         case 'list':     return frameList(fCtx, command.json);
         case 'contents': return frameContents(fCtx, command.ref, command.json);
+        case 'fit':      return frameFit(fCtx, command.ref, command.padding);
       }
     }
 

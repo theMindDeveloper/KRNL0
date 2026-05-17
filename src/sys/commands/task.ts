@@ -33,6 +33,7 @@ import {
   resolutionError,
 } from '../../shared/dispatch/resolveRef';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
+import { TASK_STEP_X, TASK_STEP_Y, MOTHER_OFFSET_Y } from '../layout';
 
 export interface TaskCtx {
   boardPath: string;
@@ -194,10 +195,16 @@ export async function taskAdd(
 
   // Spawn rule: place new task next to the most recently added sibling.
   // If no siblings yet, drop the first task below the parent mother
-  // (540px tall + 40px gap).
+  // (mother row ≈ 540 tall; MOTHER_OFFSET_Y leaves a clear gap so the
+  // first task doesn't clip the dock).
+  //
+  // For sibling tasks, step one TASK_STEP_X to the right (TASK_W + GAP_X).
+  // The previous 252px step produced only a ~32px visible gap which
+  // looked cramped in AI-generated pipelines and made framing messy
+  // (user feedback 2026-05-17).
   let spawnPos: { x: number; y: number };
   if (siblings.length === 0) {
-    spawnPos = { x: baseX, y: baseY + 580 };
+    spawnPos = { x: baseX, y: baseY + MOTHER_OFFSET_Y };
   } else {
     const last = siblings
       .slice()
@@ -207,8 +214,8 @@ export async function taskAdd(
       .at(-1)!;
     const lastNode = last as AnyNode & { position?: { x: number; y: number } };
     const lx = lastNode.position?.x ?? baseX;
-    const ly = lastNode.position?.y ?? baseY + 580;
-    spawnPos = { x: lx + 252, y: ly };
+    const ly = lastNode.position?.y ?? baseY + MOTHER_OFFSET_Y;
+    spawnPos = { x: lx + TASK_STEP_X, y: ly };
   }
 
   const taskNode: AnyNode = {
@@ -392,8 +399,8 @@ export async function taskSubtask(
     kind: 'todo.task',
     isMother: false,
     position: {
-      x: (parentNode.position?.x ?? 0) + (seq - 1) * 252,
-      y: (parentNode.position?.y ?? 0) + 160,
+      x: (parentNode.position?.x ?? 0) + (seq - 1) * TASK_STEP_X,
+      y: (parentNode.position?.y ?? 0) + 200,
     },
     state: childState,
     config: { showDuration: true },
@@ -498,10 +505,11 @@ export async function taskSibling(
     id: newNodeId,
     kind: 'todo.task',
     isMother: false,
-    // Parallel fork: position below source, not beside it
+    // Parallel fork: position below source, not beside it.
+    // TASK_STEP_Y = TASK_H (140) + TASK_GAP_Y (120) = 260.
     position: {
       x: sourceNode.position?.x ?? 0,
-      y: (sourceNode.position?.y ?? 0) + 240,
+      y: (sourceNode.position?.y ?? 0) + TASK_STEP_Y,
     },
     state: newTaskState,
     config: { showDuration: true },
@@ -741,7 +749,7 @@ export async function taskUnschedule(
 /**
  * `krnl task addNext <sourceRef> "<text>" [--duration <min>]`
  * Creates a sequential successor: same parentTaskId as source, same layer,
- * positioned beside source (x + 252), with task.next → task.activate edge
+ * positioned beside source (x + TASK_STEP_X), with task.next → task.activate edge
  * from source to the new node. Also creates a TodoItem on the parent TodoNode.
  */
 export async function taskAddNext(
@@ -810,7 +818,7 @@ export async function taskAddNext(
     kind: 'todo.task',
     isMother: false,
     position: {
-      x: (sourceNode.position?.x ?? 0) + 252,
+      x: (sourceNode.position?.x ?? 0) + TASK_STEP_X,
       y: sourceNode.position?.y ?? 0,
     },
     state: newTaskState,
