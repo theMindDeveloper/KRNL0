@@ -299,20 +299,26 @@ export async function frameList(ctx: FrameCtx, json = false): Promise<SysResult>
 }
 
 /**
- * `krnl frame fit <ref> [--padding N]` — resize & reposition a frame so it
- * wraps all its persisted childIds with the given padding (default
- * FRAME_PADDING = 40 px per side).
+ * `krnl frame fit <ref> [--padding N]` — resize, reposition, AND gather.
  *
- * Headless-capable. Reads each child node's position + best-effort size
- * via resolveSourceGeometry (TaskNode = 220×140, frame defaults to its
- * own width/height, text/image read state.width/height, etc.) and
- * computes a bounding box, then sets the frame's position + width +
- * height to enclose the box.
+ * Two-phase contract:
+ *   1. Gather — walk every non-frame, non-mother node on the board. Any
+ *      whose center sits inside the frame's CURRENT bounds is added to
+ *      the frame's `state.childIds` (if not already there). This is the
+ *      headless analogue of the renderer's drag-end spatial recompute:
+ *      after a CLI chain spawns into a frame, those tasks are inside
+ *      the frame's rect but `childIds` is still just the original
+ *      `--near` seed. Without the gather step the user's drag-frame-
+ *      moves-children behaviour silently drops everything but the seed.
+ *   2. Fit — compute the bounding box of every resolved child, then
+ *      resize and reposition the frame so it wraps the box with
+ *      `padding` (default FRAME_PADDING = 40 px) on every side.
  *
- * If childIds is empty (or all stale), the command leaves the frame
- * unchanged and reports it — there's nothing useful to fit to. This is
- * the AI-facing automation for the user's "frames are smaller than
- * their contents" complaint.
+ * If childIds is empty AND gather found nothing inside the frame, the
+ * command leaves the frame unchanged and reports it.
+ *
+ * This is the AI-facing automation for the user's "frames don't actually
+ * own the things inside them" complaint (2026-05-17 feedback round 2).
  */
 export async function frameFit(
   ctx: FrameCtx,
@@ -329,30 +335,58 @@ export async function frameFit(
   if ('error' in resolved) return { ok: false, message: resolved.error };
   const frameNode = resolved.node;
   const state = frameNode.state as FrameState;
-  const childIds = state.childIds ?? [];
-  if (childIds.length === 0) {
+
+  // Phase 1: gather any non-frame, non-mother node whose center lies
+  // inside the frame's current bounds. Mothers are excluded because
+  // they shouldn't be inside frames; frames are excluded because nested
+  // frames are not in our model.
+  const frameX = frameNode.position?.x ?? 0;
+  const frameY = frameNode.position?.y ?? 0;
+  const frameW = state.width;
+  const frameH = state.height;
+  const frameRight = frameX + frameW;
+  const frameBottom = frameY + frameH;
+  const existing = new Set(state.childIds ?? []);
+  const gathered: string[] = [];
+  for (const candidate of board.nodes) {
+    if (candidate.id === frameNode.id) continue;
+    if (candidate.kind === 'frame') continue;
+    if (candidate.isMother) continue;
+    if (existing.has(candidate.id)) continue;
+    const geo = resolveSourceGeometry(board.nodes, candidate.id);
+    if (!geo) continue;
+    const cx = geo.x + geo.w / 2;
+    const cy = geo.y + geo.h / 2;
+    if (cx >= frameX && cx <= frameRight && cy >= frameY && cy <= frameBottom) {
+      gathered.push(candidate.id);
+      existing.add(candidate.id);
+    }
+  }
+  const mergedChildIds = [...(state.childIds ?? []), ...gathered];
+
+  if (mergedChildIds.length === 0) {
     return {
       ok: false,
-      message: `frame ${frameNode.id.slice(0, 8)} has no childIds — nothing to fit. Use 'frame contents <ref>' to inspect, or move nodes into the frame's bounds and let the renderer recompute first.`,
+      message: `frame ${frameNode.id.slice(0, 8)} has no childIds and nothing inside its bounds — nothing to fit. Move nodes so their centers are inside the frame, then re-run.`,
     };
   }
 
-  // Compute bounding box of all valid children.
+  // Phase 2: bounding box over all resolved children.
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  let resolved_count = 0;
-  for (const childId of childIds) {
+  let resolvedCount = 0;
+  for (const childId of mergedChildIds) {
     const geo = resolveSourceGeometry(board.nodes, childId);
     if (!geo) continue;
-    resolved_count++;
+    resolvedCount++;
     if (geo.x < minX) minX = geo.x;
     if (geo.y < minY) minY = geo.y;
     if (geo.x + geo.w > maxX) maxX = geo.x + geo.w;
     if (geo.y + geo.h > maxY) maxY = geo.y + geo.h;
   }
-  if (resolved_count === 0) {
+  if (resolvedCount === 0) {
     return {
       ok: false,
-      message: `frame ${frameNode.id.slice(0, 8)}: none of the ${childIds.length} childId(s) resolve to live nodes.`,
+      message: `frame ${frameNode.id.slice(0, 8)}: none of the ${mergedChildIds.length} childId(s) resolve to live nodes.`,
     };
   }
 
@@ -361,7 +395,7 @@ export async function frameFit(
   const newW = Math.max(FRAME_MIN_W, Math.round((maxX - minX) + 2 * padding));
   const newH = Math.max(FRAME_MIN_H, Math.round((maxY - minY) + 2 * padding));
 
-  const nextState: FrameState = { ...state, width: newW, height: newH };
+  const nextState: FrameState = { ...state, width: newW, height: newH, childIds: mergedChildIds };
   board.nodes = board.nodes.map((n) =>
     n.id === frameNode.id
       ? { ...n, position: { x: newX, y: newY }, state: nextState }
@@ -371,15 +405,16 @@ export async function frameFit(
 
   return {
     ok: true,
-    message: `frame ${frameNode.id.slice(0, 8)}: fitted to ${resolved_count}/${childIds.length} children → pos=(${newX},${newY}) size=${newW}×${newH} padding=${padding}`,
+    message: `frame ${frameNode.id.slice(0, 8)}: fitted to ${resolvedCount}/${mergedChildIds.length} children (${gathered.length} newly gathered) → pos=(${newX},${newY}) size=${newW}×${newH} padding=${padding}`,
     data: {
       id: frameNode.id,
       position: { x: newX, y: newY },
       width: newW,
       height: newH,
       padding,
-      childrenResolved: resolved_count,
-      childrenTotal: childIds.length,
+      childrenResolved: resolvedCount,
+      childrenTotal: mergedChildIds.length,
+      childrenGathered: gathered,
     },
   };
 }

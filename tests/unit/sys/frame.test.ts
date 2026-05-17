@@ -271,12 +271,50 @@ describe('frame fit', () => {
     expect(frame.position!.y).toBe(100);
   });
 
-  it('refuses to fit when childIds is empty', async () => {
-    await frameAdd(ctx, {}); // default frame at viewport center, no childIds
+  it('refuses to fit when childIds is empty AND no node sits inside the frame', async () => {
+    // Default frame is centered on viewport (500,300), size 360×240,
+    // so it occupies x ∈ [320, 680], y ∈ [180, 420]. seedBoard's
+    // source-node is at (100,200) size 200×80, center (200,240) —
+    // outside [320,680]. No gather candidates, no seed childIds → refuse.
+    await frameAdd(ctx, {});
     const id = getFrames()[0]!.id;
     const res = await frameFit(ctx, id, undefined);
     expect(res.ok).toBe(false);
-    expect(res.message).toContain('no childIds');
+    expect(res.message).toContain('nothing inside');
+  });
+
+  it('gathers nodes whose centers sit inside the frame bounds into childIds', async () => {
+    // Add a frame big enough to contain source-node spatially, but
+    // without --near so its initial childIds is empty.
+    await frameAdd(ctx, { at: { x: 0, y: 100 }, w: 500, h: 300 });
+    const id = getFrames()[0]!.id;
+    // source-node center is (200, 240). Frame is x ∈ [0,500], y ∈ [100,400].
+    // → center is inside.
+    expect(getFrames().find((f) => f.id === id)!.state.childIds).toEqual([]);
+    const res = await frameFit(ctx, id, undefined);
+    expect(res.ok).toBe(true);
+    const frame = getFrames().find((f) => f.id === id)!;
+    expect(frame.state.childIds).toEqual(['source-node']);
+  });
+
+  it('does NOT gather mother nodes or other frames into childIds', async () => {
+    // Add a mother + another frame both inside the bounds of a big test frame.
+    const raw = JSON.parse(readFileSync(boardPath, 'utf-8'));
+    raw.nodes.push(
+      { id: 'mother-todo', kind: 'todo', isMother: true, position: { x: 50, y: 150 }, state: { items: [] }, config: {} },
+      { id: 'other-frame', kind: 'frame', isMother: false, position: { x: 80, y: 180 }, state: { label: '', width: 100, height: 60, childIds: [] }, config: { tint: 'neutral' } },
+    );
+    writeFileSync(boardPath, JSON.stringify(raw), 'utf-8');
+
+    await frameAdd(ctx, { at: { x: 0, y: 100 }, w: 500, h: 400 });
+    const id = getFrames().find((f) => f.id !== 'other-frame')!.id;
+    const res = await frameFit(ctx, id, undefined);
+    expect(res.ok).toBe(true);
+    const frame = getFrames().find((f) => f.id === id)!;
+    // source-node gathered; mother + other frame excluded.
+    expect(frame.state.childIds).toContain('source-node');
+    expect(frame.state.childIds).not.toContain('mother-todo');
+    expect(frame.state.childIds).not.toContain('other-frame');
   });
 
   it('refuses to fit when no childIds resolve to live nodes', async () => {
