@@ -82,19 +82,32 @@ jobs:
       - name: Build renderer + main
         run: npm run build
 
+      # Package via electron-builder. GitHub renders unset secrets as the
+      # empty string, and electron-builder treats CSC_LINK="" as "user
+      # provided a cert" then errors out trying to read an empty path. So
+      # we strip empty CSC vars at runtime before calling electron-builder,
+      # and disable mac keychain auto-discovery when no signing cert is
+      # present. To enable signing, add these repo secrets and they will
+      # flow through unchanged:
+      #   macOS: MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD, APPLE_ID,
+      #          APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+      #   Windows: WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD
       - name: Package (electron-builder)
-        run: npx electron-builder ${{ matrix.ebuild_args }} --publish never
+        shell: bash
+        run: |
+          set -e
+          for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then unset "$v"; fi
+          done
+          if [ -z "${CSC_LINK:-}" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          npx electron-builder ${{ matrix.ebuild_args }} --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # ---- macOS signing & notarization (optional) ----
-          # Provide these repo secrets to produce a signed + notarized DMG.
-          # Leave unset for an unsigned local-only build.
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # ---- Windows signing (optional) ----
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
