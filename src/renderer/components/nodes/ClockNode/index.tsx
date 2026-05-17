@@ -321,6 +321,82 @@ export function ClockNode({
           </div>
         )}
 
+        {/* 12-hour window toggle bar — prominent, above the clock face.
+            Shows which half-day the arcs reflect and lets users swap. */}
+        <div
+          data-testid="clock-window-bar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '4px 0 2px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            userSelect: 'none',
+          }}
+        >
+          <button
+            type="button"
+            data-testid="clock-window-am"
+            onClick={() => onCommand('clock.setViewWindow', { window: 0 })}
+            style={{
+              padding: '3px 10px',
+              background: viewWindow === 0 ? 'var(--rust)' : 'transparent',
+              color: viewWindow === 0 ? 'var(--paper)' : 'var(--ink-3)',
+              border: `1px solid ${viewWindow === 0 ? 'var(--rust)' : 'var(--paper-3)'}`,
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              letterSpacing: 'inherit',
+              fontWeight: viewWindow === 0 ? 700 : 400,
+            }}
+          >
+            AM · 0–12
+          </button>
+          <button
+            type="button"
+            data-testid="clock-window-swap"
+            onClick={() => onCommand('clock.setViewWindow', { window: viewWindow === 0 ? 1 : 0 })}
+            title="Show next 12 hours"
+            style={{
+              padding: '3px 8px',
+              background: 'transparent',
+              color: 'var(--ink-2)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 12,
+              lineHeight: 1,
+            }}
+          >
+            ⇆
+          </button>
+          <button
+            type="button"
+            data-testid="clock-window-pm"
+            onClick={() => onCommand('clock.setViewWindow', { window: 1 })}
+            style={{
+              padding: '3px 10px',
+              background: viewWindow === 1 ? 'var(--rust)' : 'transparent',
+              color: viewWindow === 1 ? 'var(--paper)' : 'var(--ink-3)',
+              border: `1px solid ${viewWindow === 1 ? 'var(--rust)' : 'var(--paper-3)'}`,
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              letterSpacing: 'inherit',
+              fontWeight: viewWindow === 1 ? 700 : 400,
+            }}
+          >
+            PM · 12–24
+          </button>
+        </div>
+
         {/* Clock face */}
         <div style={{ position: 'relative', width: 244, height: 244, margin: '0 auto' }}>
           <svg
@@ -558,73 +634,24 @@ export function ClockNode({
               the 12 numeral. Previous `top:70 + fontSize:9` collided with
               the "11" numeral (which sits at SVG y≈68). Bumped down to 92
               and shrunk to 7.5px so it sits clear of all face numerals. */}
-          {/* AM/PM toggle — switches the 12h viewWindow so users can see the
-              other half of the day. Active half highlighted in rust. */}
+          {/* Current wall-clock time label (HH:MM, mono). The AM/PM swap UI
+              lives in the dedicated bar above the clock face. */}
           <div
-            data-testid="clock-window-toggle"
             style={{
               position: 'absolute',
               top: 92,
               left: '50%',
               transform: 'translateX(-50%)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 8.5,
-              letterSpacing: '0.12em',
+              fontSize: 8,
+              letterSpacing: '0.16em',
               color: 'var(--ink-4)',
               textTransform: 'uppercase',
+              pointerEvents: 'none',
               whiteSpace: 'nowrap',
-              display: 'flex',
-              gap: 6,
-              alignItems: 'center',
-              pointerEvents: 'auto',
-              userSelect: 'none',
             }}
           >
-            <button
-              type="button"
-              data-testid="clock-window-am"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCommand('clock.setViewWindow', { window: 0 });
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '1px 4px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 'inherit',
-                letterSpacing: 'inherit',
-                color: viewWindow === 0 ? 'var(--rust)' : 'var(--ink-4)',
-                fontWeight: viewWindow === 0 ? 700 : 400,
-                borderBottom: viewWindow === 0 ? '1px solid var(--rust)' : '1px solid transparent',
-              }}
-            >
-              AM
-            </button>
-            <button
-              type="button"
-              data-testid="clock-window-pm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCommand('clock.setViewWindow', { window: 1 });
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '1px 4px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 'inherit',
-                letterSpacing: 'inherit',
-                color: viewWindow === 1 ? 'var(--rust)' : 'var(--ink-4)',
-                fontWeight: viewWindow === 1 ? 700 : 400,
-                borderBottom: viewWindow === 1 ? '1px solid var(--rust)' : '1px solid transparent',
-              }}
-            >
-              PM
-            </button>
-            <span style={{ color: 'var(--ink-3)' }}>{String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}</span>
+            {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
           </div>
         </div>
 
