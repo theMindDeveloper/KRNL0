@@ -12,8 +12,16 @@ import {
 import { createRpcServer } from './rpc/server';
 import type { RpcServer } from './rpc/server';
 
+// Force canonical display name. package.json's `name` stays lowercase per
+// npm convention; this is what shows in the taskbar, window title, About
+// dialog, and is returned by app.getName(). MUST run before any other
+// `app.*` call so setPath / userData / Chromium cache all use the right
+// folder name. On Windows + macOS default filesystems case is
+// insensitive, so existing %APPDATA%/krnl0/ data is reused transparently.
+app.setName('KRNL0');
+
 // Per-worktree user-data isolation (scripts/dev.mjs sets KRNL0_USER_DATA).
-// Without this, multiple worktrees of KRNL0 fight over `%APPDATA%/krnl0/`
+// Without this, multiple worktrees of KRNL0 fight over `%APPDATA%/KRNL0/`
 // Chromium cache → "Unable to move the cache: Access is denied".
 if (process.env['KRNL0_USER_DATA']) {
   app.setPath('userData', process.env['KRNL0_USER_DATA']);
