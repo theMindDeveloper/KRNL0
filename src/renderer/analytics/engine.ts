@@ -112,7 +112,7 @@ export function buildAnalytics(board: BoardLike): AnalyticsResult {
       const perHabit = habits.map((h) => ({
         habitId: h.id,
         label: h.name,
-        streak: calcHabitStreak(h.log ?? [], today),
+        streak: calcHabitStreak(h.log ?? [], today, h.schedule),
       }));
       const longestHabitStreak = perHabit.reduce((m, p) => Math.max(m, p.streak), 0);
       streaksCache = { longestHabitStreak, perHabit };

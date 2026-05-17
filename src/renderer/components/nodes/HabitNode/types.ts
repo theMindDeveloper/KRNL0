@@ -51,6 +51,27 @@ export function isValidTimeOfDay(t: string): boolean {
   return TIME_OF_DAY_RE.test(t);
 }
 
+// ISO day-of-week (1=Mon..7=Sun) for a YYYY-MM-DD local-date string.
+export function isoDowOf(dateStr: string): IsoDow {
+  const d = new Date(dateStr + 'T00:00:00');
+  const js = d.getDay(); // 0=Sun..6=Sat
+  return (js === 0 ? 7 : js) as IsoDow;
+}
+
+// Whether a given local date is a scheduled occurrence under `schedule`.
+// Absent schedule → every day is scheduled (legacy / unscheduled habits).
+export function isDayScheduled(
+  schedule: HabitSchedule | undefined,
+  dateStr: string,
+): boolean {
+  if (!schedule) return true;
+  if (schedule.kind === 'daily') return true;
+  const dow = isoDowOf(dateStr);
+  if (schedule.kind === 'weekdays') return dow >= 1 && dow <= 5;
+  // weekly
+  return schedule.days.includes(dow);
+}
+
 export interface Habit {
   id: string;           // crypto.randomUUID()
   name: string;

@@ -3,7 +3,7 @@
 // Time and id sources are injected so tests can pin them.
 
 import type { Habit, HabitColor, HabitConfig, HabitSchedule, HabitState, HabitView, IsoDow } from './types';
-import { isHabitColor, isHabitView, isValidTimeOfDay, todayLocal } from './types';
+import { isHabitColor, isHabitView, isValidTimeOfDay, isDayScheduled, todayLocal } from './types';
 
 export interface HabitEnv {
   uuid: () => string;
@@ -233,16 +233,42 @@ export function habitSetSchedule(
   return { ...state, habits };
 }
 
-// Streak = consecutive days in log ending at today (if present) or yesterday.
-// If today is not yet marked, start from yesterday so the user doesn't see 0
-// prematurely (Decision #11).
-export function calcStreak(log: string[], today: string): number {
+// Streak = consecutive scheduled days in log walking backwards from today.
+// • No schedule → every day counts (legacy behaviour).
+// • Scheduled habit → only scheduled days are inspected. Non-scheduled days
+//   are skipped entirely — they neither extend nor break the streak.
+// • Grace (Decision #11): if the most-recent scheduled day is today and is
+//   not yet logged, start counting from the previous scheduled day so the
+//   user doesn't see 0 prematurely.
+export function calcStreak(
+  log: string[],
+  today: string,
+  schedule?: HabitSchedule,
+): number {
   const logSet = new Set(log);
+
+  let cursor = today;
+  let safety = 366;
+  while (!isDayScheduled(schedule, cursor) && safety-- > 0) {
+    cursor = prevDayStr(cursor);
+  }
+
+  if (cursor === today && !logSet.has(cursor)) {
+    cursor = prevDayStr(cursor);
+    safety = 366;
+    while (!isDayScheduled(schedule, cursor) && safety-- > 0) {
+      cursor = prevDayStr(cursor);
+    }
+  }
+
   let count = 0;
-  let cursor = logSet.has(today) ? today : prevDayStr(today);
   while (logSet.has(cursor)) {
     count++;
     cursor = prevDayStr(cursor);
+    safety = 366;
+    while (!isDayScheduled(schedule, cursor) && safety-- > 0) {
+      cursor = prevDayStr(cursor);
+    }
   }
   return count;
 }
