@@ -489,26 +489,15 @@ export function ClockNode({
                   : {};
                 const breakdown = t.breakdown;
 
-                // Glassy ring helper — 3 stacked arcs: shadow + base + highlight.
-                // Mimics liquid-glass curvature without SVG gradients (which
-                // don't follow arc paths well).
-                const glassyArc = (
+                // Single-stroke ring — same visual language as calendar.
+                // Calendar uses task-tone background + tone-color border;
+                // we render the analog equivalent as one solid arc in tone.
+                const baseArc = (
                   key: string,
                   s: number,
                   e: number,
                   cap: 'round' | 'butt',
-                ): React.ReactElement[] => [
-                  // shadow (outer edge)
-                  <path
-                    key={`${key}-shadow`}
-                    d={arcPath(s, e, r + sw * 0.25)}
-                    fill="none"
-                    stroke="rgba(0,0,0,0.35)"
-                    strokeWidth={sw * 0.5}
-                    strokeLinecap={cap}
-                    opacity={opacity}
-                  />,
-                  // base color
+                ): React.ReactElement => (
                   <path
                     key={`${key}-base`}
                     d={arcPath(s, e, r)}
@@ -518,36 +507,24 @@ export function ClockNode({
                     strokeLinecap={cap}
                     opacity={opacity}
                     style={activeStyle}
-                  />,
-                  // highlight (inner edge — toward clock center)
-                  <path
-                    key={`${key}-shine`}
-                    d={arcPath(s, e, r - sw * 0.28)}
-                    fill="none"
-                    stroke="rgba(255,255,255,0.55)"
-                    strokeWidth={sw * 0.32}
-                    strokeLinecap={cap}
-                    opacity={opacity}
-                  />,
-                ];
+                  />
+                );
 
                 if (breakdown === null || breakdown.segments.length <= 1) {
-                  return glassyArc(t.id, t.start, t.end, 'round');
+                  return [baseArc(t.id, t.start, t.end, 'round')];
                 }
 
                 const out: React.ReactElement[] = [];
-                out.push(...glassyArc(t.id, t.start, t.end, 'round'));
+                out.push(baseArc(t.id, t.start, t.end, 'round'));
 
-                // Break overlays — transparent glass panels showing track through.
-                // Short = subtle, long = slightly more opaque. Edge highlight
-                // hairlines for glass-rim look.
+                // Break overlays — track-color stroke cuts through the task
+                // arc cleanly (matches the calendar's dashed-border + stripe
+                // language — neutral panel break in the timeline).
                 let segCursor = t.start;
                 for (let sIdx = 0; sIdx < breakdown.segments.length; sIdx++) {
                   const seg = breakdown.segments[sIdx]!;
                   const segEnd = Math.min(segCursor + seg.min / 60, t.end);
                   if (seg.kind !== 'work' && segEnd > segCursor) {
-                    const glassOpacity = seg.kind === 'long' ? 0.55 : 0.4;
-                    // Frosted glass panel — full stroke, semi-transparent white.
                     out.push(
                       <path
                         key={`${t.id}-seg-${sIdx}`}
@@ -555,20 +532,8 @@ export function ClockNode({
                         data-break-kind={seg.kind}
                         d={arcPath(segCursor, segEnd, r)}
                         fill="none"
-                        stroke={`rgba(255,255,255,${glassOpacity})`}
+                        stroke="var(--paper-3)"
                         strokeWidth={sw}
-                        strokeLinecap="butt"
-                        opacity={opacity}
-                      />,
-                    );
-                    // Subtle inner-edge highlight on the break panel.
-                    out.push(
-                      <path
-                        key={`${t.id}-seg-${sIdx}-rim`}
-                        d={arcPath(segCursor, segEnd, r - sw * 0.32)}
-                        fill="none"
-                        stroke="rgba(255,255,255,0.5)"
-                        strokeWidth={1}
                         strokeLinecap="butt"
                         opacity={opacity}
                       />,
