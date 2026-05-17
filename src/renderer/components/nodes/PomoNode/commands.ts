@@ -107,7 +107,7 @@ export const pomoCancel = (
  */
 export const pomoComplete = (
   state: PomoState,
-  args: { config?: PomoConfig } = {},
+  args: { config?: PomoConfig; skipBreak?: boolean } = {},
   env: PomoEnv = defaultEnv,
 ): PomoState => {
   if (state.status !== 'running' || state.startedAt === null) return state;
@@ -115,8 +115,6 @@ export const pomoComplete = (
   if (now - Date.parse(state.startedAt) < state.durationMin * 60_000) return state;
   const config = args.config ?? defaultPomoConfig();
   const nextSessions = state.sessionsCompleted + 1;
-  const isLong = isLongBreakAfter(state.sessionsCompleted, config);
-  const breakMin = isLong ? config.longBreakMin : config.shortBreakMin;
   const record: PomoSessionRecord = {
     id: env.uuid(),
     startedAt: state.startedAt,
@@ -126,6 +124,20 @@ export const pomoComplete = (
     completed: true,
     taskId: state.activeTaskId,
   };
+  // Event-task path (Decision 28 + follow-up): single big session, no break.
+  // Caller signals via skipBreak=true. FSM transitions to 'done' (idle-like)
+  // so the START button reappears and no break countdown runs.
+  if (args.skipBreak) {
+    return {
+      ...state,
+      status: 'done',
+      startedAt: null,
+      sessionsCompleted: nextSessions,
+      history: [...state.history, record],
+    };
+  }
+  const isLong = isLongBreakAfter(state.sessionsCompleted, config);
+  const breakMin = isLong ? config.longBreakMin : config.shortBreakMin;
   return {
     ...state,
     status: 'break',

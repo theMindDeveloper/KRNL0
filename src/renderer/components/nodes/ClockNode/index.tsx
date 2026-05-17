@@ -401,13 +401,17 @@ export function ClockNode({
                 const seg = breakdown.segments[s]!;
                 const segEnd = segCursor + seg.min / 60;
                 if (seg.kind !== 'work') {
+                  // Short breaks = paper-white. Long breaks = ink-3 (darker neutral)
+                  // so users can distinguish a 15-min long break from a 5-min short.
+                  const breakStroke = seg.kind === 'long' ? 'var(--ink-3)' : 'var(--paper)';
                   arcs.push(
                     <path
                       key={`${t.id}-seg-${s}`}
                       data-testid="clock-task-break-arc"
+                      data-break-kind={seg.kind}
                       d={arcPath(segCursor, segEnd, R_ARC)}
                       fill="none"
-                      stroke="var(--paper)"
+                      stroke={breakStroke}
                       strokeWidth={sw}
                       strokeLinecap="butt"
                       opacity={opacity}

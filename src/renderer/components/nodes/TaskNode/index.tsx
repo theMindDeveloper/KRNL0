@@ -406,8 +406,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const handleBodyDoubleClick = (e: MouseEvent) => {
     // Children that handle their own dblclick (the editable task text) stop
     // propagation, so this handler only fires on the surrounding card surface.
+    // Both focus and event tasks load into pomo; event tasks render as a
+    // single big session with no breaks.
     if (state.done) return;
-    if (state.kind === 'event') return;
     e.stopPropagation();
     onCommand('task.loadIntoPomo');
   };
@@ -533,7 +534,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             fully abandon a session, press RESET on the parent PomoNode.
             Decision 28: START/PAUSE hidden for event-kind tasks. */}
         <div style={{ display: 'flex', gap: 4 }}>
-          {state.kind === 'focus' && !state.done && !isActiveRunning && (
+          {!state.done && !isActiveRunning && (
             <button
               type="button"
               data-testid="task-start-btn"
@@ -559,7 +560,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               START
             </button>
           )}
-          {state.kind === 'focus' && isActiveRunning && (
+          {isActiveRunning && (
             <button
               type="button"
               data-testid="task-pause-btn"

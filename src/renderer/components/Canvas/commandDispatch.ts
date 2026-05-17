@@ -202,7 +202,20 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.pause':    return { state: pomoPause(s as never) };
         case 'pomo.resume':   return { state: pomoResume(s as never) };
         case 'pomo.cancel':   return { state: pomoCancel(s as never) };
-        case 'pomo.complete': return { state: pomoComplete(s as never, { config: pomoCfg }) };
+        case 'pomo.complete': {
+          // Detect if the active task is an event-kind task; if so, signal
+          // skipBreak so the FSM transitions straight to 'done' (no break).
+          const ps = s as unknown as PomoState;
+          let skipBreak = false;
+          if (ps.activeTaskId !== null) {
+            const board = useBoardStore.getState().board;
+            const activeTask = board?.nodes.find((n) => n.id === ps.activeTaskId);
+            if (activeTask && (activeTask.state as TaskState).kind === 'event') {
+              skipBreak = true;
+            }
+          }
+          return { state: pomoComplete(s as never, { config: pomoCfg, skipBreak }) };
+        }
         case 'pomo.skipBreak': return { state: pomoSkipBreak(s as never) };
         case 'pomo.endBreak': return { state: pomoEndBreak(s as never) };
         case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
@@ -551,10 +564,6 @@ function loadTaskIntoPomo(
   const taskNode = board.nodes.find((n) => n.id === taskNodeId);
   if (!taskNode || taskNode.kind !== 'todo.task') return;
 
-  // Decision 28: event-kind tasks never load into the pomo. Defense in depth
-  // for any caller that bypasses the dblclick gate (e.g., TodoItem row clicks).
-  if ((taskNode.state as TaskState).kind === 'event') return;
-
   const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
   if (!pomoNode) return;
 
@@ -613,11 +622,14 @@ function loadTaskIntoPomo(
     workingState = pomoSkipBreak(workingState);
   }
 
-  // Step 5: compute current session minutes using the shared clamp rule
-  // (Decision 28 §2 — computeCurrentSessionMin is the single source of truth).
+  // Step 5: compute current session minutes.
+  // - Focus tasks: shared clamp rule (computeCurrentSessionMin = single source).
+  // - Event tasks: single big session, durationMin = plannedMin (no splitting).
   const taskState = taskNode.state as TaskState;
   const completed = taskState.pomoSessionsCompleted ?? 0;
-  const currentSessionMin = computeCurrentSessionMin(taskState.plannedMin, completed, cfg);
+  const currentSessionMin = taskState.kind === 'event'
+    ? Math.max(1, Math.round(taskState.plannedMin))
+    : computeCurrentSessionMin(taskState.plannedMin, completed, cfg);
 
   // Step 6: read the checkpoint (in-flight elapsed) from the new task.
   const checkpointMs = (taskState.currentSessionElapsedSec ?? 0) * 1000;
@@ -773,28 +785,30 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const ts = node.state as TaskState;
       const newKind = ts.kind === 'focus' ? 'event' : 'focus';
 
-      if (newKind === 'event') {
-        // Clean handoff: if this task is the pomo's active task in ANY status,
-        // clear it. Cancel an in-flight session first so the partial run is
-        // recorded; then clearActiveTask flips back to idle. This avoids the
-        // pomo continuing to show pips/sessions for a task that is no longer
-        // a pomodoro task.
-        const freshBoard = useBoardStore.getState().board;
-        const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
-        if (pomoNode) {
-          const ps = pomoNode.state as PomoState;
-          if (ps.activeTaskId === nodeId) {
-            let nextState = ps;
-            if (ps.status === 'running' || ps.status === 'paused') {
-              nextState = pomoCancel(nextState);
-            }
-            nextState = pomoClearActiveTask(nextState);
-            updateNode(pomoNode.id, { state: nextState });
-          }
+      // If this task is currently loaded in the pomo and a session is in-flight,
+      // cancel it so the partial run is recorded; then re-load with the new
+      // kind's settings (single big session for event, per-session for focus).
+      const freshBoard = useBoardStore.getState().board;
+      const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
+      const wasActive = pomoNode
+        ? (pomoNode.state as PomoState).activeTaskId === nodeId
+        : false;
+      if (pomoNode && wasActive) {
+        const ps = pomoNode.state as PomoState;
+        if (ps.status === 'running' || ps.status === 'paused') {
+          updateNode(pomoNode.id, { state: pomoCancel(ps) });
+        } else if (ps.status === 'break') {
+          updateNode(pomoNode.id, { state: pomoSkipBreak(ps) });
         }
       }
 
       updateNode(nodeId, { state: { ...ts, kind: newKind } });
+
+      // Re-load the task so durationMin / pip count reflects the new kind.
+      if (wasActive) {
+        loadTaskIntoPomo(nodeId, { autoStart: false });
+      }
+
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       emit('task.toggleKind', `task ${shortId(nodeId)} kind flipped to ${newKind}`, { refId: nodeId });
