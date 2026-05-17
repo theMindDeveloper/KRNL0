@@ -101,16 +101,16 @@ describe('Decision 28 — event-kind UX gates', () => {
     expect(btn.tagName.toLowerCase()).toBe('button');
   });
 
-  it('toggle button shows 🍅 when kind=focus', () => {
+  it('toggle button shows POMO label when kind=focus', () => {
     renderTaskNode(makeTaskState({ kind: 'focus' }));
     const btn = screen.getByTestId('task-kind-toggle');
-    expect(btn.textContent).toContain('🍅');
+    expect(btn.textContent).toContain('POMO');
   });
 
-  it('toggle button shows 🍞 when kind=event', () => {
+  it('toggle button shows EVENT label when kind=event', () => {
     renderTaskNode(makeTaskState({ kind: 'event' }));
     const btn = screen.getByTestId('task-kind-toggle');
-    expect(btn.textContent).toContain('🍞');
+    expect(btn.textContent).toContain('EVENT');
   });
 
   it('toggle button has aria-label "Toggle to event" when kind=focus', () => {

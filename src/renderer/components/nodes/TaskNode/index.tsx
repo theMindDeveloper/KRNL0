@@ -446,34 +446,6 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       }}
       onDoubleClick={handleBodyDoubleClick}
     >
-      {/* Decision 28 — kind toggle (top-right). 🍅 = focus, 🍞 = event. */}
-      <button
-        type="button"
-        data-testid="task-kind-toggle"
-        aria-label={state.kind === 'focus' ? 'Toggle to event' : 'Toggle to focus'}
-        onClick={(e) => {
-          e.stopPropagation();
-          onCommand('task.toggleKind');
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute',
-          top: -8,
-          right: -2,
-          padding: '1px 4px',
-          background: 'var(--paper)',
-          border: `1px solid var(--paper-3)`,
-          borderRadius: 4,
-          fontSize: 9,
-          lineHeight: 1,
-          cursor: 'pointer',
-          pointerEvents: 'auto',
-          zIndex: 1,
-        }}
-      >
-        {state.kind === 'focus' ? '🍅' : '🍞'}
-      </button>
-
       {/* Decision 22 F16 — corner timer (top-left) */}
       {showTimer && (
         <span
@@ -533,7 +505,52 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             the task loaded — pressing START resumes from the checkpoint. To
             fully abandon a session, press RESET on the parent PomoNode.
             Decision 28: START/PAUSE hidden for event-kind tasks. */}
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {/* Decision 28 — kind toggle pill. Matches KRNL0 button language
+              (mono uppercase, paper-2 chassis, ink-3 text, thin border).
+              Focus = acid accent dot, Event = ink-3 dot. */}
+          <button
+            type="button"
+            data-testid="task-kind-toggle"
+            aria-label={state.kind === 'focus' ? 'Toggle to event' : 'Toggle to focus'}
+            title={state.kind === 'focus' ? 'Pomodoro task (click → event)' : 'Event task (click → pomodoro)'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCommand('task.toggleKind');
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 6px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              color: state.kind === 'focus' ? 'var(--acid)' : 'var(--ink-3)',
+              background: 'var(--paper-2)',
+              border: `1px solid ${state.kind === 'focus' ? 'var(--acid)' : 'var(--paper-3)'}`,
+              borderRadius: 3,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              cursor: 'pointer',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 0 rgba(0,0,0,0.15)',
+              opacity: 0.95,
+              lineHeight: 1,
+            }}
+          >
+            <span
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: '50%',
+                background: state.kind === 'focus' ? 'var(--acid)' : 'var(--ink-3)',
+                boxShadow: state.kind === 'focus'
+                  ? '0 0 4px var(--acid)'
+                  : 'none',
+              }}
+            />
+            {state.kind === 'focus' ? 'POMO' : 'EVENT'}
+          </button>
           {!state.done && !isActiveRunning && (
             <button
               type="button"
