@@ -655,76 +655,51 @@ export function ClockNode({
             })()}
 
             {/* Now-pointer — spans exactly the train-track band.
-                Only rendered when viewing today; on any other day `now`
-                has no meaningful position relative to the day's arcs.
+                Only rendered when viewing today.
 
-                The pointer paints in --rust, the same family the user's
-                rust-toned tasks paint in, so without contrast the
-                pointer disappears over a rust task arc. To restore the
-                "this is RIGHT NOW" signal we (a) render a soft warm
-                halo behind the line via SVG <filter>, (b) wrap the line
-                in a brighter outer stroke + a near-white inner stroke
-                (double-stroke trick — no extra DOM nodes), and (c)
-                pulse the centre dot so it reads as alive even when its
-                track is the same hue. */}
+                Contrast trick — the pointer paints in --rust, the same
+                family as user's rust-toned task arcs, so without help
+                it vanishes over them. We use a thin near-white core
+                running through a slightly wider rust stroke (double-
+                stroke, no extra DOM cost) and a tiny dot with a small
+                pulse. No SVG filter halos: previous version's glow
+                overflowed the node's clip box. */}
             {isToday && (() => {
               const pIn  = pt(nowFloat, trackInnerEdge);
               const pOut = pt(nowFloat, trackOuterEdge);
               const pDot = pt(nowFloat, trackBaseR);
               return (
-                <g style={{ filter: 'url(#clock-now-glow)' }}>
-                  {/* Bright outer stroke — wider, full-strength rust. */}
+                <>
                   <line
                     x1={pIn.x} y1={pIn.y}
                     x2={pOut.x} y2={pOut.y}
                     stroke="var(--rust)"
-                    strokeWidth={3}
+                    strokeWidth={2.5}
                     strokeLinecap="round"
                     opacity={0.95}
                   />
-                  {/* Inner highlight — near-white core so the pointer
-                      always reads against any rust-family task arc. */}
                   <line
                     x1={pIn.x} y1={pIn.y}
                     x2={pOut.x} y2={pOut.y}
                     stroke="#fff5ec"
-                    strokeWidth={1}
+                    strokeWidth={0.8}
                     strokeLinecap="round"
-                    opacity={0.95}
-                  />
-                  {/* Outer halo ring on the dot — fades out continuously. */}
-                  <circle
-                    cx={pDot.x} cy={pDot.y} r={6}
-                    fill="var(--rust)"
-                    opacity={0.35}
+                    opacity={0.9}
                   />
                   <circle
-                    cx={pDot.x} cy={pDot.y} r={3.5}
+                    cx={pDot.x} cy={pDot.y} r={3}
                     fill="var(--rust)"
                     stroke="#fff5ec"
-                    strokeWidth={1.2}
+                    strokeWidth={0.8}
                     style={{
-                      animation: 'clock-now-pulse 1.6s ease-in-out infinite',
+                      animation: 'clock-now-pulse 2s ease-in-out infinite',
                       transformBox: 'fill-box',
                       transformOrigin: 'center',
                     }}
                   />
-                </g>
+                </>
               );
             })()}
-
-            {/* Filter def for the now-pointer halo — kept inline so the
-                ClockNode is self-contained and other SVGs can't accidentally
-                inherit the id. */}
-            <defs>
-              <filter id="clock-now-glow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="1.4" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
 
             {/* Inner face */}
             <circle

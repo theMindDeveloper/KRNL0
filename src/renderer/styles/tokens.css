@@ -300,20 +300,18 @@
   50%      { filter: drop-shadow(0 0 10px currentColor); }
 }
 
-/* ClockNode — now-pointer centre dot pulses so the "current time" beacon
-   stays visible against rust-toned task arcs sitting on its track.
-   transform-origin via transform-box: fill-box keeps the scale centred on
-   the SVG circle rather than the page origin. */
+/* ClockNode — now-pointer centre dot does a small breathe so it reads
+   as alive without bleeding glow past the node's clip box.
+   transform-box: fill-box keeps the scale centred on the SVG circle
+   rather than the page origin. */
 @keyframes clock-now-pulse {
   0%, 100% {
     transform: scale(1);
-    filter: drop-shadow(0 0 2px var(--rust));
+    opacity: 1;
   }
   50% {
-    transform: scale(1.22);
-    filter:
-      drop-shadow(0 0 5px var(--rust))
-      drop-shadow(0 0 10px rgba(200, 85, 61, 0.55));
+    transform: scale(1.12);
+    opacity: 0.85;
   }
 }
 
