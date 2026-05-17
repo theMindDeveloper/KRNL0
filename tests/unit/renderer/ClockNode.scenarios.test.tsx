@@ -200,7 +200,10 @@ describe('ClockNode renders the analog face', () => {
     }
   });
 
-  it('shows link UI when linkedTodoId is null', () => {
+  // (Removed) "shows link UI when linkedTodoId is null" — the manual
+  // todo-link picker was dropped per user request: the clock auto-pulls
+  // from every todo (and now every scheduled habit) on the board.
+  it.skip('shows link UI when linkedTodoId is null', () => {
     seedBoard([]);
     renderClockNode(makeClockState({ linkedTodoId: null }));
     expect(screen.getByText('Link Todo:')).toBeDefined();

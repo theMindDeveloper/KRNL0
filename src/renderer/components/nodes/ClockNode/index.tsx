@@ -7,6 +7,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import type { TaskState } from '../TaskNode/types';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
+import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 
 // Kept for backward-compat — timelineSelector.colorTokens.test.ts imports this.
 // The new analog design no longer renders break arcs, but the tokens must still
@@ -14,7 +15,7 @@ import type { PomoBreakdown } from '../../../store/pomoSchedule';
 export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 
 // Shared palette across Clock, Calendar, Todo. See src/renderer/utils/taskColor.ts.
-import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR, type TaskTone as ToneToken } from '../../../utils/taskColor';
+import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -85,19 +86,36 @@ function isoToHourFloat(iso: string): number | null {
 const NUMERALS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
 
 // ── Flattened task type for display ───────────────────────────────────────────
+// Entries can come from two sources: scheduled tasks (from the schedule
+// selector) and habits dropped on the calendar (from habit mothers). Both
+// render as arcs in the clock; habits behave like events (no breakdown).
 interface TaskEntry {
   id: string;
   start: number;   // hour-float, e.g. 9.5 = 9:30 AM
   end: number;
   name: string;
-  tone: ToneToken;
+  /** Resolved CSS color (a `var(--token)` string). Tasks use their tone,
+   *  habits use their habit color. Single source of truth — render code
+   *  reads `colorVar` directly and never re-maps from a tone token. */
+  colorVar: string;
   plannedMin: number;
-  /** Decision 28: null for event tasks, non-null for focus tasks. */
+  /** Decision 28: null for event tasks AND habits, non-null for focus tasks. */
   breakdown: PomoBreakdown | null;
-  /** Parallel group id; null if this task is sequential. */
+  /** Parallel group id; null if this task is sequential or a habit. */
   parallelGroupId: string | null;
   /** 0-based branch index within the parallel group; null if sequential. */
   parallelBranchIndex: number | null;
+  /** 'task' or 'habit' — for future styling differentiation. */
+  source: 'task' | 'habit';
+}
+
+/** Check if a habit schedule fires on a given ISO day-of-week. */
+function habitOnDow(schedule: HabitSchedule, isoDow: IsoDow): boolean {
+  switch (schedule.kind) {
+    case 'daily': return true;
+    case 'weekly': return schedule.days.includes(isoDow);
+    case 'weekdays': return isoDow >= 1 && isoDow <= 5;
+  }
 }
 
 export function ClockNode({
@@ -106,7 +124,12 @@ export function ClockNode({
   slotIndex = 6,
   slotTotal = MOTHER_TOTAL,
 }: NodeProps<ClockState, ClockConfig>) {
-  const { linkedTodoId, viewWindow } = node.state;
+  // `linkedTodoId` is preserved on state for backward-compat with persisted
+  // boards (and any in-flight FSM logic) but is no longer consulted at render
+  // time. The clock now shows ALL scheduled tasks + ALL scheduled habits for
+  // today — there's effectively one user todo list per board, and the manual
+  // link picker was redundant.
+  const { viewWindow } = node.state;
 
   // PERF (Wave C+): the previous 1-second setInterval re-rendered this
   // entire SVG (60 ticks + 12 numerals + arcs + 3 hands + meridiem + task
@@ -142,13 +165,6 @@ export function ClockNode({
   // Board + selectors
   const board = useBoardStore((s) => s.board);
 
-  const todoNodes = useMemo(() => {
-    if (!board) return [] as Array<{ id: string }>;
-    return board.nodes
-      .filter((n) => n.kind === 'todo')
-      .map((n) => ({ id: n.id }));
-  }, [board?.nodes]);
-
   const placementsMap = useMemo(() => {
     if (!board) return null;
     return selectSchedule(board).placements;
@@ -171,41 +187,95 @@ export function ClockNode({
     return m;
   }, [board?.nodes]);
 
-  // Flatten placements to TaskEntry[]. Filter by selected 12-hour viewWindow.
+  // Scheduled habits — same source the WeekView consumes (ADR 0002 §6).
+  // A habit is "scheduled" once the user drops it on the calendar; the drop
+  // writes `schedule: { kind, timeOfDay, durationMin }` onto the habit record.
+  // The clock visualizes these the same way it visualizes event tasks:
+  // single arc, no break overlays, habit color.
+  const scheduledHabits = useMemo(() => {
+    const out: Array<{ id: string; name: string; color: string; schedule: HabitSchedule }> = [];
+    if (!board) return out;
+    for (const n of board.nodes) {
+      if (n.kind !== 'habit') continue;
+      const hs = n.state as { habits?: Habit[] } | null;
+      if (!hs?.habits) continue;
+      for (const h of hs.habits) {
+        if (h.archived || !h.schedule) continue;
+        out.push({ id: h.id, name: h.name, color: h.color ?? 'acid', schedule: h.schedule });
+      }
+    }
+    return out;
+  }, [board?.nodes]);
+
+  // Today's ISO day-of-week (1=Mon..7=Sun) — for habit schedule matching.
+  const todayIsoDow: IsoDow = (() => {
+    const jsDay = now.getDay(); // 0=Sun..6=Sat
+    return (jsDay === 0 ? 7 : jsDay) as IsoDow;
+  })();
+
+  // Flatten placements + scheduled habits → TaskEntry[].
+  // Filter by selected 12-hour viewWindow.
   const tasks: TaskEntry[] = useMemo(() => {
-    if (!placementsMap || !linkedTodoId) return [];
+    if (!placementsMap) return [];
     const today = todayLocalYMD();
     const winLo = viewWindow === 1 ? 12 : 0;
     const winHi = viewWindow === 1 ? 24 : 12;
     const out: TaskEntry[] = [];
+
+    // 1) Scheduled tasks from the selector.
     for (const p of placementsMap.values()) {
       const info = taskInfo.get(p.taskId);
       if (!info) continue;
-      if (info.parentTodoId !== linkedTodoId) continue;
       const startDate = p.startISO.slice(0, 10);
       if (startDate !== today) continue;
       const startH = isoToHourFloat(p.startISO);
       if (startH === null) continue;
       const endH = isoToHourFloat(p.endISO) ?? startH + info.plannedMin / 60;
       if (endH <= startH) continue;
-      // 12h window filter: keep only tasks intersecting [winLo, winHi).
       if (endH <= winLo || startH >= winHi) continue;
       out.push({
         id: p.taskId,
         start: Math.max(startH, winLo),
         end: Math.min(endH, winHi),
         name: info.text,
-        tone: colorFor(p.taskId),
+        colorVar: TONE_VAR[colorFor(p.taskId)],
         plannedMin: info.plannedMin,
         breakdown: p.breakdown,
         parallelGroupId: p.parallelGroupId,
         parallelBranchIndex: p.parallelBranchIndex,
+        source: 'task',
       });
     }
+
+    // 2) Scheduled habits that fire today.
+    for (const h of scheduledHabits) {
+      if (!habitOnDow(h.schedule, todayIsoDow)) continue;
+      const [hhStr, mmStr] = h.schedule.timeOfDay.split(':');
+      const hh = Number.parseInt(hhStr ?? '0', 10);
+      const mm = Number.parseInt(mmStr ?? '0', 10);
+      if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
+      const durMin = h.schedule.durationMin && h.schedule.durationMin > 0 ? h.schedule.durationMin : 30;
+      const startH = hh + mm / 60;
+      const endH = startH + durMin / 60;
+      if (endH <= winLo || startH >= winHi) continue;
+      out.push({
+        id: `habit-${h.id}`,
+        start: Math.max(startH, winLo),
+        end: Math.min(endH, winHi),
+        name: h.name,
+        colorVar: `var(--${h.color})`,
+        plannedMin: durMin,
+        breakdown: null, // habits = single block (event-like)
+        parallelGroupId: null,
+        parallelBranchIndex: null,
+        source: 'habit',
+      });
+    }
+
     // Sort by start time
     out.sort((a, b) => a.start - b.start);
     return out;
-  }, [placementsMap, linkedTodoId, taskInfo, viewWindow]);
+  }, [placementsMap, taskInfo, viewWindow, scheduledHabits, todayIsoDow]);
 
   const activeIdx = tasks.findIndex((t) => nowFloat >= t.start && nowFloat < t.end);
 
@@ -233,14 +303,7 @@ export function ClockNode({
   const activeProgress = activeIdx >= 0
     ? (nowFloat - tasks[activeIdx]!.start) / (tasks[activeIdx]!.end - tasks[activeIdx]!.start)
     : 0;
-  const activeColor = activeIdx >= 0 ? TONE_VAR[tasks[activeIdx]!.tone] : 'var(--ink-3)';
-
-  // Styles
-  const labelStyle: React.CSSProperties = {
-    fontSize: 11,
-    color: 'var(--ink-2)',
-    fontFamily: 'var(--font-mono)',
-  };
+  const activeColor = activeIdx >= 0 ? tasks[activeIdx]!.colorVar : 'var(--ink-3)';
 
   return (
     <MotherFrame
@@ -280,67 +343,8 @@ export function ClockNode({
           <span style={{ color: 'var(--ink-4)' }}>CLK.12H</span>
         </div>
 
-        {/* Link UI */}
-        {linkedTodoId === null ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={labelStyle}>Link Todo:</span>
-            <select
-              style={{
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                background: 'var(--paper-2)',
-                border: '1px solid var(--paper-3)',
-                borderRadius: 4,
-                color: 'var(--ink)',
-                padding: '2px 6px',
-                cursor: 'pointer',
-              }}
-              defaultValue=""
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val) onCommand('clock.linkTodo', { todoNodeId: val });
-              }}
-            >
-              <option value="" disabled>
-                — pick a todo —
-              </option>
-              {todoNodes.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.id.slice(-8)}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={labelStyle}>Todo:</span>
-            <span
-              style={{
-                fontSize: 11,
-                color: 'var(--ink)',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              {linkedTodoId.slice(-8)}
-            </span>
-            <button
-              type="button"
-              style={{
-                fontSize: 11,
-                color: 'var(--ink-2)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0 2px',
-                lineHeight: 1,
-              }}
-              title="Unlink todo"
-              onClick={() => onCommand('clock.linkTodo', { todoNodeId: null })}
-            >
-              ×
-            </button>
-          </div>
-        )}
+        {/* (Removed) "Link Todo" picker — the clock now pulls from all todos
+            and habits automatically; the manual link was redundant. */}
 
         {/* 12-hour window toggle bar — prominent, above the clock face.
             Shows which half-day the arcs reflect and lets users swap. */}
@@ -485,7 +489,7 @@ export function ClockNode({
                 const sw = stroke;
                 const r = radiusFor(t);
                 const activeStyle: React.CSSProperties = active
-                  ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: TONE_VAR[t.tone] }
+                  ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: t.colorVar }
                   : {};
                 const breakdown = t.breakdown;
 
@@ -502,7 +506,7 @@ export function ClockNode({
                     key={`${key}-base`}
                     d={arcPath(s, e, r)}
                     fill="none"
-                    stroke={TONE_VAR[t.tone]}
+                    stroke={t.colorVar}
                     strokeWidth={sw}
                     strokeLinecap={cap}
                     opacity={opacity}
@@ -816,7 +820,7 @@ export function ClockNode({
                     width: 4,
                     height: 16,
                     borderRadius: 1,
-                    background: TONE_VAR[t.tone],
+                    background: t.colorVar,
                     display: 'inline-block',
                     alignSelf: 'center',
                   }}
