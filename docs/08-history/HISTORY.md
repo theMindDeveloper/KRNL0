@@ -530,3 +530,33 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `fix/board-save-logging-readonly`
 **Files changed:** `src/renderer/store/eventLog/boardSaveLogging.ts`
 **Summary:** App failed to launch with `TypeError: Cannot assign to read only property 'boardSave' of object '#<Object>'` because `installBoardSaveLogging` tried to mutate `window.krnl.boardSave` in place. `contextBridge.exposeInMainWorld` freezes the bridge object, so the property assignment threw. Replaced the in-place monkey-patch with a Proxy wrapper that intercepts `boardSave` and routes every other key through to the original bridge, installed via `Object.defineProperty(window, 'krnl', …)` so the renderer keeps booting even on Electron versions where the bridge is non-configurable.
+
+
+---
+
+## [2026-05-17] — Decision 28: task `kind` (`focus`/`event`) + break-aware scheduling + contrast pass
+
+**Type:** Feature + Architecture + UX polish
+**Branch:** `feat/decision-28-pr-b`
+**PR:** [#142](https://github.com/theMindDeveloper/KRNL0/pull/142)
+**ADR:** [`docs/03-adr/0007-pomodoro-task-kinds-and-contrast-pass.md`](../03-adr/0007-pomodoro-task-kinds-and-contrast-pass.md)
+**Spec:** `docs/03-architecture/decisions.md` § Decision 28
+**Files changed:** ~22 files across `src/renderer` and `src/main`. Full list in the ADR.
+
+**Summary:** Tasks now carry a `kind: 'focus' | 'event'` discriminator. A `focus` task is the existing Pomodoro behaviour: 25/5 work-break cadence, calendar block extended by the break overhead, clock arc with break overlays. An `event` task is a flat block — load it into the pomo timer and it runs as one big session, no breaks; the calendar shows a solid slot, the clock shows a single solid arc. Parity between the FSM and the schedule walker is now guaranteed by a shared `pomoRules.ts` (`isLongBreakAfter`, `computeCurrentSessionMin`) so the timer and the visualization can never drift apart.
+
+**Why:** Two real-world cases broke the old model — "go to university 09:00-12:00" (not a pomodoro, do not insert breaks) and "75-min focus task at 02:00" (was rendered as 75-min on the calendar but ran for 85 min wall-clock on the timer, breaking cascade placement of the next task).
+
+**How it shipped:** Two PRs by design. **PR-A** introduced the data field, migration, and UX gates (icon toggle, double-click reload, hidden START/pips for event tasks). **PR-B** added the parity predicates, `breakdownPomoTime`, selector branching, calendar tail texture, and the rewritten ClockNode (Apple-Fitness-style concentric rings, AM/PM toggle, solid arcs in the task tone with break overlays in the track color, scheduled-habit arcs).
+
+**Follow-ups during review (all in #142):**
+- Inline note editor on TaskNode and HabitContextMenu (replaces `window.prompt`, which throws in the Electron renderer).
+- ClockNode auto-pulls every todo + every scheduled habit (manual "Link Todo" picker removed).
+- `--font-sans` switched to JetBrains Mono so body text matches the chrome.
+- HabitSwapModal time picker rebuilt with two `NumberStepper` widgets (HH/MM); native `<input type="time">` removed.
+- HabitSwapModal corner arrow chips removed (decorative, looked like back/forward buttons).
+- `removeAllLanesForHabit()` helper sweeps orphan lane nodes when a habit is deleted; HabitLaneNode also self-removes on null habit lookup.
+- New `--ink-on-bright: #0a0908` token + KRNL0 contrast rule: never light text on a bright accent background. Fixed: HabitSwapModal CONFIRM / weekly badge / daily badge, App RELOAD button, calendar habit blocks (label + icon, opacity 0.7 → 0.9), TodoNode done checkbox.
+- WeekView legend chip explains the two block treatments (solid = session, striped = break).
+
+**Tests:** New: parity test, table-driven breakdown test, selector kind test, migration test, kind-toggle UX test, toggle-handoff test, ClockNode break-arc test. Pre-existing 4 ClockNode-renderer test failures (stale assertions from earlier glassy-arc design) and 5 stale "Add subtask" tests are not regressions from this PR; tracked as follow-ups.

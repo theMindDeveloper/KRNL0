@@ -773,7 +773,10 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             right: 2,
             height: blockHeight,
             background: `var(--${habit.color})`,
-            opacity: 0.7,
+            // Bumped from 0.7 → 0.9 so the dark text on bright fill
+            // doesn't get washed out by alpha. Contrast was the user's
+            // explicit complaint; opacity was making it worse.
+            opacity: 0.9,
             borderRadius: 2,
             overflow: 'hidden',
             zIndex: 1,
@@ -791,7 +794,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 fontSize: 8,
                 lineHeight: 1,
                 flexShrink: 0,
-                color: '#0a0908', // theme-locked dark — readable on every habit color
+                // Theme-locked dark — see tokens.css --ink-on-bright.
+                color: 'var(--ink-on-bright)',
               }}
             >
               {habit.icon}
@@ -801,7 +805,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 8,
-              color: 'var(--paper)',
+              fontWeight: 600,
+              // KRNL0 contrast rule (see tokens.css --ink-on-bright):
+              // never light text on a bright accent bg. Habit colors are
+              // all bright/tinted, so the label is locked to dark in
+              // every theme.
+              color: 'var(--ink-on-bright)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
