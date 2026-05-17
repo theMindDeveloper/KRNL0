@@ -20,6 +20,7 @@ import { NowLine } from './NowLine';
 import { HabitSwapModal } from '../../ui/HabitSwapModal';
 import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
 import { calcStreak } from '../HabitNode/commands';
+import { toneVarForTask } from '../../../utils/taskColor';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -591,8 +592,9 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         breakdown.breakMin > 0 &&
         breakdown.effectiveMin > 0;
 
-      // Tone colour: acid for now (WeekView uses a single colour for all tasks).
-      const taskTone = isGrayed ? 'var(--ink-4)' : 'var(--acid)';
+      // Per-task tone — shared palette with Clock + Todo so users can link
+      // the same task visually across surfaces.
+      const taskTone = isGrayed ? 'var(--ink-4)' : toneVarForTask(task.id);
 
       return (
         <div
@@ -611,8 +613,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             left: `calc(${leftPct}% + 2px)`,
             right: `calc(${rightPct}% + 2px)`,
             height: heightPx,
-            background: isGrayed ? 'var(--paper-3)' : 'var(--acid-faint)',
-            border: `1px solid ${isGrayed ? 'var(--ink-4)' : 'var(--acid)'}`,
+            background: isGrayed ? 'var(--paper-3)' : 'color-mix(in srgb, ' + taskTone + ' 18%, transparent)',
+            border: `1px solid ${isGrayed ? 'var(--ink-4)' : taskTone}`,
             borderTopLeftRadius,
             borderTopRightRadius,
             borderBottomLeftRadius,
@@ -674,27 +676,20 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                   left: 0,
                   right: 0,
                   height: `${(breakdown.workMin / breakdown.effectiveMin) * 100}%`,
-                  background: isGrayed ? 'var(--paper-3)' : 'var(--acid-faint)',
+                  background: isGrayed ? 'var(--paper-3)' : 'color-mix(in srgb, ' + taskTone + ' 22%, transparent)',
                   pointerEvents: 'none',
                 }}
               />
               {/* Break tail — bottom fraction of the block.
-                  Split into short-break (top of tail, lighter) and long-break
-                  (bottom of tail, ink-3) zones so long breaks read distinctly. */}
+                  Diagonal-stripe texture in the task tone so it reads as
+                  "same task, not work" instead of "different colored block".
+                  No more solid green/black/gray zones.
+                  Long-break stripes are wider so the eye can still see the cadence. */}
               {(() => {
-                const shortTotal = breakdown.segments
-                  .filter((seg) => seg.kind === 'short')
-                  .reduce((sum, seg) => sum + seg.min, 0);
-                const longTotal = breakdown.segments
-                  .filter((seg) => seg.kind === 'long')
-                  .reduce((sum, seg) => sum + seg.min, 0);
                 const tailPct = (breakdown.breakMin / breakdown.effectiveMin) * 100;
-                const shortFrac = breakdown.breakMin > 0
-                  ? shortTotal / breakdown.breakMin
-                  : 0;
-                const longFrac = breakdown.breakMin > 0
-                  ? longTotal / breakdown.breakMin
-                  : 0;
+                const hasLong = breakdown.segments.some((seg) => seg.kind === 'long');
+                // Wider stripe spacing if a long break exists in this block.
+                const stripeSize = hasLong ? 10 : 6;
                 return (
                   <div
                     data-testid="calendar-task-break-tail"
@@ -704,32 +699,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                       left: 0,
                       right: 0,
                       height: `${tailPct}%`,
-                      borderTop: `1px solid ${taskTone}`,
+                      borderTop: `1px dashed ${taskTone}`,
                       pointerEvents: 'none',
-                      display: 'flex',
-                      flexDirection: 'column',
+                      backgroundImage: `repeating-linear-gradient(135deg, ${taskTone} 0 1px, transparent 1px ${stripeSize}px)`,
+                      opacity: 0.6,
                     }}
-                  >
-                    {shortTotal > 0 && (
-                      <div
-                        data-testid="calendar-task-break-short"
-                        style={{
-                          flexBasis: `${shortFrac * 100}%`,
-                          background: 'var(--paper-3)',
-                        }}
-                      />
-                    )}
-                    {longTotal > 0 && (
-                      <div
-                        data-testid="calendar-task-break-long"
-                        style={{
-                          flexBasis: `${longFrac * 100}%`,
-                          background: 'var(--ink-4)',
-                          opacity: 0.6,
-                        }}
-                      />
-                    )}
-                  </div>
+                  />
                 );
               })()}
             </>
