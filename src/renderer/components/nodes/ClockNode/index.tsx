@@ -463,24 +463,29 @@ export function ClockNode({
               const arcElements = tasks.flatMap((t, i) => {
                 const ended  = nowFloat >= t.end;
                 const active = i === activeIdx;
-                const opacity = ended ? 0.35 : 1;
-                // Stroke width = laneStroke for all tasks (uniform thickness).
-                const sw = laneStroke;
+                const opacity = ended ? 0.35 : active ? 1 : 0.92;
+                // Stroke width = laneStroke. Active task gets a small bump.
+                const sw = active ? laneStroke + 2 : laneStroke;
                 const r = radiusFor(t);
                 const activeStyle: React.CSSProperties = active
-                  ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite' }
+                  ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: TONE_VAR[t.tone] }
                   : {};
                 const breakdown = t.breakdown;
 
-                // No inset — round caps sit at exact t.start/t.end. The lane
-                // system already separates overlapping tasks onto different
-                // rings, so adjacent caps no longer collide visually.
+                // Inset start/end so round caps stay within [t.start, t.end].
+                // sw/2 in pixels → convert to hour-float via arc length = r * theta.
+                // theta_per_hour = 2π/12; px_per_hour = r * 2π/12 → 1px = (12/(r·2π)) h.
+                // Half a cap = sw/2 px → inset_h = (sw/2) * 12 / (r·2π) hours.
+                const insetHours = (sw / 2) * 12 / (r * 2 * Math.PI);
+                const cappedStart = Math.min(t.start + insetHours, (t.start + t.end) / 2);
+                const cappedEnd = Math.max(t.end - insetHours, (t.start + t.end) / 2);
+
                 // Single-arc path: event tasks, null breakdown, or 1-segment focus.
                 if (breakdown === null || breakdown.segments.length <= 1) {
                   return [
                     <path
                       key={t.id}
-                      d={arcPath(t.start, t.end, r)}
+                      d={arcPath(cappedStart, cappedEnd, r)}
                       fill="none"
                       stroke={TONE_VAR[t.tone]}
                       strokeWidth={sw}
@@ -491,13 +496,13 @@ export function ClockNode({
                   ];
                 }
 
-                // Multi-segment focus: base arc (round caps at endpoints)
-                // + break overlays (butt caps, clamped strictly inside [t.start, t.end]).
+                // Multi-segment focus: base arc (task tone, round caps inset)
+                // + semi-transparent white break overlays (butt caps, no insets).
                 const arcs: React.ReactElement[] = [];
                 arcs.push(
                   <path
                     key={`${t.id}-base`}
-                    d={arcPath(t.start, t.end, r)}
+                    d={arcPath(cappedStart, cappedEnd, r)}
                     fill="none"
                     stroke={TONE_VAR[t.tone]}
                     strokeWidth={sw}
@@ -509,9 +514,11 @@ export function ClockNode({
                 let segCursor = t.start;
                 for (let s = 0; s < breakdown.segments.length; s++) {
                   const seg = breakdown.segments[s]!;
-                  const segEnd = Math.min(segCursor + seg.min / 60, t.end);
-                  if (seg.kind !== 'work' && segEnd > segCursor) {
-                    // Solid white break overlay — clean cut through the task arc.
+                  const segEnd = segCursor + seg.min / 60;
+                  if (seg.kind !== 'work') {
+                    // Semi-transparent white — task tone shows through. Long
+                    // breaks slightly more opaque than short to read distinctly.
+                    const breakOpacity = seg.kind === 'long' ? 0.85 : 0.65;
                     arcs.push(
                       <path
                         key={`${t.id}-seg-${s}`}
@@ -522,7 +529,7 @@ export function ClockNode({
                         stroke="var(--paper)"
                         strokeWidth={sw}
                         strokeLinecap="butt"
-                        opacity={opacity}
+                        opacity={breakOpacity * opacity}
                       />,
                     );
                   }
