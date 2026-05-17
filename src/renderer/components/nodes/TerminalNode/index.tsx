@@ -84,31 +84,21 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     //
     // Canvas renderer is the default — fast enough for TUIs, stable under
     // Electron's BrowserView paint pipeline, avoids GL-context lifetime
-    // issues when nodes go offscreen. WebGL is opt-in via
-    // KRNL0_TERM_RENDERER=webgl for users who want it.
+    // issues when nodes go offscreen. WebGL was the prior choice but its
+    // async load created the cols/rows drift this commit fixes; if it's
+    // ever re-introduced as an opt-in, do it via a preload bridge flag
+    // (window.krnl.config), NOT process.env — `process` is undefined in
+    // the renderer context and crashes the init promise (user report
+    // 2026-05-17: "process is not defined", terminal renders as black).
 
     let cancelled = false;
     let sessionCleanup: (() => void) | null = null;
 
     const init = async () => {
-      if (process.env['KRNL0_TERM_RENDERER'] === 'webgl') {
-        try {
-          const { WebglAddon } = await import('@xterm/addon-webgl');
-          const webgl = new WebglAddon();
-          webgl.onContextLoss(() => webgl.dispose());
-          term.loadAddon(webgl);
-        } catch {
-          try {
-            const { CanvasAddon } = await import('@xterm/addon-canvas');
-            term.loadAddon(new CanvasAddon());
-          } catch { /* fall through to DOM */ }
-        }
-      } else {
-        try {
-          const { CanvasAddon } = await import('@xterm/addon-canvas');
-          term.loadAddon(new CanvasAddon());
-        } catch { /* fall through to DOM */ }
-      }
+      try {
+        const { CanvasAddon } = await import('@xterm/addon-canvas');
+        term.loadAddon(new CanvasAddon());
+      } catch { /* fall through to DOM */ }
 
       if (cancelled || !containerRef.current) return;
       term.open(containerRef.current);
