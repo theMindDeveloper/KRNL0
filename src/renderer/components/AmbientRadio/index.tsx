@@ -121,6 +121,8 @@ const HEIGHT = 148;
 const POS_KEY    = 'krnl0-ambient-radio-pos';
 const PARAMS_KEY = 'krnl0-ambient-radio-params';
 const STATE_KEY  = 'krnl0-ambient-radio-state';
+const FAVS_KEY   = 'krnl0-ambient-radio-yt-favs';
+const FAVS_MAX   = 50;
 const Z = 200;
 const SNAP_PAST_EDGE = 30;
 const PEEK_PX = 14;
@@ -144,6 +146,13 @@ interface SavedState {
   focusedId: LayerId;
   layerVolumes: Record<LayerId, number>;
   masterVolume: number;
+}
+
+interface YtFav {
+  id: string;
+  url: string;
+  title: string;
+  savedAt: number;
 }
 
 const DEFAULT_LAYER_VOLS: Record<LayerId, number> = {
@@ -229,6 +238,39 @@ function loadState(): { focusedId: LayerId; layerVolumes: Record<LayerId, number
 
 function saveState(s: { focusedId: LayerId; layerVolumes: Record<LayerId, number>; masterVolume: number; activeLayers: LayerId[] }): void {
   try { localStorage.setItem(STATE_KEY, JSON.stringify(s)); } catch { /* quota */ }
+}
+
+function loadFavs(): YtFav[] {
+  try {
+    const raw = localStorage.getItem(FAVS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((f): f is YtFav =>
+        f !== null && typeof f === 'object' &&
+        typeof (f as YtFav).id === 'string' &&
+        typeof (f as YtFav).url === 'string' &&
+        typeof (f as YtFav).title === 'string' &&
+        typeof (f as YtFav).savedAt === 'number'
+      )
+      .slice(0, FAVS_MAX);
+  } catch { return []; }
+}
+
+function saveFavs(favs: YtFav[]): void {
+  try { localStorage.setItem(FAVS_KEY, JSON.stringify(favs)); } catch { /* quota */ }
+}
+
+async function fetchYtTitle(id: string): Promise<string> {
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`);
+    if (!r.ok) return `Video ${id}`;
+    const j = await r.json() as { title?: string };
+    return (typeof j.title === 'string' && j.title.length > 0) ? j.title : `Video ${id}`;
+  } catch {
+    return `Video ${id}`;
+  }
 }
 
 function hex2(n: number): string {
@@ -353,6 +395,9 @@ export function AmbientRadio() {
   const [ytError, setYtError] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [allParams, setAllParams] = useState<Record<PresetId, Params>>(loadParams);
+  const [ytFavs, setYtFavs] = useState<YtFav[]>(loadFavs);
+  const [favsOpen, setFavsOpen] = useState(false);
+  const [currentVidId, setCurrentVidId] = useState<string | null>(null);
 
   const focusedPreset = PRESET_BY_ID[focusedId] ?? PRESETS[0]!;
   const isYtFocused = focusedId === 'yt';
@@ -707,11 +752,70 @@ export function AmbientRadio() {
     const ytLv = layerVolumes.yt ?? 80;
     const combined = Math.round((volume / 100) * (ytLv / 100) * 100);
     loadYouTubeVideo(id, combined, 'krnl0-ambient-radio-yt-iframe');
+    setCurrentVidId(id);
     if (!activeLayers.has('yt')) {
       setActiveLayers((prev) => new Set(prev).add('yt'));
     }
     if (!playingRef.current) setPlaying(true);
   }, [ytUrl, volume, layerVolumes.yt, activeLayers]);
+
+  // ── Favorites ────────────────────────────────────────────────────────────
+  const currentFavId = currentVidId ?? extractYouTubeId(ytUrl);
+  const isStarred = currentFavId !== null && ytFavs.some((f) => f.id === currentFavId);
+
+  const toggleStar = useCallback(() => {
+    const id = currentVidId ?? extractYouTubeId(ytUrl);
+    if (!id) { setYtError(true); return; }
+    setYtFavs((prev) => {
+      const existing = prev.find((f) => f.id === id);
+      if (existing) {
+        const next = prev.filter((f) => f.id !== id);
+        saveFavs(next);
+        return next;
+      }
+      const placeholder: YtFav = {
+        id,
+        url: `https://www.youtube.com/watch?v=${id}`,
+        title: `Video ${id}`,
+        savedAt: Date.now(),
+      };
+      const next = [placeholder, ...prev].slice(0, FAVS_MAX);
+      saveFavs(next);
+      // Fetch real title async, patch entry
+      void fetchYtTitle(id).then((title) => {
+        setYtFavs((cur) => {
+          const updated = cur.map((f) => f.id === id ? { ...f, title } : f);
+          saveFavs(updated);
+          return updated;
+        });
+      });
+      return next;
+    });
+  }, [currentVidId, ytUrl]);
+
+  const playFav = useCallback((fav: YtFav) => {
+    setYtUrl(fav.url);
+    setYtError(false);
+    const ytLv = layerVolumes.yt ?? 80;
+    const combined = Math.round((volume / 100) * (ytLv / 100) * 100);
+    loadYTScript();
+    loadYouTubeVideo(fav.id, combined, 'krnl0-ambient-radio-yt-iframe');
+    setCurrentVidId(fav.id);
+    setFocusedId('yt');
+    if (!activeLayersRef.current.has('yt')) {
+      setActiveLayers((prev) => new Set(prev).add('yt'));
+    }
+    if (!playingRef.current) setPlaying(true);
+    setFavsOpen(false);
+  }, [volume, layerVolumes.yt]);
+
+  const removeFav = useCallback((id: string) => {
+    setYtFavs((prev) => {
+      const next = prev.filter((f) => f.id !== id);
+      saveFavs(next);
+      return next;
+    });
+  }, []);
 
   // ── Settings change (live update + persist) ──────────────────────────────
   const onSettingChange = useCallback((key: string, value: number) => {
@@ -791,6 +895,7 @@ export function AmbientRadio() {
       loadYTScript();
       loadYouTubeVideo(vid, combined, 'krnl0-ambient-radio-yt-iframe');
       ytSetVolume(combined);
+      setCurrentVidId(vid);
 
       if (!activeLayersRef.current.has('yt')) {
         setActiveLayers((prev) => new Set(prev).add('yt'));
@@ -1020,49 +1125,166 @@ export function AmbientRadio() {
 
           {/* YouTube URL row (focused on yt) */}
           {isYtFocused && !settingsOpen && (
-            <div style={{
-              display: 'flex', gap: 6, alignItems: 'center',
-              padding: '7px 10px',
-              borderBottom: '1px solid rgba(255,255,255,.05)',
-              background: 'rgba(244,63,94,.03)',
-            }}>
-              <input
-                data-testid="ambient-radio-yt-url"
-                type="text"
-                placeholder="Paste YouTube URL or video ID…"
-                value={ytUrl}
-                onChange={(e) => { setYtUrl(e.target.value); setYtError(false); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') onYtLoad(); }}
-                style={{
-                  flex: 1, minWidth: 0,
-                  background: 'rgba(255,255,255,.06)',
-                  border: `1px solid rgba(244,63,94,${ytError ? '.7' : '.25'})`,
-                  borderRadius: 5,
-                  color: 'rgba(255,255,255,.8)',
-                  fontFamily: 'inherit',
-                  fontSize: 8,
-                  padding: '5px 7px',
-                  outline: 'none',
-                }}
-              />
-              <button
-                type="button"
-                onClick={onYtLoad}
-                style={{
-                  background: 'rgba(244,63,94,.12)',
-                  border: '1px solid rgba(244,63,94,.3)',
-                  borderRadius: 5,
-                  color: '#f43f5e',
-                  fontSize: 8,
-                  padding: '5px 10px',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  letterSpacing: '0.04em',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >▶ Load</button>
-            </div>
+            <>
+              <div style={{
+                display: 'flex', gap: 6, alignItems: 'center',
+                padding: '7px 10px',
+                borderBottom: favsOpen ? '1px solid rgba(244,63,94,.15)' : '1px solid rgba(255,255,255,.05)',
+                background: 'rgba(244,63,94,.03)',
+              }}>
+                <input
+                  data-testid="ambient-radio-yt-url"
+                  type="text"
+                  placeholder="Paste YouTube URL or video ID…"
+                  value={ytUrl}
+                  onChange={(e) => { setYtUrl(e.target.value); setYtError(false); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') onYtLoad(); }}
+                  style={{
+                    flex: 1, minWidth: 0,
+                    background: 'rgba(255,255,255,.06)',
+                    border: `1px solid rgba(244,63,94,${ytError ? '.7' : '.25'})`,
+                    borderRadius: 5,
+                    color: 'rgba(255,255,255,.8)',
+                    fontFamily: 'inherit',
+                    fontSize: 8,
+                    padding: '5px 7px',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  data-testid="ambient-radio-yt-star"
+                  aria-label={isStarred ? 'Unstar video' : 'Star video'}
+                  title={isStarred ? 'Unstar' : 'Save to favorites'}
+                  onClick={toggleStar}
+                  disabled={!currentFavId}
+                  style={{
+                    background: isStarred ? 'rgba(244,63,94,.18)' : 'rgba(255,255,255,.04)',
+                    border: `1px solid rgba(244,63,94,${isStarred ? '.55' : '.2'})`,
+                    borderRadius: 5,
+                    color: isStarred ? '#f43f5e' : (currentFavId ? 'rgba(244,63,94,.55)' : 'rgba(255,255,255,.2)'),
+                    fontSize: 10,
+                    lineHeight: 1,
+                    padding: '4px 7px',
+                    cursor: currentFavId ? 'pointer' : 'not-allowed',
+                    fontFamily: 'inherit',
+                    flexShrink: 0,
+                    transition: 'background .15s, color .15s, border-color .15s',
+                  }}
+                >{isStarred ? '★' : '☆'}</button>
+                <button
+                  type="button"
+                  data-testid="ambient-radio-yt-favs-toggle"
+                  aria-label="Toggle favorites"
+                  title={`${ytFavs.length} saved`}
+                  onClick={() => setFavsOpen((o) => !o)}
+                  style={{
+                    background: favsOpen ? 'rgba(244,63,94,.18)' : 'rgba(255,255,255,.04)',
+                    border: `1px solid rgba(244,63,94,${favsOpen ? '.55' : '.2'})`,
+                    borderRadius: 5,
+                    color: favsOpen ? '#f43f5e' : 'rgba(244,63,94,.55)',
+                    fontSize: 8,
+                    padding: '5px 7px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    flexShrink: 0,
+                    display: 'inline-flex', alignItems: 'center', gap: 3,
+                    letterSpacing: '0.04em',
+                    transition: 'background .15s, color .15s, border-color .15s',
+                  }}
+                >{ytFavs.length}<span style={{ fontSize: 7 }}>{favsOpen ? '▴' : '▾'}</span></button>
+                <button
+                  type="button"
+                  onClick={onYtLoad}
+                  style={{
+                    background: 'rgba(244,63,94,.12)',
+                    border: '1px solid rgba(244,63,94,.3)',
+                    borderRadius: 5,
+                    color: '#f43f5e',
+                    fontSize: 8,
+                    padding: '5px 10px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    letterSpacing: '0.04em',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >▶ Load</button>
+              </div>
+
+              {favsOpen && (
+                <div
+                  data-testid="ambient-radio-yt-favs"
+                  style={{
+                    maxHeight: 160,
+                    overflowY: 'auto',
+                    borderBottom: '1px solid rgba(255,255,255,.05)',
+                    background: 'rgba(244,63,94,.02)',
+                    padding: ytFavs.length === 0 ? '10px' : '4px 6px',
+                  }}
+                >
+                  {ytFavs.length === 0 ? (
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,.3)', letterSpacing: '0.04em', textAlign: 'center' }}>
+                      no saved videos — load one, then tap ☆
+                    </div>
+                  ) : ytFavs.map((fav) => {
+                    const playing_ = currentVidId === fav.id;
+                    return (
+                      <div
+                        key={fav.id}
+                        data-testid={`ambient-radio-yt-fav-${fav.id}`}
+                        onClick={() => playFav(fav)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '4px 6px',
+                          borderRadius: 4,
+                          cursor: 'pointer',
+                          background: playing_ ? 'rgba(244,63,94,.10)' : 'transparent',
+                          borderLeft: `2px solid ${playing_ ? '#f43f5e' : 'transparent'}`,
+                          transition: 'background .12s',
+                        }}
+                        onMouseEnter={(e) => { if (!playing_) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,.04)'; }}
+                        onMouseLeave={(e) => { if (!playing_) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+                      >
+                        <span style={{
+                          fontSize: 9,
+                          color: playing_ ? '#f43f5e' : 'rgba(244,63,94,.7)',
+                          flexShrink: 0,
+                        }}>{playing_ ? '▶' : '♪'}</span>
+                        <span
+                          title={fav.title}
+                          style={{
+                            flex: 1, minWidth: 0,
+                            fontSize: 8.5,
+                            color: playing_ ? '#fff' : 'rgba(255,255,255,.75)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >{fav.title}</span>
+                        <button
+                          type="button"
+                          data-testid={`ambient-radio-yt-fav-remove-${fav.id}`}
+                          aria-label={`Remove ${fav.title}`}
+                          onClick={(e) => { e.stopPropagation(); removeFav(fav.id); }}
+                          style={{
+                            background: 'none', border: 0,
+                            color: 'rgba(255,255,255,.35)',
+                            cursor: 'pointer', fontSize: 12, lineHeight: 1,
+                            padding: 0, width: 14, height: 14,
+                            display: 'grid', placeItems: 'center',
+                            borderRadius: 2,
+                            flexShrink: 0,
+                          }}
+                        >×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
 
           {/* Settings panel — focused layer */}
