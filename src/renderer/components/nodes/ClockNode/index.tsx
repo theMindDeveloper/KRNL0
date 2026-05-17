@@ -649,12 +649,11 @@ export function ClockNode({
                 //
                 // BUGFIX (2026-05-17): the break stroke previously matched
                 // the task arc's stroke-width exactly, which left a 1-px
-                // anti-aliased halo of the tone color around every break
-                // (so each black break had a faint purple/acid edge that
-                // read as the task bleeding through). Bump the overlay
-                // stroke a touch wider than the base so anti-aliasing
-                // fully covers the underlying arc.
-                const breakStroke = sw + 2;
+                // anti-aliased halo of the tone color around every break.
+                // Bump the overlay stroke by exactly 1px — just enough for
+                // anti-aliasing to cover the underlying arc without
+                // visibly thickening the black band.
+                const breakStroke = sw + 1;
                 let segCursor = t.start;
                 for (let sIdx = 0; sIdx < breakdown.segments.length; sIdx++) {
                   const seg = breakdown.segments[sIdx]!;

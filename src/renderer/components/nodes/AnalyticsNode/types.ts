@@ -44,7 +44,9 @@ export const defaultAnalyticsState = (): AnalyticsState => ({
   rangeDays: 30,
   metric: 'taskCount',
   width: 620,
-  height: 520,
+  // Matches MOTHER_HEIGHT so the dashboard reads as a sister panel to
+  // the mother row when it spawns to the right of the dock.
+  height: 540,
 });
 
 export const defaultAnalyticsConfig = (): AnalyticsConfig => ({});
