@@ -11,13 +11,24 @@ export function linearScale(domainMax: number, rangeMax: number): (v: number) =>
   return (v) => (v / domainMax) * rangeMax;
 }
 
-// Theme tokens — kept as CSS var refs so light/dark theme switches Just Work.
+// Chart colors.
+//
+// AnalyticsNode's chrome is always dark (hardcoded #16181a gradient) — it
+// doesn't follow the global theme. Therefore axis / label / grid tokens
+// must NOT use --ink-3 / --ink-4 / --paper-3 (which flip per theme and go
+// olive-tan in light mode, leaving chart labels barely visible on the dark
+// chart bg). Locked to bright greys instead so the labels read in every
+// theme.
+//
+// Series colors (task / habit / focus) stay theme-aware — they pick up
+// the user's brand tone choices and contrast against the chart's dark bg
+// regardless.
 export const COLOR_TASK = 'var(--cyan)';
 export const COLOR_HABIT = 'var(--acid)';
 export const COLOR_FOCUS = 'var(--rust)';
-export const COLOR_GRID = 'var(--paper-3)';
-export const COLOR_AXIS = 'var(--ink-4)';
-export const COLOR_LABEL = 'var(--ink-3)';
+export const COLOR_GRID = '#2a2e33';
+export const COLOR_AXIS = '#aab0b7';
+export const COLOR_LABEL = '#c8cdd3';
 
 export const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 export const MONTH_LABELS = [
