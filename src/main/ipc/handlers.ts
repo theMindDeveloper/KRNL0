@@ -291,14 +291,51 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       const base = shell.toLowerCase();
       const isPwsh = base.endsWith('powershell.exe') || base.endsWith('pwsh.exe')
         || base === 'powershell' || base === 'pwsh';
-      if (!isPwsh) return [];
-      const args = ['-NoLogo'];
-      const cliDir = process.env['KRNL0_CLI_DIR'];
-      if (cliDir && process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] !== '1') {
-        args.push('-NoExit', '-File', join(cliDir, 'krnl-init.ps1'));
+      if (isPwsh) {
+        const args = ['-NoLogo'];
+        const cliDir = process.env['KRNL0_CLI_DIR'];
+        if (cliDir && process.env['KRNL0_KEEP_PSREADLINE_PREDICTION'] !== '1') {
+          args.push('-NoExit', '-File', join(cliDir, 'krnl-init.ps1'));
+        }
+        return args;
       }
-      return args;
+      // POSIX: spawn as a *login* shell so /etc/zprofile + ~/.zprofile run,
+      // including macOS's path_helper which adds /usr/local/bin, /usr/bin,
+      // etc. Without -l the shell inherits launchd's minimal PATH (when the
+      // app is opened from Finder) and homebrew binaries (eza, brew-managed
+      // claude, ripgrep, …) end up missing even though .zshrc loads.
+      // bash, zsh, sh, and dash all accept -l. fish doesn't, so skip there.
+      if (process.platform !== 'win32') {
+        const shellBase = base.split(/[\\/]/).pop() ?? '';
+        if (shellBase === 'zsh' || shellBase === 'bash' || shellBase === 'sh' || shellBase === 'dash') {
+          return ['-l'];
+        }
+      }
+      return [];
     })();
+
+    // Belt-and-suspenders for macOS: if the user's shell rc later wipes
+    // PATH (common with conda init replacing the prepended /opt/homebrew
+    // entries), make sure the well-known homebrew + system paths are at
+    // least *in* the env we hand to the shell so tools like eza, fzf,
+    // ripgrep stay reachable from a fresh KRNL0 terminal.
+    if (process.platform === 'darwin') {
+      const standardMacPaths = [
+        '/opt/homebrew/bin',     // Apple Silicon homebrew
+        '/opt/homebrew/sbin',
+        '/usr/local/bin',        // Intel homebrew + manual installs
+        '/usr/local/sbin',
+        '/usr/bin',
+        '/bin',
+        '/usr/sbin',
+        '/sbin',
+      ];
+      const currentPath = (childEnv['PATH'] ?? '').split(':').filter(Boolean);
+      for (const p of standardMacPaths) {
+        if (!currentPath.includes(p)) currentPath.push(p);
+      }
+      childEnv['PATH'] = currentPath.join(':');
+    }
 
     let proc: pty.IPty;
     try {
