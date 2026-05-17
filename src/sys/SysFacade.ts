@@ -9,13 +9,31 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
-import { pomoStart, pomoStop, pomoStatus } from './commands/pomo';
+import { pomoStart, pomoStop, pomoStatus, pomoConfig } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
   imageResize,
   imageClear,
 } from './commands/image';
+import {
+  frameAdd,
+  frameLabel,
+  frameResize,
+  frameTint,
+  frameList,
+  frameContents,
+} from './commands/frame';
+import type { FrameCtx } from './commands/frame';
+import {
+  analyticsShow,
+  analyticsTotals,
+  analyticsStreaks,
+} from './commands/analytics';
+import type { AnalyticsCtx } from './commands/analytics';
+import { logTail, logStats, requiresRenderer as logRequiresRenderer } from './commands/log';
+import { themeShow } from './commands/theme';
+import type { ThemeCtx } from './commands/theme';
 import {
   generateHelp,
   generateGroupHelp,
@@ -257,13 +275,82 @@ export class SysFacade {
     }
 
     if (command.kind === 'theme') {
-      if (!command.value || !['light', 'dark'].includes(command.value)) {
-        return { ok: false, message: 'theme set requires <light|dark>' };
+      if (command.sub === 'show') {
+        const tCtx: ThemeCtx = { boardPath: this.deps.boardPath };
+        return themeShow(tCtx, command.json);
       }
+      if (command.sub === 'set') {
+        if (!command.value || !['light', 'dark'].includes(command.value)) {
+          return { ok: false, message: 'theme set requires <light|dark>' };
+        }
+        if (!this.deps.cliDispatch) {
+          return { ok: false, message: 'theme set requires an open renderer window', data: { exitCode: 2 } };
+        }
+        return this.deps.cliDispatch('theme.set', { value: command.value });
+      }
+    }
+
+    // ── Decision 29 — frame CRUD ────────────────────────────────────────────
+    if (command.kind === 'frame') {
+      const fCtx: FrameCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'add': {
+          const fAddOpts: Parameters<typeof frameAdd>[1] = {};
+          if (command.label !== undefined) fAddOpts.label = command.label;
+          if (command.at !== undefined) fAddOpts.at = command.at;
+          if (command.w !== undefined) fAddOpts.w = command.w;
+          if (command.h !== undefined) fAddOpts.h = command.h;
+          if (command.tint !== undefined) fAddOpts.tint = command.tint;
+          if (command.near !== undefined) fAddOpts.near = command.near;
+          return frameAdd(fCtx, fAddOpts);
+        }
+        case 'label':    return frameLabel(fCtx, command.ref, command.label);
+        case 'resize':   return frameResize(fCtx, command.ref, command.w, command.h);
+        case 'tint':     return frameTint(fCtx, command.ref, command.tint);
+        case 'list':     return frameList(fCtx, command.json);
+        case 'contents': return frameContents(fCtx, command.ref, command.json);
+      }
+    }
+
+    // ── Decision 29 — analytics reads ──────────────────────────────────────
+    if (command.kind === 'analytics') {
+      const aCtx: AnalyticsCtx = { boardPath: this.deps.boardPath };
+      switch (command.sub) {
+        case 'show': {
+          const showOpts: Parameters<typeof analyticsShow>[1] = {};
+          if (command.view !== undefined) showOpts.view = command.view;
+          if (command.range !== undefined) showOpts.range = command.range;
+          if (command.metric !== undefined) showOpts.metric = command.metric;
+          if (command.json) showOpts.json = command.json;
+          return analyticsShow(aCtx, showOpts);
+        }
+        case 'totals': {
+          const totalsOpts: Parameters<typeof analyticsTotals>[1] = {};
+          if (command.range !== undefined) totalsOpts.range = command.range;
+          if (command.json) totalsOpts.json = command.json;
+          return analyticsTotals(aCtx, totalsOpts);
+        }
+        case 'streaks': return analyticsStreaks(aCtx, { json: command.json });
+      }
+    }
+
+    // ── Decision 29 — log reads (renderer-required) ─────────────────────────
+    if (command.kind === 'log') {
       if (!this.deps.cliDispatch) {
-        return { ok: false, message: 'theme set requires an open renderer window', data: { exitCode: 2 } };
+        return logRequiresRenderer(`log.${command.sub}`);
       }
-      return this.deps.cliDispatch('theme.set', { value: command.value });
+      switch (command.sub) {
+        case 'tail': {
+          const tailOpts: Parameters<typeof logTail>[1] = {};
+          if (command.limit !== undefined) tailOpts.limit = command.limit;
+          if (command.json) tailOpts.json = command.json;
+          return logTail(this.deps.cliDispatch, tailOpts);
+        }
+        case 'stats': return logStats(this.deps.cliDispatch, { json: command.json });
+      }
     }
 
     if (command.kind === 'sfx') {
@@ -283,6 +370,15 @@ export class SysFacade {
         case 'start':  return pomoStart(command.label, command.minutes);
         case 'stop':   return pomoStop();
         case 'status': return pomoStatus();
+        case 'config': {
+          const cfgOpts: Parameters<typeof pomoConfig>[0] = {};
+          if (command.session !== undefined) cfgOpts.session = command.session;
+          if (command.short !== undefined) cfgOpts.short = command.short;
+          if (command.long !== undefined) cfgOpts.long = command.long;
+          if (command.every !== undefined) cfgOpts.every = command.every;
+          if (command.face !== undefined) cfgOpts.face = command.face;
+          return pomoConfig(cfgOpts);
+        }
       }
     }
 
@@ -290,6 +386,7 @@ export class SysFacade {
       const ctx: habit.HabitCtx = {
         boardPath: this.deps.boardPath,
         ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+        ...(this.deps.cliDispatch ? { cliDispatch: this.deps.cliDispatch } : {}),
       };
       switch (command.sub) {
         case 'add':    return habit.cliAdd(ctx, command.name);
@@ -299,6 +396,16 @@ export class SysFacade {
         case 'remove': return habit.cliRemove(ctx, command.name);
         case 'view':   return habit.cliView(ctx, command.view);
         case 'list':   return habit.cliList(ctx, command.json);
+        // Decision 29 — new habit subcommands
+        case 'rename':     return habit.cliRename(ctx, command.ref, command.newName);
+        case 'icon':       return habit.cliIcon(ctx, command.ref, command.icon, command.clear);
+        case 'note':       return habit.cliNote(ctx, command.ref, command.text, command.clear);
+        case 'schedule':   return habit.cliSchedule(ctx, command.ref, command.scheduleKind, command.days, command.at, command.durationMin, command.invalidDays);
+        case 'unschedule': return habit.cliUnschedule(ctx, command.ref);
+        case 'archive':    return habit.cliArchive(ctx, command.ref);
+        case 'show':       return habit.cliShow(ctx, command.ref, command.json);
+        case 'pin':        return habit.cliPin(ctx, command.ref);
+        case 'unpin':      return habit.cliUnpin(ctx, command.ref);
       }
     }
 
@@ -335,6 +442,9 @@ export class SysFacade {
         case 'schedule':   return task.taskSchedule(ctx, command.id, command.at, command.durationMin);
         case 'unschedule': return task.taskUnschedule(ctx, command.id);
         case 'addNext':    return task.taskAddNext(ctx, command.sourceRef, command.text, command.durationMin);
+        // Decision 29 — kind + note
+        case 'kind': return task.taskKind(ctx, command.ref, command.taskKind);
+        case 'note': return task.taskNote(ctx, command.ref, command.text, command.clear);
       }
     }
 
@@ -361,7 +471,7 @@ export class SysFacade {
     // with the habit/todo/task ctx-passing pattern is a future refactor.
     if (command.kind === 'text') {
       switch (command.sub) {
-        case 'add':    return textAdd(command.text, command.at);
+        case 'add':    return textAdd(command.text, command.at, command.near);
         case 'set':    return textSet(command.id, command.text);
         case 'resize': return textResize(command.id, command.w, command.h);
       }
@@ -369,7 +479,7 @@ export class SysFacade {
 
     if (command.kind === 'image') {
       switch (command.sub) {
-        case 'add':     return imageAdd(command.path, command.at);
+        case 'add':     return imageAdd(command.path, command.at, command.near);
         case 'replace': return imageReplace(command.id, command.path);
         case 'resize':  return imageResize(command.id, command.w, command.h);
         case 'clear':   return imageClear(command.id);

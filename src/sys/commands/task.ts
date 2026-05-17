@@ -853,6 +853,102 @@ export async function taskAddNext(
  */
 export const taskParallel = taskSibling;
 
+// ── Decision 29 — task kind + task note ──────────────────────────────────────
+
+/**
+ * `krnl task kind <ref> <focus|event>`
+ *
+ * Decision 29 §3 refusal contract:
+ * - Renderer path: dispatches task.toggleKind (allows pomoCancel first).
+ * - Headless (no renderer): REFUSE with exit 1 if the task is the active pomo
+ *   task and the toggle direction is focus → event. This prevents corrupting
+ *   the pomo FSM state.
+ */
+export async function taskKind(
+  ctx: TaskCtx,
+  ref: string | undefined,
+  taskKind: 'focus' | 'event' | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'task kind requires <ref>' };
+  if (!taskKind) return { ok: false, message: 'task kind requires <focus|event>' };
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, ref);
+  if (!taskNode) return { ok: false, message: `No task node matching "${ref}"` };
+
+  const ts = taskNode.state as TaskState;
+  if (ts.kind === taskKind) {
+    return { ok: true, message: `Task "${taskNode.id.slice(0, 8)}" kind is already ${taskKind}.`, data: { id: taskNode.id, kind: taskKind } };
+  }
+
+  // Headless refusal: if toggling focus → event and this task is the active pomo task.
+  if (ts.kind === 'focus' && taskKind === 'event') {
+    const pomoMother = findPomoMother(board);
+    if (pomoMother) {
+      const ps = pomoMother.state as import('../../renderer/components/nodes/PomoNode/types').PomoState;
+      if (ps.status === 'running' && ps.activeTaskId === taskNode.id) {
+        return {
+          ok: false,
+          message: 'cannot toggle kind on active pomo task — open the app or stop pomo first',
+          data: { exitCode: 1 },
+        };
+      }
+    }
+  }
+
+  const nextState: TaskState = { ...ts, kind: taskKind };
+  updateNode(board, taskNode.id, { ...taskNode, state: nextState });
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Task "${taskNode.id.slice(0, 8)}" kind → ${taskKind}.`,
+    data: { id: taskNode.id, kind: taskKind },
+  };
+}
+
+/**
+ * `krnl task note <ref> "<text>"` / `--clear`
+ * Empty/trimmed note drops the field (mirrors habitSetNote semantics).
+ */
+export async function taskNote(
+  ctx: TaskCtx,
+  ref: string | undefined,
+  text: string | undefined,
+  clear: boolean,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'task note requires <ref>' };
+  if (!clear && text === undefined) {
+    return { ok: false, message: 'task note requires "<text>" or --clear' };
+  }
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, ref);
+  if (!taskNode) return { ok: false, message: `No task node matching "${ref}"` };
+
+  const ts = taskNode.state as TaskState;
+  let nextState: TaskState;
+  if (clear) {
+    const { note: _removed, ...rest } = ts;
+    void _removed;
+    nextState = rest as TaskState;
+  } else {
+    const trimmed = (text ?? '').trim();
+    if (trimmed === '') {
+      const { note: _removed, ...rest } = ts;
+      void _removed;
+      nextState = rest as TaskState;
+    } else {
+      nextState = { ...ts, note: trimmed };
+    }
+  }
+  updateNode(board, taskNode.id, { ...taskNode, state: nextState });
+  saveBoard(ctx, board);
+  const action = (clear || !(nextState as TaskState).note) ? 'cleared' : `set to "${nextState.note}"`;
+  return {
+    ok: true,
+    message: `Task "${taskNode.id.slice(0, 8)}" note ${action}.`,
+    data: { id: taskNode.id },
+  };
+}
+
 export async function taskList(
   ctx: TaskCtx,
   todoId?: string,

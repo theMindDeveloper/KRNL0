@@ -1112,6 +1112,31 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       return;
     }
 
+    // ── habit.unpinLane (Decision 29 §4) — remove habit.lane node(s) for a habit ─
+    // Issued by cli:dispatch from `habit unpin <ref>`. Renderer-required.
+    if (node.kind === 'habit' && command === 'habit.unpinLane') {
+      const habitId = args['habitId'];
+      if (typeof habitId !== 'string') return;
+      const currentBoard = useBoardStore.getState().board;
+      if (!currentBoard) return;
+      const lanes = currentBoard.nodes.filter(
+        (n) => n.kind === 'habit.lane' && (n.state as HabitLaneState | null)?.habitId === habitId,
+      );
+      if (lanes.length === 0) {
+        // Will be surfaced as error by the cli dispatch return path — but commandDispatch
+        // cannot return values here. The useCliDispatch handler catches this.
+        return;
+      }
+      const { removeNode } = useBoardStore.getState();
+      for (const lane of lanes) {
+        removeNode(lane.id);
+        emit('node.removed', `habit.lane removed for habit ${habitId.slice(0, 8)}`, { refId: lane.id });
+      }
+      const finalBoard = useBoardStore.getState().board;
+      if (finalBoard) void saveBoard(finalBoard);
+      return;
+    }
+
     // ── habit.lane.* — route to the mother habit referenced by the lane ─
     if (node.kind === 'habit.lane') {
       const laneState = node.state as HabitLaneState | null;
