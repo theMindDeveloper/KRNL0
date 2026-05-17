@@ -1433,6 +1433,42 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
               updateNode(prevItem.taskNodeId, { state: mirrored });
             }
           }
+
+          // If the item is now done and it's the active pomo task, stop the timer.
+          if (nextItem.done && prevItem.taskNodeId) {
+            const freshBoard = useBoardStore.getState().board;
+            const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
+            if (pomoNode) {
+              const ps = pomoNode.state as PomoState;
+              if (ps.activeTaskId === prevItem.taskNodeId && ps.status !== 'idle') {
+                const wasRunningOrPaused = ps.status === 'running' || ps.status === 'paused';
+                let cancelledState = wasRunningOrPaused ? pomoCancel(ps) : pomoSkipBreak(ps);
+                cancelledState = pomoClearActiveTask(cancelledState);
+                updateNode(pomoNode.id, { state: cancelledState });
+
+                const newest = wasRunningOrPaused ? cancelledState.history[cancelledState.history.length - 1] : null;
+                if (newest) {
+                  const elapsedSec = Math.max(
+                    0,
+                    Math.floor((Date.parse(newest.endedAt) - Date.parse(newest.startedAt)) / 1000),
+                  );
+                  const freshTask = useBoardStore
+                    .getState()
+                    .board?.nodes.find((n) => n.id === prevItem.taskNodeId);
+                  if (freshTask && freshTask.kind === 'todo.task') {
+                    const fts = freshTask.state as TaskState;
+                    updateNode(prevItem.taskNodeId, {
+                      state: {
+                        ...fts,
+                        secondsAccumulated: (fts.secondsAccumulated ?? 0) + elapsedSec,
+                        currentSessionElapsedSec: 0,
+                      },
+                    });
+                  }
+                }
+              }
+            }
+          }
         }
       }
 
@@ -1536,12 +1572,16 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         if (pomoNode) {
           const ps = pomoNode.state as PomoState;
           if (ps.activeTaskId === nodeId && ps.status !== 'idle') {
-            let cancelledState = pomoCancel(ps);
+            // For break/done: skip the break instead of cancel (pomoCancel no-ops on break).
+            // Time was already credited when the session completed, so don't re-credit.
+            const wasRunningOrPaused = ps.status === 'running' || ps.status === 'paused';
+            let cancelledState = wasRunningOrPaused ? pomoCancel(ps) : pomoSkipBreak(ps);
             cancelledState = pomoClearActiveTask(cancelledState);
             updateNode(pomoNode.id, { state: cancelledState });
 
             // Commit the just-cancelled session's elapsed time into the task.
-            const newest = cancelledState.history[cancelledState.history.length - 1];
+            // Only for running/paused — break sessions were already credited at completion.
+            const newest = wasRunningOrPaused ? cancelledState.history[cancelledState.history.length - 1] : null;
             if (newest) {
               const elapsedSec = Math.max(
                 0,
