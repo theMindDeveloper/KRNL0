@@ -6,7 +6,7 @@
 // done tick, 7-day mini strip with the two-color trick, foot with streak
 // and cadence text, drop-hint that fades in while dragging.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
@@ -115,28 +115,19 @@ export function HabitLaneNode({
     setMenuOpen({ x: e.clientX, y: e.clientY });
   };
 
+  // If the underlying habit was deleted, this lane is an orphan — auto-clean
+  // it instead of showing a "habit removed — delete this lane" placeholder
+  // the user has to dismiss by hand. The lane node is non-mother, so
+  // removeNode in the board store will accept it.
+  const removeSelf = useBoardStore((s) => s.removeNode);
+  useEffect(() => {
+    if (!board) return; // wait until store hydrates
+    if (habit) return;
+    removeSelf(node.id);
+  }, [board, habit, node.id, removeSelf]);
   if (!habit) {
-    return (
-      <div
-        style={{
-          width: LANE_WIDTH,
-          background: 'var(--node-bg)',
-          border: '1px dashed var(--paper-3)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 12,
-          color: 'var(--ink-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          letterSpacing: '0.04em',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}
-      >
-        <span style={{ color: 'var(--rust)' }}>●</span>
-        <span>habit removed — delete this lane</span>
-      </div>
-    );
+    // Render nothing while the auto-cleanup useEffect fires on the next tick.
+    return null;
   }
 
   const color = habitColor(habit.color);
@@ -348,6 +339,7 @@ export function HabitLaneNode({
           onRename={(name) => onCommand('habit.lane.rename', { name })}
           onSetColor={(c) => onCommand('habit.lane.setColor', { color: c })}
           onSetIcon={(icon) => onCommand('habit.lane.setIcon', { icon })}
+          onSetNote={(note) => onCommand('habit.lane.setNote', { note })}
           onDelete={() => onCommand('habit.lane.removeHabit')}
           onClose={() => setMenuOpen(null)}
         />

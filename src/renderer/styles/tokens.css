@@ -88,10 +88,24 @@
   --btn-primary-fg:        var(--acid);
   --btn-primary-ring:      rgba(201,241,88,0.45);
 
-  /* Typography */
+  /* Typography
+   * --font-sans is the default body/text font (task names, notes, todo
+   * items, habit names, free-form strings). Per user request, this now
+   * defaults to JetBrains Mono so the body text matches the chrome's mono
+   * language; Geist is kept as a fallback for environments without
+   * JetBrains Mono loaded. */
   --font-mono:  'JetBrains Mono', ui-monospace, monospace;
-  --font-sans:  'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-sans:  'JetBrains Mono', 'Geist', ui-monospace, ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Instrument Serif', Georgia, serif;
+
+  /* Contrast lock.
+   * Theme-invariant near-black for text that sits ON a bright accent
+   * background (--acid, --rust, --cyan, habit colors, etc.). KRNL0 rule:
+   * white-on-bright-green is never allowed. Always use --ink-on-bright
+   * (or hardcode #0a0908) for buttons/badges/blocks whose background is
+   * one of the accent tokens. --ink alone is theme-variant and will flip
+   * to cream in dark mode, producing the green-on-white miscontrast. */
+  --ink-on-bright: #0a0908;
 
   /* Orb */
   --orb-size: 56px;
@@ -284,6 +298,13 @@
 @keyframes clock-arc-pulse {
   0%, 100% { filter: drop-shadow(0 0 4px  currentColor); }
   50%      { filter: drop-shadow(0 0 10px currentColor); }
+}
+
+/* HabitSwapModal — time picker mount-in animation. Small fade + slide up so
+   the picker doesn't pop into place when the modal opens or re-renders. */
+@keyframes krnl-time-picker-in {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0)   scale(1);    }
 }
 
 /* ClockNode — continuous 60s sweep for the second hand. CSS-driven so the

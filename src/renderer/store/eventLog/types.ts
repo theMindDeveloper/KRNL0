@@ -6,7 +6,7 @@
  */
 
 export type EventKind =
-  | 'task.created' | 'task.completed' | 'task.deleted' | 'task.reordered'
+  | 'task.created' | 'task.completed' | 'task.deleted' | 'task.reordered' | 'task.toggleKind'
   | 'habit.checkin' | 'habit.uncheck' | 'habit.created' | 'habit.deleted'
   | 'pomo.start' | 'pomo.complete' | 'pomo.stop'
   | 'node.added' | 'node.removed' | 'node.moved'

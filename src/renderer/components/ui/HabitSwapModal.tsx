@@ -231,18 +231,19 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
     display: 'block',
   };
 
-  const inputFieldStyle: React.CSSProperties = {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    background: 'var(--paper-2)',
-    border: '1px solid var(--paper-3)',
-    borderRadius: 4,
-    padding: '4px 6px',
-    color: 'var(--ink)',
-    outline: 'none',
-    width: '100%',
-    boxSizing: 'border-box',
-  };
+  // ── Time picker (HH:MM) ────────────────────────────────────────────────────
+  // Native <input type="time"> opens an OS-level picker (the chunky blue
+  // scroll wheel on Windows) which is jarring against the KRNL0 chrome.
+  // We swap it for two NumberStepper widgets — same component as the
+  // duration field, so the cadence + time inputs share one language.
+  const [tHH, tMM] = (() => {
+    const m = /^(\d{1,2}):(\d{1,2})$/.exec(time);
+    const hh = m ? Math.min(23, Math.max(0, Number.parseInt(m[1]!, 10))) : 0;
+    const mm = m ? Math.min(59, Math.max(0, Number.parseInt(m[2]!, 10))) : 0;
+    return [hh, mm] as const;
+  })();
+  const setHH = (hh: number) => setTime(`${String(Math.max(0, Math.min(23, hh))).padStart(2, '0')}:${String(tMM).padStart(2, '0')}`);
+  const setMM = (mm: number) => setTime(`${String(tHH).padStart(2, '0')}:${String(Math.max(0, Math.min(59, mm))).padStart(2, '0')}`);
 
   // Stop a synthetic React event from bubbling through the portal back to the
   // canvas (React events bubble through the React tree, NOT the DOM tree — so
@@ -410,40 +411,26 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
             onMouseEnter={(e) => applyHover(e.currentTarget, -1.2)}
             onMouseLeave={(e) => removeHover(e.currentTarget)}
           >
-            {/* Arrow chip — top left */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 12,
-                left: 12,
-                width: 30,
-                height: 30,
-                borderRadius: '50%',
-                display: 'grid',
-                placeItems: 'center',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 16,
-                fontWeight: 700,
-                color: 'var(--ink-2)',
-                background: 'var(--node-bg)',
-                border: '1.5px solid var(--ink-3)',
-              }}
-            >
-              ←
-            </div>
+            {/* (Removed) corner arrow chip — was a stray decorative ornament
+                that read as a back/forward button. Card click is the only
+                affordance now. */}
 
-            {/* Badge */}
+            {/* Badge — locked-dark text on the rust pill so it stays
+                readable across every theme (light / dark / high-contrast).
+                Previous `color: var(--paper)` rendered as white-on-bright
+                in some themes and failed contrast. */}
             <div style={{ alignSelf: 'center' }}>
               <span
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: 9.5,
+                  fontWeight: 700,
                   letterSpacing: '0.16em',
                   textTransform: 'uppercase',
                   padding: '3px 9px',
                   borderRadius: 100,
                   background: 'var(--rust)',
-                  color: 'var(--paper)',
+                  color: '#0a0908',
                 }}
               >
                 weekly
@@ -512,40 +499,21 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
             onMouseEnter={(e) => applyHover(e.currentTarget, 1.2)}
             onMouseLeave={(e) => removeHover(e.currentTarget)}
           >
-            {/* Arrow chip — top right */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 12,
-                right: 12,
-                width: 30,
-                height: 30,
-                borderRadius: '50%',
-                display: 'grid',
-                placeItems: 'center',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 16,
-                fontWeight: 700,
-                color: 'var(--ink-2)',
-                background: 'var(--node-bg)',
-                border: '1.5px solid var(--ink-3)',
-              }}
-            >
-              →
-            </div>
+            {/* (Removed) corner arrow chip — see weekly card. */}
 
-            {/* Badge */}
+            {/* Badge — locked-dark text for the same theme-safety reason. */}
             <div style={{ alignSelf: 'center' }}>
               <span
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: 9.5,
+                  fontWeight: 700,
                   letterSpacing: '0.16em',
                   textTransform: 'uppercase',
                   padding: '3px 9px',
                   borderRadius: 100,
                   background: 'var(--acid)',
-                  color: 'var(--ink)',
+                  color: '#0a0908',
                 }}
               >
                 daily
@@ -614,18 +582,59 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
             padding: '0 18px 16px',
           }}
         >
-          {/* TIME */}
+          {/* TIME — custom HH/MM steppers; no native browser picker. */}
           <div>
             <label style={inputLabelStyle}>
               Time
             </label>
+            {/* Hidden mirror of the HH:MM string so existing tests/queries
+                that target [data-testid="habit-swap-time-input"] keep
+                working (read .value on the input). */}
             <input
               data-testid="habit-swap-time-input"
-              type="time"
+              type="hidden"
               value={time}
-              onChange={(e) => setTime(e.target.value)}
-              style={inputFieldStyle}
+              readOnly
             />
+            <div
+              data-time-picker
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                animation: 'krnl-time-picker-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+              }}
+            >
+              <NumberStepper
+                value={tHH}
+                onChange={setHH}
+                min={0}
+                max={23}
+                step={1}
+                testId="habit-swap-time-hh"
+              />
+              <span
+                aria-hidden
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 14,
+                  color: 'var(--ink-3)',
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  userSelect: 'none',
+                }}
+              >
+                :
+              </span>
+              <NumberStepper
+                value={tMM}
+                onChange={setMM}
+                min={0}
+                max={59}
+                step={5}
+                testId="habit-swap-time-mm"
+              />
+            </div>
           </div>
           {/* DURATION */}
           <div>
@@ -745,7 +754,10 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
           >
             cancel drop
           </button>
-          {/* Confirm button — disabled until kind selected and inputs valid */}
+          {/* Confirm button — disabled until kind selected and inputs valid.
+              Active state locks the text to a paper-invariant dark hex so
+              "CONFIRM" reads black-on-green in every theme (KRNL0 rule:
+              never white-on-bright-green). */}
           <button
             data-testid="habit-swap-confirm"
             type="button"
@@ -755,7 +767,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
               marginLeft: 'auto',
               background: canConfirm ? 'var(--acid)' : 'var(--paper-3)',
               border: 'none',
-              color: canConfirm ? 'var(--ink)' : 'var(--ink-4)',
+              color: canConfirm ? '#0a0908' : 'var(--ink-4)',
               cursor: canConfirm ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--font-mono)',
               fontSize: 9.5,

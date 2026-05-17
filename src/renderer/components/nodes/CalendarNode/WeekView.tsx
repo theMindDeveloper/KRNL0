@@ -11,6 +11,8 @@ import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
+import type { PomoBreakdown } from '../../../store/pomoSchedule';
+import type { TaskKind } from '../TaskNode/types';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -18,6 +20,7 @@ import { NowLine } from './NowLine';
 import { HabitSwapModal } from '../../ui/HabitSwapModal';
 import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
 import { calcStreak } from '../HabitNode/commands';
+import { toneVarForTask } from '../../../utils/taskColor';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -83,6 +86,8 @@ interface ScheduledTask {
   scheduledDurationMin: number; // calendar block duration (fallback: plannedMin or durationMin)
   plannedMin: number;           // for drag payload
   isAnchor: boolean;            // ADR 0003: true iff the user explicitly anchored this task
+  kind: TaskKind;               // Decision 28: 'focus' | 'event'
+  breakdown: PomoBreakdown | null; // Decision 28: null iff kind === 'event'
 }
 
 // One day's slice of a (potentially multi-day) task. `sliceStartMin` and
@@ -226,11 +231,15 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           durationMin?: number;
         };
         const plannedMin = st.plannedMin ?? st.durationMin ?? 25;
-        // Successors get their plannedMin as their block height; only the
-        // anchor honours scheduledDurationMin (ADR 0003 §3.7).
-        const blockDurationMin = p.isAnchor
-          ? (st.scheduledDurationMin ?? plannedMin)
-          : plannedMin;
+        // Decision 28: block duration comes from placement endISO - startISO
+        // (effectiveMin for focus tasks, which already includes breaks).
+        // For event tasks and legacy cases, fall back to plannedMin.
+        const startMs = new Date(p.startISO).getTime();
+        const endMs = new Date(p.endISO).getTime();
+        const blockDurationMin =
+          Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+            ? Math.round((endMs - startMs) / 60_000)
+            : plannedMin;
         out.push({
           id: p.taskId,
           text: typeof st.text === 'string' ? st.text : '',
@@ -239,6 +248,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           scheduledDurationMin: blockDurationMin,
           plannedMin,
           isAnchor: p.isAnchor,
+          kind: p.kind,
+          breakdown: p.breakdown,
         });
       }
       return out;
@@ -478,9 +489,14 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         setTaskPopup(null);
+        // BUGFIX: drag payload must carry WORK-time (plannedMin), not block
+        // height. scheduledDurationMin on focus tasks is treated as work-time
+        // override by the selector, which then adds breaks on top. Using the
+        // block height (which already includes breaks) caused exponential
+        // growth on every nudge.
         e.dataTransfer.setData(
           'application/krnl-task',
-          JSON.stringify({ taskId: task.id, durationMin: task.scheduledDurationMin }),
+          JSON.stringify({ taskId: task.id, durationMin: task.plannedMin }),
         );
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
@@ -565,6 +581,21 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const borderBottomLeftRadius = hasContinuation ? 0 : 4;
       const borderBottomRightRadius = hasContinuation ? 0 : 4;
 
+      // Decision 28 §6 — break tail sub-region.
+      // Render only when kind==='focus' AND breakdown.breakMin > 0.
+      // §8: zero-breakMin → no DOM (not even a zero-height node, which would
+      // produce a visible 1px hairline from the border).
+      const breakdown = task.breakdown;
+      const showTail =
+        task.kind === 'focus' &&
+        breakdown !== null &&
+        breakdown.breakMin > 0 &&
+        breakdown.effectiveMin > 0;
+
+      // Per-task tone — shared palette with Clock + Todo so users can link
+      // the same task visually across surfaces.
+      const taskTone = isGrayed ? 'var(--ink-4)' : toneVarForTask(task.id);
+
       return (
         <div
           key={`${task.id}-${isContinuation ? 'cont' : 'head'}`}
@@ -582,8 +613,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             left: `calc(${leftPct}% + 2px)`,
             right: `calc(${rightPct}% + 2px)`,
             height: heightPx,
-            background: isGrayed ? 'var(--paper-3)' : 'var(--acid-faint)',
-            border: `1px solid ${isGrayed ? 'var(--ink-4)' : 'var(--acid)'}`,
+            background: isGrayed ? 'var(--paper-3)' : 'color-mix(in srgb, ' + taskTone + ' 18%, transparent)',
+            border: `1px solid ${isGrayed ? 'var(--ink-4)' : taskTone}`,
             borderTopLeftRadius,
             borderTopRightRadius,
             borderBottomLeftRadius,
@@ -629,6 +660,55 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               ↓
             </span>
           )}
+          {/* Decision 28 §6 — work/break sub-regions.
+              Only rendered when showTail is true (focus task with break time > 0).
+              The entire block height is effectiveMin (workMin + breakMin).
+              Top region = workMin fraction of blockHeight (task tone colour).
+              Bottom region = breakMin fraction of blockHeight (paper-3 + tone border).
+              §8: when breakMin === 0, showTail is false and no sub-region DOM is emitted. */}
+          {showTail && breakdown !== null && (
+            <>
+              {/* Work region — overlays the top fraction of the block */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: `${(breakdown.workMin / breakdown.effectiveMin) * 100}%`,
+                  background: isGrayed ? 'var(--paper-3)' : 'color-mix(in srgb, ' + taskTone + ' 22%, transparent)',
+                  pointerEvents: 'none',
+                }}
+              />
+              {/* Break tail — bottom fraction of the block.
+                  Diagonal-stripe texture in the task tone so it reads as
+                  "same task, not work" instead of "different colored block".
+                  No more solid green/black/gray zones.
+                  Long-break stripes are wider so the eye can still see the cadence. */}
+              {(() => {
+                const tailPct = (breakdown.breakMin / breakdown.effectiveMin) * 100;
+                const hasLong = breakdown.segments.some((seg) => seg.kind === 'long');
+                // Wider stripe spacing if a long break exists in this block.
+                const stripeSize = hasLong ? 10 : 6;
+                return (
+                  <div
+                    data-testid="calendar-task-break-tail"
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: `${tailPct}%`,
+                      borderTop: `1px dashed ${taskTone}`,
+                      pointerEvents: 'none',
+                      backgroundImage: `repeating-linear-gradient(135deg, ${taskTone} 0 1px, transparent 1px ${stripeSize}px)`,
+                      opacity: 0.6,
+                    }}
+                  />
+                );
+              })()}
+            </>
+          )}
           {heightPx >= 12 && (
             <span
               style={{
@@ -641,6 +721,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 display: 'block',
                 paddingLeft: isContinuation ? 10 : 0,
                 pointerEvents: 'none',
+                position: 'relative',
+                zIndex: 1,
               }}
             >
               {task.text}
@@ -691,7 +773,10 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             right: 2,
             height: blockHeight,
             background: `var(--${habit.color})`,
-            opacity: 0.7,
+            // Bumped from 0.7 → 0.9 so the dark text on bright fill
+            // doesn't get washed out by alpha. Contrast was the user's
+            // explicit complaint; opacity was making it worse.
+            opacity: 0.9,
             borderRadius: 2,
             overflow: 'hidden',
             zIndex: 1,
@@ -709,7 +794,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 fontSize: 8,
                 lineHeight: 1,
                 flexShrink: 0,
-                color: 'var(--paper)',
+                // Theme-locked dark — see tokens.css --ink-on-bright.
+                color: 'var(--ink-on-bright)',
               }}
             >
               {habit.icon}
@@ -719,7 +805,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 8,
-              color: 'var(--paper)',
+              fontWeight: 600,
+              // KRNL0 contrast rule (see tokens.css --ink-on-bright):
+              // never light text on a bright accent bg. Habit colors are
+              // all bright/tinted, so the label is locked to dark in
+              // every theme.
+              color: 'var(--ink-on-bright)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -772,17 +863,75 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         >
           ←
         </button>
-        <span
-          data-testid="week-label"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-1)',
-            letterSpacing: '0.06em',
-          }}
-        >
-          Week of {weekLabel}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <span
+            data-testid="week-label"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              color: 'var(--ink-1)',
+              letterSpacing: '0.06em',
+            }}
+          >
+            Week of {weekLabel}
+          </span>
+
+          {/* Legend chip — explains the two block treatments used on the
+              calendar surface: solid = work session, diagonal-stripe with
+              dashed top border = break. Same visual language as the actual
+              calendar-task-break-tail renderer above. */}
+          <div
+            data-testid="week-legend"
+            title="Solid = work session • Striped (dashed top) = break"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '2px 7px',
+              background: 'var(--paper-2)',
+              border: '1px dashed var(--paper-3)',
+              borderRadius: 3,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-3)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 12,
+                  height: 9,
+                  background: 'var(--acid)',
+                  borderRadius: 1,
+                  display: 'inline-block',
+                  opacity: 0.85,
+                }}
+              />
+              session
+            </span>
+            <span style={{ color: 'var(--ink-4)' }}>·</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 12,
+                  height: 9,
+                  borderRadius: 1,
+                  borderTop: '1px dashed var(--acid)',
+                  backgroundImage:
+                    'repeating-linear-gradient(135deg, var(--acid) 0 1px, transparent 1px 4px)',
+                  display: 'inline-block',
+                  opacity: 0.85,
+                }}
+              />
+              break
+            </span>
+          </div>
+        </div>
         <button
           type="button"
           data-testid="week-next"

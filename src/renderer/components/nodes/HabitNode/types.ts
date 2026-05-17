@@ -60,6 +60,7 @@ export interface Habit {
   color: HabitColor;    // v2 — default 'acid'
   icon?: string;        // v2.1 — optional glyph/emoji; falls back to round-robin glyph
   schedule?: HabitSchedule; // ADR 0002 — absence = unscheduled
+  note?: string;        // free-form text shown under the habit row
 }
 
 // Built-in icon palette presented in the context menu. Mix of mono glyphs

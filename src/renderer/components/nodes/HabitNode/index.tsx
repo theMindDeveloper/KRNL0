@@ -301,6 +301,7 @@ export function HabitNode({
               onRename={(name) => onCommand('habit.rename', { id: menu.habitId, name })}
               onSetColor={(color) => onCommand('habit.setColor', { id: menu.habitId, color })}
               onSetIcon={(icon) => onCommand('habit.setIcon', { id: menu.habitId, icon })}
+              onSetNote={(note) => onCommand('habit.setNote', { id: menu.habitId, note })}
               onDelete={() => onCommand('habit.remove', { id: menu.habitId })}
               onPinAsLane={() => onCommand('habit.spawnLane', { habitId: menu.habitId })}
               laneExists={pinnedHabitIds.has(menu.habitId)}
@@ -518,6 +519,26 @@ const WeekRow = memo(function WeekRow({
           })}
         </div>
       </div>
+
+      {habit.note && habit.note.length > 0 && (
+        <div
+          data-testid={`habit-note-${habit.id}`}
+          style={{
+            marginLeft: 22,
+            marginTop: 4,
+            fontFamily: 'var(--font-sans)',
+            fontSize: 11,
+            lineHeight: 1.4,
+            color: 'var(--ink-3)',
+            fontStyle: 'italic',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          }}
+          title={habit.note}
+        >
+          {habit.note}
+        </div>
+      )}
 
       <div
         data-habit-streak

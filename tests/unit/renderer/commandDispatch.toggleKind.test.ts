@@ -183,9 +183,9 @@ describe('task.toggleKind — non-active task', () => {
 });
 
 describe('task.toggleKind — active running task (clean handoff)', () => {
-  it('cancels the pomo when toggling the active running task to event', () => {
+  it('cancels in-flight session + re-loads as event single-session on toggle', () => {
     const board = makeBoard({
-      taskState: { kind: 'focus', pomoSessionsCompleted: 1 },
+      taskState: { kind: 'focus', pomoSessionsCompleted: 1, plannedMin: 60 },
       pomoState: {
         status: 'running',
         activeTaskId: 'task-a',
@@ -199,9 +199,10 @@ describe('task.toggleKind — active running task (clean handoff)', () => {
     handler('task.toggleKind');
 
     const ps = getPomoState();
-    expect(ps.status).toBe('idle');
-    expect(ps.activeTaskId).toBeNull();
-    // pomoCancel records a history entry (completed: false)
+    // Active task stays; in-flight session is cancelled (history entry) and
+    // the task is re-loaded with the new kind's durationMin (= plannedMin for events).
+    expect(ps.activeTaskId).toBe('task-a');
+    expect(ps.durationMin).toBe(60); // single big session
     expect(ps.history).toHaveLength(1);
     expect(ps.history[0]!.completed).toBe(false);
   });
@@ -227,9 +228,9 @@ describe('task.toggleKind — active running task (clean handoff)', () => {
     expect(ts.pomoSessionsCompleted).toBe(2);
   });
 
-  it('cancels the pomo when toggling the active paused task to event', () => {
+  it('cancels in-flight paused session + re-loads as event single-session', () => {
     const board = makeBoard({
-      taskState: { kind: 'focus', pomoSessionsCompleted: 0 },
+      taskState: { kind: 'focus', pomoSessionsCompleted: 0, plannedMin: 45 },
       pomoState: {
         status: 'paused',
         activeTaskId: 'task-a',
@@ -245,8 +246,9 @@ describe('task.toggleKind — active running task (clean handoff)', () => {
     handler('task.toggleKind');
 
     const ps = getPomoState();
-    expect(ps.status).toBe('idle');
-    expect(ps.activeTaskId).toBeNull();
+    // active task stays loaded; re-loaded with event single-session settings
+    expect(ps.activeTaskId).toBe('task-a');
+    expect(ps.durationMin).toBe(45);
   });
 
   it('does NOT cancel the pomo when toggling a DIFFERENT (non-active) task to event', () => {
@@ -272,5 +274,34 @@ describe('task.toggleKind — active running task (clean handoff)', () => {
 
     const ts = getTaskState();
     expect(ts.kind).toBe('event');
+  });
+
+  // PR-A tester nit: secondsAccumulated must survive an active-cancel toggle.
+  it('secondsAccumulated is preserved after active-cancel toggle', () => {
+    const board = makeBoard({
+      taskState: {
+        kind: 'focus',
+        pomoSessionsCompleted: 2,
+        secondsAccumulated: 3000, // 50 minutes accumulated
+      },
+      pomoState: {
+        status: 'running',
+        activeTaskId: 'task-a',
+        startedAt: new Date(Date.now() - 30_000).toISOString(),
+        durationMin: 25,
+      },
+    });
+    useBoardStore.getState().setBoard(board);
+
+    const handler = makeCommandHandler('task-a');
+    handler('task.toggleKind');
+
+    const ts = getTaskState();
+    expect(ts.kind).toBe('event');
+    // secondsAccumulated must not be zeroed — it's preserved for focus-resume.
+    // The pomoCancel only affects PomoState (adds to history), NOT TaskState.secondsAccumulated.
+    expect(ts.secondsAccumulated).toBe(3000);
+    // pomoSessionsCompleted is also preserved.
+    expect(ts.pomoSessionsCompleted).toBe(2);
   });
 });

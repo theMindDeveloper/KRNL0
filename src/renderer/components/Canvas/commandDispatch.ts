@@ -51,6 +51,7 @@ import {
 } from '../nodes/PomoNode/commands';
 import type { PomoConfig, PomoState, TimerFace } from '../nodes/PomoNode/types';
 import { defaultPomoConfig } from '../nodes/PomoNode/types';
+import { computeCurrentSessionMin } from '../nodes/PomoNode/pomoRules';
 
 // ── Todo ──────────────────────────────────────────────────────────────
 import {
@@ -89,6 +90,7 @@ import {
   habitRename,
   habitSetColor,
   habitSetIcon,
+  habitSetNote,
   habitSetView,
   habitSetSchedule,
 } from '../nodes/HabitNode/commands';
@@ -201,7 +203,20 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.pause':    return { state: pomoPause(s as never) };
         case 'pomo.resume':   return { state: pomoResume(s as never) };
         case 'pomo.cancel':   return { state: pomoCancel(s as never) };
-        case 'pomo.complete': return { state: pomoComplete(s as never, { config: pomoCfg }) };
+        case 'pomo.complete': {
+          // Detect if the active task is an event-kind task; if so, signal
+          // skipBreak so the FSM transitions straight to 'done' (no break).
+          const ps = s as unknown as PomoState;
+          let skipBreak = false;
+          if (ps.activeTaskId !== null) {
+            const board = useBoardStore.getState().board;
+            const activeTask = board?.nodes.find((n) => n.id === ps.activeTaskId);
+            if (activeTask && (activeTask.state as TaskState).kind === 'event') {
+              skipBreak = true;
+            }
+          }
+          return { state: pomoComplete(s as never, { config: pomoCfg, skipBreak }) };
+        }
         case 'pomo.skipBreak': return { state: pomoSkipBreak(s as never) };
         case 'pomo.endBreak': return { state: pomoEndBreak(s as never) };
         case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
@@ -251,6 +266,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.rename':      return { state: habitRename(s as never, args as never) };
         case 'habit.setColor':    return { state: habitSetColor(s as never, args as never) };
         case 'habit.setIcon':     return { state: habitSetIcon(s as never, args as never) };
+        case 'habit.setNote':     return { state: habitSetNote(s as never, args as never) };
         case 'habit.setView':     return { config: habitSetView(c as never, args as never) };
         // ADR 0002 §5 — set/clear schedule on a habit.
         case 'habit.setSchedule': return { state: habitSetSchedule(s as never, args as never) };
@@ -494,6 +510,26 @@ function findMotherForHabit(habitId: string): Node | null {
   return null;
 }
 
+/**
+ * Remove every `habit.lane` node that points at the given habitId.
+ * Used after a habit is deleted (from either the mother right-click menu
+ * or via a lane's "delete habit" action) so the canvas doesn't leak
+ * orphan lane placeholders.
+ *
+ * removeNode in the board store already no-ops on mother nodes, so this
+ * is safe to call even if a future lane definition isMother flips.
+ */
+function removeAllLanesForHabit(habitId: string): void {
+  const { board, removeNode } = useBoardStore.getState();
+  if (!board) return;
+  const orphans = board.nodes.filter(
+    (n) =>
+      n.kind === 'habit.lane' &&
+      (n.state as { habitId?: string } | null)?.habitId === habitId,
+  );
+  for (const lane of orphans) removeNode(lane.id);
+}
+
 // ── Decision 22.1 helpers ──────────────────────────────────────────────────
 
 const toIso = (ms: number): string => new Date(ms).toISOString();
@@ -608,17 +644,14 @@ function loadTaskIntoPomo(
     workingState = pomoSkipBreak(workingState);
   }
 
-  // Step 5: compute current session minutes using the clamp rule.
-  // min(plannedMin - pomoSessionsCompleted * sessionMin, sessionMin), never < 1.
-  // If remainder <= 0 (over budget), fall back to sessionMin.
+  // Step 5: compute current session minutes.
+  // - Focus tasks: shared clamp rule (computeCurrentSessionMin = single source).
+  // - Event tasks: single big session, durationMin = plannedMin (no splitting).
   const taskState = taskNode.state as TaskState;
-  const sessionMin = cfg.sessionMin;
   const completed = taskState.pomoSessionsCompleted ?? 0;
-  const remainder = taskState.plannedMin - completed * sessionMin;
-  const currentSessionMin = Math.max(
-    1,
-    Math.min(remainder > 0 ? remainder : sessionMin, sessionMin),
-  );
+  const currentSessionMin = taskState.kind === 'event'
+    ? Math.max(1, Math.round(taskState.plannedMin))
+    : computeCurrentSessionMin(taskState.plannedMin, completed, cfg);
 
   // Step 6: read the checkpoint (in-flight elapsed) from the new task.
   const checkpointMs = (taskState.currentSessionElapsedSec ?? 0) * 1000;
@@ -774,25 +807,49 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const ts = node.state as TaskState;
       const newKind = ts.kind === 'focus' ? 'event' : 'focus';
 
-      if (newKind === 'event') {
-        // Check whether this task is the currently active pomo task.
-        const freshBoard = useBoardStore.getState().board;
-        const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
-        if (pomoNode) {
-          const ps = pomoNode.state as PomoState;
-          if (ps.activeTaskId === nodeId && (ps.status === 'running' || ps.status === 'paused')) {
-            // Cancel the pomo (records partial session) then clear activeTaskId.
-            let cancelledState = pomoCancel(ps);
-            cancelledState = pomoClearActiveTask(cancelledState);
-            updateNode(pomoNode.id, { state: cancelledState });
-          }
+      // If this task is currently loaded in the pomo and a session is in-flight,
+      // cancel it so the partial run is recorded; then re-load with the new
+      // kind's settings (single big session for event, per-session for focus).
+      const freshBoard = useBoardStore.getState().board;
+      const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
+      const wasActive = pomoNode
+        ? (pomoNode.state as PomoState).activeTaskId === nodeId
+        : false;
+      if (pomoNode && wasActive) {
+        const ps = pomoNode.state as PomoState;
+        if (ps.status === 'running' || ps.status === 'paused') {
+          updateNode(pomoNode.id, { state: pomoCancel(ps) });
+        } else if (ps.status === 'break') {
+          updateNode(pomoNode.id, { state: pomoSkipBreak(ps) });
         }
       }
 
       updateNode(nodeId, { state: { ...ts, kind: newKind } });
+
+      // Re-load the task so durationMin / pip count reflects the new kind.
+      if (wasActive) {
+        loadTaskIntoPomo(nodeId, { autoStart: false });
+      }
+
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       emit('task.toggleKind', `task ${shortId(nodeId)} kind flipped to ${newKind}`, { refId: nodeId });
+      return;
+    }
+
+    // ── task.setNote: write a free-form note onto the task state ───────────
+    if (command === 'task.setNote') {
+      if (node.kind !== 'todo.task') return;
+      const raw = args['note'];
+      const note = typeof raw === 'string' ? raw : '';
+      const ts = node.state as TaskState;
+      const trimmed = note.trim();
+      const nextState = trimmed.length > 0
+        ? { ...ts, note: trimmed }
+        : (() => { const { note: _drop, ...rest } = ts; return rest as TaskState; })();
+      updateNode(nodeId, { state: nextState });
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
       return;
     }
 
@@ -1093,8 +1150,18 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           mutateMotherHabit(mother.id, (s) => habitSetIcon(s, { id: habitId, icon }));
           break;
         }
+        case 'habit.lane.setNote': {
+          const note = args['note'];
+          if (typeof note !== 'string') return;
+          mutateMotherHabit(mother.id, (s) => habitSetNote(s, { id: habitId, note }));
+          break;
+        }
         case 'habit.lane.removeHabit': {
           mutateMotherHabit(mother.id, (s) => habitRemove(s, { id: habitId }));
+          // Also remove every lane node that referenced this habit — the
+          // habit is gone, an orphaned "habit removed — delete this lane"
+          // placeholder is just busywork for the user.
+          removeAllLanesForHabit(habitId);
           break;
         }
         default:
@@ -1291,6 +1358,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         plannedMin: parsedPlanned,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
+        kind: 'focus',
       };
 
       const taskNodeId = `task-${crypto.randomUUID()}`;
@@ -1611,6 +1679,9 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     } else if (command === 'habit.remove' && node.kind === 'habit') {
       const habitId = typeof args['id'] === 'string' ? args['id'] : '';
       emit('habit.deleted', `habit ${habitId.slice(0, 8)} removed`, { severity: 'warn' });
+      // Auto-clean any lane nodes that referenced this habit so the user
+      // doesn't see the "habit removed — delete this lane" orphan card.
+      if (habitId) removeAllLanesForHabit(habitId);
     } else if (command === 'frame.setSize' && node.kind === 'frame') {
       emit('frame.resized', `frame ${shortId(nodeId)} resized`, { refId: nodeId });
     }

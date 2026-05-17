@@ -3,6 +3,7 @@
 
 import type { PomoConfig, PomoSessionRecord, PomoState, TimerFace } from './types';
 import { defaultPomoConfig } from './types';
+import { isLongBreakAfter } from './pomoRules';
 
 export interface PomoEnv {
   now: () => number;
@@ -106,7 +107,7 @@ export const pomoCancel = (
  */
 export const pomoComplete = (
   state: PomoState,
-  args: { config?: PomoConfig } = {},
+  args: { config?: PomoConfig; skipBreak?: boolean } = {},
   env: PomoEnv = defaultEnv,
 ): PomoState => {
   if (state.status !== 'running' || state.startedAt === null) return state;
@@ -114,8 +115,6 @@ export const pomoComplete = (
   if (now - Date.parse(state.startedAt) < state.durationMin * 60_000) return state;
   const config = args.config ?? defaultPomoConfig();
   const nextSessions = state.sessionsCompleted + 1;
-  const isLong = nextSessions % config.longBreakEvery === 0;
-  const breakMin = isLong ? config.longBreakMin : config.shortBreakMin;
   const record: PomoSessionRecord = {
     id: env.uuid(),
     startedAt: state.startedAt,
@@ -125,6 +124,20 @@ export const pomoComplete = (
     completed: true,
     taskId: state.activeTaskId,
   };
+  // Event-task path (Decision 28 + follow-up): single big session, no break.
+  // Caller signals via skipBreak=true. FSM transitions to 'done' (idle-like)
+  // so the START button reappears and no break countdown runs.
+  if (args.skipBreak) {
+    return {
+      ...state,
+      status: 'done',
+      startedAt: null,
+      sessionsCompleted: nextSessions,
+      history: [...state.history, record],
+    };
+  }
+  const isLong = isLongBreakAfter(state.sessionsCompleted, config);
+  const breakMin = isLong ? config.longBreakMin : config.shortBreakMin;
   return {
     ...state,
     status: 'break',
@@ -188,7 +201,7 @@ export const pomoClearActiveTask = (state: PomoState): PomoState => {
   return { ...state, activeTaskId: null, label: '' };
 };
 
-const VALID_FACES: ReadonlyArray<TimerFace> = ['ring', 'ascii', 'lcd', 'blocks', 'vapor'];
+const VALID_FACES: ReadonlyArray<TimerFace> = ['ascii', 'lcd', 'blocks', 'vapor'];
 
 /**
  * PR4 — set the timer face variant on the PomoConfig.

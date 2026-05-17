@@ -6,7 +6,8 @@ import { defaultPomoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
-import type { TaskState } from '../TaskNode/types';
+import type { TaskState, TaskKind } from '../TaskNode/types';
+import { breakdownPomoTime } from '../../../store/pomoSchedule';
 import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
@@ -107,25 +108,55 @@ export function PomoNode({
 
   // Decision 22 §4 + F10 + A.6 — derive plannedSessions from the active task's
   // plannedMin, and also read that task's pomoSessionsCompleted for the per-task counter.
-  const { activeTaskPlannedMin, activeTaskPomoSessionsCompleted } = useBoardStore(
+  // Also expose kind for event-vs-focus rendering decisions.
+  const { activeTaskPlannedMin, activeTaskPomoSessionsCompleted, activeTaskKind } = useBoardStore(
     useShallow((s) => {
       const id = state.activeTaskId;
       if (!id || !s.board) {
-        return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
+        return {
+          activeTaskPlannedMin: null,
+          activeTaskPomoSessionsCompleted: 0,
+          activeTaskKind: 'focus' as TaskKind,
+        };
       }
       const t = s.board.nodes.find((n) => n.id === id);
-      if (!t) return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
+      if (!t) {
+        return {
+          activeTaskPlannedMin: null,
+          activeTaskPomoSessionsCompleted: 0,
+          activeTaskKind: 'focus' as TaskKind,
+        };
+      }
       const ts = t.state as TaskState;
       return {
         activeTaskPlannedMin: ts.plannedMin ?? null,
         activeTaskPomoSessionsCompleted: ts.pomoSessionsCompleted ?? 0,
+        activeTaskKind: (ts.kind ?? 'focus') as TaskKind,
       };
     }),
   );
 
+  const isEventTask = isTaskMode && activeTaskKind === 'event';
+
   const pipCount = isTaskMode && activeTaskPlannedMin
-    ? Math.max(1, Math.ceil(activeTaskPlannedMin / config.sessionMin))
+    ? (isEventTask
+        ? 1
+        : Math.max(1, Math.ceil(activeTaskPlannedMin / config.sessionMin)))
     : config.longBreakEvery;
+
+  // Three-numbers breakdown for the active task (Decision 28 follow-up).
+  // Computed from the current PomoConfig so it tracks gear edits live.
+  // For events: workMin = plannedMin, breakMin = 0.
+  const taskBreakdown = isTaskMode && activeTaskPlannedMin
+    ? (isEventTask
+        ? { workMin: activeTaskPlannedMin, shortMin: 0, longMin: 0, breakMin: 0, effectiveMin: activeTaskPlannedMin }
+        : (() => {
+            const bd = breakdownPomoTime(activeTaskPlannedMin, 0, config);
+            const shortMin = bd.segments.filter((s) => s.kind === 'short').reduce((sum, s) => sum + s.min, 0);
+            const longMin = bd.segments.filter((s) => s.kind === 'long').reduce((sum, s) => sum + s.min, 0);
+            return { workMin: bd.workMin, breakMin: bd.breakMin, effectiveMin: bd.effectiveMin, shortMin, longMin };
+          })())
+    : null;
 
   // A.6 — when in task mode, use the per-task session counter
   const sessionsForDisplay = isTaskMode
@@ -324,11 +355,11 @@ export function PomoNode({
             ['shortBreakMin', 'Short break (min)'],
             ['longBreakMin', 'Long break (min)'],
             ['longBreakEvery', 'Long break every'],
-          ] as Array<[keyof PomoConfig, string]>).map(([key, label]) => (
+          ] as Array<[Exclude<keyof PomoConfig, 'face'>, string]>).map(([key, label]) => (
             <div key={key} className="pomo-settings-row">
               <span className="pomo-settings-label">{label}</span>
               <NumberStepper
-                value={draftConfig[key]}
+                value={draftConfig[key] as number}
                 onChange={updateDraft(key)}
                 min={1}
                 max={key === 'longBreakEvery' ? 12 : 120}
@@ -450,27 +481,56 @@ export function PomoNode({
           <div
             className="pomo-pips"
             data-testid="pomo-pips"
-            style={{ display: 'flex', gap: 8, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: 10 }}
+            style={{ display: 'flex', gap: 4, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: 10 }}
           >
-            {/* A.5 — render at most 8 pips */}
+            {/* Pips + break lines between them (Decision 28 follow-up).
+                Short break = thin green line, long break = wide green line.
+                Walks the breakdown.segments to know which break type follows
+                each session; falls back to plain dots in free-pomo mode. */}
             {Array.from({ length: visiblePipCount }).map((_, i) => {
               const ps = pipState(i, completedDots, state.status);
+              // Find the break that follows this session (if any).
+              // breakdown.segments alternates work/break/work/break/.../work.
+              // Session index i corresponds to segment 2*i; following break is 2*i+1.
+              const followingBreak = taskBreakdown && !isEventTask
+                ? (() => {
+                    const breakdown = breakdownPomoTime(activeTaskPlannedMin ?? 0, 0, config);
+                    return breakdown.segments[2 * i + 1] ?? null;
+                  })()
+                : null;
               return (
-                <span
-                  key={i}
-                  className={`pip ${ps}`}
-                  data-pip-index={i}
-                  data-pip-state={ps}
-                  style={{
-                    width: 9, height: 9, borderRadius: '50%',
-                    border: '1.5px solid',
-                    borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
-                    background: ps === 'done' ? 'var(--rust)' : 'transparent',
-                    boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
-                    position: 'relative',
-                    flexShrink: 0,
-                  }}
-                />
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+                  <span
+                    className={`pip ${ps}`}
+                    data-pip-index={i}
+                    data-pip-state={ps}
+                    style={{
+                      width: 9, height: 9, borderRadius: '50%',
+                      border: '1.5px solid',
+                      borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
+                      background: ps === 'done' ? 'var(--rust)' : 'transparent',
+                      boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
+                      flexShrink: 0,
+                    }}
+                  />
+                  {followingBreak && i < visiblePipCount - 1 && (
+                    <span
+                      data-testid="pomo-pip-break"
+                      data-break-kind={followingBreak.kind}
+                      style={{
+                        display: 'inline-block',
+                        height: 2,
+                        // short = 6px line, long = 18px line
+                        width: followingBreak.kind === 'long' ? 18 : 6,
+                        background: 'var(--acid)',
+                        marginLeft: 4,
+                        marginRight: 4,
+                        borderRadius: 1,
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </div>
               );
             })}
             {/* A.5 — overflow indicator */}
@@ -550,6 +610,48 @@ export function PomoNode({
               {buttonLabel}
             </button>
           </div>
+
+          {/* Three-numbers breakdown — work / break / total — for the active task.
+              Hidden in free-pomo mode (no active task). Updates live as PomoConfig changes. */}
+          {taskBreakdown !== null && (
+            <div
+              data-testid="pomo-breakdown"
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                color: 'var(--ink-3)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginTop: 4,
+                paddingTop: 8,
+                borderTop: '1px dashed var(--paper-3)',
+              }}
+            >
+              <span data-testid="pomo-breakdown-work">
+                <span style={{ color: 'var(--ink-4)' }}>WORK </span>
+                <span style={{ color: 'var(--ink-2)' }}>{taskBreakdown.workMin}m</span>
+              </span>
+              <span data-testid="pomo-breakdown-break" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.3 }}>
+                <span>
+                  <span style={{ color: 'var(--ink-4)' }}>BREAK </span>
+                  <span style={{ color: 'var(--ink-2)' }}>{taskBreakdown.breakMin}m</span>
+                </span>
+                {taskBreakdown.breakMin > 0 && (
+                  <span style={{ fontSize: 8, color: 'var(--ink-4)', letterSpacing: '0.06em' }}>
+                    <span data-testid="pomo-breakdown-short">s{taskBreakdown.shortMin}m</span>
+                    <span style={{ opacity: 0.5, padding: '0 3px' }}>·</span>
+                    <span data-testid="pomo-breakdown-long">l{taskBreakdown.longMin}m</span>
+                  </span>
+                )}
+              </span>
+              <span data-testid="pomo-breakdown-total">
+                <span style={{ color: 'var(--ink-4)' }}>TOTAL </span>
+                <span style={{ color: 'var(--acid)' }}>{taskBreakdown.effectiveMin}m</span>
+              </span>
+            </div>
+          )}
         </div>
       )}
     </MotherFrame>

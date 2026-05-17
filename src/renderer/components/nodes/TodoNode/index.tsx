@@ -9,6 +9,10 @@ import { ContextMenu } from '../../ContextMenu';
 import type { ContextMenuItem } from '../../ContextMenu';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
+import type { PomoConfig } from '../PomoNode/types';
+import { defaultPomoConfig } from '../PomoNode/types';
+import { breakdownPomoTime } from '../../../store/pomoSchedule';
+import { toneVarForTask } from '../../../utils/taskColor';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -54,6 +58,28 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         map.set(n.id, st.plannedMin ?? st.durationMin ?? 25);
       }
       return map;
+    }),
+  );
+
+  // Build a map from taskNodeId → kind for the three-numbers display.
+  const taskKindMap = useBoardStore(
+    useShallow((s): Map<string, 'focus' | 'event'> => {
+      if (!s.board) return new Map();
+      const map = new Map<string, 'focus' | 'event'>();
+      for (const n of s.board.nodes) {
+        if (n.kind !== 'todo.task') continue;
+        const st = n.state as { kind?: 'focus' | 'event' };
+        map.set(n.id, st.kind ?? 'focus');
+      }
+      return map;
+    }),
+  );
+
+  // Read PomoConfig for live breakdown calculations.
+  const pomoConfig = useBoardStore(
+    useShallow((s) => {
+      const pomo = s.board?.nodes.find((n) => n.kind === 'pomo');
+      return (pomo?.config as PomoConfig | null) ?? defaultPomoConfig();
     }),
   );
 
@@ -399,10 +425,31 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                     }}
                   />
                 )}
-                {/* F3: checkbox — dispatches todo.toggle */}
+                {/* Shared per-task color dot — links this todo row to its
+                    Calendar block and Clock arc. Only shown when the item
+                    is bound to an actual task node. */}
+                {item.taskNodeId !== null && (
+                  <span
+                    data-testid={`todo-color-dot-${item.id}`}
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: toneVarForTask(item.taskNodeId),
+                      flexShrink: 0,
+                      opacity: item.done ? 0.4 : 0.95,
+                    }}
+                  />
+                )}
+                {/* F3: checkbox — dispatches todo.toggle.
+                    Uses a theme-locked dark hex for the done bg + acid border
+                    + acid checkmark, so the "checked" state reads as a small
+                    dark chip with a green tick in BOTH light and dark themes.
+                    Previously `background: var(--ink)` flipped to light/cream
+                    in dark mode, producing "green-on-white" mis-contrast. */}
                 <button
                   type="button"
-                  className="todo-check"
+                  className={`todo-check${item.done ? ' todo-check--done' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     onCommand('todo.toggle', { id: item.id });
@@ -411,9 +458,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                     flexShrink: 0,
                     width: 14,
                     height: 14,
-                    border: `1px solid ${item.done ? 'var(--ink)' : 'var(--ink-4)'}`,
+                    border: `1px solid ${item.done ? 'var(--acid)' : 'var(--ink-4)'}`,
                     borderRadius: 3,
-                    background: item.done ? 'var(--ink)' : 'transparent',
+                    background: item.done ? '#0a0908' : 'transparent',
                     cursor: 'pointer',
                     display: 'grid',
                     placeItems: 'center',
@@ -477,6 +524,36 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                     {item.text}
                   </span>
                 )}
+
+                {/* Three-numbers display: work / break / total (mono, right-aligned).
+                    Only shown when item is wired to a task node (has taskNodeId). */}
+                {item.taskNodeId !== null && (() => {
+                  const planned = taskPlannedMin.get(item.taskNodeId) ?? 25;
+                  const kind = taskKindMap.get(item.taskNodeId) ?? 'focus';
+                  const bd = kind === 'event'
+                    ? { workMin: planned, breakMin: 0, effectiveMin: planned }
+                    : breakdownPomoTime(planned, 0, pomoConfig);
+                  return (
+                    <span
+                      data-testid="todo-item-breakdown"
+                      title={`work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m`}
+                      style={{
+                        flexShrink: 0,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 9,
+                        color: 'var(--ink-4)',
+                        letterSpacing: '0.04em',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span style={{ color: 'var(--ink-3)' }}>{bd.workMin}</span>
+                      <span style={{ opacity: 0.5 }}>·</span>
+                      <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
+                      <span style={{ opacity: 0.5 }}>·</span>
+                      <span style={{ color: 'var(--acid)' }}>{bd.effectiveMin}m</span>
+                    </span>
+                  );
+                })()}
 
                 {/* F2: tag pill — 4-char max, mono uppercase */}
                 {item.tag !== undefined && (

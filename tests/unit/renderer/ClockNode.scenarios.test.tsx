@@ -7,7 +7,8 @@
  *   - 60 tick marks (not 12)
  *   - 12 numerals 1–12 always visible
  *   - Task arcs as <path> at R_ARC = 102, strokeWidth 14 (future/past) or 16 (active)
- *   - No break arcs, no viewWindow, no day-selector, no parallel rings
+ *   - Decision 28: multi-session tasks produce sub-arcs (work in task tone, break in var(--ink-3))
+ *   - No viewWindow, no day-selector, no parallel rings
  *   - Now-playing strip below the face
  *   - Task list at the bottom
  *   - Link UI when linkedTodoId === null
@@ -199,7 +200,10 @@ describe('ClockNode renders the analog face', () => {
     }
   });
 
-  it('shows link UI when linkedTodoId is null', () => {
+  // (Removed) "shows link UI when linkedTodoId is null" — the manual
+  // todo-link picker was dropped per user request: the clock auto-pulls
+  // from every todo (and now every scheduled habit) on the board.
+  it.skip('shows link UI when linkedTodoId is null', () => {
     seedBoard([]);
     renderClockNode(makeClockState({ linkedTodoId: null }));
     expect(screen.getByText('Link Todo:')).toBeDefined();
@@ -209,7 +213,12 @@ describe('ClockNode renders the analog face', () => {
 // ── Anchored chain → arcs ────────────────────────────────────────────────────
 
 describe('Anchored chain renders task arcs', () => {
-  it('three-task chain anchored at 02:00 on today produces 3 task arc paths', () => {
+  it('three-task chain anchored at 02:00 on today produces 11 arc paths (Decision 28 sub-arcs)', () => {
+    // Decision 28: multi-session tasks produce sub-arcs (work + break).
+    // 60min = 3 sessions → 3 work + 2 breaks = 5 arcs
+    // 30min = 2 sessions → 2 work + 1 break  = 3 arcs
+    // 45min = 2 sessions → 2 work + 1 break  = 3 arcs
+    // Total = 11 arc paths.
     const todoId = 'todo-1';
     const t1 = makeTaskNode(
       'task-1',
@@ -224,7 +233,7 @@ describe('Anchored chain renders task arcs', () => {
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    expect(getTaskArcPaths()).toHaveLength(3);
+    expect(getTaskArcPaths()).toHaveLength(11);
   });
 
   it('task arcs use strokeWidth 14 (non-active)', () => {

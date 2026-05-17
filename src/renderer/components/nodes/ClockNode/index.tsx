@@ -6,31 +6,16 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import type { TaskState } from '../TaskNode/types';
+import type { PomoBreakdown } from '../../../store/pomoSchedule';
+import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 
 // Kept for backward-compat — timelineSelector.colorTokens.test.ts imports this.
 // The new analog design no longer renders break arcs, but the tokens must still
 // exist in tokens.css (Decision 24.2 contract test).
 export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 
-// Tone palette for the new analog design. Deterministic per taskId.
-const TONE_PALETTE = ['rust', 'spine', 'cyan', 'plum', 'rust-deep', 'amber'] as const;
-type ToneToken = (typeof TONE_PALETTE)[number];
-
-/** Deterministic tone for a task — stable for a given taskId. */
-function colorFor(taskId: string): ToneToken {
-  let h = 0;
-  for (let i = 0; i < taskId.length; i++) h = (h * 31 + taskId.charCodeAt(i)) >>> 0;
-  return TONE_PALETTE[h % TONE_PALETTE.length]!;
-}
-
-const TONE_VAR: Record<ToneToken, string> = {
-  rust:        'var(--rust)',
-  spine:       'var(--spine)',
-  cyan:        'var(--cyan)',
-  plum:        'var(--plum)',
-  'rust-deep': 'var(--rust-deep)',
-  amber:       'var(--amber)',
-};
+// Shared palette across Clock, Calendar, Todo. See src/renderer/utils/taskColor.ts.
+import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -101,13 +86,36 @@ function isoToHourFloat(iso: string): number | null {
 const NUMERALS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
 
 // ── Flattened task type for display ───────────────────────────────────────────
+// Entries can come from two sources: scheduled tasks (from the schedule
+// selector) and habits dropped on the calendar (from habit mothers). Both
+// render as arcs in the clock; habits behave like events (no breakdown).
 interface TaskEntry {
   id: string;
   start: number;   // hour-float, e.g. 9.5 = 9:30 AM
   end: number;
   name: string;
-  tone: ToneToken;
+  /** Resolved CSS color (a `var(--token)` string). Tasks use their tone,
+   *  habits use their habit color. Single source of truth — render code
+   *  reads `colorVar` directly and never re-maps from a tone token. */
+  colorVar: string;
   plannedMin: number;
+  /** Decision 28: null for event tasks AND habits, non-null for focus tasks. */
+  breakdown: PomoBreakdown | null;
+  /** Parallel group id; null if this task is sequential or a habit. */
+  parallelGroupId: string | null;
+  /** 0-based branch index within the parallel group; null if sequential. */
+  parallelBranchIndex: number | null;
+  /** 'task' or 'habit' — for future styling differentiation. */
+  source: 'task' | 'habit';
+}
+
+/** Check if a habit schedule fires on a given ISO day-of-week. */
+function habitOnDow(schedule: HabitSchedule, isoDow: IsoDow): boolean {
+  switch (schedule.kind) {
+    case 'daily': return true;
+    case 'weekly': return schedule.days.includes(isoDow);
+    case 'weekdays': return isoDow >= 1 && isoDow <= 5;
+  }
 }
 
 export function ClockNode({
@@ -116,7 +124,12 @@ export function ClockNode({
   slotIndex = 6,
   slotTotal = MOTHER_TOTAL,
 }: NodeProps<ClockState, ClockConfig>) {
-  const { linkedTodoId } = node.state;
+  // `linkedTodoId` is preserved on state for backward-compat with persisted
+  // boards (and any in-flight FSM logic) but is no longer consulted at render
+  // time. The clock now shows ALL scheduled tasks + ALL scheduled habits for
+  // today — there's effectively one user todo list per board, and the manual
+  // link picker was redundant.
+  const { viewWindow } = node.state;
 
   // PERF (Wave C+): the previous 1-second setInterval re-rendered this
   // entire SVG (60 ticks + 12 numerals + arcs + 3 hands + meridiem + task
@@ -152,13 +165,6 @@ export function ClockNode({
   // Board + selectors
   const board = useBoardStore((s) => s.board);
 
-  const todoNodes = useMemo(() => {
-    if (!board) return [] as Array<{ id: string }>;
-    return board.nodes
-      .filter((n) => n.kind === 'todo')
-      .map((n) => ({ id: n.id }));
-  }, [board?.nodes]);
-
   const placementsMap = useMemo(() => {
     if (!board) return null;
     return selectSchedule(board).placements;
@@ -181,48 +187,123 @@ export function ClockNode({
     return m;
   }, [board?.nodes]);
 
-  // Flatten placements to TaskEntry[].
+  // Scheduled habits — same source the WeekView consumes (ADR 0002 §6).
+  // A habit is "scheduled" once the user drops it on the calendar; the drop
+  // writes `schedule: { kind, timeOfDay, durationMin }` onto the habit record.
+  // The clock visualizes these the same way it visualizes event tasks:
+  // single arc, no break overlays, habit color.
+  const scheduledHabits = useMemo(() => {
+    const out: Array<{ id: string; name: string; color: string; schedule: HabitSchedule }> = [];
+    if (!board) return out;
+    for (const n of board.nodes) {
+      if (n.kind !== 'habit') continue;
+      const hs = n.state as { habits?: Habit[] } | null;
+      if (!hs?.habits) continue;
+      for (const h of hs.habits) {
+        if (h.archived || !h.schedule) continue;
+        out.push({ id: h.id, name: h.name, color: h.color ?? 'acid', schedule: h.schedule });
+      }
+    }
+    return out;
+  }, [board?.nodes]);
+
+  // Today's ISO day-of-week (1=Mon..7=Sun) — for habit schedule matching.
+  const todayIsoDow: IsoDow = (() => {
+    const jsDay = now.getDay(); // 0=Sun..6=Sat
+    return (jsDay === 0 ? 7 : jsDay) as IsoDow;
+  })();
+
+  // Flatten placements + scheduled habits → TaskEntry[].
+  // Filter by selected 12-hour viewWindow.
   const tasks: TaskEntry[] = useMemo(() => {
-    if (!placementsMap || !linkedTodoId) return [];
+    if (!placementsMap) return [];
     const today = todayLocalYMD();
+    const winLo = viewWindow === 1 ? 12 : 0;
+    const winHi = viewWindow === 1 ? 24 : 12;
     const out: TaskEntry[] = [];
+
+    // 1) Scheduled tasks from the selector.
     for (const p of placementsMap.values()) {
       const info = taskInfo.get(p.taskId);
       if (!info) continue;
-      if (info.parentTodoId !== linkedTodoId) continue;
       const startDate = p.startISO.slice(0, 10);
       if (startDate !== today) continue;
       const startH = isoToHourFloat(p.startISO);
       if (startH === null) continue;
       const endH = isoToHourFloat(p.endISO) ?? startH + info.plannedMin / 60;
       if (endH <= startH) continue;
+      if (endH <= winLo || startH >= winHi) continue;
       out.push({
         id: p.taskId,
-        start: startH,
-        end: endH,
+        start: Math.max(startH, winLo),
+        end: Math.min(endH, winHi),
         name: info.text,
-        tone: colorFor(p.taskId),
+        colorVar: TONE_VAR[colorFor(p.taskId)],
         plannedMin: info.plannedMin,
+        breakdown: p.breakdown,
+        parallelGroupId: p.parallelGroupId,
+        parallelBranchIndex: p.parallelBranchIndex,
+        source: 'task',
       });
     }
+
+    // 2) Scheduled habits that fire today.
+    for (const h of scheduledHabits) {
+      if (!habitOnDow(h.schedule, todayIsoDow)) continue;
+      const [hhStr, mmStr] = h.schedule.timeOfDay.split(':');
+      const hh = Number.parseInt(hhStr ?? '0', 10);
+      const mm = Number.parseInt(mmStr ?? '0', 10);
+      if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
+      const durMin = h.schedule.durationMin && h.schedule.durationMin > 0 ? h.schedule.durationMin : 30;
+      const startH = hh + mm / 60;
+      const endH = startH + durMin / 60;
+      if (endH <= winLo || startH >= winHi) continue;
+      out.push({
+        id: `habit-${h.id}`,
+        start: Math.max(startH, winLo),
+        end: Math.min(endH, winHi),
+        name: h.name,
+        colorVar: `var(--${h.color})`,
+        plannedMin: durMin,
+        breakdown: null, // habits = single block (event-like)
+        parallelGroupId: null,
+        parallelBranchIndex: null,
+        source: 'habit',
+      });
+    }
+
     // Sort by start time
     out.sort((a, b) => a.start - b.start);
     return out;
-  }, [placementsMap, linkedTodoId, taskInfo]);
+  }, [placementsMap, taskInfo, viewWindow, scheduledHabits, todayIsoDow]);
 
   const activeIdx = tasks.findIndex((t) => nowFloat >= t.start && nowFloat < t.end);
+
+  // Hoisted track-geometry constants — also consumed by the now-pointer
+  // so it spans exactly from the innermost ring inner-edge to the outermost
+  // ring outer-edge (no spill under the clock, no overshoot past max ring).
+  const TRACK_STROKE = 7;
+  const TRACK_LANE_GAP = 2;
+  const trackBaseR = R_TICK_OUT + 8; // center radius of lane 0
+  const trackTotalLanes = (() => {
+    // Re-run the same overlap lane assignment used inside the SVG IIFE
+    // to know how many concentric tracks exist.
+    const sorted = [...tasks].sort((a, b) => a.start - b.start);
+    const ends: number[] = [];
+    for (const t of sorted) {
+      const lane = ends.findIndex((end) => end <= t.start);
+      if (lane === -1) ends.push(t.end);
+      else ends[lane] = t.end;
+    }
+    return Math.max(1, ends.length);
+  })();
+  const trackInnerEdge = trackBaseR - TRACK_STROKE / 2;
+  const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
 
   const activeProgress = activeIdx >= 0
     ? (nowFloat - tasks[activeIdx]!.start) / (tasks[activeIdx]!.end - tasks[activeIdx]!.start)
     : 0;
-  const activeColor = activeIdx >= 0 ? TONE_VAR[tasks[activeIdx]!.tone] : 'var(--ink-3)';
-
-  // Styles
-  const labelStyle: React.CSSProperties = {
-    fontSize: 11,
-    color: 'var(--ink-2)',
-    fontFamily: 'var(--font-mono)',
-  };
+  const activeColor = activeIdx >= 0 ? tasks[activeIdx]!.colorVar : 'var(--ink-3)';
 
   return (
     <MotherFrame
@@ -262,111 +343,222 @@ export function ClockNode({
           <span style={{ color: 'var(--ink-4)' }}>CLK.12H</span>
         </div>
 
-        {/* Link UI */}
-        {linkedTodoId === null ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={labelStyle}>Link Todo:</span>
-            <select
-              style={{
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                background: 'var(--paper-2)',
-                border: '1px solid var(--paper-3)',
-                borderRadius: 4,
-                color: 'var(--ink)',
-                padding: '2px 6px',
-                cursor: 'pointer',
-              }}
-              defaultValue=""
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val) onCommand('clock.linkTodo', { todoNodeId: val });
-              }}
-            >
-              <option value="" disabled>
-                — pick a todo —
-              </option>
-              {todoNodes.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.id.slice(-8)}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={labelStyle}>Todo:</span>
-            <span
-              style={{
-                fontSize: 11,
-                color: 'var(--ink)',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              {linkedTodoId.slice(-8)}
-            </span>
-            <button
-              type="button"
-              style={{
-                fontSize: 11,
-                color: 'var(--ink-2)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0 2px',
-                lineHeight: 1,
-              }}
-              title="Unlink todo"
-              onClick={() => onCommand('clock.linkTodo', { todoNodeId: null })}
-            >
-              ×
-            </button>
-          </div>
-        )}
+        {/* (Removed) "Link Todo" picker — the clock now pulls from all todos
+            and habits automatically; the manual link was redundant. */}
 
-        {/* Clock face */}
-        <div style={{ position: 'relative', width: 244, height: 244, margin: '0 auto' }}>
+        {/* 12-hour window toggle bar — prominent, above the clock face.
+            Shows which half-day the arcs reflect and lets users swap. */}
+        <div
+          data-testid="clock-window-bar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '4px 0 2px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            userSelect: 'none',
+          }}
+        >
+          <button
+            type="button"
+            data-testid="clock-window-am"
+            onClick={() => onCommand('clock.setViewWindow', { window: 0 })}
+            style={{
+              padding: '3px 10px',
+              background: viewWindow === 0 ? 'var(--rust)' : 'transparent',
+              color: viewWindow === 0 ? 'var(--paper)' : 'var(--ink-3)',
+              border: `1px solid ${viewWindow === 0 ? 'var(--rust)' : 'var(--paper-3)'}`,
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              letterSpacing: 'inherit',
+              fontWeight: viewWindow === 0 ? 700 : 400,
+            }}
+          >
+            AM · 0–12
+          </button>
+          <button
+            type="button"
+            data-testid="clock-window-swap"
+            onClick={() => onCommand('clock.setViewWindow', { window: viewWindow === 0 ? 1 : 0 })}
+            title="Show next 12 hours"
+            style={{
+              padding: '3px 8px',
+              background: 'transparent',
+              color: 'var(--ink-2)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 12,
+              lineHeight: 1,
+            }}
+          >
+            ⇆
+          </button>
+          <button
+            type="button"
+            data-testid="clock-window-pm"
+            onClick={() => onCommand('clock.setViewWindow', { window: 1 })}
+            style={{
+              padding: '3px 10px',
+              background: viewWindow === 1 ? 'var(--rust)' : 'transparent',
+              color: viewWindow === 1 ? 'var(--paper)' : 'var(--ink-3)',
+              border: `1px solid ${viewWindow === 1 ? 'var(--rust)' : 'var(--paper-3)'}`,
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              letterSpacing: 'inherit',
+              fontWeight: viewWindow === 1 ? 700 : 400,
+            }}
+          >
+            PM · 12–24
+          </button>
+        </div>
+
+        {/* Clock face — container wider than SVG viewBox so outward-growing
+            train tracks don't clip on the parent div edge. */}
+        <div style={{ position: 'relative', width: 244, height: 244, margin: '0 auto', overflow: 'visible' }}>
           <svg
             viewBox="0 0 240 240"
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
           >
-            {/* Outer arc track */}
-            <circle
-              cx={CX} cy={CY} r={R_ARC}
-              fill="none"
-              stroke="var(--paper-3)"
-              strokeWidth={14}
-              opacity={0.7}
-            />
-
-            {/* Task arcs */}
-            {tasks.map((t, i) => {
-              const ended  = nowFloat >= t.end;
-              const active = i === activeIdx;
-              const opacity = ended ? 0.35 : active ? 1 : 0.92;
-              const sw = active ? 16 : 14;
-              const style: React.CSSProperties = active
-                ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: TONE_VAR[t.tone] }
-                : {};
-              return (
-                <path
-                  key={t.id}
-                  d={arcPath(t.start, t.end, R_ARC)}
-                  fill="none"
-                  stroke={TONE_VAR[t.tone]}
-                  strokeWidth={sw}
-                  strokeLinecap="round"
-                  opacity={opacity}
-                  style={style}
-                />
-              );
-            })}
-
-            {/* Now notch */}
+            {/* Train-track concentric lanes.
+                One gray "track" circle per overlapping-task lane.
+                Tasks ride their assigned lane's track.
+                Stroke width auto-shrinks as lanes are added so all rings
+                fit within the outer band without crossing the numerals. */}
             {(() => {
-              const p    = pt(nowFloat, R_ARC);
-              const pIn  = pt(nowFloat, R_ARC - 11);
-              const pOut = pt(nowFloat, R_ARC + 11);
+              // ── Lane assignment (interval-graph coloring on time overlap) ──
+              const sortedByStart = [...tasks].sort((a, b) => a.start - b.start);
+              const laneEnds: number[] = [];
+              const laneByTaskId = new Map<string, number>();
+              for (const t of sortedByStart) {
+                let lane = laneEnds.findIndex((end) => end <= t.start);
+                if (lane === -1) {
+                  lane = laneEnds.length;
+                  laneEnds.push(t.end);
+                } else {
+                  laneEnds[lane] = t.end;
+                }
+                laneByTaskId.set(t.id, lane);
+              }
+              const totalLanes = Math.max(1, laneEnds.length);
+
+              // ── Geometry: tracks grow OUTWARD from the clock edge ──
+              // Lane 0 = innermost, sits just outside the clock face.
+              // Each new lane stacks further outward (larger radius).
+              // Thin uniform stroke — no shrinking; the clock has free space
+              // around it for many tracks before overflowing the node bounds.
+              // Track geometry comes from the hoisted constants so the
+              // now-pointer (rendered after this IIFE) can use the same span.
+              const STROKE = TRACK_STROKE;
+              const LANE_GAP = TRACK_LANE_GAP;
+              const radiusForLane = (lane: number): number =>
+                trackBaseR + lane * (STROKE + LANE_GAP);
+              const radiusFor = (t: TaskEntry): number =>
+                radiusForLane(laneByTaskId.get(t.id) ?? 0);
+              const stroke = STROKE;
+
+              // ── Gray train tracks, one per lane in use ──
+              const tracks: React.ReactElement[] = [];
+              for (let lane = 0; lane < totalLanes; lane++) {
+                tracks.push(
+                  <circle
+                    key={`track-${lane}`}
+                    cx={CX} cy={CY} r={radiusForLane(lane)}
+                    fill="none"
+                    stroke="var(--paper-3)"
+                    strokeWidth={stroke}
+                    opacity={0.55}
+                  />,
+                );
+              }
+
+              // ── Task arcs riding their lane's track ──
+              const arcs = tasks.flatMap((t, i) => {
+                const ended = nowFloat >= t.end;
+                const active = i === activeIdx;
+                const opacity = ended ? 0.4 : 1;
+                const sw = stroke;
+                const r = radiusFor(t);
+                const activeStyle: React.CSSProperties = active
+                  ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: t.colorVar }
+                  : {};
+                const breakdown = t.breakdown;
+
+                // Single-stroke ring — same visual language as calendar.
+                // Calendar uses task-tone background + tone-color border;
+                // we render the analog equivalent as one solid arc in tone.
+                const baseArc = (
+                  key: string,
+                  s: number,
+                  e: number,
+                  cap: 'round' | 'butt',
+                ): React.ReactElement => (
+                  <path
+                    key={`${key}-base`}
+                    d={arcPath(s, e, r)}
+                    fill="none"
+                    stroke={t.colorVar}
+                    strokeWidth={sw}
+                    strokeLinecap={cap}
+                    opacity={opacity}
+                    style={activeStyle}
+                  />
+                );
+
+                if (breakdown === null || breakdown.segments.length <= 1) {
+                  return [baseArc(t.id, t.start, t.end, 'round')];
+                }
+
+                const out: React.ReactElement[] = [];
+                out.push(baseArc(t.id, t.start, t.end, 'round'));
+
+                // Break overlays — track-color stroke cuts through the task
+                // arc cleanly (matches the calendar's dashed-border + stripe
+                // language — neutral panel break in the timeline).
+                let segCursor = t.start;
+                for (let sIdx = 0; sIdx < breakdown.segments.length; sIdx++) {
+                  const seg = breakdown.segments[sIdx]!;
+                  const segEnd = Math.min(segCursor + seg.min / 60, t.end);
+                  if (seg.kind !== 'work' && segEnd > segCursor) {
+                    out.push(
+                      <path
+                        key={`${t.id}-seg-${sIdx}`}
+                        data-testid="clock-task-break-arc"
+                        data-break-kind={seg.kind}
+                        d={arcPath(segCursor, segEnd, r)}
+                        fill="none"
+                        stroke="var(--paper-3)"
+                        strokeWidth={sw}
+                        strokeLinecap="butt"
+                        opacity={opacity}
+                      />,
+                    );
+                  }
+                  segCursor = segEnd;
+                }
+                return out;
+              });
+
+              return [...tracks, ...arcs];
+            })()}
+
+            {/* Now-pointer — spans exactly the train-track band.
+                Inner end = innermost ring inner-edge.
+                Outer end = outermost ring outer-edge.
+                With 1 ring: line is exactly the width of that single ring. */}
+            {(() => {
+              const pIn  = pt(nowFloat, trackInnerEdge);
+              const pOut = pt(nowFloat, trackOuterEdge);
+              const pDot = pt(nowFloat, trackBaseR);
               return (
                 <>
                   <line
@@ -374,9 +566,9 @@ export function ClockNode({
                     x2={pOut.x} y2={pOut.y}
                     stroke="var(--rust)"
                     strokeWidth={1.5}
-                    opacity={0.85}
+                    opacity={0.9}
                   />
-                  <circle cx={p.x} cy={p.y} r={3} fill="var(--rust)" />
+                  <circle cx={pDot.x} cy={pDot.y} r={3} fill="var(--rust)" />
                 </>
               );
             })()}
@@ -478,6 +670,8 @@ export function ClockNode({
               the 12 numeral. Previous `top:70 + fontSize:9` collided with
               the "11" numeral (which sits at SVG y≈68). Bumped down to 92
               and shrunk to 7.5px so it sits clear of all face numerals. */}
+          {/* Current wall-clock time label (HH:MM, mono). The AM/PM swap UI
+              lives in the dedicated bar above the clock face. */}
           <div
             style={{
               position: 'absolute',
@@ -485,7 +679,7 @@ export function ClockNode({
               left: '50%',
               transform: 'translateX(-50%)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 7.5,
+              fontSize: 8,
               letterSpacing: '0.16em',
               color: 'var(--ink-4)',
               textTransform: 'uppercase',
@@ -493,9 +687,6 @@ export function ClockNode({
               whiteSpace: 'nowrap',
             }}
           >
-            <span style={{ color: 'var(--rust)', marginRight: 3, fontWeight: 700 }}>
-              {hours >= 12 ? 'PM' : 'AM'}
-            </span>
             {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
           </div>
         </div>
@@ -629,7 +820,7 @@ export function ClockNode({
                     width: 4,
                     height: 16,
                     borderRadius: 1,
-                    background: TONE_VAR[t.tone],
+                    background: t.colorVar,
                     display: 'inline-block',
                     alignSelf: 'center',
                   }}
