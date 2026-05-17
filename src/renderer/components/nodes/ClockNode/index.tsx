@@ -127,9 +127,13 @@ export function ClockNode({
   // `linkedTodoId` is preserved on state for backward-compat with persisted
   // boards (and any in-flight FSM logic) but is no longer consulted at render
   // time. The clock now shows ALL scheduled tasks + ALL scheduled habits for
-  // today — there's effectively one user todo list per board, and the manual
-  // link picker was redundant.
-  const { viewWindow } = node.state;
+  // the selected day — there's effectively one user todo list per board, and
+  // the manual link picker was redundant.
+  //
+  // ADR 0004 §3 — `selectedDate` (YYYY-MM-DD, local) drives task/habit
+  // filtering. Defaults to today; the day-selector UI below lets the user
+  // page through other days without touching the wall-clock hands.
+  const { viewWindow, selectedDate } = node.state;
 
   // PERF (Wave C+): the previous 1-second setInterval re-rendered this
   // entire SVG (60 ticks + 12 numerals + arcs + 3 hands + meridiem + task
@@ -207,17 +211,36 @@ export function ClockNode({
     return out;
   }, [board?.nodes]);
 
-  // Today's ISO day-of-week (1=Mon..7=Sun) — for habit schedule matching.
-  const todayIsoDow: IsoDow = (() => {
-    const jsDay = now.getDay(); // 0=Sun..6=Sat
+  // Today (real wall-clock day) — used to decide whether `now`-derived UI
+  // (now-pointer, active task, now-playing strip) is meaningful for the
+  // currently selected day.
+  const today = todayLocalYMD();
+  const isToday = selectedDate === today;
+
+  // Parse the selected date once. Used both for the ISO DoW (habit matching)
+  // and for the day-selector header label.
+  const selectedDateObj = useMemo(() => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(selectedDate);
+    if (!m) return new Date();
+    return new Date(
+      Number.parseInt(m[1]!, 10),
+      Number.parseInt(m[2]!, 10) - 1,
+      Number.parseInt(m[3]!, 10),
+    );
+  }, [selectedDate]);
+
+  // Selected day's ISO day-of-week (1=Mon..7=Sun) — habits fire based on the
+  // selected day, not "today", so the user sees a habit on Sunday when
+  // viewing a Sunday in the future.
+  const selectedIsoDow: IsoDow = (() => {
+    const jsDay = selectedDateObj.getDay(); // 0=Sun..6=Sat
     return (jsDay === 0 ? 7 : jsDay) as IsoDow;
   })();
 
   // Flatten placements + scheduled habits → TaskEntry[].
-  // Filter by selected 12-hour viewWindow.
+  // Filter by selected day and 12-hour viewWindow.
   const tasks: TaskEntry[] = useMemo(() => {
     if (!placementsMap) return [];
-    const today = todayLocalYMD();
     const winLo = viewWindow === 1 ? 12 : 0;
     const winHi = viewWindow === 1 ? 24 : 12;
     const out: TaskEntry[] = [];
@@ -227,7 +250,7 @@ export function ClockNode({
       const info = taskInfo.get(p.taskId);
       if (!info) continue;
       const startDate = p.startISO.slice(0, 10);
-      if (startDate !== today) continue;
+      if (startDate !== selectedDate) continue;
       const startH = isoToHourFloat(p.startISO);
       if (startH === null) continue;
       const endH = isoToHourFloat(p.endISO) ?? startH + info.plannedMin / 60;
@@ -247,9 +270,9 @@ export function ClockNode({
       });
     }
 
-    // 2) Scheduled habits that fire today.
+    // 2) Scheduled habits that fire on the selected day.
     for (const h of scheduledHabits) {
-      if (!habitOnDow(h.schedule, todayIsoDow)) continue;
+      if (!habitOnDow(h.schedule, selectedIsoDow)) continue;
       const [hhStr, mmStr] = h.schedule.timeOfDay.split(':');
       const hh = Number.parseInt(hhStr ?? '0', 10);
       const mm = Number.parseInt(mmStr ?? '0', 10);
@@ -275,9 +298,14 @@ export function ClockNode({
     // Sort by start time
     out.sort((a, b) => a.start - b.start);
     return out;
-  }, [placementsMap, taskInfo, viewWindow, scheduledHabits, todayIsoDow]);
+  }, [placementsMap, taskInfo, viewWindow, scheduledHabits, selectedIsoDow, selectedDate]);
 
-  const activeIdx = tasks.findIndex((t) => nowFloat >= t.start && nowFloat < t.end);
+  // Active-task / now-pointer concepts only apply when the user is viewing
+  // today. On any other day, `now` has no meaning relative to the day being
+  // shown — silently lighting up a task as "active" would be a lie.
+  const activeIdx = isToday
+    ? tasks.findIndex((t) => nowFloat >= t.start && nowFloat < t.end)
+    : -1;
 
   // Hoisted track-geometry constants — also consumed by the now-pointer
   // so it spans exactly from the innermost ring inner-edge to the outermost
@@ -337,14 +365,162 @@ export function ClockNode({
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-2)' }}>
-            <span style={{ color: 'var(--cyan)', fontSize: 9 }}>◉</span>
-            Today · Schedule
+            <span style={{ color: isToday ? 'var(--cyan)' : 'var(--ink-4)', fontSize: 9 }}>◉</span>
+            {isToday ? 'Today · Schedule' : 'Day · Schedule'}
           </span>
           <span style={{ color: 'var(--ink-4)' }}>CLK.12H</span>
         </div>
 
-        {/* (Removed) "Link Todo" picker — the clock now pulls from all todos
-            and habits automatically; the manual link was redundant. */}
+        {/* Day selector — ADR 0004 §3.3. Lets the user page through days
+            (← / →), jump to any date via native picker (covers month/year),
+            and snap back to today. Disabled when already on today. */}
+        <div
+          data-testid="clock-day-bar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '2px 0',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            letterSpacing: '0.04em',
+            userSelect: 'none',
+          }}
+        >
+          <button
+            type="button"
+            data-testid="clock-day-prev"
+            onClick={() => onCommand('clock.advanceDay', { delta: -1 })}
+            title="Previous day"
+            style={{
+              padding: '3px 8px',
+              background: 'transparent',
+              color: 'var(--ink-2)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 12,
+              lineHeight: 1,
+            }}
+          >
+            ←
+          </button>
+          <label
+            style={{
+              position: 'relative',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '3px 8px',
+              background: isToday ? 'transparent' : 'var(--paper-2)',
+              color: 'var(--ink-2)',
+              border: `1px solid ${isToday ? 'var(--paper-3)' : 'var(--rust)'}`,
+              borderRadius: 4,
+              fontFamily: 'inherit',
+              fontSize: 10,
+              letterSpacing: '0.04em',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+            title="Pick a date"
+          >
+            <span data-testid="clock-day-label">
+              {selectedDateObj.toLocaleDateString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              })}
+            </span>
+            <input
+              type="date"
+              data-testid="clock-day-input"
+              value={selectedDate}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v) onCommand('clock.setSelectedDate', { date: v });
+              }}
+              style={{
+                position: 'absolute',
+                width: 1,
+                height: 1,
+                opacity: 0,
+                pointerEvents: 'none',
+                border: 0,
+                padding: 0,
+                margin: 0,
+              }}
+              tabIndex={-1}
+            />
+            <span
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const root = (e.currentTarget.parentElement as HTMLElement | null);
+                const input = root?.querySelector<HTMLInputElement>('input[type="date"]') ?? null;
+                if (input) {
+                  // Modern browsers expose showPicker(); fall back to focus+click.
+                  const sp = (input as unknown as { showPicker?: () => void }).showPicker;
+                  if (typeof sp === 'function') sp.call(input);
+                  else {
+                    input.focus();
+                    input.click();
+                  }
+                }
+              }}
+              style={{
+                color: 'var(--ink-3)',
+                fontSize: 11,
+                lineHeight: 1,
+              }}
+              title="Pick a different month or year"
+            >
+              ▾
+            </span>
+          </label>
+          <button
+            type="button"
+            data-testid="clock-day-today"
+            onClick={() => onCommand('clock.goToday', {})}
+            disabled={isToday}
+            title="Jump back to today"
+            style={{
+              padding: '3px 8px',
+              background: isToday ? 'transparent' : 'var(--rust)',
+              color: isToday ? 'var(--ink-4)' : 'var(--paper)',
+              border: `1px solid ${isToday ? 'var(--paper-3)' : 'var(--rust)'}`,
+              borderRadius: 4,
+              cursor: isToday ? 'default' : 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 9,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              opacity: isToday ? 0.6 : 1,
+            }}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            data-testid="clock-day-next"
+            onClick={() => onCommand('clock.advanceDay', { delta: 1 })}
+            title="Next day"
+            style={{
+              padding: '3px 8px',
+              background: 'transparent',
+              color: 'var(--ink-2)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 12,
+              lineHeight: 1,
+            }}
+          >
+            →
+          </button>
+        </div>
 
         {/* 12-hour window toggle bar — prominent, above the clock face.
             Shows which half-day the arcs reflect and lets users swap. */}
@@ -483,7 +659,9 @@ export function ClockNode({
 
               // ── Task arcs riding their lane's track ──
               const arcs = tasks.flatMap((t, i) => {
-                const ended = nowFloat >= t.end;
+                // `ended` (faded arc) only makes sense for today — a 9am task
+                // on tomorrow is not "ended" at 3pm today.
+                const ended = isToday && nowFloat >= t.end;
                 const active = i === activeIdx;
                 const opacity = ended ? 0.4 : 1;
                 const sw = stroke;
@@ -552,10 +730,9 @@ export function ClockNode({
             })()}
 
             {/* Now-pointer — spans exactly the train-track band.
-                Inner end = innermost ring inner-edge.
-                Outer end = outermost ring outer-edge.
-                With 1 ring: line is exactly the width of that single ring. */}
-            {(() => {
+                Only rendered when viewing today; on any other day `now`
+                has no meaningful position relative to the day's arcs. */}
+            {isToday && (() => {
               const pIn  = pt(nowFloat, trackInnerEdge);
               const pOut = pt(nowFloat, trackOuterEdge);
               const pDot = pt(nowFloat, trackBaseR);
@@ -782,7 +959,13 @@ export function ClockNode({
                   fontSize: 10.5,
                 }}
               >
-                free · {fmtTime(nowFloat)}
+                {isToday
+                  ? `free · ${fmtTime(nowFloat)}`
+                  : `viewing ${selectedDateObj.toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      month: 'short',
+                      day: 'numeric',
+                    })}`}
               </span>
             </>
           )}
@@ -799,7 +982,7 @@ export function ClockNode({
           }}
         >
           {tasks.map((t, i) => {
-            const ended = nowFloat >= t.end;
+            const ended = isToday && nowFloat >= t.end;
             const on    = i === activeIdx;
             return (
               <div
