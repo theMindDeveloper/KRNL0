@@ -748,6 +748,25 @@ export function ClockNode({
               );
             })}
 
+            {/* Digital HH:MM readout — drawn here (between numerals and
+                hands) so SVG paint order places it BEHIND the hour /
+                minute / second hands. Previously rendered as an HTML
+                overlay sibling of the SVG, which floated above
+                everything and crossed the minute hand. */}
+            <text
+              x={CX}
+              y={CY - 28}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontFamily="var(--font-mono)"
+              fontSize={8}
+              letterSpacing="1.4"
+              fill="var(--ink-4)"
+              style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
+            >
+              {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
+            </text>
+
             {/* Hour hand */}
             <g transform={`rotate(${hourAng - 90} ${CX} ${CY})`}>
               <line
@@ -794,29 +813,8 @@ export function ClockNode({
             <circle cx={CX} cy={CY} r={1.6} fill="var(--acid)" />
           </svg>
 
-          {/* Meridiem readout — positioned inside the inner face just below
-              the 12 numeral. Previous `top:70 + fontSize:9` collided with
-              the "11" numeral (which sits at SVG y≈68). Bumped down to 92
-              and shrunk to 7.5px so it sits clear of all face numerals. */}
-          {/* Current wall-clock time label (HH:MM, mono). The AM/PM swap UI
-              lives in the dedicated bar above the clock face. */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 92,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 8,
-              letterSpacing: '0.16em',
-              color: 'var(--ink-4)',
-              textTransform: 'uppercase',
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
-          </div>
+          {/* HH:MM digital readout moved into the SVG (above) so it
+              paints behind the hour/minute/second hands. */}
         </div>
 
         {/* Now-playing strip */}
