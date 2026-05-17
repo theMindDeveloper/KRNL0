@@ -411,7 +411,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
-  const { screenToFlowPosition, getNodes, fitView } = useReactFlow();
+  const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport } = useReactFlow();
 
   // Dock-frame variant (classic | synthesizer | telemetry | phosphor).
   // Hook applies `data-dock` to <html> and persists in localStorage.
@@ -452,6 +452,47 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // Mouse-wheel = zoom (canvas-app convention). The trackpad-first config
+  // below uses `panOnScroll`, which makes RF treat every wheel event as a
+  // pan gesture — that's right for two-finger trackpad scroll, wrong for a
+  // notched mouse wheel where users expect zoom. We intercept in the capture
+  // phase, detect mouse-wheel events heuristically, and apply a cursor-anchored
+  // zoom directly through RF's viewport API. Trackpad events fall through
+  // untouched and keep panning. Pinch (ctrlKey synthesised by the OS) is also
+  // left for RF's `zoomOnPinch` to handle.
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return; // pinch-zoom or explicit modifier — let RF handle
+      // Mouse-wheel heuristic: large integer deltaY, no horizontal component,
+      // or non-pixel deltaMode (lines/pages). Trackpads emit small fractional
+      // values, often with a deltaX component during inertia.
+      const isMouseWheel =
+        e.deltaMode !== 0 ||
+        (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50);
+      if (!isMouseWheel) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const vp = getViewport();
+      const rect = el.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      // Exponential zoom feels right across delta magnitudes; 0.0015 per delta
+      // unit gives ~17% per notch on a typical 120-unit wheel tick.
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      const nextZoom = Math.min(4, Math.max(0.25, vp.zoom * factor));
+      if (nextZoom === vp.zoom) return;
+      const k = nextZoom / vp.zoom;
+      const nextX = cx - (cx - vp.x) * k;
+      const nextY = cy - (cy - vp.y) * k;
+      setRfViewport({ x: nextX, y: nextY, zoom: nextZoom });
+    };
+    // Capture + non-passive so we beat RF's listener and can preventDefault.
+    el.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    return () => el.removeEventListener('wheel', onWheel, { capture: true });
+  }, [getViewport, setRfViewport]);
 
   // ── Fit-view on first launch (Architect Amendment B) ──────────────────────
   // When the persisted viewport equals the legacy seed sentinel {0, 220, 1},
