@@ -432,7 +432,7 @@ export function ClockNode({
               // Thin uniform stroke — no shrinking; the clock has free space
               // around it for many tracks before overflowing the node bounds.
               const STROKE = 5;           // thin train track
-              const CLOCK_GAP = 1;        // hair gap between clock edge and innermost track
+              const CLOCK_GAP = -3;       // innermost track straddles the clock outer edge
               const LANE_GAP = 2;         // gap between adjacent tracks
               const radiusForLane = (lane: number): number =>
                 R_ARC + CLOCK_GAP + STROKE / 2 + lane * (STROKE + LANE_GAP);
