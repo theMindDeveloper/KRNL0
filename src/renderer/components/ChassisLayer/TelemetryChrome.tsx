@@ -34,15 +34,22 @@ function fmtMinSec(ms: number): string {
   return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
 }
 
-function severityToHeight(sev: EventSeverity, idx: number): number {
-  // Base height 16, with severity-driven spikes for "signal" feel.
-  const base = 16 + Math.sin(idx * 0.7) * 0.9;
-  const spike =
-    sev === 'err' ? -10 :
-    sev === 'warn' ? -5 :
-    sev === 'info' ? 2 :
-    0;
-  return base + spike;
+// Map an event slot to a y-coordinate in the [0, 32] viewBox.
+// Lower y = higher spike on screen. Filled slots produce a hash-derived
+// height inside a severity-keyed band so the line visibly undulates as
+// events stream in (the previous ±0.9 sine variation made the waveform
+// look frozen unless an err/warn arrived).
+function entryToHeight(entry: { ts: number; severity: EventSeverity } | null): number {
+  if (!entry) return 28; // no entry yet → flat baseline near the bottom
+  // Knuth-style integer hash on the timestamp → deterministic per-entry
+  // variance in [0, 1), so each event gets a distinct spike height.
+  const variance = ((entry.ts >>> 0) * 2654435761 >>> 0) / 0xffffffff;
+  const ceiling =
+    entry.severity === 'err'  ? 4  :
+    entry.severity === 'warn' ? 8  :
+    entry.severity === 'info' ? 12 :
+    18; // 'ok'
+  return ceiling + variance * 8;
 }
 
 export function TelemetryChrome() {
@@ -62,14 +69,19 @@ export function TelemetryChrome() {
   const ss = pad(now.getSeconds());
 
   // ── Cell 02 — signal waveform from the most recent 80 event entries ───
+  // The tail is right-aligned: most recent event sits at the right edge of
+  // the SVG so new activity visibly pushes spikes onto the right side as
+  // they arrive.
   const wave = useMemo(() => {
     const N = 80;
     const tail = entries.slice(-N);
+    const filled = N - tail.length;
     const pts: string[] = [];
     for (let i = 0; i < N; i++) {
-      const e = tail[i] ?? null;
-      const sev: EventSeverity = e?.severity ?? 'ok';
-      const y = severityToHeight(sev, i);
+      // i < filled  → empty slot (left of the first real entry)
+      // i >= filled → tail[i - filled] is the entry for this slot
+      const e = i < filled ? null : tail[i - filled] ?? null;
+      const y = entryToHeight(e);
       const t = i / (N - 1);
       pts.push(`${t * 100},${y}`);
     }

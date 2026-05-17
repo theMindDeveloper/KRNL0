@@ -769,7 +769,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         return;
       }
     }
-    const pos = args.at ?? defaultDockSpawnPos();
+    // Analytics default spawn — sits to the right of the dock at the
+    // same top edge as the mother row, reading as a sister panel.
+    // (mother-term is the rightmost mother at x=1400, width 540 → right
+    // edge 1940; analytics goes 20px past that.) `args.at` still wins
+    // for explicit right-click spawns.
+    const analyticsDefaultPos = { x: 1960, y: 0 };
+    const pos = args.at ?? (args.kind === 'analytics' ? analyticsDefaultPos : defaultDockSpawnPos());
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
       // clock is a permanent mother — never spawnable via handleAddNode.
@@ -803,7 +809,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const sizes: Partial<Record<NodeKind, { width: number; height: number }>> = {
       text:  { width: 260, height: 120 },
       frame: { width: 360, height: 240 },
-      analytics: { width: 620, height: 520 },
+      analytics: { width: 620, height: 540 },
     };
     const sz = sizes[args.kind];
     if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });

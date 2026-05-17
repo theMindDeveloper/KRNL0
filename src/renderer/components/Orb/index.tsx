@@ -247,10 +247,40 @@ export function Orb() {
     return () => clearTimeout(greetTimer);
   }, []);
 
-  // Clamp on resize.
+  // Re-anchor on resize.
+  // Previously: only clamped, which left the orb stranded mid-window
+  // whenever the user resized the app — the saved (x, y) was an absolute
+  // pixel position with no awareness of which corner it had been parked
+  // in. Now we capture the distance to the right and bottom edges
+  // BEFORE the resize, decide which side of the window the orb was
+  // anchored to (whichever is closer), and on resize preserve that
+  // edge-distance so the orb stays glued to its corner.
+  const prevWinRef = useRef<{ w: number; h: number }>({
+    w: typeof window !== 'undefined' ? window.innerWidth : 0,
+    h: typeof window !== 'undefined' ? window.innerHeight : 0,
+  });
   useEffect(() => {
     const onResize = () => {
-      setPos((p) => { const c = clampPos(p); savePos(c); return c; });
+      const prev = prevWinRef.current;
+      const nextW = window.innerWidth;
+      const nextH = window.innerHeight;
+      setPos((p) => {
+        // Distances from each edge in the OLD viewport — these are
+        // what we preserve. Pick the smaller of (left, right) and
+        // (top, bottom) as the anchored side.
+        const distLeft   = p.x;
+        const distRight  = prev.w - (p.x + ORB_SIZE);
+        const distTop    = p.y;
+        const distBottom = prev.h - (p.y + ORB_SIZE);
+        const anchorRight  = distRight  < distLeft;
+        const anchorBottom = distBottom < distTop;
+        const nx = anchorRight  ? nextW - ORB_SIZE - Math.max(ORB_MARGIN, distRight)  : Math.max(ORB_MARGIN, distLeft);
+        const ny = anchorBottom ? nextH - ORB_SIZE - Math.max(ORB_MARGIN, distBottom) : Math.max(ORB_MARGIN, distTop);
+        const next = clampPos({ x: nx, y: ny });
+        savePos(next);
+        return next;
+      });
+      prevWinRef.current = { w: nextW, h: nextH };
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);

@@ -300,6 +300,21 @@
   50%      { filter: drop-shadow(0 0 10px currentColor); }
 }
 
+/* ClockNode — now-pointer centre dot does a small breathe so it reads
+   as alive without bleeding glow past the node's clip box.
+   transform-box: fill-box keeps the scale centred on the SVG circle
+   rather than the page origin. */
+@keyframes clock-now-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.85;
+  }
+}
+
 /* HabitSwapModal — time picker mount-in animation. Small fade + slide up so
    the picker doesn't pop into place when the modal opens or re-renders. */
 @keyframes krnl-time-picker-in {
@@ -434,6 +449,85 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
 .term-body *::-webkit-scrollbar-thumb:hover,
 [data-term] *::-webkit-scrollbar-thumb:hover {
   background: var(--term-fg);
+}
+
+/* ── ClockNode day-selector controls (ADR 0004 §3.3) ───────────────────
+   Shared button + chip styling so the row reads as a coherent control
+   instead of four mismatched outlined boxes. Round shape, subtle hover,
+   focus-visible ring; the `data-state="other"` modifier on Today flips
+   it into "you're off today" emphasis. */
+.clock-day-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.clock-day-btn:hover {
+  background: var(--paper-3);
+  color: var(--ink);
+}
+.clock-day-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--rust);
+}
+.clock-day-today {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 10px;
+}
+.clock-day-today[data-state="other"] {
+  background: var(--rust);
+  color: var(--ink-on-bright);
+}
+.clock-day-today[data-state="other"]:hover {
+  background: var(--rust-deep);
+  color: var(--ink-on-bright);
+}
+.clock-day-today:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.clock-day-today:disabled:hover {
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+/* Static date readout — the calendar node is the canonical day picker,
+   so this chip is display-only. `data-state="other"` highlights it when
+   the clock is parked on a non-today day. */
+.clock-day-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+.clock-day-chip[data-state="other"] {
+  border-color: var(--rust);
 }
 
 /* ── TaskNode checkbox — light: green box w/ dark check ; dark: dark

@@ -373,14 +373,16 @@ export function ClockNode({
 
         {/* Day selector — ADR 0004 §3.3. Lets the user page through days
             (← / →), jump to any date via native picker (covers month/year),
-            and snap back to today. Disabled when already on today. */}
+            and snap back to today. Disabled when already on today.
+            Buttons share a single `clock-day-btn` class so hover/focus
+            polish lives in tokens.css (rather than 5 inline copies). */}
         <div
           data-testid="clock-day-bar"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 6,
+            gap: 4,
             padding: '2px 0',
             fontFamily: 'var(--font-mono)',
             fontSize: 10,
@@ -390,135 +392,52 @@ export function ClockNode({
         >
           <button
             type="button"
+            className="clock-day-btn"
             data-testid="clock-day-prev"
             onClick={() => onCommand('clock.advanceDay', { delta: -1 })}
             title="Previous day"
-            style={{
-              padding: '3px 8px',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 12,
-              lineHeight: 1,
-            }}
+            aria-label="Previous day"
           >
-            ←
+            ‹
           </button>
-          <label
-            style={{
-              position: 'relative',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '3px 8px',
-              background: isToday ? 'transparent' : 'var(--paper-2)',
-              color: 'var(--ink-2)',
-              border: `1px solid ${isToday ? 'var(--paper-3)' : 'var(--rust)'}`,
-              borderRadius: 4,
-              fontFamily: 'inherit',
-              fontSize: 10,
-              letterSpacing: '0.04em',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-            title="Pick a date"
+          {/* Static date label.
+              The native <input type="date"> picker was removed in favour of
+              the canonical day-selection path: click a day in the Calendar
+              node, which mirrors to every clock via calendar.selectDate
+              (commandDispatch.ts). Two date pickers competing on one screen
+              was the wrong UX — the calendar IS the picker. */}
+          <span
+            className="clock-day-chip"
+            data-state={isToday ? 'today' : 'other'}
+            data-testid="clock-day-label"
+            title="Click a day on the calendar to change"
           >
-            <span data-testid="clock-day-label">
-              {selectedDateObj.toLocaleDateString(undefined, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
-            </span>
-            <input
-              type="date"
-              data-testid="clock-day-input"
-              value={selectedDate}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v) onCommand('clock.setSelectedDate', { date: v });
-              }}
-              style={{
-                position: 'absolute',
-                width: 1,
-                height: 1,
-                opacity: 0,
-                pointerEvents: 'none',
-                border: 0,
-                padding: 0,
-                margin: 0,
-              }}
-              tabIndex={-1}
-            />
-            <span
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const root = (e.currentTarget.parentElement as HTMLElement | null);
-                const input = root?.querySelector<HTMLInputElement>('input[type="date"]') ?? null;
-                if (input) {
-                  // Modern browsers expose showPicker(); fall back to focus+click.
-                  const sp = (input as unknown as { showPicker?: () => void }).showPicker;
-                  if (typeof sp === 'function') sp.call(input);
-                  else {
-                    input.focus();
-                    input.click();
-                  }
-                }
-              }}
-              style={{
-                color: 'var(--ink-3)',
-                fontSize: 11,
-                lineHeight: 1,
-              }}
-              title="Pick a different month or year"
-            >
-              ▾
-            </span>
-          </label>
+            {selectedDateObj.toLocaleDateString(undefined, {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
           <button
             type="button"
+            className="clock-day-btn clock-day-today"
             data-testid="clock-day-today"
+            data-state={isToday ? 'today' : 'other'}
             onClick={() => onCommand('clock.goToday', {})}
             disabled={isToday}
             title="Jump back to today"
-            style={{
-              padding: '3px 8px',
-              background: isToday ? 'transparent' : 'var(--rust)',
-              color: isToday ? 'var(--ink-4)' : 'var(--paper)',
-              border: `1px solid ${isToday ? 'var(--paper-3)' : 'var(--rust)'}`,
-              borderRadius: 4,
-              cursor: isToday ? 'default' : 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 9,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              opacity: isToday ? 0.6 : 1,
-            }}
           >
             Today
           </button>
           <button
             type="button"
+            className="clock-day-btn"
             data-testid="clock-day-next"
             onClick={() => onCommand('clock.advanceDay', { delta: 1 })}
             title="Next day"
-            style={{
-              padding: '3px 8px',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 12,
-              lineHeight: 1,
-            }}
+            aria-label="Next day"
           >
-            →
+            ›
           </button>
         </div>
 
@@ -702,6 +621,12 @@ export function ClockNode({
                 // Break overlays — track-color stroke cuts through the task
                 // arc cleanly (matches the calendar's dashed-border + stripe
                 // language — neutral panel break in the timeline).
+                //
+                // Break overlay stroke matches the task arc exactly.
+                // (Earlier polish bumped this to +2 and then +1 to kill an
+                // AA halo, but the user judged both visibly too thick — a
+                // faint edge of tone is the acceptable trade.)
+                const breakStroke = sw;
                 let segCursor = t.start;
                 for (let sIdx = 0; sIdx < breakdown.segments.length; sIdx++) {
                   const seg = breakdown.segments[sIdx]!;
@@ -715,7 +640,7 @@ export function ClockNode({
                         d={arcPath(segCursor, segEnd, r)}
                         fill="none"
                         stroke="var(--paper-3)"
-                        strokeWidth={sw}
+                        strokeWidth={breakStroke}
                         strokeLinecap="butt"
                         opacity={opacity}
                       />,
@@ -730,8 +655,15 @@ export function ClockNode({
             })()}
 
             {/* Now-pointer — spans exactly the train-track band.
-                Only rendered when viewing today; on any other day `now`
-                has no meaningful position relative to the day's arcs. */}
+                Only rendered when viewing today.
+
+                Contrast trick — the pointer paints in --rust, the same
+                family as user's rust-toned task arcs, so without help
+                it vanishes over them. We use a thin near-white core
+                running through a slightly wider rust stroke (double-
+                stroke, no extra DOM cost) and a tiny dot with a small
+                pulse. No SVG filter halos: previous version's glow
+                overflowed the node's clip box. */}
             {isToday && (() => {
               const pIn  = pt(nowFloat, trackInnerEdge);
               const pOut = pt(nowFloat, trackOuterEdge);
@@ -742,10 +674,29 @@ export function ClockNode({
                     x1={pIn.x} y1={pIn.y}
                     x2={pOut.x} y2={pOut.y}
                     stroke="var(--rust)"
-                    strokeWidth={1.5}
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    opacity={0.95}
+                  />
+                  <line
+                    x1={pIn.x} y1={pIn.y}
+                    x2={pOut.x} y2={pOut.y}
+                    stroke="#fff5ec"
+                    strokeWidth={0.8}
+                    strokeLinecap="round"
                     opacity={0.9}
                   />
-                  <circle cx={pDot.x} cy={pDot.y} r={3} fill="var(--rust)" />
+                  <circle
+                    cx={pDot.x} cy={pDot.y} r={3}
+                    fill="var(--rust)"
+                    stroke="#fff5ec"
+                    strokeWidth={0.8}
+                    style={{
+                      animation: 'clock-now-pulse 2s ease-in-out infinite',
+                      transformBox: 'fill-box',
+                      transformOrigin: 'center',
+                    }}
+                  />
                 </>
               );
             })()}
@@ -797,6 +748,25 @@ export function ClockNode({
               );
             })}
 
+            {/* Digital HH:MM readout — drawn here (between numerals and
+                hands) so SVG paint order places it BEHIND the hour /
+                minute / second hands. Previously rendered as an HTML
+                overlay sibling of the SVG, which floated above
+                everything and crossed the minute hand. */}
+            <text
+              x={CX}
+              y={CY - 28}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontFamily="var(--font-mono)"
+              fontSize={8}
+              letterSpacing="1.4"
+              fill="var(--ink-4)"
+              style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
+            >
+              {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
+            </text>
+
             {/* Hour hand */}
             <g transform={`rotate(${hourAng - 90} ${CX} ${CY})`}>
               <line
@@ -843,29 +813,8 @@ export function ClockNode({
             <circle cx={CX} cy={CY} r={1.6} fill="var(--acid)" />
           </svg>
 
-          {/* Meridiem readout — positioned inside the inner face just below
-              the 12 numeral. Previous `top:70 + fontSize:9` collided with
-              the "11" numeral (which sits at SVG y≈68). Bumped down to 92
-              and shrunk to 7.5px so it sits clear of all face numerals. */}
-          {/* Current wall-clock time label (HH:MM, mono). The AM/PM swap UI
-              lives in the dedicated bar above the clock face. */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 92,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 8,
-              letterSpacing: '0.16em',
-              color: 'var(--ink-4)',
-              textTransform: 'uppercase',
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
-          </div>
+          {/* HH:MM digital readout moved into the SVG (above) so it
+              paints behind the hour/minute/second hands. */}
         </div>
 
         {/* Now-playing strip */}

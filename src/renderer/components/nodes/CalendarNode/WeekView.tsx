@@ -1139,8 +1139,9 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             textAlign: 'center',
             fontFamily: 'var(--font-mono)',
             fontSize: 9,
-            color: 'var(--ink-3)',
+            color: 'var(--ink-4)',
             letterSpacing: '0.08em',
+            opacity: 0.45,
             pointerEvents: 'none',
           }}
         >
@@ -1197,7 +1198,15 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               {taskPopup.task.text}
             </div>
 
-            {/* Start → End time row with gradient glow */}
+            {/* Start → End time row.
+                Previous version painted the digits directly in --acid /
+                --cyan with a glow — looked great on dark paper, but on
+                the cream light-mode background the bright colors washed
+                out against the paper and the popup became unreadable
+                (user report 2026-05-17). Switched to colored chips with
+                the theme-invariant --ink-on-bright text token — the chip
+                background carries the color identity, the digits stay
+                legible in every theme. */}
             <div
               style={{
                 display: 'flex',
@@ -1208,13 +1217,15 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             >
               <span
                 style={{
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: 700,
-                  color: 'var(--acid)',
-                  textShadow:
-                    '0 0 6px var(--acid), 0 0 14px rgba(201, 241, 88, 0.55)',
+                  color: 'var(--ink-on-bright)',
+                  background: 'var(--acid)',
+                  padding: '3px 8px',
+                  borderRadius: 4,
                   letterSpacing: '0.04em',
                   lineHeight: 1,
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
                 {startStr}
@@ -1222,23 +1233,24 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               <div
                 style={{
                   flex: 1,
-                  height: 3,
-                  borderRadius: 2,
+                  height: 2,
+                  borderRadius: 1,
                   background:
-                    'linear-gradient(90deg, var(--acid) 0%, #9aedf6 100%)',
-                  boxShadow:
-                    '0 0 6px rgba(201, 241, 88, 0.55), 0 0 10px rgba(154, 237, 246, 0.45)',
+                    'linear-gradient(90deg, var(--acid) 0%, var(--cyan) 100%)',
+                  opacity: 0.85,
                 }}
               />
               <span
                 style={{
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: 700,
-                  color: 'var(--cyan)',
-                  textShadow:
-                    '0 0 6px var(--cyan), 0 0 14px rgba(34, 211, 238, 0.55)',
+                  color: 'var(--ink-on-bright)',
+                  background: 'var(--cyan)',
+                  padding: '3px 8px',
+                  borderRadius: 4,
                   letterSpacing: '0.04em',
                   lineHeight: 1,
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
                 {endStr}
@@ -1265,14 +1277,15 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: 9,
-                color: 'var(--acid)',
+                fontWeight: 600,
+                color: 'var(--ink-on-bright)',
+                background: 'var(--acid)',
                 border: '1px solid var(--acid)',
                 borderRadius: 3,
-                padding: '2px 6px',
-                background: 'transparent',
+                padding: '3px 8px',
                 cursor: 'pointer',
                 textTransform: 'uppercase',
-                letterSpacing: '0.04em',
+                letterSpacing: '0.06em',
               }}
             >
               Activate
