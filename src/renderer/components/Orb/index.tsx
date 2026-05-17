@@ -51,6 +51,11 @@ function mockReply(): string {
   return MOCK_REPLIES[i] ?? MOCK_REPLIES[0]!;
 }
 
+// Module-scoped one-shot guard for the startup greeting. Survives StrictMode
+// double-mount in dev without blocking the greeting in production. Resets on
+// full page reload (which is the same as a fresh app open in Electron).
+const greetedRef = { current: false };
+
 // ── Orb position helpers ──────────────────────────────────────────────────────
 const ORB_SIZE = 64;
 const ORB_MARGIN = 12;
@@ -212,29 +217,41 @@ export function Orb() {
   }, []);
 
   // ── Startup greeting ─────────────────────────────────────────────────────
-  // ONE clip on mount, picked by time of day. Guarded by sessionStorage so
-  // StrictMode double-mounts, HMR reloads, and remounts from other state
-  // changes don't retrigger the greeting within the same window session.
+  // Random clip on app open, picked from a hello-flavored pool. Guarded by a
+  // module-level ref so StrictMode double-mounts don't double-fire — but we
+  // never cancel the timer on cleanup (otherwise StrictMode's mount→unmount→
+  // remount sequence would set the flag, clear the timer, and the second
+  // mount would early-return → greeting never fires).
   useEffect(() => {
-    const GREETED_KEY = 'krnl0-orb-greeted';
-    try {
-      if (sessionStorage.getItem(GREETED_KEY)) return;
-      sessionStorage.setItem(GREETED_KEY, '1');
-    } catch { /* sessionStorage unavailable — fall through and greet */ }
+    if (greetedRef.current) return;
+    greetedRef.current = true;
 
     const hour = new Date().getHours();
-    let pick: { clip: string; text: string };
+    // Time-of-day adds a couple flavors; rest of pool is the always-on
+    // greeting set so user hears variety each open.
+    const pool: { clip: string; text: string }[] = [
+      { clip: 'click_hey',         text: "hey." },
+      { clip: 'click_sup',         text: "sup." },
+      { clip: 'click_whats_up1',   text: "what's up?" },
+      { clip: 'click_whats_up2',   text: "what's up?" },
+      { clip: 'click_im_here',     text: "i'm here." },
+      { clip: 'click_yeah',        text: "yeah." },
+      { clip: 'click_aha1',        text: "aha." },
+      { clip: 'pa_welcome_back',   text: "welcome back. the board's where you left it." },
+      { clip: 'pa_been_a_minute',  text: "been a minute." },
+      { clip: 'pa_need_anything',  text: "need anything?" },
+    ];
     if (hour >= 0 && hour < 5) {
-      pick = { clip: 'pa_past_midnight', text: "Past midnight. Whatever this is, it can wait." };
+      pool.push({ clip: 'pa_past_midnight', text: "past midnight. whatever this is, it can wait." });
     } else if (hour >= 5 && hour < 11) {
-      pick = { clip: 'pa_morning', text: "Morning." };
+      pool.push({ clip: 'pa_morning', text: "morning." });
     } else if (hour >= 22) {
-      pick = { clip: 'pa_its_late', text: "It's late. Tomorrow exists." };
-    } else {
-      pick = { clip: 'pa_welcome_back', text: "Welcome back. The board's where you left it." };
+      pool.push({ clip: 'pa_its_late', text: "it's late. tomorrow exists." });
     }
 
-    const greetTimer = window.setTimeout(() => {
+    const pick = pool[Math.floor(Math.random() * pool.length)]!;
+
+    window.setTimeout(() => {
       setOrbState('speaking');
       setCaption(pick.text);
       voicePlayer.play(pick.clip).catch(() => { /* missing clip → caption only */ });
@@ -243,8 +260,6 @@ export function Orb() {
         setOrbState('idle');
       }, Math.max(2500, pick.text.split(' ').length * 320));
     }, 1500);
-
-    return () => clearTimeout(greetTimer);
   }, []);
 
   // Re-anchor on resize.
