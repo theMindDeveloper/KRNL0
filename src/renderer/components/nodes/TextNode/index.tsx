@@ -10,9 +10,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { NodeResizer } from '@xyflow/react';
+import { NodeResizeControl } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { TextState, TextConfig } from './types';
+import { useCornerProximity } from '../../../hooks/useCornerProximity';
 
 const AUTOSAVE_MS = 400;
 
@@ -80,12 +81,19 @@ export function TextNode({
   const borderStyle = hover || editing ? 'solid' : 'dashed';
   const showShadow = hover || editing;
 
+  // Proximity reveal for the corner resize handle — invisible until the
+  // cursor is within ~48px of the bottom-right corner.
+  const corner = useCornerProximity({ threshold: 48 });
+  const showHandle = corner.near || selected === true;
+
   return (
     <div
+      ref={corner.rootRef}
       className="krnl-text-node"
       data-testid="text-node-root"
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseLeave={() => { setHover(false); corner.onMouseLeave(); }}
+      onMouseMove={corner.onMouseMove}
       style={{
         width: '100%',
         height: '100%',
@@ -100,22 +108,45 @@ export function TextNode({
         boxSizing: 'border-box',
       }}
     >
-      <NodeResizer
-        isVisible={selected === true}
+      {/* Resize handle — single bottom-right control with a diagonal-stripe
+          glyph. Matches AnalyticsNode for visual consistency; cleaner than
+          the 4-corner + 4-side NodeResizer chrome that selected text nodes
+          used to grow. */}
+      <NodeResizeControl
+        position="bottom-right"
         minWidth={180}
         minHeight={80}
         maxWidth={1200}
         maxHeight={2000}
         onResizeEnd={onResizeEnd}
-        handleStyle={{
-          width: 8,
-          height: 8,
-          background: '#0e0d0b',
-          border: '1.5px solid var(--acid)',
-          borderRadius: '50%',
+        style={{
+          background: 'transparent',
+          border: 'none',
+          width: 18,
+          height: 18,
+          right: 2,
+          bottom: 2,
         }}
-        lineStyle={{ borderColor: 'rgba(201,241,88,0.4)', borderWidth: 1 }}
-      />
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          style={{
+            position: 'absolute',
+            right: 2,
+            bottom: 2,
+            cursor: 'nwse-resize',
+            color: '#7d848b',
+            pointerEvents: 'none',
+            opacity: showHandle ? 1 : 0,
+            transition: 'opacity 140ms ease',
+          }}
+          aria-hidden
+        >
+          <path d="M13 5L5 13M13 9L9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      </NodeResizeControl>
       {editing ? (
         <textarea
           ref={taRef}

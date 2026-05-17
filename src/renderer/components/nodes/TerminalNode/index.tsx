@@ -47,14 +47,13 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       },
       cursorBlink: true,
       scrollback: 5000,
-      // Trackpad-friendly inertia: short scroll animations smooth out the
-      // jitter from high-frequency macOS trackpad wheel events. Without this
-      // the buffer jumps line-by-line and feels janky.
-      smoothScrollDuration: 90,
-      // macOS trackpads emit small delta values per frame; a slightly higher
-      // sensitivity makes a two-finger swipe feel right (matches iTerm2).
-      scrollSensitivity: 2,
-      fastScrollSensitivity: 6,
+      // No smoothScrollDuration — the animation feels heavy on macOS
+      // trackpads because each flick queues an easing tail that delays the
+      // next gesture's response. Instant jumps match iTerm2 / Ghostty.
+      // Larger per-tick line counts make a small two-finger swipe move the
+      // buffer visibly (1 = stock = sluggish for trackpads, 3 = snappy).
+      scrollSensitivity: 3,
+      fastScrollSensitivity: 8,
       allowProposedApi: true,
     });
     const fit = new FitAddon();

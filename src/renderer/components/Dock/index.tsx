@@ -20,7 +20,7 @@ type ToolMode = 'select' | 'connect';
 
 export interface DockProps {
   /** Called when the user clicks a node-creation button or triggers a keyboard shortcut. */
-  onAddNode: (args: { kind: NodeKind }) => void;
+  onAddNode: (args: { kind: NodeKind; at?: { x: number; y: number } }) => void;
   /** Called when the user clicks a tool-mode button. */
   onToolChange?: (tool: ToolMode) => void;
   /** Current mother-row chassis variant. */

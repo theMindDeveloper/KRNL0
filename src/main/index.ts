@@ -19,6 +19,36 @@ if (process.env['KRNL0_USER_DATA']) {
   app.setPath('userData', process.env['KRNL0_USER_DATA']);
 }
 
+// ── macOS / Chromium GPU compositing hints ─────────────────────────────────
+// MUST be set before app.whenReady() — Chromium reads these once at startup.
+// Goal: keep the canvas, Orb glows, and xterm WebGL renderer on the GPU path
+// instead of falling back to software compositing for backdrop-filter blurs
+// and large drop-shadows.
+//
+//   --enable-zero-copy            : skip CPU readback of tile bitmaps; GPU
+//                                   owns them end-to-end. Big win for
+//                                   high-DPI Retina displays.
+//   --enable-gpu-rasterization    : raster tiles on the GPU. Default-on in
+//                                   most builds but force it everywhere.
+//   --enable-features=Metal       : prefer Metal over the older OpenGL
+//                                   backend on macOS — large reduction in
+//                                   compositing latency for our blur-heavy
+//                                   Orb / modals.
+//   --ignore-gpu-blocklist        : Chromium's macOS GPU blocklist
+//                                   occasionally disables features on
+//                                   integrated Intel chips for stability
+//                                   reasons that don't apply to a curated
+//                                   Electron app shipping a single GPU path.
+//
+// Windows / Linux ignore the macOS-only feature flag; the rest are
+// platform-neutral.
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('enable-features', 'Metal');
+}
+
 // krnl-asset:// — used for <img src="krnl-asset://..."> (Decision 21).
 // MUST be registered before app.whenReady() so Chromium treats responses as
 // standard, secure-origin content.
