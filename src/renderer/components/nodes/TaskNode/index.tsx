@@ -357,17 +357,6 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       onSelect: startEdit,
     },
     {
-      label: 'Add subtask',
-      onSelect: () => {
-        setInlineMode('subtask');
-        setInlineName('');
-        setInlineDuration('');
-        setInlinePhase('name');
-        setInlineDurationInvalid(false);
-      },
-      disabled: state.done,
-    },
-    {
       // ADR 0004 §2 — sequential successor: same chain level as source,
       // single task.next edge.
       label: 'Add next task',
@@ -391,6 +380,17 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         setInlineDurationInvalid(false);
       },
       disabled: state.done,
+    },
+    {
+      label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
+      onSelect: () => {
+        const current = state.note ?? '';
+        const next = typeof window !== 'undefined'
+          ? window.prompt('Note for this task:', current)
+          : null;
+        if (next === null) return; // cancelled
+        onCommand('task.setNote', { note: next });
+      },
     },
     {
       label: 'Delete',
@@ -669,6 +669,36 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             </span>
           )}
         </div>
+
+        {/* Note — free-form text under the task body. Click to edit. */}
+        {state.note && state.note.length > 0 && (
+          <div
+            data-testid="task-note"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = typeof window !== 'undefined'
+                ? window.prompt('Edit note:', state.note ?? '')
+                : null;
+              if (next === null) return;
+              onCommand('task.setNote', { note: next });
+            }}
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 11,
+              lineHeight: 1.4,
+              color: 'var(--ink-3)',
+              fontStyle: 'italic',
+              padding: '4px 0 2px',
+              borderTop: '1px dashed var(--paper-3)',
+              cursor: 'text',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+            title="Click to edit note"
+          >
+            {state.note}
+          </div>
+        )}
 
         {/* F5: footer — tag + ETA (B.2: ETA is double-click editable) */}
         <div

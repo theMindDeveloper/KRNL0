@@ -348,6 +348,7 @@ export function HabitLaneNode({
           onRename={(name) => onCommand('habit.lane.rename', { name })}
           onSetColor={(c) => onCommand('habit.lane.setColor', { color: c })}
           onSetIcon={(icon) => onCommand('habit.lane.setIcon', { icon })}
+          onSetNote={(note) => onCommand('habit.lane.setNote', { note })}
           onDelete={() => onCommand('habit.lane.removeHabit')}
           onClose={() => setMenuOpen(null)}
         />

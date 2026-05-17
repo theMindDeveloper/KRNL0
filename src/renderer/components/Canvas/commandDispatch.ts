@@ -90,6 +90,7 @@ import {
   habitRename,
   habitSetColor,
   habitSetIcon,
+  habitSetNote,
   habitSetView,
   habitSetSchedule,
 } from '../nodes/HabitNode/commands';
@@ -265,6 +266,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.rename':      return { state: habitRename(s as never, args as never) };
         case 'habit.setColor':    return { state: habitSetColor(s as never, args as never) };
         case 'habit.setIcon':     return { state: habitSetIcon(s as never, args as never) };
+        case 'habit.setNote':     return { state: habitSetNote(s as never, args as never) };
         case 'habit.setView':     return { config: habitSetView(c as never, args as never) };
         // ADR 0002 §5 — set/clear schedule on a habit.
         case 'habit.setSchedule': return { state: habitSetSchedule(s as never, args as never) };
@@ -815,6 +817,22 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       return;
     }
 
+    // ── task.setNote: write a free-form note onto the task state ───────────
+    if (command === 'task.setNote') {
+      if (node.kind !== 'todo.task') return;
+      const raw = args['note'];
+      const note = typeof raw === 'string' ? raw : '';
+      const ts = node.state as TaskState;
+      const trimmed = note.trim();
+      const nextState = trimmed.length > 0
+        ? { ...ts, note: trimmed }
+        : (() => { const { note: _drop, ...rest } = ts; return rest as TaskState; })();
+      updateNode(nodeId, { state: nextState });
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+      return;
+    }
+
     // ── todo.startPomoForItem: resolve itemId → taskNodeId → auto-start ───
     if (command === 'todo.startPomoForItem') {
       const todoState = node.state as TodoState;
@@ -1110,6 +1128,12 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           const icon = args['icon'];
           if (typeof icon !== 'string') return;
           mutateMotherHabit(mother.id, (s) => habitSetIcon(s, { id: habitId, icon }));
+          break;
+        }
+        case 'habit.lane.setNote': {
+          const note = args['note'];
+          if (typeof note !== 'string') return;
+          mutateMotherHabit(mother.id, (s) => habitSetNote(s, { id: habitId, note }));
           break;
         }
         case 'habit.lane.removeHabit': {

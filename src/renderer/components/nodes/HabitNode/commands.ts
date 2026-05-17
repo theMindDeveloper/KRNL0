@@ -161,6 +161,25 @@ export function habitSetIcon(
   };
 }
 
+// Set or clear a per-habit note. Empty/whitespace trimmed → field dropped.
+export function habitSetNote(
+  state: HabitState,
+  args: { id: string; note: string },
+): HabitState {
+  const trimmed = (args.note ?? '').trim();
+  return {
+    ...state,
+    habits: state.habits.map((h) => {
+      if (h.id !== args.id) return h;
+      if (trimmed === '') {
+        const { note: _ignored, ...rest } = h;
+        return rest as typeof h;
+      }
+      return { ...h, note: trimmed };
+    }),
+  };
+}
+
 // ADR 0002 — set or clear the schedule for a habit.
 // Pure handler: returns state unchanged on invalid args (no throw).
 export function habitSetSchedule(
