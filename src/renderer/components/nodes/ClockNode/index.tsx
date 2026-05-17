@@ -523,21 +523,26 @@ export function ClockNode({
               return [...tracks, ...arcs];
             })()}
 
-            {/* Now notch — INSIDE the clock face, on the tick belt */}
+            {/* Now-pointer — crosses the train tracks at current time,
+                like the calendar's now-line. Shows where each task arc is
+                relative to the current moment. */}
             {(() => {
-              const pIn  = pt(nowFloat, R_TICK_IN);
-              const pOut = pt(nowFloat, R_TICK_OUT);
-              const pDot = pt(nowFloat, R_TICK_OUT - 2);
+              const innerR = R_TICK_OUT + 2;   // just outside clock face
+              const outerR = R_TICK_OUT + 28;  // well past the outer tracks
+              const dotR   = R_TICK_OUT + 8;   // sits on first track
+              const pIn  = pt(nowFloat, innerR);
+              const pOut = pt(nowFloat, outerR);
+              const pDot = pt(nowFloat, dotR);
               return (
                 <>
                   <line
                     x1={pIn.x} y1={pIn.y}
                     x2={pOut.x} y2={pOut.y}
                     stroke="var(--rust)"
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     opacity={0.9}
                   />
-                  <circle cx={pDot.x} cy={pDot.y} r={2.5} fill="var(--rust)" />
+                  <circle cx={pDot.x} cy={pDot.y} r={3} fill="var(--rust)" />
                 </>
               );
             })()}
