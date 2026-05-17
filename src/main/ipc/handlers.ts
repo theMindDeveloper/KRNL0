@@ -181,12 +181,33 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     const shell = process.env['KRNL0_SHELL']
       ?? (isWin ? 'powershell.exe' : (process.env['SHELL'] ?? '/bin/zsh'));
 
-    // Working directory (issue #74): default to the project root so
-    // `claude` and other CLIs can read CLAUDE.md and board.json without an
-    // explicit `cd`. process.cwd() is the repo root in dev (electron-vite
-    // is launched from there) and the resources/install dir in a packaged
-    // build. KRNL0_TERM_CWD overrides for users who want a fixed directory.
-    let cwd = process.env['KRNL0_TERM_CWD'] ?? process.cwd();
+    // Resolve where claude/CLAUDE.md lives BEFORE picking cwd — we want the
+    // shell to start inside that dir so Claude Code auto-discovers CLAUDE.md
+    // from its first cwd. In packaged builds app.getAppPath() returns the
+    // path INSIDE app.asar (an archive file) which external processes can't
+    // read; electron-builder's asarUnpack extracts claude/ to a real on-disk
+    // sibling at app.asar.unpacked/, so we rewrite the segment.
+    let claudeHome = process.env['KRNL0_CLAUDE_HOME']
+      ?? join(app.getAppPath(), 'claude');
+    const asarSegment = `${sep}app.asar${sep}`;
+    if (claudeHome.includes(asarSegment)) {
+      claudeHome = claudeHome.replace(asarSegment, `${sep}app.asar.unpacked${sep}`);
+    }
+    let claudeHomeExists = false;
+    try { claudeHomeExists = existsSync(claudeHome); } catch { /* ignore */ }
+
+    // Working directory (issue #74): start the shell inside claudeHome so
+    // `claude` discovers CLAUDE.md on first invocation. The PowerShell
+    // function in krnl-init.ps1 and bin/claude POSIX shim still do a per-
+    // command CWD hop for follow-up calls if the user navigates elsewhere
+    // — but on macOS path_helper re-prepends standard paths to PATH at
+    // shell startup, pushing our cliDir (and therefore the shim) behind
+    // the real claude binary in /usr/local/bin. Starting in claudeHome
+    // sidesteps that race for the common case.
+    //
+    // KRNL0_TERM_CWD wins if the user wants a fixed location.
+    let cwd = process.env['KRNL0_TERM_CWD']
+      ?? (claudeHomeExists ? claudeHome : process.cwd());
     try {
       if (!existsSync(cwd)) {
         cwd = process.env['USERPROFILE'] ?? process.env['HOME'] ?? homedir();
@@ -238,30 +259,11 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       childEnv['LANG'] = childEnv['LANG'] ?? 'en_US.UTF-8';
     }
 
-    // Tell krnl-init.ps1 where claude/CLAUDE.md lives so the wrapped
-    // `claude` function runs the real binary with CWD = <project>/claude.
-    // Claude Code auto-discovers CLAUDE.md from the CWD upward, so a CWD
-    // hop is enough to load the in-app instructions without polluting
-    // the user's shell location.
-    //
-    // In packaged builds app.getAppPath() returns the path INSIDE app.asar
-    // (a single archive file). PowerShell — an external process — can't
-    // see into the archive, so Test-Path on that path fails and the
-    // `claude` wrapper never gets defined. electron-builder.json's
-    // `asarUnpack: ["claude/**/*"]` extracts the dir to a real on-disk
-    // sibling at app.asar.unpacked/. Swap the path to point there so
-    // external processes can read it.
-    let claudeHome = process.env['KRNL0_CLAUDE_HOME']
-      ?? join(app.getAppPath(), 'claude');
-    const asarSegment = `${sep}app.asar${sep}`;
-    if (claudeHome.includes(asarSegment)) {
-      claudeHome = claudeHome.replace(asarSegment, `${sep}app.asar.unpacked${sep}`);
-    }
-    try {
-      if (existsSync(claudeHome)) {
-        childEnv['KRNL0_CLAUDE_HOME'] = claudeHome;
-      }
-    } catch { /* ignore — function will no-op without the env var */ }
+    // Export KRNL0_CLAUDE_HOME so the krnl-init.ps1 PowerShell function and
+    // bin/claude POSIX shim can do a per-command CWD hop when the user has
+    // navigated away from claudeHome. claudeHome itself was computed above
+    // (before the cwd block) so both pieces of logic see the same value.
+    if (claudeHomeExists) childEnv['KRNL0_CLAUDE_HOME'] = claudeHome;
 
     // PowerShell launch flags:
     //  -NoLogo : suppress the multi-line copyright banner that would
