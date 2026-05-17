@@ -510,6 +510,26 @@ function findMotherForHabit(habitId: string): Node | null {
   return null;
 }
 
+/**
+ * Remove every `habit.lane` node that points at the given habitId.
+ * Used after a habit is deleted (from either the mother right-click menu
+ * or via a lane's "delete habit" action) so the canvas doesn't leak
+ * orphan lane placeholders.
+ *
+ * removeNode in the board store already no-ops on mother nodes, so this
+ * is safe to call even if a future lane definition isMother flips.
+ */
+function removeAllLanesForHabit(habitId: string): void {
+  const { board, removeNode } = useBoardStore.getState();
+  if (!board) return;
+  const orphans = board.nodes.filter(
+    (n) =>
+      n.kind === 'habit.lane' &&
+      (n.state as { habitId?: string } | null)?.habitId === habitId,
+  );
+  for (const lane of orphans) removeNode(lane.id);
+}
+
 // ── Decision 22.1 helpers ──────────────────────────────────────────────────
 
 const toIso = (ms: number): string => new Date(ms).toISOString();
@@ -1138,6 +1158,10 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         }
         case 'habit.lane.removeHabit': {
           mutateMotherHabit(mother.id, (s) => habitRemove(s, { id: habitId }));
+          // Also remove every lane node that referenced this habit — the
+          // habit is gone, an orphaned "habit removed — delete this lane"
+          // placeholder is just busywork for the user.
+          removeAllLanesForHabit(habitId);
           break;
         }
         default:
@@ -1655,6 +1679,9 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     } else if (command === 'habit.remove' && node.kind === 'habit') {
       const habitId = typeof args['id'] === 'string' ? args['id'] : '';
       emit('habit.deleted', `habit ${habitId.slice(0, 8)} removed`, { severity: 'warn' });
+      // Auto-clean any lane nodes that referenced this habit so the user
+      // doesn't see the "habit removed — delete this lane" orphan card.
+      if (habitId) removeAllLanesForHabit(habitId);
     } else if (command === 'frame.setSize' && node.kind === 'frame') {
       emit('frame.resized', `frame ${shortId(nodeId)} resized`, { refId: nodeId });
     }

@@ -441,10 +441,15 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                     }}
                   />
                 )}
-                {/* F3: checkbox — dispatches todo.toggle */}
+                {/* F3: checkbox — dispatches todo.toggle.
+                    Uses a theme-locked dark hex for the done bg + acid border
+                    + acid checkmark, so the "checked" state reads as a small
+                    dark chip with a green tick in BOTH light and dark themes.
+                    Previously `background: var(--ink)` flipped to light/cream
+                    in dark mode, producing "green-on-white" mis-contrast. */}
                 <button
                   type="button"
-                  className="todo-check"
+                  className={`todo-check${item.done ? ' todo-check--done' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     onCommand('todo.toggle', { id: item.id });
@@ -453,9 +458,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                     flexShrink: 0,
                     width: 14,
                     height: 14,
-                    border: `1px solid ${item.done ? 'var(--ink)' : 'var(--ink-4)'}`,
+                    border: `1px solid ${item.done ? 'var(--acid)' : 'var(--ink-4)'}`,
                     borderRadius: 3,
-                    background: item.done ? 'var(--ink)' : 'transparent',
+                    background: item.done ? '#0a0908' : 'transparent',
                     cursor: 'pointer',
                     display: 'grid',
                     placeItems: 'center',
