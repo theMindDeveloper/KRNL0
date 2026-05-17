@@ -436,7 +436,7 @@ export function ClockNode({
               // Aggressively pulled inward — visible clock chassis extends well
               // past R_ARC, so we anchor first ring at R_TICK_OUT + tiny offset.
               const radiusForLane = (lane: number): number =>
-                R_TICK_OUT + 4 + lane * (STROKE + LANE_GAP);
+                R_TICK_OUT + 8 + lane * (STROKE + LANE_GAP);
               const radiusFor = (t: TaskEntry): number =>
                 radiusForLane(laneByTaskId.get(t.id) ?? 0);
               const stroke = STROKE;
