@@ -10,6 +10,9 @@
     "bin/**/*",
     "claude/**/*"
   ],
+  "asarUnpack": [
+    "claude/**/*"
+  ],
   "mac": {
     "target": "dmg"
   },

@@ -1,6 +1,6 @@
 import { app, ipcMain, BrowserWindow, clipboard } from 'electron';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, sep } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
@@ -227,10 +227,21 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     // `claude` function runs the real binary with CWD = <project>/claude.
     // Claude Code auto-discovers CLAUDE.md from the CWD upward, so a CWD
     // hop is enough to load the in-app instructions without polluting
-    // the user's shell location. KRNL0_CLAUDE_HOME override wins for
-    // packaged builds where the resource path differs.
-    const claudeHome = process.env['KRNL0_CLAUDE_HOME']
+    // the user's shell location.
+    //
+    // In packaged builds app.getAppPath() returns the path INSIDE app.asar
+    // (a single archive file). PowerShell — an external process — can't
+    // see into the archive, so Test-Path on that path fails and the
+    // `claude` wrapper never gets defined. electron-builder.json's
+    // `asarUnpack: ["claude/**/*"]` extracts the dir to a real on-disk
+    // sibling at app.asar.unpacked/. Swap the path to point there so
+    // external processes can read it.
+    let claudeHome = process.env['KRNL0_CLAUDE_HOME']
       ?? join(app.getAppPath(), 'claude');
+    const asarSegment = `${sep}app.asar${sep}`;
+    if (claudeHome.includes(asarSegment)) {
+      claudeHome = claudeHome.replace(asarSegment, `${sep}app.asar.unpacked${sep}`);
+    }
     try {
       if (existsSync(claudeHome)) {
         childEnv['KRNL0_CLAUDE_HOME'] = claudeHome;
