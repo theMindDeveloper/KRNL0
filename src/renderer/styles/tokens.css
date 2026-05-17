@@ -586,6 +586,12 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
 .habit-cell--year   { border-radius: 1px; }
 .habit-cell--past   { opacity: 0.4; }
 .habit-cell--future { /* no extra */ }
+/* Non-scheduled days (per habit.schedule) — de-emphasised + non-interactive. */
+.habit-cell--unscheduled {
+  opacity: 0.15;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 /* PR6 — done state uses LifeOS's two-color trick: outer is ink (dark),
    inner ::after is the habit color (acid by default). Gives a small

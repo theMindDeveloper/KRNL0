@@ -31,6 +31,7 @@ import {
   getMonthDays,
   getWeekDays,
   getYearGridCells,
+  isDayScheduled,
   todayLocal,
 } from './types';
 import { calcStreak } from './commands';
@@ -329,6 +330,7 @@ function cellClass(
   today: string,
   done: boolean,
   viewMod: 'week' | 'month' | 'year',
+  scheduled: boolean = true,
 ): string {
   const isToday = dayStr === today;
   const isFuture = dayStr > today;
@@ -339,7 +341,8 @@ function cellClass(
   if (isToday) classes.push('habit-cell--today');
   if (isPast) classes.push('habit-cell--past');
   if (isFuture) classes.push('habit-cell--future');
-  if (!isFuture) classes.push('habit-cell--interactive');
+  if (!scheduled) classes.push('habit-cell--unscheduled');
+  if (!isFuture && scheduled) classes.push('habit-cell--interactive');
   return classes.join(' ');
 }
 
@@ -420,7 +423,10 @@ const WeekRow = memo(function WeekRow({
   onContextMenu,
 }: WeekRowProps) {
   const color = habitColor(habit.color);
-  const streak = useMemo(() => calcStreak(habit.log, today), [habit.log, today]);
+  const streak = useMemo(
+    () => calcStreak(habit.log, today, habit.schedule),
+    [habit.log, today, habit.schedule],
+  );
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -499,17 +505,21 @@ const WeekRow = memo(function WeekRow({
           {weekDays.map((dayStr) => {
             const done = logSet.has(dayStr);
             const isFuture = dayStr > today;
-            const cls = cellClass(dayStr, today, done, 'week');
+            const scheduled = isDayScheduled(habit.schedule, dayStr);
+            const cls = cellClass(dayStr, today, done, 'week', scheduled);
             const size = { width: WEEK_CELL_SIZE, height: WEEK_CELL_SIZE };
-            return isFuture ? (
-              <div key={dayStr} className={cls} style={size} title={`${habit.name} ${dayStr}`} />
+            const tip = scheduled
+              ? `${habit.name} ${dayStr}`
+              : `${habit.name} ${dayStr} — not scheduled`;
+            return isFuture || !scheduled ? (
+              <div key={dayStr} className={cls} style={size} title={tip} />
             ) : (
               <button
                 key={dayStr}
                 type="button"
                 className={cls}
                 style={size}
-                title={`${habit.name} ${dayStr} — click to toggle`}
+                title={`${tip} — click to toggle`}
                 onClick={(e) => { e.stopPropagation(); onToggle(habit.id, dayStr); }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -603,7 +613,10 @@ const MonthRow = memo(function MonthRow({
   onContextMenu,
 }: MonthRowProps) {
   const color = habitColor(habit.color);
-  const streak = useMemo(() => calcStreak(habit.log, today), [habit.log, today]);
+  const streak = useMemo(
+    () => calcStreak(habit.log, today, habit.schedule),
+    [habit.log, today, habit.schedule],
+  );
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const monthRowRef = useRef<HTMLDivElement>(null);
@@ -638,9 +651,10 @@ const MonthRow = memo(function MonthRow({
       const date = t.getAttribute('data-date');
       if (!date) return;
       if (date > today) return;
+      if (!isDayScheduled(habit.schedule, date)) return;
       onToggle(habit.id, date);
     },
-    [habit.id, today, onToggle],
+    [habit.id, today, onToggle, habit.schedule],
   );
 
   const cellStyle = { width: MONTH_CELL_SIZE, height: MONTH_CELL_SIZE };
@@ -710,14 +724,18 @@ const MonthRow = memo(function MonthRow({
       >
         {monthDays.map((dayStr) => {
           const done = logSet.has(dayStr);
-          const cls = cellClass(dayStr, today, done, 'month');
+          const scheduled = isDayScheduled(habit.schedule, dayStr);
+          const cls = cellClass(dayStr, today, done, 'month', scheduled);
+          const tip = scheduled
+            ? `${habit.name} ${dayStr}`
+            : `${habit.name} ${dayStr} — not scheduled`;
           return (
             <div
               key={dayStr}
-              data-date={dayStr}
+              data-date={scheduled ? dayStr : undefined}
               className={cls}
               style={cellStyle}
-              title={`${habit.name} ${dayStr}`}
+              title={tip}
             />
           );
         })}
@@ -780,9 +798,13 @@ const YearRow = memo(function YearRow({
   onContextMenu,
 }: YearRowProps) {
   const color = habitColor(habit.color);
-  const streak = useMemo(() => calcStreak(habit.log, today), [habit.log, today]);
+  const streak = useMemo(
+    () => calcStreak(habit.log, today, habit.schedule),
+    [habit.log, today, habit.schedule],
+  );
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const schedule = habit.schedule;
 
   // Canvas redraw — 371 cells in one DOM node instead of 371 divs. Re-runs
   // only when log / color / today / yearGrid changes. Resolves CSS-var colors
@@ -823,12 +845,15 @@ const YearRow = memo(function YearRow({
         const x = c * step;
         const y = r * step;
         const done = logSet.has(day);
+        const scheduled = isDayScheduled(schedule, day);
         if (done) {
           ctx.fillStyle = doneColor;
+          if (!scheduled) ctx.globalAlpha = 0.35;
           ctx.fillRect(x, y, YEAR_CELL_SIZE, YEAR_CELL_SIZE);
+          ctx.globalAlpha = 1;
         } else {
-          // Past undone — faded rest color.
-          ctx.globalAlpha = 0.4;
+          // Past undone — faded rest color; non-scheduled extra-faded.
+          ctx.globalAlpha = scheduled ? 0.4 : 0.15;
           ctx.fillStyle = restColor;
           ctx.fillRect(x, y, YEAR_CELL_SIZE, YEAR_CELL_SIZE);
           ctx.globalAlpha = 1;
@@ -841,7 +866,7 @@ const YearRow = memo(function YearRow({
         }
       }
     }
-  }, [habit.log, color, today, yearGrid]);
+  }, [habit.log, color, today, yearGrid, schedule]);
 
   // Year view is intentionally read-only (2026-05-15 product call). No
   // click/toggle from year view — feels noisy at 5 px cells; use the week or

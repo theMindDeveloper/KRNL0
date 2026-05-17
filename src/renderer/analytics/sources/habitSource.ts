@@ -2,12 +2,15 @@
 // across all non-archived habits on the habit mother node.
 
 import type { AnalyticsDataSource, AnalyticsEvent, BoardLike } from '../types';
+import type { HabitSchedule } from '../../components/nodes/HabitNode/types';
+import { isDayScheduled } from '../../components/nodes/HabitNode/types';
 
 interface HabitLike {
   id: string;
   name: string;
   log?: string[];
   archived?: boolean;
+  schedule?: HabitSchedule;
 }
 
 interface HabitStateLike {
@@ -43,19 +46,40 @@ export const habitSource: AnalyticsDataSource = {
 // Streak helper exported here because it depends on Habit shape — kept out of
 // the engine so the engine stays domain-agnostic.
 
-export function calcHabitStreak(log: readonly string[], today: string): number {
-  // log is sorted desc per HabitNode convention, but tolerate any order.
+function prevYmd(ymd: string): string {
+  const d = new Date(ymd + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate(),
+  ).padStart(2, '0')}`;
+}
+
+// Schedule-aware streak: non-scheduled days are skipped (neither extend nor
+// break the streak). Grace: if today is scheduled but not yet logged, start
+// from the previous scheduled day.
+export function calcHabitStreak(
+  log: readonly string[],
+  today: string,
+  schedule?: HabitSchedule,
+): number {
   const seen = new Set(log);
-  let streak = 0;
+
   let cursor = today;
+  let safety = 366;
+  while (!isDayScheduled(schedule, cursor) && safety-- > 0) cursor = prevYmd(cursor);
+
+  if (cursor === today && !seen.has(cursor)) {
+    cursor = prevYmd(cursor);
+    safety = 366;
+    while (!isDayScheduled(schedule, cursor) && safety-- > 0) cursor = prevYmd(cursor);
+  }
+
+  let streak = 0;
   while (seen.has(cursor)) {
     streak += 1;
-    // Step back one day.
-    const d = new Date(cursor + 'T00:00:00');
-    d.setDate(d.getDate() - 1);
-    cursor = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-      d.getDate(),
-    ).padStart(2, '0')}`;
+    cursor = prevYmd(cursor);
+    safety = 366;
+    while (!isDayScheduled(schedule, cursor) && safety-- > 0) cursor = prevYmd(cursor);
   }
   return streak;
 }
