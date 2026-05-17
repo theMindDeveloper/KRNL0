@@ -13,25 +13,8 @@ import type { PomoBreakdown } from '../../../store/pomoSchedule';
 // exist in tokens.css (Decision 24.2 contract test).
 export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 
-// Tone palette for the new analog design. Deterministic per taskId.
-const TONE_PALETTE = ['rust', 'spine', 'cyan', 'plum', 'rust-deep', 'amber'] as const;
-type ToneToken = (typeof TONE_PALETTE)[number];
-
-/** Deterministic tone for a task — stable for a given taskId. */
-function colorFor(taskId: string): ToneToken {
-  let h = 0;
-  for (let i = 0; i < taskId.length; i++) h = (h * 31 + taskId.charCodeAt(i)) >>> 0;
-  return TONE_PALETTE[h % TONE_PALETTE.length]!;
-}
-
-const TONE_VAR: Record<ToneToken, string> = {
-  rust:        'var(--rust)',
-  spine:       'var(--spine)',
-  cyan:        'var(--cyan)',
-  plum:        'var(--plum)',
-  'rust-deep': 'var(--rust-deep)',
-  amber:       'var(--amber)',
-};
+// Shared palette across Clock, Calendar, Todo. See src/renderer/utils/taskColor.ts.
+import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR, type TaskTone as ToneToken } from '../../../utils/taskColor';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -111,6 +94,10 @@ interface TaskEntry {
   plannedMin: number;
   /** Decision 28: null for event tasks, non-null for focus tasks. */
   breakdown: PomoBreakdown | null;
+  /** Parallel group id; null if this task is sequential. */
+  parallelGroupId: string | null;
+  /** 0-based branch index within the parallel group; null if sequential. */
+  parallelBranchIndex: number | null;
 }
 
 export function ClockNode({
@@ -119,7 +106,7 @@ export function ClockNode({
   slotIndex = 6,
   slotTotal = MOTHER_TOTAL,
 }: NodeProps<ClockState, ClockConfig>) {
-  const { linkedTodoId } = node.state;
+  const { linkedTodoId, viewWindow } = node.state;
 
   // PERF (Wave C+): the previous 1-second setInterval re-rendered this
   // entire SVG (60 ticks + 12 numerals + arcs + 3 hands + meridiem + task
@@ -184,10 +171,12 @@ export function ClockNode({
     return m;
   }, [board?.nodes]);
 
-  // Flatten placements to TaskEntry[].
+  // Flatten placements to TaskEntry[]. Filter by selected 12-hour viewWindow.
   const tasks: TaskEntry[] = useMemo(() => {
     if (!placementsMap || !linkedTodoId) return [];
     const today = todayLocalYMD();
+    const winLo = viewWindow === 1 ? 12 : 0;
+    const winHi = viewWindow === 1 ? 24 : 12;
     const out: TaskEntry[] = [];
     for (const p of placementsMap.values()) {
       const info = taskInfo.get(p.taskId);
@@ -199,20 +188,24 @@ export function ClockNode({
       if (startH === null) continue;
       const endH = isoToHourFloat(p.endISO) ?? startH + info.plannedMin / 60;
       if (endH <= startH) continue;
+      // 12h window filter: keep only tasks intersecting [winLo, winHi).
+      if (endH <= winLo || startH >= winHi) continue;
       out.push({
         id: p.taskId,
-        start: startH,
-        end: endH,
+        start: Math.max(startH, winLo),
+        end: Math.min(endH, winHi),
         name: info.text,
         tone: colorFor(p.taskId),
         plannedMin: info.plannedMin,
         breakdown: p.breakdown,
+        parallelGroupId: p.parallelGroupId,
+        parallelBranchIndex: p.parallelBranchIndex,
       });
     }
     // Sort by start time
     out.sort((a, b) => a.start - b.start);
     return out;
-  }, [placementsMap, linkedTodoId, taskInfo]);
+  }, [placementsMap, linkedTodoId, taskInfo, viewWindow]);
 
   const activeIdx = tasks.findIndex((t) => nowFloat >= t.start && nowFloat < t.end);
 
@@ -343,33 +336,60 @@ export function ClockNode({
               opacity={0.7}
             />
 
-            {/* Task arcs — Decision 28 §7.
-                For kind==='event' or breakdown===null or single-segment focus:
-                  single arc using the task tone (existing behaviour).
-                For multi-segment focus tasks:
-                  walk breakdown.segments, emitting sub-arcs.
-                  Work segments → task tone. Break segments → var(--ink-3).
-                Active-task highlight and ended-task dimming apply to the full
-                task span (t.start/t.end), not per-segment. */}
-            {tasks.flatMap((t, i) => {
-              const ended  = nowFloat >= t.end;
-              const active = i === activeIdx;
-              const opacity = ended ? 0.35 : active ? 1 : 0.92;
-              const sw = active ? 16 : 14;
-              const activeStyle: React.CSSProperties = active
-                ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: TONE_VAR[t.tone] }
-                : {};
-              const breakdown = t.breakdown;
+            {/* Task arcs — Decision 28 §7 (revised).
+                - Concentric rings for parallel branches (parallelBranchIndex).
+                - Round caps INSET into the time interval so they never extend
+                  past adjacent slots (fixes sequential-task overlap).
+                - Breaks rendered as semi-transparent white overlays — the task
+                  tone shows through faintly so the worm reads as one task. */}
+            {(() => {
+              // Compute per-task ring offset for parallel stacking.
+              // Each parallel branch shifts inward by RING_GAP.
+              const RING_GAP = 6;
+              const ringOffset = (t: TaskEntry): number =>
+                t.parallelBranchIndex !== null ? t.parallelBranchIndex * RING_GAP : 0;
+              return tasks.flatMap((t, i) => {
+                const ended  = nowFloat >= t.end;
+                const active = i === activeIdx;
+                const opacity = ended ? 0.35 : active ? 1 : 0.92;
+                const sw = active ? 16 : 14;
+                const r = R_ARC - ringOffset(t);
+                const activeStyle: React.CSSProperties = active
+                  ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: TONE_VAR[t.tone] }
+                  : {};
+                const breakdown = t.breakdown;
 
-              // Single-arc path: event tasks, null breakdown, or 1-segment focus.
-              if (
-                breakdown === null ||
-                breakdown.segments.length <= 1
-              ) {
-                return [
+                // Inset start/end so round caps stay within [t.start, t.end].
+                // sw/2 in pixels → convert to hour-float via arc length = r * theta.
+                // theta_per_hour = 2π/12; px_per_hour = r * 2π/12 → 1px = (12/(r·2π)) h.
+                // Half a cap = sw/2 px → inset_h = (sw/2) * 12 / (r·2π) hours.
+                const insetHours = (sw / 2) * 12 / (r * 2 * Math.PI);
+                const cappedStart = Math.min(t.start + insetHours, (t.start + t.end) / 2);
+                const cappedEnd = Math.max(t.end - insetHours, (t.start + t.end) / 2);
+
+                // Single-arc path: event tasks, null breakdown, or 1-segment focus.
+                if (breakdown === null || breakdown.segments.length <= 1) {
+                  return [
+                    <path
+                      key={t.id}
+                      d={arcPath(cappedStart, cappedEnd, r)}
+                      fill="none"
+                      stroke={TONE_VAR[t.tone]}
+                      strokeWidth={sw}
+                      strokeLinecap="round"
+                      opacity={opacity}
+                      style={activeStyle}
+                    />,
+                  ];
+                }
+
+                // Multi-segment focus: base arc (task tone, round caps inset)
+                // + semi-transparent white break overlays (butt caps, no insets).
+                const arcs: React.ReactElement[] = [];
+                arcs.push(
                   <path
-                    key={t.id}
-                    d={arcPath(t.start, t.end, R_ARC)}
+                    key={`${t.id}-base`}
+                    d={arcPath(cappedStart, cappedEnd, r)}
                     fill="none"
                     stroke={TONE_VAR[t.tone]}
                     strokeWidth={sw}
@@ -377,51 +397,34 @@ export function ClockNode({
                     opacity={opacity}
                     style={activeStyle}
                   />,
-                ];
-              }
-
-              // Multi-segment focus: single worm with break overlays.
-              // 1. Base arc t.start→t.end in task tone, round caps.
-              // 2. White butt-cap overlays at each break interval.
-              const arcs: React.ReactElement[] = [];
-              arcs.push(
-                <path
-                  key={`${t.id}-base`}
-                  d={arcPath(t.start, t.end, R_ARC)}
-                  fill="none"
-                  stroke={TONE_VAR[t.tone]}
-                  strokeWidth={sw}
-                  strokeLinecap="round"
-                  opacity={opacity}
-                  style={activeStyle}
-                />,
-              );
-              let segCursor = t.start;
-              for (let s = 0; s < breakdown.segments.length; s++) {
-                const seg = breakdown.segments[s]!;
-                const segEnd = segCursor + seg.min / 60;
-                if (seg.kind !== 'work') {
-                  // Short breaks = paper-white. Long breaks = ink-3 (darker neutral)
-                  // so users can distinguish a 15-min long break from a 5-min short.
-                  const breakStroke = seg.kind === 'long' ? 'var(--ink-3)' : 'var(--paper)';
-                  arcs.push(
-                    <path
-                      key={`${t.id}-seg-${s}`}
-                      data-testid="clock-task-break-arc"
-                      data-break-kind={seg.kind}
-                      d={arcPath(segCursor, segEnd, R_ARC)}
-                      fill="none"
-                      stroke={breakStroke}
-                      strokeWidth={sw}
-                      strokeLinecap="butt"
-                      opacity={opacity}
-                    />,
-                  );
+                );
+                let segCursor = t.start;
+                for (let s = 0; s < breakdown.segments.length; s++) {
+                  const seg = breakdown.segments[s]!;
+                  const segEnd = segCursor + seg.min / 60;
+                  if (seg.kind !== 'work') {
+                    // Semi-transparent white — task tone shows through. Long
+                    // breaks slightly more opaque than short to read distinctly.
+                    const breakOpacity = seg.kind === 'long' ? 0.85 : 0.65;
+                    arcs.push(
+                      <path
+                        key={`${t.id}-seg-${s}`}
+                        data-testid="clock-task-break-arc"
+                        data-break-kind={seg.kind}
+                        d={arcPath(segCursor, segEnd, r)}
+                        fill="none"
+                        stroke="var(--paper)"
+                        strokeWidth={sw}
+                        strokeLinecap="butt"
+                        opacity={breakOpacity * opacity}
+                      />,
+                    );
+                  }
+                  segCursor = segEnd;
                 }
-                segCursor = segEnd;
-              }
-              return arcs;
-            })}
+                return arcs;
+              });
+            })()}
 
             {/* Now notch */}
             {(() => {
@@ -539,25 +542,73 @@ export function ClockNode({
               the 12 numeral. Previous `top:70 + fontSize:9` collided with
               the "11" numeral (which sits at SVG y≈68). Bumped down to 92
               and shrunk to 7.5px so it sits clear of all face numerals. */}
+          {/* AM/PM toggle — switches the 12h viewWindow so users can see the
+              other half of the day. Active half highlighted in rust. */}
           <div
+            data-testid="clock-window-toggle"
             style={{
               position: 'absolute',
               top: 92,
               left: '50%',
               transform: 'translateX(-50%)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 7.5,
-              letterSpacing: '0.16em',
+              fontSize: 8.5,
+              letterSpacing: '0.12em',
               color: 'var(--ink-4)',
               textTransform: 'uppercase',
-              pointerEvents: 'none',
               whiteSpace: 'nowrap',
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+              pointerEvents: 'auto',
+              userSelect: 'none',
             }}
           >
-            <span style={{ color: 'var(--rust)', marginRight: 3, fontWeight: 700 }}>
-              {hours >= 12 ? 'PM' : 'AM'}
-            </span>
-            {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
+            <button
+              type="button"
+              data-testid="clock-window-am"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCommand('clock.setViewWindow', { window: 0 });
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '1px 4px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                letterSpacing: 'inherit',
+                color: viewWindow === 0 ? 'var(--rust)' : 'var(--ink-4)',
+                fontWeight: viewWindow === 0 ? 700 : 400,
+                borderBottom: viewWindow === 0 ? '1px solid var(--rust)' : '1px solid transparent',
+              }}
+            >
+              AM
+            </button>
+            <button
+              type="button"
+              data-testid="clock-window-pm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCommand('clock.setViewWindow', { window: 1 });
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '1px 4px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                letterSpacing: 'inherit',
+                color: viewWindow === 1 ? 'var(--rust)' : 'var(--ink-4)',
+                fontWeight: viewWindow === 1 ? 700 : 400,
+                borderBottom: viewWindow === 1 ? '1px solid var(--rust)' : '1px solid transparent',
+              }}
+            >
+              PM
+            </button>
+            <span style={{ color: 'var(--ink-3)' }}>{String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}</span>
           </div>
         </div>
 

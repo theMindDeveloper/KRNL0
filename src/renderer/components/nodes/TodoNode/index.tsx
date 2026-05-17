@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { PomoConfig } from '../PomoNode/types';
 import { defaultPomoConfig } from '../PomoNode/types';
 import { breakdownPomoTime } from '../../../store/pomoSchedule';
+import { toneVarForTask } from '../../../utils/taskColor';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -421,6 +422,22 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                       background: 'var(--rust)',
                       flexShrink: 0,
                       boxShadow: '0 0 6px rgba(200, 85, 61, 0.45)',
+                    }}
+                  />
+                )}
+                {/* Shared per-task color dot — links this todo row to its
+                    Calendar block and Clock arc. Only shown when the item
+                    is bound to an actual task node. */}
+                {item.taskNodeId !== null && (
+                  <span
+                    data-testid={`todo-color-dot-${item.id}`}
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: toneVarForTask(item.taskNodeId),
+                      flexShrink: 0,
+                      opacity: item.done ? 0.4 : 0.95,
                     }}
                   />
                 )}
