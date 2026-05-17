@@ -8,6 +8,7 @@
   "files": [
     "out/**/*",
     "bin/**/*",
+    "build/icon.*",
     "claude/**/*"
   ],
   "mac": {

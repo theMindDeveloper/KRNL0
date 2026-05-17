@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, protocol, net } from 'electron';
 import { join, normalize, sep } from 'path';
-import { mkdirSync, copyFileSync, existsSync } from 'fs';
+import { mkdirSync, copyFileSync, existsSync, chmodSync } from 'fs';
 import { tmpdir } from 'os';
 import { pathToFileURL } from 'url';
 import { registerHandlers, getCliDispatch } from './ipc/handlers';
@@ -53,6 +53,22 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+// Resolve the BrowserWindow icon for the current platform. Windows requires a
+// .ico file for crisp taskbar / alt-tab rendering; everywhere else .png works.
+// In packaged builds the `build/` directory is inside app.asar (see
+// electron-builder.json `files`), so __dirname-relative paths reach it the
+// same way as in dev. If the resolved file is missing we fall back to the PNG
+// rather than crashing — Electron just shows the default icon in that case.
+function resolveWindowIcon(): string {
+  const buildDir = join(__dirname, '../../build');
+  const preferred = process.platform === 'win32'
+    ? join(buildDir, 'icon.ico')
+    : join(buildDir, 'icon.png');
+  if (existsSync(preferred)) return preferred;
+  const fallback = join(buildDir, 'icon.png');
+  return existsSync(fallback) ? fallback : preferred;
+}
+
 function createWindow(): BrowserWindow {
   Menu.setApplicationMenu(null);
 
@@ -60,7 +76,7 @@ function createWindow(): BrowserWindow {
     width: 1440,
     height: 900,
     backgroundColor: '#0e0d0b',
-    icon: join(__dirname, '../../build/icon.png'),
+    icon: resolveWindowIcon(),
     titleBarStyle: 'hidden',
     titleBarOverlay: {
       color: '#1a1814',
@@ -131,11 +147,22 @@ function setupCliDir(): string {
   // In packaged:   resources/app.asar/out/main/index.js → ../../bin
   const srcBin = join(__dirname, '../../bin');
 
-  for (const file of ['krnl.js', 'krnl', 'krnl.cmd', 'sys.js', 'package.json', 'krnl-init.ps1']) {
+  // POSIX shell shims (krnl, claude) need the executable bit preserved across
+  // the copy. copyFileSync preserves mode on POSIX, but on packaged builds the
+  // bin/ ships from inside app.asar where mode bits aren't guaranteed — force
+  // them with chmod after copying.
+  const posixShims = new Set(['krnl', 'claude']);
+  for (const file of ['krnl.js', 'krnl', 'krnl.cmd', 'sys.js', 'package.json', 'krnl-init.ps1', 'claude']) {
     const src = join(srcBin, file);
     const dst = join(cliDir, file);
     try {
-      if (existsSync(src)) copyFileSync(src, dst);
+      if (existsSync(src)) {
+        copyFileSync(src, dst);
+        if (posixShims.has(file) && process.platform !== 'win32') {
+          // 0o755 — owner rwx, group/others rx.
+          try { chmodSync(dst, 0o755); } catch { /* non-fatal */ }
+        }
+      }
     } catch { /* non-fatal — krnl binary may be missing in some builds */ }
   }
 
@@ -146,6 +173,15 @@ function setupCliDir(): string {
 let rpcServer: RpcServer | undefined;
 
 app.whenReady().then(() => {
+  // Windows taskbar icon — without a unique AppUserModelID, Windows groups
+  // our window under Electron's generic model ID and pins the default
+  // Electron icon to the taskbar even when BrowserWindow({ icon }) is set.
+  // Setting an explicit ID (matches electron-builder.json `appId`) tells
+  // Windows this is its own application and the BrowserWindow icon wins.
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.theminddevlab.krnl0');
+  }
+
   setupCliDir();
 
   // TNF1: RPC server starts before any window opens.

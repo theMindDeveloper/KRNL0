@@ -46,7 +46,15 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
         cursorAccent: '#0e0d0b',
       },
       cursorBlink: true,
-      scrollback: 1000,
+      scrollback: 5000,
+      // Trackpad-friendly inertia: short scroll animations smooth out the
+      // jitter from high-frequency macOS trackpad wheel events. Without this
+      // the buffer jumps line-by-line and feels janky.
+      smoothScrollDuration: 90,
+      // macOS trackpads emit small delta values per frame; a slightly higher
+      // sensitivity makes a two-finger swipe feel right (matches iTerm2).
+      scrollSensitivity: 2,
+      fastScrollSensitivity: 6,
       allowProposedApi: true,
     });
     const fit = new FitAddon();
