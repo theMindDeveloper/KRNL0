@@ -57,7 +57,6 @@ export function ChassisLayer({ dockStyle }: { dockStyle: DockStyle }) {
     let maxX = -Infinity;
     for (const n of s.board.nodes) {
       if (!n.isMother) continue;
-      if (n.visible === false) continue;
       const x = n.position.x;
       if (x < minX) minX = x;
       if (x + MOTHER_WIDTH > maxX) maxX = x + MOTHER_WIDTH;

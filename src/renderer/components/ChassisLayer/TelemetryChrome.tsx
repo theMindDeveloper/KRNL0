@@ -109,7 +109,7 @@ export function TelemetryChrome() {
   const pomoSessionsToday = todayTotals.sessions;
   const todoOpen = open.tasksOpen;
   const habitBest = streaks.longestHabitStreak;
-  const calendarTodayEvents = todayTotals.taskCount + todayTotals.habitCount;
+  const calendarTodayEvents = todayTotals.tasksDone + todayTotals.habitCheckins;
 
   const bays = [
     { kind: 'pomo',     id: 'bay 01 · pomo',  name: 'DEEP WORK',  metric: `${pomoSessionsToday}`,        sub: 'sessions today',  warn: false },

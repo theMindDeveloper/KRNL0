@@ -1665,15 +1665,14 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     //    applyCommand fall-through. Keeps log coverage broad without
     //    requiring an emit on every dedicated branch above.
     if (command === 'pomo.start' && node.kind === 'pomo' && result.state !== undefined) {
-      emit('pomo.start', `pomo session started`, {
-        refId: (result.state as PomoState).activeTaskId ?? undefined,
-      });
+      const activeId = (result.state as PomoState).activeTaskId;
+      emit('pomo.start', `pomo session started`, activeId ? { refId: activeId } : {});
     } else if (command === 'habit.toggleDay' && node.kind === 'habit') {
       const habitId = typeof args['id'] === 'string' ? args['id'] : '';
-      emit('habit.checkin', `habit ${habitId.slice(0, 8)} toggled`, { refId: habitId || undefined });
+      emit('habit.checkin', `habit ${habitId.slice(0, 8)} toggled`, habitId ? { refId: habitId } : {});
     } else if (command === 'habit.markDone' && node.kind === 'habit') {
       const habitId = typeof args['id'] === 'string' ? args['id'] : '';
-      emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, { refId: habitId || undefined });
+      emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, habitId ? { refId: habitId } : {});
     } else if (command === 'habit.add' && node.kind === 'habit') {
       emit('habit.created', `habit added on ${shortId(nodeId)}`);
     } else if (command === 'habit.remove' && node.kind === 'habit') {

@@ -143,6 +143,17 @@ function getBoardSnapshot(): BoardSnapshot {
     return p && typeof p.x === 'number' && typeof p.y === 'number' ? { x: p.x, y: p.y } : undefined;
   };
 
+  const nodePositions: {
+    pomo?: { x: number; y: number };
+    todo?: { x: number; y: number };
+    calendar?: { x: number; y: number };
+    clock?: { x: number; y: number };
+  } = {};
+  const pomoPos = posOf('pomo'); if (pomoPos) nodePositions.pomo = pomoPos;
+  const todoPos = posOf('todo'); if (todoPos) nodePositions.todo = todoPos;
+  const calPos = posOf('calendar'); if (calPos) nodePositions.calendar = calPos;
+  const clockPos = posOf('clock'); if (clockPos) nodePositions.clock = clockPos;
+
   return {
     nodeCount: board.nodes.length,
     taskCount: tasks.length,
@@ -151,12 +162,7 @@ function getBoardSnapshot(): BoardSnapshot {
     hasTodo: board.nodes.some((n) => n.kind === 'todo'),
     hasCalendar: board.nodes.some((n) => n.kind === 'calendar'),
     hasClock: board.nodes.some((n) => n.kind === 'clock'),
-    nodePositions: {
-      pomo:     posOf('pomo'),
-      todo:     posOf('todo'),
-      calendar: posOf('calendar'),
-      clock:    posOf('clock'),
-    },
+    nodePositions,
     scheduledTaskCount,
     chainedTaskCount,
     taskTexts,
