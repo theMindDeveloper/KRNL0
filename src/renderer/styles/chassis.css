@@ -1283,10 +1283,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
    Ported from krnl-dock.html, prefixed `dk-` to avoid global clashes.
    Local color tokens are scoped via .dock-chassis.dock-krnl-dock.
    ============================================================ */
-.dock-chassis.dock-krnl-dock {
-  /* Force the dark ink scale on the chassis itself too — any descendant
-   * that reads var(--ink) resolves to a light shade even in light theme,
-   * since the rack interior is always near-black. */
+/* Variable overrides — canvas mode only.
+ * In canvas mode the krnl-dock chassis IS the rack interior (near-black)
+ * and every descendant inside it should pick up the dark ink scale even
+ * when the global theme is light. Station mode opts out (the chassis
+ * wraps the whole shell including the embedded canvas; forcing dark
+ * tokens would invert the active theme and hide the canvas grid). */
+.dock-chassis.dock-krnl-dock:not([data-station]) {
   --paper:   #14130f;
   --paper-2: #1f1d18;
   --paper-3: #2f2b24;
@@ -1295,6 +1298,9 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --ink-2:   #ddd6c6;
   --ink-3:   #968d7a;
   --ink-4:   #6a6253;
+}
+
+.dock-chassis.dock-krnl-dock {
   color: var(--ink);
 
   --dk-ch-1: #43463f;
@@ -1305,9 +1311,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --dk-phos-glow: #b8d95740;
   --dk-amber: #d9a23a;
   --dk-amber-dim: #6b4f1c;
-  /* Rack interior — dark brushed metal. Same hi-frequency vertical brush
-   * pattern as the rails but in much darker tones so the (dark, minimal)
-   * mother panels read as sitting INSIDE the rack rather than on top of it. */
+}
+
+/* Rack interior — dark brushed metal. Canvas mode only: the chassis IS
+ * the visible rack body and needs the dark gradient. Station mode opts
+ * out so the embedded canvas + its dot grid remain visible against the
+ * active theme's paper colour. */
+.dock-chassis.dock-krnl-dock:not([data-station]) {
   background:
     repeating-linear-gradient(90deg,
       rgba(0,0,0,0.45) 0 1px, transparent 1px 2px,
@@ -1319,7 +1329,6 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
     inset 0 0 0 1px #000,
     inset 0 16px 32px rgba(0,0,0,0.75),
     inset 0 -16px 32px rgba(0,0,0,0.75),
-    /* outer drop-shadow — rack lifts off the canvas paper */
     0 6px 14px rgba(0,0,0,0.4),
     0 24px 48px rgba(0,0,0,0.55),
     0 48px 100px -10px rgba(0,0,0,0.7);

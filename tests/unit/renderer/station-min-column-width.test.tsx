@@ -34,7 +34,11 @@ describe('station column minSize — 1024px viewport (ADR § 9.1)', () => {
   });
 
   it('default bottom-row split sums to 100%', () => {
-    expect(SLOT_DEFAULTS.bottom.canvas + SLOT_DEFAULTS.bottom.clock).toBe(100);
+    expect(
+      SLOT_DEFAULTS.bottom.canvas +
+      SLOT_DEFAULTS.bottom.terminal +
+      SLOT_DEFAULTS.bottom.clock
+    ).toBe(100);
   });
 
   it('default row + canvas fraction sums to 100%', () => {

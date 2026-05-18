@@ -47,10 +47,11 @@ export const SLOT_DEFAULTS = {
     'top-right-pre':   25,   // Habit
     'top-right-upper': 25,   // Calendar
   },
-  // Bottom-row column widths (must sum to 100): canvas + clock
+  // Bottom-row column widths (must sum to 100): canvas + terminal + clock
   bottom: {
-    canvas: 75,   // Embedded canvas
-    clock:  25,   // Clock — mirrors top-row Calendar's column width
+    canvas:   60,   // Embedded canvas — widest
+    terminal: 15,   // Terminal — hideable via right-click
+    clock:    25,   // Clock — mirrors top-row Calendar's column width
   },
   // Minimum sizes (percent)
   minRow:    18,

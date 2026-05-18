@@ -52,8 +52,9 @@ const PANEL_IDS = {
   colTodo:   'station-col-todo',
   colHabit:  'station-col-habit',
   colCal:    'station-col-cal',
-  bottomCanvas: 'station-bottom-canvas',
-  bottomClock:  'station-bottom-clock',
+  bottomCanvas:   'station-bottom-canvas',
+  bottomTerminal: 'station-bottom-terminal',
+  bottomClock:    'station-bottom-clock',
 } as const;
 
 // Rail padding per dock style — top/bottom in pixels so the layout doesn't
@@ -96,8 +97,9 @@ export function StationLayout() {
     [PANEL_IDS.colCal]:   SLOT_DEFAULTS.columns['top-right-upper'],
   };
   const defaultBottomLayout: Layout = {
-    [PANEL_IDS.bottomCanvas]: SLOT_DEFAULTS.bottom.canvas,
-    [PANEL_IDS.bottomClock]:  SLOT_DEFAULTS.bottom.clock,
+    [PANEL_IDS.bottomCanvas]:   SLOT_DEFAULTS.bottom.canvas,
+    [PANEL_IDS.bottomTerminal]: SLOT_DEFAULTS.bottom.terminal,
+    [PANEL_IDS.bottomClock]:    SLOT_DEFAULTS.bottom.clock,
   };
 
   const outerGroupRef = useRef<GroupImperativeHandle | null>(null);
@@ -185,6 +187,7 @@ export function StationLayout() {
   return (
     <div
       data-testid="station-layout"
+      data-station="true"
       className={`dock-chassis dock-${dockStyle}`}
       style={{
         // .dock-chassis defaults pointer-events:none + z-index:-1 (canvas
@@ -301,6 +304,16 @@ export function StationLayout() {
                 minSize={SLOT_DEFAULTS.minCanvas}
               >
                 <EmbeddedCanvasCell />
+              </Panel>
+
+              <Separator style={verticalHandleStyle} />
+
+              <Panel
+                id={PANEL_IDS.bottomTerminal}
+                defaultSize={SLOT_DEFAULTS.bottom.terminal}
+                minSize={SLOT_DEFAULTS.minColumn}
+              >
+                <CellWrapper><StationCell slot="bottom-strip" /></CellWrapper>
               </Panel>
 
               <Separator style={verticalHandleStyle} />
