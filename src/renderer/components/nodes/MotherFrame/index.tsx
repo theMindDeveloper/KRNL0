@@ -34,6 +34,11 @@ interface Props {
   background?: string;     // override (terminal uses --term-bg)
   borderColor?: string;
   minHeight?: number;      // override — must match INITIAL_DIMS_BY_KIND height
+  // ADR 0008 § 2.7 / § 12 required change #4 — variant controls whether the
+  // RF-specific rfToScreen badge tracker and portal are used.  In 'station'
+  // variant the badge is a normal absolute-positioned span inside the panel
+  // (no ViewportPortal, no rfToScreen arithmetic).  Mother content is identical.
+  variant?: 'canvas' | 'station';
 }
 
 // Wave C (LifeOS UI refresh) — bumped to 500×500 so mothers read as the
@@ -54,6 +59,7 @@ export function MotherFrame({
   background = 'var(--node-bg)',
   borderColor = 'var(--paper-3)',
   minHeight = MOTHER_HEIGHT,
+  variant = 'canvas',
 }: Props) {
   const setHoveredNodeId = useBoardStore((s) => s.setHoveredNodeId);
   const idx = String(slotIndex).padStart(2, '0');
@@ -61,9 +67,13 @@ export function MotherFrame({
 
   const badgeRef = useRef<HTMLDivElement>(null);
 
-  // Badge position tracking — pure arithmetic, no DOM reads.
+  // Badge position tracking (canvas variant only) — pure arithmetic, no DOM reads.
   // Badge anchor: left:14px, top:-11px relative to panel's RF top-left corner
   // → in screen space: rfToScreen(nodeX + 14, nodeY - 11).
+  //
+  // In 'station' variant this effect is a no-op: the badge renders as a normal
+  // absolute-positioned span inside the panel — no ViewportPortal escape needed
+  // because the panel is not clipped by .react-flow { overflow: hidden }.
   //
   // CSS transform is used instead of top/left because transform writes are
   // compositor-level (no layout dirtying). The badge starts at (0,0) hidden
@@ -72,6 +82,8 @@ export function MotherFrame({
   // Dependency on position.x/y: re-registers when node is swapped so the
   // closure captures the new flow coordinates.
   useLayoutEffect(() => {
+    if (variant === 'station') return;
+
     let cachedX = NaN;
     let cachedY = NaN;
     let cachedZ = NaN;
@@ -101,7 +113,7 @@ export function MotherFrame({
       },
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [position.x, position.y]);
+  }, [position.x, position.y, variant]);
 
   return (
     <div
@@ -150,22 +162,20 @@ export function MotherFrame({
 
       {children}
 
-      {/* Slot badge — portaled to document.body with position:fixed so it
-          escapes `.react-flow`'s overflow:hidden clip. Starts at (0,0) hidden
-          offscreen via transform; rafBatcher computes real coords each frame
-          from rfToScreen() — no getBoundingClientRect, no layout reads. */}
-      {typeof document !== 'undefined' && createPortal(
-        <div
-          ref={badgeRef}
+      {/* Slot badge — two rendering paths depending on variant:
+          'canvas': portaled to document.body with position:fixed so it escapes
+            `.react-flow`'s overflow:hidden clip. rafBatcher computes real coords
+            each frame from rfToScreen() — no getBoundingClientRect, no layout reads.
+          'station': normal absolute-positioned span inside the panel. The panel
+            is not RF-clipped so no portal escape is needed. */}
+      {variant === 'station' ? (
+        <span
           className="mother-frame__badge"
           aria-hidden
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            transformOrigin: '0 0',
-            // Start far offscreen — rAF writes the real transform on first paint.
-            transform: 'translate(-9999px, -9999px)',
+            position: 'absolute',
+            top: -11,
+            left: 14,
             background: 'var(--paper-2)',
             color: 'var(--ink-2)',
             fontFamily: 'var(--font-mono)',
@@ -183,8 +193,40 @@ export function MotherFrame({
         >
           <span style={{ color: 'var(--spine-hot)', marginRight: 1 }}>{idx}</span>
           <span> · spine · {total}</span>
-        </div>,
-        document.body,
+        </span>
+      ) : (
+        typeof document !== 'undefined' && createPortal(
+          <div
+            ref={badgeRef}
+            className="mother-frame__badge"
+            aria-hidden
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              transformOrigin: '0 0',
+              // Start far offscreen — rAF writes the real transform on first paint.
+              transform: 'translate(-9999px, -9999px)',
+              background: 'var(--paper-2)',
+              color: 'var(--ink-2)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              padding: '2.5px 8px 3px',
+              borderRadius: 2,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+              border: '1px solid var(--paper-3)',
+              zIndex: 5,
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ color: 'var(--spine-hot)', marginRight: 1 }}>{idx}</span>
+            <span> · spine · {total}</span>
+          </div>,
+          document.body,
+        )
       )}
     </div>
   );
