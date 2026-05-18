@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-dock="krnl-dock">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KRNL0 — Station Mode prototype</title>
+<style>
+  /* ───────── theme tokens (shared by both modes) ───────── */
+  :root,
+  [data-theme="dark"] {
+    --ink: #0e0d0b;
+    --paper: #14130f;
+    --paper-2: #1a1814;
+    --paper-3: #211e19;
+    --paper-4: #2a2620;
+    --line: #34302a;
+    --line-strong: #4a443a;
+    --ink-soft: #6d6557;
+    --ink-mid: #9b927f;
+    --ink-text: #cfc6b0;
+  }
+  [data-theme="light"] {
+    --ink: #ebe1c2;
+    --paper: #f4ecd2;
+    --paper-2: #ede2bd;
+    --paper-3: #e3d7ab;
+    --paper-4: #d9cb9a;
+    --line: #b9a777;
+    --line-strong: #a0905f;
+    --ink-soft: #7c6f4d;
+    --ink-mid: #5b5236;
+    --ink-text: #1a1612;
+  }
+  :root {
+    /* signal tokens — theme-invariant */
+    --acid: #c8ff3a;
+    --rust: #ff7849;
+    --cyan: #6ce4ff;
+    --magenta: #ff7ad6;
+    --gold: #f5c34b;
+    --lime: #c2ff5e;
+    --emerald: #4ee08f;
+    --mint: #74e6c2;
+    --ink-on-bright: #0a0908;
+    --font-sans: ui-monospace, "JetBrains Mono", "Menlo", "Consolas", monospace;
+    --radius: 6px;
+    --gap: 8px;
+    --splitter: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--ink); color: var(--ink-text); font-family: var(--font-sans); font-size: 12px; overflow: hidden; transition: background 120ms, color 120ms; }
+
+  /* ───────── shared topbar ───────── */
+  .topbar {
+    display: flex; align-items: center; gap: 14px;
+    height: 36px; padding: 0 14px;
+    background: var(--paper); border-bottom: 1px solid var(--line);
+    user-select: none;
+  }
+  .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: 0.4px; }
+  .brand .mark { width: 10px; height: 10px; background: var(--acid); display: inline-block; }
+  .crumb { color: var(--ink-soft); }
+  .crumb b { color: var(--ink-text); font-weight: 500; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 7px; border: 1px solid var(--line); border-radius: 999px;
+    color: var(--emerald); font-size: 10px; letter-spacing: 0.6px;
+  }
+  .badge .dot { width: 6px; height: 6px; background: var(--emerald); border-radius: 50%; box-shadow: 0 0 6px var(--emerald); }
+  .topbar .spacer { flex: 1; }
+  .topbar button, .pill, .topbar select {
+    background: transparent; color: var(--ink-text);
+    border: 1px solid var(--line); border-radius: 4px;
+    padding: 3px 8px; font: inherit; cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+  .topbar select { padding: 2px 6px; }
+  .topbar button:hover, .pill:hover { background: var(--paper-2); }
+  .pill { display: inline-flex; padding: 0; overflow: hidden; }
+  .pill .seg {
+    padding: 3px 9px; color: var(--ink-soft); cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .pill .seg + .seg { border-left: 1px solid var(--line); }
+  .pill .seg.active { background: var(--acid); color: var(--ink-on-bright); font-weight: 600; }
+
+  .statusbar {
+    height: 24px; padding: 0 14px;
+    display: flex; align-items: center; gap: 16px;
+    background: var(--ink); border-top: 1px solid var(--line);
+    color: var(--ink-soft); font-size: 10px; letter-spacing: 0.4px;
+  }
+  .statusbar .led { width: 6px; height: 6px; border-radius: 50%; background: var(--acid); box-shadow: 0 0 6px var(--acid); }
+  .statusbar .log { color: var(--ink-mid); }
+
+  /* ───────── mother chassis (shared between modes) ───────── */
+  .node {
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    min-width: 0; min-height: 0;
+  }
+  .node .head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: var(--paper-3);
+    border-bottom: 1px solid var(--line);
+    font-size: 10px; letter-spacing: 0.8px; color: var(--ink-mid);
+  }
+  .node .head .title { color: var(--ink-text); font-weight: 600; }
+  .node .head .spacer { flex: 1; }
+  .node .head .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--acid); }
+  .node .body { padding: 10px 12px; flex: 1; overflow: auto; }
+
+  /* mother contents */
+  .pomo .body { display: grid; grid-template-rows: auto 1fr auto auto; gap: 8px; }
+  .pomo .pips { display: flex; gap: 3px; height: 6px; align-items: end; }
+  .pomo .pips i { display: inline-block; width: 8px; height: 6px; background: var(--paper-4); border-radius: 1px; }
+  .pomo .pips i.on { background: var(--acid); }
+  .pomo .pips i.long { width: 14px; }
+  .pomo .pips i.brk { background: var(--paper); border: 1px solid var(--line); }
+  .pomo .timer { font-size: 44px; line-height: 1; font-weight: 600; letter-spacing: 1px; color: var(--ink-text); }
+  .pomo .meta { color: var(--ink-soft); font-size: 10px; letter-spacing: 0.6px; }
+  .pomo .actions { display: flex; gap: 6px; }
+  .pomo .actions .btn { flex: 1; text-align: center; padding: 7px; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+  .pomo .actions .btn.primary { background: var(--acid); color: var(--ink-on-bright); border-color: var(--acid); font-weight: 700; }
+
+  .todo .body { display: flex; flex-direction: column; gap: 4px; }
+  .todo .row { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: center; padding: 4px 2px; border-bottom: 1px dashed var(--paper-3); }
+  .todo .row:last-child { border-bottom: 0; }
+  .todo .check { width: 12px; height: 12px; border: 1px solid var(--line); border-radius: 2px; display: inline-block; }
+  .todo .check.done { background: var(--acid); border-color: var(--acid); }
+  .todo .name { color: var(--ink-text); }
+  .todo .num { color: var(--ink-soft); font-size: 10px; }
+  .todo .add { color: var(--ink-soft); padding: 4px 0; cursor: pointer; }
+
+  .habit .body { display: flex; flex-direction: column; gap: 12px; }
+  .habit .row { display: flex; align-items: center; justify-content: space-between; }
+  .habit .label { color: var(--ink-text); }
+  .habit .grid { display: inline-grid; grid-template-columns: repeat(4, 14px); gap: 3px; }
+  .habit .grid i { width: 14px; height: 14px; border: 1px solid var(--line); border-radius: 2px; display: inline-block; }
+  .habit .grid i.on { background: var(--acid); border-color: var(--acid); }
+  .habit .streak { color: var(--ink-soft); font-size: 10px; margin-top: 2px; }
+
+  .cal .body { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+  .cal .week { display: grid; grid-template-columns: 26px repeat(7, 1fr); gap: 2px; font-size: 9px; color: var(--ink-soft); }
+  .cal .week .h { text-align: center; padding: 2px 0; }
+  .cal .grid { flex: 1; display: grid; grid-template-columns: 26px repeat(7, 1fr); gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 3px; padding: 3px; min-height: 120px; position: relative; }
+  .cal .grid .hour { font-size: 8px; color: var(--ink-soft); text-align: right; padding-right: 4px; }
+  .cal .grid .col { background: var(--paper-2); border-radius: 2px; position: relative; min-height: 100%; }
+  .cal .blk { position: absolute; left: 1px; right: 1px; border-radius: 2px; padding: 2px 3px; font-size: 8px; color: var(--ink-on-bright); }
+
+  .clock .body { display: flex; align-items: center; justify-content: center; padding: 6px; }
+  .clock svg { width: 100%; max-width: 220px; aspect-ratio: 1/1; }
+
+  .term .body { padding: 6px 12px; color: var(--ink-mid); font-size: 10px; }
+  .term .line { display: flex; gap: 10px; }
+  .term .ts { color: var(--ink-soft); }
+  .term .led { width: 6px; height: 6px; background: var(--rust); border-radius: 50%; display: inline-block; box-shadow: 0 0 4px var(--rust); margin-right: 6px; vertical-align: middle; }
+
+  /* ───────── DOCK CHROME VARIANTS (apply in both modes) ───────── */
+  /* classic: nothing visible — relies on MotherFrame brackets */
+  [data-dock="classic"] .dock-strip { display: none; }
+  [data-dock="classic"] .dock-rail-top, [data-dock="classic"] .dock-rail-bot { display: none; }
+
+  /* synthesizer: knob rail along the bottom of the mother row */
+  [data-dock="synthesizer"] .dock-strip {
+    background: linear-gradient(180deg, var(--paper-3), var(--paper-4));
+    border-top: 1px solid var(--line-strong);
+    border-bottom: 1px solid var(--line);
+    padding: 6px 12px;
+    display: flex; align-items: center; gap: 14px;
+    overflow: hidden;
+  }
+  [data-dock="synthesizer"] .dock-strip .knob {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--paper), var(--paper-4));
+    border: 1px solid var(--line-strong);
+    position: relative; flex: 0 0 22px;
+    box-shadow: inset 0 -2px 4px rgba(0,0,0,0.4);
+  }
+  [data-dock="synthesizer"] .dock-strip .knob::after {
+    content: ''; position: absolute; left: 50%; top: 3px;
+    width: 2px; height: 7px; background: var(--ink-text); transform: translateX(-50%) rotate(var(--rot, -25deg));
+    transform-origin: 50% 9px;
+  }
+  [data-dock="synthesizer"] .dock-strip .lbl {
+    font-size: 8px; color: var(--ink-soft); letter-spacing: 0.6px; margin-left: -10px;
+  }
+  [data-dock="synthesizer"] .dock-strip .led-strip { display: inline-flex; gap: 3px; margin-left: auto; }
+  [data-dock="synthesizer"] .dock-strip .led-strip i { width: 4px; height: 12px; background: var(--paper-4); border-radius: 1px; }
+  [data-dock="synthesizer"] .dock-strip .led-strip i.on { background: var(--acid); box-shadow: 0 0 4px var(--acid); }
+
+  /* telemetry: instrument cells with gauges + signal */
+  [data-dock="telemetry"] .dock-strip {
+    background: var(--paper-3);
+    border-top: 1px solid var(--line-strong);
+    padding: 6px 12px;
+    display: grid; grid-template-columns: repeat(5, 1fr) auto; gap: 8px;
+  }
+  [data-dock="telemetry"] .dock-strip .cell {
+    border: 1px solid var(--line);
+    background: var(--paper-2);
+    padding: 4px 6px;
+    display: flex; flex-direction: column; gap: 2px;
+    font-size: 8px; color: var(--ink-soft); letter-spacing: 0.5px;
+    border-radius: 3px;
+  }
+  [data-dock="telemetry"] .dock-strip .cell .val { color: var(--ink-text); font-size: 14px; font-weight: 600; letter-spacing: 1px; }
+  [data-dock="telemetry"] .dock-strip .cell .bar { height: 3px; background: var(--paper-4); border-radius: 1px; overflow: hidden; }
+  [data-dock="telemetry"] .dock-strip .cell .bar i { display: block; height: 100%; background: var(--acid); }
+  [data-dock="telemetry"] .dock-strip .log { font-size: 9px; color: var(--ink-mid); align-self: end; }
+
+  /* krnl-dock: rack rails top + bottom */
+  [data-dock="krnl-dock"] .dock-rail-top, [data-dock="krnl-dock"] .dock-rail-bot {
+    background: linear-gradient(180deg, var(--paper-3), var(--paper-4));
+    border: 1px solid var(--line-strong);
+    padding: 4px 12px;
+    display: flex; align-items: center; gap: 14px;
+    font-size: 9px; color: var(--ink-soft); letter-spacing: 0.8px;
+  }
+  [data-dock="krnl-dock"] .dock-rail-top { border-bottom: 1px solid var(--ink); border-radius: 4px 4px 0 0; }
+  [data-dock="krnl-dock"] .dock-rail-bot { border-top: 1px solid var(--ink); border-radius: 0 0 4px 4px; }
+  [data-dock="krnl-dock"] .dock-rail-top .screw, [data-dock="krnl-dock"] .dock-rail-bot .screw {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--paper); border: 1px solid var(--line-strong);
+    box-shadow: inset 0 1px 1px rgba(0,0,0,0.5);
+  }
+  [data-dock="krnl-dock"] .dock-rail-top .live { color: var(--emerald); margin-left: auto; }
+  [data-dock="krnl-dock"] .dock-rail-bot .spacer { flex: 1; }
+  [data-dock="krnl-dock"] .dock-strip { display: none; }
+
+  /* default: hide rails unless krnl-dock */
+  .dock-rail-top, .dock-rail-bot { display: none; }
+  [data-dock="krnl-dock"] .dock-rail-top, [data-dock="krnl-dock"] .dock-rail-bot { display: flex; }
+
+  /* ───────── STATION MODE ───────── */
+  body[data-mode="station"] .app {
+    display: grid;
+    grid-template-rows: 36px 1fr 24px;
+    height: 100%;
+  }
+  body[data-mode="station"] .stage { background: var(--ink); overflow: hidden; display: flex; flex-direction: column; padding: var(--gap); gap: 0; }
+
+  body[data-mode="station"] .station-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns:
+      minmax(180px, var(--col-pomo, 1fr))
+      var(--splitter)
+      minmax(220px, var(--col-todo, 1.4fr))
+      var(--splitter)
+      minmax(180px, var(--col-habit, 1fr))
+      var(--splitter)
+      minmax(220px, var(--col-cal, 1.2fr));
+    grid-template-rows:
+      minmax(160px, var(--row-mothers, 0.34fr))
+      var(--splitter)
+      1fr;
+    grid-template-areas:
+      "pomo  sv1 todo  sv2 habit sv3 cal"
+      "sh1   sh1 sh1   sh1 sh1   sh1 calc-split"
+      "canvas canvas canvas canvas canvas canvas clock";
+    gap: 0;
+    overflow: hidden;
+    min-height: 0;
+  }
+  /* override: clock sits in right column under calendar */
+  body[data-mode="station"] .station-grid {
+    grid-template-areas:
+      "pomo  sv1 todo  sv2 habit sv3 cal"
+      "sh1   sh1 sh1   sh1 sh1   sh1 sh2"
+      "canvas canvas canvas canvas canvas canvas clock";
+    grid-template-rows:
+      minmax(160px, var(--row-mothers, 0.34fr))
+      var(--splitter)
+      1fr;
+  }
+  body[data-mode="station"] .slot-pomo { grid-area: pomo; padding: 0 var(--gap) 0 0; }
+  body[data-mode="station"] .slot-todo { grid-area: todo; padding: 0 var(--gap); }
+  body[data-mode="station"] .slot-habit { grid-area: habit; padding: 0 var(--gap); }
+  body[data-mode="station"] .slot-cal { grid-area: cal; padding: 0 0 0 var(--gap); }
+  body[data-mode="station"] .slot-clock { grid-area: clock; padding: var(--gap) 0 0 var(--gap); }
+  body[data-mode="station"] .slot-canvas { grid-area: canvas; padding: var(--gap) var(--gap) 0 0; }
+
+  /* splitters */
+  body[data-mode="station"] .splitter-v { background: transparent; cursor: col-resize; align-self: stretch; transition: background 120ms; }
+  body[data-mode="station"] .splitter-v:hover { background: var(--acid); opacity: 0.7; }
+  body[data-mode="station"] .splitter-h { background: transparent; cursor: row-resize; justify-self: stretch; transition: background 120ms; }
+  body[data-mode="station"] .splitter-h:hover { background: var(--acid); opacity: 0.7; }
+  body[data-mode="station"] .sv1 { grid-area: sv1; } body[data-mode="station"] .sv2 { grid-area: sv2; } body[data-mode="station"] .sv3 { grid-area: sv3; }
+  body[data-mode="station"] .sh1 { grid-area: sh1; } body[data-mode="station"] .sh2 { grid-area: sh2; cursor: row-resize; transition: background 120ms; } body[data-mode="station"] .sh2:hover { background: var(--acid); opacity: 0.7; }
+
+  body[data-mode="station"] .dock-strip,
+  body[data-mode="station"] .dock-rail-top,
+  body[data-mode="station"] .dock-rail-bot { display: flex; }
+
+  /* term as bottom strip in station */
+  body[data-mode="station"] .slot-term { display: none; }     /* term goes into the canvas strip area in v1 */
+
+  /* ───────── CANVAS MODE ───────── */
+  body[data-mode="canvas"] .app { display: grid; grid-template-rows: 36px 1fr 24px; height: 100%; }
+  body[data-mode="canvas"] .stage {
+    position: relative; overflow: hidden;
+    background-color: var(--ink);
+    background-image: radial-gradient(circle at 1px 1px, var(--paper-4) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  body[data-mode="canvas"] .station-grid { display: none; }
+  body[data-mode="canvas"] .canvas-mode-stage { display: block; position: absolute; inset: 0; }
+  .canvas-mode-stage { display: none; }
+  .canvas-mode-stage .float {
+    position: absolute;
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+  }
+  /* canvas-mode positions (current design — anchored mother row + free children + dock chrome wraps row) */
+  .cm-pomo  { left: 32px;  top: 30px;  width: 220px; height: 220px; }
+  .cm-todo  { left: 270px; top: 30px;  width: 220px; height: 220px; }
+  .cm-habit { left: 506px; top: 30px;  width: 220px; height: 220px; }
+  .cm-cal   { left: 742px; top: 30px;  width: 230px; height: 220px; }
+  .cm-clock { left: 988px; top: 30px;  width: 220px; height: 220px; }
+  .cm-term  { left: 270px; top: 540px; width: 700px; height: 70px; }
+  .cm-task  { width: 130px; height: 56px; padding: 6px 8px; font-size: 10px; color: var(--ink-text); }
+  .cm-task .t { font-weight: 600; }
+  .cm-task .m { color: var(--ink-soft); font-size: 9px; margin-top: 2px; }
+  .cm-task .acc { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--acid); margin-right: 5px; vertical-align: middle; }
+  /* dock chrome wraps the mother row in canvas mode too — sits behind cards */
+  .cm-dock-wrap {
+    position: absolute; left: 14px; top: 12px;
+    width: 1210px; padding-top: 18px; padding-bottom: 12px;
+    pointer-events: none;
+  }
+  .cm-dock-wrap .dock-rail-top, .cm-dock-wrap .dock-rail-bot,
+  .cm-dock-wrap .dock-strip { pointer-events: auto; }
+  .cm-dock-inner { height: 240px; position: relative; }
+
+  .canvas-mode-stage svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .canvas-mode-stage svg.wires path { stroke: var(--cyan); stroke-width: 1.5; fill: none; stroke-dasharray: 4 4; opacity: 0.7; animation: dash 10s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -200; } }
+
+  /* ───────── embedded canvas window (station mode) ───────── */
+  .canvas-window {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--paper);
+    background-image: radial-gradient(circle at 1px 1px, var(--paper-4) 1px, transparent 0);
+    background-size: 18px 18px;
+  }
+  .canvas-window .cw-head {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: linear-gradient(to bottom, color-mix(in oklab, var(--paper) 92%, transparent), transparent);
+    z-index: 3;
+    font-size: 10px; color: var(--ink-mid); letter-spacing: 0.6px;
+  }
+  .canvas-window .cw-head .title { color: var(--ink-text); font-weight: 600; }
+  .canvas-window .cw-head .spacer { flex: 1; }
+  .canvas-window .cw-head .tag { padding: 1px 6px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink-soft); }
+  .canvas-window .cw-toolbar {
+    position: absolute; top: 32px; left: 10px;
+    display: flex; gap: 4px; z-index: 3;
+  }
+  .canvas-window .cw-toolbar button {
+    background: var(--paper-2); border: 1px solid var(--line); color: var(--ink-text);
+    border-radius: 3px; padding: 3px 7px; font: inherit; font-size: 10px; cursor: pointer;
+    letter-spacing: 0.4px;
+  }
+  .canvas-window .cw-toolbar button:hover { background: var(--paper-3); border-color: var(--line-strong); }
+  .canvas-window .nodes { position: absolute; inset: 0; transform: translate(var(--pan-x, 0px), var(--pan-y, 0px)) scale(var(--zoom, 1)); transform-origin: 0 0; transition: none; }
+  .canvas-window .nd {
+    position: absolute;
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 6px 8px; font-size: 10px;
+    color: var(--ink-text);
+    min-width: 110px;
+    cursor: grab;
+  }
+  .canvas-window .nd .h { display: flex; align-items: center; gap: 6px; }
+  .canvas-window .nd .acc { width: 6px; height: 6px; border-radius: 50%; background: var(--acid); }
+  .canvas-window .nd .sub { color: var(--ink-soft); font-size: 9px; margin-top: 3px; }
+  .canvas-window svg.wires { position: absolute; inset: 0; pointer-events: none; transform: translate(var(--pan-x, 0px), var(--pan-y, 0px)) scale(var(--zoom, 1)); transform-origin: 0 0; }
+  .canvas-window svg.wires path { stroke: var(--cyan); stroke-width: 1.5; fill: none; stroke-dasharray: 4 4; opacity: 0.65; animation: dash 10s linear infinite; }
+
+  .nd-t1 { left: 40px;  top: 70px; }
+  .nd-t2 { left: 230px; top: 140px; }
+  .nd-t3 { left: 430px; top: 100px; }
+  .nd-t4 { left: 230px; top: 230px; }
+  .nd-h1 { left: 510px; top: 230px; background: var(--paper-3); }
+  .nd-h1 .acc { background: var(--gold); }
+
+  /* ───────── hint banner ───────── */
+  .hint {
+    position: fixed; bottom: 32px; right: 14px;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 4px;
+    padding: 8px 10px; font-size: 10px; color: var(--ink-mid);
+    max-width: 320px; letter-spacing: 0.4px; line-height: 1.5;
+  }
+  .hint b { color: var(--ink-text); font-weight: 600; }
+  .hint kbd { background: var(--paper-3); padding: 1px 4px; border-radius: 3px; border: 1px solid var(--line); color: var(--ink-text); }
+</style>
+</head>
+<body data-mode="station">
+<div class="app">
+
+  <!-- ───── TOPBAR ───── -->
+  <header class="topbar">
+    <span class="brand"><span class="mark"></span>KRNL0</span>
+    <span class="crumb">∷ ~/krnl0 / boards / <b>deep-work</b></span>
+    <span class="badge"><span class="dot"></span>LIVE</span>
+    <span class="spacer"></span>
+
+    <label style="display:inline-flex;align-items:center;gap:6px;color:var(--ink-soft);font-size:10px;">
+      FRAME
+      <select id="dock-style">
+        <option value="classic">classic</option>
+        <option value="synthesizer">synthesizer</option>
+        <option value="telemetry">telemetry</option>
+        <option value="krnl-dock" selected>krnl-dock</option>
+      </select>
+    </label>
+
+    <span class="pill" role="tablist" id="mode-toggle" title="Toggle Station / Canvas mode (Ctrl+Shift+L)">
+      <span class="seg active" data-mode="station">◳ STATION</span>
+      <span class="seg"        data-mode="canvas">◰ CANVAS</span>
+    </span>
+    <button>FIT</button>
+    <button id="theme-toggle">☾ DARK</button>
+    <button>TWEAKS</button>
+    <button>SHARE</button>
+  </header>
+
+  <main class="stage">
+
+    <!-- ───── CANVAS MODE: free-floating mother row + dock chrome wraps it + free child nodes + wires ───── -->
+    <div class="canvas-mode-stage">
+      <!-- dock chrome wrapping the mother row (anchored on canvas, pans with it) -->
+      <div class="cm-dock-wrap">
+        <div class="dock-rail-top"><span class="screw"></span>KRNL0 RACK · BUS A · 18:32 · <span class="live">● LIVE</span></div>
+        <div class="cm-dock-inner"></div>
+        <div class="dock-rail-bot"><span class="screw"></span>kernel ready · 12 nodes · 8 wires<span class="spacer"></span>v0.8.9</div>
+        <div class="dock-strip">
+          <span class="cell"><span>POMO</span><span class="val">25:00</span><span class="bar"><i style="width:32%"></i></span></span>
+          <span class="cell"><span>TASKS</span><span class="val">4/5</span><span class="bar"><i style="width:80%"></i></span></span>
+          <span class="cell"><span>HABITS</span><span class="val">2/2</span><span class="bar"><i style="width:100%"></i></span></span>
+          <span class="cell"><span>FOCUS</span><span class="val">75m</span><span class="bar"><i style="width:55%"></i></span></span>
+          <span class="cell"><span>STREAK</span><span class="val">4d</span><span class="bar"><i style="width:65%"></i></span></span>
+          <span class="log">[telemetry · 0.4 Hz]</span>
+        </div>
+        <span class="knob" style="--rot:-25deg"></span>
+        <span class="lbl">GAIN</span>
+        <span class="knob" style="--rot:18deg"></span>
+        <span class="lbl">CUTOFF</span>
+        <span class="knob" style="--rot:60deg"></span>
+        <span class="lbl">RES</span>
+        <span class="led-strip"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></span>
+      </div>
+
+      <svg class="wires" viewBox="0 0 1280 700" preserveAspectRatio="none">
+        <path d="M 200 360 C 260 380, 300 410, 360 420" />
+        <path d="M 360 420 C 430 430, 470 470, 530 480" />
+        <path d="M 530 480 C 600 470, 640 440, 720 430" />
+        <path d="M 720 430 C 790 440, 830 480, 900 490" />
+      </svg>
+
+      <div class="float cm-pomo" data-mother="pomo"></div>
+      <div class="float cm-todo" data-mother="todo"></div>
+      <div class="float cm-habit" data-mother="habit"></div>
+      <div class="float cm-cal" data-mother="cal"></div>
+      <div class="float cm-clock" data-mother="clock"></div>
+      <div class="float cm-term" data-mother="term"></div>
+
+      <div class="float cm-task" style="left: 140px; top: 340px;"><div><span class="acc"></span><b class="t">Task 1</b></div><div class="m">25m · TASK</div></div>
+      <div class="float cm-task" style="left: 330px; top: 400px;"><div><span class="acc"></span><b class="t">Task 2</b></div><div class="m">1h · TASK</div></div>
+      <div class="float cm-task" style="left: 500px; top: 460px;"><div><span class="acc"></span><b class="t">Task 3</b></div><div class="m">45m · TASK</div></div>
+      <div class="float cm-task" style="left: 690px; top: 410px;"><div><span class="acc"></span><b class="t">Task 4</b></div><div class="m">1h 30m · TASK</div></div>
+      <div class="float cm-task" style="left: 880px; top: 470px;"><div><span class="acc" style="background:var(--gold)"></span><b class="t">habit 1</b></div><div class="m">EVENT</div></div>
+    </div>
+
+    <!-- ───── STATION MODE: fixed grid + splitters + dock chrome below row + embedded canvas ───── -->
+    <div class="station-grid">
+      <section class="slot-pomo" data-mother="pomo"></section>
+      <div class="splitter-v sv1" data-resize="col" data-target="pomo-todo"></div>
+      <section class="slot-todo" data-mother="todo"></section>
+      <div class="splitter-v sv2" data-resize="col" data-target="todo-habit"></div>
+      <section class="slot-habit" data-mother="habit"></section>
+      <div class="splitter-v sv3" data-resize="col" data-target="habit-cal"></div>
+      <section class="slot-cal" data-mother="cal"></section>
+
+      <div class="splitter-h sh1" data-resize="row"></div>
+      <div class="splitter-h sh2" data-resize="cal-clock"></div>
+
+      <section class="slot-canvas">
+        <div class="node canvas-window" style="height:100%">
+          <div class="cw-head">
+            <span class="title">CANVAS</span>
+            <span class="tag">embedded · infinite · pan · zoom</span>
+            <span class="spacer"></span>
+            <span style="color:var(--ink-soft)">5 nodes · 4 wires · zoom <span id="zoom-pct">100%</span></span>
+          </div>
+          <div class="cw-toolbar">
+            <button title="Add text">＋ TEXT</button>
+            <button title="Add image">＋ IMAGE</button>
+            <button title="Add frame">＋ FRAME</button>
+            <button title="Fit view">⌖ FIT</button>
+            <button id="zoom-out" title="Zoom out">−</button>
+            <button id="zoom-in" title="Zoom in">＋</button>
+          </div>
+          <svg class="wires" viewBox="0 0 700 360" preserveAspectRatio="none">
+            <path d="M 100 100 C 160 120, 200 150, 250 170" />
+            <path d="M 280 170 C 340 170, 380 140, 440 130" />
+            <path d="M 280 270 C 340 260, 380 240, 440 230" />
+            <path d="M 470 140 C 510 190, 540 230, 540 260" />
+          </svg>
+          <div class="nodes" id="cw-nodes">
+            <div class="nd nd-t1"><div class="h"><span class="acc"></span><b>Task 1</b></div><div class="sub">25m · TASK</div></div>
+            <div class="nd nd-t2"><div class="h"><span class="acc"></span><b>Task 2</b></div><div class="sub">1h · TASK</div></div>
+            <div class="nd nd-t3"><div class="h"><span class="acc"></span><b>Task 3</b></div><div class="sub">45m · TASK</div></div>
+            <div class="nd nd-t4"><div class="h"><span class="acc"></span><b>Task 3.2</b></div><div class="sub">1h 30m · TASK</div></div>
+            <div class="nd nd-h1"><div class="h"><span class="acc"></span><b>habit 1</b></div><div class="sub">EVENT · 30m</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slot-clock" data-mother="clock"></section>
+    </div>
+  </main>
+
+  <footer class="statusbar">
+    <span class="led"></span>
+    <span>5 nodes · 4 edges · <b style="color:var(--ink-text)">deep-work</b></span>
+    <span style="flex:1"></span>
+    <span class="log">[13:07:11] daemon ready · clock <b style="color:var(--ink-text)">CONNECTED</b> · pomo 3/4 · IDLE</span>
+  </footer>
+</div>
+
+<div class="hint">
+  <b>STATION MODE prototype.</b> <br>
+  Toggle layout: <kbd>◳ STATION</kbd> / <kbd>◰ CANVAS</kbd> pill or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>.<br>
+  Change dock chrome variant in the <b>FRAME</b> picker — applies to <b>both modes</b>.<br>
+  Toggle theme via the ☾ DARK button.<br>
+  In station mode: drag the splitter handles between panels to resize. Use the canvas toolbar (＋ TEXT / IMAGE / FRAME / − / ＋) inside the embedded canvas.
+</div>
+
+<!-- ───────── shared mother-content templates injected into both modes ───────── -->
+<template id="tpl-pomo">
+  <div class="node pomo" style="height:100%">
+    <div class="head"><span class="title">POMO</span><span style="color:var(--ink-soft)">· DEEP WORK</span><span class="spacer"></span><span class="dot"></span></div>
+    <div class="body">
+      <div class="pips"><i class="on"></i><i class="brk"></i><i class="on"></i><i class="brk long"></i><i class="on"></i><i></i><i></i></div>
+      <div class="timer">25:00</div>
+      <div class="meta">SESSION 3 · 75/85 EFF</div>
+      <div class="actions"><div class="btn">RESET</div><div class="btn primary">START</div></div>
+    </div>
+  </div>
+</template>
+<template id="tpl-todo">
+  <div class="node todo" style="height:100%">
+    <div class="head"><span class="title">TASKS</span><span style="color:var(--ink-soft)">(5)</span><span class="spacer"></span><span class="dot"></span></div>
+    <div class="body">
+      <div class="row"><span class="check"></span><span class="name">Task 1</span><span class="num">1h 25m</span></div>
+      <div class="row"><span class="check"></span><span class="name">Task 2</span><span class="num">1h 15m</span></div>
+      <div class="row"><span class="check done"></span><span class="name">Task 3</span><span class="num">45m</span></div>
+      <div class="row"><span class="check"></span><span class="name">Task 3.2</span><span class="num">1h 30m</span></div>
+      <div class="row"><span class="check"></span><span class="name">Task 4</span><span class="num">1h 30m</span></div>
+      <div class="add">+ ADD TASK</div>
+    </div>
+  </div>
+</template>
+<template id="tpl-habit">
+  <div class="node habit" style="height:100%">
+    <div class="head"><span class="title">HABITS</span><span style="color:var(--ink-soft)">· TODAY</span><span class="spacer"></span><span class="dot"></span></div>
+    <div class="body">
+      <div><div class="row"><span class="label">habit 1</span><span class="grid"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div><div class="streak">▲ 4 day streak</div></div>
+      <div><div class="row"><span class="label">habit 2</span><span class="grid"><i class="on"></i><i></i><i></i><i></i></span></div><div class="streak">▲ 1 day streak</div></div>
+    </div>
+  </div>
+</template>
+<template id="tpl-cal">
+  <div class="node cal" style="height:100%">
+    <div class="head"><span class="title">CALENDAR</span><span style="color:var(--ink-soft)">Week of May 11</span><span class="spacer"></span><span class="dot"></span></div>
+    <div class="body" data-cal-host></div>
+  </div>
+</template>
+<template id="tpl-clock">
+  <div class="node clock" style="height:100%">
+    <div class="head"><span class="title">TODAY</span><span style="color:var(--ink-soft)">· SCHEDULE</span><span class="spacer"></span><span class="dot"></span></div>
+    <div class="body" data-clock-host></div>
+  </div>
+</template>
+<template id="tpl-term">
+  <div class="node term" style="height:100%">
+    <div class="head"><span class="title">SYSTEM</span><span style="color:var(--ink-soft)">· KERNEL</span><span class="spacer"></span><span class="dot" style="background:var(--rust)"></span></div>
+    <div class="body">
+      <div class="line"><span class="led"></span><span class="ts">[13:07:09]</span><span>KRNL0 daemon initialized</span></div>
+      <div class="line"><span class="ts">[13:07:11]</span><span>12 nodes loaded · 8 wires connected · System ready</span></div>
+    </div>
+  </div>
+</template>
+
+<script>
+  const body = document.body;
+  const html = document.documentElement;
+
+  // ───── mode toggle ─────
+  const pill = document.getElementById('mode-toggle');
+  function setMode(mode) {
+    body.setAttribute('data-mode', mode);
+    pill.querySelectorAll('.seg').forEach(s => s.classList.toggle('active', s.dataset.mode === mode));
+    try { localStorage.setItem('krnl0-proto-mode', mode); } catch {}
+  }
+  pill.addEventListener('click', e => {
+    const seg = e.target.closest('.seg');
+    if (seg) setMode(seg.dataset.mode);
+  });
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
+      e.preventDefault();
+      setMode(body.dataset.mode === 'station' ? 'canvas' : 'station');
+    }
+  });
+  try { const m = localStorage.getItem('krnl0-proto-mode'); if (m) setMode(m); } catch {}
+
+  // ───── dock variant ─────
+  const dockSel = document.getElementById('dock-style');
+  function setDock(d) { html.setAttribute('data-dock', d); dockSel.value = d; try { localStorage.setItem('krnl0-proto-dock', d); } catch {} }
+  dockSel.addEventListener('change', e => setDock(e.target.value));
+  try { const d = localStorage.getItem('krnl0-proto-dock'); if (d) setDock(d); } catch {}
+
+  // ───── theme toggle ─────
+  const themeBtn = document.getElementById('theme-toggle');
+  function setTheme(t) {
+    html.setAttribute('data-theme', t);
+    themeBtn.textContent = t === 'dark' ? '☾ DARK' : '☀ LIGHT';
+    try { localStorage.setItem('krnl0-proto-theme', t); } catch {}
+  }
+  themeBtn.addEventListener('click', () => setTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+  try { const t = localStorage.getItem('krnl0-proto-theme'); if (t) setTheme(t); else setTheme('dark'); } catch { setTheme('dark'); }
+
+  // ───── mount mother content into both station cells and canvas-mode floaters ─────
+  function mountMother(host, kind) {
+    const tpl = document.getElementById('tpl-' + kind);
+    if (!tpl) return;
+    host.innerHTML = '';
+    host.appendChild(tpl.content.cloneNode(true));
+    const calHost = host.querySelector('[data-cal-host]');
+    if (calHost) renderCal(calHost);
+    const clockHost = host.querySelector('[data-clock-host]');
+    if (clockHost) renderClock(clockHost);
+  }
+  document.querySelectorAll('[data-mother]').forEach(el => mountMother(el, el.dataset.mother));
+
+  // ───── calendar mini-grid ─────
+  function renderCal(host) {
+    host.innerHTML = '';
+    const wk = document.createElement('div'); wk.className = 'week';
+    wk.appendChild(Object.assign(document.createElement('div'), {className: 'h', textContent: ''}));
+    ['M','T','W','T','F','S','S'].forEach(d => wk.appendChild(Object.assign(document.createElement('div'), {className: 'h', textContent: d})));
+    const grid = document.createElement('div'); grid.className = 'grid';
+    for (let h = 9; h <= 18; h += 3) {
+      grid.appendChild(Object.assign(document.createElement('div'), {className: 'hour', textContent: h + ':00'}));
+      for (let c = 0; c < 7; c++) {
+        if (h === 9) {
+          const col = document.createElement('div'); col.className = 'col';
+          if (c === 1) { const b = document.createElement('div'); b.className = 'blk'; b.style.cssText = 'top:8%;height:30%;background:var(--acid)'; b.textContent = 'Task 1'; col.appendChild(b); }
+          if (c === 2) { const b = document.createElement('div'); b.className = 'blk'; b.style.cssText = 'top:24%;height:40%;background:var(--rust);color:#fff'; b.textContent = 'Task 2'; col.appendChild(b); }
+          if (c === 4) { const b = document.createElement('div'); b.className = 'blk'; b.style.cssText = 'top:10%;height:24%;background:var(--gold)'; b.textContent = 'habit'; col.appendChild(b); }
+          grid.appendChild(col);
+        }
+      }
+    }
+    host.appendChild(wk);
+    host.appendChild(grid);
+  }
+
+  // ───── clock SVG ─────
+  function renderClock(host) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 200 200');
+    const cx = 100, cy = 100;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+      const t = document.createElementNS(ns, 'line');
+      t.setAttribute('x1', cx + Math.cos(a) * 78); t.setAttribute('y1', cy + Math.sin(a) * 78);
+      t.setAttribute('x2', cx + Math.cos(a) * 84); t.setAttribute('y2', cy + Math.sin(a) * 84);
+      t.setAttribute('stroke', 'var(--ink-soft)'); t.setAttribute('stroke-width', '1.5');
+      svg.appendChild(t);
+    }
+    const base = document.createElementNS(ns, 'circle');
+    base.setAttribute('cx', cx); base.setAttribute('cy', cy); base.setAttribute('r', 70);
+    base.setAttribute('fill', 'none'); base.setAttribute('stroke', 'var(--paper-3)'); base.setAttribute('stroke-width', '6');
+    svg.appendChild(base);
+    function arc(r, startH, endH, color) {
+      const a1 = (startH / 12) * Math.PI * 2 - Math.PI/2, a2 = (endH / 12) * Math.PI * 2 - Math.PI/2;
+      const x1 = cx + Math.cos(a1) * r, y1 = cy + Math.sin(a1) * r;
+      const x2 = cx + Math.cos(a2) * r, y2 = cy + Math.sin(a2) * r;
+      const large = (a2 - a1) > Math.PI ? 1 : 0;
+      const p = document.createElementNS(ns, 'path');
+      p.setAttribute('d', `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`);
+      p.setAttribute('fill', 'none'); p.setAttribute('stroke', color); p.setAttribute('stroke-width', '6');
+      svg.appendChild(p);
+    }
+    arc(70, 1, 3, 'var(--acid)');
+    arc(70, 4, 5.5, 'var(--rust)');
+    arc(62, 10, 11, 'var(--gold)');
+    const now = new Date();
+    const hAngle = ((now.getHours() % 12) + now.getMinutes()/60) / 12 * Math.PI * 2 - Math.PI/2;
+    const mAngle = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI/2;
+    function hand(angle, len, w, color) {
+      const ln = document.createElementNS(ns, 'line');
+      ln.setAttribute('x1', cx); ln.setAttribute('y1', cy);
+      ln.setAttribute('x2', cx + Math.cos(angle) * len); ln.setAttribute('y2', cy + Math.sin(angle) * len);
+      ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', w); ln.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(ln);
+    }
+    hand(hAngle, 38, 3, 'var(--ink-text)');
+    hand(mAngle, 52, 2, 'var(--ink-text)');
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', 3); dot.setAttribute('fill', 'var(--acid)');
+    svg.appendChild(dot);
+    host.innerHTML = ''; host.appendChild(svg);
+  }
+
+  // ───── resizable splitters (column + row) ─────
+  const stationGrid = document.querySelector('.station-grid');
+  const colVars = ['--col-pomo', '--col-todo', '--col-habit', '--col-cal'];
+  const colDefaults = [1, 1.4, 1, 1.2];
+  let colFractions = [...colDefaults];
+  function applyCols() { colVars.forEach((v, i) => stationGrid.style.setProperty(v, colFractions[i] + 'fr')); }
+  applyCols();
+  let rowFraction = 0.34;
+  stationGrid.style.setProperty('--row-mothers', rowFraction + 'fr');
+
+  function startDrag(e, kind, target) {
+    e.preventDefault();
+    const rect = stationGrid.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY;
+    const startCols = [...colFractions];
+    const startRow = rowFraction;
+    function onMove(ev) {
+      if (kind === 'col') {
+        const dx = ev.clientX - startX;
+        const pxPerFr = rect.width / startCols.reduce((a,b) => a+b, 0);
+        const dfr = dx / pxPerFr;
+        if (target === 'pomo-todo')  { colFractions[0] = Math.max(0.4, startCols[0] + dfr); colFractions[1] = Math.max(0.4, startCols[1] - dfr); }
+        if (target === 'todo-habit') { colFractions[1] = Math.max(0.4, startCols[1] + dfr); colFractions[2] = Math.max(0.4, startCols[2] - dfr); }
+        if (target === 'habit-cal')  { colFractions[2] = Math.max(0.4, startCols[2] + dfr); colFractions[3] = Math.max(0.4, startCols[3] - dfr); }
+        applyCols();
+      } else if (kind === 'row') {
+        const dy = ev.clientY - startY;
+        const f = startRow + dy / rect.height * 3;     // 3 = (1 + startRow) approx scaling factor
+        rowFraction = Math.max(0.15, Math.min(0.7, f));
+        stationGrid.style.setProperty('--row-mothers', rowFraction + 'fr');
+      }
+    }
+    function onUp() { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+  document.querySelectorAll('.splitter-v').forEach(sp => {
+    sp.addEventListener('mousedown', e => startDrag(e, 'col', sp.dataset.target));
+    sp.addEventListener('dblclick', () => { colFractions = [...colDefaults]; applyCols(); });
+  });
+  document.querySelectorAll('.splitter-h').forEach(sp => {
+    sp.addEventListener('mousedown', e => startDrag(e, 'row'));
+    sp.addEventListener('dblclick', () => { rowFraction = 0.34; stationGrid.style.setProperty('--row-mothers', '0.34fr'); });
+  });
+
+  // ───── embedded canvas: pan + zoom ─────
+  const cw = document.querySelector('.canvas-window');
+  let zoom = 1, panX = 0, panY = 0;
+  function applyTransform() {
+    cw.style.setProperty('--zoom', zoom);
+    cw.style.setProperty('--pan-x', panX + 'px');
+    cw.style.setProperty('--pan-y', panY + 'px');
+    const z = document.getElementById('zoom-pct'); if (z) z.textContent = Math.round(zoom * 100) + '%';
+  }
+  cw.addEventListener('wheel', e => {
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoom = Math.max(0.3, Math.min(2.5, zoom + (e.deltaY < 0 ? 0.08 : -0.08))); applyTransform(); return; }
+    panX -= e.deltaX; panY -= e.deltaY; applyTransform(); e.preventDefault();
+  }, { passive: false });
+  let dragging = false, dragStart = {x:0, y:0, panX:0, panY:0};
+  cw.addEventListener('mousedown', e => {
+    if (e.target.closest('.nd') || e.target.closest('button')) return;
+    dragging = true; dragStart = { x: e.clientX, y: e.clientY, panX, panY };
+    cw.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    panX = dragStart.panX + (e.clientX - dragStart.x);
+    panY = dragStart.panY + (e.clientY - dragStart.y);
+    applyTransform();
+  });
+  window.addEventListener('mouseup', () => { dragging = false; cw.style.cursor = ''; });
+  document.getElementById('zoom-in').addEventListener('click', () => { zoom = Math.min(2.5, zoom + 0.1); applyTransform(); });
+  document.getElementById('zoom-out').addEventListener('click', () => { zoom = Math.max(0.3, zoom - 0.1); applyTransform(); });
+</script>
+</body>
+</html>

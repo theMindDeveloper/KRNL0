@@ -3,13 +3,47 @@
  *
  * Every consumer (CanvasChassis bounds, StationLayout padding/chrome, Dock
  * picker tiles, TopBar dark-only gating, useDockStyle persistence) reads from
- * this file. Adding a new dock style is:
- *   1. Add one entry below
- *   2. Write the Chrome component (or omit for a chromeless style)
- *   3. Write the CSS for `.dock-chassis.dock-<id>` in chassis.css
+ * this file. Both canvas and station mode share the same Chrome component
+ * per style — design once, both layouts pick it up.
  *
- * NO other file needs editing. TypeScript will narrow `DockStyle` to the new
- * keyset automatically.
+ * ───────────────────────────────────────────────────────────────────────────
+ * HOW TO ADD A NEW DOCK STYLE  (e.g. "brutalist", "hologram", "warm-paper")
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * 1) WRITE THE CHROME COMPONENT (optional — omit for chromeless styles like
+ *    classic). Mirror the existing SynthesizerChrome/TelemetryChrome/
+ *    KrnlDockChrome files — a plain React component that renders the
+ *    decorative SVG/HTML inside whatever container CanvasChassis +
+ *    StationLayout give it (they wrap it in `.dock-chassis dock-<id>` so
+ *    your component just paints inside that box):
+ *
+ *      // BrutalistChrome.tsx
+ *      export function BrutalistChrome() {
+ *        return <div className="md-brutalist-frame">...</div>;
+ *      }
+ *
+ * 2) ADD ONE ENTRY TO DOCK_REGISTRY BELOW:
+ *
+ *      brutalist: {
+ *        id: 'brutalist',
+ *        label: 'Brutalist',
+ *        sublabel: 'Concrete slab',
+ *        glyph: BRUTALIST_GLYPH,                       // small SVG, see CLASSIC_GLYPH for the pattern
+ *        Chrome: BrutalistChrome,                       // optional
+ *        canvasBounds: { kind: 'static', rect: {...} } // or 'fit-mothers' — see KRNL Dock
+ *                  | { kind: 'fit-mothers', topOffset, height, sidePad, minWidth },
+ *        stationPadding: { top: 60, bottom: 60 },       // pixels reserved at top/bottom of station shell
+ *        theme: 'dark-only',                            // optional — TopBar hides theme toggle
+ *      },
+ *
+ * 3) WRITE THE CSS in `src/renderer/styles/chassis.css` scoped to
+ *    `.dock-chassis.dock-<id>` for the visual decoration (rails, gradients,
+ *    rivets, etc.). For station-mode-only overrides use
+ *    `.dock-chassis.dock-<id>[data-station] ...`.
+ *
+ * That's it. NO other file needs editing. TypeScript will narrow `DockStyle`
+ * to the new keyset automatically, the picker will show the new tile, and
+ * both Canvas and Station modes will render the chrome.
  */
 
 import type { ReactNode } from 'react';
