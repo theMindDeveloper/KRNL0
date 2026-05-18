@@ -8,6 +8,9 @@
 
 import { useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
+import { LayoutModeToggle } from '../ui/LayoutModeToggle';
+import { useDockStyle } from '../ChassisLayer/useDockStyle';
+import { isDarkOnly } from '../ChassisLayer/dockRegistry';
 
 type Theme = 'light' | 'dark';
 
@@ -41,7 +44,16 @@ function applyTheme(theme: Theme): void {
 
 export function TopBar() {
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
+  const [dockStyle] = useDockStyle();
   const rf = useReactFlow();
+
+  // Some dock skins declare themselves dark-only (see dockRegistry.theme).
+  // Hide the theme toggle while one is selected and force the global theme
+  // to dark for visual consistency.
+  const darkOnly = isDarkOnly(dockStyle);
+  useEffect(() => {
+    if (darkOnly && theme !== 'dark') setTheme('dark');
+  }, [darkOnly, theme]);
 
   // Sync theme to DOM on mount and whenever it changes.
   useEffect(() => {
@@ -175,8 +187,11 @@ export function TopBar() {
 
       {/* Right: action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <LayoutModeToggle />
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
-        <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
+        {!darkOnly && (
+          <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
+        )}
       </div>
     </div>
   );

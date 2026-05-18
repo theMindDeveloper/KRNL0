@@ -1,19 +1,27 @@
-/* useDockStyle — persisted dock-frame variant selector.
+/* useDockStyle — persisted dock-frame variant selector with shared state.
  *
  * Stores choice in localStorage and mirrors to <html data-dock="..."> so the
- * chassis CSS in `src/renderer/styles/chassis.css` activates. Pattern matches
- * the theme hook in src/renderer/components/TopBar/index.tsx.
+ * chassis CSS in `src/renderer/styles/chassis.css` activates.
+ *
+ * Module-level shared state: every component that calls `useDockStyle()`
+ * subscribes to the same value. When one calls `setStyle`, all subscribed
+ * components re-render with the new value. Required for station mode where
+ * the dock-style picker lives in the embedded canvas (CanvasFlow) but the
+ * actual chassis chrome lives in StationLayout — without shared state, the
+ * picker would update only its own component's hook instance, leaving the
+ * chrome stale.
+ *
+ * `DockStyle` and `DOCK_STYLES` are derived from the dock registry — adding a
+ * new entry there extends the union automatically.
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { DOCK_STYLES, DEFAULT_DOCK_STYLE, type DockStyle } from './dockRegistry';
 
-export type DockStyle = 'classic' | 'synthesizer' | 'telemetry' | 'krnl-dock';
-
-export const DOCK_STYLES: DockStyle[] = ['classic', 'synthesizer', 'telemetry', 'krnl-dock'];
+export type { DockStyle } from './dockRegistry';
+export { DOCK_STYLES } from './dockRegistry';
 
 const STORAGE_KEY = 'krnl0-dock-style';
-
-const DEFAULT_DOCK_STYLE: DockStyle = 'telemetry';
 
 function readStored(): DockStyle {
   if (typeof localStorage === 'undefined') return DEFAULT_DOCK_STYLE;
@@ -30,16 +38,32 @@ function apply(style: DockStyle) {
   }
 }
 
+let current: DockStyle = readStored();
+const subscribers = new Set<(s: DockStyle) => void>();
+
+function setCurrent(next: DockStyle) {
+  if (next === current) return;
+  current = next;
+  apply(next);
+  try { localStorage.setItem(STORAGE_KEY, next); } catch { /* ignore */ }
+  subscribers.forEach((fn) => fn(next));
+}
+
+apply(current);
+
 export function useDockStyle(): [DockStyle, (s: DockStyle) => void] {
-  const [style, setStyleState] = useState<DockStyle>(() => readStored());
+  const [style, setLocal] = useState<DockStyle>(current);
 
   useEffect(() => {
-    apply(style);
-  }, [style]);
+    if (current !== style) setLocal(current);
+    const sub = (s: DockStyle) => setLocal(s);
+    subscribers.add(sub);
+    return () => { subscribers.delete(sub); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setStyle = useCallback((s: DockStyle) => {
-    setStyleState(s);
-    try { localStorage.setItem(STORAGE_KEY, s); } catch { /* ignore */ }
+    setCurrent(s);
   }, []);
 
   return [style, setStyle];

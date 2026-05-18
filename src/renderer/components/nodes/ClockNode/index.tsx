@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useContext } from 'react';
 import type { NodeProps } from '../types';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
-import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import type { TaskState } from '../TaskNode/types';
@@ -351,6 +351,11 @@ export function ClockNode({
     : 0;
   const activeColor = activeIdx >= 0 ? tasks[activeIdx]!.colorVar : 'var(--ink-3)';
 
+  // Station mode: the bottom-right Clock panel is much taller than the canvas-
+  // mode fixed mother (540px) — scale the dial up so it fills the space
+  // instead of leaving a strip of empty card around a tiny 244px square.
+  const inStation = useContext(MotherFrameStationContext);
+
   return (
     <MotherFrame
       nodeId={node.id}
@@ -536,8 +541,16 @@ export function ClockNode({
         </div>
 
         {/* Clock face — container wider than SVG viewBox so outward-growing
-            train tracks don't clip on the parent div edge. */}
-        <div style={{ position: 'relative', width: 244, height: 244, margin: '0 auto', overflow: 'visible' }}>
+            train tracks don't clip on the parent div edge. Station mode:
+            scale up to fill the panel (capped so very-wide panels don't
+            give a giant dial). Canvas mode: fixed 244×244. */}
+        <div
+          style={
+            inStation
+              ? { position: 'relative', width: '92%', maxWidth: 460, aspectRatio: '1 / 1', margin: '0 auto', overflow: 'visible' }
+              : { position: 'relative', width: 244, height: 244, margin: '0 auto', overflow: 'visible' }
+          }
+        >
           <svg
             viewBox="0 0 240 240"
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}

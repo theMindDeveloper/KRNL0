@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { NodeKind } from '../../../shared/types/node';
 import { DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
+import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { useBoardStore } from '../../store/boardStore';
 
 type ToolMode = 'select' | 'connect';
@@ -28,58 +29,6 @@ export interface DockProps {
   /** Setter for the chassis variant. */
   onDockStyleChange?: (s: DockStyle) => void;
 }
-
-const DOCK_STYLE_LABELS: Record<DockStyle, string> = {
-  classic: 'Classic',
-  synthesizer: 'Synthesizer',
-  telemetry: 'Telemetry',
-  'krnl-dock': 'KRNL Dock',
-};
-
-const DOCK_STYLE_SUB: Record<DockStyle, string> = {
-  classic: 'Default frame',
-  synthesizer: 'Eurorack panel',
-  telemetry: 'Mission control',
-  'krnl-dock': 'Rack chassis',
-};
-
-/** Mini-glyph per dock style — a tiny visual signature shown in the picker
- *  flyout. Composed inside a 24×24 viewBox so all four sit on a shared grid. */
-const DOCK_STYLE_GLYPHS: Record<DockStyle, React.ReactNode> = {
-  classic: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="6" width="18" height="12" rx="2" />
-      <path d="M7 10h10M7 14h6" opacity="0.7" />
-    </svg>
-  ),
-  synthesizer: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="5" width="18" height="14" rx="1.5" />
-      <circle cx="7"  cy="14" r="1.6" />
-      <circle cx="12" cy="14" r="1.6" />
-      <circle cx="17" cy="14" r="1.6" />
-      <path d="M5 8h14" opacity="0.5" />
-    </svg>
-  ),
-  telemetry: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="5" width="18" height="14" rx="1.5" />
-      <path d="M4 13l3-3 3 2 4-5 3 4 3-2" />
-      <circle cx="7" cy="10" r="0.9" fill="currentColor" stroke="none" />
-      <circle cx="14" cy="7" r="0.9" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-  'krnl-dock': (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="16" rx="1" />
-      <path d="M3 8h18M3 16h18" />
-      <circle cx="6" cy="6" r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="6" r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="6" cy="18" r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="18" r="0.6" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-};
 
 export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: DockProps) {
   const [activeTool, setActiveTool] = useState<ToolMode>('select');
@@ -301,12 +250,12 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
             type="button"
             data-testid="dock-btn-dock-style"
             className={`krnl-dock-style-btn${dockStyle !== 'classic' ? ' is-armed' : ''}${dockMenuOpen ? ' is-open' : ''}`}
-            title={`Frame style: ${DOCK_STYLE_LABELS[dockStyle]} — click to change`}
+            title={`Frame style: ${DOCK_REGISTRY[dockStyle].label} — click to change`}
             aria-label="Pick mother-row frame style"
             aria-expanded={dockMenuOpen}
             onClick={() => setDockMenuOpen((o) => !o)}
           >
-            <span className="krnl-dock-style-btn__glyph">{DOCK_STYLE_GLYPHS[dockStyle]}</span>
+            <span className="krnl-dock-style-btn__glyph">{DOCK_REGISTRY[dockStyle].glyph}</span>
           </button>
 
           {dockMenuOpen && (
@@ -322,6 +271,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
               <div className="dsp-tiles">
                 {DOCK_STYLES.map((s) => {
                   const isActive = s === dockStyle;
+                  const sDef = DOCK_REGISTRY[s];
                   return (
                     <button
                       key={s}
@@ -335,9 +285,9 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
                         setDockMenuOpen(false);
                       }}
                     >
-                      <span className="dsp-tile__glyph">{DOCK_STYLE_GLYPHS[s]}</span>
-                      <span className="dsp-tile__label">{DOCK_STYLE_LABELS[s]}</span>
-                      <span className="dsp-tile__sub">{DOCK_STYLE_SUB[s]}</span>
+                      <span className="dsp-tile__glyph">{sDef.glyph}</span>
+                      <span className="dsp-tile__label">{sDef.label}</span>
+                      <span className="dsp-tile__sub">{sDef.sublabel}</span>
                       {isActive && (
                         <span className="dsp-tile__check" aria-hidden>
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -22,7 +22,12 @@ import { useBoardStore } from '../../store/boardStore';
 
 const BOARD_VERSION = 'v0.2.0';
 
-export function StatusBar() {
+interface StatusBarProps {
+  /** ADR 0008 § 9.5 — shown when station mode falls back to canvas due to narrow viewport. */
+  fallbackNotice?: boolean;
+}
+
+export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
   // Granular primitive selectors — subscribing to s.board would re-render
   // this row on every drag tick (the board ref churns at 60fps).
   const nodeCount = useBoardStore((s) => s.board?.nodes.length ?? 0);
@@ -98,6 +103,21 @@ export function StatusBar() {
         <StatusItem label="day" testId="statusbar-day">
           {dateStr}
         </StatusItem>
+        {fallbackNotice && (
+          <span
+            data-testid="statusbar-station-fallback"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10.5,
+              color: 'var(--ink-4)',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase' as const,
+              whiteSpace: 'nowrap' as const,
+            }}
+          >
+            Station mode requires ≥ 1024 × 640 — falling back to canvas.
+          </span>
+        )}
       </div>
 
       {/* Right cluster: nodes · edges · zoom · version */}

@@ -1283,10 +1283,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
    Ported from krnl-dock.html, prefixed `dk-` to avoid global clashes.
    Local color tokens are scoped via .dock-chassis.dock-krnl-dock.
    ============================================================ */
-.dock-chassis.dock-krnl-dock {
-  /* Force the dark ink scale on the chassis itself too — any descendant
-   * that reads var(--ink) resolves to a light shade even in light theme,
-   * since the rack interior is always near-black. */
+/* KRNL Dock is a DARK-ONLY skin by design — the rails, rack interior, and
+ * dk-* chrome are tuned for the dark ink scale. Canvas mode: the chassis IS
+ * the rack body so vars apply chassis-wide. Station mode: vars are scoped
+ * to .dk-rail only, so the embedded canvas + panel content still pick up
+ * the global light/dark theme (grid stays visible in light mode). */
+.dock-chassis.dock-krnl-dock:not([data-station]),
+.dock-chassis.dock-krnl-dock[data-station] .dk-rail {
   --paper:   #14130f;
   --paper-2: #1f1d18;
   --paper-3: #2f2b24;
@@ -1296,7 +1299,9 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --ink-3:   #968d7a;
   --ink-4:   #6a6253;
   color: var(--ink);
+}
 
+.dock-chassis.dock-krnl-dock {
   --dk-ch-1: #43463f;
   --dk-ch-2: #3a3d36;
   --dk-ch-3: #2f322c;
@@ -1305,9 +1310,11 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --dk-phos-glow: #b8d95740;
   --dk-amber: #d9a23a;
   --dk-amber-dim: #6b4f1c;
-  /* Rack interior — dark brushed metal. Same hi-frequency vertical brush
-   * pattern as the rails but in much darker tones so the (dark, minimal)
-   * mother panels read as sitting INSIDE the rack rather than on top of it. */
+}
+
+/* Rack interior — dark brushed metal. Applied in BOTH modes now so the
+ * krnl-dock looks consistent (always dark) regardless of global theme. */
+.dock-chassis.dock-krnl-dock {
   background:
     repeating-linear-gradient(90deg,
       rgba(0,0,0,0.45) 0 1px, transparent 1px 2px,
@@ -1319,7 +1326,6 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
     inset 0 0 0 1px #000,
     inset 0 16px 32px rgba(0,0,0,0.75),
     inset 0 -16px 32px rgba(0,0,0,0.75),
-    /* outer drop-shadow — rack lifts off the canvas paper */
     0 6px 14px rgba(0,0,0,0.4),
     0 24px 48px rgba(0,0,0,0.55),
     0 48px 100px -10px rgba(0,0,0,0.7);
@@ -2207,4 +2213,89 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   background: #5aff7a;
   box-shadow: 0 0 4px rgba(90,255,122,0.5), inset 0 0 2px #1a4a1a;
   animation: dk-pulse 1.4s infinite;
+}
+
+/* ============================================================
+   Station mode — mother-card drag handle
+   Pill-shaped grab affordance anchored to the top edge of every
+   station cell. ⋮⋮ replaced by a 6-dot SVG glyph (cleaner). Idle:
+   subtle; hover: brighter + acid tint; active: full acid + grabbing
+   cursor.
+   ============================================================ */
+.station-drag-handle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 14px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  color: var(--ink-3);
+  background: var(--paper-2);
+  border: 1px solid var(--paper-3);
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  opacity: 0.55;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition:
+    opacity 140ms ease,
+    width 140ms ease,
+    color 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.station-drag-handle:hover {
+  opacity: 1;
+  width: 44px;
+  color: var(--acid, #c9f158);
+  background: var(--paper-3);
+  border-color: var(--acid, #c9f158);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    0 0 8px rgba(201, 241, 88, 0.18);
+}
+.station-drag-handle:active,
+.station-drag-handle[data-dragging='true'] {
+  cursor: grabbing;
+  opacity: 1;
+  color: var(--acid, #c9f158);
+  background: var(--paper-3);
+  border-color: var(--acid, #c9f158);
+  box-shadow:
+    inset 0 0 0 1px rgba(201, 241, 88, 0.4),
+    0 0 12px rgba(201, 241, 88, 0.35);
+  transform: translateX(-50%) translateY(1px);
+}
+.station-drag-handle:focus-visible {
+  outline: 1px solid var(--acid, #c9f158);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Station mode — panel splitter (resize handle)
+   RPL Separator is a focusable div, so clicking it gains focus
+   and the browser/OS paints a persistent focus ring (yellow on
+   some setups). We reset the focus outline entirely and use
+   :hover / :active to give a clear "I am draggable / I am being
+   dragged" cue without lingering after release.
+   ============================================================ */
+.station-splitter {
+  background: var(--paper-3);
+  transition: background 120ms ease;
+}
+.station-splitter:hover {
+  background: var(--ink-4, #6e6655);
+}
+.station-splitter:active {
+  background: var(--ink-3, #b3aa97);
+}
+.station-splitter:focus,
+.station-splitter:focus-visible {
+  outline: none;
 }

@@ -14,11 +14,19 @@
 // reads, zero layout flushes. Badge style uses CSS `transform:translate` (not
 // top/left) so the write is also compositor-level.
 
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
 import { scheduleBatch } from '../../../utils/rafBatcher';
 import { rfToScreen, getZoom } from '../../../utils/viewportBus';
+
+// Station mode mounts mother nodes inside resizable panels (ADR 0008). Each
+// mother component renders its own <MotherFrame width=540> internally; in
+// canvas mode that's correct (RF flow coords), but in station mode the
+// fixed 540×540 prevents the card from filling the panel. StationCell
+// wraps its child in this provider so any nested MotherFrame auto-switches
+// to the fluid 100%/100% variant — no per-kind component changes needed.
+export const MotherFrameStationContext = createContext(false);
 
 interface Props {
   nodeId: string;          // reports hover to boardStore so edges can bold on hover
@@ -34,6 +42,11 @@ interface Props {
   background?: string;     // override (terminal uses --term-bg)
   borderColor?: string;
   minHeight?: number;      // override — must match INITIAL_DIMS_BY_KIND height
+  // ADR 0008 § 2.7 / § 12 required change #4 — variant controls whether the
+  // RF-specific rfToScreen badge tracker and portal are used.  In 'station'
+  // variant the badge is a normal absolute-positioned span inside the panel
+  // (no ViewportPortal, no rfToScreen arithmetic).  Mother content is identical.
+  variant?: 'canvas' | 'station';
 }
 
 // Wave C (LifeOS UI refresh) — bumped to 500×500 so mothers read as the
@@ -54,16 +67,27 @@ export function MotherFrame({
   background = 'var(--node-bg)',
   borderColor = 'var(--paper-3)',
   minHeight = MOTHER_HEIGHT,
+  variant: variantProp = 'canvas',
 }: Props) {
+  // Context override: when this MotherFrame is rendered inside a StationCell,
+  // the provider sets the context to true and we force 'station' variant —
+  // overriding the prop. This lets each mother component (PomoNode, etc.)
+  // keep its own `<MotherFrame width={MOTHER_WIDTH}>` call unchanged.
+  const inStation = useContext(MotherFrameStationContext);
+  const variant: 'canvas' | 'station' = inStation ? 'station' : variantProp;
   const setHoveredNodeId = useBoardStore((s) => s.setHoveredNodeId);
   const idx = String(slotIndex).padStart(2, '0');
   const total = String(slotTotal).padStart(2, '0');
 
   const badgeRef = useRef<HTMLDivElement>(null);
 
-  // Badge position tracking — pure arithmetic, no DOM reads.
+  // Badge position tracking (canvas variant only) — pure arithmetic, no DOM reads.
   // Badge anchor: left:14px, top:-11px relative to panel's RF top-left corner
   // → in screen space: rfToScreen(nodeX + 14, nodeY - 11).
+  //
+  // In 'station' variant this effect is a no-op: the badge renders as a normal
+  // absolute-positioned span inside the panel — no ViewportPortal escape needed
+  // because the panel is not clipped by .react-flow { overflow: hidden }.
   //
   // CSS transform is used instead of top/left because transform writes are
   // compositor-level (no layout dirtying). The badge starts at (0,0) hidden
@@ -72,6 +96,8 @@ export function MotherFrame({
   // Dependency on position.x/y: re-registers when node is swapped so the
   // closure captures the new flow coordinates.
   useLayoutEffect(() => {
+    if (variant === 'station') return;
+
     let cachedX = NaN;
     let cachedY = NaN;
     let cachedZ = NaN;
@@ -101,8 +127,9 @@ export function MotherFrame({
       },
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [position.x, position.y]);
+  }, [position.x, position.y, variant]);
 
+  const isStation = variant === 'station';
   return (
     <div
       className="mother-frame"
@@ -110,9 +137,10 @@ export function MotherFrame({
       onMouseLeave={() => setHoveredNodeId(null)}
       style={{
         position: 'relative',
-        width,
-        // Pinned fixed height — see PR2.1 history. Bodies must overflow internally.
-        height: minHeight,
+        // Canvas: fixed 540×540 (RF flow coords). Station: fill the resizable
+        // panel so the user can shrink/grow it without content overflowing.
+        width: isStation ? '100%' : width,
+        height: isStation ? '100%' : minHeight,
         display: 'flex',
         flexDirection: 'column',
         background: background === 'var(--node-bg)'
@@ -122,7 +150,9 @@ export function MotherFrame({
         borderRadius: 8,
         boxShadow:
           '0 2px 8px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
-        overflow: 'visible',
+        // Station-mode panels must clip overflow so the inner mother content
+        // never bleeds past the resizable panel boundary.
+        overflow: isStation ? 'hidden' : 'visible',
         contain: 'layout paint',
         // willChange:'transform' removed (2026-05-15 pan-perf fix) — promoting
         // 6 compositor layers costs VRAM with no benefit during pan. RF moves
@@ -150,41 +180,44 @@ export function MotherFrame({
 
       {children}
 
-      {/* Slot badge — portaled to document.body with position:fixed so it
-          escapes `.react-flow`'s overflow:hidden clip. Starts at (0,0) hidden
-          offscreen via transform; rafBatcher computes real coords each frame
-          from rfToScreen() — no getBoundingClientRect, no layout reads. */}
-      {typeof document !== 'undefined' && createPortal(
-        <div
-          ref={badgeRef}
-          className="mother-frame__badge"
-          aria-hidden
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            transformOrigin: '0 0',
-            // Start far offscreen — rAF writes the real transform on first paint.
-            transform: 'translate(-9999px, -9999px)',
-            background: 'var(--paper-2)',
-            color: 'var(--ink-2)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9,
-            padding: '2.5px 8px 3px',
-            borderRadius: 2,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            fontWeight: 600,
-            border: '1px solid var(--paper-3)',
-            zIndex: 5,
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <span style={{ color: 'var(--spine-hot)', marginRight: 1 }}>{idx}</span>
-          <span> · spine · {total}</span>
-        </div>,
-        document.body,
+      {/* Slot badge — canvas variant only.
+          Station mode panels are named by position (top-row column, bottom
+          clock) so a slot index would be visual noise. It also got clipped
+          by overflow:hidden on the station mother frame ("splice box cut in
+          half" bug). Skip it entirely in station variant. */}
+      {variant !== 'station' && (
+        typeof document !== 'undefined' && createPortal(
+          <div
+            ref={badgeRef}
+            className="mother-frame__badge"
+            aria-hidden
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              transformOrigin: '0 0',
+              // Start far offscreen — rAF writes the real transform on first paint.
+              transform: 'translate(-9999px, -9999px)',
+              background: 'var(--paper-2)',
+              color: 'var(--ink-2)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              padding: '2.5px 8px 3px',
+              borderRadius: 2,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+              border: '1px solid var(--paper-3)',
+              zIndex: 5,
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ color: 'var(--spine-hot)', marginRight: 1 }}>{idx}</span>
+            <span> · spine · {total}</span>
+          </div>,
+          document.body,
+        )
       )}
     </div>
   );

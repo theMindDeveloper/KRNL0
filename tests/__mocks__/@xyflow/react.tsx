@@ -90,8 +90,30 @@ export function useReactFlow() {
     screenToFlowPosition: (pos: { x: number; y: number }) => pos,
     getNodes: () => [],
     getEdges: () => [],
+    getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
   };
 }
+
+// Stub useStore for StatusBar (reads zoom from RF internal transform).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useStore<T>(selector: (state: any) => T): T {
+  return selector({ transform: [0, 0, 1] });
+}
+
+export function ViewportPortal({ children }: { children?: React.ReactNode }): React.ReactElement {
+  return <div data-testid="viewport-portal">{children}</div>;
+}
+
+export const BackgroundVariant = {
+  Dots: 'dots',
+  Lines: 'lines',
+  Cross: 'cross',
+} as const;
+
+export const SelectionMode = {
+  Full: 'full',
+  Partial: 'partial',
+} as const;
 
 export function useNodesState(initial: Node[]) {
   return [initial, () => undefined, () => undefined] as const;

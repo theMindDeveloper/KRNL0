@@ -206,7 +206,15 @@ export function Orb() {
       setCaption,
       setOrbState,
       setActiveFlowId,
-      setViewport: (vp, opts) => setViewport(vp, opts),
+      setViewport: (vp, opts) => {
+        // Station mode: the embedded canvas is a tiny window, mothers live
+        // in static panels — yanking the camera to a mother makes no sense
+        // and would just disorient the user. Skip the move; the spoken line
+        // still plays so the tutorial still reads correctly.
+        const mode = useBoardStore.getState().board?.layoutMode;
+        if (mode === 'station') return;
+        setViewport(vp, opts);
+      },
       getBoardSnapshot,
     });
   }, [setViewport]);
