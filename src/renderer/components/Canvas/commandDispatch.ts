@@ -929,6 +929,29 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       return;
     }
 
+    // ── todo.setItemPlannedMin: resolve itemId → taskNodeId → update its
+    //    plannedMin. Mirrors todo.startPomoForItem's lookup pattern so the
+    //    TodoNode row context menu can edit time without reaching across
+    //    into the task node directly. No-op when the item has no task node
+    //    yet (the row menu disables this item in that case).
+    if (command === 'todo.setItemPlannedMin') {
+      const todoState = node.state as TodoState;
+      const itemId = args['itemId'] as string | undefined;
+      const minutes = args['minutes'];
+      if (!itemId || typeof minutes !== 'number' || !Number.isFinite(minutes)) return;
+      const item = todoState.items.find((i) => i.id === itemId);
+      if (!item?.taskNodeId) return;
+      const taskNode = useBoardStore.getState().board?.nodes.find(
+        (n) => n.id === item.taskNodeId,
+      );
+      if (!taskNode || taskNode.kind !== 'todo.task') return;
+      const nextTaskState = taskSetPlannedMin(taskNode.state as never, { minutes });
+      updateNode(taskNode.id, { state: nextTaskState });
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+      return;
+    }
+
     // ── todo.loadTaskForItem: resolve itemId → taskNodeId → LOAD ONLY ─────
     // Single-clicking a TodoItem row refreshes the pomo with the task's saved
     // state (label, durationMin, checkpoint elapsed) without auto-starting.
