@@ -4,27 +4,25 @@
  * ADR 0008 § 2.3 / § 2.4 / § 9.2.
  *
  * Layout (matches user-provided sketch):
- *   ┌─ DOCK TOP ─────────────────────────────────────┐
- *   │ Pomo │ Todo │ Habit │ Calendar                  │
- *   ├──────┴──────┴───────┴─────────────────┬────────┤
- *   │         Embedded Canvas               │ Clock  │
- *   └─ DOCK BOTTOM ──────────────────────────────────┘
+ *   ┌─ DOCK TOP ─────────────────────────────────────────────┐
+ *   │ [StationToolbar: panel-show/hide icons]                 │
+ *   ├──────┬──────┬───────┬─────────────────────────────────┤
+ *   │ Pomo │ Todo │ Habit │ Calendar                          │
+ *   ├──────┴──────┴───────┴───────────────┬────────┬────────┤
+ *   │      Embedded Canvas                │ Term   │ Clock  │
+ *   └─ DOCK BOTTOM ──────────────────────────────────────────┘
  *
- *   - Top row: 4 equal-width mother cells
- *   - Bottom row: Canvas (~75%) + Clock (~25%)
- *   - Outer horizontal divider runs straight across both rows
+ * - Top row: 4 equal-width mother cells
+ * - Bottom row: Canvas (60%) + Terminal (15%) + Clock (25%)
+ * - StationToolbar (top strip) toggles each panel's visibility; hidden
+ *   panels are OMITTED from the layout — neighbouring panels redistribute
+ *   to fill the freed space (no empty windows).
  *
  * The whole shell is wrapped in `.dock-chassis dock-{style}` so the dock
  * chrome frames the entire layout. Variant-keyed padding clears the rails.
  *
  * NOTE: react-resizable-panels v4 requires Separators to be DIRECT children
  * of their parent Group — wrapping them in a div breaks push/pull drag.
- * The Separator carries the visible style.
- *
- * NOTE 2: The .dock-chassis class sets pointer-events:none + z-index:-1
- * for canvas mode where the chassis is a decorative backdrop. Station mode
- * IS the foreground — override both inline so panels/splitters/content
- * receive events.
  */
 
 import { useRef, useCallback } from 'react';
@@ -42,9 +40,11 @@ import { TelemetryChrome } from '../ChassisLayer/TelemetryChrome';
 import { KrnlDockChrome } from '../ChassisLayer/KrnlDockChrome';
 import { StationCell } from './StationCell';
 import { EmbeddedCanvasCell } from './EmbeddedCanvasCell';
+import { StationToolbar } from './StationToolbar';
 import { SLOT_DEFAULTS } from './SlotResolver';
+import type { MotherNodeConfig, StationSlot } from '../../../shared/types';
+import type { Node } from '../../../shared/types/node';
 
-// Panel IDs for imperative layout reset.
 const PANEL_IDS = {
   outerTop:    'station-top-row',
   outerBottom: 'station-bottom-row',
@@ -57,8 +57,6 @@ const PANEL_IDS = {
   bottomClock:    'station-bottom-clock',
 } as const;
 
-// Rail padding per dock style — top/bottom in pixels so the layout doesn't
-// overlap the chassis chrome rails.
 const RAIL_PADDING: Record<DockStyle, { top: number; bottom: number }> = {
   classic:     { top: 0,   bottom: 0   },
   synthesizer: { top: 50,  bottom: 88  },
@@ -80,87 +78,78 @@ const horizontalHandleStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
+// Top-row slot → (panel id, default size, station-cell slot prop)
+const TOP_ROW_DEFS: ReadonlyArray<{
+  panelId: string;
+  defaultSize: number;
+  slot: StationSlot;
+}> = [
+  { panelId: PANEL_IDS.colPomo,  defaultSize: SLOT_DEFAULTS.columns['top-left'],        slot: 'top-left' },
+  { panelId: PANEL_IDS.colTodo,  defaultSize: SLOT_DEFAULTS.columns['top-center'],      slot: 'top-center' },
+  { panelId: PANEL_IDS.colHabit, defaultSize: SLOT_DEFAULTS.columns['top-right-pre'],   slot: 'top-right-pre' },
+  { panelId: PANEL_IDS.colCal,   defaultSize: SLOT_DEFAULTS.columns['top-right-upper'], slot: 'top-right-upper' },
+];
+
+function isStationHidden(node: Node | undefined): boolean {
+  if (!node) return true; // missing == hidden
+  const cfg = (node.config ?? {}) as MotherNodeConfig;
+  return !!cfg.stationHidden;
+}
+
 export function StationLayout() {
   const setLayoutGeometry = useBoardStore((s) => s.setLayoutGeometry);
   const storedGeometry = useBoardStore((s) => s.board?.layoutGeometry?.station);
+  const board = useBoardStore((s) => s.board);
   const [dockStyle] = useDockStyle();
 
-  // Default layouts in v4 format (panelId → percentage 0..100).
-  const defaultOuterLayout: Layout = {
-    [PANEL_IDS.outerTop]:    SLOT_DEFAULTS.rowPercent,
-    [PANEL_IDS.outerBottom]: SLOT_DEFAULTS.canvasPercent,
+  const canvasHidden = storedGeometry?.canvasHidden ?? false;
+
+  // Resolve mothers by slot so we can check visibility per top-row entry.
+  const motherBySlot = new Map<StationSlot, Node>();
+  for (const n of board?.nodes ?? []) {
+    if (!n.isMother) continue;
+    const slot = (n.config as MotherNodeConfig | undefined)?.stationSlot;
+    if (slot) motherBySlot.set(slot, n);
+  }
+
+  const visibleTopDefs = TOP_ROW_DEFS.filter((d) => !isStationHidden(motherBySlot.get(d.slot)));
+  const termHidden  = isStationHidden(motherBySlot.get('bottom-strip'));
+  const clockHidden = isStationHidden(motherBySlot.get('top-right-lower'));
+  const bottomVisible = {
+    canvas:   !canvasHidden,
+    terminal: !termHidden,
+    clock:    !clockHidden,
   };
-  const defaultTopLayout: Layout = {
-    [PANEL_IDS.colPomo]:  SLOT_DEFAULTS.columns['top-left'],
-    [PANEL_IDS.colTodo]:  SLOT_DEFAULTS.columns['top-center'],
-    [PANEL_IDS.colHabit]: SLOT_DEFAULTS.columns['top-right-pre'],
-    [PANEL_IDS.colCal]:   SLOT_DEFAULTS.columns['top-right-upper'],
-  };
-  const defaultBottomLayout: Layout = {
-    [PANEL_IDS.bottomCanvas]:   SLOT_DEFAULTS.bottom.canvas,
-    [PANEL_IDS.bottomTerminal]: SLOT_DEFAULTS.bottom.terminal,
-    [PANEL_IDS.bottomClock]:    SLOT_DEFAULTS.bottom.clock,
-  };
+  const topRowVisible    = visibleTopDefs.length > 0;
+  const bottomRowVisible = bottomVisible.canvas || bottomVisible.terminal || bottomVisible.clock;
 
   const outerGroupRef = useRef<GroupImperativeHandle | null>(null);
   const topGroupRef = useRef<GroupImperativeHandle | null>(null);
   const bottomGroupRef = useRef<GroupImperativeHandle | null>(null);
-  void outerGroupRef; void topGroupRef; void bottomGroupRef;
-
-  // Derive defaultLayout from stored geometry (if present).
-  const outerDefaultLayout: Layout | undefined = storedGeometry?.rowFraction != null
-    ? {
-        [PANEL_IDS.outerTop]:    Math.round(storedGeometry.rowFraction * 100),
-        [PANEL_IDS.outerBottom]: Math.round((1 - storedGeometry.rowFraction) * 100),
-      }
-    : undefined;
-
-  const topDefaultLayout: Layout | undefined = storedGeometry?.columnFractions != null
-    ? {
-        [PANEL_IDS.colPomo]:  Math.round((storedGeometry.columnFractions[0] ?? SLOT_DEFAULTS.columns['top-left']  / 100) * 100),
-        [PANEL_IDS.colTodo]:  Math.round((storedGeometry.columnFractions[1] ?? SLOT_DEFAULTS.columns['top-center'] / 100) * 100),
-        [PANEL_IDS.colHabit]: Math.round((storedGeometry.columnFractions[2] ?? SLOT_DEFAULTS.columns['top-right-pre'] / 100) * 100),
-        [PANEL_IDS.colCal]:   Math.round((storedGeometry.columnFractions[3] ?? SLOT_DEFAULTS.columns['top-right-upper'] / 100) * 100),
-      }
-    : undefined;
-
-  const bottomDefaultLayout: Layout | undefined = storedGeometry?.rightColumnSplit != null
-    ? {
-        // rightColumnSplit is reused as canvas-vs-clock split for the bottom row.
-        [PANEL_IDS.bottomCanvas]: Math.round(storedGeometry.rightColumnSplit * 100),
-        [PANEL_IDS.bottomClock]:  Math.round((1 - storedGeometry.rightColumnSplit) * 100),
-      }
-    : undefined;
 
   // ── Persistence callbacks ────────────────────────────────────────────────
-
   const onOuterLayoutChanged = useCallback((layout: Layout) => {
     const rowFraction = (layout[PANEL_IDS.outerTop] ?? SLOT_DEFAULTS.rowPercent) / 100;
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
     setLayoutGeometry({
       station: {
         rowFraction,
-        columnFractions: current?.columnFractions
-          ?? Object.values(defaultTopLayout).map((v) => v / 100),
-        rightColumnSplit: current?.rightColumnSplit
-          ?? SLOT_DEFAULTS.bottom.canvas / 100,
+        columnFractions: current?.columnFractions ?? [],
+        rightColumnSplit: current?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
+        ...(current?.canvasHidden !== undefined ? { canvasHidden: current.canvasHidden } : {}),
       },
     });
-  }, [setLayoutGeometry, defaultTopLayout]);
+  }, [setLayoutGeometry]);
 
   const onTopLayoutChanged = useCallback((layout: Layout) => {
-    const columnFractions = [
-      (layout[PANEL_IDS.colPomo]  ?? SLOT_DEFAULTS.columns['top-left'])  / 100,
-      (layout[PANEL_IDS.colTodo]  ?? SLOT_DEFAULTS.columns['top-center']) / 100,
-      (layout[PANEL_IDS.colHabit] ?? SLOT_DEFAULTS.columns['top-right-pre']) / 100,
-      (layout[PANEL_IDS.colCal]   ?? SLOT_DEFAULTS.columns['top-right-upper']) / 100,
-    ];
+    const columnFractions = TOP_ROW_DEFS.map((d) => (layout[d.panelId] ?? d.defaultSize) / 100);
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
     setLayoutGeometry({
       station: {
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
         columnFractions,
         rightColumnSplit: current?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
+        ...(current?.canvasHidden !== undefined ? { canvasHidden: current.canvasHidden } : {}),
       },
     });
   }, [setLayoutGeometry]);
@@ -171,18 +160,46 @@ export function StationLayout() {
     setLayoutGeometry({
       station: {
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
-        columnFractions: current?.columnFractions
-          ?? Object.values(defaultTopLayout).map((v) => v / 100),
+        columnFractions: current?.columnFractions ?? [],
         rightColumnSplit,
+        ...(current?.canvasHidden !== undefined ? { canvasHidden: current.canvasHidden } : {}),
       },
     });
-  }, [setLayoutGeometry, defaultTopLayout]);
-
-  void defaultOuterLayout; void defaultBottomLayout; // silence unused — defaults
-  // are applied via Panel defaultSize, the Layout literals above are reserved
-  // for an imperative reset path that's not wired yet.
+  }, [setLayoutGeometry]);
 
   const padding = RAIL_PADDING[dockStyle];
+
+  // Build the top-row panel list: visible panels with separators between.
+  const topRowChildren: React.ReactNode[] = [];
+  visibleTopDefs.forEach((d, i) => {
+    if (i > 0) topRowChildren.push(<Separator key={`sep-${d.panelId}`} style={verticalHandleStyle} />);
+    topRowChildren.push(
+      <Panel
+        key={d.panelId}
+        id={d.panelId}
+        defaultSize={d.defaultSize}
+        minSize={SLOT_DEFAULTS.minColumn}
+      >
+        <CellWrapper><StationCell slot={d.slot} /></CellWrapper>
+      </Panel>
+    );
+  });
+
+  // Build the bottom-row panel list.
+  const bottomRowChildren: React.ReactNode[] = [];
+  const bottomItems = [
+    bottomVisible.canvas   && { id: PANEL_IDS.bottomCanvas,   size: SLOT_DEFAULTS.bottom.canvas,   min: SLOT_DEFAULTS.minCanvas,  node: <EmbeddedCanvasCell /> },
+    bottomVisible.terminal && { id: PANEL_IDS.bottomTerminal, size: SLOT_DEFAULTS.bottom.terminal, min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="bottom-strip" /></CellWrapper> },
+    bottomVisible.clock    && { id: PANEL_IDS.bottomClock,    size: SLOT_DEFAULTS.bottom.clock,    min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="top-right-lower" /></CellWrapper> },
+  ].filter(Boolean) as Array<{ id: string; size: number; min: number; node: React.ReactNode }>;
+  bottomItems.forEach((it, i) => {
+    if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} style={verticalHandleStyle} />);
+    bottomRowChildren.push(
+      <Panel key={it.id} id={it.id} defaultSize={it.size} minSize={it.min}>
+        {it.node}
+      </Panel>
+    );
+  });
 
   return (
     <div
@@ -190,8 +207,6 @@ export function StationLayout() {
       data-station="true"
       className={`dock-chassis dock-${dockStyle}`}
       style={{
-        // .dock-chassis defaults pointer-events:none + z-index:-1 (canvas
-        // mode wants it behind nodes). Station mode IS the foreground.
         pointerEvents: 'auto',
         zIndex: 0,
         position: 'relative',
@@ -201,12 +216,10 @@ export function StationLayout() {
         background: dockStyle === 'classic' ? 'var(--paper)' : undefined,
       }}
     >
-      {/* Dock chrome rails — positioned absolute inside .dock-chassis */}
       {dockStyle === 'synthesizer' && <SynthesizerChrome />}
       {dockStyle === 'telemetry' && <TelemetryChrome />}
       {dockStyle === 'krnl-dock' && <KrnlDockChrome />}
 
-      {/* Station content — inset to clear top/bottom rails */}
       <div
         style={{
           position: 'absolute',
@@ -220,122 +233,65 @@ export function StationLayout() {
           zIndex: 1,
         }}
       >
-        {/* Outer vertical group — top row (mothers) vs bottom row (canvas + clock) */}
-        <Group
-          orientation="vertical"
-          groupRef={outerGroupRef}
-          onLayoutChanged={onOuterLayoutChanged}
-          defaultLayout={outerDefaultLayout}
-          style={{ flex: 1, minHeight: 0 }}
-        >
-          {/* TOP ROW — 4 equal-width mothers */}
-          <Panel
-            id={PANEL_IDS.outerTop}
-            defaultSize={SLOT_DEFAULTS.rowPercent}
-            minSize={SLOT_DEFAULTS.minRow}
+        <StationToolbar />
+
+        {/* If everything is hidden, show a hint instead of an empty Group
+            (RPL crashes on zero panels). */}
+        {!topRowVisible && !bottomRowVisible ? (
+          <EmptyShellHint />
+        ) : (
+          <Group
+            orientation="vertical"
+            groupRef={outerGroupRef}
+            onLayoutChanged={onOuterLayoutChanged}
+            style={{ flex: 1, minHeight: 0 }}
           >
-            <Group
-              orientation="horizontal"
-              groupRef={topGroupRef}
-              onLayoutChanged={onTopLayoutChanged}
-              defaultLayout={topDefaultLayout}
-              style={{ height: '100%' }}
-            >
+            {topRowVisible && (
               <Panel
-                id={PANEL_IDS.colPomo}
-                defaultSize={SLOT_DEFAULTS.columns['top-left']}
-                minSize={SLOT_DEFAULTS.minColumn}
+                id={PANEL_IDS.outerTop}
+                defaultSize={bottomRowVisible ? SLOT_DEFAULTS.rowPercent : 100}
+                minSize={SLOT_DEFAULTS.minRow}
               >
-                <CellWrapper><StationCell slot="top-left" /></CellWrapper>
+                <Group
+                  orientation="horizontal"
+                  groupRef={topGroupRef}
+                  onLayoutChanged={onTopLayoutChanged}
+                  style={{ height: '100%' }}
+                >
+                  {topRowChildren}
+                </Group>
               </Panel>
+            )}
 
-              <Separator style={verticalHandleStyle} />
+            {topRowVisible && bottomRowVisible && (
+              <Separator style={horizontalHandleStyle} />
+            )}
 
+            {bottomRowVisible && (
               <Panel
-                id={PANEL_IDS.colTodo}
-                defaultSize={SLOT_DEFAULTS.columns['top-center']}
-                minSize={SLOT_DEFAULTS.minColumn}
-              >
-                <CellWrapper><StationCell slot="top-center" /></CellWrapper>
-              </Panel>
-
-              <Separator style={verticalHandleStyle} />
-
-              <Panel
-                id={PANEL_IDS.colHabit}
-                defaultSize={SLOT_DEFAULTS.columns['top-right-pre']}
-                minSize={SLOT_DEFAULTS.minColumn}
-              >
-                <CellWrapper><StationCell slot="top-right-pre" /></CellWrapper>
-              </Panel>
-
-              <Separator style={verticalHandleStyle} />
-
-              <Panel
-                id={PANEL_IDS.colCal}
-                defaultSize={SLOT_DEFAULTS.columns['top-right-upper']}
-                minSize={SLOT_DEFAULTS.minColumn}
-              >
-                <CellWrapper><StationCell slot="top-right-upper" /></CellWrapper>
-              </Panel>
-            </Group>
-          </Panel>
-
-          {/* Single horizontal divider running straight across — splits top
-              row of mothers from bottom row of canvas+clock. */}
-          <Separator style={horizontalHandleStyle} />
-
-          {/* BOTTOM ROW — embedded canvas (wide) + clock (narrow) */}
-          <Panel
-            id={PANEL_IDS.outerBottom}
-            defaultSize={SLOT_DEFAULTS.canvasPercent}
-            minSize={SLOT_DEFAULTS.minCanvas}
-          >
-            <Group
-              orientation="horizontal"
-              groupRef={bottomGroupRef}
-              onLayoutChanged={onBottomLayoutChanged}
-              defaultLayout={bottomDefaultLayout}
-              style={{ height: '100%' }}
-            >
-              <Panel
-                id={PANEL_IDS.bottomCanvas}
-                defaultSize={SLOT_DEFAULTS.bottom.canvas}
+                id={PANEL_IDS.outerBottom}
+                defaultSize={topRowVisible ? SLOT_DEFAULTS.canvasPercent : 100}
                 minSize={SLOT_DEFAULTS.minCanvas}
               >
-                <EmbeddedCanvasCell />
+                <Group
+                  orientation="horizontal"
+                  groupRef={bottomGroupRef}
+                  onLayoutChanged={onBottomLayoutChanged}
+                  style={{ height: '100%' }}
+                >
+                  {bottomRowChildren}
+                </Group>
               </Panel>
-
-              <Separator style={verticalHandleStyle} />
-
-              <Panel
-                id={PANEL_IDS.bottomTerminal}
-                defaultSize={SLOT_DEFAULTS.bottom.terminal}
-                minSize={SLOT_DEFAULTS.minColumn}
-              >
-                <CellWrapper><StationCell slot="bottom-strip" /></CellWrapper>
-              </Panel>
-
-              <Separator style={verticalHandleStyle} />
-
-              <Panel
-                id={PANEL_IDS.bottomClock}
-                defaultSize={SLOT_DEFAULTS.bottom.clock}
-                minSize={SLOT_DEFAULTS.minColumn}
-              >
-                <CellWrapper><StationCell slot="top-right-lower" /></CellWrapper>
-              </Panel>
-            </Group>
-          </Panel>
-        </Group>
+            )}
+          </Group>
+        )}
       </div>
     </div>
   );
 }
 
-/** Thin wrapper that sizes a station cell to fill its panel. Transparent
- *  background so the dock chrome's themed background shows through the gaps
- *  between mother cards. */
+/** Thin wrapper that sizes a station cell to fill its panel. Transparent so
+ *  the dock chrome's themed background shows between cards. */
 function CellWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -349,6 +305,27 @@ function CellWrapper({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+function EmptyShellHint() {
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--ink-3)',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        opacity: 0.6,
+      }}
+    >
+      every panel is hidden — toggle one back on
     </div>
   );
 }

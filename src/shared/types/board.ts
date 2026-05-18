@@ -34,6 +34,10 @@ export interface StationGeometry {
   rowFraction: number;         // [0..1] mother-row height as fraction of viewport
   columnFractions: number[];   // length matches station column count (4 columns)
   rightColumnSplit: number;    // [0..1] split between Calendar (upper) and Clock (lower)
+  // Whether the embedded canvas panel is hidden (toggled via StationToolbar).
+  // Mother visibility is stored per-node on config.stationHidden; canvas isn't
+  // a node so it lives on the geometry object instead.
+  canvasHidden?: boolean;
 }
 
 // Structural mixin for mother-node config objects.
