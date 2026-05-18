@@ -37,9 +37,12 @@ export function resolveStationSlot(node: Node): StationSlot | undefined {
 // Default panel sizes for the react-resizable-panels API.
 // Stored as percentage values (0–100) as required by the library.
 export const SLOT_DEFAULTS = {
-  // Outer row split: top row (mothers) vs bottom row (canvas + clock)
-  rowPercent: 50,
-  canvasPercent: 50,
+  // Outer row split: top row (mothers) vs bottom row (canvas + clock).
+  // Defaults to 35/65 — mothers fit comfortably without big empty space
+  // below (Pomo / Todo / Habit cards have natural heights ~280px) and the
+  // canvas gets the lion's share. User can drag the splitter to taste.
+  rowPercent: 35,
+  canvasPercent: 65,
   // Top-row column widths (must sum to 100): 4 equal columns
   columns: {
     'top-left':        25,   // Pomo
