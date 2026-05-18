@@ -1,7 +1,9 @@
 <div align="center">
 
 <img src="docs/assets/krnl0d1.jpg" alt="KRNL0 — Life OS" width="100%" />
+<img src="docs/assets/stationMODEUpdate.jpg" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges"/>
 <img src="docs/assets/dockupdate.png" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges"/>
+
 <br /><br />
 
 # KRNL0
@@ -50,6 +52,8 @@ KRNL0 puts every primitive on one canvas as a node, and lets them communicate. D
 
 <div align="center">
 <img src="docs/assets/update0.8.0.png" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges" width="94%" />
+<img src="docs/assets/Station Mode.png" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges"/>
+
 </div>
 
 ---
