@@ -83,10 +83,14 @@ const TOP_ROW_DEFS: ReadonlyArray<{
   { panelId: PANEL_IDS.colCal,   defaultSize: SLOT_DEFAULTS.columns['top-right-upper'], slot: 'top-right-upper' },
 ];
 
-function isStationHidden(node: Node | undefined): boolean {
+// Terminal mother is default-hidden across every dock variant — users opt in
+// via the StationToolbar toggle. Other mothers stay default-visible.
+export function isStationHidden(node: Node | undefined): boolean {
   if (!node) return true; // missing == hidden
   const cfg = (node.config ?? {}) as MotherNodeConfig;
-  return !!cfg.stationHidden;
+  if (cfg.stationHidden !== undefined) return !!cfg.stationHidden;
+  if (node.kind === 'term') return true;
+  return false;
 }
 
 export function StationLayout() {

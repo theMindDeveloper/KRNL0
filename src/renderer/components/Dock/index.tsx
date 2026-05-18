@@ -11,7 +11,8 @@
  *   - Connect (no shortcut) — sets connect tool mode
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { NodeKind } from '../../../shared/types/node';
 import { DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
@@ -34,7 +35,37 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
   const [activeTool, setActiveTool] = useState<ToolMode>('select');
   const [pressed, setPressedKind] = useState<NodeKind | null>(null);
   const [dockMenuOpen, setDockMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
   const dockBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Compute portal position from the dock button's rect, clamped to viewport.
+  // Picker is ~248px wide, ~280px tall (8 tiles). Anchor to the right of the
+  // dock button, top-aligned with it but clamped so it never clips top/bottom.
+  useLayoutEffect(() => {
+    if (!dockMenuOpen || !dockBtnRef.current) return;
+    const recompute = () => {
+      const r = dockBtnRef.current!.getBoundingClientRect();
+      const menuW = 248;
+      const menuH = 300;
+      const gap = 8;
+      let left = r.right + gap;
+      let top = r.top - (menuH - r.height) / 2; // vertically centered on button
+      // Viewport clamps
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      if (left + menuW > vw - 8) left = Math.max(8, r.left - menuW - gap);
+      if (top < 8) top = 8;
+      if (top + menuH > vh - 8) top = Math.max(8, vh - menuH - 8);
+      setMenuPos({ left, top });
+    };
+    recompute();
+    window.addEventListener('resize', recompute);
+    window.addEventListener('scroll', recompute, true);
+    return () => {
+      window.removeEventListener('resize', recompute);
+      window.removeEventListener('scroll', recompute, true);
+    };
+  }, [dockMenuOpen]);
 
   // Analytics is a singleton — button reflects whether one is on the board.
   const analyticsOpen = useBoardStore((s) =>
@@ -258,11 +289,12 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
             <span className="krnl-dock-style-btn__glyph">{DOCK_REGISTRY[dockStyle].glyph}</span>
           </button>
 
-          {dockMenuOpen && (
+          {dockMenuOpen && menuPos && createPortal(
             <div
               className="dock-style-picker-flyout"
               data-testid="dock-style-picker-menu"
               role="menu"
+              style={{ left: menuPos.left, top: menuPos.top, bottom: 'auto' }}
             >
               <div className="dsp-head">
                 <span className="dsp-head__dot" aria-hidden />
@@ -299,7 +331,8 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
                   );
                 })}
               </div>
-            </div>
+            </div>,
+            document.body,
           )}
         </>
       ) : null}

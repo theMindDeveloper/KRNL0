@@ -50,6 +50,9 @@ import type { ReactNode } from 'react';
 import { SynthesizerChrome } from './SynthesizerChrome';
 import { TelemetryChrome } from './TelemetryChrome';
 import { KrnlDockChrome } from './KrnlDockChrome';
+import { BlueprintChrome } from './BlueprintChrome';
+import { MacintoshChrome } from './MacintoshChrome';
+import { SubmarineChrome } from './SubmarineChrome';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,6 +118,42 @@ const KRNL_DOCK_GLYPH = (
   </svg>
 );
 
+const BLUEPRINT_GLYPH = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="16" rx="0.5" />
+    {/* dimension arrow along the top */}
+    <path d="M5 7h14" />
+    <path d="M5 7l1.4 -1M5 7l1.4 1M19 7l-1.4 -1M19 7l-1.4 1" />
+    {/* schematic line + a small detail node */}
+    <path d="M6 12h7M16 12h2" opacity="0.7" />
+    <circle cx="14.5" cy="12" r="1.1" />
+    {/* title-block corner */}
+    <path d="M14 16h5M14 18h5M14 16v2" opacity="0.7" />
+  </svg>
+);
+
+const MACINTOSH_GLYPH = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    {/* 1984 Mac 128K silhouette: chunky body, screen, floppy slot */}
+    <rect x="5" y="2" width="14" height="20" rx="1.2" />
+    <rect x="7" y="4" width="10" height="8" rx="0.5" />
+    <rect x="9" y="14" width="6" height="1" />
+    <circle cx="17" cy="15" r="0.6" fill="currentColor" stroke="none" />
+    <path d="M8 19h8" opacity="0.6" />
+  </svg>
+);
+
+const SUBMARINE_GLYPH = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    {/* depth gauge dial + needle + helm spokes */}
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    <path d="M12 12l4 -3" />
+    <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2" />
+    <path d="M5.8 5.8l1.4 1.4M16.8 16.8l1.4 1.4M5.8 18.2l1.4 -1.4M16.8 7.2l1.4 -1.4" opacity="0.6" />
+  </svg>
+);
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 // Helper preserves literal keys (so DockStyle is a narrow union) while typing
@@ -159,6 +198,36 @@ export const DOCK_REGISTRY = defineRegistry({
     Chrome: KrnlDockChrome,
     canvasBounds: { kind: 'fit-mothers', topOffset: -102, height: 744, sidePad: 10, minWidth: 600 },
     stationPadding: { top: 102, bottom: 102 },
+    theme: 'dark-only',
+  },
+  blueprint: {
+    id: 'blueprint',
+    label: 'Blueprint',
+    sublabel: 'Drafting table',
+    glyph: BLUEPRINT_GLYPH,
+    Chrome: BlueprintChrome,
+    canvasBounds: { kind: 'static', rect: { left: -1410, top: -68, width: 3360, height: 678 } },
+    stationPadding: { top: 68, bottom: 68 },
+  },
+  macintosh: {
+    id: 'macintosh',
+    label: 'Macintosh',
+    sublabel: '1984 hardware',
+    glyph: MACINTOSH_GLYPH,
+    Chrome: MacintoshChrome,
+    // Top: case top + venting + brand row (~108). Bottom: floppy slot + model
+    // plate + power section (~116). Mother row sits inside the CRT bezel.
+    canvasBounds: { kind: 'static', rect: { left: -1410, top: -110, width: 3360, height: 766 } },
+    stationPadding: { top: 110, bottom: 116 },
+  },
+  submarine: {
+    id: 'submarine',
+    label: 'Submarine',
+    sublabel: 'Periscope console',
+    glyph: SUBMARINE_GLYPH,
+    Chrome: SubmarineChrome,
+    canvasBounds: { kind: 'static', rect: { left: -1410, top: -120, width: 3360, height: 780 } },
+    stationPadding: { top: 120, bottom: 116 },
     theme: 'dark-only',
   },
 });

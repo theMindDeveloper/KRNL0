@@ -16,6 +16,7 @@ import { useBoardStore } from '../../store/boardStore';
 import type { NodeKind, Node } from '../../../shared/types/node';
 import type { MotherNodeConfig, StationGeometry } from '../../../shared/types';
 import { SLOT_DEFAULTS } from './SlotResolver';
+import { isStationHidden } from './StationLayout';
 
 interface MotherEntry {
   kind: NodeKind;
@@ -164,7 +165,11 @@ export function StationToolbar() {
     const m = motherByKind.get(kind);
     if (!m) return;
     const cfg = (m.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
-    updateNode(m.id, { config: { ...cfg, stationHidden: !cfg.stationHidden } });
+    // Read the effective visibility (factors in the terminal default-hidden
+    // rule) so the toggle flips from what the user actually sees, not from
+    // the raw undefined/false value of the field.
+    const currentlyHidden = isStationHidden(m);
+    updateNode(m.id, { config: { ...cfg, stationHidden: !currentlyHidden } });
   };
 
   const toggleCanvas = () => {
@@ -185,6 +190,10 @@ export function StationToolbar() {
         alignItems: 'center',
         gap: 4,
         padding: '6px 10px',
+        // Outer margin lets per-dock themes inset the toolbar so its
+        // rectangular box doesn't kiss the chassis edge (chrome corner
+        // radii, brass rails, etc.). Default = no inset.
+        margin: 'var(--station-toolbar-margin, 0)',
         background: 'var(--paper-2, rgba(0,0,0,0.2))',
         borderBottom: '1px solid var(--paper-3)',
         flexShrink: 0,
@@ -206,8 +215,7 @@ export function StationToolbar() {
       </span>
       {MOTHER_ORDER.map((m) => {
         const node = motherByKind.get(m.kind);
-        const cfg = (node?.config ?? {}) as MotherNodeConfig;
-        const active = !!node && !cfg.stationHidden;
+        const active = !!node && !isStationHidden(node);
         return (
           <ToolbarBtn
             key={m.kind}
