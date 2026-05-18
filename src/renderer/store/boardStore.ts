@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { saveBoard } from './eventLog';
-import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry } from '../../shared/types';
+import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
 
@@ -202,13 +202,19 @@ export const useBoardStore = create<BoardStore>((set) => ({
       if (!nodeA || !nodeB) return s;
       const posA = nodeA.position;
       const posB = nodeB.position;
+      // Station-mode parity: swap config.stationSlot too so dragging a mother
+      // in station mode visibly rearranges the panels (ADR 0008 § 4.2).
+      const cfgA = (nodeA.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
+      const cfgB = (nodeB.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
+      const slotA = cfgA.stationSlot;
+      const slotB = cfgB.stationSlot;
       return {
         ...pushHistory(s),
         board: {
           ...s.board,
           nodes: s.board.nodes.map((n) => {
-            if (n.id === idA) return { ...n, position: posB };
-            if (n.id === idB) return { ...n, position: posA };
+            if (n.id === idA) return { ...n, position: posB, config: { ...cfgA, stationSlot: slotB } };
+            if (n.id === idB) return { ...n, position: posA, config: { ...cfgB, stationSlot: slotA } };
             return n;
           }),
         },

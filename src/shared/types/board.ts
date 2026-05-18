@@ -40,6 +40,11 @@ export interface StationGeometry {
 // Step 4 (StationCell rendering) will rely on this contract to read stationSlot.
 export interface MotherNodeConfig {
   stationSlot?: StationSlot;
+  // When true, StationCell renders a small "show" placeholder instead of the
+  // mother UI — user-toggleable via right-click → Hide on the drag handle.
+  // Hidden mothers still exist on the canvas; only the station-mode
+  // rendering is suppressed.
+  stationHidden?: boolean;
 }
 
 export interface Board {
