@@ -31,8 +31,8 @@ export function resolveStationSlot(node: Node): StationSlot | undefined {
 // Stored as percentage values (0–100) as required by the library.
 export const SLOT_DEFAULTS = {
   // Outer row: top row fraction vs canvas fraction (percent)
-  rowPercent: 32,
-  canvasPercent: 68,
+  rowPercent: 50,
+  canvasPercent: 50,
   // Column widths inside the top row (must sum to 100)
   columns: {
     'top-left':        22,   // Pomo

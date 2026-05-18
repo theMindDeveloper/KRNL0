@@ -7,18 +7,13 @@
  * Calendar-over-Clock), embedded canvas below.  All dividers are resizable
  * via react-resizable-panels v4.
  *
- * Persistence: onLayoutChanged callbacks route into boardStore.setLayoutGeometry.
- * The library's built-in storage is NOT used — board.json is the single source
- * of truth (ADR § 9.2).
+ * The whole shell is wrapped in `.dock-chassis dock-{style}` so the dock
+ * chrome (top rail + bottom rail + themed middle) frames the entire layout.
+ * Variant-keyed padding clears the rails so panels don't sit under them.
  *
- * Double-click reset: Separator has built-in double-click-to-reset behaviour in v4.
- *
- * Styling: splitter handles use var(--line) inline; no new CSS file (NF4).
- *
- * NOTE: react-resizable-panels v4 uses:
- *   Group (was PanelGroup), Panel (same), Separator (was PanelResizeHandle).
- *   Layout is { [panelId: string]: number } (0..100 percentages).
- *   GroupImperativeHandle is accessed via the groupRef prop (not ref).
+ * NOTE: react-resizable-panels v4 requires Separators to be DIRECT DOM
+ * children of their parent Group — wrapping them in a div breaks push/pull
+ * drag and leaves gaps.  The Separator itself carries the visible style.
  */
 
 import { useRef, useCallback } from 'react';
@@ -30,6 +25,10 @@ import {
   type Layout,
 } from 'react-resizable-panels';
 import { useBoardStore } from '../../store/boardStore';
+import { useDockStyle, type DockStyle } from '../ChassisLayer/useDockStyle';
+import { SynthesizerChrome } from '../ChassisLayer/SynthesizerChrome';
+import { TelemetryChrome } from '../ChassisLayer/TelemetryChrome';
+import { KrnlDockChrome } from '../ChassisLayer/KrnlDockChrome';
 import { StationCell } from './StationCell';
 import { EmbeddedCanvasCell } from './EmbeddedCanvasCell';
 import { SLOT_DEFAULTS } from './SlotResolver';
@@ -46,23 +45,19 @@ const PANEL_IDS = {
   railClock: 'station-rail-clock',
 } as const;
 
-// Default layouts in v4 format (panelId → percentage 0..100).
-const defaultOuterLayout: Layout = {
-  [PANEL_IDS.outerRow]:    SLOT_DEFAULTS.rowPercent,
-  [PANEL_IDS.outerCanvas]: SLOT_DEFAULTS.canvasPercent,
-};
-const defaultColLayout: Layout = {
-  [PANEL_IDS.colPomo]:  SLOT_DEFAULTS.columns['top-left'],
-  [PANEL_IDS.colTodo]:  SLOT_DEFAULTS.columns['top-center'],
-  [PANEL_IDS.colHabit]: SLOT_DEFAULTS.columns['top-right-pre'],
-  [PANEL_IDS.colRail]:  SLOT_DEFAULTS.columns['right-rail'],
-};
-const defaultRailLayout: Layout = {
-  [PANEL_IDS.railCal]:   SLOT_DEFAULTS.rightColumn.upper,
-  [PANEL_IDS.railClock]: SLOT_DEFAULTS.rightColumn.lower,
+// Rail padding per dock style — top/bottom in pixels so the layout doesn't
+// overlap the chassis chrome rails.  Numbers come from chassis.css (md-tel-top
+// 6+64=70 ≈76 with extra breathing, md-synth-top 6+38=44, dk-rail 96, etc.).
+const RAIL_PADDING: Record<DockStyle, { top: number; bottom: number }> = {
+  classic:     { top: 0,  bottom: 0  },
+  synthesizer: { top: 50, bottom: 88 },
+  telemetry:   { top: 76, bottom: 70 },
+  'krnl-dock': { top: 102, bottom: 102 },
 };
 
 // Splitter handle appearance — uses --line token for theme parity (NF4).
+// Style is applied directly to <Separator> since the library mandates it must
+// be a direct child of Group.
 const verticalHandleStyle: React.CSSProperties = {
   width: 4,
   background: 'var(--line, var(--paper-3))',
@@ -80,6 +75,23 @@ const horizontalHandleStyle: React.CSSProperties = {
 export function StationLayout() {
   const setLayoutGeometry = useBoardStore((s) => s.setLayoutGeometry);
   const storedGeometry = useBoardStore((s) => s.board?.layoutGeometry?.station);
+  const [dockStyle] = useDockStyle();
+
+  // Default layouts in v4 format (panelId → percentage 0..100).
+  const defaultOuterLayout: Layout = {
+    [PANEL_IDS.outerRow]:    SLOT_DEFAULTS.rowPercent,
+    [PANEL_IDS.outerCanvas]: SLOT_DEFAULTS.canvasPercent,
+  };
+  const defaultColLayout: Layout = {
+    [PANEL_IDS.colPomo]:  SLOT_DEFAULTS.columns['top-left'],
+    [PANEL_IDS.colTodo]:  SLOT_DEFAULTS.columns['top-center'],
+    [PANEL_IDS.colHabit]: SLOT_DEFAULTS.columns['top-right-pre'],
+    [PANEL_IDS.colRail]:  SLOT_DEFAULTS.columns['right-rail'],
+  };
+  const defaultRailLayout: Layout = {
+    [PANEL_IDS.railCal]:   SLOT_DEFAULTS.rightColumn.upper,
+    [PANEL_IDS.railClock]: SLOT_DEFAULTS.rightColumn.lower,
+  };
 
   // Refs for programmatic layout reset via double-click.
   const outerGroupRef = useRef<GroupImperativeHandle | null>(null);
@@ -96,10 +108,10 @@ export function StationLayout() {
 
   const colDefaultLayout: Layout | undefined = storedGeometry?.columnFractions != null
     ? {
-        [PANEL_IDS.colPomo]:  Math.round(storedGeometry.columnFractions[0] ?? SLOT_DEFAULTS.columns['top-left'] / 100),
-        [PANEL_IDS.colTodo]:  Math.round(storedGeometry.columnFractions[1] ?? SLOT_DEFAULTS.columns['top-center'] / 100),
-        [PANEL_IDS.colHabit]: Math.round(storedGeometry.columnFractions[2] ?? SLOT_DEFAULTS.columns['top-right-pre'] / 100),
-        [PANEL_IDS.colRail]:  Math.round(storedGeometry.columnFractions[3] ?? SLOT_DEFAULTS.columns['right-rail'] / 100),
+        [PANEL_IDS.colPomo]:  Math.round((storedGeometry.columnFractions[0] ?? SLOT_DEFAULTS.columns['top-left']  / 100) * 100),
+        [PANEL_IDS.colTodo]:  Math.round((storedGeometry.columnFractions[1] ?? SLOT_DEFAULTS.columns['top-center'] / 100) * 100),
+        [PANEL_IDS.colHabit]: Math.round((storedGeometry.columnFractions[2] ?? SLOT_DEFAULTS.columns['top-right-pre'] / 100) * 100),
+        [PANEL_IDS.colRail]:  Math.round((storedGeometry.columnFractions[3] ?? SLOT_DEFAULTS.columns['right-rail'] / 100) * 100),
       }
     : undefined;
 
@@ -124,7 +136,7 @@ export function StationLayout() {
           ?? SLOT_DEFAULTS.rightColumn.upper / 100,
       },
     });
-  }, [setLayoutGeometry]);
+  }, [setLayoutGeometry, defaultColLayout]);
 
   const onColumnLayoutChanged = useCallback((layout: Layout) => {
     const columnFractions = [
@@ -154,158 +166,156 @@ export function StationLayout() {
         rightColumnSplit,
       },
     });
-  }, [setLayoutGeometry]);
+  }, [setLayoutGeometry, defaultColLayout]);
 
-  // ── Double-click reset (wrap each Separator for onDoubleClick) ───────────
-
-  const resetOuterRow = useCallback(() => {
-    outerGroupRef.current?.setLayout(defaultOuterLayout);
-  }, []);
-
-  const resetColumns = useCallback(() => {
-    innerGroupRef.current?.setLayout(defaultColLayout);
-  }, []);
-
-  const resetRailColumn = useCallback(() => {
-    rightGroupRef.current?.setLayout(defaultRailLayout);
-  }, []);
+  const padding = RAIL_PADDING[dockStyle];
 
   return (
     <div
       data-testid="station-layout"
+      className={`dock-chassis dock-${dockStyle}`}
       style={{
+        position: 'relative',
         width: '100%',
         height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
         overflow: 'hidden',
-        background: 'var(--paper)',
+        background: dockStyle === 'classic' ? 'var(--paper)' : undefined,
       }}
     >
-      {/* Outer vertical group — top row vs canvas */}
-      <Group
-        orientation="vertical"
-        groupRef={outerGroupRef}
-        onLayoutChanged={onRowLayoutChanged}
-        defaultLayout={outerDefaultLayout}
-        style={{ flex: 1, minHeight: 0 }}
+      {/* Dock chrome rails — positioned absolute inside .dock-chassis */}
+      {dockStyle === 'synthesizer' && <SynthesizerChrome />}
+      {dockStyle === 'telemetry' && <TelemetryChrome />}
+      {dockStyle === 'krnl-dock' && <KrnlDockChrome />}
+
+      {/* Station content — inset to clear top/bottom rails */}
+      <div
+        style={{
+          position: 'absolute',
+          top: padding.top,
+          bottom: padding.bottom,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          zIndex: 1,
+        }}
       >
-        {/* Top row */}
-        <Panel
-          id={PANEL_IDS.outerRow}
-          defaultSize={SLOT_DEFAULTS.rowPercent}
-          minSize={SLOT_DEFAULTS.minRow}
+        {/* Outer vertical group — top row vs canvas */}
+        <Group
+          orientation="vertical"
+          groupRef={outerGroupRef}
+          onLayoutChanged={onRowLayoutChanged}
+          defaultLayout={outerDefaultLayout}
+          style={{ flex: 1, minHeight: 0 }}
         >
-          {/* Horizontal column group */}
-          <Group
-            orientation="horizontal"
-            groupRef={innerGroupRef}
-            onLayoutChanged={onColumnLayoutChanged}
-            defaultLayout={colDefaultLayout}
-            style={{ height: '100%' }}
+          {/* Top row */}
+          <Panel
+            id={PANEL_IDS.outerRow}
+            defaultSize={SLOT_DEFAULTS.rowPercent}
+            minSize={SLOT_DEFAULTS.minRow}
           >
-            {/* Pomo */}
-            <Panel
-              id={PANEL_IDS.colPomo}
-              defaultSize={SLOT_DEFAULTS.columns['top-left']}
-              minSize={SLOT_DEFAULTS.minColumn}
+            {/* Horizontal column group */}
+            <Group
+              orientation="horizontal"
+              groupRef={innerGroupRef}
+              onLayoutChanged={onColumnLayoutChanged}
+              defaultLayout={colDefaultLayout}
+              style={{ height: '100%' }}
             >
-              <CellWrapper>
-                <StationCell slot="top-left" />
-              </CellWrapper>
-            </Panel>
-
-            <div style={verticalHandleStyle} onDoubleClick={resetColumns}>
-              <Separator style={{ width: '100%', height: '100%', background: 'transparent' }} />
-            </div>
-
-            {/* Todo */}
-            <Panel
-              id={PANEL_IDS.colTodo}
-              defaultSize={SLOT_DEFAULTS.columns['top-center']}
-              minSize={SLOT_DEFAULTS.minColumnWide}
-            >
-              <CellWrapper>
-                <StationCell slot="top-center" />
-              </CellWrapper>
-            </Panel>
-
-            <div style={verticalHandleStyle} onDoubleClick={resetColumns}>
-              <Separator style={{ width: '100%', height: '100%', background: 'transparent' }} />
-            </div>
-
-            {/* Habit — OQ-1.A option A: own column */}
-            <Panel
-              id={PANEL_IDS.colHabit}
-              defaultSize={SLOT_DEFAULTS.columns['top-right-pre']}
-              minSize={SLOT_DEFAULTS.minColumn}
-            >
-              <CellWrapper>
-                <StationCell slot="top-right-pre" />
-              </CellWrapper>
-            </Panel>
-
-            <div style={verticalHandleStyle} onDoubleClick={resetColumns}>
-              <Separator style={{ width: '100%', height: '100%', background: 'transparent' }} />
-            </div>
-
-            {/* Right rail: Calendar over Clock */}
-            <Panel
-              id={PANEL_IDS.colRail}
-              defaultSize={SLOT_DEFAULTS.columns['right-rail']}
-              minSize={SLOT_DEFAULTS.minColumnWide}
-            >
-              <Group
-                orientation="vertical"
-                groupRef={rightGroupRef}
-                onLayoutChanged={onRailLayoutChanged}
-                defaultLayout={railDefaultLayout}
-                style={{ height: '100%' }}
+              {/* Pomo */}
+              <Panel
+                id={PANEL_IDS.colPomo}
+                defaultSize={SLOT_DEFAULTS.columns['top-left']}
+                minSize={SLOT_DEFAULTS.minColumn}
               >
-                {/* Calendar */}
-                <Panel
-                  id={PANEL_IDS.railCal}
-                  defaultSize={SLOT_DEFAULTS.rightColumn.upper}
-                  minSize={SLOT_DEFAULTS.minRailCell}
+                <CellWrapper>
+                  <StationCell slot="top-left" />
+                </CellWrapper>
+              </Panel>
+
+              <Separator style={verticalHandleStyle} />
+
+              {/* Todo */}
+              <Panel
+                id={PANEL_IDS.colTodo}
+                defaultSize={SLOT_DEFAULTS.columns['top-center']}
+                minSize={SLOT_DEFAULTS.minColumnWide}
+              >
+                <CellWrapper>
+                  <StationCell slot="top-center" />
+                </CellWrapper>
+              </Panel>
+
+              <Separator style={verticalHandleStyle} />
+
+              {/* Habit — OQ-1.A option A: own column */}
+              <Panel
+                id={PANEL_IDS.colHabit}
+                defaultSize={SLOT_DEFAULTS.columns['top-right-pre']}
+                minSize={SLOT_DEFAULTS.minColumn}
+              >
+                <CellWrapper>
+                  <StationCell slot="top-right-pre" />
+                </CellWrapper>
+              </Panel>
+
+              <Separator style={verticalHandleStyle} />
+
+              {/* Right rail: Calendar over Clock */}
+              <Panel
+                id={PANEL_IDS.colRail}
+                defaultSize={SLOT_DEFAULTS.columns['right-rail']}
+                minSize={SLOT_DEFAULTS.minColumnWide}
+              >
+                <Group
+                  orientation="vertical"
+                  groupRef={rightGroupRef}
+                  onLayoutChanged={onRailLayoutChanged}
+                  defaultLayout={railDefaultLayout}
+                  style={{ height: '100%' }}
                 >
-                  <CellWrapper>
-                    <StationCell slot="top-right-upper" />
-                  </CellWrapper>
-                </Panel>
+                  {/* Calendar */}
+                  <Panel
+                    id={PANEL_IDS.railCal}
+                    defaultSize={SLOT_DEFAULTS.rightColumn.upper}
+                    minSize={SLOT_DEFAULTS.minRailCell}
+                  >
+                    <CellWrapper>
+                      <StationCell slot="top-right-upper" />
+                    </CellWrapper>
+                  </Panel>
 
-                <div style={horizontalHandleStyle} onDoubleClick={resetRailColumn}>
-                  <Separator style={{ width: '100%', height: '100%', background: 'transparent' }} />
-                </div>
+                  <Separator style={horizontalHandleStyle} />
 
-                {/* Clock */}
-                <Panel
-                  id={PANEL_IDS.railClock}
-                  defaultSize={SLOT_DEFAULTS.rightColumn.lower}
-                  minSize={SLOT_DEFAULTS.minRailCell}
-                >
-                  <CellWrapper>
-                    <StationCell slot="top-right-lower" />
-                  </CellWrapper>
-                </Panel>
-              </Group>
-            </Panel>
-          </Group>
-        </Panel>
+                  {/* Clock */}
+                  <Panel
+                    id={PANEL_IDS.railClock}
+                    defaultSize={SLOT_DEFAULTS.rightColumn.lower}
+                    minSize={SLOT_DEFAULTS.minRailCell}
+                  >
+                    <CellWrapper>
+                      <StationCell slot="top-right-lower" />
+                    </CellWrapper>
+                  </Panel>
+                </Group>
+              </Panel>
+            </Group>
+          </Panel>
 
-        {/* Splitter between top row and canvas */}
-        <div style={horizontalHandleStyle} onDoubleClick={resetOuterRow}>
-          <Separator style={{ width: '100%', height: '100%', background: 'transparent' }} />
-        </div>
+          {/* Splitter between top row and canvas */}
+          <Separator style={horizontalHandleStyle} />
 
-        {/* Canvas panel */}
-        <Panel
-          id={PANEL_IDS.outerCanvas}
-          defaultSize={SLOT_DEFAULTS.canvasPercent}
-          minSize={SLOT_DEFAULTS.minCanvas}
-        >
-          <EmbeddedCanvasCell />
-        </Panel>
-      </Group>
+          {/* Canvas panel */}
+          <Panel
+            id={PANEL_IDS.outerCanvas}
+            defaultSize={SLOT_DEFAULTS.canvasPercent}
+            minSize={SLOT_DEFAULTS.minCanvas}
+          >
+            <EmbeddedCanvasCell />
+          </Panel>
+        </Group>
+      </div>
     </div>
   );
 }
@@ -318,7 +328,8 @@ function CellWrapper({ children }: { children: React.ReactNode }) {
         width: '100%',
         height: '100%',
         overflow: 'hidden',
-        borderRight: '1px solid var(--paper-3)',
+        background: 'var(--node-bg, var(--paper))',
+        border: '1px solid var(--paper-3)',
       }}
     >
       {children}

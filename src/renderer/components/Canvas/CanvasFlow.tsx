@@ -884,6 +884,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (updated) void saveBoard(updated);
   }, [addEdge]);
 
+  // In station mode the mothers are rendered as station cells in
+  // StationLayout — the embedded canvas must hide them (and their edges) so
+  // they aren't drawn twice. ADR 0008 § 2.5.
+  const isStation = board?.layoutMode === 'station';
+
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
   // Also appends swap-button pseudo-nodes between every adjacent mother pair
@@ -901,7 +906,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
     );
 
-    const baseNodes: KrnlRFNode[] = board.nodes.map((node: KrnlNode) => {
+    // Source nodes for RF derivation — drop mothers entirely in station mode.
+    const sourceNodes = isStation
+      ? board.nodes.filter((n) => !n.isMother)
+      : board.nodes;
+
+    const baseNodes: KrnlRFNode[] = sourceNodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
       const onSelect = getSelectHandler(node.id, selectNode);
 
@@ -931,13 +941,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       return rf;
     });
 
-    // Swap-button pseudo-nodes — one per adjacent mother pair.
-    // Position: in the gap between the two cards, vertically centered.
-    // gap between motherR.left and motherL.right is
-    // motherR.position.x - (motherL.position.x + MOTHER_WIDTH). Place button
-    // at the midpoint of that gap; vertical center at half MOTHER_HEIGHT.
+    // Swap-button pseudo-nodes — one per adjacent mother pair. Skip in
+    // station mode (mothers aren't on the embedded canvas).
     const swapNodes: KrnlRFNode[] = [];
-    for (let i = 0; i < motherNodes.length - 1; i++) {
+    const swapLimit = isStation ? 0 : motherNodes.length - 1;
+    for (let i = 0; i < swapLimit; i++) {
       const left = motherNodes[i]!;
       const right = motherNodes[i + 1]!;
       const gapMidX = (left.position.x + MOTHER_WIDTH + right.position.x) / 2;
@@ -969,7 +977,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // mothers + frames + habits stay visible regardless. Spread-clone only the
     // ones that need `hidden:true` so identity is preserved for unaffected nodes.
     const filteredBase = baseNodes.map((rf, idx) => {
-      const node = board.nodes[idx];
+      const node = sourceNodes[idx];
       if (!node) return rf;
       const layer = kindToLayer(node.kind);
       if (!layer) return rf;
@@ -981,7 +989,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     });
 
     return [...filteredBase, ...swapNodes];
-  }, [board, selectNode, layerTasks, layerTexts, layerImages]);
+  }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
   // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that
@@ -1017,12 +1025,20 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const kindMap = new Map<string, string>(
       board.nodes.map((n: KrnlNode) => [n.id, n.kind])
     );
-    return board.edges.map((edge) => {
+    // In station mode, drop edges whose source or target is a mother — those
+    // mothers are rendered as station cells and have no canvas counterpart.
+    const motherIds = isStation
+      ? new Set(board.nodes.filter((n) => n.isMother).map((n) => n.id))
+      : null;
+    const visibleEdges = motherIds
+      ? board.edges.filter((e) => !motherIds.has(e.from.nodeId) && !motherIds.has(e.to.nodeId))
+      : board.edges;
+    return visibleEdges.map((edge) => {
       const srcKind = kindMap.get(edge.from.nodeId) ?? '';
       const tgtKind = kindMap.get(edge.to.nodeId) ?? '';
       return getMemoizedRfEdge(edge, srcKind, tgtKind);
     });
-  }, [board]);
+  }, [board, isStation]);
 
   // ── Bold-set — which source node IDs should bold their outgoing edges ─────
   // Keyed on [board.nodes, hoveredNodeId]. When a mother is hovered we walk its
