@@ -543,12 +543,14 @@ export function ClockNode({
         {/* Clock face — container wider than SVG viewBox so outward-growing
             train tracks don't clip on the parent div edge. Station mode:
             scale up to fill the panel (capped so very-wide panels don't
-            give a giant dial). Canvas mode: fixed 244×244. */}
+            give a giant dial). Canvas mode: fixed dial diameter.
+            Sizes shrunk ~10% from the prior 92%/460/244 so labels above
+            and below stay visible on smaller screens. */}
         <div
           style={
             inStation
-              ? { position: 'relative', width: '92%', maxWidth: 460, aspectRatio: '1 / 1', margin: '0 auto', overflow: 'visible' }
-              : { position: 'relative', width: 244, height: 244, margin: '0 auto', overflow: 'visible' }
+              ? { position: 'relative', width: '83%', maxWidth: 414, aspectRatio: '1 / 1', margin: '0 auto', overflow: 'visible' }
+              : { position: 'relative', width: 220, height: 220, margin: '0 auto', overflow: 'visible' }
           }
         >
           <svg

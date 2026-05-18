@@ -42,8 +42,6 @@ export const CLIP_MAP: Record<string, string> = {
   'tut1_00a': 'tut1_00a_know_tutorials_are_boring',
   'tut1_00b': 'tut1_00b_ill_make_it_more_fun',
   'tut1_00c': 'tut1_00c_lets_play_some_music',
-  'tut1_00d': 'tut1_00d_nah_not_this',
-  'tut1_00e': 'tut1_00e_okay_thats_better',
   // Main script
   'tut1_01': 'tut1_01_hey_again_im_jen',
   'tut1_02': 'tut1_02_this_tutorial_pomo_and_tasks',
