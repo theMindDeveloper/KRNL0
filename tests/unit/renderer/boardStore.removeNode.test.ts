@@ -5,9 +5,10 @@ import type { Board } from '../../../src/shared/types';
 function seed(): Board {
   return {
     version: 1,
-    schemaVersion: 1,
+    schemaVersion: 2,
     savedAt: '2026-05-12T00:00:00.000Z',
     viewport: { x: 0, y: 0, zoom: 1 },
+    layoutMode: 'canvas',
     nodes: [
       {
         id: 'mom',

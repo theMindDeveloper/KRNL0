@@ -9,11 +9,12 @@ const TMP = join(tmpdir(), `krnl0-test-board-${Date.now()}.json`);
 
 const EMPTY_BOARD: Board = {
   version: 1,
-  schemaVersion: 1,
+  schemaVersion: 2,
   savedAt: '2026-05-09T12:00:00.000Z',
   viewport: { x: 0, y: 160, zoom: 1 },
   nodes: [],
   edges: [],
+  layoutMode: 'canvas',
 };
 
 function save(board: Board, path: string): void {
@@ -39,10 +40,11 @@ describe('board.json round-trip', () => {
     const loaded = load(TMP);
 
     expect(loaded.version).toBe(1);
-    expect(loaded.schemaVersion).toBe(1);
+    expect(loaded.schemaVersion).toBe(2);
     expect(loaded.nodes).toHaveLength(0);
     expect(loaded.edges).toHaveLength(0);
     expect(loaded.viewport).toEqual(EMPTY_BOARD.viewport);
+    expect(loaded.layoutMode).toBe('canvas');
   });
 
   it('validates board with Zod — rejects bad version', () => {

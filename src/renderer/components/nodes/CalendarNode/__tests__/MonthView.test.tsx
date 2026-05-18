@@ -53,11 +53,12 @@ function setEmptyBoard() {
   useBoardStore.setState({
     board: {
       version: 1,
-      schemaVersion: 1,
+      schemaVersion: 2,
       savedAt: new Date().toISOString(),
       viewport: { x: 0, y: 0, zoom: 1 },
       nodes: [],
       edges: [],
+      layoutMode: 'canvas',
     },
   });
 }
@@ -234,7 +235,7 @@ describe('MonthView — task chips', () => {
     useBoardStore.setState({
       board: {
         version: 1,
-        schemaVersion: 1,
+        schemaVersion: 2,
         savedAt: new Date().toISOString(),
         viewport: { x: 0, y: 0, zoom: 1 },
         nodes: [
@@ -265,6 +266,7 @@ describe('MonthView — task chips', () => {
           },
         ],
         edges: [],
+        layoutMode: 'canvas',
       },
     });
 
@@ -312,7 +314,7 @@ describe('MonthView — task chips', () => {
     useBoardStore.setState({
       board: {
         version: 1,
-        schemaVersion: 1,
+        schemaVersion: 2,
         savedAt: new Date().toISOString(),
         viewport: { x: 0, y: 0, zoom: 1 },
         nodes: [
@@ -323,6 +325,7 @@ describe('MonthView — task chips', () => {
           makeTask('t5', 'Task five'),
         ],
         edges: [],
+        layoutMode: 'canvas',
       },
     });
 
