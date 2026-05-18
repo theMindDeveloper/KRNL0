@@ -90,6 +90,10 @@ function DragHandle({ nodeId }: { nodeId: string }) {
   const onDragStart = (e: React.DragEvent) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData(DRAG_MIME, nodeId);
+    (e.currentTarget as HTMLDivElement).dataset.dragging = 'true';
+  };
+  const onDragEnd = (e: React.DragEvent) => {
+    delete (e.currentTarget as HTMLDivElement).dataset.dragging;
   };
 
   return (
@@ -97,38 +101,26 @@ function DragHandle({ nodeId }: { nodeId: string }) {
       draggable
       role="button"
       aria-label="Drag to swap with another panel"
+      className="station-drag-handle"
       onDragStart={onDragStart}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: 40,
-        height: 14,
-        zIndex: 10,
-        cursor: 'grab',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'transparent',
-        userSelect: 'none',
-      }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--paper-3)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+      onDragEnd={onDragEnd}
     >
-      <span
+      <svg
         aria-hidden
-        style={{
-          fontSize: 10,
-          letterSpacing: 2,
-          color: 'var(--ink-3)',
-          opacity: 0.6,
-          fontFamily: 'var(--font-mono)',
-          lineHeight: 1,
-        }}
+        width="18"
+        height="10"
+        viewBox="0 0 18 10"
+        fill="currentColor"
+        style={{ display: 'block', pointerEvents: 'none' }}
       >
-        ⋮⋮
-      </span>
+        {/* 6 dots in a 3×2 grid — standard drag-handle affordance */}
+        <circle cx="3"  cy="3" r="1" />
+        <circle cx="9"  cy="3" r="1" />
+        <circle cx="15" cy="3" r="1" />
+        <circle cx="3"  cy="7" r="1" />
+        <circle cx="9"  cy="7" r="1" />
+        <circle cx="15" cy="7" r="1" />
+      </svg>
     </div>
   );
 }
