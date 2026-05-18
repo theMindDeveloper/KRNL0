@@ -20,7 +20,7 @@ export const DOCK_STYLES: DockStyle[] = ['classic', 'synthesizer', 'telemetry', 
 
 const STORAGE_KEY = 'krnl0-dock-style';
 
-const DEFAULT_DOCK_STYLE: DockStyle = 'telemetry';
+const DEFAULT_DOCK_STYLE: DockStyle = 'classic';
 
 function readStored(): DockStyle {
   if (typeof localStorage === 'undefined') return DEFAULT_DOCK_STYLE;

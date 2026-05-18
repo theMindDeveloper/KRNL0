@@ -1283,13 +1283,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
    Ported from krnl-dock.html, prefixed `dk-` to avoid global clashes.
    Local color tokens are scoped via .dock-chassis.dock-krnl-dock.
    ============================================================ */
-/* Variable overrides — canvas mode only.
- * In canvas mode the krnl-dock chassis IS the rack interior (near-black)
- * and every descendant inside it should pick up the dark ink scale even
- * when the global theme is light. Station mode opts out (the chassis
- * wraps the whole shell including the embedded canvas; forcing dark
- * tokens would invert the active theme and hide the canvas grid). */
-.dock-chassis.dock-krnl-dock:not([data-station]) {
+/* KRNL Dock is a DARK-ONLY skin by design — the rails, rack interior, and
+ * dk-* chrome are tuned for the dark ink scale. Canvas mode: the chassis IS
+ * the rack body so vars apply chassis-wide. Station mode: vars are scoped
+ * to .dk-rail only, so the embedded canvas + panel content still pick up
+ * the global light/dark theme (grid stays visible in light mode). */
+.dock-chassis.dock-krnl-dock:not([data-station]),
+.dock-chassis.dock-krnl-dock[data-station] .dk-rail {
   --paper:   #14130f;
   --paper-2: #1f1d18;
   --paper-3: #2f2b24;
@@ -1298,11 +1298,10 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --ink-2:   #ddd6c6;
   --ink-3:   #968d7a;
   --ink-4:   #6a6253;
+  color: var(--ink);
 }
 
 .dock-chassis.dock-krnl-dock {
-  color: var(--ink);
-
   --dk-ch-1: #43463f;
   --dk-ch-2: #3a3d36;
   --dk-ch-3: #2f322c;
@@ -1313,11 +1312,9 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --dk-amber-dim: #6b4f1c;
 }
 
-/* Rack interior — dark brushed metal. Canvas mode only: the chassis IS
- * the visible rack body and needs the dark gradient. Station mode opts
- * out so the embedded canvas + its dot grid remain visible against the
- * active theme's paper colour. */
-.dock-chassis.dock-krnl-dock:not([data-station]) {
+/* Rack interior — dark brushed metal. Applied in BOTH modes now so the
+ * krnl-dock looks consistent (always dark) regardless of global theme. */
+.dock-chassis.dock-krnl-dock {
   background:
     repeating-linear-gradient(90deg,
       rgba(0,0,0,0.45) 0 1px, transparent 1px 2px,

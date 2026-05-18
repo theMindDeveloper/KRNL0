@@ -9,8 +9,8 @@
  * first paint — satisfying NF4 / Gherkin F6b.
  */
 
-import { useEffect, Component, type ReactNode } from 'react';
-import { ReactFlowProvider } from '@xyflow/react';
+import { useEffect, useRef, Component, type ReactNode } from 'react';
+import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
 import { StationLayout } from './components/Station/StationLayout';
 import { useStationViewportGate } from './components/Station/useStationViewportGate';
@@ -91,6 +91,26 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 // can safely read boardStore after board is loaded.
 function AppInner() {
   const { effectiveMode, isFallingBack } = useStationViewportGate();
+  const { fitView } = useReactFlow();
+
+  // Centre the viewport on the mother row whenever the layout mode changes,
+  // and on first mount once nodes exist. RF remounts on toggle (ADR § 9.3
+  // strategy A), so this fires after the new tree's RF instance is ready.
+  // Delay one rAF + a short tick so the new RF wrapper has measured its
+  // container before fitView reads its dimensions.
+  const lastModeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastModeRef.current === effectiveMode) return;
+    lastModeRef.current = effectiveMode;
+    const id = window.setTimeout(() => {
+      try {
+        fitView({ padding: 0.18, duration: 400 });
+      } catch {
+        /* RF not ready yet — skipped */
+      }
+    }, 120);
+    return () => window.clearTimeout(id);
+  }, [effectiveMode, fitView]);
 
   return (
     <div
