@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutModeToggle } from '../ui/LayoutModeToggle';
+import { useDockStyle } from '../ChassisLayer/useDockStyle';
 
 type Theme = 'light' | 'dark';
 
@@ -42,7 +43,20 @@ function applyTheme(theme: Theme): void {
 
 export function TopBar() {
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
+  const [dockStyle, setDockStyle] = useDockStyle();
   const rf = useReactFlow();
+
+  // KRNL Dock is a dark-only skin — hide the theme toggle while it's
+  // selected so the user can't switch to a light variant that the chassis
+  // chrome ignores anyway. If the user lands on krnl-dock while in light
+  // mode, force the global theme back to dark for visual consistency.
+  useEffect(() => {
+    if (dockStyle === 'krnl-dock' && theme !== 'dark') {
+      setTheme('dark');
+    }
+  }, [dockStyle, theme]);
+
+  void setDockStyle;
 
   // Sync theme to DOM on mount and whenever it changes.
   useEffect(() => {
@@ -178,7 +192,9 @@ export function TopBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <LayoutModeToggle />
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
-        <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
+        {dockStyle !== 'krnl-dock' && (
+          <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
+        )}
       </div>
     </div>
   );
