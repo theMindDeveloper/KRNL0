@@ -30,6 +30,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
+  // Inline time-edit state (item.taskNodeId-backed plannedMin).
+  const [editingTimeId, setEditingTimeId] = useState<string | null>(null);
+  const [timeValue, setTimeValue] = useState('');
+  const [timeInvalid, setTimeInvalid] = useState(false);
+
   // Row context menu state
   const [ctxMenu, setCtxMenu] = useState<{
     x: number;
@@ -258,6 +263,42 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     }
   };
 
+  const startTimeEdit = (itemId: string, taskNodeId: string) => {
+    const current = taskPlannedMin.get(taskNodeId) ?? 25;
+    setEditingTimeId(itemId);
+    setTimeValue(String(current));
+    setTimeInvalid(false);
+  };
+
+  const commitTimeEdit = () => {
+    if (editingTimeId === null) return;
+    const parsed = parseInt(timeValue, 10);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 480) {
+      setTimeInvalid(true);
+      return;
+    }
+    onCommand('todo.setItemPlannedMin', { itemId: editingTimeId, minutes: parsed });
+    setEditingTimeId(null);
+    setTimeValue('');
+    setTimeInvalid(false);
+  };
+
+  const cancelTimeEdit = () => {
+    setEditingTimeId(null);
+    setTimeValue('');
+    setTimeInvalid(false);
+  };
+
+  const handleTimeKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      commitTimeEdit();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      cancelTimeEdit();
+    }
+  };
+
   const handleRowContextMenu = (
     e: MouseEvent,
     itemId: string,
@@ -275,6 +316,14 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         label: 'Edit text',
         onSelect: () => {
           if (item) startEdit(itemId, item.text);
+        },
+      },
+      {
+        label: 'Edit time',
+        // Time lives on the linked task node — no task node, nothing to edit.
+        disabled: !hasTaskNode || (item?.done ?? false),
+        onSelect: () => {
+          if (item?.taskNodeId) startTimeEdit(itemId, item.taskNodeId);
         },
       },
       {
@@ -526,34 +575,66 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 )}
 
                 {/* Three-numbers display: work / break / total (mono, right-aligned).
-                    Only shown when item is wired to a task node (has taskNodeId). */}
-                {item.taskNodeId !== null && (() => {
-                  const planned = taskPlannedMin.get(item.taskNodeId) ?? 25;
-                  const kind = taskKindMap.get(item.taskNodeId) ?? 'focus';
-                  const bd = kind === 'event'
-                    ? { workMin: planned, breakMin: 0, effectiveMin: planned }
-                    : breakdownPomoTime(planned, 0, pomoConfig);
-                  return (
-                    <span
-                      data-testid="todo-item-breakdown"
-                      title={`work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m`}
+                    Only shown when item is wired to a task node (has taskNodeId).
+                    Replaced by a numeric input when this row's time is being edited. */}
+                {item.taskNodeId !== null && (
+                  editingTimeId === item.id ? (
+                    <input
+                      type="number"
+                      min={1}
+                      max={480}
+                      value={timeValue}
+                      autoFocus
+                      onChange={(e) => {
+                        setTimeValue(e.target.value);
+                        setTimeInvalid(false);
+                      }}
+                      onKeyDown={handleTimeKeyDown}
+                      onBlur={commitTimeEdit}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
                       style={{
                         flexShrink: 0,
+                        width: 56,
+                        background: 'var(--paper-2)',
+                        border: `1px solid ${timeInvalid ? 'var(--rust)' : 'var(--ink-3)'}`,
+                        borderRadius: 3,
+                        outline: 'none',
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 9,
-                        color: 'var(--ink-4)',
-                        letterSpacing: '0.04em',
-                        whiteSpace: 'nowrap',
+                        fontSize: 9.5,
+                        color: 'var(--ink-3)',
+                        textAlign: 'right',
+                        padding: '1px 4px',
                       }}
-                    >
-                      <span style={{ color: 'var(--ink-3)' }}>{bd.workMin}</span>
-                      <span style={{ opacity: 0.5 }}>·</span>
-                      <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
-                      <span style={{ opacity: 0.5 }}>·</span>
-                      <span style={{ color: 'var(--acid)' }}>{bd.effectiveMin}m</span>
-                    </span>
-                  );
-                })()}
+                    />
+                  ) : (() => {
+                    const planned = taskPlannedMin.get(item.taskNodeId) ?? 25;
+                    const kind = taskKindMap.get(item.taskNodeId) ?? 'focus';
+                    const bd = kind === 'event'
+                      ? { workMin: planned, breakMin: 0, effectiveMin: planned }
+                      : breakdownPomoTime(planned, 0, pomoConfig);
+                    return (
+                      <span
+                        data-testid="todo-item-breakdown"
+                        title={`work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m`}
+                        style={{
+                          flexShrink: 0,
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 9,
+                          color: 'var(--ink-4)',
+                          letterSpacing: '0.04em',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <span style={{ color: 'var(--ink-3)' }}>{bd.workMin}</span>
+                        <span style={{ opacity: 0.5 }}>·</span>
+                        <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
+                        <span style={{ opacity: 0.5 }}>·</span>
+                        <span style={{ color: 'var(--acid)' }}>{bd.effectiveMin}m</span>
+                      </span>
+                    );
+                  })()
+                )}
 
                 {/* F2: tag pill — 4-char max, mono uppercase */}
                 {item.tag !== undefined && (
