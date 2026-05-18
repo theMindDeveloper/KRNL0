@@ -32,7 +32,7 @@ const MOTHER_ORDER: MotherEntry[] = [
   { kind: 'clock',    label: 'Clock' },
 ];
 
-function Glyph({ kind, active }: { kind: NodeKind | 'canvas'; active: boolean }) {
+function Glyph({ kind, active }: { kind: NodeKind | 'canvas' | 'analytics'; active: boolean }) {
   const stroke = active ? 'currentColor' : 'currentColor';
   const opacity = active ? 1 : 0.45;
   const common = {
@@ -101,6 +101,16 @@ function Glyph({ kind, active }: { kind: NodeKind | 'canvas'; active: boolean })
           <circle cx="11" cy="17" r="1" fill="currentColor" stroke="none" />
         </svg>
       );
+    case 'analytics':
+      return (
+        <svg {...common}>
+          {/* bar-chart silhouette: three stepped columns + baseline */}
+          <path d="M4 20h16" />
+          <rect x="5" y="12" width="3" height="7" />
+          <rect x="10.5" y="8" width="3" height="11" />
+          <rect x="16" y="4" width="3" height="15" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -156,6 +166,7 @@ export function StationToolbar() {
 
   const stationGeo = board.layoutGeometry?.station;
   const canvasHidden = stationGeo?.canvasHidden ?? false;
+  const analyticsHidden = stationGeo?.analyticsHidden ?? true;
 
   const mothers = board.nodes.filter((n) => n.isMother);
   const motherByKind = new Map<string, Node>(mothers.map((m) => [m.kind, m]));
@@ -173,6 +184,18 @@ export function StationToolbar() {
       columnFractions: stationGeo?.columnFractions ?? [],
       rightColumnSplit: stationGeo?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
       canvasHidden: !canvasHidden,
+      ...(stationGeo?.analyticsHidden !== undefined ? { analyticsHidden: stationGeo.analyticsHidden } : {}),
+    };
+    setLayoutGeometry({ station: next });
+  };
+
+  const toggleAnalytics = () => {
+    const next: StationGeometry = {
+      rowFraction: stationGeo?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
+      columnFractions: stationGeo?.columnFractions ?? [],
+      rightColumnSplit: stationGeo?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
+      ...(stationGeo?.canvasHidden !== undefined ? { canvasHidden: stationGeo.canvasHidden } : {}),
+      analyticsHidden: !analyticsHidden,
     };
     setLayoutGeometry({ station: next });
   };
@@ -225,6 +248,13 @@ export function StationToolbar() {
         onClick={toggleCanvas}
       >
         <Glyph kind="canvas" active={!canvasHidden} />
+      </ToolbarBtn>
+      <ToolbarBtn
+        active={!analyticsHidden}
+        label="Analytics"
+        onClick={toggleAnalytics}
+      >
+        <Glyph kind="analytics" active={!analyticsHidden} />
       </ToolbarBtn>
     </div>
   );

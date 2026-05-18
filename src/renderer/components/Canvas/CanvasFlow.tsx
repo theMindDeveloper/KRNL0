@@ -848,7 +848,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const sizes: Partial<Record<NodeKind, { width: number; height: number }>> = {
       text:  { width: 260, height: 120 },
       frame: { width: 360, height: 240 },
-      analytics: { width: 620, height: 540 },
+      analytics: { width: 540, height: 540 },
     };
     const sz = sizes[args.kind];
     if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });

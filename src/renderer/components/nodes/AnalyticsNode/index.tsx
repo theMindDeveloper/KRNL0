@@ -18,7 +18,6 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { NodeResizeControl } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import {
   ActivityStrip,
@@ -225,11 +224,13 @@ const chipBtn = (active: boolean): React.CSSProperties => ({
 
 // ── responsive helpers ───────────────────────────────────────────────────────
 
-// Map measured node width to a card column count. Mirrors the auto-fit grid
-// breakpoints but is explicit so card span values can match.
+// Map measured body width to a card column count. The node is locked at
+// 540×540 — minus padding the body is ~510px, so 2 cols is the sweet spot.
+// Breakpoints tuned to drop to 1-col when the settings sidebar eats half the
+// inner width (≈ 280px main column).
 function colCountFor(width: number): number {
-  if (width < 520) return 1;
-  if (width < 920) return 2;
+  if (width < 320) return 1;
+  if (width < 720) return 2;
   return 3;
 }
 
@@ -430,9 +431,7 @@ export function AnalyticsNode({
     [onCommand],
   );
 
-  const onResizeEnd = (_e: unknown, p: { width: number; height: number }): void => {
-    onCommand('analytics.setSize', { width: p.width, height: p.height });
-  };
+  // 2026-05-18 (rev 3): node is fixed-size now — no resize handler.
 
   // Container size — drives the grid column count.
   const [bodyRef, bodySize] = useElementSize<HTMLDivElement>();
@@ -519,40 +518,6 @@ export function AnalyticsNode({
 
   return (
     <div data-testid="analytics-node-root" style={rootStyle}>
-      <NodeResizeControl
-        position="bottom-right"
-        minWidth={420}
-        minHeight={320}
-        maxWidth={1800}
-        maxHeight={1600}
-        onResizeEnd={onResizeEnd}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          width: 18,
-          height: 18,
-          right: 2,
-          bottom: 2,
-        }}
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 14 14"
-          style={{
-            position: 'absolute',
-            right: 2,
-            bottom: 2,
-            cursor: 'nwse-resize',
-            color: '#7d848b',
-            pointerEvents: 'none',
-          }}
-          aria-hidden
-        >
-          <path d="M13 5L5 13M13 9L9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
-      </NodeResizeControl>
-
       {/* Titlebar */}
       <div style={titlebarStyle}>
         <span style={dotStyle} aria-hidden />
@@ -698,7 +663,7 @@ function SettingsSidebar({
     <aside
       data-testid="analytics-settings-sidebar"
       style={{
-        width: 230,
+        width: 196,
         flexShrink: 0,
         background: 'linear-gradient(180deg, #16191c 0%, #101214 100%)',
         border: '1px solid #23262a',

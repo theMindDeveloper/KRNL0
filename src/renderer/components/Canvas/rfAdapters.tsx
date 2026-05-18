@@ -60,7 +60,7 @@ const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = 
   'text':        { width: 260, height: 120 },
   'image':       { width: 240, height: 180 },
   'frame':       { width: 360, height: 240 },
-  'analytics':   { width: 620, height: 540 },
+  'analytics':   { width: 540, height: 540 },
 };
 
 export function toRfNode(
@@ -86,8 +86,12 @@ export function toRfNode(
   // back to the kind's initial-dims row to suppress RF warning #015 on the
   // first paint before any resize has occurred.
   const stateAny = node.state as { width?: number; height?: number };
-  const w = stateAny.width ?? initialDims?.width;
-  const h = stateAny.height ?? initialDims?.height;
+  // 2026-05-18: Analytics is no longer user-resizable — always lock to its
+  // initial 540×540 box regardless of any state.width/height left over from
+  // older boards. Internal scroll handles overflow.
+  const lockSize = node.kind === 'analytics';
+  const w = lockSize ? initialDims?.width : stateAny.width ?? initialDims?.width;
+  const h = lockSize ? initialDims?.height : stateAny.height ?? initialDims?.height;
   const sizeFields =
     w !== undefined && h !== undefined
       ? { width: w, height: h, measured: { width: w, height: h } }

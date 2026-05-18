@@ -108,8 +108,11 @@ export const defaultAnalyticsState = (): AnalyticsState => ({
   view: 'overview',
   rangeDays: 30,
   metric: 'taskCount',
-  width: 720,
-  height: 600,
+  // 2026-05-18 (rev 3): node is fixed-size (matches the mother box) and
+  // scrolls internally — width/height are no longer mutated, but kept in the
+  // type for backwards compat with previously persisted boards.
+  width: 540,
+  height: 540,
   hiddenCards: [],
   pinnedCards: [],
   settingsOpen: false,

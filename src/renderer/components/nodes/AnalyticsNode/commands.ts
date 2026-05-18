@@ -43,12 +43,12 @@ export const analyticsSetYear = (
 
 export const analyticsSetSize = (
   state: AnalyticsState,
-  args: { width: number; height: number },
+  _args: { width: number; height: number },
 ): AnalyticsState => {
-  const w = Math.max(360, Math.round(args.width));
-  const h = Math.max(280, Math.round(args.height));
-  if (w === state.width && h === state.height) return state;
-  return { ...state, width: w, height: h };
+  // 2026-05-18 (rev 3): AnalyticsNode is fixed at 540×540 in both canvas and
+  // station mode now — resizing is a no-op. Kept registered so old keyboard
+  // bindings / replay logs don't blow up, but the state is untouched.
+  return state;
 };
 
 // ── Card curation (2026-05-18 overhaul) ────────────────────────────────────
