@@ -246,8 +246,13 @@ interface ChartCardProps {
   pinned: boolean;
   settingsOpen: boolean;
   /** Each card declares a target chart height so the row is consistent across
-   *  the grid. Card padding + title adds ≈ 50px of chrome. */
-  contentHeight?: number;
+   *  the grid. Card padding + title adds ≈ 50px of chrome. Pass `'auto'` for
+   *  cards whose content (HTML tiles, tables) sizes itself — the host then
+   *  grows naturally instead of clipping. */
+  contentHeight?: number | 'auto';
+  /** When the content uses `'auto'` it's helpful to publish a typical width to
+   *  child charts that still take a `width` prop. */
+  measuredWidthFallback?: number;
   onToggleHidden: () => void;
   onTogglePin: () => void;
   children: (size: { width: number; height: number }) => React.ReactNode;
@@ -338,8 +343,9 @@ function ChartCard({
         ref={hostRef}
         style={{
           width: '100%',
-          height: contentHeight,
-          minHeight: 0,
+          ...(contentHeight === 'auto'
+            ? { minHeight: 0 }
+            : { height: contentHeight, minHeight: 0 }),
           display: 'flex',
           alignItems: 'stretch',
           justifyContent: 'center',
@@ -885,7 +891,7 @@ function ViewBody(props: ViewBodyProps) {
               cardId="overview.kpis"
               title={`KPIs · last ${state.rangeDays} days`}
               span={clamp(3)}
-              contentHeight={132}
+              contentHeight="auto"
               hidden={isHidden('overview.kpis')}
               pinned={isPinned('overview.kpis')}
               settingsOpen={settingsOpen}
