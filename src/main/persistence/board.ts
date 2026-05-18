@@ -22,14 +22,25 @@ export interface PartialBoard {
   viewport?: { x: number; y: number; zoom: number };
   nodes: unknown[];
   edges: unknown[];
+  // ADR 0008 § 4.1 — layout fields (present after migration or on new boards)
+  layoutMode?: string;
+  layoutGeometry?: {
+    station?: {
+      rowFraction: number;
+      columnFractions: number[];
+      rightColumnSplit: number;
+    };
+  };
 }
 
 export function seedBoard(): PartialBoard {
   return {
     version: 1,
-    schemaVersion: 1,
+    schemaVersion: 2,   // ADR 0008 § 4.1 — new boards start at schema v2
     savedAt: new Date().toISOString(),
     viewport: { x: 0, y: 220, zoom: 1 },
+    // ADR 0008 § 5: new boards default to 'station' layout
+    layoutMode: 'station',
     nodes: [
       {
         id: 'mother-pomo',
@@ -49,7 +60,8 @@ export function seedBoard(): PartialBoard {
           pausedElapsedMs: 0,
         },
         // Decision 22 — canonical PomoConfig shape.
-        config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
+        // ADR 0008 § 4.2 — stationSlot backfilled for station layout
+        config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, stationSlot: 'top-left' },
       },
       {
         id: 'mother-todo',
@@ -57,7 +69,8 @@ export function seedBoard(): PartialBoard {
         position: { x: -840, y: 0 },
         isMother: true,
         state: { items: [] },
-        config: { showCompleted: true, maxVisible: 50 },
+        // ADR 0008 § 4.2
+        config: { showCompleted: true, maxVisible: 50, stationSlot: 'top-center' },
       },
       {
         id: 'mother-habit',
@@ -65,7 +78,8 @@ export function seedBoard(): PartialBoard {
         position: { x: -280, y: 0 },
         isMother: true,
         state: { habits: [] },
-        config: { maxHabits: 5, weekStartsOn: 'monday', view: 'week' },
+        // ADR 0008 § 4.2 / § 9.1 OQ-1.A decision A: Habit gets its own column
+        config: { maxHabits: 5, weekStartsOn: 'monday', view: 'week', stationSlot: 'top-right-pre' },
       },
       // ADR 0001 — fourth mother: Calendar (terminal moved to rightmost slot)
       {
@@ -74,12 +88,14 @@ export function seedBoard(): PartialBoard {
         position: { x: 280, y: 0 },
         isMother: true,
         state: { selectedDate: null, anchorDate: todayLocalYMD() },
+        // ADR 0008 § 4.2
         config: {
           view: 'week',
           weekStartsOn: 'monday',
           showHabits: true,
           showPomoHeatmap: true,
           hourRange: { start: 6, end: 23 },
+          stationSlot: 'top-right-upper',
         },
       },
       // Decision 24.2 — fifth mother: Clock (12-hour visualization, viewWindow replaces windowStartHour)
@@ -89,7 +105,8 @@ export function seedBoard(): PartialBoard {
         position: { x: 840, y: 0 },
         isMother: true,
         state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
-        config: {},
+        // ADR 0008 § 4.2
+        config: { stationSlot: 'top-right-lower' },
       },
       // Terminal — rightmost (Wave-D default): the shell lives at the tight
       // edge of the rack so it doesn't sit between data mothers.
@@ -99,7 +116,8 @@ export function seedBoard(): PartialBoard {
         position: { x: 1400, y: 0 },
         isMother: true,
         state: { sessionId: null, title: 'Terminal' },
-        config: { shell: 'default', fontSize: 13 },
+        // ADR 0008 § 4.2
+        config: { shell: 'default', fontSize: 13, stationSlot: 'bottom-strip' },
       },
     ],
     edges: [],
@@ -428,6 +446,60 @@ function migrateTodoItemFields(board: Record<string, unknown>): Record<string, u
 }
 
 
+// ADR 0008 § 4.1 / § 5 — forward-only schemaVersion bump and layoutMode backfill.
+// Existing boards (schemaVersion 1 or missing) become 'canvas' (preserves today's
+// behaviour). New boards seeded by seedBoard() already carry schemaVersion: 2 and
+// layoutMode: 'station' so this migration is a no-op for them.
+function migrateLayoutMode(board: Record<string, unknown>): Record<string, unknown> {
+  // Always set schemaVersion to 2 — whether it was 1, missing, or already 2.
+  board['schemaVersion'] = 2;
+
+  // Backfill layoutMode: missing → 'canvas' (preserves legacy behaviour per § 5).
+  if (board['layoutMode'] !== 'canvas' && board['layoutMode'] !== 'station') {
+    board['layoutMode'] = 'canvas';
+  }
+
+  return board;
+}
+
+// ADR 0008 § 4.2 / § 9.1 OQ-1.A — backfill stationSlot on mother node configs.
+// Maps each known mother kind to its default station slot. Forward-only: if the
+// slot is already set it is preserved unchanged.
+//
+// Slot assignments (architect decision § 9.1 OQ-1.A, option A — Habit column):
+//   pomo     → top-left
+//   todo     → top-center
+//   habit    → top-right-pre   (Habit gets its own column, 5-column layout)
+//   calendar → top-right-upper
+//   clock    → top-right-lower
+//   term     → bottom-strip
+const MOTHER_STATION_SLOTS: Record<string, string> = {
+  pomo:     'top-left',
+  todo:     'top-center',
+  habit:    'top-right-pre',
+  calendar: 'top-right-upper',
+  clock:    'top-right-lower',
+  term:     'bottom-strip',
+};
+
+function migrateStationSlot(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  board['nodes'] = nodes.map((n: unknown) => {
+    if (typeof n !== 'object' || n === null) return n;
+    const node = n as { kind?: string; isMother?: boolean; config?: Record<string, unknown> | null };
+    // Only mother nodes get a stationSlot — child nodes do not.
+    if (!node.isMother) return n;
+    const slot = MOTHER_STATION_SLOTS[node.kind ?? ''];
+    if (!slot) return n; // unknown mother kind — leave untouched
+    const cfg = (node.config ?? {}) as Record<string, unknown>;
+    // If already set, preserve the user's value (forward-only).
+    if (typeof cfg['stationSlot'] === 'string') return n;
+    return { ...node, config: { ...cfg, stationSlot: slot } };
+  });
+  return board;
+}
+
 function validateBoardInvariants(board: unknown): unknown {
   if (typeof board !== 'object' || board === null) return board;
   const b = board as Record<string, unknown>;
@@ -480,25 +552,34 @@ export function loadBoardFrom(boardPath: string): unknown {
       // validateBoardInvariants runs last to heal any orphaned TodoItems before
       // the board is handed to the renderer.
       return validateBoardInvariants(
-        migrateTodoItemFields(
-          migrateHabitFields(
-            migrateNodeStates(
-              // Decision 24.2: migrateClockState strips legacy windowStartHour and
-              // sets viewWindow BEFORE migrateNodeStates so STATE_DEFAULTS healing
-              // doesn't re-add windowStartHour via the spread's right-operand win.
-              migrateClockState(
-                // ADR 0001: migrateAddCalendarMother runs before migrateNodeStates
-                // so the injected calendar node gets STATE/CONFIG_DEFAULTS healing.
-                // Decision 23.1: migrateAddClockMother runs immediately after
-                // migrateAddCalendarMother (same reason — before migrateNodeStates).
-                migrateAddClockMother(
-                  migrateAddCalendarMother(
-                    // Decision 28: migrateTaskKind runs after migrateTaskPlannedMin
-                    // so both fields are settled before migrateNodeStates spreads.
-                    migrateTaskKind(
-                      migrateTaskPlannedMin(
-                        migratePomoConfig(
-                          migrateMotherPositions(parsed),
+        // ADR 0008: migrateLayoutMode + migrateStationSlot run outermost so
+        // schemaVersion and stationSlot are settled after all node-level
+        // migrations have already run. They read/write only top-level board
+        // fields (layoutMode, schemaVersion) and node.config.stationSlot —
+        // fields not touched by any earlier migration.
+        migrateStationSlot(
+          migrateLayoutMode(
+            migrateTodoItemFields(
+              migrateHabitFields(
+                migrateNodeStates(
+                  // Decision 24.2: migrateClockState strips legacy windowStartHour and
+                  // sets viewWindow BEFORE migrateNodeStates so STATE_DEFAULTS healing
+                  // doesn't re-add windowStartHour via the spread's right-operand win.
+                  migrateClockState(
+                    // ADR 0001: migrateAddCalendarMother runs before migrateNodeStates
+                    // so the injected calendar node gets STATE/CONFIG_DEFAULTS healing.
+                    // Decision 23.1: migrateAddClockMother runs immediately after
+                    // migrateAddCalendarMother (same reason — before migrateNodeStates).
+                    migrateAddClockMother(
+                      migrateAddCalendarMother(
+                        // Decision 28: migrateTaskKind runs after migrateTaskPlannedMin
+                        // so both fields are settled before migrateNodeStates spreads.
+                        migrateTaskKind(
+                          migrateTaskPlannedMin(
+                            migratePomoConfig(
+                              migrateMotherPositions(parsed),
+                            ),
+                          ),
                         ),
                       ),
                     ),

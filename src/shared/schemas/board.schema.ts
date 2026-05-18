@@ -24,13 +24,30 @@ export const BoardViewportSchema = z.object({
   zoom: z.number().positive(),
 });
 
+// ADR 0008 § 4.1 — schemaVersion bumped to 2. The Zod schema validates boards
+// that have already been migrated. Raw files on disk may arrive as version 1
+// and are migrated by loadBoardFrom() before they reach this schema.
 export const BoardSchema = z.object({
   version: z.literal(1),
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   savedAt: z.string().datetime(),
   viewport: BoardViewportSchema,
   nodes: z.array(NodeSchema),
   edges: z.array(EdgeSchema),
+  // ADR 0008 § 2.1: layout mode required after migration
+  layoutMode: z.enum(['canvas', 'station']),
+  // ADR 0008 § 4.1: station geometry optional (persisted only after user resizes)
+  layoutGeometry: z
+    .object({
+      station: z
+        .object({
+          rowFraction: z.number(),
+          columnFractions: z.array(z.number()),
+          rightColumnSplit: z.number(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export type BoardSchemaType = z.infer<typeof BoardSchema>;

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { saveBoard } from './eventLog';
-import type { Board, BoardViewport, Node, Edge } from '../../shared/types';
+import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
 
@@ -79,6 +79,10 @@ interface BoardStore {
   insertSiblingTaskAfter: (taskNodeId: string, opts?: { text?: string; durationMin?: number }) => void;
   undo: () => void;
   redo: () => void;
+  // ADR 0008 § 2.1 / § 4.1 — layout mode and geometry actions.
+  // Both persist through the same saveBoard IPC path as all other mutations.
+  setLayoutMode: (mode: LayoutMode) => void;
+  setLayoutGeometry: (geom: Board['layoutGeometry']) => void;
 }
 
 const HISTORY_CAP = 50;
@@ -272,6 +276,38 @@ export const useBoardStore = create<BoardStore>((set) => ({
         future: s.future.slice(1),
       };
     }),
+
+  // ADR 0008 § 2.1 / § 4.1 — setLayoutMode persists through the same boardSave
+  // IPC path used by every other board mutation. No history slot — mode toggle
+  // is not undoable (intentional; matches Decision 13 anchor-position behaviour).
+  setLayoutMode: (mode) => {
+    set((s) => {
+      if (!s.board) return s;
+      const updated: Board = { ...s.board, layoutMode: mode };
+      void saveBoard(updated);
+      return { board: updated };
+    });
+  },
+
+  // ADR 0008 § 4.1 — setLayoutGeometry persists the panel resize state.
+  // Called via the react-resizable-panels onLayout callbacks in StationLayout
+  // (Step 4). Not undoable — geometry is a preference, not a content mutation.
+  setLayoutGeometry: (geom) => {
+    set((s) => {
+      if (!s.board) return s;
+      // exactOptionalPropertyTypes: strip layoutGeometry from the spread when
+      // the caller passes undefined (omit the key rather than setting it to undefined).
+      const updated: Board = geom !== undefined
+        ? { ...s.board, layoutGeometry: geom }
+        : (() => {
+            const { layoutGeometry: _drop, ...rest } = s.board;
+            void _drop;
+            return rest as Board;
+          })();
+      void saveBoard(updated);
+      return { board: updated };
+    });
+  },
 
   // NOTE: `theme` in the store is no longer the authoritative source of truth for
   // the active theme. TopBar owns the live theme value (reads/writes localStorage

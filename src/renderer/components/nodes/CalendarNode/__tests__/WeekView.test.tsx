@@ -80,11 +80,12 @@ function setEmptyBoard() {
   useBoardStore.setState({
     board: {
       version: 1,
-      schemaVersion: 1,
+      schemaVersion: 2,
       savedAt: new Date().toISOString(),
       viewport: { x: 0, y: 0, zoom: 1 },
       nodes: [],
       edges: [],
+      layoutMode: 'canvas',
     },
   });
 }
@@ -382,11 +383,12 @@ describe('WeekView — empty state hint', () => {
     useBoardStore.setState({
       board: {
         version: 1,
-        schemaVersion: 1,
+        schemaVersion: 2,
         savedAt: new Date().toISOString(),
         viewport: { x: 0, y: 0, zoom: 1 },
         nodes: [makeTask('t1', '2026-05-14T10:00')],
         edges: [],
+        layoutMode: 'canvas',
       },
     });
 
@@ -407,11 +409,12 @@ describe('WeekView — early-morning task (PR #122 24h grid)', () => {
     useBoardStore.setState({
       board: {
         version: 1,
-        schemaVersion: 1,
+        schemaVersion: 2,
         savedAt: new Date().toISOString(),
         viewport: { x: 0, y: 0, zoom: 1 },
         nodes: [makeTask('early-task', '2026-05-14T03:00')],
         edges: [],
+        layoutMode: 'canvas',
       },
     });
 
@@ -650,7 +653,7 @@ describe('WeekView — habit block visualisation', () => {
     useBoardStore.setState({
       board: {
         version: 1,
-        schemaVersion: 1,
+        schemaVersion: 2,
         savedAt: new Date().toISOString(),
         viewport: { x: 0, y: 0, zoom: 1 },
         nodes: [
@@ -659,6 +662,7 @@ describe('WeekView — habit block visualisation', () => {
           ]),
         ],
         edges: [],
+        layoutMode: 'canvas',
       },
     });
 
@@ -683,7 +687,7 @@ describe('WeekView — habit block visualisation', () => {
     useBoardStore.setState({
       board: {
         version: 1,
-        schemaVersion: 1,
+        schemaVersion: 2,
         savedAt: new Date().toISOString(),
         viewport: { x: 0, y: 0, zoom: 1 },
         nodes: [
@@ -697,6 +701,7 @@ describe('WeekView — habit block visualisation', () => {
           ]),
         ],
         edges: [],
+        layoutMode: 'canvas',
       },
     });
 
