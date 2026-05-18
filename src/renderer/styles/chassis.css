@@ -1126,12 +1126,14 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   transform: rotate(180deg);
 }
 
-/* Flyout — 2×2 tile grid sitting to the right of the trigger. */
+/* Flyout — portaled to <body>; coords are set inline from the dock-button
+   bounding rect, so it always escapes the dock's stacking context (z:40)
+   and is clamped inside the viewport. */
 .dock-style-picker-flyout {
-  position: absolute;
-  left: 60px;
-  bottom: 12px;
+  position: fixed;
   width: 248px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   background: linear-gradient(180deg, var(--paper-2) 0%, var(--paper) 100%);
   border: 1px solid var(--paper-3);
   border-radius: 10px;
@@ -1140,10 +1142,10 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
     0 24px 48px rgba(60,40,18,0.18),
     inset 0 1px 0 rgba(255,255,255,0.55);
   padding: 10px;
-  z-index: 100;
+  z-index: 10000;
   font-family: var(--font-mono);
   animation: dsp-pop 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  transform-origin: left bottom;
+  transform-origin: left center;
 }
 @keyframes dsp-pop {
   from { opacity: 0; transform: translateY(4px) scale(0.94); }
@@ -2275,6 +2277,1889 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .station-drag-handle:focus-visible {
   outline: 1px solid var(--acid, #c9f158);
   outline-offset: 2px;
+}
+
+/* ============================================================
+   BLUEPRINT chassis — technical drafting board
+   ============================================================
+   Aesthetic: an engineering blueprint laid across the mother row.
+   Drafting-paper background (warm cream in light, navy in dark),
+   cyan/spine ink dimension callouts along the top, a right-side
+   title block, and a revision history table along the bottom.
+   Works in light + dark — colour tokens flip per theme. */
+
+.dock-chassis.dock-blueprint {
+  /* Light defaults — warm drafting paper. Dark overrides further down. */
+  --bp-paper:   #f3ecda;
+  --bp-paper-2: #e8ddc1;
+  --bp-ink:     #1f2a3a;
+  --bp-ink-2:   rgba(31, 42, 58, 0.62);
+  --bp-ink-3:   rgba(31, 42, 58, 0.32);
+  --bp-line:    #5e7d1d;          /* spine — dimension callouts */
+  --bp-line-2:  rgba(94, 125, 29, 0.45);
+  --bp-accent:  #c8553d;          /* rust — REV numbers, section marker */
+  --bp-warm:    #b8771e;          /* drafting-pencil amber — credit, clock val */
+  --bp-olive:   #3a5414;          /* deeper olive for dimension numerals */
+  --bp-graphite:#5a6677;          /* graphite — secondary text */
+  --bp-grid:    rgba(31, 42, 58, 0.08);
+
+  background: var(--bp-paper);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 1px var(--bp-line-2),
+    inset 0 0 0 2px var(--bp-paper),
+    inset 0 0 0 3px rgba(31, 42, 58, 0.18),
+    0 6px 14px rgba(60, 50, 30, 0.10),
+    0 24px 48px rgba(60, 50, 30, 0.14),
+    0 48px 100px -10px rgba(60, 50, 30, 0.18);
+}
+
+/* Drafting grid (subtle cross-hatch). Major every 96px, minor every 16px. */
+.dock-chassis.dock-blueprint::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--bp-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bp-grid) 1px, transparent 1px),
+    linear-gradient(rgba(31, 42, 58, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 42, 58, 0.04) 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px, 16px 16px, 16px 16px;
+  border-radius: inherit;
+  opacity: 0.85;
+}
+
+/* Drafting tick-marks at the four corners — engineering frame. */
+.dock-chassis.dock-blueprint::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg,  var(--bp-line) 0 14px, transparent 14px) top left     / 14px 1px no-repeat,
+    linear-gradient(180deg, var(--bp-line) 0 14px, transparent 14px) top left     / 1px 14px no-repeat,
+    linear-gradient(270deg, var(--bp-line) 0 14px, transparent 14px) top right    / 14px 1px no-repeat,
+    linear-gradient(180deg, var(--bp-line) 0 14px, transparent 14px) top right    / 1px 14px no-repeat,
+    linear-gradient(90deg,  var(--bp-line) 0 14px, transparent 14px) bottom left  / 14px 1px no-repeat,
+    linear-gradient(0deg,   var(--bp-line) 0 14px, transparent 14px) bottom left  / 1px 14px no-repeat,
+    linear-gradient(270deg, var(--bp-line) 0 14px, transparent 14px) bottom right / 14px 1px no-repeat,
+    linear-gradient(0deg,   var(--bp-line) 0 14px, transparent 14px) bottom right / 1px 14px no-repeat;
+  opacity: 0.7;
+}
+
+/* Dark theme — flip to deep navy blueprint with cyan ink. */
+[data-theme="dark"] .dock-chassis.dock-blueprint {
+  --bp-paper:   #0a1525;
+  --bp-paper-2: #112038;
+  --bp-ink:     #cfe7ff;
+  --bp-ink-2:   rgba(207, 231, 255, 0.62);
+  --bp-ink-3:   rgba(207, 231, 255, 0.30);
+  --bp-line:    #7ec8e3;
+  --bp-line-2:  rgba(126, 200, 227, 0.40);
+  --bp-accent:  #e87a5f;   /* terracotta — REV column, section cut letters */
+  --bp-warm:    #f1c463;   /* drafting-pencil amber — highlights, credit, clock val */
+  --bp-olive:   #a7c14a;   /* engineer's pencil green — dimension numerals */
+  --bp-graphite:#9aa6b8;   /* graphite stroke — secondary text */
+  --bp-grid:    rgba(126, 200, 227, 0.10);
+
+  box-shadow:
+    inset 0 0 0 1px var(--bp-line-2),
+    inset 0 0 0 2px var(--bp-paper),
+    inset 0 0 0 3px rgba(126, 200, 227, 0.22),
+    0 6px 14px rgba(0, 0, 0, 0.4),
+    0 24px 48px rgba(0, 0, 0, 0.55),
+    0 48px 100px -10px rgba(0, 0, 0, 0.7);
+}
+
+/* Per-node palette + bezel — mothers read as drawings ON the blueprint.
+ * Light: warm drafting paper, dark blue-grey ink, spine-green dimension
+ * accents. Dark: deep navy paper, cyan ink, cyan accents. */
+[data-dock="blueprint"] .mother-frame {
+  /* Background + ink */
+  --paper:        #f0e6cc;
+  --paper-2:      #e2d6b6;
+  --paper-3:      #c8bb99;
+  --node-bg:      #f8eed4;
+  --ink:          #1f2a3a;
+  --ink-2:        rgba(31, 42, 58, 0.82);
+  --ink-3:        rgba(31, 42, 58, 0.55);
+  --ink-4:        rgba(31, 42, 58, 0.32);
+  --ink-on-bright:#0a1525;
+  /* Accents — spine green replaces acid; rust kept for warnings */
+  --acid:         #5e7d1d;
+  --acid-glow:    #7ea22b;
+  --acid-faint:   rgba(94, 125, 29, 0.10);
+  --spine:        #5e7d1d;
+  --spine-hot:    #7ea22b;
+  --rust:         #c8553d;
+  --rust-deep:    #a83e2a;
+  --cyan:         #2f4012;
+  --frame-bg:     rgba(94, 125, 29, 0.05);
+  --frame-edge:   rgba(94, 125, 29, 0.42);
+  /* Bezel */
+  border-radius: 2px !important;
+  border: 0 !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(94, 125, 29, 0.42),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+    0 0 0 3px rgba(60, 50, 30, 0.08),
+    0 0 18px -8px rgba(94, 125, 29, 0.20) !important;
+  background: var(--paper) !important;
+}
+[data-theme="dark"][data-dock="blueprint"] .mother-frame {
+  --paper:        #0c1a2e;
+  --paper-2:      #142441;
+  --paper-3:      #1e3358;
+  --node-bg:      #0e1c34;
+  --ink:          #d8eaff;
+  --ink-2:        rgba(216, 234, 255, 0.78);
+  --ink-3:        rgba(216, 234, 255, 0.50);
+  --ink-4:        rgba(216, 234, 255, 0.30);
+  --ink-on-bright:#0a1525;
+  --acid:         #7ec8e3;
+  --acid-glow:    #a8e0ff;
+  --acid-faint:   rgba(126, 200, 227, 0.12);
+  --spine:        #7ec8e3;
+  --spine-hot:    #a8e0ff;
+  --rust:         #e87a5f;
+  --rust-deep:    #c8553d;
+  --cyan:         #7ec8e3;
+  --frame-bg:     rgba(126, 200, 227, 0.05);
+  --frame-edge:   rgba(126, 200, 227, 0.40);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 200, 227, 0.40),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.55),
+    0 0 0 3px rgba(126, 200, 227, 0.10),
+    0 0 24px -10px rgba(126, 200, 227, 0.25) !important;
+}
+
+/* ── Top rail — dimension callouts + title block ───────────────────── */
+.md-bp-top {
+  position: absolute;
+  top: 8px; left: 12px; right: 12px;
+  height: 52px;
+  display: grid;
+  grid-template-columns: 110px 1fr 110px 240px;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--bp-ink);
+}
+
+/* Sheet detail cells (left + centre-right) */
+.md-bp-detail {
+  display: flex; flex-direction: column;
+  padding: 4px 8px;
+  border: 1px dashed var(--bp-line-2);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.04);
+}
+[data-theme="dark"] .md-bp-detail { background: rgba(126, 200, 227, 0.04); }
+.md-bp-detail-key {
+  font-size: 7.5px;
+  letter-spacing: 0.22em;
+  color: var(--bp-ink-2);
+  text-transform: uppercase;
+}
+.md-bp-detail-val {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  /* Warm-amber drafting-pencil readout — breaks up the cyan/olive */
+  color: var(--bp-warm);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--bp-warm) 22%, transparent);
+}
+.md-bp-detail-val .colon { animation: bp-blink 1.05s steps(2) infinite; }
+@keyframes bp-blink { 50% { opacity: 0.3; } }
+.md-bp-detail-sub {
+  font-size: 7px;
+  letter-spacing: 0.2em;
+  color: var(--bp-ink-3);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* Dimension callouts row */
+.md-bp-dims {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 14px;
+  padding: 0 8px;
+}
+.md-bp-dim {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--bp-line);
+  white-space: nowrap;
+}
+.md-bp-dim-arrow {
+  font-size: 9px;
+  color: var(--bp-line);
+  line-height: 1;
+}
+.md-bp-dim-line {
+  flex: 0 0 26px;
+  height: 1px;
+  background: var(--bp-line);
+  opacity: 0.6;
+}
+.md-bp-dim-num {
+  color: var(--bp-olive);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 1px;
+}
+[data-theme="dark"] .md-bp-dim-num { background: rgba(126, 200, 227, 0.10); }
+.md-bp-dim-lbl {
+  color: var(--bp-ink-2);
+  font-size: 7.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-left: 4px;
+}
+
+/* Title block — drafting title-block grid */
+.md-bp-title {
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+  border: 1px solid var(--bp-line);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.20);
+  overflow: hidden;
+}
+[data-theme="dark"] .md-bp-title { background: rgba(126, 200, 227, 0.06); }
+.md-bp-title-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  align-items: center;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--bp-line-2);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  gap: 4px;
+}
+.md-bp-title-row:last-child { border-bottom: 0; }
+.md-bp-title-row-split {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.md-bp-title-row-split > span {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 8.5px;
+}
+/* REV cell — paint the value in rust so it pops against the cyan/olive */
+.md-bp-title-row-split > span:last-child .v {
+  color: var(--bp-accent);
+  text-shadow: 0 0 4px color-mix(in srgb, var(--bp-accent) 22%, transparent);
+}
+.md-bp-title-row .k {
+  color: var(--bp-ink-2);
+  text-transform: uppercase;
+  font-size: 7.5px;
+  letter-spacing: 0.2em;
+}
+.md-bp-title-row .v {
+  color: var(--bp-ink);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+.dock-chassis .md-bp-title-credit { pointer-events: auto; }
+.md-bp-title-credit {
+  color: var(--bp-warm);
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  transition: color 160ms;
+}
+.md-bp-title-credit:hover {
+  color: var(--bp-accent);
+  text-shadow: 0 0 4px color-mix(in srgb, var(--bp-accent) 30%, transparent);
+}
+
+/* ── Bottom rail — revision table + scale bar + section marker ─────── */
+.md-bp-bot {
+  position: absolute;
+  bottom: 8px; left: 12px; right: 12px;
+  height: 52px;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 12px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--bp-ink);
+}
+
+/* Revision history table */
+.md-bp-rev {
+  border: 1px solid var(--bp-line-2);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.20);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 16px 1fr 1fr 1fr;
+}
+[data-theme="dark"] .md-bp-rev { background: rgba(126, 200, 227, 0.05); }
+.md-bp-rev-head,
+.md-bp-rev-row {
+  display: grid;
+  grid-template-columns: 48px 60px 1fr 96px;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  border-bottom: 1px solid var(--bp-line-2);
+}
+.md-bp-rev-row:last-child,
+.md-bp-rev-head:last-child { border-bottom: 0; }
+.md-bp-rev-head {
+  color: var(--bp-line);
+  background: rgba(94, 125, 29, 0.12);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+[data-theme="dark"] .md-bp-rev-head { background: rgba(126, 200, 227, 0.10); }
+.md-bp-rev-row .col-no {
+  color: var(--bp-accent);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+.md-bp-rev-row .col-tag {
+  color: var(--bp-line);
+  text-transform: uppercase;
+  font-size: 7.5px;
+  letter-spacing: 0.18em;
+}
+.md-bp-rev-row .col-desc {
+  color: var(--bp-ink);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-bp-rev-row .col-ts {
+  color: var(--bp-ink-2);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.md-bp-rev-row.md-bp-rev-row-empty .col-desc { color: var(--bp-ink-3); font-style: italic; }
+.md-bp-rev-row.sev-err  .col-tag,
+.md-bp-rev-row.sev-err  .col-no  { color: var(--bp-accent); }
+.md-bp-rev-row.sev-warn .col-tag { color: var(--bp-accent); }
+
+/* Section marker + scale bar (right) */
+.md-bp-section {
+  display: grid;
+  grid-template-columns: 1fr 50px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.dock-chassis .md-bp-scale { pointer-events: auto; }
+.md-bp-scale {
+  display: flex; flex-direction: column;
+  align-items: stretch;
+  padding: 6px 8px;
+  border: 1px solid var(--bp-line-2);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+.md-bp-scale:hover {
+  border-color: var(--bp-line);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--bp-line) 25%, transparent);
+}
+.md-bp-scale-lbl {
+  font-size: 7.5px;
+  letter-spacing: 0.22em;
+  color: var(--bp-ink-2);
+  text-transform: uppercase;
+}
+.md-bp-scale-bar {
+  display: flex;
+  gap: 0;
+  height: 8px;
+  margin: 4px 0 2px;
+  background: linear-gradient(90deg,
+    var(--bp-ink) 0 50%,
+    transparent 50% 100%);
+  border: 1px solid var(--bp-ink);
+  border-radius: 1px;
+  position: relative;
+}
+.md-bp-scale-bar .tick {
+  flex: 1;
+  border-right: 1px solid var(--bp-line-2);
+}
+.md-bp-scale-bar .tick:last-child { border-right: 0; }
+.md-bp-scale-num {
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  color: var(--bp-ink-3);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section-cut symbol — A↑ / A↓ with dashed cut line */
+.md-bp-section-sym {
+  display: flex; flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--bp-accent);
+  font-weight: 600;
+}
+.md-bp-section-sym .cut-letter {
+  background: var(--bp-accent);
+  color: var(--bp-paper);
+  width: 16px; height: 16px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+.md-bp-section-sym .cut-line {
+  width: 1px; height: 8px;
+  background: var(--bp-accent);
+  border-left: 1px dashed var(--bp-accent);
+  border-color: transparent var(--bp-accent);
+}
+
+.md-bp-section-meta {
+  display: flex; flex-direction: column;
+  align-items: flex-end;
+  padding: 4px 8px;
+  border: 1px dashed var(--bp-line-2);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.04);
+}
+[data-theme="dark"] .md-bp-section-meta { background: rgba(126, 200, 227, 0.04); }
+.md-bp-section-meta .k {
+  font-size: 7px;
+  letter-spacing: 0.22em;
+  color: var(--bp-ink-2);
+  text-transform: uppercase;
+}
+.md-bp-section-meta .v {
+  font-size: 16px;
+  /* Warm-amber tally — different colour from the cyan/olive lines */
+  color: var(--bp-warm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  margin-top: 1px;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--bp-warm) 22%, transparent);
+}
+
+/* Station-mode override — slightly tighter rails since the chrome
+ * wraps the whole shell instead of just the row. */
+.dock-chassis.dock-blueprint[data-station] .md-bp-top,
+.dock-chassis.dock-blueprint[data-station] .md-bp-bot {
+  height: 48px;
+}
+
+/* ============================================================
+   MACINTOSH 128K chassis — the 1984 hardware as the frame
+   ============================================================
+   Mother row IS the CRT screen. The chrome above and below is the beige
+   plastic case: top vent slots + rainbow Apple + "Macintosh" wordmark, then
+   the CRT bezel insetting the mothers, then the bottom skirt with floppy
+   slot, model plate, brightness/contrast knobs, and a power LED. */
+
+.dock-chassis.dock-macintosh {
+  /* True 1984 Snow-White palette — lighter, less yellow than before, so
+     dark labels reads cleanly against the case. Old palette tested as too
+     muddy / olive; this hits the recognizable warm-grey beige. */
+  --mac-beige:    #e3dcc6;
+  --mac-beige-2:  #d2c9af;
+  --mac-beige-3:  #b9af92;
+  --mac-shadow:   #3a3325;   /* labels on the case — bumped darker for contrast */
+  --mac-deep:     #1c1814;
+  --mac-ink:      #161208;
+  --mac-stroke:   rgba(20, 16, 10, 0.55);
+  --mac-led-on:   #92ff5e;
+  --mac-led-dim:  rgba(146, 255, 94, 0.18);
+  --mac-bezel-2:  #948b6f;
+
+  background: linear-gradient(180deg,
+    var(--mac-beige) 0%,
+    var(--mac-beige-2) 70%,
+    var(--mac-beige-3) 100%);
+  /* Squarer corners — rectangular station panels need a rectangular case,
+     and the mother row reads more like a flush CRT than a TV. */
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.18),
+    inset 0 0 0 1px var(--mac-stroke),
+    0 8px 18px rgba(0, 0, 0, 0.25),
+    0 28px 60px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] .dock-chassis.dock-macintosh {
+  --mac-beige:    #38322a;
+  --mac-beige-2:  #2a251f;
+  --mac-beige-3:  #1f1b16;
+  /* Was #0a0907 — near-black, completely unreadable on the dark beige case.
+     Bumped to a warm-cream tone so knob/floppy/plate labels stay legible. */
+  --mac-shadow:   #b8ad8a;
+  --mac-deep:     #0a0805;
+  --mac-ink:      #ddd6c6;
+  --mac-stroke:   rgba(220, 210, 188, 0.22);
+  --mac-bezel-2:  #5a523e;
+}
+
+/* ── CRT bezel — recessed window around the mother row ─────────────────
+   Tight left/right inset so the mother row fits flush inside the bezel,
+   not spilling past it. Squarer radius matches the squarer case. */
+.md-mac-crt-bezel {
+  position: absolute;
+  top: 102px; bottom: 110px; left: 6px; right: 6px;
+  background: var(--mac-deep);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 4px var(--mac-bezel-2),
+    inset 0 0 0 5px rgba(0, 0, 0, 0.5),
+    inset 0 6px 18px rgba(0, 0, 0, 0.85),
+    inset 0 -4px 12px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.md-mac-crt-scanlines {
+  position: absolute; inset: 6px;
+  border-radius: 10px;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 2px,
+    rgba(0, 0, 0, 0.18) 2px 3px);
+  opacity: 0.5;
+}
+.md-mac-crt-glare {
+  position: absolute; inset: 6px;
+  background:
+    radial-gradient(ellipse 60% 50% at 26% 24%, rgba(255, 255, 240, 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse 100% 70% at 50% 110%, rgba(0, 0, 0, 0.35) 0%, transparent 70%);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+/* ── Top case ─────────────────────────────────────────────────────────── */
+.md-mac-case-top {
+  position: absolute;
+  top: 6px; left: 12px; right: 12px;
+  height: 92px;
+  display: grid;
+  grid-template-rows: 32px 1fr;
+  padding: 0 16px;
+  background: transparent;
+}
+
+.md-mac-vents {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  align-items: center;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+.md-mac-vents span {
+  height: 2px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(255,255,255,0.18));
+  border-radius: 1px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.18);
+}
+.md-mac-vents[data-running='true'] span {
+  animation: mac-vent-warm 2.4s ease-in-out infinite;
+}
+@keyframes mac-vent-warm {
+  0%, 100% { box-shadow: 0 1px 0 rgba(255,255,255,0.18); }
+  50%      { box-shadow: 0 1px 0 rgba(255,255,255,0.18), 0 0 6px rgba(255, 180, 80, 0.35); }
+}
+
+.md-mac-brand {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 0 4px;
+}
+.md-mac-wordmark {
+  font-family: 'Chicago', 'Lucida Grande', Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: 0.01em;
+  color: var(--mac-ink);
+  text-shadow: 1px 1px 0 rgba(255,255,255,0.45);
+  user-select: none;
+}
+/* Brand row: serial badge on the right where the apple used to sit. */
+.md-mac-brand-meta {
+  display: flex; flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+  line-height: 1.1;
+}
+.md-mac-brand-meta .k {
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  font-weight: 600;
+  color: var(--mac-ink);
+  text-transform: uppercase;
+}
+.md-mac-brand-meta .v {
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  color: var(--mac-shadow);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+[data-theme="dark"] .md-mac-brand-meta .v { color: rgba(220, 210, 188, 0.65); }
+
+/* Smiling-Mac glyph on the CRT bezel — Susan Kare's classic ROM icon */
+.md-mac-smiley {
+  position: absolute;
+  left: 12px; bottom: 10px;
+  color: rgba(245, 220, 160, 0.62);
+  opacity: 0.78;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(255, 220, 140, 0.25));
+}
+.md-mac-smiley.is-running { color: rgba(170, 255, 130, 0.85); }
+.md-mac-smiley.is-blink .eye { opacity: 0.05; }
+
+/* ── Bottom case ──────────────────────────────────────────────────────── */
+.md-mac-case-bot {
+  position: absolute;
+  bottom: 8px; left: 14px; right: 14px;
+  height: 100px;
+  display: grid;
+  grid-template-columns: 1.1fr 1.7fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+  padding: 6px 10px;
+}
+
+.md-mac-floppy {
+  display: flex; flex-direction: column;
+  justify-content: center; gap: 6px;
+  padding: 4px 8px;
+}
+.md-mac-floppy-slot {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  padding: 0 10px 0 6px;
+  background: linear-gradient(180deg, #0a0805 0%, #2a241d 100%);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.md-mac-floppy-led {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--mac-led-on);
+  box-shadow: 0 0 4px var(--mac-led-on);
+}
+.md-mac-floppy-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: rgba(220, 200, 160, 0.65);
+  text-transform: lowercase;
+}
+.md-mac-floppy-eject {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(220, 200, 160, 0.4);
+}
+.md-mac-floppy-sub {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.28em;
+  color: var(--mac-shadow);
+  text-transform: uppercase;
+  padding-left: 6px;
+}
+
+.md-mac-plate {
+  display: flex; flex-direction: column;
+  justify-content: center; gap: 3px;
+  padding: 8px 12px;
+  /* Cream-paper inset — solid background so ink-on-paper labels read with
+     high contrast (the previous translucent gradient blended with the case
+     and made labels look washed out). */
+  background: linear-gradient(180deg, #f5edd2 0%, #ece2c0 100%);
+  border-radius: 3px;
+  border: 1px solid var(--mac-stroke);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.85),
+    inset 0 -1px 0 rgba(0,0,0,0.22),
+    0 1px 0 rgba(255,255,255,0.5);
+}
+[data-theme="dark"] .md-mac-plate {
+  background: linear-gradient(180deg, #211c14 0%, #15110a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(220,210,188,0.20),
+    inset 0 -1px 0 rgba(0,0,0,0.55);
+}
+.md-mac-plate-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  min-width: 0;
+}
+.md-mac-plate-row .k {
+  font-size: 7px;
+  letter-spacing: 0.24em;
+  color: var(--mac-shadow);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.md-mac-plate-row .v {
+  font-size: 10px;
+  color: var(--mac-ink);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-mac-plate-row-thin .v { font-size: 9px; }
+.md-mac-plate-row-thin .k { font-size: 6.5px; }
+.md-mac-plate-row-split {
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.md-mac-plate-row-split > div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+}
+.md-mac-plate-row-split .k { font-size: 6.5px; }
+.md-mac-plate-row-split .v { font-size: 9px; }
+.md-mac-plate-row-hero {
+  border-bottom: 1px solid var(--mac-stroke);
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+}
+.md-mac-plate-row-hero .k {
+  font-family: 'Chicago', Georgia, serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--mac-ink);
+}
+.md-mac-plate-row-hero .v {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mac-ink);
+  text-align: right;
+}
+.dock-chassis .md-mac-credit { pointer-events: auto; }
+.md-mac-credit {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--mac-ink);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--mac-shadow);
+}
+.md-mac-credit:hover { color: #4d6fd8; }
+
+.md-mac-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 4px;
+}
+.md-mac-knob {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: default;
+  font-family: var(--font-mono);
+}
+.dock-chassis button.md-mac-knob { pointer-events: auto; cursor: pointer; }
+.md-mac-knob-cap {
+  position: relative;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.55), transparent 50%),
+    radial-gradient(circle at 50% 50%, var(--mac-beige) 0%, var(--mac-beige-3) 70%, var(--mac-shadow) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.3),
+    inset 0 -2px 4px rgba(0,0,0,0.45),
+    inset 0 2px 2px rgba(255,255,255,0.4),
+    0 2px 4px rgba(0,0,0,0.35);
+}
+[data-theme="dark"] .md-mac-knob-cap {
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), transparent 50%),
+    radial-gradient(circle at 50% 50%, #6e6757 0%, #2a251f 70%, #0a0907 100%);
+}
+.md-mac-knob-indicator {
+  position: absolute;
+  top: 4px; left: 50%;
+  width: 2px; height: 12px;
+  margin-left: -1px;
+  background: var(--mac-ink);
+  box-shadow: 0 0 2px rgba(0,0,0,0.6);
+  transform-origin: 1px 13px;
+  transition: transform 320ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+[data-theme="dark"] .md-mac-knob-indicator {
+  background: var(--mac-led-on);
+  box-shadow: 0 0 4px var(--mac-led-on);
+}
+.md-mac-knob-lbl {
+  font-size: 7px;
+  letter-spacing: 0.22em;
+  color: var(--mac-shadow);
+  text-transform: uppercase;
+}
+
+.md-mac-power {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+  padding: 2px 4px;
+}
+.md-mac-power-led {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--mac-led-dim);
+  box-shadow: inset 0 -1px 2px rgba(0,0,0,0.4);
+}
+.md-mac-power-led.led-on {
+  background: var(--mac-led-on);
+  box-shadow:
+    0 0 6px var(--mac-led-on),
+    0 0 12px rgba(146, 255, 94, 0.5),
+    inset 0 -1px 2px rgba(0,0,0,0.4);
+}
+.md-mac-power-led.led-pulse {
+  background: var(--mac-led-on);
+  animation: mac-led-pulse 2.4s ease-in-out infinite;
+}
+@keyframes mac-led-pulse {
+  0%, 100% { box-shadow: 0 0 2px var(--mac-led-on), inset 0 -1px 2px rgba(0,0,0,0.4); opacity: 0.5; }
+  50%      { box-shadow: 0 0 6px var(--mac-led-on), 0 0 12px rgba(146, 255, 94, 0.5); opacity: 1; }
+}
+.md-mac-power-lbl {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 0.24em;
+  color: var(--mac-shadow);
+  text-transform: uppercase;
+}
+.md-mac-power-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--mac-ink);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.md-mac-rivet {
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.6), transparent 50%),
+    radial-gradient(circle at 50% 50%, var(--mac-beige-3) 0%, var(--mac-shadow) 100%);
+  box-shadow:
+    inset 0 -1px 1px rgba(0,0,0,0.45),
+    0 1px 1px rgba(0,0,0,0.3);
+  pointer-events: none;
+}
+.md-mac-rivet.rv-tl { top: 9px; left: 16px; }
+.md-mac-rivet.rv-tr { top: 9px; right: 16px; }
+.md-mac-rivet.rv-bl { bottom: 9px; left: 16px; }
+.md-mac-rivet.rv-br { bottom: 9px; right: 16px; }
+
+/* Macintosh nodes — the mother row IS the CRT, so contents read as a
+ * crisp 1-bit Mac document: warm Mac-white paper, true-black ink, no
+ * colour accents. The original 128K display literally couldn't show
+ * colour. Dark theme inverts: night-mode Mac with cream-on-black. */
+[data-dock="macintosh"] .mother-frame {
+  --paper:        #faf3df;
+  --paper-2:      #f0e6c8;
+  --paper-3:      #d8cdaa;
+  --node-bg:      #fffbe8;
+  --ink:          #050505;
+  --ink-2:        #1a1a1a;
+  --ink-3:        rgba(5, 5, 5, 0.55);
+  --ink-4:        rgba(5, 5, 5, 0.32);
+  --ink-on-bright:#050505;
+  /* Monochrome — every accent collapses to greyscale, true 1-bit feel.
+   * Pomo "rust" stays distinguishable via a slightly warmer charcoal. */
+  --acid:         #050505;
+  --acid-glow:    #2a2a2a;
+  --acid-faint:   rgba(5, 5, 5, 0.10);
+  --spine:        #1f1f1f;
+  --spine-hot:    #050505;
+  --rust:         #2a1a14;
+  --rust-deep:    #050505;
+  --cyan:         #050505;
+  --plum:         #1f1f1f;
+  --frame-bg:     rgba(5, 5, 5, 0.04);
+  --frame-edge:   rgba(5, 5, 5, 0.55);
+  border-radius: 3px !important;
+  border: 0 !important;
+  background: var(--paper) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(5, 5, 5, 0.85),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.45),
+    0 0 0 3px rgba(0, 0, 0, 0.15),
+    0 2px 0 rgba(0, 0, 0, 0.35) !important;
+}
+[data-theme="dark"][data-dock="macintosh"] .mother-frame {
+  --paper:        #14110c;
+  --paper-2:      #1f1b14;
+  --paper-3:      #2c261c;
+  --node-bg:      #0a0807;
+  --ink:          #f5efde;
+  --ink-2:        #d4cdb8;
+  --ink-3:        rgba(245, 239, 222, 0.55);
+  --ink-4:        rgba(245, 239, 222, 0.32);
+  --ink-on-bright:#0a0807;
+  --acid:         #f5efde;
+  --acid-glow:    #ffffff;
+  --acid-faint:   rgba(245, 239, 222, 0.10);
+  --spine:        #d4cdb8;
+  --spine-hot:    #f5efde;
+  --rust:         #e8d8b0;
+  --rust-deep:    #f5efde;
+  --cyan:         #f5efde;
+  --plum:         #d4cdb8;
+  --frame-bg:     rgba(245, 239, 222, 0.04);
+  --frame-edge:   rgba(245, 239, 222, 0.40);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 239, 222, 0.55),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.65),
+    0 0 0 3px rgba(0, 0, 0, 0.55),
+    0 2px 0 rgba(0, 0, 0, 0.7) !important;
+}
+
+
+/* ============================================================
+   SUBMARINE chassis — brass periscope console (dark-only)
+   ============================================================ */
+
+.dock-chassis.dock-submarine {
+  --sub-hull:     #1a1310;
+  --sub-hull-2:   #261c14;
+  --sub-hull-3:   #100a06;
+  --sub-brass:    #b88a3a;
+  --sub-brass-hi: #e8c876;
+  --sub-brass-lo: #6e521c;
+  --sub-face:     #0a0805;
+  --sub-cream:    #e8d8a8;
+  --sub-needle:   #f0b850;
+  --sub-phos:     #8aff5a;
+  --sub-red:      #ff6450;
+  --sub-ink:      #d4c69e;
+  --sub-ink-dim:  rgba(212, 198, 158, 0.55);
+
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,0.08) 0 3px,
+      rgba(255, 200, 130, 0.025) 3px 5px),
+    radial-gradient(ellipse 60% 80% at 50% 50%, rgba(80, 20, 10, 0.18) 0%, transparent 70%),
+    linear-gradient(180deg, var(--sub-hull) 0%, var(--sub-hull-2) 50%, var(--sub-hull-3) 100%);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(232, 200, 118, 0.18),
+    inset 0 0 0 1px rgba(0,0,0,0.75),
+    inset 0 -2px 0 rgba(0,0,0,0.75),
+    0 8px 18px rgba(0,0,0,0.5),
+    0 28px 60px rgba(0,0,0,0.6);
+}
+
+.dock-chassis.dock-submarine::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(135deg,
+      transparent 0 22px,
+      rgba(232, 200, 118, 0.04) 22px 23px);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.md-sub-rivet {
+  position: absolute;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, var(--sub-brass-hi) 0%, var(--sub-brass) 50%, var(--sub-brass-lo) 100%);
+  box-shadow:
+    inset 0 -1px 1px rgba(0,0,0,0.55),
+    0 1px 2px rgba(0,0,0,0.55);
+  pointer-events: none;
+}
+.md-sub-rivet.rv-tl  { top: 10px;  left: 14px; }
+.md-sub-rivet.rv-tr  { top: 10px;  right: 14px; }
+.md-sub-rivet.rv-tl2 { top: 10px;  left: 36px; }
+.md-sub-rivet.rv-tr2 { top: 10px;  right: 36px; }
+.md-sub-rivet.rv-bl  { bottom: 10px; left: 14px; }
+.md-sub-rivet.rv-br  { bottom: 10px; right: 14px; }
+.md-sub-rivet.rv-bl2 { bottom: 10px; left: 36px; }
+.md-sub-rivet.rv-br2 { bottom: 10px; right: 36px; }
+
+/* ── Top rail — 9 modules, densely packed ─────────────────────────── */
+.md-sub-top {
+  position: absolute;
+  top: 6px; left: 36px; right: 36px;
+  height: 108px;
+  display: grid;
+  grid-template-columns:
+    52px        /* 01 bell */
+    72px        /* 02 depth */
+    132px       /* 03 trim */
+    178px       /* 04 ballast */
+    96px        /* 05 sonar */
+    1fr         /* 06 radar log (flex) */
+    78px        /* 07 oxygen */
+    134px       /* 08 battery */
+    72px        /* 09 compass */;
+  gap: 10px;
+  align-items: stretch;
+  /* faint engraved background panel under all modules; extra padding-bottom
+     so module tags never abut the mother row below the chrome. */
+  padding: 4px 8px 12px;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.22) 100%);
+  border: 1px solid rgba(0,0,0,0.6);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(232, 200, 118, 0.10),
+    inset 0 -1px 0 rgba(0,0,0,0.55);
+}
+
+/* Generic modular cell — used by non-instrument modules */
+.md-sub-mod {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  padding: 2px 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+.md-sub-mod-tag {
+  display: flex; align-items: center; gap: 4px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.18em;
+  color: var(--sub-ink-dim);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-sub-mod-tag .num {
+  background: var(--sub-brass);
+  color: #1a1408;
+  padding: 0 3px;
+  font-weight: 700;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+.md-sub-mod-tag .lbl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-sub-instrument {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  padding: 2px 0;
+  min-width: 0;
+}
+
+.md-sub-bezel {
+  position: relative;
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 25%, var(--sub-brass-hi) 0%, var(--sub-brass) 22%, var(--sub-brass-lo) 70%, #2a1f08 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.7),
+    inset 0 -2px 4px rgba(0,0,0,0.55),
+    inset 0 2px 3px rgba(255,235,180,0.4),
+    0 2px 3px rgba(0,0,0,0.55),
+    0 0 18px -10px rgba(232, 200, 118, 0.5);
+  flex-shrink: 0;
+}
+.md-sub-bezel-large { width: 78px; height: 78px; }
+.md-sub-bezel-mini  { width: 52px; height: 52px; }
+.md-sub-bezel.small { width: 56px; height: 56px; }
+.md-sub-bezel-inner {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--sub-face);
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 200, 118, 0.18),
+    inset 0 3px 6px rgba(0,0,0,0.85),
+    inset 0 -1px 0 rgba(232, 200, 118, 0.08);
+  overflow: hidden;
+}
+.md-sub-bezel-inner.sonar {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(60, 120, 40, 0.15) 0%, transparent 70%),
+    var(--sub-face);
+}
+
+.md-sub-dial { width: 100%; height: 100%; display: block; }
+.md-sub-face { fill: rgba(212, 198, 158, 0.04); }
+.md-sub-tick { stroke: var(--sub-cream); stroke-width: 1.4; }
+.md-sub-tick-major { stroke: var(--sub-cream); stroke-width: 1.4; }
+.md-sub-tick-minor { stroke: var(--sub-ink-dim); stroke-width: 0.8; }
+.md-sub-needle {
+  fill: var(--sub-needle);
+  stroke: rgba(0,0,0,0.5);
+  stroke-width: 0.4;
+  filter: drop-shadow(0 0 2px rgba(240, 184, 80, 0.5));
+  transition: transform 360ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+.md-sub-cap {
+  fill: var(--sub-brass);
+  stroke: var(--sub-brass-lo);
+  stroke-width: 0.5;
+}
+.md-sub-numeral, .md-sub-unit, .md-sub-tel-lbl {
+  font-family: var(--font-mono);
+  font-size: 5.5px;
+  fill: var(--sub-cream);
+  text-anchor: middle;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+.md-sub-unit {
+  font-size: 4.5px;
+  fill: var(--sub-ink-dim);
+  letter-spacing: 0.22em;
+}
+.md-sub-tel-lbl {
+  font-size: 5px;
+  fill: var(--sub-cream);
+  letter-spacing: 0.06em;
+}
+.md-sub-hazard {
+  stroke: var(--sub-red);
+  stroke-width: 3;
+  opacity: 0.7;
+}
+.md-sub-compass-letter {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  fill: var(--sub-cream);
+  text-anchor: middle;
+  font-weight: 700;
+}
+.md-sub-compass-letter.n { fill: var(--sub-red); }
+.md-sub-lubber { stroke: var(--sub-red); stroke-width: 2; }
+
+.md-sub-sonar-rim { fill: none; stroke: rgba(138, 255, 90, 0.4); stroke-width: 1.2; }
+.md-sub-sonar-ring { fill: none; stroke: rgba(138, 255, 90, 0.22); stroke-width: 0.5; stroke-dasharray: 1 2; }
+.md-sub-sonar-cross { stroke: rgba(138, 255, 90, 0.22); stroke-width: 0.4; stroke-dasharray: 2 2; }
+.md-sub-sonar-letter {
+  font-family: var(--font-mono);
+  font-size: 5px;
+  fill: rgba(138, 255, 90, 0.55);
+  text-anchor: middle;
+  letter-spacing: 0.06em;
+}
+.md-sub-sonar-arm {
+  stroke: rgba(138, 255, 90, 0.85);
+  stroke-width: 0.7;
+  filter: drop-shadow(0 0 2px rgba(138, 255, 90, 0.65));
+}
+.md-sub-sonar-blip {
+  filter: drop-shadow(0 0 1.5px var(--sub-phos));
+}
+.md-sub-sonar-blip.sev-err  { fill: var(--sub-red);  filter: drop-shadow(0 0 2px var(--sub-red)); }
+.md-sub-sonar-blip.sev-warn { fill: var(--sub-needle); }
+.md-sub-sonar-blip.sev-info { fill: var(--sub-cream); }
+.md-sub-sonar-blip.sev-ok   { fill: var(--sub-phos); }
+
+.md-sub-tag {
+  display: flex; align-items: center;
+  gap: 4px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.18em;
+  color: var(--sub-ink-dim);
+  text-transform: uppercase;
+  padding: 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  justify-content: center;
+}
+.md-sub-tag .num {
+  background: var(--sub-brass);
+  color: #1a1408;
+  padding: 0 3px;
+  font-weight: 700;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+.md-sub-tag .r {
+  color: var(--sub-needle);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* ── 01 — Diving alarm bell ────────────────────────────────────────── */
+.md-sub-bell-mod { justify-content: center; gap: 4px; }
+.md-sub-bell {
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));
+  transform-origin: 50% 0%;
+  transition: filter 200ms;
+}
+.md-sub-bell svg { width: 100%; height: 100%; }
+.md-sub-bell .bell-body {
+  fill: var(--sub-brass);
+  stroke: var(--sub-brass-lo);
+  stroke-width: 0.4;
+}
+.md-sub-bell .bell-yoke { stroke: var(--sub-brass-lo); stroke-width: 0.6; }
+.md-sub-bell .bell-clapper { fill: var(--sub-brass-hi); }
+.md-sub-bell .bell-rim { stroke: var(--sub-brass-lo); stroke-width: 0.5; }
+.md-sub-bell.active .bell-body {
+  fill: var(--sub-brass-hi);
+}
+.md-sub-bell.active {
+  filter: drop-shadow(0 0 6px rgba(255, 100, 80, 0.55));
+}
+.md-sub-bell.ring {
+  animation: sub-bell-ring 240ms ease-in-out;
+}
+@keyframes sub-bell-ring {
+  0%, 100% { transform: rotate(0); }
+  25%      { transform: rotate(-12deg); }
+  75%      { transform: rotate(12deg); }
+}
+
+/* ── 03 — Trim indicator ───────────────────────────────────────────── */
+.md-sub-trim-mod { justify-content: space-between; gap: 4px; }
+.md-sub-trim {
+  display: flex; flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: 4px;
+}
+.md-sub-trim-glass {
+  position: relative;
+  height: 14px;
+  background: linear-gradient(180deg, #0a0805 0%, #14110a 100%);
+  border: 1px solid rgba(232, 200, 118, 0.4);
+  border-radius: 7px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.85);
+  overflow: hidden;
+}
+.md-sub-trim-bubble {
+  position: absolute;
+  top: 2px; left: 50%;
+  width: 10px; height: 8px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.85), transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(232, 200, 118, 0.85), rgba(184, 138, 58, 0.45) 80%);
+  box-shadow: 0 0 4px rgba(232, 200, 118, 0.6);
+  transition: transform 360ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+.md-sub-trim-line {
+  position: absolute;
+  top: 6px; bottom: 6px;
+  left: 50%; width: 1px;
+  margin-left: -0.5px;
+  background: var(--sub-red);
+  opacity: 0.7;
+}
+.md-sub-trim-tick {
+  position: absolute;
+  top: 1px; bottom: 1px;
+  width: 1px;
+  background: rgba(232, 200, 118, 0.25);
+}
+.md-sub-trim-tick.t0 { left: 10%; }
+.md-sub-trim-tick.t1 { left: 30%; }
+.md-sub-trim-tick.t2 { left: 70%; }
+.md-sub-trim-tick.t3 { left: 90%; }
+.md-sub-trim-tick.t4 { display: none; }
+.md-sub-planes {
+  display: flex; flex-direction: column;
+  gap: 2px;
+}
+.md-sub-planes .plane-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 1fr 1fr;
+  gap: 3px;
+  align-items: center;
+}
+.md-sub-planes .lbl {
+  font-family: var(--font-mono);
+  font-size: 6px;
+  color: var(--sub-ink-dim);
+  letter-spacing: 0.18em;
+}
+.md-sub-planes .lamp {
+  width: 100%; height: 4px;
+  background: rgba(232, 200, 118, 0.10);
+  border-radius: 1px;
+  border: 1px solid rgba(0,0,0,0.6);
+}
+.md-sub-planes .lamp.on {
+  background: var(--sub-phos);
+  box-shadow: 0 0 3px var(--sub-phos);
+}
+.md-sub-planes .lamp.center.on {
+  background: var(--sub-needle);
+  box-shadow: 0 0 3px var(--sub-needle);
+}
+
+/* ── 04 — Ballast tanks ─────────────────────────────────────────────── */
+.md-sub-ballast-mod { justify-content: space-between; gap: 4px; }
+.md-sub-ballast {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  width: 100%;
+  flex: 1;
+  align-items: stretch;
+}
+.dock-chassis .md-sub-ballast-tank { pointer-events: auto; }
+.md-sub-ballast-tank {
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  min-width: 0;
+}
+.md-sub-ballast-tank .tank-glass {
+  position: relative;
+  width: 100%; height: 46px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.85) 100%);
+  border: 1px solid rgba(232, 200, 118, 0.5);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,0.85),
+    inset 0 0 0 1px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+.md-sub-ballast-tank .tank-fill {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background:
+    linear-gradient(180deg, rgba(232, 200, 118, 0.6) 0%, rgba(184, 138, 58, 0.4) 100%);
+  box-shadow: inset 0 1px 0 rgba(232, 200, 118, 0.6);
+  transition: height 320ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+.md-sub-ballast-tank .tank-marks {
+  position: absolute;
+  top: 0; bottom: 0; left: 2px;
+  display: flex; flex-direction: column;
+  justify-content: space-around;
+  pointer-events: none;
+}
+.md-sub-ballast-tank .tank-marks span {
+  width: 4px; height: 1px;
+  background: rgba(232, 200, 118, 0.45);
+}
+.md-sub-ballast-tank .tank-lbl {
+  font-size: 6px;
+  letter-spacing: 0.18em;
+  color: var(--sub-ink-dim);
+  text-transform: uppercase;
+}
+.md-sub-ballast-tank:hover .tank-glass { border-color: var(--sub-brass-hi); }
+.md-sub-ballast-tank:hover .tank-lbl { color: var(--sub-cream); }
+
+/* ── 06 — Radar contact log ────────────────────────────────────────── */
+.md-sub-radar-mod { justify-content: space-between; gap: 2px; align-items: stretch; }
+.md-sub-radar {
+  flex: 1;
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, rgba(0, 30, 10, 0.55) 0%, rgba(0, 12, 4, 0.85) 100%);
+  border: 1px solid rgba(138, 255, 90, 0.35);
+  border-radius: 2px;
+  box-shadow: inset 0 0 8px rgba(138, 255, 90, 0.08);
+  padding: 3px 6px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+}
+.md-sub-radar-head {
+  display: grid;
+  grid-template-columns: 38px 38px 1fr;
+  gap: 6px;
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(138, 255, 90, 0.25);
+  font-size: 6.5px;
+  letter-spacing: 0.18em;
+  color: rgba(138, 255, 90, 0.55);
+  text-transform: uppercase;
+}
+.md-sub-radar-row {
+  display: grid;
+  grid-template-columns: 38px 38px 1fr;
+  gap: 6px;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: var(--sub-phos);
+  text-shadow: 0 0 3px rgba(138, 255, 90, 0.4);
+  font-variant-numeric: tabular-nums;
+  align-items: baseline;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.md-sub-radar-row .brg { color: var(--sub-needle); font-weight: 600; }
+.md-sub-radar-row .ts  { color: rgba(138, 255, 90, 0.7); font-size: 7.5px; }
+.md-sub-radar-row .desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  font-size: 7.5px;
+}
+.md-sub-radar-row.sev-err  .brg, .md-sub-radar-row.sev-err  .desc { color: var(--sub-red); text-shadow: 0 0 4px rgba(255,100,80,0.45); }
+.md-sub-radar-row.sev-warn .brg { color: var(--sub-needle); }
+.md-sub-radar-row.empty .desc { color: rgba(138, 255, 90, 0.4); font-style: italic; }
+
+/* ── 07 — Small/mini instruments (oxygen, pressure) ────────────────── */
+.md-sub-small-mod { justify-content: center; gap: 3px; }
+
+/* ── 08 — Battery banks ─────────────────────────────────────────────── */
+.md-sub-battery-mod { justify-content: space-between; gap: 4px; }
+.md-sub-battery {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+  width: 100%;
+  flex: 1;
+  align-items: stretch;
+}
+.md-sub-cell {
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.8) 100%);
+  border: 1px solid rgba(232, 200, 118, 0.3);
+  border-radius: 1px;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.6);
+}
+.md-sub-cell.lit {
+  background:
+    linear-gradient(180deg, var(--sub-needle) 0%, #c8932a 100%);
+  border-color: rgba(232, 200, 118, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255,235,180,0.4),
+    0 0 4px rgba(240, 184, 80, 0.4);
+}
+
+/* ── Bottom rail — 6 modules ───────────────────────────────────────── */
+.md-sub-bot {
+  position: absolute;
+  bottom: 6px; left: 36px; right: 36px;
+  height: 104px;
+  display: grid;
+  grid-template-columns:
+    96px        /* 10 helm */
+    72px        /* 11 telegraph */
+    1fr         /* 12 torpedo tubes (flex) */
+    240px       /* 13 valves */
+    72px        /* 14 pressure */
+    240px       /* 15 plate */;
+  gap: 10px;
+  align-items: stretch;
+  padding: 12px 8px 4px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.32) 100%);
+  border: 1px solid rgba(0,0,0,0.6);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(232, 200, 118, 0.10),
+    inset 0 -1px 0 rgba(0,0,0,0.55);
+}
+
+.dock-chassis .md-sub-helm { pointer-events: auto; }
+.md-sub-helm {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  gap: 2px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  min-width: 0;
+}
+.md-sub-helm-wheel {
+  width: 64px; height: 64px;
+  will-change: transform;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+}
+.md-sub-helm-wheel svg { width: 100%; height: 100%; }
+.md-sub-helm-rim {
+  fill: none;
+  stroke: var(--sub-brass);
+  stroke-width: 5;
+  filter: drop-shadow(0 0 4px rgba(232, 200, 118, 0.35));
+}
+.md-sub-helm-inner { fill: none; stroke: var(--sub-brass-lo); stroke-width: 1.5; }
+.md-sub-helm-spoke { stroke: var(--sub-brass); stroke-width: 2.4; stroke-linecap: round; }
+.md-sub-helm-knob {
+  fill: var(--sub-brass-hi);
+  stroke: var(--sub-brass-lo);
+  stroke-width: 0.8;
+}
+.md-sub-helm-hub {
+  fill: var(--sub-brass);
+  stroke: var(--sub-brass-lo);
+  stroke-width: 1;
+}
+.md-sub-helm-lbl {
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.18em;
+  color: var(--sub-ink-dim);
+  text-transform: uppercase;
+}
+.md-sub-helm:hover .md-sub-helm-rim { stroke: var(--sub-brass-hi); }
+
+/* Telegraph + pressure share small-instrument layout */
+.md-sub-telegraph, .md-sub-pressure {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  gap: 2px;
+  padding: 2px 0;
+  min-width: 0;
+}
+
+/* ── 12 — Torpedo tubes ─────────────────────────────────────────────── */
+.md-sub-tubes-mod { justify-content: space-between; gap: 4px; }
+.md-sub-tubes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  width: 100%;
+  flex: 1;
+  align-items: stretch;
+}
+.dock-chassis .md-sub-tube { pointer-events: auto; }
+.md-sub-tube {
+  position: relative;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  background:
+    linear-gradient(180deg, #2a1f12 0%, #14110a 100%);
+  border: 1px solid rgba(232, 200, 118, 0.40);
+  border-radius: 3px;
+  padding: 4px 0 3px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 200, 118, 0.18),
+    inset 0 -1px 2px rgba(0,0,0,0.65);
+  min-width: 0;
+  overflow: hidden;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+.md-sub-tube .tube-door {
+  position: relative;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #6e521c 0%, #4a3812 40%, #2a1f08 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(232, 200, 118, 0.32),
+    inset 0 -2px 3px rgba(0,0,0,0.75),
+    inset 0 0 0 1px rgba(0,0,0,0.55);
+}
+.md-sub-tube .tube-bolt {
+  position: absolute;
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, var(--sub-brass-hi), var(--sub-brass-lo));
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.5);
+}
+.md-sub-tube .tube-bolt:nth-child(1) { top: 3px;  left: 50%; margin-left: -1.5px; }
+.md-sub-tube .tube-bolt:nth-child(2) { top: 50%; right: 3px; margin-top: -1.5px; }
+.md-sub-tube .tube-bolt:nth-child(3) { bottom: 3px; left: 50%; margin-left: -1.5px; }
+.md-sub-tube .tube-bolt:nth-child(4) { top: 50%; left: 3px; margin-top: -1.5px; }
+.md-sub-tube .tube-lbl {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--sub-cream);
+  text-transform: uppercase;
+}
+.md-sub-tube .tube-sub {
+  font-size: 6px;
+  letter-spacing: 0.16em;
+  color: var(--sub-ink-dim);
+  text-transform: uppercase;
+}
+.md-sub-tube.loaded {
+  border-color: var(--sub-brass-hi);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 200, 118, 0.30),
+    inset 0 -1px 2px rgba(0,0,0,0.65),
+    0 0 8px -2px rgba(240, 184, 80, 0.4);
+}
+.md-sub-tube.loaded .tube-door {
+  background:
+    radial-gradient(circle at 35% 30%, var(--sub-brass-hi) 0%, var(--sub-brass) 40%, #6e521c 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255,235,180,0.5),
+    inset 0 -2px 3px rgba(0,0,0,0.5),
+    0 0 6px rgba(240, 184, 80, 0.35);
+}
+.md-sub-tube:hover { border-color: var(--sub-brass-hi); }
+.md-sub-tube:active { transform: translateY(1px); }
+
+/* ── 13 — Valve manifold ────────────────────────────────────────────── */
+.md-sub-valves-mod { justify-content: space-between; gap: 4px; }
+.md-sub-valves {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  flex: 1;
+  align-items: end;
+  padding-bottom: 2px;
+  /* Chrome pipe across the bottom of the manifold */
+  background:
+    linear-gradient(180deg,
+      transparent 0%,
+      transparent 64%,
+      rgba(0,0,0,0.6) 64%,
+      rgba(0,0,0,0.6) 68%,
+      var(--sub-brass-lo) 68%,
+      var(--sub-brass) 78%,
+      var(--sub-brass-hi) 84%,
+      var(--sub-brass) 90%,
+      var(--sub-brass-lo) 96%,
+      rgba(0,0,0,0.5) 100%);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 rgba(232, 200, 118, 0.12);
+}
+.dock-chassis .md-sub-valve { pointer-events: auto; }
+.md-sub-valve {
+  position: relative;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  min-width: 0;
+}
+.md-sub-valve .valve-handle {
+  position: relative;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #f0f0f0 0%, #b8b8b8 40%, #6e6e6e 100%);
+  box-shadow:
+    inset 0 -2px 3px rgba(0,0,0,0.5),
+    inset 0 1px 1px rgba(255,255,255,0.7),
+    0 1px 2px rgba(0,0,0,0.55);
+  transform: rotate(0deg);
+  transition: transform 280ms cubic-bezier(0.4, 0.0, 0.2, 1), filter 160ms;
+}
+.md-sub-valve.open .valve-handle {
+  transform: rotate(90deg);
+  filter: drop-shadow(0 0 4px rgba(138, 255, 90, 0.45));
+}
+.md-sub-valve .valve-spoke {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 28px; height: 2px;
+  margin: -1px 0 0 -14px;
+  background: linear-gradient(90deg, #8e8e8e, #f0f0f0, #8e8e8e);
+  border-radius: 1px;
+  transform-origin: 14px 1px;
+}
+.md-sub-valve .valve-spoke.s0 { transform: rotate(0deg); }
+.md-sub-valve .valve-spoke.s1 { transform: rotate(60deg); }
+.md-sub-valve .valve-spoke.s2 { transform: rotate(120deg); }
+.md-sub-valve .valve-cap {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 8px; height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, var(--sub-brass-hi), var(--sub-brass-lo));
+  box-shadow: inset 0 -1px 1px rgba(0,0,0,0.45);
+}
+.md-sub-valve .valve-pipe {
+  width: 3px; height: 10px;
+  background: linear-gradient(180deg, #4a4a4a, #2a2a2a);
+  margin-top: -2px;
+  box-shadow: inset -1px 0 0 rgba(255,255,255,0.18), inset 1px 0 0 rgba(0,0,0,0.55);
+}
+.md-sub-valve .valve-lbl {
+  font-size: 6.5px;
+  letter-spacing: 0.18em;
+  color: var(--sub-ink-dim);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.md-sub-valve.open .valve-lbl {
+  color: var(--sub-phos);
+  text-shadow: 0 0 3px rgba(138, 255, 90, 0.5);
+}
+.md-sub-valve:hover .valve-handle { filter: brightness(1.15); }
+
+.md-sub-plate {
+  display: flex; flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 10px;
+  background:
+    linear-gradient(180deg, var(--sub-brass-hi) 0%, var(--sub-brass) 50%, var(--sub-brass-lo) 100%);
+  border-radius: 2px;
+  border: 1px solid rgba(0,0,0,0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.55),
+    inset 0 -1px 0 rgba(0,0,0,0.45),
+    0 2px 4px rgba(0,0,0,0.45);
+  font-family: var(--font-mono);
+  min-width: 0;
+  overflow: hidden;
+}
+.md-sub-plate-row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 4px;
+  align-items: baseline;
+  color: #1a1408;
+  min-width: 0;
+}
+.md-sub-plate-row .k {
+  font-size: 6.5px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+.md-sub-plate-row .v {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-sub-plate-row.thin { font-size: 8px; }
+.md-sub-plate-row.thin .v { font-size: 8.5px; }
+.md-sub-plate-row.thin .k { font-size: 6.5px; }
+.md-sub-plate-row:first-child {
+  border-bottom: 1px solid rgba(0,0,0,0.35);
+  padding-bottom: 1px;
+  margin-bottom: 1px;
+}
+.md-sub-plate-row:first-child .k {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  opacity: 1;
+}
+.md-sub-plate-row:first-child .v {
+  font-size: 11px;
+  font-weight: 700;
+}
+.dock-chassis .md-sub-credit { pointer-events: auto; }
+.md-sub-credit {
+  font-size: 9px;
+  color: #1a1408;
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px dotted rgba(0,0,0,0.5);
+}
+.md-sub-credit:hover { color: #4a1908; }
+
+/* Submarine nodes — dark walnut hull plating with cream-on-dark ink,
+ * brass-yellow accents, and sonar-phosphor green for active states.
+ * Dark-only by design. */
+[data-dock="submarine"] .mother-frame {
+  --paper:        #1a1410;
+  --paper-2:      #261c14;
+  --paper-3:      #38291c;
+  --node-bg:      #110a06;
+  --ink:          #d4c69e;
+  --ink-2:        rgba(212, 198, 158, 0.82);
+  --ink-3:        rgba(212, 198, 158, 0.55);
+  --ink-4:        rgba(212, 198, 158, 0.32);
+  --ink-on-bright:#1a1408;
+  --acid:         #f0b850;
+  --acid-glow:    #f0d090;
+  --acid-faint:   rgba(240, 184, 80, 0.12);
+  --spine:        #b88a3a;
+  --spine-hot:    #f0b850;
+  --rust:         #ff6450;
+  --rust-deep:    #c8553d;
+  --cyan:         #8aff5a;
+  --plum:         #e8d8a8;
+  --frame-bg:     rgba(184, 138, 58, 0.08);
+  --frame-edge:   rgba(232, 200, 118, 0.40);
+  border-radius: 4px !important;
+  border: 0 !important;
+  background: var(--paper) !important;
+  /* Brass rim + heavy outer recess + faint phosphor wash */
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 200, 118, 0.45),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.85),
+    inset 0 0 32px rgba(232, 200, 118, 0.05),
+    0 0 0 2px rgba(0, 0, 0, 0.55),
+    0 0 24px -8px rgba(232, 200, 118, 0.35) !important;
 }
 
 /* ============================================================
