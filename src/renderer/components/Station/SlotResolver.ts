@@ -5,12 +5,19 @@
  * ADR 0008 § 4.2 / § 9.1 OQ-1.A (architect decision A: Habit gets its own column).
  *
  * Slot assignments (from migration and seedBoard):
- *   pomo     → top-left
- *   todo     → top-center
- *   habit    → top-right-pre   (own column, 4-column layout with right rail)
- *   calendar → top-right-upper
- *   clock    → top-right-lower
- *   term     → bottom-strip
+ *   pomo     → top-left           (top row, col 1)
+ *   todo     → top-center         (top row, col 2)
+ *   habit    → top-right-pre      (top row, col 3)
+ *   calendar → top-right-upper    (top row, col 4 — rightmost)
+ *   clock    → top-right-lower    (bottom row, right column beside Canvas)
+ *   term     → bottom-strip       (not rendered in station mode)
+ *
+ * Layout structure (matches user-provided sketch):
+ *   ┌─ DOCK TOP ─────────────────────────────────────┐
+ *   │ Pomo │ Todo │ Habit │ Calendar                  │
+ *   ├──────┴──────┴───────┴─────────────────┬────────┤
+ *   │         Embedded Canvas               │ Clock  │
+ *   └─ DOCK BOTTOM ──────────────────────────────────┘
  */
 
 import type { StationSlot } from '../../../shared/types';
@@ -30,27 +37,25 @@ export function resolveStationSlot(node: Node): StationSlot | undefined {
 // Default panel sizes for the react-resizable-panels API.
 // Stored as percentage values (0–100) as required by the library.
 export const SLOT_DEFAULTS = {
-  // Outer row: top row fraction vs canvas fraction (percent)
+  // Outer row split: top row (mothers) vs bottom row (canvas + clock)
   rowPercent: 50,
   canvasPercent: 50,
-  // Column widths inside the top row (must sum to 100)
+  // Top-row column widths (must sum to 100): 4 equal columns
   columns: {
-    'top-left':        22,   // Pomo
-    'top-center':      30,   // Todo
-    'top-right-pre':   22,   // Habit
-    'right-rail':      26,   // Calendar + Clock stacked
+    'top-left':        25,   // Pomo
+    'top-center':      25,   // Todo
+    'top-right-pre':   25,   // Habit
+    'top-right-upper': 25,   // Calendar
   },
-  // Right-rail split: calendar (upper) vs clock (lower)
-  rightColumn: {
-    upper: 55,   // Calendar
-    lower: 45,   // Clock
+  // Bottom-row column widths (must sum to 100): canvas + clock
+  bottom: {
+    canvas: 75,   // Embedded canvas
+    clock:  25,   // Clock — mirrors top-row Calendar's column width
   },
-  // Minimum sizes (percent) — enforces NF6 minimum column floor
-  minRow:        20,
-  minCanvas:     40,
-  minColumn:     18,
-  minColumnWide: 20,   // for top-center (Todo)
-  minRailCell:   30,
+  // Minimum sizes (percent)
+  minRow:    18,
+  minCanvas: 30,
+  minColumn: 14,
 } as const;
 
 // 1-based slot index for the badge label. Mirrors canvas-mode sort order.
