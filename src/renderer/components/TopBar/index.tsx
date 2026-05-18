@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
+import { LayoutModeToggle } from '../ui/LayoutModeToggle';
 
 type Theme = 'light' | 'dark';
 
@@ -175,6 +176,7 @@ export function TopBar() {
 
       {/* Right: action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <LayoutModeToggle />
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
         <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
       </div>
