@@ -12,13 +12,15 @@
 import { useEffect, Component, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
+import { StationLayout } from './components/Station/StationLayout';
+import { useStationViewportGate } from './components/Station/useStationViewportGate';
 import { Orb } from './components/Orb';
 import { AmbientRadio } from './components/AmbientRadio';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
 import { useBoardStore } from './store/boardStore';
 import { useBoardChannel } from './store/useBoardChannel';
-import { RadialChooserHost } from './components/ui/RadialChooser';    
+import { RadialChooserHost } from './components/ui/RadialChooser';
 import { useCliDispatch } from './store/useCliDispatch';
 import { sfxEngine } from './sfx/sfxEngine';
 
@@ -85,6 +87,34 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
   }
 }
 
+// ── AppInner — mounts inside ReactFlowProvider so useStationViewportGate ──
+// can safely read boardStore after board is loaded.
+function AppInner() {
+  const { effectiveMode, isFallingBack } = useStationViewportGate();
+
+  return (
+    <div
+      style={{
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+      }}
+    >
+      <TopBar />
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {/* ADR 0008 § 9.3 strategy A — one remount on toggle, same provider. */}
+        {effectiveMode === 'station' ? <StationLayout /> : <Canvas />}
+        {effectiveMode === 'station' ? null : <Orb />}
+        <AmbientRadio />
+      </div>
+      <StatusBar fallbackNotice={isFallingBack} />
+      <RadialChooserHost />
+    </div>
+  );
+}
+
 export function App() {
   const setBoard = useBoardStore((s) => s.setBoard);
   useBoardChannel();
@@ -108,24 +138,7 @@ export function App() {
   return (
     <ErrorBoundary>
       <ReactFlowProvider>
-        <div
-          style={{
-            width: '100vw',
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
-          }}
-        >
-          <TopBar />
-          <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-            <Canvas />
-            <Orb />
-            <AmbientRadio />
-          </div>
-          <StatusBar />
-          <RadialChooserHost />
-        </div>
+        <AppInner />
       </ReactFlowProvider>
     </ErrorBoundary>
   );
