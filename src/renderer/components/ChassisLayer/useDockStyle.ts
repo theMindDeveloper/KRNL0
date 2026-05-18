@@ -10,17 +10,18 @@
  * actual chassis chrome lives in StationLayout — without shared state, the
  * picker would update only its own component's hook instance, leaving the
  * chrome stale.
+ *
+ * `DockStyle` and `DOCK_STYLES` are derived from the dock registry — adding a
+ * new entry there extends the union automatically.
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { DOCK_STYLES, DEFAULT_DOCK_STYLE, type DockStyle } from './dockRegistry';
 
-export type DockStyle = 'classic' | 'synthesizer' | 'telemetry' | 'krnl-dock';
-
-export const DOCK_STYLES: DockStyle[] = ['classic', 'synthesizer', 'telemetry', 'krnl-dock'];
+export type { DockStyle } from './dockRegistry';
+export { DOCK_STYLES } from './dockRegistry';
 
 const STORAGE_KEY = 'krnl0-dock-style';
-
-const DEFAULT_DOCK_STYLE: DockStyle = 'classic';
 
 function readStored(): DockStyle {
   if (typeof localStorage === 'undefined') return DEFAULT_DOCK_STYLE;
@@ -37,7 +38,6 @@ function apply(style: DockStyle) {
   }
 }
 
-// ── Module-level shared state ──────────────────────────────────────────────
 let current: DockStyle = readStored();
 const subscribers = new Set<(s: DockStyle) => void>();
 
@@ -49,14 +49,12 @@ function setCurrent(next: DockStyle) {
   subscribers.forEach((fn) => fn(next));
 }
 
-// Apply on first import so <html data-dock> matches storage before paint.
 apply(current);
 
 export function useDockStyle(): [DockStyle, (s: DockStyle) => void] {
   const [style, setLocal] = useState<DockStyle>(current);
 
   useEffect(() => {
-    // Catch up if the value changed between render and effect run.
     if (current !== style) setLocal(current);
     const sub = (s: DockStyle) => setLocal(s);
     subscribers.add(sub);

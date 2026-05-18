@@ -34,10 +34,8 @@ import {
   type Layout,
 } from 'react-resizable-panels';
 import { useBoardStore } from '../../store/boardStore';
-import { useDockStyle, type DockStyle } from '../ChassisLayer/useDockStyle';
-import { SynthesizerChrome } from '../ChassisLayer/SynthesizerChrome';
-import { TelemetryChrome } from '../ChassisLayer/TelemetryChrome';
-import { KrnlDockChrome } from '../ChassisLayer/KrnlDockChrome';
+import { useDockStyle } from '../ChassisLayer/useDockStyle';
+import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { StationCell } from './StationCell';
 import { EmbeddedCanvasCell } from './EmbeddedCanvasCell';
 import { StationToolbar } from './StationToolbar';
@@ -56,13 +54,6 @@ const PANEL_IDS = {
   bottomTerminal: 'station-bottom-terminal',
   bottomClock:    'station-bottom-clock',
 } as const;
-
-const RAIL_PADDING: Record<DockStyle, { top: number; bottom: number }> = {
-  classic:     { top: 0,   bottom: 0   },
-  synthesizer: { top: 50,  bottom: 88  },
-  telemetry:   { top: 76,  bottom: 70  },
-  'krnl-dock': { top: 102, bottom: 102 },
-};
 
 const verticalHandleStyle: React.CSSProperties = {
   width: 4,
@@ -167,7 +158,9 @@ export function StationLayout() {
     });
   }, [setLayoutGeometry]);
 
-  const padding = RAIL_PADDING[dockStyle];
+  const def = DOCK_REGISTRY[dockStyle];
+  const padding = def.stationPadding;
+  const Chrome = def.Chrome;
 
   // Build the top-row panel list: visible panels with separators between.
   const topRowChildren: React.ReactNode[] = [];
@@ -216,9 +209,7 @@ export function StationLayout() {
         background: dockStyle === 'classic' ? 'var(--paper)' : undefined,
       }}
     >
-      {dockStyle === 'synthesizer' && <SynthesizerChrome />}
-      {dockStyle === 'telemetry' && <TelemetryChrome />}
-      {dockStyle === 'krnl-dock' && <KrnlDockChrome />}
+      {Chrome ? <Chrome /> : null}
 
       <div
         style={{
