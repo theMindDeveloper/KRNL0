@@ -28,8 +28,10 @@ export type AnalyticsMetric = 'taskCount' | 'habitCount' | 'focusMin' | 'session
 // Renaming an ID is a migration — keep them stable.
 export type AnalyticsCardId =
   // overview
+  | 'overview.kpis'
   | 'overview.totals'
   | 'overview.activity'
+  | 'overview.dowHour'
   | 'overview.dow'
   | 'overview.hour'
   // calendar
@@ -38,28 +40,40 @@ export type AnalyticsCardId =
   | 'patterns.dow'
   | 'patterns.hour'
   | 'patterns.month'
+  | 'patterns.cumulative'
   // insights (multivariate)
+  | 'insights.radar'
   | 'insights.donutSessionsByDay'
   | 'insights.donutSources'
   | 'insights.scatterTasksFocus'
+  | 'insights.scatterHabitFocus'
   | 'insights.stacked'
+  | 'insights.histogramFocus'
+  | 'insights.histogramTasks'
   // sources
   | 'sources.list'
   | 'sources.streaks';
 
 export const ANALYTICS_CARD_LABELS: Record<AnalyticsCardId, string> = {
+  'overview.kpis':                'KPI tiles',
   'overview.totals':              'Totals',
   'overview.activity':            'Activity strip',
+  'overview.dowHour':             'Weekday × hour heatmap',
   'overview.dow':                 'By weekday',
   'overview.hour':                'By hour',
   'calendar.heatmap':             'Year heatmap',
   'patterns.dow':                 'Weekday pattern',
   'patterns.hour':                'Hour pattern',
   'patterns.month':               'Month pattern',
-  'insights.donutSessionsByDay':  'Sessions split (donut)',
+  'patterns.cumulative':          'Cumulative trajectories',
+  'insights.radar':               'Multivariate radar',
+  'insights.donutSessionsByDay':  'Focus by weekday (donut)',
   'insights.donutSources':        'Sources split (pie)',
   'insights.scatterTasksFocus':   'Tasks × focus (scatter)',
+  'insights.scatterHabitFocus':   'Habits × focus (scatter)',
   'insights.stacked':             'Daily mix (stacked)',
+  'insights.histogramFocus':      'Focus distribution',
+  'insights.histogramTasks':      'Tasks distribution',
   'sources.list':                 'Registered sources',
   'sources.streaks':              'Habit streaks',
 };

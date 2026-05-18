@@ -34,7 +34,8 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 18,
+        gap: 34,
+        padding: '6px 4px',
       }}
     >
       <style>{`

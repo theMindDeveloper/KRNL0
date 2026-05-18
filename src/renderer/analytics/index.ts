@@ -25,7 +25,7 @@ export {
   clearDataSources,
   collectAllEvents,
 } from './registry';
-export { lastNDays, yearRange, todayLocal, toYMD } from './dateRange';
+export { lastNDays, yearRange, todayLocal, toYMD, addDays } from './dateRange';
 export { ActivityStrip } from './charts/ActivityStrip';
 export { CalendarHeatmap } from './charts/CalendarHeatmap';
 export { DowBars } from './charts/DowBars';
@@ -37,4 +37,10 @@ export type { DonutSlice } from './charts/DonutChart';
 export { Scatter } from './charts/Scatter';
 export type { ScatterPoint } from './charts/Scatter';
 export { StackedArea } from './charts/StackedArea';
+export { KpiTiles } from './charts/KpiTiles';
+export { DowHourMatrix } from './charts/DowHourMatrix';
+export { Radar } from './charts/Radar';
+export type { RadarAxis } from './charts/Radar';
+export { CumulativeLine } from './charts/CumulativeLine';
+export { Histogram } from './charts/Histogram';
 export { useElementSize } from './useElementSize';

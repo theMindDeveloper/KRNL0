@@ -1,16 +1,18 @@
 /**
  * AnalyticsNode — free-floating analytics dashboard.
  *
- * 2026-05-18 overhaul:
- *   - Responsive chart sizing via ResizeObserver — every chart adapts to its
- *     card's measured width as the node is resized.
- *   - Settings gear in the titlebar reveals per-card hide/pin toggles. State
- *     lives on `state.hiddenCards` + `state.pinnedCards` (stable IDs).
- *   - New "Insights" view with multivariate visuals: donut for sessions split
- *     by source, donut for daily-block split, scatter (tasks × focus, size by
- *     habits) showing Pearson r, and a stacked-area daily mix.
- *   - Card-grid layout uses CSS grid auto-fit so the dashboard reflows from a
- *     narrow 1-column reading view to a wide 3-column dashboard.
+ * 2026-05-18 (rev 2) overhaul:
+ *   - Container-queried responsive grid: card-count adapts to the node's own
+ *     measured width (≤ 480 → 1 col, ≤ 880 → 2 col, otherwise 3 col). Cards
+ *     share a consistent row height so wide layouts don't leak dead space.
+ *   - Settings sidebar lists every card in the catalogue with a show/hide
+ *     toggle + pin star — hidden cards stay discoverable and re-toggleable
+ *     instead of vanishing entirely.
+ *   - Far richer Overview: KPI tiles (with deltas + sparklines), DowHour
+ *     heatmap, activity strip, and the existing dow/hour minis.
+ *   - Insights view bundles multivariate visuals: radar, scatter, donut/pie,
+ *     stacked area, cumulative trajectory, focus-distribution histogram.
+ *   - Patterns view gains the cumulative trajectory card.
  *
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
@@ -21,13 +23,18 @@ import type { NodeProps } from '../types';
 import {
   ActivityStrip,
   CalendarHeatmap,
+  CumulativeLine,
   DonutChart,
   DowBars,
+  DowHourMatrix,
+  Histogram,
   HourLine,
+  KpiTiles,
   MonthBars,
+  Radar,
   Scatter,
   StackedArea,
-  TotalsPanel,
+  addDays,
   lastNDays,
   listDataSources,
   todayLocal,
@@ -36,6 +43,7 @@ import {
 } from '../../../analytics';
 import type {
   DonutSlice,
+  RadarAxis,
   ScatterPoint,
 } from '../../../analytics';
 import type {
@@ -78,6 +86,36 @@ const SOURCE_PALETTE: Record<string, string> = {
 };
 
 const FALLBACK_PALETTE = ['#8a7bff', '#5dd3c5', '#d18bff', '#f4d35e', '#ff8e64'];
+
+// Each view lists the cards it owns, in their default order. The settings
+// sidebar groups by view so the picker mirrors the user's mental model.
+const CARDS_BY_VIEW: Record<AnalyticsView, readonly AnalyticsCardId[]> = {
+  overview: [
+    'overview.kpis',
+    'overview.activity',
+    'overview.dowHour',
+    'overview.dow',
+    'overview.hour',
+  ],
+  calendar: ['calendar.heatmap'],
+  patterns: [
+    'patterns.cumulative',
+    'patterns.dow',
+    'patterns.hour',
+    'patterns.month',
+  ],
+  insights: [
+    'insights.radar',
+    'insights.scatterTasksFocus',
+    'insights.scatterHabitFocus',
+    'insights.donutSources',
+    'insights.donutSessionsByDay',
+    'insights.stacked',
+    'insights.histogramFocus',
+    'insights.histogramTasks',
+  ],
+  sources: ['sources.list', 'sources.streaks'],
+};
 
 // ── chrome ────────────────────────────────────────────────────────────────────
 
@@ -132,8 +170,8 @@ const summaryChipStyle: React.CSSProperties = {
 };
 
 const gearBtnStyle = (active: boolean): React.CSSProperties => ({
-  width: 24,
-  height: 24,
+  width: 26,
+  height: 26,
   display: 'grid',
   placeItems: 'center',
   borderRadius: 6,
@@ -142,6 +180,7 @@ const gearBtnStyle = (active: boolean): React.CSSProperties => ({
   border: '1px solid ' + (active ? 'var(--acid)' : '#2a2e33'),
   cursor: 'pointer',
   padding: 0,
+  fontSize: 13,
   transition: 'background 120ms, color 120ms, border-color 120ms',
 });
 
@@ -184,37 +223,30 @@ const chipBtn = (active: boolean): React.CSSProperties => ({
   fontWeight: active ? 700 : 500,
 });
 
-const bodyStyle: React.CSSProperties = {
-  flex: 1,
-  overflow: 'auto',
-  padding: '12px 14px 16px',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 12,
-};
+// ── responsive helpers ───────────────────────────────────────────────────────
 
-// Grid container — auto-fit so cards reflow from 1 to N columns as the user
-// resizes the node. minmax(280, 1fr) guarantees a comfortable minimum card
-// width before wrapping to a new row.
-const cardGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-  gap: 12,
-  alignItems: 'start',
-};
+// Map measured node width to a card column count. Mirrors the auto-fit grid
+// breakpoints but is explicit so card span values can match.
+function colCountFor(width: number): number {
+  if (width < 520) return 1;
+  if (width < 920) return 2;
+  return 3;
+}
 
 // ── ChartCard wrapper ────────────────────────────────────────────────────────
 
 interface ChartCardProps {
   cardId: AnalyticsCardId;
   title: string;
-  /** Optional subtitle / metric pill row, rendered next to the title. */
   toolbar?: React.ReactNode;
-  /** Optional wider span — passes through grid `gridColumn: span N`. */
+  /** Effective grid span — caller computes against current col count. */
   span?: number;
   hidden: boolean;
   pinned: boolean;
   settingsOpen: boolean;
+  /** Each card declares a target chart height so the row is consistent across
+   *  the grid. Card padding + title adds ≈ 50px of chrome. */
+  contentHeight?: number;
   onToggleHidden: () => void;
   onTogglePin: () => void;
   children: (size: { width: number; height: number }) => React.ReactNode;
@@ -228,36 +260,35 @@ function ChartCard({
   hidden,
   pinned,
   settingsOpen,
+  contentHeight = 220,
   onToggleHidden,
   onTogglePin,
   children,
 }: ChartCardProps) {
-  // Measure the chart-host area so SVG children can size to the card.
   const [hostRef, hostSize] = useElementSize<HTMLDivElement>();
 
-  // In settings mode we still render hidden cards but dimmed and labelled,
-  // so the user can re-enable them without leaving the gear panel. Normal
-  // mode skips them entirely.
-  if (hidden && !settingsOpen) return null;
+  if (hidden) return null;
 
   const cardStyle: React.CSSProperties = {
     background: 'linear-gradient(180deg, #1a1d20 0%, #131517 100%)',
     border: `1px solid ${pinned ? 'rgba(201,241,88,0.45)' : '#23262a'}`,
-    boxShadow: pinned ? '0 0 0 1px rgba(201,241,88,0.18) inset' : 'inset 0 1px 0 rgba(255,255,255,0.02)',
+    boxShadow: pinned
+      ? '0 0 0 1px rgba(201,241,88,0.18) inset, 0 6px 20px rgba(0,0,0,0.35)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.02), 0 4px 14px rgba(0,0,0,0.25)',
     borderRadius: 8,
-    padding: '10px 12px',
+    padding: '10px 12px 12px',
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    opacity: hidden ? 0.45 : 1,
-    transition: 'opacity 140ms, border-color 140ms, box-shadow 140ms',
+    gap: 10,
+    transition: 'border-color 140ms, box-shadow 140ms',
     gridColumn: span ? `span ${span}` : undefined,
     minHeight: 0,
+    minWidth: 0,
   };
 
   return (
-    <div data-card-id={cardId} data-pinned={pinned || undefined} data-hidden={hidden || undefined} style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div data-card-id={cardId} data-pinned={pinned || undefined} style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 18 }}>
         <span
           style={{
             fontFamily: 'var(--font-mono)',
@@ -266,6 +297,11 @@ function ChartCard({
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             fontWeight: pinned ? 700 : 500,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            minWidth: 0,
+            flexShrink: 1,
           }}
         >
           {pinned ? '★ ' : ''}{title}
@@ -289,15 +325,25 @@ function ChartCard({
               data-testid={`analytics-card-hide-${cardId}`}
               onClick={(e) => { e.stopPropagation(); onToggleHidden(); }}
               onMouseDown={(e) => e.stopPropagation()}
-              title={hidden ? 'Show card' : 'Hide card'}
+              title="Hide card"
               style={cardActionBtn(false, '#ff8e64')}
             >
-              {hidden ? '+' : '−'}
+              −
             </button>
           </div>
         )}
       </div>
-      <div ref={hostRef} style={{ width: '100%', minHeight: 0 }}>
+      <div
+        ref={hostRef}
+        style={{
+          width: '100%',
+          height: contentHeight,
+          minHeight: 0,
+          display: 'flex',
+          alignItems: 'stretch',
+          justifyContent: 'center',
+        }}
+      >
         {children(hostSize)}
       </div>
     </div>
@@ -306,8 +352,8 @@ function ChartCard({
 
 function cardActionBtn(active: boolean, accent: string): React.CSSProperties {
   return {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
     display: 'grid',
     placeItems: 'center',
     background: active ? accent : 'transparent',
@@ -316,19 +362,20 @@ function cardActionBtn(active: boolean, accent: string): React.CSSProperties {
     borderRadius: 4,
     cursor: 'pointer',
     fontFamily: 'var(--font-mono)',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 700,
     lineHeight: 1,
     padding: 0,
   };
 }
 
-// ── responsive chart helpers ─────────────────────────────────────────────────
-
 // Most chart components still take width/height props. Pad the measured host
 // down a tad so a 1px border doesn't trigger an infinite resize loop.
 function chartWidth(measured: number, fallback: number): number {
   return measured > 0 ? Math.max(140, measured - 2) : fallback;
+}
+function chartHeight(measured: number, fallback: number): number {
+  return measured > 0 ? Math.max(120, measured) : fallback;
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
@@ -342,10 +389,18 @@ export function AnalyticsNode({
   const analytics = useAnalytics();
 
   const range = useMemo(() => lastNDays(state.rangeDays), [state.rangeDays]);
+  const prevRange = useMemo(
+    () => ({
+      start: addDays(range.start, -state.rangeDays),
+      end: addDays(range.start, -1),
+    }),
+    [range.start, state.rangeDays],
+  );
   const year = state.year ?? new Date(todayLocal() + 'T00:00:00').getFullYear();
 
   const byDay = analytics.byDay(range);
   const tot = analytics.totals(range);
+  const prevTot = analytics.totals(prevRange);
   const open = analytics.open();
   const dow = analytics.byDayOfWeek(range);
   const hour = analytics.byHourOfDay(range);
@@ -379,9 +434,18 @@ export function AnalyticsNode({
     onCommand('analytics.setSize', { width: p.width, height: p.height });
   };
 
+  // Container size — drives the grid column count.
+  const [bodyRef, bodySize] = useElementSize<HTMLDivElement>();
+  const colCount = colCountFor(bodySize.width || (state.width ?? 720));
+
+  // Clamp span helper — never let a card request more columns than exist.
+  const clamp = useCallback(
+    (requested: number) => Math.min(requested, colCount),
+    [colCount],
+  );
+
   // ── derived data for the new Insights view ─────────────────────────────────
 
-  // Source-split donut: count of events per registered source within range.
   const sourceSlices: DonutSlice[] = useMemo(() => {
     const counts = new Map<string, number>();
     for (const e of events) {
@@ -397,8 +461,6 @@ export function AnalyticsNode({
       });
   }, [events, range, sources]);
 
-  // Day-of-week donut: pomo session count grouped by weekday. Shows which
-  // days you actually do focused work, regardless of total magnitude.
   const sessionsByDowSlices: DonutSlice[] = useMemo(() => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return dow
@@ -411,8 +473,7 @@ export function AnalyticsNode({
       .filter((s) => s.value > 0);
   }, [dow]);
 
-  // Scatter: each day in range is a point. x=focusMin, y=taskCount, r=habits.
-  const scatterPoints: ScatterPoint[] = useMemo(
+  const scatterTasksFocus: ScatterPoint[] = useMemo(
     () =>
       byDay.map((d) => ({
         id: d.date,
@@ -425,13 +486,44 @@ export function AnalyticsNode({
     [byDay],
   );
 
+  const scatterHabitFocus: ScatterPoint[] = useMemo(
+    () =>
+      byDay.map((d) => ({
+        id: d.date,
+        x: d.habitCount,
+        y: d.focusMin,
+        r: d.taskCount,
+        label: d.date,
+        color: 'var(--acid)',
+      })),
+    [byDay],
+  );
+
+  const radarAxes: RadarAxis[] = useMemo(() => {
+    const prevByDay = analytics.byDay(prevRange);
+    const days = state.rangeDays;
+    const activeNow = byDay.filter((d) => d.taskCount + d.habitCount + d.focusMin > 0).length;
+    const activePrev = prevByDay.filter((d) => d.taskCount + d.habitCount + d.focusMin > 0).length;
+    const base: RadarAxis[] = [
+      { key: 'tasks', label: 'Tasks', value: tot.tasksDone, previous: prevTot.tasksDone },
+      { key: 'habits', label: 'Habits', value: tot.habitCheckins, previous: prevTot.habitCheckins },
+      { key: 'focus', label: 'Focus min', value: tot.focusMin, previous: prevTot.focusMin },
+      { key: 'sessions', label: 'Sessions', value: tot.sessions, previous: prevTot.sessions },
+      { key: 'active', label: 'Active days', value: activeNow, previous: activePrev, max: days },
+    ];
+    if (streaks.longestHabitStreak > 0) {
+      base.push({ key: 'streak', label: 'Longest streak', value: streaks.longestHabitStreak });
+    }
+    return base;
+  }, [analytics, prevRange, tot, prevTot, byDay, state.rangeDays, streaks.longestHabitStreak]);
+
   return (
     <div data-testid="analytics-node-root" style={rootStyle}>
       <NodeResizeControl
         position="bottom-right"
         minWidth={420}
         minHeight={320}
-        maxWidth={1600}
+        maxWidth={1800}
         maxHeight={1600}
         onResizeEnd={onResizeEnd}
         style={{
@@ -473,6 +565,10 @@ export function AnalyticsNode({
           <span style={{ color: '#f4f6f8' }}>{tot.tasksDone}</span>
         </span>
         <span style={summaryChipStyle}>
+          <span style={{ color: '#9aa1a8' }}>focus </span>
+          <span style={{ color: '#f4f6f8' }}>{tot.focusMin}m</span>
+        </span>
+        <span style={summaryChipStyle}>
           <span style={{ color: '#9aa1a8' }}>streak </span>
           <span style={{ color: 'var(--acid, #c9f158)' }}>{streaks.longestHabitStreak}d</span>
         </span>
@@ -489,7 +585,7 @@ export function AnalyticsNode({
         </button>
       </div>
 
-      {/* Tabs + range chips + (when gear open) reset button */}
+      {/* Tabs + range chips */}
       <div style={toolbarStyle}>
         {ANALYTICS_VIEWS.map((v) => (
           <button
@@ -518,70 +614,218 @@ export function AnalyticsNode({
             </button>
           ))}
         </div>
-        {settingsOpen && (
-          <button
-            type="button"
-            data-testid="analytics-reset-layout"
-            onClick={(e) => { e.stopPropagation(); onCommand('analytics.resetCardLayout', {}); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              ...chipBtn(false),
-              borderColor: '#ff8e64',
-              color: '#ff8e64',
-            }}
-            title="Show every card, clear pins"
-          >
-            reset layout
-          </button>
-        )}
       </div>
 
-      <div style={bodyStyle}>
-        {/* SETTINGS PROMPT — a thin banner explains what gear mode does. */}
-        {settingsOpen && (
-          <div
-            data-testid="analytics-settings-banner"
-            style={{
-              padding: '6px 10px',
-              background: 'rgba(201,241,88,0.06)',
-              border: '1px solid rgba(201,241,88,0.3)',
-              borderRadius: 6,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 9.5,
-              color: '#c8cdd3',
-              letterSpacing: '0.06em',
-            }}
-          >
-            <span style={{ color: 'var(--acid)' }}>★</span> pin to top  ·  <span style={{ color: '#ff8e64' }}>−</span> hide from view — click <span style={{ color: 'var(--acid)' }}>✓</span> when done
-          </div>
-        )}
+      {/* Body — split: cards on the left, settings sidebar on the right */}
+      <div
+        ref={bodyRef}
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: '12px 14px 16px',
+          display: 'flex',
+          gap: 12,
+          minHeight: 0,
+        }}
+      >
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+          <ViewBody
+            view={view}
+            state={state}
+            byDay={byDay}
+            dow={dow}
+            hour={hour}
+            months={months}
+            tot={tot}
+            prevTot={prevTot}
+            open={open}
+            streaks={streaks}
+            sources={sources}
+            events={events}
+            year={year}
+            range={range}
+            settingsOpen={settingsOpen}
+            isHidden={isHidden}
+            isPinned={isPinned}
+            toggleHidden={toggleHidden}
+            togglePin={togglePin}
+            onCommand={onCommand}
+            sourceSlices={sourceSlices}
+            sessionsByDowSlices={sessionsByDowSlices}
+            scatterTasksFocus={scatterTasksFocus}
+            scatterHabitFocus={scatterHabitFocus}
+            radarAxes={radarAxes}
+            colCount={colCount}
+            clamp={clamp}
+          />
+        </div>
 
-        <ViewBody
-          view={view}
-          state={state}
-          byDay={byDay}
-          dow={dow}
-          hour={hour}
-          months={months}
-          tot={tot}
-          open={open}
-          streaks={streaks}
-          sources={sources}
-          events={events}
-          year={year}
-          range={range}
-          settingsOpen={settingsOpen}
-          isHidden={isHidden}
-          isPinned={isPinned}
-          toggleHidden={toggleHidden}
-          togglePin={togglePin}
-          onCommand={onCommand}
-          sourceSlices={sourceSlices}
-          sessionsByDowSlices={sessionsByDowSlices}
-          scatterPoints={scatterPoints}
-        />
+        {settingsOpen && (
+          <SettingsSidebar
+            currentView={view}
+            hiddenCards={hiddenCards}
+            pinnedCards={pinnedCards}
+            onToggleHidden={toggleHidden}
+            onTogglePin={togglePin}
+            onReset={() => onCommand('analytics.resetCardLayout', {})}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+// ── Settings sidebar ─────────────────────────────────────────────────────────
+
+interface SettingsSidebarProps {
+  currentView: AnalyticsView;
+  hiddenCards: readonly AnalyticsCardId[];
+  pinnedCards: readonly AnalyticsCardId[];
+  onToggleHidden: (id: AnalyticsCardId) => void;
+  onTogglePin: (id: AnalyticsCardId) => void;
+  onReset: () => void;
+}
+
+function SettingsSidebar({
+  currentView,
+  hiddenCards,
+  pinnedCards,
+  onToggleHidden,
+  onTogglePin,
+  onReset,
+}: SettingsSidebarProps) {
+  return (
+    <aside
+      data-testid="analytics-settings-sidebar"
+      style={{
+        width: 230,
+        flexShrink: 0,
+        background: 'linear-gradient(180deg, #16191c 0%, #101214 100%)',
+        border: '1px solid #23262a',
+        borderRadius: 8,
+        padding: '12px 12px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        overflow: 'auto',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            color: 'var(--acid)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            fontWeight: 700,
+          }}
+        >
+          Curate cards
+        </span>
+        <div style={{ flex: 1 }} />
+        <button
+          type="button"
+          data-testid="analytics-reset-layout"
+          onClick={(e) => { e.stopPropagation(); onReset(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            ...chipBtn(false),
+            borderColor: '#ff8e64',
+            color: '#ff8e64',
+            fontSize: 8,
+          }}
+          title="Show every card, clear pins"
+        >
+          reset
+        </button>
+      </div>
+
+      <p
+        style={{
+          margin: 0,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 9,
+          color: '#9aa1a8',
+          letterSpacing: '0.04em',
+          lineHeight: 1.45,
+        }}
+      >
+        <span style={{ color: 'var(--acid)' }}>★</span> pin to top  ·  <span style={{ color: '#ff8e64' }}>✕</span> hide
+      </p>
+
+      {ANALYTICS_VIEWS.map((v) => (
+        <div key={v} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              color: v === currentView ? '#eef1f4' : '#7d848b',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              fontWeight: v === currentView ? 700 : 500,
+              borderBottom: '1px dashed #23262a',
+              paddingBottom: 3,
+            }}
+          >
+            {VIEW_LABELS[v]}
+          </span>
+          {CARDS_BY_VIEW[v].map((id) => {
+            const hidden = hiddenCards.includes(id);
+            const pinned = pinnedCards.includes(id);
+            return (
+              <div
+                key={id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 0',
+                  opacity: hidden ? 0.55 : 1,
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9.5,
+                    color: hidden ? '#7d848b' : '#c8cdd3',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    textDecoration: hidden ? 'line-through' : 'none',
+                  }}
+                  title={ANALYTICS_CARD_LABELS[id]}
+                >
+                  {ANALYTICS_CARD_LABELS[id]}
+                </span>
+                <button
+                  type="button"
+                  data-testid={`analytics-sidebar-pin-${id}`}
+                  onClick={(e) => { e.stopPropagation(); onTogglePin(id); }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title={pinned ? 'Unpin' : 'Pin to top'}
+                  style={cardActionBtn(pinned, 'var(--acid)')}
+                >
+                  {pinned ? '★' : '☆'}
+                </button>
+                <button
+                  type="button"
+                  data-testid={`analytics-sidebar-hide-${id}`}
+                  onClick={(e) => { e.stopPropagation(); onToggleHidden(id); }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title={hidden ? 'Show' : 'Hide'}
+                  style={cardActionBtn(hidden, '#ff8e64')}
+                >
+                  {hidden ? '+' : '✕'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </aside>
   );
 }
 
@@ -595,6 +839,7 @@ interface ViewBodyProps {
   hour: ReturnType<ReturnType<typeof useAnalytics>['byHourOfDay']>;
   months: ReturnType<ReturnType<typeof useAnalytics>['byMonth']>;
   tot: ReturnType<ReturnType<typeof useAnalytics>['totals']>;
+  prevTot: ReturnType<ReturnType<typeof useAnalytics>['totals']>;
   open: ReturnType<ReturnType<typeof useAnalytics>['open']>;
   streaks: ReturnType<ReturnType<typeof useAnalytics>['streaks']>;
   sources: ReturnType<typeof listDataSources>;
@@ -609,11 +854,13 @@ interface ViewBodyProps {
   onCommand: (cmd: string, args?: Record<string, unknown>) => void;
   sourceSlices: DonutSlice[];
   sessionsByDowSlices: DonutSlice[];
-  scatterPoints: ScatterPoint[];
+  scatterTasksFocus: ScatterPoint[];
+  scatterHabitFocus: ScatterPoint[];
+  radarAxes: RadarAxis[];
+  colCount: number;
+  clamp: (requested: number) => number;
 }
 
-// Sort pinned cards to the front while preserving the user's pin order, so
-// the dashboard layout matches the order in which they pinned things.
 function orderCards<T extends { cardId: AnalyticsCardId }>(
   cards: T[],
   pinnedOrder: readonly AnalyticsCardId[],
@@ -628,10 +875,21 @@ function orderCards<T extends { cardId: AnalyticsCardId }>(
 
 function ViewBody(props: ViewBodyProps) {
   const {
-    view, state, byDay, dow, hour, months, tot, open, streaks, sources, events,
+    view, state, byDay, dow, hour, months, tot, prevTot, open, streaks, sources, events,
     year, range, settingsOpen, isHidden, isPinned, toggleHidden, togglePin,
-    onCommand, sourceSlices, sessionsByDowSlices, scatterPoints,
+    onCommand, sourceSlices, sessionsByDowSlices, scatterTasksFocus, scatterHabitFocus,
+    radarAxes, colCount, clamp,
   } = props;
+
+  // Grid track count is driven by the measured node width so cards never
+  // squeeze below 280px and never leave random whitespace on the right.
+  const cardGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+    gap: 12,
+    alignItems: 'stretch',
+    gridAutoRows: 'min-content',
+  };
 
   const metricPicker = (currentMetric: AnalyticsMetric, onChange: (m: AnalyticsMetric) => void) => (
     <div style={{ display: 'flex', gap: 4 }}>
@@ -656,31 +914,39 @@ function ViewBody(props: ViewBodyProps) {
     const cards = orderCards(
       [
         {
-          cardId: 'overview.totals' as const,
-          span: 2,
+          cardId: 'overview.kpis' as const,
           render: () => (
             <ChartCard
-              cardId="overview.totals"
-              title={`Totals · last ${state.rangeDays} days`}
-              span={2}
-              hidden={isHidden('overview.totals')}
-              pinned={isPinned('overview.totals')}
+              cardId="overview.kpis"
+              title={`KPIs · last ${state.rangeDays} days`}
+              span={clamp(3)}
+              contentHeight={132}
+              hidden={isHidden('overview.kpis')}
+              pinned={isPinned('overview.kpis')}
               settingsOpen={settingsOpen}
-              onToggleHidden={() => toggleHidden('overview.totals')}
-              onTogglePin={() => togglePin('overview.totals')}
+              onToggleHidden={() => toggleHidden('overview.kpis')}
+              onTogglePin={() => togglePin('overview.kpis')}
             >
-              {() => <TotalsPanel totals={tot} open={open} rangeLabel={`${range.start} → ${range.end}`} />}
+              {() => (
+                <KpiTiles
+                  totals={tot}
+                  prevTotals={prevTot}
+                  open={open}
+                  byDay={byDay}
+                  rangeLabel={`${range.start} → ${range.end}`}
+                />
+              )}
             </ChartCard>
           ),
         },
         {
           cardId: 'overview.activity' as const,
-          span: 2,
           render: () => (
             <ChartCard
               cardId="overview.activity"
               title={`Activity · ${METRIC_LABELS[state.metric]}`}
-              span={2}
+              span={clamp(3)}
+              contentHeight={70}
               toolbar={metricPicker(state.metric, setMetric)}
               hidden={isHidden('overview.activity')}
               pinned={isPinned('overview.activity')}
@@ -693,7 +959,33 @@ function ViewBody(props: ViewBodyProps) {
                   data={byDay}
                   metric={state.metric}
                   width={chartWidth(size.width, 580)}
-                  height={56}
+                  height={chartHeight(size.height, 70)}
+                />
+              )}
+            </ChartCard>
+          ),
+        },
+        {
+          cardId: 'overview.dowHour' as const,
+          render: () => (
+            <ChartCard
+              cardId="overview.dowHour"
+              title="Weekday × hour heatmap"
+              span={clamp(2)}
+              contentHeight={220}
+              hidden={isHidden('overview.dowHour')}
+              pinned={isPinned('overview.dowHour')}
+              settingsOpen={settingsOpen}
+              onToggleHidden={() => toggleHidden('overview.dowHour')}
+              onTogglePin={() => togglePin('overview.dowHour')}
+            >
+              {(size) => (
+                <DowHourMatrix
+                  events={events}
+                  range={range}
+                  metric="count"
+                  width={chartWidth(size.width, 520)}
+                  height={chartHeight(size.height, 220)}
                 />
               )}
             </ChartCard>
@@ -704,14 +996,22 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="overview.dow"
-              title="By weekday"
+              title="By weekday · tasks"
+              contentHeight={220}
               hidden={isHidden('overview.dow')}
               pinned={isPinned('overview.dow')}
               settingsOpen={settingsOpen}
               onToggleHidden={() => toggleHidden('overview.dow')}
               onTogglePin={() => togglePin('overview.dow')}
             >
-              {(size) => <DowBars data={dow} metric="tasks" width={chartWidth(size.width, 280)} height={140} />}
+              {(size) => (
+                <DowBars
+                  data={dow}
+                  metric="tasks"
+                  width={chartWidth(size.width, 280)}
+                  height={chartHeight(size.height, 220)}
+                />
+              )}
             </ChartCard>
           ),
         },
@@ -720,21 +1020,29 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="overview.hour"
-              title="By hour"
+              title="By hour · tasks"
+              contentHeight={220}
               hidden={isHidden('overview.hour')}
               pinned={isPinned('overview.hour')}
               settingsOpen={settingsOpen}
               onToggleHidden={() => toggleHidden('overview.hour')}
               onTogglePin={() => togglePin('overview.hour')}
             >
-              {(size) => <HourLine data={hour} metric="tasks" width={chartWidth(size.width, 280)} height={140} />}
+              {(size) => (
+                <HourLine
+                  data={hour}
+                  metric="tasks"
+                  width={chartWidth(size.width, 280)}
+                  height={chartHeight(size.height, 220)}
+                />
+              )}
             </ChartCard>
           ),
         },
       ],
       state.pinnedCards ?? [],
     );
-    return <div style={cardGridStyle}>{cards.map((c, i) => <CardSlot key={c.cardId + i}>{c.render()}</CardSlot>)}</div>;
+    return <div style={cardGridStyle}>{cards.map((c) => <CardSlot key={c.cardId}>{c.render()}</CardSlot>)}</div>;
   }
 
   if (view === 'calendar') {
@@ -743,7 +1051,8 @@ function ViewBody(props: ViewBodyProps) {
         <ChartCard
           cardId="calendar.heatmap"
           title={`Year heatmap · ${METRIC_LABELS[state.metric]}`}
-          span={2}
+          span={clamp(3)}
+          contentHeight={200}
           toolbar={metricPicker(state.metric, setMetric)}
           hidden={isHidden('calendar.heatmap')}
           pinned={isPinned('calendar.heatmap')}
@@ -752,7 +1061,7 @@ function ViewBody(props: ViewBodyProps) {
           onTogglePin={() => togglePin('calendar.heatmap')}
         >
           {() => (
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ width: '100%', overflowX: 'auto' }}>
               <CalendarHeatmap data={byDay} metric={state.metric} />
             </div>
           )}
@@ -765,76 +1074,144 @@ function ViewBody(props: ViewBodyProps) {
     const cards = orderCards(
       [
         {
+          cardId: 'patterns.cumulative' as const,
+          render: () => (
+            <ChartCard
+              cardId="patterns.cumulative"
+              title={`Cumulative · last ${state.rangeDays}d`}
+              span={clamp(3)}
+              contentHeight={240}
+              hidden={isHidden('patterns.cumulative')}
+              pinned={isPinned('patterns.cumulative')}
+              settingsOpen={settingsOpen}
+              onToggleHidden={() => toggleHidden('patterns.cumulative')}
+              onTogglePin={() => togglePin('patterns.cumulative')}
+            >
+              {(size) => (
+                <CumulativeLine
+                  data={byDay}
+                  width={chartWidth(size.width, 580)}
+                  height={chartHeight(size.height, 240)}
+                />
+              )}
+            </ChartCard>
+          ),
+        },
+        {
           cardId: 'patterns.dow' as const,
-          span: 2,
           render: () => (
             <ChartCard
               cardId="patterns.dow"
               title="Weekday pattern · tasks"
-              span={2}
+              span={clamp(colCount >= 3 ? 2 : 1)}
+              contentHeight={220}
               hidden={isHidden('patterns.dow')}
               pinned={isPinned('patterns.dow')}
               settingsOpen={settingsOpen}
               onToggleHidden={() => toggleHidden('patterns.dow')}
               onTogglePin={() => togglePin('patterns.dow')}
             >
-              {(size) => <DowBars data={dow} metric="tasks" width={chartWidth(size.width, 580)} height={150} />}
+              {(size) => (
+                <DowBars
+                  data={dow}
+                  metric="tasks"
+                  width={chartWidth(size.width, 580)}
+                  height={chartHeight(size.height, 220)}
+                />
+              )}
             </ChartCard>
           ),
         },
         {
           cardId: 'patterns.hour' as const,
-          span: 2,
           render: () => (
             <ChartCard
               cardId="patterns.hour"
               title="Hour pattern · tasks"
-              span={2}
+              contentHeight={220}
               hidden={isHidden('patterns.hour')}
               pinned={isPinned('patterns.hour')}
               settingsOpen={settingsOpen}
               onToggleHidden={() => toggleHidden('patterns.hour')}
               onTogglePin={() => togglePin('patterns.hour')}
             >
-              {(size) => <HourLine data={hour} metric="tasks" width={chartWidth(size.width, 580)} height={150} />}
+              {(size) => (
+                <HourLine
+                  data={hour}
+                  metric="tasks"
+                  width={chartWidth(size.width, 320)}
+                  height={chartHeight(size.height, 220)}
+                />
+              )}
             </ChartCard>
           ),
         },
         {
           cardId: 'patterns.month' as const,
-          span: 2,
           render: () => (
             <ChartCard
               cardId="patterns.month"
               title={`Month pattern · ${year}`}
-              span={2}
+              span={clamp(3)}
+              contentHeight={220}
               hidden={isHidden('patterns.month')}
               pinned={isPinned('patterns.month')}
               settingsOpen={settingsOpen}
               onToggleHidden={() => toggleHidden('patterns.month')}
               onTogglePin={() => togglePin('patterns.month')}
             >
-              {(size) => <MonthBars data={months} metric="tasks" width={chartWidth(size.width, 580)} height={150} />}
+              {(size) => (
+                <MonthBars
+                  data={months}
+                  metric="tasks"
+                  width={chartWidth(size.width, 580)}
+                  height={chartHeight(size.height, 220)}
+                />
+              )}
             </ChartCard>
           ),
         },
       ],
       state.pinnedCards ?? [],
     );
-    return <div style={cardGridStyle}>{cards.map((c, i) => <CardSlot key={c.cardId + i}>{c.render()}</CardSlot>)}</div>;
+    return <div style={cardGridStyle}>{cards.map((c) => <CardSlot key={c.cardId}>{c.render()}</CardSlot>)}</div>;
   }
 
   if (view === 'insights') {
     const cards = orderCards(
       [
         {
+          cardId: 'insights.radar' as const,
+          render: () => (
+            <ChartCard
+              cardId="insights.radar"
+              title={`Multivariate · this vs prev ${state.rangeDays}d`}
+              span={clamp(colCount >= 3 ? 1 : 1)}
+              contentHeight={260}
+              hidden={isHidden('insights.radar')}
+              pinned={isPinned('insights.radar')}
+              settingsOpen={settingsOpen}
+              onToggleHidden={() => toggleHidden('insights.radar')}
+              onTogglePin={() => togglePin('insights.radar')}
+            >
+              {(size) => (
+                <Radar
+                  axes={radarAxes}
+                  width={Math.min(chartWidth(size.width, 280), 320)}
+                  height={chartHeight(size.height, 260)}
+                />
+              )}
+            </ChartCard>
+          ),
+        },
+        {
           cardId: 'insights.scatterTasksFocus' as const,
-          span: 2,
           render: () => (
             <ChartCard
               cardId="insights.scatterTasksFocus"
-              title={`Tasks × focus · last ${state.rangeDays}d`}
-              span={2}
+              title={`Tasks × focus · per day`}
+              span={clamp(colCount >= 3 ? 2 : 1)}
+              contentHeight={260}
               hidden={isHidden('insights.scatterTasksFocus')}
               pinned={isPinned('insights.scatterTasksFocus')}
               settingsOpen={settingsOpen}
@@ -843,11 +1220,38 @@ function ViewBody(props: ViewBodyProps) {
             >
               {(size) => (
                 <Scatter
-                  data={scatterPoints}
-                  width={chartWidth(size.width, 560)}
-                  height={240}
-                  xLabel="focus min · per day"
+                  data={scatterTasksFocus}
+                  width={chartWidth(size.width, 480)}
+                  height={chartHeight(size.height, 260)}
+                  xLabel="focus min"
                   yLabel="tasks done"
+                />
+              )}
+            </ChartCard>
+          ),
+        },
+        {
+          cardId: 'insights.scatterHabitFocus' as const,
+          render: () => (
+            <ChartCard
+              cardId="insights.scatterHabitFocus"
+              title={`Habits × focus · per day`}
+              span={clamp(colCount >= 3 ? 2 : 1)}
+              contentHeight={260}
+              hidden={isHidden('insights.scatterHabitFocus')}
+              pinned={isPinned('insights.scatterHabitFocus')}
+              settingsOpen={settingsOpen}
+              onToggleHidden={() => toggleHidden('insights.scatterHabitFocus')}
+              onTogglePin={() => togglePin('insights.scatterHabitFocus')}
+            >
+              {(size) => (
+                <Scatter
+                  data={scatterHabitFocus}
+                  width={chartWidth(size.width, 480)}
+                  height={chartHeight(size.height, 260)}
+                  xLabel="habit checkins"
+                  yLabel="focus min"
+                  pointColor="var(--acid)"
                 />
               )}
             </ChartCard>
@@ -859,19 +1263,17 @@ function ViewBody(props: ViewBodyProps) {
             <ChartCard
               cardId="insights.donutSources"
               title="Sources split (pie)"
+              contentHeight={260}
               hidden={isHidden('insights.donutSources')}
               pinned={isPinned('insights.donutSources')}
               settingsOpen={settingsOpen}
               onToggleHidden={() => toggleHidden('insights.donutSources')}
               onTogglePin={() => togglePin('insights.donutSources')}
             >
-              {(size) => (
-                <DonutChart
-                  data={sourceSlices}
-                  innerRatio={0}
-                  size={Math.min(220, chartWidth(size.width, 220))}
-                />
-              )}
+              {(size) => {
+                const side = Math.min(220, chartWidth(size.width, 220));
+                return <DonutChart data={sourceSlices} innerRatio={0} size={side} />;
+              }}
             </ChartCard>
           ),
         },
@@ -881,6 +1283,7 @@ function ViewBody(props: ViewBodyProps) {
             <ChartCard
               cardId="insights.donutSessionsByDay"
               title="Focus by weekday (donut)"
+              contentHeight={260}
               hidden={isHidden('insights.donutSessionsByDay')}
               pinned={isPinned('insights.donutSessionsByDay')}
               settingsOpen={settingsOpen}
@@ -889,11 +1292,12 @@ function ViewBody(props: ViewBodyProps) {
             >
               {(size) => {
                 const total = sessionsByDowSlices.reduce((s, d) => s + d.value, 0);
+                const side = Math.min(220, chartWidth(size.width, 220));
                 return (
                   <DonutChart
                     data={sessionsByDowSlices}
                     innerRatio={0.55}
-                    size={Math.min(220, chartWidth(size.width, 220))}
+                    size={side}
                     centerPrimary={String(total)}
                     centerSecondary="focus min"
                   />
@@ -904,26 +1308,84 @@ function ViewBody(props: ViewBodyProps) {
         },
         {
           cardId: 'insights.stacked' as const,
-          span: 2,
           render: () => (
             <ChartCard
               cardId="insights.stacked"
               title="Daily mix (stacked)"
-              span={2}
+              span={clamp(3)}
+              contentHeight={220}
               hidden={isHidden('insights.stacked')}
               pinned={isPinned('insights.stacked')}
               settingsOpen={settingsOpen}
               onToggleHidden={() => toggleHidden('insights.stacked')}
               onTogglePin={() => togglePin('insights.stacked')}
             >
-              {(size) => <StackedArea data={byDay} width={chartWidth(size.width, 560)} height={160} />}
+              {(size) => (
+                <StackedArea
+                  data={byDay}
+                  width={chartWidth(size.width, 560)}
+                  height={chartHeight(size.height, 220)}
+                />
+              )}
+            </ChartCard>
+          ),
+        },
+        {
+          cardId: 'insights.histogramFocus' as const,
+          render: () => (
+            <ChartCard
+              cardId="insights.histogramFocus"
+              title="Focus minutes · distribution"
+              contentHeight={240}
+              hidden={isHidden('insights.histogramFocus')}
+              pinned={isPinned('insights.histogramFocus')}
+              settingsOpen={settingsOpen}
+              onToggleHidden={() => toggleHidden('insights.histogramFocus')}
+              onTogglePin={() => togglePin('insights.histogramFocus')}
+            >
+              {(size) => (
+                <Histogram
+                  values={byDay.map((d) => d.focusMin)}
+                  bins={10}
+                  width={chartWidth(size.width, 320)}
+                  height={chartHeight(size.height, 240)}
+                  color="var(--rust)"
+                  xLabel="min/day"
+                />
+              )}
+            </ChartCard>
+          ),
+        },
+        {
+          cardId: 'insights.histogramTasks' as const,
+          render: () => (
+            <ChartCard
+              cardId="insights.histogramTasks"
+              title="Tasks per day · distribution"
+              contentHeight={240}
+              hidden={isHidden('insights.histogramTasks')}
+              pinned={isPinned('insights.histogramTasks')}
+              settingsOpen={settingsOpen}
+              onToggleHidden={() => toggleHidden('insights.histogramTasks')}
+              onTogglePin={() => togglePin('insights.histogramTasks')}
+            >
+              {(size) => (
+                <Histogram
+                  values={byDay.map((d) => d.taskCount)}
+                  bins={8}
+                  width={chartWidth(size.width, 320)}
+                  height={chartHeight(size.height, 240)}
+                  color="var(--cyan)"
+                  xLabel="tasks/day"
+                />
+              )}
             </ChartCard>
           ),
         },
       ],
       state.pinnedCards ?? [],
     );
-    return <div style={cardGridStyle}>{cards.map((c, i) => <CardSlot key={c.cardId + i}>{c.render()}</CardSlot>)}</div>;
+    return <div style={cardGridStyle}>{cards.map((c) => <CardSlot key={c.cardId}>{c.render()}</CardSlot>)}</div>;
   }
 
   // sources
@@ -932,6 +1394,8 @@ function ViewBody(props: ViewBodyProps) {
       <ChartCard
         cardId="sources.list"
         title="Registered sources"
+        span={clamp(2)}
+        contentHeight={240}
         hidden={isHidden('sources.list')}
         pinned={isPinned('sources.list')}
         settingsOpen={settingsOpen}
@@ -939,48 +1403,7 @@ function ViewBody(props: ViewBodyProps) {
         onTogglePin={() => togglePin('sources.list')}
       >
         {() => (
-          <table
-            style={{
-              width: '100%',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              color: '#eef1f4',
-              borderCollapse: 'collapse',
-            }}
-          >
-            <thead>
-              <tr style={{ color: '#9aa1a8', textAlign: 'left' }}>
-                <th style={{ padding: '4px 6px' }}>id</th>
-                <th style={{ padding: '4px 6px' }}>label</th>
-                <th style={{ padding: '4px 6px', textAlign: 'right' }}>events</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sources.map((s) => {
-                const count = events.filter((e) => e.source === s.id).length;
-                return (
-                  <tr key={s.id} style={{ borderTop: '1px solid #23262a' }}>
-                    <td style={{ padding: '4px 6px' }}>{s.id}</td>
-                    <td style={{ padding: '4px 6px' }}>{s.label}</td>
-                    <td style={{ padding: '4px 6px', textAlign: 'right' }}>{count}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </ChartCard>
-      {streaks.perHabit.length > 0 && (
-        <ChartCard
-          cardId="sources.streaks"
-          title="Habit streaks"
-          hidden={isHidden('sources.streaks')}
-          pinned={isPinned('sources.streaks')}
-          settingsOpen={settingsOpen}
-          onToggleHidden={() => toggleHidden('sources.streaks')}
-          onTogglePin={() => togglePin('sources.streaks')}
-        >
-          {() => (
+          <div style={{ width: '100%', overflow: 'auto' }}>
             <table
               style={{
                 width: '100%',
@@ -990,17 +1413,63 @@ function ViewBody(props: ViewBodyProps) {
                 borderCollapse: 'collapse',
               }}
             >
+              <thead>
+                <tr style={{ color: '#9aa1a8', textAlign: 'left' }}>
+                  <th style={{ padding: '4px 6px' }}>id</th>
+                  <th style={{ padding: '4px 6px' }}>label</th>
+                  <th style={{ padding: '4px 6px', textAlign: 'right' }}>events</th>
+                </tr>
+              </thead>
               <tbody>
-                {streaks.perHabit.map((h) => (
-                  <tr key={h.habitId} style={{ borderTop: '1px solid #23262a' }}>
-                    <td style={{ padding: '4px 6px' }}>{h.label}</td>
-                    <td style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--acid, #c9f158)' }}>
-                      {h.streak}d
-                    </td>
-                  </tr>
-                ))}
+                {sources.map((s) => {
+                  const count = events.filter((e) => e.source === s.id).length;
+                  return (
+                    <tr key={s.id} style={{ borderTop: '1px solid #23262a' }}>
+                      <td style={{ padding: '4px 6px' }}>{s.id}</td>
+                      <td style={{ padding: '4px 6px' }}>{s.label}</td>
+                      <td style={{ padding: '4px 6px', textAlign: 'right' }}>{count}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+          </div>
+        )}
+      </ChartCard>
+      {streaks.perHabit.length > 0 && (
+        <ChartCard
+          cardId="sources.streaks"
+          title="Habit streaks"
+          contentHeight={240}
+          hidden={isHidden('sources.streaks')}
+          pinned={isPinned('sources.streaks')}
+          settingsOpen={settingsOpen}
+          onToggleHidden={() => toggleHidden('sources.streaks')}
+          onTogglePin={() => togglePin('sources.streaks')}
+        >
+          {() => (
+            <div style={{ width: '100%', overflow: 'auto' }}>
+              <table
+                style={{
+                  width: '100%',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  color: '#eef1f4',
+                  borderCollapse: 'collapse',
+                }}
+              >
+                <tbody>
+                  {streaks.perHabit.map((h) => (
+                    <tr key={h.habitId} style={{ borderTop: '1px solid #23262a' }}>
+                      <td style={{ padding: '4px 6px' }}>{h.label}</td>
+                      <td style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--acid, #c9f158)' }}>
+                        {h.streak}d
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </ChartCard>
       )}
@@ -1008,9 +1477,6 @@ function ViewBody(props: ViewBodyProps) {
   );
 }
 
-// Identity pass-through — exists so map() can supply a stable key boundary
-// for cards rendered in an `orderCards` loop (cards themselves already have
-// a stable data-card-id, but the outer fragment needs the React key).
 function CardSlot({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

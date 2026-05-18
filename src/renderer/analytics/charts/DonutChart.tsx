@@ -171,12 +171,12 @@ export function DonutChart({
               key={`${sl.id}-label`}
               x={sl.labelPos.x}
               y={sl.labelPos.y + 3}
-              fontSize={9}
+              fontSize={10}
               textAnchor="middle"
-              fill="#0e1012"
+              fill="#ffffff"
               fontFamily="var(--font-mono)"
               fontWeight={700}
-              style={{ paintOrder: 'stroke', stroke: 'rgba(255,255,255,0.4)', strokeWidth: 0.6 }}
+              style={{ paintOrder: 'stroke', stroke: 'rgba(8,10,12,0.85)', strokeWidth: 2.4, strokeLinejoin: 'round' }}
             >
               {Math.round(sl.pct)}%
             </text>
