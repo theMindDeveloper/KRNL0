@@ -6,7 +6,7 @@
  * useMemo from board.nodes / board.edges. RF runs in controlled mode.
  */
 
-import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
+import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { scheduleBatch } from '../../utils/rafBatcher';
 import { rfToScreen, updateViewport, updateCanvasRect } from '../../utils/viewportBus';
@@ -870,7 +870,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // for the new habit at the click pos (mirroring habit.spawnLane's lane node
   // shape but with custom position instead of laneCount slotting).
   const spawnTaskAtFlowPos = useCallback(
-    (text: string, flowX: number, flowY: number) => {
+    (text: string, flowX: number, flowY: number, plannedMin?: number) => {
       const trimmed = text.trim();
       if (!trimmed) return;
       const board = useBoardStore.getState().board;
@@ -883,6 +883,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       const pomoMother = board.nodes.find((n) => n.kind === 'pomo');
       const cfg = (pomoMother?.config as PomoConfig | null) ?? defaultPomoConfig();
       const sessionMin = cfg.sessionMin;
+      const effectivePlanned =
+        typeof plannedMin === 'number' && Number.isFinite(plannedMin) && plannedMin >= 1
+          ? Math.max(1, Math.min(480, Math.round(plannedMin)))
+          : sessionMin;
 
       // todoAdd → grab the new TodoItem.id → todoLinkTask
       const prevTodoState = todoMother.state as TodoState;
@@ -907,7 +911,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         text: trimmed,
         done: false,
         durationMin: sessionMin,
-        eta: `~${sessionMin} min`,
+        eta: `~${effectivePlanned} min`,
         sequenceNumber: seq,
         layer: 0,
         createdAt: new Date().toISOString(),
@@ -915,7 +919,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         parentTaskId: null,
         todoItemId: newItem.id,
         pomoSessionsCompleted: 0,
-        plannedMin: sessionMin,
+        plannedMin: effectivePlanned,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         kind: 'focus',
@@ -1669,12 +1673,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         <PaneNamePrompt
           x={paneNamePrompt.x}
           y={paneNamePrompt.y}
-          placeholder={paneNamePrompt.kind === 'task' ? 'task name…' : 'habit name…'}
-          onCommit={(text) => {
+          kind={paneNamePrompt.kind}
+          onCommit={(text, durationMin) => {
             const np = paneNamePrompt;
             closePaneNamePrompt();
             if (np.kind === 'task') {
-              spawnTaskAtFlowPos(text, np.flowX, np.flowY);
+              spawnTaskAtFlowPos(text, np.flowX, np.flowY, durationMin);
             } else {
               spawnHabitAtFlowPos(text, np.flowX, np.flowY);
             }
@@ -1779,25 +1783,29 @@ export function CanvasFlow() {
   return <CanvasFlowInner initialViewport={viewport} />;
 }
 
-// PaneNamePrompt — tiny single-input portal anchored at viewport coords.
-// Enter commits, Escape / blur-outside cancels. window.prompt() is blocked
-// in the Electron renderer, hence the inline replacement.
+// PaneNamePrompt — small input portal anchored at viewport coords.
+// For 'task' kind it is two-phase (name → duration) mirroring TaskNode's
+// subtask/next inline input. For 'habit' it is single-phase (name only).
+// Enter advances or commits; Escape backs up (duration → name) or cancels.
 function PaneNamePrompt({
   x,
   y,
-  placeholder,
+  kind,
   onCommit,
   onCancel,
 }: {
   x: number;
   y: number;
-  placeholder: string;
-  onCommit: (text: string) => void;
+  kind: 'task' | 'habit';
+  onCommit: (text: string, durationMin?: number) => void;
   onCancel: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [val, setVal] = useState('');
+  const [name, setName] = useState('');
+  const [duration, setDuration] = useState('');
+  const [phase, setPhase] = useState<'name' | 'duration'>('name');
+  const [durationInvalid, setDurationInvalid] = useState(false);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -1805,16 +1813,51 @@ function PaneNamePrompt({
     const onDown = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) onCancel();
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
     document.addEventListener('mousedown', onDown, true);
-    document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('mousedown', onDown, true);
-      document.removeEventListener('keydown', onKey, true);
     };
   }, [onCancel]);
+
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (phase === 'name') {
+      if (e.key === 'Enter') {
+        e.stopPropagation();
+        const t = name.trim();
+        if (!t) {
+          onCancel();
+          return;
+        }
+        if (kind === 'habit') {
+          onCommit(t);
+        } else {
+          setPhase('duration');
+          setDuration('');
+          setDurationInvalid(false);
+        }
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        onCancel();
+      }
+    } else {
+      // duration phase (task only)
+      if (e.key === 'Enter') {
+        e.stopPropagation();
+        const parsed = parseInt(duration, 10);
+        if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
+          setDurationInvalid(false);
+          onCommit(name.trim(), parsed);
+        } else {
+          setDurationInvalid(true);
+        }
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        setPhase('name');
+        setDuration('');
+        setDurationInvalid(false);
+      }
+    }
+  };
 
   // Clamp to viewport so the prompt is never clipped off-screen.
   const W = 220;
@@ -1823,6 +1866,13 @@ function PaneNamePrompt({
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const cx = Math.round(Math.min(Math.max(0, x), Math.max(0, vw - W)));
   const cy = Math.round(Math.min(Math.max(0, y), Math.max(0, vh - H)));
+
+  const placeholder =
+    phase === 'duration'
+      ? 'how long? (min)'
+      : kind === 'task'
+        ? 'task name…'
+        : 'habit name…';
 
   return createPortal(
     <div
@@ -1845,22 +1895,26 @@ function PaneNamePrompt({
     >
       <input
         ref={inputRef}
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            const t = val.trim();
-            if (t) onCommit(t);
-            else onCancel();
+        type={phase === 'duration' ? 'number' : 'text'}
+        min={phase === 'duration' ? 1 : undefined}
+        max={phase === 'duration' ? 480 : undefined}
+        value={phase === 'name' ? name : duration}
+        onChange={(e) => {
+          if (phase === 'name') {
+            setName(e.target.value);
+          } else {
+            setDuration(e.target.value);
+            setDurationInvalid(false);
           }
         }}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         style={{
           width: '100%',
           boxSizing: 'border-box',
           padding: '4px 6px',
           background: 'var(--paper-2)',
-          border: '1px solid var(--paper-3)',
+          border: `1px solid ${durationInvalid ? 'var(--rust)' : 'var(--paper-3)'}`,
           borderRadius: 3,
           color: 'var(--ink)',
           fontFamily: 'inherit',
