@@ -175,30 +175,54 @@ export const pomoSetDuration = (state: PomoState, args: { minutes: number }): Po
 /**
  * Decision 22 §1 — write a new canonical PomoConfig. No-op if the proposed
  * config is structurally identical to the current one.
+ *
+ * IMPORTANT (2026-05-18 bug fix): mother-node configs piggyback non-pomo
+ * fields like `stationSlot` and `stationHidden` on the same config object
+ * (see MotherNodeConfig in src/shared/types/board.ts). Rebuilding the object
+ * from scratch dropped those fields — after a gear SAVE the pomo lost its
+ * stationSlot and StationCell could no longer resolve it, so the pomo card
+ * vanished from station view. Spread `current` first so any extra fields
+ * (stationSlot, stationHidden, future flags) ride through untouched.
  */
 export const pomoSetConfig = (
   config: PomoConfig | null,
   args: { config: Partial<PomoConfig> },
 ): PomoConfig => {
   const current = config ?? defaultPomoConfig();
-  const next: PomoConfig = {
+  return {
+    ...current,
     sessionMin: clampPositive(args.config.sessionMin, current.sessionMin),
     shortBreakMin: clampPositive(args.config.shortBreakMin, current.shortBreakMin),
     longBreakMin: clampPositive(args.config.longBreakMin, current.longBreakMin),
     longBreakEvery: clampPositive(args.config.longBreakEvery, current.longBreakEvery),
   };
-  // PR4 — preserve face selection across SAVE; face is optional so only copy when set
-  if (current.face !== undefined) next.face = current.face;
-  return next;
 };
 
 /**
- * Decision 22 §5 — clear the active task without changing FSM status.
- * Used when the user opens the gear panel or otherwise asks for default mode.
+ * Decision 22 §5 — clear the active task and snap the timer back to its
+ * configured defaults. Without resetting durationMin/breakMin, a stale per-
+ * task session length (e.g. 15-min) would linger after the task is deleted
+ * or unloaded, making the pomo node read "task-shaped" with no task attached.
+ * Passing the live PomoConfig is required for the snap-to-default behavior;
+ * omitting it preserves the current durations (legacy call sites).
  */
-export const pomoClearActiveTask = (state: PomoState): PomoState => {
-  if (state.activeTaskId === null) return state;
-  return { ...state, activeTaskId: null, label: '' };
+export const pomoClearActiveTask = (
+  state: PomoState,
+  config?: PomoConfig,
+): PomoState => {
+  const noop =
+    state.activeTaskId === null &&
+    state.label === '' &&
+    (config === undefined ||
+      (state.durationMin === config.sessionMin &&
+        state.breakMin === config.shortBreakMin));
+  if (noop) return state;
+  return {
+    ...state,
+    activeTaskId: null,
+    label: '',
+    ...(config ? { durationMin: config.sessionMin, breakMin: config.shortBreakMin } : {}),
+  };
 };
 
 const VALID_FACES: ReadonlyArray<TimerFace> = ['ascii', 'lcd', 'blocks', 'vapor'];

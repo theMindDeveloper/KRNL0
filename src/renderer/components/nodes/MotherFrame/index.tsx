@@ -14,11 +14,19 @@
 // reads, zero layout flushes. Badge style uses CSS `transform:translate` (not
 // top/left) so the write is also compositor-level.
 
-import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
+import { saveBoard } from '../../../store/eventLog';
 import { scheduleBatch } from '../../../utils/rafBatcher';
 import { rfToScreen, getZoom } from '../../../utils/viewportBus';
+
+// Shared drag-and-drop MIME for swapping mother positions. Both station cells
+// and canvas mother cards use this so a handle from one view can drop on a
+// target in the other (when both happen to be live during a layout-mode
+// transition). The string is namespaced so it doesn't collide with stray
+// drag payloads from other apps or the canvas image-drop path.
+export const MOTHER_DRAG_MIME = 'application/x-krnl0-mother';
 
 // Station mode mounts mother nodes inside resizable panels (ADR 0008). Each
 // mother component renders its own <MotherFrame width=540> internally; in
@@ -76,10 +84,31 @@ export function MotherFrame({
   const inStation = useContext(MotherFrameStationContext);
   const variant: 'canvas' | 'station' = inStation ? 'station' : variantProp;
   const setHoveredNodeId = useBoardStore((s) => s.setHoveredNodeId);
+  const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
   const idx = String(slotIndex).padStart(2, '0');
   const total = String(slotTotal).padStart(2, '0');
 
   const badgeRef = useRef<HTMLDivElement>(null);
+
+  // Drop target — accepts a mother-drag payload and swaps slots with the
+  // dragged source. Both variants opt in: canvas uses it for the new drag
+  // handle (replacing the inter-mother swap button); station uses it from
+  // its existing handle. Guards on the MIME so unrelated drags (image files,
+  // text selections) pass through.
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(MOTHER_DRAG_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+  const onDrop = useCallback((e: React.DragEvent) => {
+    const sourceId = e.dataTransfer.getData(MOTHER_DRAG_MIME);
+    if (!sourceId || sourceId === nodeId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    swapMotherSlots(sourceId, nodeId);
+    const updated = useBoardStore.getState().board;
+    if (updated) void saveBoard(updated);
+  }, [nodeId, swapMotherSlots]);
 
   // Badge position tracking (canvas variant only) — pure arithmetic, no DOM reads.
   // Badge anchor: left:14px, top:-11px relative to panel's RF top-left corner
@@ -135,6 +164,8 @@ export function MotherFrame({
       className="mother-frame"
       onMouseEnter={() => setHoveredNodeId(nodeId)}
       onMouseLeave={() => setHoveredNodeId(null)}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       style={{
         position: 'relative',
         // Canvas: fixed 540×540 (RF flow coords). Station: fill the resizable
@@ -178,6 +209,14 @@ export function MotherFrame({
         <span style={cornerBase('br')} />
       </div>
 
+      {/* Canvas variant: top-edge drag handle for the swap-by-drag UX
+          (replaces the in-gap swap-button click target — 2026-05-18).
+          Station variant omits it because StationCell already renders one
+          as a sibling, with the same MIME contract. */}
+      {!isStation && (
+        <MotherDragHandle nodeId={nodeId} />
+      )}
+
       {children}
 
       {/* Slot badge — canvas variant only.
@@ -219,6 +258,60 @@ export function MotherFrame({
           document.body,
         )
       )}
+    </div>
+  );
+}
+
+// MotherDragHandle — top-center grab affordance used to swap two mothers'
+// positions via HTML5 drag-and-drop. Same MIME + .station-drag-handle CSS
+// class as the station-mode handle so the visual treatment is identical
+// across views; this one lives inside the canvas MotherFrame so the user
+// no longer needs the inter-mother swap button. Pointer events stop
+// propagating so RF doesn't start a pan / marquee when the user grabs it.
+function MotherDragHandle({ nodeId }: { nodeId: string }) {
+  const onDragStart = useCallback(
+    (e: React.DragEvent) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData(MOTHER_DRAG_MIME, nodeId);
+      (e.currentTarget as HTMLDivElement).dataset.dragging = 'true';
+    },
+    [nodeId],
+  );
+  const onDragEnd = useCallback((e: React.DragEvent) => {
+    delete (e.currentTarget as HTMLDivElement).dataset.dragging;
+  }, []);
+  const stop = useCallback((e: React.PointerEvent | React.MouseEvent) => {
+    // RF reads unhandled pointerdown / mousedown as the start of a pan or
+    // marquee. Without these, grabbing the handle would also drag the canvas.
+    e.stopPropagation();
+  }, []);
+  return (
+    <div
+      draggable
+      role="button"
+      aria-label="Drag to swap with another mother"
+      className="station-drag-handle"
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onPointerDown={stop}
+      onMouseDown={stop}
+    >
+      <svg
+        aria-hidden
+        width="18"
+        height="10"
+        viewBox="0 0 18 10"
+        fill="currentColor"
+        style={{ display: 'block', pointerEvents: 'none' }}
+      >
+        <circle cx="3"  cy="3" r="1" />
+        <circle cx="9"  cy="3" r="1" />
+        <circle cx="15" cy="3" r="1" />
+        <circle cx="3"  cy="7" r="1" />
+        <circle cx="9"  cy="7" r="1" />
+        <circle cx="15" cy="7" r="1" />
+      </svg>
     </div>
   );
 }

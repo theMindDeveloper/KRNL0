@@ -7,6 +7,7 @@
  */
 
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType } from 'react';
+import { createPortal } from 'react-dom';
 import { scheduleBatch } from '../../utils/rafBatcher';
 import { rfToScreen, updateViewport, updateCanvasRect } from '../../utils/viewportBus';
 import { useCameraEnsureVisible } from '../../utils/cameraEnsureVisible';
@@ -32,7 +33,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
-import { saveBoard } from '../../store/eventLog';
+import { saveBoard, emit } from '../../store/eventLog';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapters';
@@ -49,6 +50,11 @@ import type { Edge as KrnlEdge } from '../../../shared/types/edge';
 import type { Connection } from '@xyflow/react';
 import type { TaskState } from '../nodes/TaskNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
+import type { HabitState } from '../nodes/HabitNode/types';
+import type { TodoState } from '../nodes/TodoNode/types';
+import type { PomoConfig } from '../nodes/PomoNode/types';
+import { defaultPomoConfig } from '../nodes/PomoNode/types';
+import { todoAdd, todoLinkTask } from '../nodes/TodoNode/commands';
 import type { FrameState } from '../nodes/FrameNode/types';
 import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
 import { defaultAnalyticsState, defaultAnalyticsConfig } from '../nodes/AnalyticsNode/types';
@@ -578,6 +584,20 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   } | null>(null);
   const closePaneCtxMenu = useCallback(() => setPaneCtxMenu(null), []);
 
+  // Pane right-click "+ Task" / "+ Habit" → inline name prompt portal.
+  // window.prompt is blocked in Electron renderer, so a tiny styled input
+  // replaces it. Anchored to the click point in viewport coords; flow coords
+  // are carried through to the spawn so the new node lands where the user
+  // actually clicked (not the default dock lane).
+  const [paneNamePrompt, setPaneNamePrompt] = useState<{
+    kind: 'task' | 'habit';
+    x: number;
+    y: number;
+    flowX: number;
+    flowY: number;
+  } | null>(null);
+  const closePaneNamePrompt = useCallback(() => setPaneNamePrompt(null), []);
+
   const onNodeContextMenu = useCallback(
     (event: React.MouseEvent, rfNode: KrnlRFNode) => {
       event.preventDefault();
@@ -834,6 +854,135 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });
   }, [addNode, removeNode, defaultDockSpawnPos, ensureVisible]);
 
+  // ── Pane-ctx "+ Task" / "+ Habit" — submit handlers ─────────────────────
+  // Task: spawn at click flow pos, parent to todo mother (parentTodoId is a
+  // required invariant), link bidirectionally via todoAdd/todoLinkTask. Skip
+  // the chain edge to the previous sibling — that's the "not connected to the
+  // one before" the user asked for.
+  // Habit: dispatch habit.add on the habit mother, then spawn a habit.lane
+  // for the new habit at the click pos (mirroring habit.spawnLane's lane node
+  // shape but with custom position instead of laneCount slotting).
+  const spawnTaskAtFlowPos = useCallback(
+    (text: string, flowX: number, flowY: number) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const board = useBoardStore.getState().board;
+      if (!board) return;
+      const todoMother = board.nodes.find((n) => n.kind === 'todo' && n.isMother === true);
+      if (!todoMother) {
+        emit('sys.error', 'No todo mother on board — cannot spawn task', { severity: 'err' });
+        return;
+      }
+      const pomoMother = board.nodes.find((n) => n.kind === 'pomo');
+      const cfg = (pomoMother?.config as PomoConfig | null) ?? defaultPomoConfig();
+      const sessionMin = cfg.sessionMin;
+
+      // todoAdd → grab the new TodoItem.id → todoLinkTask
+      const prevTodoState = todoMother.state as TodoState;
+      const taskNodeId = `task-${crypto.randomUUID()}`;
+      let nextTodoState = todoAdd(prevTodoState, { text: trimmed });
+      const newItem = nextTodoState.items[nextTodoState.items.length - 1];
+      if (!newItem) return;
+      nextTodoState = todoLinkTask(nextTodoState, { itemId: newItem.id, taskNodeId });
+
+      const { updateNode } = useBoardStore.getState();
+      updateNode(todoMother.id, { state: nextTodoState });
+
+      // seq among root tasks under this todo (parentTaskId === null)
+      const rootSiblings = board.nodes.filter((n) => {
+        if (n.kind !== 'todo.task') return false;
+        const ts = n.state as TaskState;
+        return ts.parentTodoId === todoMother.id && ts.parentTaskId === null;
+      });
+      const seq = rootSiblings.length + 1;
+
+      const taskState: TaskState = {
+        text: trimmed,
+        done: false,
+        durationMin: sessionMin,
+        eta: `~${sessionMin} min`,
+        sequenceNumber: seq,
+        layer: 0,
+        createdAt: new Date().toISOString(),
+        parentTodoId: todoMother.id,
+        parentTaskId: null,
+        todoItemId: newItem.id,
+        pomoSessionsCompleted: 0,
+        plannedMin: sessionMin,
+        secondsAccumulated: 0,
+        currentSessionElapsedSec: 0,
+        kind: 'focus',
+      };
+      const newTask: KrnlNode = {
+        id: taskNodeId,
+        kind: 'todo.task',
+        position: { x: flowX, y: flowY },
+        isMother: false,
+        state: taskState,
+        config: { showDuration: true },
+      };
+      addNode(newTask);
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+      emit('task.created', `task ${taskNodeId.slice(0, 10)} added (orphan @click)`, {
+        refId: taskNodeId,
+      });
+      // Auto-enable the TASKS layer if it was hidden so the spawned task
+      // doesn't silently disappear.
+      const layer = kindToLayer('todo.task');
+      if (layer) useLayerVisibility.getState().setLayer(layer, true);
+      ensureVisible({ x: flowX, y: flowY, width: 240, height: 160 });
+    },
+    [addNode, ensureVisible],
+  );
+
+  const spawnHabitAtFlowPos = useCallback(
+    (name: string, flowX: number, flowY: number) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const board = useBoardStore.getState().board;
+      if (!board) return;
+      const habitMother = board.nodes.find((n) => n.kind === 'habit' && n.isMother === true);
+      if (!habitMother) {
+        emit('sys.error', 'No habit mother on board — cannot spawn habit', { severity: 'err' });
+        return;
+      }
+
+      // habit.add via mother's command handler (single source of truth).
+      getCommandHandler(habitMother.id)('habit.add', { name: trimmed });
+
+      // Re-read board: habitAdd appends, new habit is at .habits.at(-1).
+      const fresh = useBoardStore.getState().board;
+      if (!fresh) return;
+      const motherAfter = fresh.nodes.find((n) => n.id === habitMother.id);
+      const habits = (motherAfter?.state as HabitState | null)?.habits ?? [];
+      const newHabit = habits.at(-1);
+      if (!newHabit) return;
+
+      // Spawn habit.lane at the click flow pos (commandDispatch:1122 mirrors
+      // this shape but slots by laneCount — we want explicit pos here).
+      const lane: KrnlNode = {
+        id: `habit-lane-${crypto.randomUUID()}`,
+        kind: 'habit.lane',
+        position: { x: flowX, y: flowY },
+        isMother: false,
+        state: { habitId: newHabit.id } as unknown as Record<string, unknown>,
+        config: { days: 28 },
+      };
+      addNode(lane);
+      const saved = useBoardStore.getState().board;
+      if (saved) void saveBoard(saved);
+      emit('node.added', `habit.lane spawned for habit ${newHabit.id.slice(0, 8)}`, {
+        refId: lane.id,
+      });
+      // Auto-enable HABITS layer (same reason as task path).
+      const layer = kindToLayer('habit.lane');
+      if (layer) useLayerVisibility.getState().setLayer(layer, true);
+      ensureVisible({ x: flowX, y: flowY, width: 480, height: 160 });
+    },
+    [addNode, ensureVisible],
+  );
+
   // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
     if (!Array.from(e.dataTransfer.types).includes('Files')) return;
@@ -960,36 +1109,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       return rf;
     });
 
-    // Swap-button pseudo-nodes — one per adjacent mother pair. Skip in
-    // station mode (mothers aren't on the embedded canvas).
+    // SwapButton pseudo-nodes were removed 2026-05-18 in favour of HTML5
+    // drag-and-drop from a top-edge grab handle inside each MotherFrame
+    // (matches the station-mode swap UX). The button-between-pairs metaphor
+    // didn't scale to non-adjacent swaps and forced users to step through
+    // intermediates; drag-onto-target lets any pair swap in one gesture.
     const swapNodes: KrnlRFNode[] = [];
-    const swapLimit = isStation ? 0 : motherNodes.length - 1;
-    for (let i = 0; i < swapLimit; i++) {
-      const left = motherNodes[i]!;
-      const right = motherNodes[i + 1]!;
-      const gapMidX = (left.position.x + MOTHER_WIDTH + right.position.x) / 2;
-      const cy = left.position.y + MOTHER_HEIGHT / 2;
-      swapNodes.push({
-        id: `__swap__${left.id}__${right.id}`,
-        type: 'swap-button',
-        position: { x: gapMidX - 16, y: cy - 16 }, // button is 32×32
-        draggable: false,
-        selectable: false,
-        data: {
-          // RFNodeData shape padding — never read by SwapButtonNode.
-          node: {} as KrnlNode,
-          onCommand: () => { /* no-op */ },
-          onSelect: () => { /* no-op */ },
-          leftId: left.id,
-          rightId: right.id,
-        } as RFNodeData & { leftId: string; rightId: string },
-        width: 32,
-        height: 32,
-        measured: { width: 32, height: 32 },
-        // Sit above mother cards so the button stays clickable.
-        zIndex: 50,
-      });
-    }
 
     // Apply canvas-wide layer filters from useLayerVisibility. Only nodes
     // whose kind has a registered layer (tasks / texts / images) are affected;
@@ -1484,6 +1609,30 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
           y={paneCtxMenu.y}
           items={[
             {
+              label: '+ Task',
+              onSelect: () => {
+                setPaneNamePrompt({
+                  kind: 'task',
+                  x: paneCtxMenu.x,
+                  y: paneCtxMenu.y,
+                  flowX: paneCtxMenu.flowX,
+                  flowY: paneCtxMenu.flowY,
+                });
+              },
+            },
+            {
+              label: '+ Habit (pinned lane)',
+              onSelect: () => {
+                setPaneNamePrompt({
+                  kind: 'habit',
+                  x: paneCtxMenu.x,
+                  y: paneCtxMenu.y,
+                  flowX: paneCtxMenu.flowX,
+                  flowY: paneCtxMenu.flowY,
+                });
+              },
+            },
+            {
               label: '+ Text note',
               onSelect: () => handleAddNode({
                 kind: 'text',
@@ -1506,6 +1655,24 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
             },
           ]}
           onDismiss={closePaneCtxMenu}
+        />
+      )}
+
+      {paneNamePrompt !== null && (
+        <PaneNamePrompt
+          x={paneNamePrompt.x}
+          y={paneNamePrompt.y}
+          placeholder={paneNamePrompt.kind === 'task' ? 'task name…' : 'habit name…'}
+          onCommit={(text) => {
+            const np = paneNamePrompt;
+            closePaneNamePrompt();
+            if (np.kind === 'task') {
+              spawnTaskAtFlowPos(text, np.flowX, np.flowY);
+            } else {
+              spawnHabitAtFlowPos(text, np.flowX, np.flowY);
+            }
+          }}
+          onCancel={closePaneNamePrompt}
         />
       )}
 
@@ -1603,4 +1770,98 @@ export function CanvasFlow() {
   }
 
   return <CanvasFlowInner initialViewport={viewport} />;
+}
+
+// PaneNamePrompt — tiny single-input portal anchored at viewport coords.
+// Enter commits, Escape / blur-outside cancels. window.prompt() is blocked
+// in the Electron renderer, hence the inline replacement.
+function PaneNamePrompt({
+  x,
+  y,
+  placeholder,
+  onCommit,
+  onCancel,
+}: {
+  x: number;
+  y: number;
+  placeholder: string;
+  onCommit: (text: string) => void;
+  onCancel: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [val, setVal] = useState('');
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) onCancel();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [onCancel]);
+
+  // Clamp to viewport so the prompt is never clipped off-screen.
+  const W = 220;
+  const H = 36;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const cx = Math.round(Math.min(Math.max(0, x), Math.max(0, vw - W)));
+  const cy = Math.round(Math.min(Math.max(0, y), Math.max(0, vh - H)));
+
+  return createPortal(
+    <div
+      ref={wrapRef}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{
+        position: 'fixed',
+        left: cx,
+        top: cy,
+        width: W,
+        zIndex: 10000,
+        background: 'var(--paper)',
+        border: '1px solid var(--paper-3)',
+        borderRadius: 6,
+        boxShadow: 'var(--shadow-1)',
+        padding: 4,
+        fontFamily: 'var(--font-mono)',
+        fontSize: 12,
+      }}
+    >
+      <input
+        ref={inputRef}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            const t = val.trim();
+            if (t) onCommit(t);
+            else onCancel();
+          }
+        }}
+        placeholder={placeholder}
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          padding: '4px 6px',
+          background: 'var(--paper-2)',
+          border: '1px solid var(--paper-3)',
+          borderRadius: 3,
+          color: 'var(--ink)',
+          fontFamily: 'inherit',
+          fontSize: 'inherit',
+          outline: 'none',
+        }}
+      />
+    </div>,
+    document.body,
+  );
 }

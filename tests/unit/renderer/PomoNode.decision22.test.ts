@@ -122,6 +122,28 @@ describe('Decision 22 — Pomodoro v2', () => {
       expect(next.sessionMin).toBe(30);
       expect(next.shortBreakMin).toBe(5);
     });
+
+    it('regression 2026-05-18 — preserves mother-node extra config fields (stationSlot, stationHidden) across SAVE', () => {
+      // Mother-node configs piggyback fields like stationSlot on the pomo's
+      // config object. Stripping them on SAVE caused the pomo to vanish from
+      // station view (StationCell.resolveStationSlot returned undefined).
+      const current = {
+        ...defaultPomoConfig(),
+        face: 'lcd' as const,
+        // Extra fields are typed via `MotherNodeConfig` at the boundary —
+        // pomoSetConfig must not be schema-restrictive about preserving them.
+        stationSlot: 'top-left',
+        stationHidden: false,
+      } as unknown as Parameters<typeof pomoSetConfig>[0];
+      const next = pomoSetConfig(current, { config: { sessionMin: 1, longBreakEvery: 1 } });
+      expect(next.sessionMin).toBe(1);
+      expect(next.longBreakEvery).toBe(1);
+      // The extra mother-config fields must survive — without this, station
+      // view loses the pomo card after the user saves new gear settings.
+      expect((next as unknown as { stationSlot: string }).stationSlot).toBe('top-left');
+      expect((next as unknown as { stationHidden: boolean }).stationHidden).toBe(false);
+      expect(next.face).toBe('lcd');
+    });
   });
 
   describe('pomoClearActiveTask', () => {
