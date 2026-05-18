@@ -38,10 +38,6 @@ export interface StationGeometry {
   // Mother visibility is stored per-node on config.stationHidden; canvas isn't
   // a node so it lives on the geometry object instead.
   canvasHidden?: boolean;
-  // 2026-05-18: Analytics is a free-floating overlay in station mode (not a
-  // mother slot), so its visibility lives on the geometry object too.
-  // Absent → hidden (the user opts in via the station toolbar).
-  analyticsHidden?: boolean;
 }
 
 // Structural mixin for mother-node config objects.

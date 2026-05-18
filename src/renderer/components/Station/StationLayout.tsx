@@ -37,7 +37,6 @@ import { useBoardStore } from '../../store/boardStore';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { StationCell } from './StationCell';
-import { StationAnalyticsOverlay } from './StationAnalyticsOverlay';
 import { EmbeddedCanvasCell } from './EmbeddedCanvasCell';
 import { StationToolbar } from './StationToolbar';
 import { SLOT_DEFAULTS } from './SlotResolver';
@@ -97,8 +96,6 @@ export function StationLayout() {
   const [dockStyle] = useDockStyle();
 
   const canvasHidden = storedGeometry?.canvasHidden ?? false;
-  // Analytics overlay defaults to hidden — user opts in via the toolbar.
-  const analyticsHidden = storedGeometry?.analyticsHidden ?? true;
 
   // Resolve mothers by slot so we can check visibility per top-row entry.
   const motherBySlot = new Map<StationSlot, Node>();
@@ -292,8 +289,6 @@ export function StationLayout() {
           </Group>
         )}
       </div>
-
-      {!analyticsHidden && <StationAnalyticsOverlay />}
     </div>
   );
 }
