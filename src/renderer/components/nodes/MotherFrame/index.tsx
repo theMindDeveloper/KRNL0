@@ -14,11 +14,19 @@
 // reads, zero layout flushes. Badge style uses CSS `transform:translate` (not
 // top/left) so the write is also compositor-level.
 
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
 import { scheduleBatch } from '../../../utils/rafBatcher';
 import { rfToScreen, getZoom } from '../../../utils/viewportBus';
+
+// Station mode mounts mother nodes inside resizable panels (ADR 0008). Each
+// mother component renders its own <MotherFrame width=540> internally; in
+// canvas mode that's correct (RF flow coords), but in station mode the
+// fixed 540×540 prevents the card from filling the panel. StationCell
+// wraps its child in this provider so any nested MotherFrame auto-switches
+// to the fluid 100%/100% variant — no per-kind component changes needed.
+export const MotherFrameStationContext = createContext(false);
 
 interface Props {
   nodeId: string;          // reports hover to boardStore so edges can bold on hover
@@ -59,8 +67,14 @@ export function MotherFrame({
   background = 'var(--node-bg)',
   borderColor = 'var(--paper-3)',
   minHeight = MOTHER_HEIGHT,
-  variant = 'canvas',
+  variant: variantProp = 'canvas',
 }: Props) {
+  // Context override: when this MotherFrame is rendered inside a StationCell,
+  // the provider sets the context to true and we force 'station' variant —
+  // overriding the prop. This lets each mother component (PomoNode, etc.)
+  // keep its own `<MotherFrame width={MOTHER_WIDTH}>` call unchanged.
+  const inStation = useContext(MotherFrameStationContext);
+  const variant: 'canvas' | 'station' = inStation ? 'station' : variantProp;
   const setHoveredNodeId = useBoardStore((s) => s.setHoveredNodeId);
   const idx = String(slotIndex).padStart(2, '0');
   const total = String(slotTotal).padStart(2, '0');
