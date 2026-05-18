@@ -808,12 +808,19 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         return;
       }
     }
-    // Analytics default spawn — sits to the right of the dock at the
-    // same top edge as the mother row, reading as a sister panel.
-    // (mother-term is the rightmost mother at x=1400, width 540 → right
-    // edge 1940; analytics goes 20px past that.) `args.at` still wins
-    // for explicit right-click spawns.
-    const analyticsDefaultPos = { x: 1960, y: 0 };
+    // Analytics default spawn — centered on the user's current viewport so
+    // the new panel appears wherever they're looking, not parked off in the
+    // dead zone to the right of the dock. The 540×540 box is centered via
+    // a half-size top-left offset. `args.at` (explicit right-click spawn)
+    // still wins.
+    const viewportCenter = screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+    const analyticsDefaultPos = {
+      x: viewportCenter.x - 270,
+      y: viewportCenter.y - 270,
+    };
     const pos = args.at ?? (args.kind === 'analytics' ? analyticsDefaultPos : defaultDockSpawnPos());
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
