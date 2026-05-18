@@ -27,6 +27,18 @@
 
 import { useBoardStore } from '../../store/boardStore';
 import { emit, saveBoard } from '../../store/eventLog';
+
+/** Dispatch `krnl:ensure-visible` so CanvasFlow can pan the camera if the
+ *  spawned rect sits outside the current viewport. No-op outside a browser
+ *  (test environments) and in station mode (CanvasFlow's listener gates). */
+function notifySpawnVisible(rect: { x: number; y: number; width: number; height: number }) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('krnl:ensure-visible', { detail: rect }));
+}
+
+// Standard task card footprint — kept in sync with INITIAL_DIMS_BY_KIND in
+// rfAdapters.tsx so the camera-ensure rect matches what RF will measure.
+const TASK_RECT = { width: 220, height: 120 } as const;
 import type { Node } from '@shared/types/node';
 import type { Edge } from '@shared/types/edge';
 import {
@@ -986,6 +998,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       emit('task.created', `subtask ${shortId(childNodeId)} added under ${shortId(nodeId)}`, { refId: childNodeId });
+      notifySpawnVisible({ x: childNode.position.x, y: childNode.position.y, ...TASK_RECT });
       return;
     }
 
@@ -1081,6 +1094,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       emit('task.created', `next task ${shortId(newNodeId)} after ${shortId(nodeId)}`, { refId: newNodeId });
+      notifySpawnVisible({ x: newNode.position.x, y: newNode.position.y, ...TASK_RECT });
       return;
     }
 
@@ -1470,6 +1484,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const finalBoard = useBoardStore.getState().board;
       if (finalBoard) void saveBoard(finalBoard);
       emit('task.created', `task ${shortId(taskNodeId)} added via todo`, { refId: taskNodeId });
+      notifySpawnVisible({ x: position.x, y: position.y, ...TASK_RECT });
       return;
     }
 

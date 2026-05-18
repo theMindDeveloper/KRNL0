@@ -440,6 +440,25 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // Used by every spawn path; also available to future features that need to
   // focus the camera on a particular thing (search jump, chain head, etc.).
   const ensureVisible = useCameraEnsureVisible(canvasContainerRef);
+
+  // krnl:ensure-visible — commandDispatch fires this after spawning a task
+  // (todo.add, task.addSubtask, task.addNext) so the camera pans if the
+  // newly-created node is offscreen. Station mode: no-op (mothers/tasks are
+  // already framed by the panel layout; yanking the embedded canvas would
+  // disorient).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onEnsureVisible = (e: Event) => {
+      const detail = (e as CustomEvent<{ x: number; y: number; width: number; height: number }>).detail;
+      if (!detail) return;
+      const mode = useBoardStore.getState().board?.layoutMode;
+      if (mode === 'station') return;
+      ensureVisible(detail);
+    };
+    window.addEventListener('krnl:ensure-visible', onEnsureVisible);
+    return () => window.removeEventListener('krnl:ensure-visible', onEnsureVisible);
+  }, [ensureVisible]);
+
   useLayoutEffect(() => {
     const el = canvasContainerRef.current;
     if (!el) return;

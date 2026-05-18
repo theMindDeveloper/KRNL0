@@ -106,7 +106,10 @@ function AppInner() {
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {/* ADR 0008 § 9.3 strategy A — one remount on toggle, same provider. */}
         {effectiveMode === 'station' ? <StationLayout /> : <Canvas />}
-        {effectiveMode === 'station' ? null : <Orb />}
+        {/* Orb (AI bubble) is available in both modes — tutorials and chat
+            work the same. ScriptRunner gates camera moves so station mode
+            doesn't yank the embedded canvas around. */}
+        <Orb />
         <AmbientRadio />
       </div>
       <StatusBar fallbackNotice={isFallingBack} />
