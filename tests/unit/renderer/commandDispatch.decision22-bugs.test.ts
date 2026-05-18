@@ -252,10 +252,14 @@ describe('B5 — remainder after 3 sessions of 10-min on a 35-min task → durat
   });
 });
 
-// ── Idempotent guard: same task + paused → no-op (checkpoint preserved) ───────
+// ── Toggle-off semantics: same task + loaded → unload to default (2026-05-18) ─
+// Spec update: double-clicking an already-loaded task unloads it. Previously
+// this was a no-op that preserved the checkpoint; now it cancels the session
+// (recording a non-completed history entry) and snaps the pomo back to
+// configured defaults so a single gesture drops the task.
 
-describe('Idempotent guard — clicking same paused task does not reset checkpoint', () => {
-  it('pausedElapsedMs stays 120000 when task-a is already paused and active', () => {
+describe('Toggle-off — double-clicking same paused task unloads to default', () => {
+  it('cancel + clear active task; durationMin snaps to sessionMin', () => {
     const board = makeBoardWithTasks({
       taskA: { currentSessionElapsedSec: 120 },
       pomoState: {
@@ -270,13 +274,16 @@ describe('Idempotent guard — clicking same paused task does not reset checkpoi
     });
     useBoardStore.getState().setBoard(board);
 
-    // Click the same paused task again — should be a no-op
+    // Re-load the same task → toggle-off (unload + reset to defaults).
     makeCommandHandler('task-a')('task.loadIntoPomo');
 
     const ps = getPomoState();
-    expect(ps.status).toBe('paused');
-    expect(ps.pausedElapsedMs).toBe(120_000);
-    expect(ps.activeTaskId).toBe('task-a');
+    expect(ps.activeTaskId).toBeNull();
+    expect(ps.label).toBe('');
+    expect(ps.status).toBe('idle');
+    expect(ps.history).toHaveLength(1);
+    expect(ps.history[0]!.completed).toBe(false);
+    expect(ps.durationMin).toBe(25);
   });
 });
 

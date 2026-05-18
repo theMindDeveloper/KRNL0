@@ -20,7 +20,7 @@
 import { useCallback } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { NODE_REGISTRY } from '../nodes/registry';
-import { MotherFrameStationContext, MOTHER_TOTAL } from '../nodes/MotherFrame';
+import { MotherFrameStationContext, MOTHER_TOTAL, MOTHER_DRAG_MIME } from '../nodes/MotherFrame';
 import { makeCommandHandler } from '../Canvas/commandDispatch';
 import { resolveStationSlot, SLOT_INDEX } from './SlotResolver';
 import type { StationSlot } from '../../../shared/types';
@@ -29,7 +29,9 @@ interface Props {
   slot: StationSlot;
 }
 
-const DRAG_MIME = 'application/x-krnl0-station-mother';
+// MIME shared with the canvas-mode handle on MotherFrame so a drag from
+// either view drops on the other's compatible target. Defined in MotherFrame.
+const DRAG_MIME = MOTHER_DRAG_MIME;
 
 export function StationCell({ slot }: Props) {
   const node = useBoardStore((s) =>

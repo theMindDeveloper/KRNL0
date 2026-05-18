@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
 import { defaultPomoConfig } from './types';
-import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL, MotherFrameStationContext } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { TaskState, TaskKind } from '../TaskNode/types';
@@ -66,6 +66,14 @@ export function PomoNode({
   const { state } = node;
   const config = node.config ?? defaultPomoConfig();
   const [, setTick] = useState(0);
+
+  // Station mode mounts this inside a resizable panel that's typically much
+  // shorter than the canvas 540×540. Tighten paddings and gaps when the
+  // MotherFrameStationContext is true so the timer + pips + cycle counter +
+  // controls all fit without spilling past the panel's overflow:hidden edge.
+  const inStation = useContext(MotherFrameStationContext);
+  const bodyPadding = inStation ? '10px 14px 12px' : '18px 18px 16px';
+  const bodyGap = inStation ? 8 : 14;
 
   // Gear panel local UI state (Decision 22 F9).
   const [gearOpen, setGearOpen] = useState(false);
@@ -163,6 +171,32 @@ export function PomoNode({
     ? activeTaskPomoSessionsCompleted
     : state.sessionsCompleted;
   const completedDots = sessionsForDisplay % pipCount;
+
+  // Default-mode (no task) breakdown of the configured cycle. Walks N work
+  // segments separated by N-1 short breaks; the long break that terminates
+  // the cycle is rendered explicitly after the last pip (breakdownPomoTime's
+  // "no trailing break" rule means it isn't in segments).
+  const defaultBreakdown = !isTaskMode
+    ? breakdownPomoTime(config.longBreakEvery * config.sessionMin, 0, config)
+    : null;
+
+  // Today's pomo cycle counter — counts COMPLETED sessions whose endedAt
+  // falls on the local date today. A full cycle = `longBreakEvery` sessions
+  // (e.g. 4 default), so `cyclesToday = floor(sessionsToday / longBreakEvery)`.
+  // Distinct from the per-task pip counter (which is per-task progress).
+  const { cyclesToday, sessionsToday, progressToNext } = (() => {
+    const today = new Date().toLocaleDateString('en-CA');
+    let count = 0;
+    for (const rec of state.history) {
+      if (!rec.completed || !rec.endedAt) continue;
+      if (new Date(rec.endedAt).toLocaleDateString('en-CA') === today) count++;
+    }
+    return {
+      cyclesToday: Math.floor(count / config.longBreakEvery),
+      sessionsToday: count,
+      progressToNext: count % config.longBreakEvery,
+    };
+  })();
 
   // F5 — context-driven primary button (A.3)
   const handlePrimary = () => {
@@ -463,7 +497,7 @@ export function PomoNode({
           </div>
         </div>
       ) : (
-        <div style={{ padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap }}>
           {/* PR4 — timer face switch: swap inner face without touching outer chrome */}
           {activeFace === 'ascii' && (
             <Ascii m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
@@ -477,6 +511,17 @@ export function PomoNode({
           {activeFace === 'vapor' && (
             <Vapor m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
           )}
+
+          {/* Today's full-cycle counter — distinct visual from the session pips
+              (squares + numeric badge + acid glow) so it reads as "achievement"
+              not "in-progress session". Always rendered so the user gets a
+              live count even at 0 cycles. Tooltip carries the breakdown. */}
+          <CycleCounter
+            cyclesToday={cyclesToday}
+            sessionsToday={sessionsToday}
+            progressToNext={progressToNext}
+            longBreakEvery={config.longBreakEvery}
+          />
 
           <div
             className="pomo-pips"
@@ -492,12 +537,19 @@ export function PomoNode({
               // Find the break that follows this session (if any).
               // breakdown.segments alternates work/break/work/break/.../work.
               // Session index i corresponds to segment 2*i; following break is 2*i+1.
-              const followingBreak = taskBreakdown && !isEventTask
-                ? (() => {
-                    const breakdown = breakdownPomoTime(activeTaskPlannedMin ?? 0, 0, config);
-                    return breakdown.segments[2 * i + 1] ?? null;
-                  })()
-                : null;
+              // Task mode reads the active task's breakdown; default mode reads
+              // the configured cycle's breakdown so the visualization matches
+              // the user's gear settings even with no task connected.
+              const followingBreak = (() => {
+                if (taskBreakdown && !isEventTask) {
+                  const breakdown = breakdownPomoTime(activeTaskPlannedMin ?? 0, 0, config);
+                  return breakdown.segments[2 * i + 1] ?? null;
+                }
+                if (defaultBreakdown) {
+                  return defaultBreakdown.segments[2 * i + 1] ?? null;
+                }
+                return null;
+              })();
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
                   <span
@@ -533,6 +585,27 @@ export function PomoNode({
                 </div>
               );
             })}
+            {/* Long-break terminator marker — only in default mode, after the
+                last visible pip. Visually closes the cycle so the user reads
+                "4 sessions → long break → repeat". breakdownPomoTime omits the
+                trailing break (its "no trailing break" rule) so we render it
+                explicitly here. */}
+            {!isTaskMode && overflowPips === 0 && (
+              <span
+                data-testid="pomo-cycle-terminator"
+                title={`Long break · ${config.longBreakMin}m`}
+                style={{
+                  display: 'inline-block',
+                  height: 4,
+                  width: 22,
+                  marginLeft: 6,
+                  borderRadius: 2,
+                  background: 'var(--acid)',
+                  boxShadow: '0 0 6px rgba(201,241,88,0.45)',
+                  flexShrink: 0,
+                }}
+              />
+            )}
             {/* A.5 — overflow indicator */}
             {overflowPips > 0 && (
               <span
@@ -661,6 +734,155 @@ export function PomoNode({
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 1) + '…';
+}
+
+// CycleCounter — today's completed pomodoro cycles, visually distinct from
+// the small per-session pips. Compact single-line strip: numeric badge +
+// filled diamonds for completed cycles + thin progress bar toward the next.
+//
+// Designed to add minimum vertical height (~24px) so it fits in the narrow
+// station-view pomo cell without pushing other content off the bottom.
+// Diamonds are capped at MAX; extras are summarised as "+N".
+function CycleCounter({
+  cyclesToday,
+  sessionsToday,
+  progressToNext,
+  longBreakEvery,
+}: {
+  cyclesToday: number;
+  sessionsToday: number;
+  progressToNext: number;
+  longBreakEvery: number;
+}) {
+  const MAX_DIAMONDS = 6;
+  const visibleDiamonds = Math.min(cyclesToday, MAX_DIAMONDS);
+  const overflow = cyclesToday > MAX_DIAMONDS ? cyclesToday - MAX_DIAMONDS : 0;
+  const hasAny = cyclesToday > 0;
+  const cellColor = hasAny ? 'var(--acid)' : 'var(--ink-4)';
+
+  return (
+    <div
+      data-testid="pomo-cycles-today"
+      data-cycles={cyclesToday}
+      data-sessions={sessionsToday}
+      title={`${cyclesToday} cycle${cyclesToday === 1 ? '' : 's'} today · ${sessionsToday} sessions · ${progressToNext}/${longBreakEvery} toward next`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 7,
+        padding: '3px 8px',
+        background: hasAny
+          ? 'linear-gradient(90deg, rgba(201,241,88,0.10), rgba(201,241,88,0.02) 60%)'
+          : 'var(--paper-2)',
+        border: `1px solid ${hasAny ? 'rgba(201,241,88,0.40)' : 'var(--paper-3)'}`,
+        borderRadius: 4,
+        boxShadow: hasAny ? '0 0 8px rgba(201,241,88,0.14) inset' : 'none',
+      }}
+    >
+      {/* Numeric badge */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, flexShrink: 0 }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 7.5,
+            color: 'var(--ink-4)',
+            letterSpacing: '0.08em',
+          }}
+        >
+          ×
+        </span>
+        <span
+          data-testid="pomo-cycles-today-count"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 14,
+            fontVariantNumeric: 'tabular-nums',
+            fontWeight: 700,
+            lineHeight: 1,
+            color: cellColor,
+            textShadow: hasAny ? '0 0 6px rgba(201,241,88,0.5)' : 'none',
+          }}
+        >
+          {cyclesToday}
+        </span>
+      </div>
+
+      {/* Diamonds + progress bar — flex:1 so it absorbs slack */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
+        {Array.from({ length: visibleDiamonds }).map((_, i) => (
+          <span
+            key={i}
+            data-testid="pomo-cycle-diamond"
+            style={{
+              width: 7,
+              height: 7,
+              background: 'var(--acid)',
+              transform: 'rotate(45deg)',
+              boxShadow: '0 0 5px rgba(201,241,88,0.5)',
+              flexShrink: 0,
+            }}
+          />
+        ))}
+        {overflow > 0 && (
+          <span
+            data-testid="pomo-cycles-overflow"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              color: 'var(--acid)',
+              letterSpacing: '0.06em',
+              marginLeft: 1,
+            }}
+          >
+            +{overflow}
+          </span>
+        )}
+        {longBreakEvery > 0 && (
+          <span
+            data-testid="pomo-cycle-progress"
+            data-progress={progressToNext}
+            data-of={longBreakEvery}
+            style={{
+              flexShrink: 0,
+              marginLeft: visibleDiamonds > 0 || overflow > 0 ? 4 : 0,
+              display: 'inline-block',
+              width: 28,
+              height: 3,
+              borderRadius: 1.5,
+              background: 'var(--paper-3)',
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            <span
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: `${(progressToNext / longBreakEvery) * 100}%`,
+                background: 'var(--acid)',
+                opacity: progressToNext > 0 ? 0.85 : 0,
+              }}
+            />
+          </span>
+        )}
+      </div>
+
+      {/* Single-line label — flexShrink:0 keeps it readable even when crowded */}
+      <span
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 8,
+          color: 'var(--ink-4)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        cycles · today
+      </span>
+    </div>
+  );
 }
 
 export default PomoNode;

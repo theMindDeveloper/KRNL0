@@ -12,7 +12,7 @@
 import type { BoardShape, AnyNode, DispatchCtx } from './types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
-import type { PomoState } from '../../renderer/components/nodes/PomoNode/types';
+import type { PomoConfig, PomoState } from '../../renderer/components/nodes/PomoNode/types';
 import {
   todoRemove as fsmTodoRemove,
   todoToggle as fsmTodoToggle,
@@ -23,6 +23,7 @@ import {
 import {
   pomoCancel as fsmPomoCancel,
   pomoClearActiveTask as fsmPomoClearActiveTask,
+  pomoSkipBreak as fsmPomoSkipBreak,
 } from '../../renderer/components/nodes/PomoNode/commands';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -117,8 +118,19 @@ export function deleteTaskCascade(
     const ps = pomoNode.state as PomoState;
     if (ps.activeTaskId !== null && allDescendants.has(ps.activeTaskId)) {
       let cancelledState = ps;
-      if (ps.status !== 'idle') cancelledState = fsmPomoCancel(ps);
-      const cleared = fsmPomoClearActiveTask(cancelledState);
+      // pomoCancel only covers running/paused; pomoSkipBreak transitions a
+      // 'break' status back to idle. Without that branch, deleting a task
+      // mid-break would leave the break timer ticking on a phantom session.
+      if (ps.status === 'running' || ps.status === 'paused') {
+        cancelledState = fsmPomoCancel(ps);
+      } else if (ps.status === 'break') {
+        cancelledState = fsmPomoSkipBreak(ps);
+      }
+      // Pass the pomo mother's live config so durationMin/breakMin snap back
+      // to user-configured defaults — without this, a deleted task left the
+      // pomo stuck on the task's per-session minutes (user report 2026-05-18).
+      const cfg = (pomoNode.config as PomoConfig | null) ?? undefined;
+      const cleared = fsmPomoClearActiveTask(cancelledState, cfg);
       const idx = board.nodes.indexOf(pomoNode);
       if (idx !== -1) {
         board.nodes[idx] = { ...pomoNode, state: cleared };

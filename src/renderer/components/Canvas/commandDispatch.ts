@@ -163,6 +163,10 @@ import {
   analyticsSetMetric,
   analyticsSetYear,
   analyticsSetSize,
+  analyticsToggleCardHidden,
+  analyticsTogglePinCard,
+  analyticsSetSettingsOpen,
+  analyticsResetCardLayout,
 } from '../nodes/AnalyticsNode/commands';
 
 // ── dispatch ──────────────────────────────────────────────────────────
@@ -233,7 +237,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.endBreak': return { state: pomoEndBreak(s as never) };
         case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
         case 'pomo.setFace':   return { config: pomoSetFace(pomoCfg, args as { face: TimerFace }) };
-        case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never) };
+        case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never, pomoCfg) };
       }
       break;
     }
@@ -347,11 +351,15 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
     // Issue #134 — AnalyticsNode commands. Pure FSM, no side effects.
     case 'analytics': {
       switch (command) {
-        case 'analytics.setView':      return { state: analyticsSetView(s as never, args as never) };
-        case 'analytics.setRangeDays': return { state: analyticsSetRangeDays(s as never, args as never) };
-        case 'analytics.setMetric':    return { state: analyticsSetMetric(s as never, args as never) };
-        case 'analytics.setYear':      return { state: analyticsSetYear(s as never, args as never) };
-        case 'analytics.setSize':      return { state: analyticsSetSize(s as never, args as never) };
+        case 'analytics.setView':           return { state: analyticsSetView(s as never, args as never) };
+        case 'analytics.setRangeDays':      return { state: analyticsSetRangeDays(s as never, args as never) };
+        case 'analytics.setMetric':         return { state: analyticsSetMetric(s as never, args as never) };
+        case 'analytics.setYear':           return { state: analyticsSetYear(s as never, args as never) };
+        case 'analytics.setSize':           return { state: analyticsSetSize(s as never, args as never) };
+        case 'analytics.toggleCardHidden':  return { state: analyticsToggleCardHidden(s as never, args as never) };
+        case 'analytics.togglePinCard':     return { state: analyticsTogglePinCard(s as never, args as never) };
+        case 'analytics.setSettingsOpen':   return { state: analyticsSetSettingsOpen(s as never, args as never) };
+        case 'analytics.resetCardLayout':   return { state: analyticsResetCardLayout(s as never) };
       }
       break;
     }
@@ -757,9 +765,54 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       return;
     }
 
-    // ── task.loadIntoPomo: load without auto-start (Bug #2 fix) ───────────
-    // Passive (click/selection driven) — protect a different running session.
+    // ── task.loadIntoPomo: toggle-load this task into pomo ────────────────
+    // Passive (double-click / todo-row click driven). Toggle semantics:
+    //   - If THIS task is already loaded (any FSM status) → unload, cancel any
+    //     in-flight session (or skip break), snap pomo back to defaults, and
+    //     clear the task's in-flight checkpoint so the next load starts fresh.
+    //   - Otherwise → load (autoStart=false), protect a different running
+    //     session so accidental clicks don't disturb live work.
     if (command === 'task.loadIntoPomo') {
+      const pomoNode = board.nodes.find((n) => n.kind === 'pomo');
+      if (pomoNode) {
+        const ps = pomoNode.state as PomoState;
+        if (ps.activeTaskId === nodeId) {
+          const cfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
+          let next = ps;
+          // pomoCancel handles running/paused; pomoSkipBreak handles break.
+          // Without the break branch, status would stay 'break' after unload
+          // and the break timer would keep ticking on a phantom session.
+          if (next.status === 'running' || next.status === 'paused') {
+            next = pomoCancel(next);
+          } else if (next.status === 'break') {
+            next = pomoSkipBreak(next);
+          }
+          next = pomoClearActiveTask(next, cfg);
+          updateNode(pomoNode.id, { state: next });
+
+          // Wipe the task's in-flight checkpoint — the session was abandoned.
+          // Without this, re-loading the task later would resume from a stale
+          // currentSessionElapsedSec, contradicting the "snap to defaults" UX.
+          const freshTask = useBoardStore
+            .getState()
+            .board?.nodes.find((n) => n.id === nodeId);
+          if (freshTask && freshTask.kind === 'todo.task') {
+            const ts = freshTask.state as TaskState;
+            if ((ts.currentSessionElapsedSec ?? 0) > 0) {
+              updateNode(
+                nodeId,
+                { state: taskClearCurrentSessionElapsedSec(ts) },
+                { skipHistory: true },
+              );
+            }
+          }
+
+          const updated = useBoardStore.getState().board;
+          if (updated) void saveBoard(updated);
+          emit('pomo.stop', `task ${shortId(nodeId)} unloaded from pomo`, { refId: nodeId });
+          return;
+        }
+      }
       loadTaskIntoPomo(nodeId, { autoStart: false, protectRunning: true });
       return;
     }
@@ -1617,8 +1670,19 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         if (pomoNode) {
           const ps = pomoNode.state as PomoState;
           if (ps.activeTaskId === nodeId && ps.status !== 'idle') {
-            let cancelledState = pomoCancel(ps);
-            cancelledState = pomoClearActiveTask(cancelledState);
+            const pomoCfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
+            // pomoCancel covers running/paused; pomoSkipBreak covers break.
+            // Without skipBreak, marking a task done mid-break would orphan
+            // the break timer (status stays 'break' with no active task).
+            let cancelledState = ps;
+            if (ps.status === 'running' || ps.status === 'paused') {
+              cancelledState = pomoCancel(cancelledState);
+            } else if (ps.status === 'break') {
+              cancelledState = pomoSkipBreak(cancelledState);
+            }
+            // Pass config so durationMin/breakMin snap back to user defaults
+            // (matches task-delete and task.loadIntoPomo toggle-off paths).
+            cancelledState = pomoClearActiveTask(cancelledState, pomoCfg);
             updateNode(pomoNode.id, { state: cancelledState });
 
             // Commit the just-cancelled session's elapsed time into the task.

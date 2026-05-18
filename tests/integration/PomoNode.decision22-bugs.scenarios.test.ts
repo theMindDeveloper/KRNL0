@@ -349,8 +349,11 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(getPomoState().durationMin).toBe(5);
     });
 
-    it('B6: Given a running pomo with active task A, when task.loadIntoPomo dispatched for the same task A, then the pomo stays running and no history record is added', () => {
-      // The running same-task path is the critical no-op: no clock reset, no cancel.
+    it('B6: Given a running pomo with active task A, when task.loadIntoPomo dispatched for the same task A, then the pomo unloads to default (toggle-off semantics, 2026-05-18)', () => {
+      // Spec update 2026-05-18: double-clicking the already-loaded task is the
+      // "unload to default" gesture. Previously this was an idempotent no-op;
+      // the new behavior cancels the in-flight session and snaps pomo back to
+      // its configured defaults so the user can drop a task with one gesture.
       const startedAt = new Date(Date.now() - 60_000).toISOString();
       const board = makeBoardWithTasks({
         pomoState: {
@@ -366,14 +369,15 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       makeCommandHandler('task-a')('task.loadIntoPomo');
 
       const ps = getPomoState();
-      // Same task re-clicked: pomo must NOT cancel and restart (no new history record).
-      expect(ps.activeTaskId).toBe('task-a');
-      expect(ps.history).toHaveLength(0);
-      // startedAt must not have been reset to a recent timestamp (clock not rewound).
-      // Allow 2s of jitter: if startedAt was reset it would be near now (~0s ago), but
-      // the original was ~60s ago — any value < 55s means it was incorrectly reset.
-      const elapsedSinceStart = Date.now() - Date.parse(ps.startedAt!);
-      expect(elapsedSinceStart).toBeGreaterThanOrEqual(55_000);
+      // Same task re-loaded → cancel + clear active task. Cancelled session
+      // appears in history with completed=false.
+      expect(ps.activeTaskId).toBeNull();
+      expect(ps.label).toBe('');
+      expect(ps.status).toBe('idle');
+      expect(ps.history).toHaveLength(1);
+      expect(ps.history[0]!.completed).toBe(false);
+      // durationMin snaps back to config.sessionMin (default 25).
+      expect(ps.durationMin).toBe(25);
     });
 
   });

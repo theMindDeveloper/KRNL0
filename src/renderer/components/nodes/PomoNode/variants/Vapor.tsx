@@ -25,11 +25,17 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
     <div
       className="pomo-vapor"
       style={{
+        // Side-by-side layout 2026-05-18 (rev 2): clock numerals on the LEFT
+        // with the glass tube as a vertical companion on the RIGHT. Total
+        // height ≈ tube (200px). Wider than the overlay variant but reads
+        // cleaner — no text-shadow tricks needed against bright liquid.
         width: '100%',
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
+        justifyContent: 'center',
+        gap: 34,
+        padding: '6px 4px',
       }}
     >
       <style>{`
@@ -38,15 +44,65 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
         }
       `}</style>
 
-      {/* Glass tube — flat top, rounded bottom */}
+      {/* LEFT — info block (clock + label + reserve %). Stays on its own
+          background so the numerals are always readable regardless of how
+          full the tube is on the right. */}
+      <div
+        className="info"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 5,
+          fontFamily: 'var(--font-mono)',
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 46,
+            letterSpacing: '-0.04em',
+            color: 'var(--ink)',
+            fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1,
+            fontWeight: 300,
+          }}
+        >
+          {m}
+          <span style={{ color: 'var(--rust)' }}>:</span>
+          {s}
+        </div>
+
+        <div
+          style={{
+            fontSize: 9.5,
+            color: 'var(--ink-3)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+          }}
+        >
+          deep work · phase 03
+        </div>
+
+        <div
+          style={{
+            fontSize: 11,
+            color: 'var(--acid)',
+            textShadow: '0 0 8px rgba(201,241,88,0.4)',
+          }}
+        >
+          {Math.round(remainingPct)}% reserve
+        </div>
+      </div>
+
+      {/* RIGHT — glass tube, slightly taller (200) than the compact pass */}
       <div
         className="pomo-vapor-tube"
         style={{
           position: 'relative',
-          width: 88,
+          width: 96,
           height: 200,
           flexShrink: 0,
-          borderRadius: '3px 3px 44px 44px',
+          borderRadius: '3px 3px 48px 48px',
           overflow: 'hidden',
         }}
       >
@@ -154,47 +210,6 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
         </div>
       </div>
 
-      {/* Info below tube */}
-      <div
-        className="info"
-        style={{
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 5,
-          fontFamily: 'var(--font-mono)',
-        }}
-      >
-        <div
-          style={{
-            fontSize: 42,
-            letterSpacing: '-0.04em',
-            color: 'var(--ink)',
-            fontVariantNumeric: 'tabular-nums',
-            lineHeight: 1,
-            fontWeight: 300,
-          }}
-        >
-          {m}
-          <span style={{ color: 'var(--rust)' }}>:</span>
-          {s}
-        </div>
-
-        <div
-          style={{
-            fontSize: 9.5,
-            color: 'var(--ink-3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-          }}
-        >
-          deep work · phase 03
-        </div>
-
-        <div style={{ fontSize: 11, color: 'var(--acid)', textShadow: '0 0 8px rgba(201,241,88,0.4)' }}>
-          {Math.round(remainingPct)}% reserve
-        </div>
-      </div>
     </div>
   );
 }

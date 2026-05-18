@@ -39,9 +39,8 @@ describe('AnalyticsNode commands', () => {
     expect(analyticsSetYear(base, { year: 2026.7 }).year).toBe(2027);
   });
 
-  it('setSize clamps to minimum and rounds', () => {
+  it('setSize is a no-op (node is fixed-size 540×540, rev 3)', () => {
     const next = analyticsSetSize(base, { width: 200.4, height: 100.6 });
-    expect(next.width).toBe(360);
-    expect(next.height).toBe(280);
+    expect(next).toBe(base);
   });
 });
