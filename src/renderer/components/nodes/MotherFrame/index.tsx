@@ -115,6 +115,7 @@ export function MotherFrame({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position.x, position.y, variant]);
 
+  const isStation = variant === 'station';
   return (
     <div
       className="mother-frame"
@@ -122,9 +123,10 @@ export function MotherFrame({
       onMouseLeave={() => setHoveredNodeId(null)}
       style={{
         position: 'relative',
-        width,
-        // Pinned fixed height — see PR2.1 history. Bodies must overflow internally.
-        height: minHeight,
+        // Canvas: fixed 540×540 (RF flow coords). Station: fill the resizable
+        // panel so the user can shrink/grow it without content overflowing.
+        width: isStation ? '100%' : width,
+        height: isStation ? '100%' : minHeight,
         display: 'flex',
         flexDirection: 'column',
         background: background === 'var(--node-bg)'
@@ -134,7 +136,9 @@ export function MotherFrame({
         borderRadius: 8,
         boxShadow:
           '0 2px 8px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
-        overflow: 'visible',
+        // Station-mode panels must clip overflow so the inner mother content
+        // never bleeds past the resizable panel boundary.
+        overflow: isStation ? 'hidden' : 'visible',
         contain: 'layout paint',
         // willChange:'transform' removed (2026-05-15 pan-perf fix) — promoting
         // 6 compositor layers costs VRAM with no benefit during pan. RF moves

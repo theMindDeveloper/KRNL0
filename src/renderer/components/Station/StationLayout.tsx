@@ -175,6 +175,11 @@ export function StationLayout() {
       data-testid="station-layout"
       className={`dock-chassis dock-${dockStyle}`}
       style={{
+        // .dock-chassis defaults pointer-events:none + z-index:-1 (canvas
+        // mode wants it behind nodes). Station mode IS the foreground — undo
+        // both so panels/splitters/mother content are interactive.
+        pointerEvents: 'auto',
+        zIndex: 0,
         position: 'relative',
         width: '100%',
         height: '100%',
@@ -320,7 +325,9 @@ export function StationLayout() {
   );
 }
 
-/** Thin wrapper that sizes a station cell to fill its panel. */
+/** Thin wrapper that sizes a station cell to fill its panel. Transparent
+ *  background so the dock chrome's themed background shows through the gaps
+ *  between mother cards. */
 function CellWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -328,8 +335,9 @@ function CellWrapper({ children }: { children: React.ReactNode }) {
         width: '100%',
         height: '100%',
         overflow: 'hidden',
-        background: 'var(--node-bg, var(--paper))',
-        border: '1px solid var(--paper-3)',
+        background: 'transparent',
+        padding: 6,
+        boxSizing: 'border-box',
       }}
     >
       {children}
