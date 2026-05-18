@@ -61,7 +61,7 @@ export function seedBoard(): PartialBoard {
         },
         // Decision 22 — canonical PomoConfig shape.
         // ADR 0008 § 4.2 — stationSlot backfilled for station layout
-        config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, stationSlot: 'top-left' },
+        config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, face: 'blocks', stationSlot: 'top-left' },
       },
       {
         id: 'mother-todo',

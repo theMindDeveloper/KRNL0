@@ -104,7 +104,9 @@ function AppInner() {
     lastModeRef.current = effectiveMode;
     const id = window.setTimeout(() => {
       try {
-        fitView({ padding: 0.18, duration: 400 });
+        // maxZoom: 1 keeps fitView from over-zooming when the visible set is
+        // small (e.g. a single task node). Matches seedBoard's default zoom.
+        fitView({ padding: 0.18, duration: 400, maxZoom: 1 });
       } catch {
         /* RF not ready yet — skipped */
       }

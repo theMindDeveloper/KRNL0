@@ -10,11 +10,7 @@ const TASK_1 = 'learn machine learning';
 const TASK_2 = 'go for a walk';
 const TASK_3 = 'listen to music';
 
-// The bait — rickroll, full volume.
-const RICKROLL_YT_URL =
-  'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1';
-
-// The real background music — kept moderate so Jen stays audible.
+// Background music for the tutorial — kept moderate so Jen stays audible.
 const TUTORIAL_YT_URL = 'https://www.youtube.com/watch?v=tCfSt1TWVn4';
 const TUTORIAL_YT_VOLUME = 75;
 
@@ -49,32 +45,13 @@ export const tutorialPomoTodoFlow: Flow = {
 
       { kind: 'speak', clip: 'tut1_00c', text: "Let's put on some music first." },
       { kind: 'radioMoveToCenter' },
-      // Longer pre-roll — gives the YT IFrame API time to download
-      // before we try to mount a player.
+      // Pre-roll — gives the YT IFrame API time to download before we
+      // try to mount a player.
       { kind: 'wait', ms: 2500 },
 
-      // The bait — play the rickroll at the user's current YT volume.
-      // NOTE: if this stops landing because YouTube changes embed rules
-      // for dQw4w9WgXcQ, swap RICKROLL_YT_URL above to any video that
-      // still embeds — extractYouTubeId() handles both /watch?v= and
-      // youtu.be/ short URLs.
-      { kind: 'radioPlayYouTube', url: RICKROLL_YT_URL },
-      // Dwell long enough for the IFrame to mount, the mute->unMute
-      // handshake to complete, AND for the user to register what's
-      // playing. Old 2800ms was tight enough that a slow YT init in
-      // packaged Electron made the bait inaudible before the swap.
-      { kind: 'wait', ms: 5000 },
-
-      // Jen catches herself
-      { kind: 'speak', clip: 'tut1_00d', text: 'Nah — not this. Sorry.' },
-      { kind: 'wait', ms: 200 },
-
-      // Swap in the real tutorial music. Player is already alive,
-      // so the swap is near-instant via loadVideoById.
+      // Play the tutorial background music.
       { kind: 'radioPlayYouTube', url: TUTORIAL_YT_URL, volume: TUTORIAL_YT_VOLUME },
       { kind: 'wait', ms: 1800 },
-      { kind: 'speak', clip: 'tut1_00e', text: "Okay — that's better. Let's go." },
-      { kind: 'wait', ms: 400 },
       // Snap the panel to the right edge — music keeps playing, panel
       // stays clickable as a thin peek so the user can bring it back.
       { kind: 'radioSnapToEdge' },

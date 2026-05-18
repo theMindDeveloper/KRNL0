@@ -389,6 +389,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       onSelect: startEdit,
     },
     {
+      label: 'Edit time',
+      onSelect: startEtaEdit,
+      disabled: state.done,
+    },
+    {
       // ADR 0004 §2 — sequential successor: same chain level as source,
       // single task.next edge.
       label: 'Add next task',
