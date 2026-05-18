@@ -36,6 +36,12 @@ export interface StationGeometry {
   rightColumnSplit: number;    // [0..1] split between Calendar (upper) and Clock (lower)
 }
 
+// Structural mixin for mother-node config objects.
+// Step 4 (StationCell rendering) will rely on this contract to read stationSlot.
+export interface MotherNodeConfig {
+  stationSlot?: StationSlot;
+}
+
 export interface Board {
   version: 1;
   schemaVersion: 2;            // bumped from 1 (ADR 0008 § 4.1)
