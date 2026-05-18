@@ -180,39 +180,12 @@ export function MotherFrame({
 
       {children}
 
-      {/* Slot badge — two rendering paths depending on variant:
-          'canvas': portaled to document.body with position:fixed so it escapes
-            `.react-flow`'s overflow:hidden clip. rafBatcher computes real coords
-            each frame from rfToScreen() — no getBoundingClientRect, no layout reads.
-          'station': normal absolute-positioned span inside the panel. The panel
-            is not RF-clipped so no portal escape is needed. */}
-      {variant === 'station' ? (
-        <span
-          className="mother-frame__badge"
-          aria-hidden
-          style={{
-            position: 'absolute',
-            top: -11,
-            left: 14,
-            background: 'var(--paper-2)',
-            color: 'var(--ink-2)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9,
-            padding: '2.5px 8px 3px',
-            borderRadius: 2,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            fontWeight: 600,
-            border: '1px solid var(--paper-3)',
-            zIndex: 5,
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <span style={{ color: 'var(--spine-hot)', marginRight: 1 }}>{idx}</span>
-          <span> · spine · {total}</span>
-        </span>
-      ) : (
+      {/* Slot badge — canvas variant only.
+          Station mode panels are named by position (top-row column, bottom
+          clock) so a slot index would be visual noise. It also got clipped
+          by overflow:hidden on the station mother frame ("splice box cut in
+          half" bug). Skip it entirely in station variant. */}
+      {variant !== 'station' && (
         typeof document !== 'undefined' && createPortal(
           <div
             ref={badgeRef}
