@@ -2276,3 +2276,26 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   outline: 1px solid var(--acid, #c9f158);
   outline-offset: 2px;
 }
+
+/* ============================================================
+   Station mode — panel splitter (resize handle)
+   RPL Separator is a focusable div, so clicking it gains focus
+   and the browser/OS paints a persistent focus ring (yellow on
+   some setups). We reset the focus outline entirely and use
+   :hover / :active to give a clear "I am draggable / I am being
+   dragged" cue without lingering after release.
+   ============================================================ */
+.station-splitter {
+  background: var(--paper-3);
+  transition: background 120ms ease;
+}
+.station-splitter:hover {
+  background: var(--ink-4, #6e6655);
+}
+.station-splitter:active {
+  background: var(--ink-3, #b3aa97);
+}
+.station-splitter:focus,
+.station-splitter:focus-visible {
+  outline: none;
+}

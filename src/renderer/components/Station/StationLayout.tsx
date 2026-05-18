@@ -55,16 +55,18 @@ const PANEL_IDS = {
   bottomClock:    'station-bottom-clock',
 } as const;
 
+// Separator dimensions stay inline; background + interaction states live in
+// chassis.css under `.station-splitter` so we can use :hover / :active /
+// :focus pseudo-classes (inline styles can't). The focus rule resets the
+// outline so clicked-and-released splitters don't keep glowing.
 const verticalHandleStyle: React.CSSProperties = {
   width: 4,
-  background: 'var(--line, var(--paper-3))',
   cursor: 'col-resize',
   flexShrink: 0,
 };
 
 const horizontalHandleStyle: React.CSSProperties = {
   height: 4,
-  background: 'var(--line, var(--paper-3))',
   cursor: 'row-resize',
   flexShrink: 0,
 };
@@ -165,7 +167,7 @@ export function StationLayout() {
   // Build the top-row panel list: visible panels with separators between.
   const topRowChildren: React.ReactNode[] = [];
   visibleTopDefs.forEach((d, i) => {
-    if (i > 0) topRowChildren.push(<Separator key={`sep-${d.panelId}`} style={verticalHandleStyle} />);
+    if (i > 0) topRowChildren.push(<Separator key={`sep-${d.panelId}`} className="station-splitter" style={verticalHandleStyle} />);
     topRowChildren.push(
       <Panel
         key={d.panelId}
@@ -178,15 +180,25 @@ export function StationLayout() {
     );
   });
 
-  // Build the bottom-row panel list.
+  // Bottom-row sizing — keep clock locked to the calendar's column width
+  // (SLOT_DEFAULTS.columns['top-right-upper'] = 25%) whenever canvas is
+  // visible, regardless of terminal visibility. Without this, hiding the
+  // terminal causes RPL to normalize canvas:clock from 60:25 → 70.6:29.4
+  // and the clock column slides out of alignment with the calendar above.
+  const clockSize = SLOT_DEFAULTS.columns['top-right-upper'];
+  const terminalSize = bottomVisible.terminal ? SLOT_DEFAULTS.bottom.terminal : 0;
+  const canvasSize = bottomVisible.canvas
+    ? Math.max(SLOT_DEFAULTS.minCanvas, 100 - clockSize - terminalSize)
+    : 0;
+
   const bottomRowChildren: React.ReactNode[] = [];
   const bottomItems = [
-    bottomVisible.canvas   && { id: PANEL_IDS.bottomCanvas,   size: SLOT_DEFAULTS.bottom.canvas,   min: SLOT_DEFAULTS.minCanvas,  node: <EmbeddedCanvasCell /> },
-    bottomVisible.terminal && { id: PANEL_IDS.bottomTerminal, size: SLOT_DEFAULTS.bottom.terminal, min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="bottom-strip" /></CellWrapper> },
-    bottomVisible.clock    && { id: PANEL_IDS.bottomClock,    size: SLOT_DEFAULTS.bottom.clock,    min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="top-right-lower" /></CellWrapper> },
+    bottomVisible.canvas   && { id: PANEL_IDS.bottomCanvas,   size: canvasSize,   min: SLOT_DEFAULTS.minCanvas,  node: <EmbeddedCanvasCell /> },
+    bottomVisible.terminal && { id: PANEL_IDS.bottomTerminal, size: terminalSize, min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="bottom-strip" /></CellWrapper> },
+    bottomVisible.clock    && { id: PANEL_IDS.bottomClock,    size: clockSize,    min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="top-right-lower" /></CellWrapper> },
   ].filter(Boolean) as Array<{ id: string; size: number; min: number; node: React.ReactNode }>;
   bottomItems.forEach((it, i) => {
-    if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} style={verticalHandleStyle} />);
+    if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} className="station-splitter" style={verticalHandleStyle} />);
     bottomRowChildren.push(
       <Panel key={it.id} id={it.id} defaultSize={it.size} minSize={it.min}>
         {it.node}
@@ -255,7 +267,7 @@ export function StationLayout() {
             )}
 
             {topRowVisible && bottomRowVisible && (
-              <Separator style={horizontalHandleStyle} />
+              <Separator className="station-splitter" style={horizontalHandleStyle} />
             )}
 
             {bottomRowVisible && (
