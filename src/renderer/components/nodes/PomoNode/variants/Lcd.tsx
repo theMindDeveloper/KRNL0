@@ -61,6 +61,7 @@ export function Lcd({ m, s, running }: TimerFaceProps) {
         {/* Digits block — ghost "88:88" underneath live digits */}
         <div
           className="digits"
+          data-testid="pomo-clock"
           style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontWeight: 700,
@@ -94,6 +95,7 @@ export function Lcd({ m, s, running }: TimerFaceProps) {
           {m}
           <span
             className="colon"
+            data-testid="pomo-colon"
             style={{
               color: 'var(--acid)',
               animation: colonAnimation,

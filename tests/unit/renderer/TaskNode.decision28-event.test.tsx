@@ -133,22 +133,19 @@ describe('Decision 28 — event-kind UX gates', () => {
     expect(onCommand).toHaveBeenCalledWith('task.toggleKind');
   });
 
-  // ── Event-kind UX gates ────────────────────────────────────────────────────
-
-  // Follow-up to Decision 28: events DO show START/PAUSE and DO load into pomo
-  // (as a single big session, no breaks). The pomo handles the kind difference.
-  it('START button is present when kind=event and task is not done', () => {
+  // Issue 166: event tasks do NOT show START/PAUSE and do NOT load into pomo
+  it('START button is ABSENT when kind=event and task is not done', () => {
     renderTaskNode(makeTaskState({ kind: 'event', done: false }));
     const btn = document.querySelector('[data-testid="task-start-btn"]');
-    expect(btn).not.toBeNull();
+    expect(btn).toBeNull();
   });
 
-  it('double-click on card body loads event task into pomo', () => {
+  it('double-click on card body does NOT load event task into pomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ kind: 'event' }), onCommand);
     const root = screen.getByTestId('task-node-root');
     fireEvent.doubleClick(root);
-    expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
+    expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
   // ── Focus-kind regression guard ────────────────────────────────────────────

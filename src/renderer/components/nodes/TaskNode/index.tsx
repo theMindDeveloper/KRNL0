@@ -438,7 +438,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     // propagation, so this handler only fires on the surrounding card surface.
     // Both focus and event tasks load into pomo; event tasks render as a
     // single big session with no breaks.
-    if (state.done) return;
+    if (state.done || state.kind === 'event') return;
     e.stopPropagation();
     onCommand('task.loadIntoPomo');
   };
@@ -581,7 +581,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             />
             {state.kind === 'focus' ? 'POMO' : 'EVENT'}
           </button>
-          {!state.done && !isActiveRunning && (
+          {state.kind === 'focus' && !state.done && !isActiveRunning && (
             <button
               type="button"
               data-testid="task-start-btn"
@@ -607,7 +607,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               START
             </button>
           )}
-          {isActiveRunning && (
+          {state.kind === 'focus' && isActiveRunning && (
             <button
               type="button"
               data-testid="task-pause-btn"

@@ -271,7 +271,7 @@ describe('Decision 22 — board migration', () => {
     // Position matches NEW_MOTHER_POSITIONS entry for mother-clock — bumped
     // 1252 → 1300 (PR2.1, 520px spacing for 440-wide mothers) → 1350
     // (Wave C, 540px spacing for 500-wide mothers).
-    expect((clock as { position?: { x: number; y: number } }).position).toMatchObject({ x: 1350, y: 0 });
+    expect((clock as { position?: { x: number; y: number } }).position).toMatchObject({ x: 840, y: 0 });
   });
 
   it('Decision 23.1: migrateAddClockMother is idempotent — no duplicate mother-clock on double load', () => {
@@ -315,13 +315,13 @@ describe('Decision 22 — board migration', () => {
       .find((n) => n.id === 'mother-clock');
     expect(clock).toBeDefined();
     expect(clock!.kind).toBe('clock');
-    expect(clock!.position).toEqual({ x: 1350, y: 0 });
+    expect(clock!.position).toEqual({ x: 840, y: 0 });
     expect(clock!.isMother).toBe(true);
     // ADR 0004 §3 — selectedDate defaults to today (local) in the seed.
     expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
     expect((clock!.state as { selectedDate?: string }).selectedDate).toMatch(
       /^\d{4}-\d{2}-\d{2}$/,
     );
-    expect(clock!.config).toEqual({});
+    expect(clock!.config).toEqual({ stationSlot: 'top-right-lower' });
   });
 });

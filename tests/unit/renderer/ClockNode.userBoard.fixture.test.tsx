@@ -183,8 +183,8 @@ function buildUserBoard(): Board {
   };
 }
 
-describe('User-board fixture — 3-task chain renders arc paths (Decision 28 sub-arcs)', () => {
-  it('mirrors user board: 3 tasks (120/80/30 min), 2 task.next edges, linkedTodoId=mother-todo', () => {
+describe('User-board fixture — focus vs event tasks pre-drawing (Issue #166)', () => {
+  it('does NOT render focus tasks on the clock concentric plan lanes', () => {
     const board = buildUserBoard();
     useBoardStore.setState({ board });
 
@@ -199,23 +199,44 @@ describe('User-board fixture — 3-task chain renders arc paths (Decision 28 sub
       }),
     );
 
-    // Arc paths: <path fill="none" stroke="var(--...)">
-    // Decision 28 sub-arcs: 120min=5work+4break=9, 80min=4work+3break=7, 30min=2work+1break=3 → 19 total.
+    const taskArcPaths = Array.from(document.querySelectorAll('svg path')).filter(
+      (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
+    );
+    expect(taskArcPaths).toHaveLength(0);
+  });
+
+  it('renders event tasks as thin hollow arcs (3 paths per event task)', () => {
+    const board = buildUserBoard();
+    // Set all tasks to events
+    for (const n of board.nodes) {
+      if (n.kind === 'todo.task') {
+        n.state = { ...n.state, kind: 'event' };
+      }
+    }
+    useBoardStore.setState({ board });
+
+    const clockNode = board.nodes.find((n) => n.kind === 'clock')! as Node<ClockState, ClockConfig>;
+
+    render(
+      React.createElement(ClockNode, {
+        node: clockNode,
+        onCommand: vi.fn(),
+        slotIndex: 6,
+        slotTotal: 6,
+      }),
+    );
+
     const taskArcPaths = Array.from(document.querySelectorAll('svg path')).filter(
       (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
     );
 
-    // ASSERTION 1: 19 arc paths total (work sub-arcs + break sub-arcs per Decision 28).
-    expect(taskArcPaths).toHaveLength(19);
+    // 3 tasks * 3 paths = 9 total paths
+    expect(taskArcPaths).toHaveLength(9);
 
-    // ASSERTION 2: each arc stroke is a var(--token) CSS variable.
+    // Each arc stroke is a var(--token) CSS variable
     for (const arc of taskArcPaths) {
       const stroke = arc.getAttribute('stroke') ?? '';
       expect(stroke).toMatch(/^var\(--[a-z][\w-]*\)/);
     }
-
-    // ASSERTION 3: break arcs use var(--ink-3) stroke (Decision 28).
-    const breakArcs = taskArcPaths.filter((a) => a.getAttribute('stroke') === 'var(--ink-3)');
-    expect(breakArcs.length).toBeGreaterThan(0);
   });
 });

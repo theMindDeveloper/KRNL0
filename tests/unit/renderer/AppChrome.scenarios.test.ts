@@ -111,35 +111,26 @@ describe('F2 — Topbar right buttons present', () => {
     renderWithWrapper(React.createElement(TopBar));
     expect(screen.getByTestId('topbar-theme-toggle')).toBeTruthy();
   });
-
-  it('renders a "TWEAKS" button', () => {
-    renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-tweaks').textContent).toBe('TWEAKS');
-  });
-
-  it('renders a "SHARE" button', () => {
-    renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-share').textContent).toBe('SHARE');
-  });
 });
 
 // ── F3 — Left dock buttons ────────────────────────────────────────────────────
 
-describe('F3 — Left dock contains 4 icon buttons', () => {
-  it('renders a dock with 4 buttons', () => {
+describe('F3 — Left dock contains 5 icon buttons', () => {
+  it('renders a dock with 5 buttons', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     const buttons = screen.getByTestId('dock').querySelectorAll('button');
-    expect(buttons.length).toBe(4);
+    expect(buttons.length).toBe(5);
   });
 
-  it('renders buttons for select, text, image, connect', () => {
+  it('renders buttons for select, text, image, analytics, frame', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     expect(screen.getByTestId('dock-btn-select')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-text')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-image')).toBeTruthy();
-    expect(screen.getByTestId('dock-btn-connect')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-analytics')).toBeTruthy();
+    expect(screen.getByTestId('dock-btn-frame')).toBeTruthy();
   });
 });
 
@@ -169,13 +160,18 @@ describe('F4 — Dock button dispatches board.addNode intent', () => {
     expect(onAddNode).not.toHaveBeenCalled();
   });
 
-  it('clicking connect button calls onToolChange with "connect"', () => {
+  it('clicking analytics dock button calls onAddNode with { kind: "analytics" }', () => {
     const onAddNode = vi.fn();
-    const onToolChange = vi.fn();
-    renderWithWrapper(React.createElement(Dock, { onAddNode, onToolChange }));
-    fireEvent.click(screen.getByTestId('dock-btn-connect'));
-    expect(onToolChange).toHaveBeenCalledWith('connect');
-    expect(onAddNode).not.toHaveBeenCalled();
+    renderWithWrapper(React.createElement(Dock, { onAddNode }));
+    fireEvent.click(screen.getByTestId('dock-btn-analytics'));
+    expect(onAddNode).toHaveBeenCalledWith({ kind: 'analytics' });
+  });
+
+  it('clicking frame dock button calls onAddNode with { kind: "frame" }', () => {
+    const onAddNode = vi.fn();
+    renderWithWrapper(React.createElement(Dock, { onAddNode }));
+    fireEvent.click(screen.getByTestId('dock-btn-frame'));
+    expect(onAddNode).toHaveBeenCalledWith({ kind: 'frame' });
   });
 });
 

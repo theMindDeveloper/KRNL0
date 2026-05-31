@@ -213,19 +213,17 @@ describe('ClockNode renders the analog face', () => {
 // ── Anchored chain → arcs ────────────────────────────────────────────────────
 
 describe('Anchored chain renders task arcs', () => {
-  it('three-task chain anchored at 02:00 on today produces 11 arc paths (Decision 28 sub-arcs)', () => {
-    // Decision 28: multi-session tasks produce sub-arcs (work + break).
-    // 60min = 3 sessions → 3 work + 2 breaks = 5 arcs
-    // 30min = 2 sessions → 2 work + 1 break  = 3 arcs
-    // 45min = 2 sessions → 2 work + 1 break  = 3 arcs
-    // Total = 11 arc paths.
+  it('three-task chain anchored at 02:00 on today produces 9 arc paths (Issue #166)', () => {
+    // Under Issue #166, focus tasks are not pre-drawn. Event tasks draw as
+    // thin hollow/outlined arcs: 3 paths per event task.
+    // 3 tasks * 3 paths = 9 total paths.
     const todoId = 'todo-1';
     const t1 = makeTaskNode(
       'task-1',
-      makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T02:00` }),
+      makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T02:00`, kind: 'event' }),
     );
-    const t2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
-    const t3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, plannedMin: 45 }));
+    const t2 = makeTaskNode('task-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30, kind: 'event' }));
+    const t3 = makeTaskNode('task-3', makeTaskState({ parentTodoId: todoId, plannedMin: 45, kind: 'event' }));
     seedBoard([makeTodoNode(todoId), t1, t2, t3], [
       makeEdge('task-1', 'task-2'),
       makeEdge('task-2', 'task-3'),
@@ -233,33 +231,34 @@ describe('Anchored chain renders task arcs', () => {
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    expect(getTaskArcPaths()).toHaveLength(11);
+    expect(getTaskArcPaths()).toHaveLength(9);
   });
 
-  it('task arcs use strokeWidth 14 (non-active)', () => {
+  it('task arcs use strokeWidth 12 for non-active background fill (Issue #166)', () => {
     const todoId = 'todo-sw';
     const t1 = makeTaskNode(
       't-sw-1',
-      makeTaskState({ parentTodoId: todoId, plannedMin: 30, scheduledFor: `${ANCHOR_DATE}T02:00` }),
+      makeTaskState({ parentTodoId: todoId, plannedMin: 30, scheduledFor: `${ANCHOR_DATE}T02:00`, kind: 'event' }),
     );
-    const t2 = makeTaskNode('t-sw-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
+    const t2 = makeTaskNode('t-sw-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30, kind: 'event' }));
     seedBoard([makeTodoNode(todoId), t1, t2], [makeEdge('t-sw-1', 't-sw-2')]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
     const arcs = getTaskArcPaths();
     expect(arcs.length).toBeGreaterThanOrEqual(1);
-    // At least some arcs have sw 14 (past or future)
-    const hasSw14 = arcs.some(
-      (a) => a.getAttribute('stroke-width') === '14' || a.getAttribute('stroke-width') === '16',
-    );
-    expect(hasSw14).toBe(true);
+    
+    // Find background fill path (strokeWidth 5) and outline paths (strokeWidth 1)
+    const hasSw5 = arcs.some((a) => a.getAttribute('stroke-width') === '5');
+    const hasSw1 = arcs.some((a) => a.getAttribute('stroke-width') === '1');
+    expect(hasSw5).toBe(true);
+    expect(hasSw1).toBe(true);
   });
 
   it('chain with no anchor renders no task arcs', () => {
     const todoId = 'todo-noanchor';
-    const t1 = makeTaskNode('na-1', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
-    const t2 = makeTaskNode('na-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30 }));
+    const t1 = makeTaskNode('na-1', makeTaskState({ parentTodoId: todoId, plannedMin: 30, kind: 'event' }));
+    const t2 = makeTaskNode('na-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30, kind: 'event' }));
     seedBoard([makeTodoNode(todoId), t1, t2], [makeEdge('na-1', 'na-2')]);
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
@@ -271,12 +270,12 @@ describe('Anchored chain renders task arcs', () => {
 // ── Past / active task display ────────────────────────────────────────────────
 
 describe('Task arcs reflect past / future state', () => {
-  it('past tasks (end < nowFloat) have opacity 0.35', () => {
+  it('past tasks (end < nowFloat) have opacity 0.4 or 0.06 (Issue #166)', () => {
     const todoId = 'todo-past';
     // Place task far in the past (01:00–02:00) so it's always past.
     const pastTask = makeTaskNode(
       'task-past',
-      makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T01:00` }),
+      makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T01:00`, kind: 'event' }),
     );
     seedBoard([makeTodoNode(todoId), pastTask]);
 
@@ -284,13 +283,11 @@ describe('Task arcs reflect past / future state', () => {
 
     const arcs = getTaskArcPaths();
     expect(arcs.length).toBeGreaterThan(0);
-    // The arc's opacity should be 0.35 since nowFloat is > 2.0 at any real clock time.
-    // (At 1 AM or 2 AM this test runs, the time is still >= 2.0 since ANCHOR_DATE=today.)
-    // We assert the opacity is NOT 1 (not active) and is one of the defined values.
-    for (const arc of arcs) {
-      const op = parseFloat(arc.getAttribute('opacity') ?? '1');
-      expect([0.35, 0.92, 1]).toContain(op);
-    }
+    
+    // The arc's opacity should be 0.4 (outlines) or 0.06 (fill)
+    const opacities = arcs.map((a) => parseFloat(a.getAttribute('opacity') ?? '1'));
+    expect(opacities).toContain(0.4);
+    expect(opacities).toContain(0.06);
   });
 });
 

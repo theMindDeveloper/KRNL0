@@ -14,7 +14,7 @@ import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
 import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
-import type { TaskKind } from '../TaskNode/types';
+import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -260,13 +260,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       for (const p of placements) {
         const node = s.board.nodes.find((n) => n.id === p.taskId);
         if (!node || node.kind !== 'todo.task') continue;
-        const st = node.state as {
-          text?: string;
-          done?: boolean;
-          scheduledDurationMin?: number;
-          plannedMin?: number;
-          durationMin?: number;
-        };
+        const st = node.state as TaskState;
+        if ((st.kind ?? 'focus') !== 'event') continue;
         const plannedMin = st.plannedMin ?? st.durationMin ?? 25;
         // Decision 28: block duration comes from placement endISO - startISO
         // (effectiveMin for focus tasks, which already includes breaks).

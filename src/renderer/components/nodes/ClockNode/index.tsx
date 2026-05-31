@@ -6,7 +6,7 @@ import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } fr
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import { selectPomoReality, pomoIsLive, type RealitySegment } from '../../../store/pomoReality';
-import type { TaskState } from '../TaskNode/types';
+import type { TaskState, TaskKind } from '../TaskNode/types';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 
@@ -206,7 +206,7 @@ export function ClockNode({
 
   // Task info — includes text now.
   const taskInfo = useMemo(() => {
-    const m = new Map<string, { done: boolean; plannedMin: number; parentTodoId: string; text: string }>();
+    const m = new Map<string, { done: boolean; plannedMin: number; parentTodoId: string; text: string; kind: TaskKind }>();
     if (!board) return m;
     for (const n of board.nodes) {
       if (n.kind !== 'todo.task') continue;
@@ -216,6 +216,7 @@ export function ClockNode({
         plannedMin: ts.plannedMin ?? ts.durationMin,
         parentTodoId: ts.parentTodoId,
         text: ts.text,
+        kind: ts.kind ?? 'focus',
       });
     }
     return m;
@@ -279,7 +280,7 @@ export function ClockNode({
     // Use day-relative hours so cross-midnight tasks (startH<0 or endH>24) are handled correctly.
     for (const p of placementsMap.values()) {
       const info = taskInfo.get(p.taskId);
-      if (!info) continue;
+      if (!info || info.kind !== 'event') continue;
       const startH = isoHoursFromDayStart(p.startISO, selectedDate);
       if (startH === null) continue;
       const endHRaw = isoHoursFromDayStart(p.endISO, selectedDate);
@@ -667,16 +668,38 @@ export function ClockNode({
                   e: number,
                   cap: 'round' | 'butt',
                 ): React.ReactElement => (
-                  <path
-                    key={`${key}-base`}
-                    d={arcPath(s, e, r)}
-                    fill="none"
-                    stroke={t.colorVar}
-                    strokeWidth={sw}
-                    strokeLinecap={cap}
-                    opacity={opacity}
-                    style={activeStyle}
-                  />
+                  <g key={`${key}-base`}>
+                    {/* Light transparent background fill */}
+                    <path
+                      d={arcPath(s, e, r)}
+                      fill="none"
+                      stroke={t.colorVar}
+                      strokeWidth={sw - 2}
+                      strokeLinecap={cap}
+                      opacity={opacity * 0.15}
+                      style={activeStyle}
+                    />
+                    {/* Outer outline */}
+                    <path
+                      d={arcPath(s, e, r + (sw - 1) / 2)}
+                      fill="none"
+                      stroke={t.colorVar}
+                      strokeWidth={1}
+                      strokeLinecap={cap}
+                      opacity={opacity}
+                      style={activeStyle}
+                    />
+                    {/* Inner outline */}
+                    <path
+                      d={arcPath(s, e, r - (sw - 1) / 2)}
+                      fill="none"
+                      stroke={t.colorVar}
+                      strokeWidth={1}
+                      strokeLinecap={cap}
+                      opacity={opacity}
+                      style={activeStyle}
+                    />
+                  </g>
                 );
 
                 if (breakdown === null || breakdown.segments.length <= 1) {

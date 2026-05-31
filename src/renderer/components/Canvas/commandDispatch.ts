@@ -32,7 +32,7 @@ import { emit, saveBoard } from '../../store/eventLog';
  *  spawned rect sits outside the current viewport. No-op outside a browser
  *  (test environments) and in station mode (CanvasFlow's listener gates). */
 function notifySpawnVisible(rect: { x: number; y: number; width: number; height: number }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
   window.dispatchEvent(new CustomEvent('krnl:ensure-visible', { detail: rect }));
 }
 

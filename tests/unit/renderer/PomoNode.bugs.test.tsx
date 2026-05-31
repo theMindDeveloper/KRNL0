@@ -41,6 +41,7 @@ function makePomoState(overrides: Partial<PomoState> = {}): PomoState {
     history: [],
     pausedAt: null,
     pausedElapsedMs: 0,
+    sessionWorkSec: 0,
     ...overrides,
   };
 }
@@ -51,6 +52,7 @@ function makePomoConfig(overrides: Partial<PomoConfig> = {}): PomoConfig {
     shortBreakMin: 5,
     longBreakMin: 15,
     longBreakEvery: 4,
+    face: 'lcd',
     ...overrides,
   };
 }
