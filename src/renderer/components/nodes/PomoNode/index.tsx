@@ -40,7 +40,7 @@ export function primaryButtonLabel(status: PomoState['status']): string {
   switch (status) {
     case 'running': return 'PAUSE';
     case 'paused':  return 'RESUME';
-    case 'break':   return 'SKIP BREAK';
+    case 'break':   return 'END BREAK';
     case 'done':    return 'START';
     default:        return 'START'; // 'idle'
   }
@@ -91,26 +91,27 @@ export function PomoNode({
     return () => clearInterval(id);
   }, [state.status]);
 
-  const totalMs =
-    state.status === 'running'
-      ? state.durationMin * 60_000
-      : state.status === 'break'
-        ? state.breakMin * 60_000
-        : state.durationMin * 60_000;
-
-  // A.4 — paused: elapsedMs reads from the frozen checkpoint
-  const elapsedMs =
-    state.status === 'paused'
-      ? state.pausedElapsedMs
-      : (state.status === 'running' || state.status === 'break') && state.startedAt !== null
-        ? Date.now() - Date.parse(state.startedAt)
+  // Issue #166 — observer model. Running counts DOWN toward the session
+  // threshold (durationMin); break counts UP, open-ended. `sessionWorkSec`
+  // carries accumulated work across pause gaps so the threshold is correct.
+  const thresholdMs = state.durationMin * 60_000;
+  const liveWorkMs =
+    state.status === 'running' && state.startedAt !== null
+      ? state.sessionWorkSec * 1000 + (Date.now() - Date.parse(state.startedAt))
+      : state.status === 'paused'
+        ? state.sessionWorkSec * 1000 + state.pausedElapsedMs
         : 0;
-  const remainingMs = totalMs - elapsedMs;
+  const remainingMs = Math.max(0, thresholdMs - liveWorkMs);
+  const breakElapsedMs =
+    state.status === 'break' && state.startedAt !== null
+      ? Date.now() - Date.parse(state.startedAt)
+      : 0;
+  // The "Are you done?" prompt fires once the work threshold is reached. The
+  // timer keeps running (arc keeps growing) — NO auto-break, NO auto-stop.
+  const promptDone = state.status === 'running' && liveWorkMs >= thresholdMs;
 
-  // F7 — auto-dispatch pomo.complete when timer hits zero
-  useEffect(() => {
-    if (state.status === 'running' && remainingMs <= 0) onCommand('pomo.complete');
-  }, [state.status, remainingMs, onCommand]);
+  // totalMs kept for the face fill pct (work threshold; break shows full).
+  const totalMs = thresholdMs;
 
   const isTaskMode = state.activeTaskId !== null;
 
@@ -198,17 +199,51 @@ export function PomoNode({
     };
   })();
 
-  // F5 — context-driven primary button (A.3)
+  // Issue #166 — observer-model controls (dispatch the new verbs).
   const handlePrimary = () => {
     if (state.status === 'idle' || state.status === 'done') onCommand('pomo.start');
     else if (state.status === 'running') onCommand('pomo.pause');
     else if (state.status === 'paused') onCommand('pomo.resume');
-    else if (state.status === 'break') onCommand('pomo.skipBreak');
+    else if (state.status === 'break') onCommand('pomo.stop'); // end break → idle
   };
-  // F4 — RESET always dispatches pomo.cancel (FSM guards the actual transition)
-  const handleReset = () => onCommand('pomo.cancel');
+  const handleBreak = () => onCommand('pomo.break');
+  const handleStop = () => onCommand('pomo.stop');
+  const handleExtend = () => onCommand('pomo.extend');
+  // RESET keeps cancelling the in-flight session back to idle.
+  const handleReset = () => onCommand('pomo.stop');
 
   const buttonLabel = primaryButtonLabel(state.status);
+
+  const ghostBtnStyle: React.CSSProperties = {
+    flex: 1,
+    padding: '10px 8px',
+    background: 'transparent',
+    color: 'var(--ink-2)',
+    border: '1px solid var(--paper-3)',
+    borderRadius: 5,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    cursor: 'pointer',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  };
+  const primaryBtnStyle: React.CSSProperties = {
+    flex: 1,
+    padding: '10px 8px',
+    background: 'var(--btn-primary-bg)',
+    color: 'var(--btn-primary-fg)',
+    border: 'none',
+    borderRadius: 5,
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: 'pointer',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    boxShadow: '0 0 0 1px var(--btn-primary-ring)',
+  };
+  const isActiveSession =
+    state.status === 'running' || state.status === 'paused' || state.status === 'break';
 
   // F1 — liquid fill height tracks remaining time
   const remainingPct = calcRemainingPct(state.status, remainingMs, totalMs);
@@ -217,7 +252,9 @@ export function PomoNode({
 
   const clockText = state.status === 'idle' || state.status === 'done'
     ? formatRemaining(state.durationMin * 60_000)
-    : formatRemaining(remainingMs);
+    : state.status === 'break'
+      ? formatRemaining(breakElapsedMs) // break counts UP, open-ended
+      : formatRemaining(remainingMs);
   const [mm, ss] = clockText.split(':') as [string, string];
 
   // F3 — running flag for variants that animate a blinking colon
@@ -634,55 +671,68 @@ export function PomoNode({
             </span>
           </div>
 
-          <div
-            className="pomo-controls"
-            style={{ display: 'flex', gap: 6 }}
-          >
-            <button
-              type="button"
-              data-testid="pomo-reset"
-              onClick={handleReset}
-              className="pomo-btn ghost"
+          {/* Issue #166 — observer-model controls. At the work threshold a
+              "Are you done?" prompt offers EXTEND / BREAK / STOP. Otherwise the
+              row adapts to status: running = PAUSE + BREAK + STOP, paused =
+              RESUME + STOP, break = END BREAK, idle = RESET + START. */}
+          {promptDone ? (
+            <div
+              data-testid="pomo-prompt"
+              className="pomo-controls"
               style={{
-                flex: 1,
-                padding: '10px 8px',
-                background: 'transparent',
-                color: 'var(--ink-2)',
-                border: '1px solid var(--paper-3)',
-                borderRadius: 5,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                cursor: 'pointer',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                padding: '8px',
+                border: '1px solid var(--acid)',
+                borderRadius: 6,
+                background: 'color-mix(in srgb, var(--acid) 8%, transparent)',
               }}
             >
-              RESET
-            </button>
-            <button
-              type="button"
-              data-testid="pomo-primary"
-              onClick={handlePrimary}
-              className="pomo-btn"
-              style={{
-                flex: 1,
-                padding: '10px 8px',
-                background: 'var(--btn-primary-bg)',
-                color: 'var(--btn-primary-fg)',
-                border: 'none',
-                borderRadius: 5,
+              <span style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
                 fontWeight: 700,
-                cursor: 'pointer',
-                letterSpacing: '0.04em',
+                color: 'var(--acid)',
                 textTransform: 'uppercase',
-                boxShadow: '0 0 0 1px var(--btn-primary-ring)',
-              }}
-            >
-              {buttonLabel}
-            </button>
-          </div>
+                letterSpacing: '0.06em',
+                textAlign: 'center',
+              }}>
+                Are you done?
+              </span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" data-testid="pomo-extend" onClick={handleExtend} style={ghostBtnStyle}>EXTEND</button>
+                <button type="button" data-testid="pomo-break" onClick={handleBreak} style={ghostBtnStyle}>BREAK</button>
+                <button type="button" data-testid="pomo-primary" onClick={handleStop} style={primaryBtnStyle}>STOP</button>
+              </div>
+            </div>
+          ) : (
+            <div className="pomo-controls" style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                data-testid="pomo-reset"
+                onClick={isActiveSession ? handleStop : handleReset}
+                className="pomo-btn ghost"
+                style={ghostBtnStyle}
+              >
+                {isActiveSession ? 'STOP' : 'RESET'}
+              </button>
+              {state.status === 'running' && (
+                <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={ghostBtnStyle}>
+                  BREAK
+                </button>
+              )}
+              <button
+                type="button"
+                data-testid="pomo-primary"
+                onClick={handlePrimary}
+                className="pomo-btn"
+                style={primaryBtnStyle}
+              >
+                {buttonLabel}
+              </button>
+            </div>
+          )}
 
           {/* Three-numbers breakdown — work / break / total — for the active task.
               Hidden in free-pomo mode (no active task). Updates live as PomoConfig changes. */}

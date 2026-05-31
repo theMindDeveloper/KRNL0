@@ -5,6 +5,7 @@ import { todayLocalYMD } from './types';
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
+import { selectPomoReality, pomoIsLive, type RealitySegment } from '../../../store/pomoReality';
 import type { TaskState } from '../TaskNode/types';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -168,6 +169,19 @@ export function ClockNode({
     return () => clearInterval(id);
   }, []);
 
+  // Issue #166 — while a pomo session is live, the tracked arc must GROW in
+  // real time. The 30-second hand tick is too coarse; add a 1-second cursor
+  // that only runs when there is an in-flight segment (zero idle cost).
+  const board0 = useBoardStore((s) => s.board);
+  const isLive = pomoIsLive(board0);
+  const [liveMs, setLiveMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isLive) return;
+    setLiveMs(Date.now());
+    const id = setInterval(() => setLiveMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isLive]);
+
   // Initial seconds offset for the CSS-driven second-hand sweep. Captured
   // once at mount; the hand continues sweeping via CSS regardless of React.
   const initialSecOffsetRef = useRef<number>(new Date().getSeconds());
@@ -317,6 +331,27 @@ export function ClockNode({
     out.sort((a, b) => a.start - b.start);
     return out;
   }, [placementsMap, taskInfo, viewWindow, scheduledHabits, selectedIsoDow, selectedDate]);
+
+  // Issue #166 — tracked REALITY segments for the selected day, clipped to the
+  // 12-hour window. These are the filled "what actually happened" arcs (work +
+  // break), distinct from the hollow scheduled-event plan arcs above.
+  const realitySegments = useMemo(() => {
+    const segs = selectPomoReality(board0, liveMs);
+    if (segs.length === 0) return [] as Array<RealitySegment & { startH: number; endH: number }>;
+    const dayStartMs = new Date(selectedDate + 'T00:00:00').getTime();
+    const winLo = viewWindow === 1 ? 12 : 0;
+    const winHi = viewWindow === 1 ? 24 : 12;
+    const out: Array<RealitySegment & { startH: number; endH: number }> = [];
+    for (const seg of segs) {
+      const startH = (seg.startMs - dayStartMs) / 3_600_000;
+      const endH = (seg.endMs - dayStartMs) / 3_600_000;
+      if (!(endH > startH)) continue;
+      if (endH <= 0 || startH >= 24) continue;
+      if (endH <= winLo || startH >= winHi) continue;
+      out.push({ ...seg, startH: Math.max(startH, winLo), endH: Math.min(endH, winHi) });
+    }
+    return out;
+  }, [board0, liveMs, selectedDate, viewWindow]);
 
   // Active-task / now-pointer concepts only apply when the user is viewing
   // today. On any other day, `now` has no meaning relative to the day being
@@ -685,6 +720,42 @@ export function ClockNode({
               });
 
               return [...tracks, ...arcs];
+            })()}
+
+            {/* Issue #166 — tracked REALITY ring. Sits just outside the tick
+                marks and inside the scheduled-event lanes, so "what happened"
+                reads as a bold filled band hugging the dial, visually distinct
+                from the thin hollow event plan arcs further out. Work = filled
+                tone (rust when unlabeled), break = dashed neutral. The live
+                segment pulses. */}
+            {(() => {
+              const R_REALITY = R_TICK_OUT + 4; // 88 — between ticks (84) and event lane0 (92)
+              return realitySegments.map((seg) => {
+                const isWork = seg.kind === 'work';
+                const tone = isWork
+                  ? (seg.taskId ? TONE_VAR[colorFor(seg.taskId)] : 'var(--rust)')
+                  : 'var(--ink-3)';
+                return (
+                  <path
+                    key={`reality-${seg.id}`}
+                    data-testid="clock-reality-arc"
+                    data-reality-kind={seg.kind}
+                    data-reality-live={seg.live ? 'true' : undefined}
+                    d={arcPath(seg.startH, seg.endH, R_REALITY)}
+                    fill="none"
+                    stroke={tone}
+                    strokeWidth={isWork ? 6 : 4}
+                    strokeLinecap="round"
+                    strokeDasharray={isWork ? undefined : '2 3'}
+                    opacity={seg.live ? 1 : 0.85}
+                    style={
+                      seg.live
+                        ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone }
+                        : undefined
+                    }
+                  />
+                );
+              });
             })()}
 
             {/* Now-pointer — spans exactly the train-track band.
