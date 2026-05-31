@@ -11,8 +11,10 @@ import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
+import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
+import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
-import type { TaskKind } from '../TaskNode/types';
+import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -198,6 +200,41 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     return () => clearInterval(id);
   }, []);
 
+  // Issue #166 — while a pomo session is live, the tracked block must grow in
+  // real time. 1-second cursor that only runs when a segment is in-flight.
+  const isLive = useBoardStore((s) => pomoIsLive(s.board));
+  const [liveMs, setLiveMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isLive) return;
+    setLiveMs(Date.now());
+    const id = setInterval(() => setLiveMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isLive]);
+
+  // Issue #166 — tracked REALITY blocks per day (work + break spans the pomo
+  // actually recorded + the live in-flight span). Filled, drawn ON TOP of the
+  // hour grid, distinct from scheduled event blocks. Same-day clipping only
+  // (a span crossing midnight is clamped to its start day for now).
+  const realityByDay = useBoardStore(
+    useShallow((s) => {
+      const segs = selectPomoReality(s.board, liveMs);
+      const map = new Map<string, Array<{
+        id: string; kind: 'work' | 'break'; taskId: string | null;
+        startMin: number; endMin: number; live: boolean;
+      }>>();
+      for (const seg of segs) {
+        const d = new Date(seg.startMs);
+        const ymd = toYMD(d);
+        const startMin = d.getHours() * 60 + d.getMinutes();
+        const endMin = Math.min(1440, startMin + Math.max(1, (seg.endMs - seg.startMs) / 60_000));
+        const arr = map.get(ymd) ?? [];
+        arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, startMin, endMin, live: seg.live });
+        map.set(ymd, arr);
+      }
+      return map;
+    }),
+  );
+
   // Popup shown when a task block is clicked (PR #122).
   const [taskPopup, setTaskPopup] = useState<{
     task: ScheduledTask;
@@ -223,13 +260,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       for (const p of placements) {
         const node = s.board.nodes.find((n) => n.id === p.taskId);
         if (!node || node.kind !== 'todo.task') continue;
-        const st = node.state as {
-          text?: string;
-          done?: boolean;
-          scheduledDurationMin?: number;
-          plannedMin?: number;
-          durationMin?: number;
-        };
+        const st = node.state as TaskState;
+        if ((st.kind ?? 'focus') !== 'event') continue;
         const plannedMin = st.plannedMin ?? st.durationMin ?? 25;
         // Decision 28: block duration comes from placement endISO - startISO
         // (effectiveMin for focus tasks, which already includes breaks).
@@ -733,6 +765,46 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     });
   }
 
+  // ── Tracked-reality block renderer (Issue #166) ─────────────────────────────
+  function renderRealityBlocks(dayYMD: string) {
+    const segs = realityByDay.get(dayYMD);
+    if (!segs || segs.length === 0) return null;
+    return segs.map((seg) => {
+      const topPx = (seg.startMin / 60) * rowHeight;
+      const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
+      const isWork = seg.kind === 'work';
+      const tone = isWork
+        ? (seg.taskId ? TASK_TONE_VAR[colorForTask(seg.taskId)] : 'var(--rust)')
+        : 'var(--ink-3)';
+      return (
+        <div
+          key={`reality-${seg.id}`}
+          data-testid="calendar-reality-block"
+          data-reality-kind={seg.kind}
+          data-reality-live={seg.live ? 'true' : undefined}
+          title={`${isWork ? 'Focus' : 'Break'} (tracked)`}
+          style={{
+            position: 'absolute',
+            top: topPx,
+            left: 1,
+            right: 1,
+            height: heightPx,
+            background: isWork ? tone : 'transparent',
+            backgroundImage: isWork
+              ? undefined
+              : `repeating-linear-gradient(135deg, ${tone} 0 1px, transparent 1px 4px)`,
+            border: `1px solid ${tone}`,
+            borderRadius: 2,
+            zIndex: 3,
+            boxShadow: seg.live ? `0 0 6px ${tone}` : undefined,
+            opacity: seg.live ? 0.55 : 0.4,
+            pointerEvents: 'none',
+          }}
+        />
+      );
+    });
+  }
+
   // ── Habit block renderer (ADR 0002 §6) ──────────────────────────────────────
 
   function renderHabitBlocks(dayYMD: string) {
@@ -1107,6 +1179,9 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
 
                 {/* Task blocks rendered as absolute-positioned children */}
                 {renderTaskBlocks(dayYMD)}
+
+                {/* Issue #166 — tracked reality overlay (work/break spans) */}
+                {renderRealityBlocks(dayYMD)}
               </div>
             );
           })}

@@ -150,8 +150,8 @@ afterEach(() => {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('WeekView — break tail (Decision 28 §6)', () => {
-  it('renders a break tail for a focus task with 75 min (breakMin > 0)', () => {
+describe('WeekView — focus vs event tasks pre-drawing (Issue #166)', () => {
+  it('does NOT render a focus task at all on the calendar schedule', () => {
     const todoId = 'todo-tail-1';
     const t1 = makeTaskNode('t1', todoId, {
       plannedMin: 75,
@@ -161,34 +161,12 @@ describe('WeekView — break tail (Decision 28 §6)', () => {
     seedBoard([makePomoNode(), makeTodoNode(todoId), t1]);
     renderWeekView();
 
-    // breakdownPomoTime(75, 0, {25/5/15/4}) = workMin:75, breakMin:10, effectiveMin:85
-    // Tail should be present.
-    const tails = document.querySelectorAll('[data-testid="calendar-task-break-tail"]');
-    expect(tails.length).toBeGreaterThan(0);
-
-    // Height of tail should be approximately (10/85) ≈ 11.76% of block height.
-    const tail = tails[0] as HTMLElement;
-    const heightPct = parseFloat(tail.style.height);
-    const expectedPct = (10 / 85) * 100;
-    expect(Math.abs(heightPct - expectedPct)).toBeLessThan(0.5);
+    const block = document.querySelector('[data-testid^="task-block-"]');
+    expect(block).toBeNull();
   });
 
-  it('does NOT render a break tail for a focus task with exactly 1 session (breakMin=0)', () => {
+  it('renders an event task but without any break tail', () => {
     const todoId = 'todo-tail-2';
-    const t1 = makeTaskNode('t1', todoId, {
-      plannedMin: 25,
-      scheduledFor: ANCHOR_ISO,
-      kind: 'focus',
-    });
-    seedBoard([makePomoNode(), makeTodoNode(todoId), t1]);
-    renderWeekView();
-
-    const tails = document.querySelectorAll('[data-testid="calendar-task-break-tail"]');
-    expect(tails.length).toBe(0);
-  });
-
-  it('does NOT render a break tail for an event task', () => {
-    const todoId = 'todo-tail-3';
     const t1 = makeTaskNode('t1', todoId, {
       plannedMin: 75,
       scheduledFor: ANCHOR_ISO,
@@ -197,23 +175,10 @@ describe('WeekView — break tail (Decision 28 §6)', () => {
     seedBoard([makePomoNode(), makeTodoNode(todoId), t1]);
     renderWeekView();
 
+    const block = document.querySelector('[data-testid^="task-block-t1"]');
+    expect(block).not.toBeNull();
+
     const tails = document.querySelectorAll('[data-testid="calendar-task-break-tail"]');
     expect(tails.length).toBe(0);
-  });
-
-  it('break tail uses a diagonal-stripe texture (repeating-linear-gradient)', () => {
-    const todoId = 'todo-tail-4';
-    const t1 = makeTaskNode('t1', todoId, {
-      plannedMin: 75,
-      scheduledFor: ANCHOR_ISO,
-      kind: 'focus',
-    });
-    seedBoard([makePomoNode(), makeTodoNode(todoId), t1]);
-    renderWeekView();
-
-    const tail = document.querySelector('[data-testid="calendar-task-break-tail"]') as HTMLElement;
-    expect(tail).not.toBeNull();
-    // Follow-up: tail uses diagonal stripe texture in task tone (no solid sub-zones).
-    expect(tail.style.backgroundImage).toContain('repeating-linear-gradient');
   });
 });

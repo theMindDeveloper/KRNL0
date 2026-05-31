@@ -1,6 +1,12 @@
-// Pomo data source — emits one 'pomo.session' per completed PomoSessionRecord
-// on the pomo mother node's history. Cancelled records (completed=false) are
-// excluded so partial sessions don't inflate focus minutes.
+// Pomo data source — Issue #166 observer model.
+//
+// Emits three event types per history record:
+//   pomo.session — work span that reached the threshold (completed=true, kind='work').
+//                  Used by focusMin / session-count aggregators.
+//   pomo.work    — every work span (including partial). Represents actual focus time.
+//   pomo.break   — every break span. Represents rest taken.
+//
+// Legacy records without a 'kind' field are treated as 'work'.
 
 import type { AnalyticsDataSource, AnalyticsEvent, BoardLike } from '../types';
 import { isoToYMD } from '../dateRange';
@@ -13,6 +19,7 @@ interface PomoSessionLike {
   completed: boolean;
   taskId?: string | null;
   label?: string;
+  kind?: string;
 }
 
 interface PomoStateLike {
@@ -29,16 +36,43 @@ export const pomoSource: AnalyticsDataSource = {
       const s = n.state as PomoStateLike;
       const history = s.history ?? [];
       for (const rec of history) {
-        if (!rec.completed) continue;
         if (!rec.endedAt) continue;
-        out.push({
-          source: 'pomo',
-          type: 'pomo.session',
-          date: isoToYMD(rec.endedAt),
-          isoTimestamp: rec.endedAt,
-          durationMin: rec.durationMin ?? 0,
-          metadata: { taskId: rec.taskId ?? null, label: rec.label ?? '' },
-        });
+        const recKind = rec.kind === 'break' ? 'break' : 'work';
+        const date = isoToYMD(rec.endedAt);
+        const meta = { taskId: rec.taskId ?? null, label: rec.label ?? '', kind: recKind };
+
+        if (recKind === 'work') {
+          // pomo.work — every work span regardless of completion.
+          out.push({
+            source: 'pomo',
+            type: 'pomo.work',
+            date,
+            isoTimestamp: rec.endedAt,
+            durationMin: rec.durationMin ?? 0,
+            metadata: meta,
+          });
+          // pomo.session — only threshold-reached spans (legacy: completed=true).
+          if (rec.completed) {
+            out.push({
+              source: 'pomo',
+              type: 'pomo.session',
+              date,
+              isoTimestamp: rec.endedAt,
+              durationMin: rec.durationMin ?? 0,
+              metadata: meta,
+            });
+          }
+        } else {
+          // pomo.break — all break spans.
+          out.push({
+            source: 'pomo',
+            type: 'pomo.break',
+            date,
+            isoTimestamp: rec.endedAt,
+            durationMin: rec.durationMin ?? 0,
+            metadata: meta,
+          });
+        }
       }
     }
     return out;

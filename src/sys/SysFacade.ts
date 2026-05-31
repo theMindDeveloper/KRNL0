@@ -9,7 +9,7 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
-import { pomoStart, pomoStop, pomoStatus, pomoConfig } from './commands/pomo';
+import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
@@ -371,6 +371,8 @@ export class SysFacade {
       switch (command.sub) {
         case 'start':  return pomoStart(command.label, command.minutes);
         case 'stop':   return pomoStop();
+        case 'break':  return pomoBreak();
+        case 'extend': return pomoExtend();
         case 'status': return pomoStatus();
         case 'config': {
           const cfgOpts: Parameters<typeof pomoConfig>[0] = {};

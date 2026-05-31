@@ -67,7 +67,8 @@ describe('analytics engine', () => {
     const events = a.events();
     expect(events.filter((e) => e.source === 'task')).toHaveLength(2);
     expect(events.filter((e) => e.source === 'habit')).toHaveLength(2);
-    expect(events.filter((e) => e.source === 'pomo')).toHaveLength(1);
+    // Issue #166: completed work span emits pomo.work + pomo.session = 2 events
+    expect(events.filter((e) => e.source === 'pomo')).toHaveLength(2);
   });
 
   it('returns stable references across repeated calls with the same range', () => {

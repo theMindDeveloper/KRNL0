@@ -32,7 +32,7 @@ import { emit, saveBoard } from '../../store/eventLog';
  *  spawned rect sits outside the current viewport. No-op outside a browser
  *  (test environments) and in station mode (CanvasFlow's listener gates). */
 function notifySpawnVisible(rect: { x: number; y: number; width: number; height: number }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
   window.dispatchEvent(new CustomEvent('krnl:ensure-visible', { detail: rect }));
 }
 
@@ -57,6 +57,9 @@ import {
   pomoComplete,
   pomoSkipBreak,
   pomoEndBreak,
+  pomoBreak,
+  pomoExtend,
+  pomoStop,
   pomoSetConfig,
   pomoSetFace,
   pomoClearActiveTask,
@@ -235,6 +238,10 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         }
         case 'pomo.skipBreak': return { state: pomoSkipBreak(s as never) };
         case 'pomo.endBreak': return { state: pomoEndBreak(s as never) };
+        // Issue #166 — observer-model verbs.
+        case 'pomo.break':    return { state: pomoBreak(s as never) };
+        case 'pomo.extend':   return { state: pomoExtend(s as never) };
+        case 'pomo.stop':     return { state: pomoStop(s as never) };
         case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
         case 'pomo.setFace':   return { config: pomoSetFace(pomoCfg, args as { face: TimerFace }) };
         case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never, pomoCfg) };
@@ -664,14 +671,14 @@ function loadTaskIntoPomo(
     workingState = pomoSkipBreak(workingState);
   }
 
-  // Step 5: compute current session minutes.
-  // - Focus tasks: shared clamp rule (computeCurrentSessionMin = single source).
-  // - Event tasks: single big session, durationMin = plannedMin (no splitting).
+  // Issue #166 — events are pre-scheduled calendar blocks, not timer-controlled.
+  // Only focus tasks can be loaded into the pomo timer.
   const taskState = taskNode.state as TaskState;
+  if (taskState.kind === 'event') return;
+
+  // Step 5: compute current session minutes for focus tasks.
   const completed = taskState.pomoSessionsCompleted ?? 0;
-  const currentSessionMin = taskState.kind === 'event'
-    ? Math.max(1, Math.round(taskState.plannedMin))
-    : computeCurrentSessionMin(taskState.plannedMin, completed, cfg);
+  const currentSessionMin = computeCurrentSessionMin(taskState.plannedMin, completed, cfg);
 
   // Step 6: read the checkpoint (in-flight elapsed) from the new task.
   const checkpointMs = (taskState.currentSessionElapsedSec ?? 0) * 1000;
@@ -891,9 +898,19 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
 
       updateNode(nodeId, { state: { ...ts, kind: newKind } });
 
-      // Re-load the task so durationMin / pip count reflects the new kind.
+      // Issue #166: events are not timer-controlled — when toggling focus→event,
+      // unload the task from pomo (clear activeTaskId, snap to defaults).
+      // When toggling event→focus, optionally re-load (autoStart=false).
       if (wasActive) {
-        loadTaskIntoPomo(nodeId, { autoStart: false });
+        if (newKind === 'event') {
+          const cfg2 = (pomoNode?.config as PomoConfig | null) ?? defaultPomoConfig();
+          const freshPomo2 = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'pomo');
+          if (freshPomo2) {
+            updateNode(freshPomo2.id, { state: pomoClearActiveTask(freshPomo2.state as PomoState, cfg2) });
+          }
+        } else {
+          loadTaskIntoPomo(nodeId, { autoStart: false });
+        }
       }
 
       const updated = useBoardStore.getState().board;

@@ -194,8 +194,8 @@ describe('Feature: PomoNode vapor timer', () => {
       expect(primaryButtonLabel('done')).toBe('START');
     });
 
-    it('When status is break, Then primaryButtonLabel returns SKIP BREAK', () => {
-      expect(primaryButtonLabel('break')).toBe('SKIP BREAK');
+    it('When status is break, Then primaryButtonLabel returns END BREAK', () => {
+      expect(primaryButtonLabel('break')).toBe('END BREAK');
     });
   });
 

@@ -160,10 +160,9 @@ afterEach(() => {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
-  it('multi-session focus task renders break sub-arcs with track-color stroke', () => {
+describe('ClockNode — focus vs event tasks pre-drawing (Issue #166)', () => {
+  it('does NOT render a focus task at all on the clock plan lanes', () => {
     const todoId = 'todo-arcs-1';
-    // 75-min focus task = 3 work sessions + 2 short breaks = 5 segments.
     const t1 = makeTaskNode('t1', todoId, {
       plannedMin: 75,
       scheduledFor: `${ANCHOR_DATE}T02:00`,
@@ -173,32 +172,12 @@ describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    const breakArcs = getBreakArcs();
-    // 2 break segments → 2 break arcs.
-    expect(breakArcs.length).toBe(2);
-    // Breaks now use the track color (paper-3) to match calendar language.
-    for (const arc of breakArcs) {
-      expect(arc.getAttribute('stroke')).toBe('var(--paper-3)');
-    }
+    expect(getAllArcPaths()).toHaveLength(0);
+    expect(getBreakArcs()).toHaveLength(0);
   });
 
-  it('1-session focus task: no break arcs', () => {
+  it('renders an event task as thin hollow/outlined arcs (3 paths) and no break arcs', () => {
     const todoId = 'todo-arcs-2';
-    const t1 = makeTaskNode('t1', todoId, {
-      plannedMin: 25,
-      scheduledFor: `${ANCHOR_DATE}T02:00`,
-      kind: 'focus',
-    });
-    seedBoard([makePomoNode(), makeTodoNode(todoId), t1]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    const breakArcs = getBreakArcs();
-    expect(breakArcs.length).toBe(0);
-  });
-
-  it('event task: no break arcs, single arc rendered', () => {
-    const todoId = 'todo-arcs-3';
     const t1 = makeTaskNode('t1', todoId, {
       plannedMin: 75,
       scheduledFor: `${ANCHOR_DATE}T02:00`,
@@ -208,48 +187,10 @@ describe('ClockNode — sub-arc rendering (Decision 28 §7)', () => {
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    const breakArcs = getBreakArcs();
-    expect(breakArcs.length).toBe(0);
-
-    // Should still have exactly 1 task arc (the event arc).
-    const allArcs = getAllArcPaths();
-    expect(allArcs.length).toBe(1);
-  });
-
-  it('multi-session task: work arcs use task tone, not ink-3', () => {
-    const todoId = 'todo-arcs-4';
-    const t1 = makeTaskNode('t1', todoId, {
-      plannedMin: 75,
-      scheduledFor: `${ANCHOR_DATE}T02:00`,
-      kind: 'focus',
-    });
-    seedBoard([makePomoNode(), makeTodoNode(todoId), t1]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    const allArcs = getAllArcPaths();
-    const breakArcs = getBreakArcs();
-    const workArcs = allArcs.filter((a) => !breakArcs.includes(a as SVGPathElement));
-
-    // Single-worm model: 1 base arc in task tone + 2 break overlays.
-    // Base arc != ink-3 (uses task tone), so workArcs.length === 1.
-    // Glassy 3-layer base (shadow + tone + shine) → workArcs >= 1.
-    expect(workArcs.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it.skip('total arc count for 75-min focus = 1 base + 2 break overlays', () => {
-    const todoId = 'todo-arcs-5';
-    const t1 = makeTaskNode('t1', todoId, {
-      plannedMin: 75,
-      scheduledFor: `${ANCHOR_DATE}T02:00`,
-      kind: 'focus',
-    });
-    seedBoard([makePomoNode(), makeTodoNode(todoId), t1]);
-
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
-
-    // 1 base arc (task tone, full span) + 2 break overlays (white, butt caps).
-    const allArcs = getAllArcPaths();
-    expect(allArcs.length).toBe(3);
+    // 1 event task renders as 3 paths (1 background, 2 outlines)
+    expect(getAllArcPaths()).toHaveLength(3);
+    
+    // No break overlays
+    expect(getBreakArcs()).toHaveLength(0);
   });
 });

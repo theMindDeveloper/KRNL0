@@ -183,6 +183,8 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     history: [],
     pausedAt: null,
     pausedElapsedMs: 0,
+    // Issue #166 — observer-model work accumulator (survives pause gaps).
+    sessionWorkSec: 0,
   }),
   todo: () => ({ items: [] }),
   habit: () => ({ habits: [] }),
@@ -308,7 +310,7 @@ function migrateAddCalendarMother(board: Record<string, unknown>): Record<string
     {
       id: 'mother-calendar',
       kind: 'calendar',
-      position: { x: 840, y: 0 },
+      position: { x: 280, y: 0 },
       isMother: true,
       state: { selectedDate: null, anchorDate: todayLocalYMD() },
       config: {
@@ -339,7 +341,7 @@ function migrateAddClockMother(board: Record<string, unknown>): Record<string, u
     {
       id: 'mother-clock',
       kind: 'clock',
-      position: { x: 1350, y: 0 },
+      position: { x: 840, y: 0 },
       isMother: true,
       state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
       config: {},

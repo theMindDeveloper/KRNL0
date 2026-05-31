@@ -157,3 +157,35 @@ export function NodeResizer(props: NodeResizerProps): React.ReactElement | null 
     />
   );
 }
+
+export interface NodeResizeControlProps {
+  position?: string;
+  minWidth?: number;
+  minHeight?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  onResizeStart?: (e: unknown, params?: unknown) => void;
+  onResize?: (e: unknown, params: { width: number; height: number }) => void;
+  onResizeEnd?: (e: unknown, params: { width: number; height: number }) => void;
+  style?: React.CSSProperties;
+  children?: React.ReactNode;
+}
+
+export function NodeResizeControl(props: NodeResizeControlProps): React.ReactElement | null {
+  return (
+    <div
+      data-testid="rf-node-resizer"
+      data-min-width={props.minWidth}
+      data-min-height={props.minHeight}
+      data-max-width={props.maxWidth}
+      data-max-height={props.maxHeight}
+      style={props.style}
+      onClick={() => {
+        props.onResizeEnd?.(null, { width: 400, height: 200 });
+      }}
+    >
+      {props.children}
+    </div>
+  );
+}
+
