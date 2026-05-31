@@ -89,6 +89,7 @@ export const pomoCancel = (
     label: state.label,
     completed: false,
     taskId: state.activeTaskId,
+    kind: 'work',
   };
   return {
     ...state,
@@ -123,6 +124,7 @@ export const pomoComplete = (
     label: state.label,
     completed: true,
     taskId: state.activeTaskId,
+    kind: 'work',
   };
   // Event-task path (Decision 28 + follow-up): single big session, no break.
   // Caller signals via skipBreak=true. FSM transitions to 'done' (idle-like)
@@ -161,6 +163,186 @@ export const pomoEndBreak = (
   if (state.status !== 'break' || state.startedAt === null) return state;
   if (env.now() - Date.parse(state.startedAt) < state.breakMin * 60_000) return state;
   return { ...state, status: 'idle', startedAt: null };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue #166 — observer-model verbs. The pomo timer draws REALITY: each
+// contiguous work/break span is recorded as a kind-tagged segment. There is no
+// pre-declared session plan. `completed` on a work record means full-vs-partial
+// (threshold reached), NOT include-vs-exclude.
+//
+// Slice 1 is additive: these coexist with the legacy decision-22 verbs above
+// while the node UI / renderers / CLI are migrated off the planner model. The
+// `sessionWorkSec` accumulator survives pause gaps so the threshold is correct
+// across a paused-and-resumed pomodoro.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Minutes spanned by [startIso, nowMs], rounded, never negative. */
+const spanMin = (startIso: string, nowMs: number): number =>
+  Math.max(0, Math.round((nowMs - Date.parse(startIso)) / 60_000));
+
+/** Close the in-flight WORK span into a record. `completed` = threshold reached. */
+function recordWorkSpan(
+  state: PomoState,
+  endMs: number,
+  completed: boolean,
+  env: PomoEnv,
+): PomoSessionRecord {
+  return {
+    id: env.uuid(),
+    startedAt: state.startedAt as string,
+    endedAt: toIso(endMs),
+    durationMin: spanMin(state.startedAt as string, endMs),
+    label: state.label,
+    completed,
+    taskId: state.activeTaskId,
+    kind: 'work',
+  };
+}
+
+/** True iff the current pomodoro has reached its session-length threshold. */
+function reachedThreshold(state: PomoState, workedSec: number): boolean {
+  return workedSec >= state.durationMin * 60;
+}
+
+/**
+ * Issue #166 — switch from work to break. Records the in-flight work span
+ * (completed iff threshold reached), then opens an open-ended break span.
+ * Valid from running or paused; no-op otherwise.
+ */
+export const pomoBreak = (
+  state: PomoState,
+  _args: object = {},
+  env: PomoEnv = defaultEnv,
+): PomoState => {
+  const now = env.now();
+  if (state.status === 'running' && state.startedAt !== null) {
+    const workedSec = state.sessionWorkSec + (now - Date.parse(state.startedAt)) / 1000;
+    const reached = reachedThreshold(state, workedSec);
+    return {
+      ...state,
+      status: 'break',
+      startedAt: toIso(now),
+      pausedAt: null,
+      pausedElapsedMs: 0,
+      sessionWorkSec: 0,
+      sessionsCompleted: state.sessionsCompleted + (reached ? 1 : 0),
+      history: [...state.history, recordWorkSpan(state, now, reached, env)],
+    };
+  }
+  if (state.status === 'paused' && state.startedAt !== null) {
+    const workedSec = state.sessionWorkSec + state.pausedElapsedMs / 1000;
+    const reached = reachedThreshold(state, workedSec);
+    const endIso = state.pausedAt ?? toIso(now);
+    const rec: PomoSessionRecord = {
+      id: env.uuid(),
+      startedAt: state.startedAt,
+      endedAt: endIso,
+      durationMin: Math.max(0, Math.round(state.pausedElapsedMs / 60_000)),
+      label: state.label,
+      completed: reached,
+      taskId: state.activeTaskId,
+      kind: 'work',
+    };
+    return {
+      ...state,
+      status: 'break',
+      startedAt: toIso(now),
+      pausedAt: null,
+      pausedElapsedMs: 0,
+      sessionWorkSec: 0,
+      sessionsCompleted: state.sessionsCompleted + (reached ? 1 : 0),
+      history: [...state.history, rec],
+    };
+  }
+  return state;
+};
+
+/**
+ * Issue #166 — "Extend" from the "Are you done?" prompt. Closes the current
+ * work span as a completed pomodoro (the prompt only appears at threshold),
+ * re-arms `sessionWorkSec`, and opens a fresh work span with no gap — the two
+ * spans render as one continuous arc. No-op unless running.
+ */
+export const pomoExtend = (
+  state: PomoState,
+  _args: object = {},
+  env: PomoEnv = defaultEnv,
+): PomoState => {
+  if (state.status !== 'running' || state.startedAt === null) return state;
+  const now = env.now();
+  return {
+    ...state,
+    startedAt: toIso(now),
+    sessionWorkSec: 0,
+    sessionsCompleted: state.sessionsCompleted + 1,
+    history: [...state.history, recordWorkSpan(state, now, true, env)],
+  };
+};
+
+/**
+ * Issue #166 — stop the timer entirely → idle. Records the final in-flight
+ * span: a work span (completed iff threshold reached) from running/paused, or
+ * a break span from break. No-op when idle.
+ */
+export const pomoStop = (
+  state: PomoState,
+  _args: object = {},
+  env: PomoEnv = defaultEnv,
+): PomoState => {
+  const now = env.now();
+  const toIdle = {
+    status: 'idle' as const,
+    startedAt: null,
+    pausedAt: null,
+    pausedElapsedMs: 0,
+    sessionWorkSec: 0,
+  };
+  if (state.status === 'running' && state.startedAt !== null) {
+    const workedSec = state.sessionWorkSec + (now - Date.parse(state.startedAt)) / 1000;
+    const reached = reachedThreshold(state, workedSec);
+    return {
+      ...state,
+      ...toIdle,
+      sessionsCompleted: state.sessionsCompleted + (reached ? 1 : 0),
+      history: [...state.history, recordWorkSpan(state, now, reached, env)],
+    };
+  }
+  if (state.status === 'break' && state.startedAt !== null) {
+    const rec: PomoSessionRecord = {
+      id: env.uuid(),
+      startedAt: state.startedAt,
+      endedAt: toIso(now),
+      durationMin: spanMin(state.startedAt, now),
+      label: state.label,
+      completed: false,
+      taskId: state.activeTaskId,
+      kind: 'break',
+    };
+    return { ...state, ...toIdle, history: [...state.history, rec] };
+  }
+  if (state.status === 'paused' && state.startedAt !== null) {
+    const workedSec = state.sessionWorkSec + state.pausedElapsedMs / 1000;
+    const reached = reachedThreshold(state, workedSec);
+    const endIso = state.pausedAt ?? toIso(now);
+    const rec: PomoSessionRecord = {
+      id: env.uuid(),
+      startedAt: state.startedAt,
+      endedAt: endIso,
+      durationMin: Math.max(0, Math.round(state.pausedElapsedMs / 60_000)),
+      label: state.label,
+      completed: reached,
+      taskId: state.activeTaskId,
+      kind: 'work',
+    };
+    return {
+      ...state,
+      ...toIdle,
+      sessionsCompleted: state.sessionsCompleted + (reached ? 1 : 0),
+      history: [...state.history, rec],
+    };
+  }
+  return state;
 };
 
 export const pomoSetLabel = (state: PomoState, args: { label: string }): PomoState => {

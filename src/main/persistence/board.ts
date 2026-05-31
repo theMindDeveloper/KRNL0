@@ -183,6 +183,8 @@ const STATE_DEFAULTS: Record<string, () => Record<string, unknown>> = {
     history: [],
     pausedAt: null,
     pausedElapsedMs: 0,
+    // Issue #166 — observer-model work accumulator (survives pause gaps).
+    sessionWorkSec: 0,
   }),
   todo: () => ({ items: [] }),
   habit: () => ({ habits: [] }),

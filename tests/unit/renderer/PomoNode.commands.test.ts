@@ -7,6 +7,9 @@ import {
   pomoEndBreak,
   pomoSetLabel,
   pomoSetDuration,
+  pomoBreak,
+  pomoExtend,
+  pomoStop,
   type PomoEnv,
 } from '../../../src/renderer/components/nodes/PomoNode/commands';
 import { defaultPomoState } from '../../../src/renderer/components/nodes/PomoNode/types';
@@ -85,6 +88,7 @@ describe('PomoNode FSM (Decision #9)', () => {
           label: 'focus',
           completed: true,
           taskId: null,
+          kind: 'work',
         },
       ]);
     });
@@ -142,6 +146,79 @@ describe('PomoNode FSM (Decision #9)', () => {
     });
   });
 
+  // ── Issue #166 — observer-model verbs ──────────────────────────────────────
+  const MIN = 60_000;
+  describe('pomo.break (Issue #166)', () => {
+    it('records the work span (completed iff threshold reached) and opens a break span', () => {
+      const running = pomoStart(defaultPomoState(), { label: 'code' }, env(T0));
+      // 25-min default threshold; run a full session then break.
+      const onBreak = pomoBreak(running, {}, env(T0 + 25 * MIN, 'w1'));
+      expect(onBreak.status).toBe('break');
+      expect(onBreak.startedAt).toBe(new Date(T0 + 25 * MIN).toISOString());
+      expect(onBreak.sessionWorkSec).toBe(0);
+      expect(onBreak.sessionsCompleted).toBe(1); // threshold reached
+      expect(onBreak.history).toHaveLength(1);
+      expect(onBreak.history[0]).toMatchObject({
+        kind: 'work', completed: true, durationMin: 25, label: 'code',
+      });
+    });
+
+    it('marks the work span partial (completed:false) when broken before threshold', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const onBreak = pomoBreak(running, {}, env(T0 + 10 * MIN, 'w1'));
+      expect(onBreak.sessionsCompleted).toBe(0);
+      expect(onBreak.history[0]).toMatchObject({ kind: 'work', completed: false, durationMin: 10 });
+    });
+
+    it('is a no-op when idle', () => {
+      const s = defaultPomoState();
+      expect(pomoBreak(s, {}, env(T0))).toBe(s);
+    });
+  });
+
+  describe('pomo.extend (Issue #166)', () => {
+    it('closes a completed pomodoro, re-arms sessionWorkSec, and opens a fresh work span', () => {
+      const running = pomoStart(defaultPomoState(), { label: 'code' }, env(T0));
+      const extended = pomoExtend(running, {}, env(T0 + 25 * MIN, 'w1'));
+      expect(extended.status).toBe('running');
+      expect(extended.startedAt).toBe(new Date(T0 + 25 * MIN).toISOString());
+      expect(extended.sessionWorkSec).toBe(0); // re-armed → prompt won't re-fire
+      expect(extended.sessionsCompleted).toBe(1);
+      expect(extended.history).toHaveLength(1);
+      expect(extended.history[0]).toMatchObject({ kind: 'work', completed: true, durationMin: 25 });
+    });
+
+    it('is a no-op when not running', () => {
+      const s = defaultPomoState();
+      expect(pomoExtend(s, {}, env(T0))).toBe(s);
+    });
+  });
+
+  describe('pomo.stop (Issue #166)', () => {
+    it('records the final work span and returns to idle', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const stopped = pomoStop(running, {}, env(T0 + 25 * MIN, 'w1'));
+      expect(stopped.status).toBe('idle');
+      expect(stopped.startedAt).toBeNull();
+      expect(stopped.sessionsCompleted).toBe(1);
+      expect(stopped.history[0]).toMatchObject({ kind: 'work', completed: true });
+    });
+
+    it('records a break span (kind break) when stopped from break', () => {
+      const running = pomoStart(defaultPomoState(), {}, env(T0));
+      const onBreak = pomoBreak(running, {}, env(T0 + 25 * MIN));
+      const stopped = pomoStop(onBreak, {}, env(T0 + 30 * MIN, 'b1'));
+      expect(stopped.status).toBe('idle');
+      const last = stopped.history[stopped.history.length - 1];
+      expect(last).toMatchObject({ kind: 'break', durationMin: 5 });
+    });
+
+    it('is a no-op when idle', () => {
+      const s = defaultPomoState();
+      expect(pomoStop(s, {}, env(T0))).toBe(s);
+    });
+  });
+
   describe('persistence rule (Decision #9)', () => {
     it('state never carries a derived countdown — only startedAt + durationMin', () => {
       const running = pomoStart(defaultPomoState(), {}, env(T0));
@@ -155,6 +232,7 @@ describe('PomoNode FSM (Decision #9)', () => {
         'label',
         'pausedAt',
         'pausedElapsedMs',
+        'sessionWorkSec',
         'sessionsCompleted',
         'startedAt',
         'status',
