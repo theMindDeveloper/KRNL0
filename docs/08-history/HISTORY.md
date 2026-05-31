@@ -587,3 +587,12 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Why:** Benchmark run on 2026-05-17 r3 exposed all three — habit lanes overlapping the dock row, frames anchored only on the seed task, and a confusing "no scheduled tasks" output despite a fresh schedule. Each fix is small and isolated; bundling them keeps the PR-#154 churn focused.
 
 **Tests:** sys + shared suites green (360/360 in-scope). Pre-existing renderer scenario failures (AppChrome, ClockNode, ImageNode, PomoNode, TextNode, TaskNode.new, board.decision22-migration) are unchanged.
+
+---
+
+## [2026-05-31] — Pomodoro live observer + decouple events
+
+**Type:** Feature + Refactor
+**PRs / Commits:** `508bdc6` (commit), [#178](https://github.com/theMindDeveloper/KRNL0/pull/178) (PR)
+**Files changed:** 17 files across `src/main`, `src/renderer`, and `tests/`.
+**Summary:** Pomodoro reworked as a live observer. Focus tasks (`kind: 'focus'`) no longer pre-draw scheduled blocks on Clock and Calendar, appearing only as they are tracked live in real time. Event tasks (`kind: 'event'`) are fully decoupled from the timer, hiding START/PAUSE buttons and blocking card double-clicking/loading. Event tasks and habits now render as thin hollow/outlined arcs (3 SVG paths: 1 background fill with `sw - 2` at 0.15 opacity, 2 thin outlines at `sw ± 3` with `strokeWidth = 1`). Tracked reality (Pomo work/break segments) draws as bold filled arcs/blocks. "Are you done?" prompt on pomo end supports EXTEND (continue drawing work arc), BREAK (draw break arc), or STOP. Unit/integration tests updated and typecheck passes with 0 errors.
