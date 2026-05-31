@@ -585,6 +585,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                       max={480}
                       value={timeValue}
                       autoFocus
+                      onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) => {
                         setTimeValue(e.target.value);
                         setTimeInvalid(false);

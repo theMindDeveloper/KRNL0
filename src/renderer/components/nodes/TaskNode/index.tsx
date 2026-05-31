@@ -783,6 +783,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               min={1}
               value={etaValue}
               autoFocus
+              onFocus={(e) => e.currentTarget.select()}
               onChange={(e) => setEtaValue(e.target.value)}
               onKeyDown={handleEtaKeyDown}
               onBlur={commitEtaEdit}
