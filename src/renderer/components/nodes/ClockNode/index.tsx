@@ -729,7 +729,9 @@ export function ClockNode({
                 tone (rust when unlabeled), break = dashed neutral. The live
                 segment pulses. */}
             {(() => {
-              const R_REALITY = R_TICK_OUT + 4; // 88 — between ticks (84) and event lane0 (92)
+              // Reality arcs ride the innermost task track ring so they appear
+              // ON the trail lines, not in the dead zone between face and lanes.
+              const R_REALITY = trackBaseR; // 92 — same radius as lane 0
               return realitySegments.map((seg) => {
                 const isWork = seg.kind === 'work';
                 const tone = isWork

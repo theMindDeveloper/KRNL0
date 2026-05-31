@@ -791,10 +791,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           style={{
             position: 'absolute',
             top: topPx,
-            // Reality hugs the right edge so it reads as a live overlay beside
-            // any scheduled event blocks rather than colliding with them.
-            right: 2,
-            width: 8,
+            left: 1,
+            right: 1,
             height: heightPx,
             background: isWork ? tone : 'transparent',
             backgroundImage: isWork
@@ -804,7 +802,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             borderRadius: 2,
             zIndex: 3,
             boxShadow: seg.live ? `0 0 6px ${tone}` : undefined,
-            opacity: seg.live ? 1 : 0.85,
+            opacity: seg.live ? 0.55 : 0.4,
             pointerEvents: 'none',
           }}
         />
