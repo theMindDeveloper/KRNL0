@@ -1,5 +1,12 @@
 import type { SysResult } from '../SysFacade';
 import type { PomoConfig, PomoState, TimerFace } from '../../renderer/components/nodes/PomoNode/types';
+import {
+  pomoStart as fsmStart,
+  pomoStop as fsmStop,
+  pomoBreak as fsmBreak,
+  pomoExtend as fsmExtend,
+  type PomoEnv,
+} from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 
 const VALID_FACES: readonly TimerFace[] = ['ascii', 'lcd', 'blocks', 'vapor'];
@@ -29,6 +36,11 @@ function getBoardIo() {
   return require('../../main/boardIo') as typeof import('../../main/boardIo');
 }
 
+const cliEnv = (): PomoEnv => ({
+  now: () => Date.now(),
+  uuid: () => crypto.randomUUID(),
+});
+
 export function pomoStart(label?: string, minutes?: number): SysResult {
   let found = false;
   getBoardIo().mutateBoard((board) => {
@@ -37,48 +49,107 @@ export function pomoStart(label?: string, minutes?: number): SysResult {
     const cfg = node['config'] ?? {};
     const sessionMin = minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
     const prev = (node['state'] ?? {}) as Partial<PomoState>;
-    node['state'] = {
-      ...prev,
-      status: 'running',
-      startedAt: new Date().toISOString(),
-      durationMin: sessionMin,
-      label: label ?? prev.label ?? '',
-      pausedAt: null,
-      pausedElapsedMs: 0,
-    } satisfies Partial<PomoState>;
+    const startArgs: { label?: string; durationMin?: number } = { durationMin: sessionMin };
+    if (label !== undefined) startArgs.label = label;
+    const next = fsmStart({ ...defaultState(prev) }, startArgs, cliEnv());
+    node['state'] = next;
     found = true;
   });
   if (!found) return { ok: false, message: 'No Pomodoro node found on the board' };
   return { ok: true, message: 'Pomodoro started' };
 }
 
+/** Issue #166 — record the in-flight segment before going idle. */
 export function pomoStop(): SysResult {
   let found = false;
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);
     if (!node) return;
-    const prev = (node['state'] ?? {}) as Partial<PomoState>;
-    node['state'] = {
-      ...prev,
-      status: 'idle',
-      startedAt: null,
-      pausedAt: null,
-      pausedElapsedMs: 0,
-    } satisfies Partial<PomoState>;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    node['state'] = fsmStop(prev, {}, cliEnv());
     found = true;
   });
   if (!found) return { ok: false, message: 'No Pomodoro node found on the board' };
   return { ok: true, message: 'Pomodoro stopped' };
 }
 
+/** Issue #166 — transition running/paused → break, recording the work span. */
+export function pomoBreak(): SysResult {
+  let found = false;
+  let msg = 'Switched to break';
+  getBoardIo().mutateBoard((board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    if (prev.status !== 'running' && prev.status !== 'paused') {
+      msg = `pomo is ${prev.status} — can only break from running or paused`;
+      return;
+    }
+    node['state'] = fsmBreak(prev, {}, cliEnv());
+    found = true;
+  });
+  if (!found) return { ok: false, message: msg };
+  return { ok: true, message: msg };
+}
+
+/** Issue #166 — close current work span as completed and re-arm the threshold. */
+export function pomoExtend(): SysResult {
+  let found = false;
+  let msg = 'Extended session';
+  getBoardIo().mutateBoard((board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    if (prev.status !== 'running') {
+      msg = `pomo is ${prev.status} — can only extend while running`;
+      return;
+    }
+    node['state'] = fsmExtend(prev, {}, cliEnv());
+    found = true;
+  });
+  if (!found) return { ok: false, message: msg };
+  return { ok: true, message: msg };
+}
+
+/** Issue #166 — segment-aware status: shows what is currently happening. */
 export function pomoStatus(): SysResult {
   const board = getBoardIo().readBoardFile();
   if (!board) return { ok: false, message: 'No board found' };
   const node = findPomoNode(board);
   if (!node) return { ok: false, message: 'No Pomodoro node found on the board' };
-  const state = (node['state'] ?? {}) as Partial<PomoState>;
-  const status = state.status ?? 'idle';
-  const label  = state.label ? ` — ${state.label}` : '';
+  const state = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+  const status = state.status;
+  const label = state.label ? ` — ${state.label}` : '';
+
+  if (status === 'idle' || status === 'done') {
+    return { ok: true, message: `pomo idle${label}` };
+  }
+  if (status === 'running' || status === 'paused') {
+    const workedMs = status === 'running' && state.startedAt
+      ? state.sessionWorkSec * 1000 + (Date.now() - Date.parse(state.startedAt))
+      : state.sessionWorkSec * 1000 + state.pausedElapsedMs;
+    const thresholdMs = state.durationMin * 60_000;
+    const remainingMs = Math.max(0, thresholdMs - workedMs);
+    const workedMin = Math.round(workedMs / 60_000);
+    const remainMin = Math.round(remainingMs / 60_000);
+    const atThreshold = workedMs >= thresholdMs;
+    const prompt = atThreshold ? ' [DONE? extend|break|stop]' : '';
+    return {
+      ok: true,
+      message: `pomo ${status}${label} — ${workedMin}m worked, ${remainMin}m remain${prompt}`,
+      data: { status, label: state.label, workedMin, remainMin, sessions: state.sessionsCompleted },
+    };
+  }
+  if (status === 'break') {
+    const elapsed = state.startedAt
+      ? Math.round((Date.now() - Date.parse(state.startedAt)) / 60_000)
+      : 0;
+    return {
+      ok: true,
+      message: `pomo break — ${elapsed}m elapsed (pomo break | pomo stop to end)`,
+      data: { status, label: state.label, breakElapsedMin: elapsed, sessions: state.sessionsCompleted },
+    };
+  }
   return { ok: true, message: `pomo ${status}${label}` };
 }
 
@@ -106,6 +177,26 @@ export function pomoConfig(opts: {
     return _pomoConfigViaElectron(opts);
   }
   return _pomoConfigViaPath(opts, boardPath);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Fill missing PomoState fields with safe defaults so FSM functions have a full object. */
+function defaultState(partial: Partial<PomoState>): PomoState {
+  return {
+    status: 'idle',
+    startedAt: null,
+    durationMin: 25,
+    breakMin: 5,
+    label: '',
+    sessionsCompleted: 0,
+    activeTaskId: null,
+    history: [],
+    pausedAt: null,
+    pausedElapsedMs: 0,
+    sessionWorkSec: 0,
+    ...partial,
+  };
 }
 
 function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResult {
