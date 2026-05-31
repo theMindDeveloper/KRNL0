@@ -517,7 +517,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const scheduledEndMs =
         new Date(task.startISO).getTime() + task.scheduledDurationMin * 60_000;
       const isPast = scheduledEndMs <= nowMs;
-      const isGrayed = task.done || isPast;
+      // #171 — completed and overrun must read differently. Done tasks get a
+      // ✓ badge (and the grey treatment); overrun = scheduled time elapsed but
+      // never marked done, which stays greyed-only with no checkmark.
+      const isDone = task.done;
+      const isOverrun = isPast && !task.done;
+      const isGrayed = isDone || isOverrun;
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         setTaskPopup(null);
@@ -690,6 +695,27 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               }}
             >
               ↓
+            </span>
+          )}
+          {/* #171 — completed marker. A done task shows a ✓ so it reads as
+              "finished" rather than just "greyed", distinguishing it from an
+              overrun (elapsed-but-undone) block which carries no checkmark. */}
+          {isDone && !isContinuation && (
+            <span
+              data-testid={`task-done-check-${task.id}`}
+              style={{
+                position: 'absolute',
+                top: 1,
+                right: 3,
+                fontSize: 9,
+                fontWeight: 700,
+                color: 'var(--acid)',
+                fontFamily: 'var(--font-mono)',
+                lineHeight: 1,
+                pointerEvents: 'none',
+              }}
+            >
+              ✓
             </span>
           )}
           {/* Decision 28 §6 — work/break sub-regions.
