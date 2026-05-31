@@ -68,27 +68,41 @@ describe('habitSource', () => {
 });
 
 describe('pomoSource', () => {
-  it('emits only completed sessions', () => {
+  it('emits pomo.work for every work span; pomo.session only for completed; pomo.break for breaks', () => {
     const board = makeBoard([
       {
         id: 'p',
         kind: 'pomo',
         state: {
           history: [
+            // completed work span → pomo.work + pomo.session
             {
               id: '1',
               startedAt: '2026-05-10T09:00:00.000Z',
               endedAt: '2026-05-10T09:25:00.000Z',
               durationMin: 25,
               completed: true,
+              kind: 'work',
               label: '',
             },
+            // partial work span → pomo.work only
             {
               id: '2',
               startedAt: '2026-05-10T10:00:00.000Z',
               endedAt: '2026-05-10T10:05:00.000Z',
               durationMin: 5,
               completed: false,
+              kind: 'work',
+              label: '',
+            },
+            // break span → pomo.break only
+            {
+              id: '3',
+              startedAt: '2026-05-10T09:25:00.000Z',
+              endedAt: '2026-05-10T09:30:00.000Z',
+              durationMin: 5,
+              completed: false,
+              kind: 'break',
               label: '',
             },
           ],
@@ -96,12 +110,36 @@ describe('pomoSource', () => {
       },
     ]);
     const events = pomoSource.collect(board);
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      source: 'pomo',
-      type: 'pomo.session',
-      durationMin: 25,
-    });
+    // completed work: pomo.work + pomo.session = 2
+    // partial work: pomo.work = 1
+    // break: pomo.break = 1
+    expect(events).toHaveLength(4);
+    const sessions = events.filter((e) => e.type === 'pomo.session');
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({ source: 'pomo', durationMin: 25 });
+    const work = events.filter((e) => e.type === 'pomo.work');
+    expect(work).toHaveLength(2);
+    const breaks = events.filter((e) => e.type === 'pomo.break');
+    expect(breaks).toHaveLength(1);
+    expect(breaks[0]).toMatchObject({ source: 'pomo', durationMin: 5 });
+  });
+
+  it('legacy records without kind field treated as work', () => {
+    const board = makeBoard([
+      {
+        id: 'p',
+        kind: 'pomo',
+        state: {
+          history: [
+            { id: '1', endedAt: '2026-05-10T09:25:00.000Z', durationMin: 25, completed: true, label: '' },
+          ],
+        },
+      },
+    ]);
+    const events = pomoSource.collect(board);
+    expect(events.some((e) => e.type === 'pomo.session')).toBe(true);
+    expect(events.some((e) => e.type === 'pomo.work')).toBe(true);
+    expect(events.some((e) => e.type === 'pomo.break')).toBe(false);
   });
 });
 

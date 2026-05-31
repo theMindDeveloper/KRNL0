@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
@@ -108,6 +108,32 @@ export function PomoNode({
   // The "Are you done?" prompt fires once the work threshold is reached. The
   // timer keeps running (arc keeps growing) — NO auto-break, NO auto-stop.
   const promptDone = state.status === 'running' && liveWorkMs >= thresholdMs;
+
+  // Issue #166 slice 5 — OS notification when threshold is first reached.
+  // Fires once per transition false→true; uses Web Notification API (works
+  // natively in Electron's renderer without extra IPC).
+  const prevPromptDone = useRef(false);
+  useEffect(() => {
+    if (promptDone && !prevPromptDone.current) {
+      prevPromptDone.current = true;
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification('Pomodoro done?', {
+          body: `${state.label || 'Session'} · EXTEND · BREAK · STOP`,
+          silent: false,
+        });
+      } else if (typeof Notification !== 'undefined' && Notification.permission !== 'denied') {
+        void Notification.requestPermission().then((perm) => {
+          if (perm === 'granted') {
+            new Notification('Pomodoro done?', {
+              body: `${state.label || 'Session'} · EXTEND · BREAK · STOP`,
+              silent: false,
+            });
+          }
+        });
+      }
+    }
+    if (!promptDone) prevPromptDone.current = false;
+  }, [promptDone, state.label]);
 
   // totalMs kept for the face fill pct (work threshold; break shows full).
   const totalMs = thresholdMs;
