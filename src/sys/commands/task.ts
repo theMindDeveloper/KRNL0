@@ -184,7 +184,7 @@ export async function taskAdd(
     plannedMin: durationMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
-    kind: 'focus',
+    kind: 'event', // #180 — Todo creates events only
   };
 
   // Link taskNodeId on the TodoItem
@@ -391,7 +391,7 @@ export async function taskSubtask(
     plannedMin: parentTs.plannedMin ?? parentTs.durationMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
-    kind: 'focus',
+    kind: 'event', // #180 — Todo creates events only
   };
 
   const childNode: AnyNode = {
@@ -498,7 +498,7 @@ export async function taskSibling(
     plannedMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
-    kind: 'focus',
+    kind: 'event', // #180 — Todo creates events only
   };
 
   const newNode: AnyNode = {
@@ -810,7 +810,7 @@ export async function taskAddNext(
     plannedMin: effectiveDuration,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
-    kind: 'focus',
+    kind: 'event', // #180 — Todo creates events only
   };
 
   const newNode: AnyNode = {
