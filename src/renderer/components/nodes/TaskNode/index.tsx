@@ -429,18 +429,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     },
   ];
 
-  // ── body double-click → refresh pomo with this task's info (no auto-start).
-  // Single click is reserved for RF selection (so users can move/connect/marquee
-  // freely). Double-click is the explicit "show me this task in the pomo" gesture.
-  // Decision 28: event-kind tasks silently no-op the double-click (no toast).
-  const handleBodyDoubleClick = (e: MouseEvent) => {
-    // Children that handle their own dblclick (the editable task text) stop
-    // propagation, so this handler only fires on the surrounding card surface.
-    // Both focus and event tasks load into pomo; event tasks render as a
-    // single big session with no breaks.
-    if (state.done || state.kind === 'event') return;
-    e.stopPropagation();
-    onCommand('task.loadIntoPomo');
+  // #180 — Tasks are events; they never touch the Pomodoro timer. The old
+  // double-click-to-load-into-pomo gesture is removed entirely. The Pomo
+  // observes time on its own and has no concept of an active task.
+  const handleBodyDoubleClick = (_e: MouseEvent) => {
+    /* no-op: events are not timer-controlled (#180) */
   };
 
   // B.4 — ring colour reacts to paused status (solid acid, no glow)
@@ -530,110 +523,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           {` task · #${seqNum} L${layer}`}
         </span>
 
-        {/* Header right slot: START (when not done + not running) or PAUSE
-            (only when the timer is actually running). PAUSE suspends but keeps
-            the task loaded — pressing START resumes from the checkpoint. To
-            fully abandon a session, press RESET on the parent PomoNode.
-            Decision 28: START/PAUSE hidden for event-kind tasks. */}
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          {/* Decision 28 — kind toggle pill. Matches KRNL0 button language
-              (mono uppercase, paper-2 chassis, ink-3 text, thin border).
-              Focus = acid accent dot, Event = ink-3 dot. */}
-          <button
-            type="button"
-            data-testid="task-kind-toggle"
-            aria-label={state.kind === 'focus' ? 'Toggle to event' : 'Toggle to focus'}
-            title={state.kind === 'focus' ? 'Pomodoro task (click → event)' : 'Event task (click → pomodoro)'}
-            onClick={(e) => {
-              e.stopPropagation();
-              onCommand('task.toggleKind');
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 3,
-              padding: '2px 5px',     // match START button footprint
-              width: 54,              // fits "EVENT" + dot at 8.5px; no reflow
-              boxSizing: 'border-box',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 8.5,
-              color: 'var(--ink-3)',
-              background: 'transparent',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 3,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              cursor: 'pointer',
-              opacity: 0.85,
-              lineHeight: 1,
-            }}
-          >
-            <span
-              style={{
-                width: 4,
-                height: 4,
-                borderRadius: '50%',
-                background: state.kind === 'focus' ? 'var(--acid)' : 'var(--ink-4)',
-                flexShrink: 0,
-              }}
-            />
-            {state.kind === 'focus' ? 'POMO' : 'EVENT'}
-          </button>
-          {state.kind === 'focus' && !state.done && !isActiveRunning && (
-            <button
-              type="button"
-              data-testid="task-start-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCommand('task.startPomo');
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 8.5,
-                color: 'var(--acid)',
-                border: '1px solid var(--acid)',
-                borderRadius: 3,
-                padding: '2px 5px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                opacity: 0.85,
-                cursor: 'pointer',
-                background: 'transparent',
-              }}
-            >
-              START
-            </button>
-          )}
-          {state.kind === 'focus' && isActiveRunning && (
-            <button
-              type="button"
-              data-testid="task-pause-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCommand('task.pausePomo');
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 8.5,
-                color: 'var(--rust)',
-                border: '1px solid var(--rust)',
-                borderRadius: 3,
-                padding: '2px 5px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                opacity: 0.85,
-                cursor: 'pointer',
-                background: 'transparent',
-              }}
-            >
-              PAUSE
-            </button>
-          )}
-        </div>
+        {/* #180 — Tasks are events. They carry no kind toggle and no
+            START/PAUSE timer controls; the Pomodoro is a separate, independent
+            observer that no task can load into or drive. */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} />
       </div>
 
       {/* Body */}

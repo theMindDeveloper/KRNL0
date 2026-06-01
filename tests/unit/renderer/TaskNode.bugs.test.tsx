@@ -67,22 +67,14 @@ function renderTaskNode(
   );
 }
 
-// ── B1 — Body double-click dispatches task.loadIntoPomo ──────────────────────
-// Single click is reserved for RF selection (so users can move / marquee /
-// connect freely). Pomo refresh is gated behind an explicit double-click.
+// ── B1 — #180: tasks are events, fully decoupled from the Pomodoro ───────────
+// The Pomodoro is an independent observer. Tasks never load into it, so the
+// old double-click-to-load gesture and the START/PAUSE timer buttons are gone.
 
-describe('B1 — Body double-click dispatches task.loadIntoPomo', () => {
-  it('double-clicking the root body fires task.loadIntoPomo when not done', () => {
+describe('B1 — #180 task is decoupled from the pomo timer', () => {
+  it('double-clicking the root body does NOT fire task.loadIntoPomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
-    const root = screen.getByTestId('task-node-root');
-    fireEvent.doubleClick(root);
-    expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
-  });
-
-  it('does NOT fire task.loadIntoPomo when done = true', () => {
-    const onCommand = vi.fn();
-    renderTaskNode(makeTaskState({ done: true }), onCommand);
     const root = screen.getByTestId('task-node-root');
     fireEvent.doubleClick(root);
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
@@ -96,16 +88,17 @@ describe('B1 — Body double-click dispatches task.loadIntoPomo', () => {
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
   });
 
-  it('START button dispatches task.startPomo (not task.loadIntoPomo) — Decision 22.2', () => {
-    // The old .task-pomo-btn was replaced. The new task-start-btn dispatches
-    // task.startPomo (same auto-start path). task.spawnPomo is still handled
-    // by the dispatcher for sys CLI use but the UI no longer dispatches it.
+  it('no START / PAUSE timer button is rendered on a task', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
-    const startBtn = screen.getByTestId('task-start-btn') as HTMLElement;
-    fireEvent.click(startBtn);
-    expect(onCommand).toHaveBeenCalledWith('task.startPomo');
-    expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
+    expect(screen.queryByTestId('task-start-btn')).toBeNull();
+    expect(screen.queryByTestId('task-pause-btn')).toBeNull();
+  });
+
+  it('no kind-toggle pill is rendered (everything is an event)', () => {
+    const onCommand = vi.fn();
+    renderTaskNode(makeTaskState({ done: false }), onCommand);
+    expect(screen.queryByTestId('task-kind-toggle')).toBeNull();
   });
 });
 
