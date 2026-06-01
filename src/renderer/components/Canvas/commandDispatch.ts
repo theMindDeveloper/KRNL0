@@ -1060,7 +1060,9 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         plannedMin: childPlannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
-        kind: 'focus',
+        // #180 — Todo is the planner; it only creates EVENTS. Focus/pomo tasks
+        // no longer exist on the Todo path. Pomo observes independently.
+        kind: 'event',
       };
 
       const childNode: Node = {
@@ -1161,7 +1163,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         plannedMin: newPlannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
-        kind: 'focus',
+        // #180 — Todo creates EVENTS only.
+        kind: 'event',
       };
 
       const newNode: Node = {
@@ -1531,7 +1534,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         plannedMin: parsedPlanned,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
-        kind: 'focus',
+        // #180 — Todo creates EVENTS only.
+        kind: 'event',
       };
 
       const taskNodeId = `task-${crypto.randomUUID()}`;
