@@ -668,6 +668,69 @@ export function PomoNode({
             </div>
           )}
 
+          {/* DEV-only (#180) — seed synthetic tracked-reality segments so the
+              Clock dial wash + Calendar background wash can be inspected without
+              running a real session. Stripped from production builds. */}
+          {import.meta.env.DEV && (
+            <div
+              data-testid="pomo-dev-viz"
+              style={{
+                marginTop: 4,
+                padding: '6px 8px',
+                border: '1px dashed var(--ink-4)',
+                borderRadius: 5,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 5,
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8.5,
+                color: 'var(--ink-4)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+              }}>
+                dev · seed reality
+              </span>
+              <div style={{ display: 'flex', gap: 5 }}>
+                <button
+                  type="button"
+                  data-testid="pomo-dev-seed-work"
+                  onClick={() => onCommand('pomo.devSeedSegment', { kind: 'work', minutes: 30, agoMin: 0 })}
+                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
+                >
+                  +30m WORK
+                </button>
+                <button
+                  type="button"
+                  data-testid="pomo-dev-seed-break"
+                  onClick={() => onCommand('pomo.devSeedSegment', { kind: 'break', minutes: 10, agoMin: 0 })}
+                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
+                >
+                  +10m BREAK
+                </button>
+                <button
+                  type="button"
+                  data-testid="pomo-dev-clear"
+                  onClick={() => onCommand('pomo.devClearSeeded')}
+                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
+                >
+                  CLEAR
+                </button>
+              </div>
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8,
+                color: 'var(--ink-4)',
+                lineHeight: 1.3,
+              }}>
+                seeds segments ending now → see Clock dial + Calendar today
+              </span>
+            </div>
+          )}
+
         </div>
       )}
     </MotherFrame>
