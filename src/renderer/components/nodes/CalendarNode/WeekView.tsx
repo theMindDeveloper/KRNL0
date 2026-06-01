@@ -791,7 +791,13 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     });
   }
 
-  // ── Tracked-reality block renderer (Issue #166) ─────────────────────────────
+  // ── Tracked-reality block renderer (#180) ───────────────────────────────────
+  // #180 dual visualization: the Pomodoro is an OBSERVER. Its tracked work/break
+  // segments render as an ambient BACKGROUND WASH spanning the full column,
+  // sitting BEHIND event blocks (low z-index, no hard border). Events — the
+  // PLAN — are bordered foreground blocks that overlap on top. This makes "what
+  // actually happened" (wash) and "what I planned" (block) co-readable even when
+  // they cover the same time. Work = warm rust tint; break = neutral striped.
   function renderRealityBlocks(dayYMD: string) {
     const segs = realityByDay.get(dayYMD);
     if (!segs || segs.length === 0) return null;
@@ -799,31 +805,36 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const topPx = (seg.startMin / 60) * rowHeight;
       const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
-      const tone = isWork
-        ? (seg.taskId ? TASK_TONE_VAR[colorForTask(seg.taskId)] : 'var(--rust)')
-        : 'var(--ink-3)';
+      // Reality wash uses a single ambient palette (NOT per-task colour — the
+      // pomo has no task). Work = rust wash, break = neutral ink stripes.
+      const tone = isWork ? 'var(--rust)' : 'var(--ink-3)';
+      const liveGlow = seg.live ? 0.22 : 0.14;
       return (
         <div
           key={`reality-${seg.id}`}
           data-testid="calendar-reality-block"
           data-reality-kind={seg.kind}
           data-reality-live={seg.live ? 'true' : undefined}
-          title={`${isWork ? 'Focus' : 'Break'} (tracked)`}
+          title={`${isWork ? 'Focus' : 'Break'} (tracked reality)`}
           style={{
             position: 'absolute',
             top: topPx,
-            left: 1,
-            right: 1,
+            // Full-column ambient wash — spans edge to edge, behind events.
+            left: 0,
+            right: 0,
             height: heightPx,
-            background: isWork ? tone : 'transparent',
+            background: isWork
+              ? `color-mix(in srgb, ${tone} ${seg.live ? 22 : 14}%, transparent)`
+              : 'transparent',
             backgroundImage: isWork
               ? undefined
-              : `repeating-linear-gradient(135deg, ${tone} 0 1px, transparent 1px 4px)`,
-            border: `1px solid ${tone}`,
-            borderRadius: 2,
-            zIndex: 3,
-            boxShadow: seg.live ? `0 0 6px ${tone}` : undefined,
-            opacity: seg.live ? 0.55 : 0.4,
+              : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 30%, transparent) 0 2px, transparent 2px 7px)`,
+            // No hard border — a soft left accent rail marks the segment edge so
+            // the wash reads as "ambient happened-time", distinct from a block.
+            borderLeft: `2px solid color-mix(in srgb, ${tone} ${seg.live ? 70 : 45}%, transparent)`,
+            // Behind event blocks (zIndex 2) and habits, above the grid.
+            zIndex: 0,
+            boxShadow: seg.live ? `inset 0 0 12px color-mix(in srgb, ${tone} ${liveGlow * 100}%, transparent)` : undefined,
             pointerEvents: 'none',
           }}
         />

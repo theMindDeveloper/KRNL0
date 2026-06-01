@@ -53,6 +53,24 @@ function arcPath(startH: number, endH: number, r: number): string {
   return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
 }
 
+/**
+ * #180 — filled pie sector from the dial centre out to radius r, spanning
+ * [startH, endH]. Used to draw tracked-reality as an ambient background WASH
+ * on the dial face (behind the ticks/numbers/event lanes), distinct from the
+ * thin outlined event arcs on the outer track lanes.
+ */
+function sectorPath(startH: number, endH: number, r: number): string {
+  const span = Math.max(0.05, endH - startH);
+  const a1 = hourToRad(startH);
+  const a2 = hourToRad(startH + span);
+  const x1 = CX + r * Math.cos(a1);
+  const y1 = CY + r * Math.sin(a1);
+  const x2 = CX + r * Math.cos(a2);
+  const y2 = CY + r * Math.sin(a2);
+  const large = span > 6 ? 1 : 0;
+  return `M ${CX} ${CY} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+}
+
 /** Format hour-float as "9:30am". */
 function fmtTime(h: number): string {
   const hr = Math.floor(h);
@@ -745,43 +763,9 @@ export function ClockNode({
               return [...tracks, ...arcs];
             })()}
 
-            {/* Issue #166 — tracked REALITY ring. Sits just outside the tick
-                marks and inside the scheduled-event lanes, so "what happened"
-                reads as a bold filled band hugging the dial, visually distinct
-                from the thin hollow event plan arcs further out. Work = filled
-                tone (rust when unlabeled), break = dashed neutral. The live
-                segment pulses. */}
-            {(() => {
-              // Reality arcs ride the innermost task track ring so they appear
-              // ON the trail lines, not in the dead zone between face and lanes.
-              const R_REALITY = trackBaseR; // 92 — same radius as lane 0
-              return realitySegments.map((seg) => {
-                const isWork = seg.kind === 'work';
-                const tone = isWork
-                  ? (seg.taskId ? TONE_VAR[colorFor(seg.taskId)] : 'var(--rust)')
-                  : 'var(--ink-3)';
-                return (
-                  <path
-                    key={`reality-${seg.id}`}
-                    data-testid="clock-reality-arc"
-                    data-reality-kind={seg.kind}
-                    data-reality-live={seg.live ? 'true' : undefined}
-                    d={arcPath(seg.startH, seg.endH, R_REALITY)}
-                    fill="none"
-                    stroke={tone}
-                    strokeWidth={isWork ? 6 : 4}
-                    strokeLinecap="round"
-                    strokeDasharray={isWork ? undefined : '2 3'}
-                    opacity={seg.live ? 1 : 0.85}
-                    style={
-                      seg.live
-                        ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone }
-                        : undefined
-                    }
-                  />
-                );
-              });
-            })()}
+            {/* #180 — tracked reality moved to a dial-face wash (drawn above,
+                under the ticks). The old lane-ring stroke is gone so reality
+                and event arcs no longer share the track lanes. */}
 
             {/* Now-pointer — spans exactly the train-track band.
                 Only rendered when viewing today.
@@ -837,6 +821,41 @@ export function ClockNode({
               stroke="var(--paper-3)"
               strokeWidth={1}
             />
+
+            {/* #180 — tracked-reality WASH on the dial face. The Pomodoro is an
+                observer: its work/break segments paint as soft filled pie wedges
+                from the dial centre, UNDER the ticks/numerals/hands and far
+                inside the outlined event arcs on the outer lanes. This is the
+                "what actually happened" ambient layer; events (the plan) read as
+                crisp arcs on the track lanes. Work = rust wash, break = neutral
+                dashed wedge. The live segment glows. */}
+            {realitySegments.map((seg) => {
+              const isWork = seg.kind === 'work';
+              const tone = isWork ? 'var(--rust)' : 'var(--ink-3)';
+              const fillPct = isWork ? (seg.live ? 26 : 18) : 0;
+              return (
+                <path
+                  key={`reality-${seg.id}`}
+                  data-testid="clock-reality-arc"
+                  data-reality-kind={seg.kind}
+                  data-reality-live={seg.live ? 'true' : undefined}
+                  d={sectorPath(seg.startH, seg.endH, R_FACE - 2)}
+                  fill={
+                    isWork
+                      ? `color-mix(in srgb, ${tone} ${fillPct}%, transparent)`
+                      : `color-mix(in srgb, ${tone} 10%, transparent)`
+                  }
+                  stroke={`color-mix(in srgb, ${tone} ${seg.live ? 60 : 40}%, transparent)`}
+                  strokeWidth={isWork ? 1 : 0.75}
+                  strokeDasharray={isWork ? undefined : '2 3'}
+                  style={
+                    seg.live
+                      ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone }
+                      : undefined
+                  }
+                />
+              );
+            })}
 
             {/* 60 tick marks */}
             {Array.from({ length: 60 }).map((_, i) => {
