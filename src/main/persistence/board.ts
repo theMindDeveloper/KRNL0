@@ -387,9 +387,15 @@ function migrateNodeStates(board: Record<string, unknown>): Record<string, unkno
 }
 
 /**
- * Decision 28 — backfill `kind` on existing task nodes that pre-date the field.
- * Any `kind` that is absent or not 'focus'|'event' is rewritten to 'focus'.
+ * #180 — every task is now an EVENT (the planner kind). The Pomodoro is a
+ * standalone observer with no task link, so 'focus' tasks no longer have any
+ * behaviour. Migrate all task nodes to kind:'event': legacy 'focus' tasks are
+ * rewritten to 'event', and absent/unknown kinds default to 'event' too.
+ * Non-destructive: only the dead 'focus' discriminator changes; scheduledFor,
+ * plannedMin, etc. are untouched, so events keep their calendar placement.
  * Silent — no version bump required (string default is structural).
+ *
+ * (Supersedes Decision 28, which defaulted to 'focus'.)
  */
 function migrateTaskKind(board: Record<string, unknown>): Record<string, unknown> {
   const nodes = board['nodes'];
@@ -399,8 +405,8 @@ function migrateTaskKind(board: Record<string, unknown>): Record<string, unknown
     const node = n as { kind?: string; state?: Record<string, unknown> | null };
     if (node.kind !== 'todo.task') return n;
     const s = (node.state ?? {}) as Record<string, unknown>;
-    if (s['kind'] === 'focus' || s['kind'] === 'event') return n;
-    return { ...node, state: { ...s, kind: 'focus' } };
+    if (s['kind'] === 'event') return n;
+    return { ...node, state: { ...s, kind: 'event' } };
   });
   return board;
 }

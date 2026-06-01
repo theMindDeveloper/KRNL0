@@ -878,7 +878,16 @@ export async function taskKind(
   taskKind: 'focus' | 'event' | undefined,
 ): Promise<SysResult> {
   if (!ref) return { ok: false, message: 'task kind requires <ref>' };
-  if (!taskKind) return { ok: false, message: 'task kind requires <focus|event>' };
+  if (!taskKind) return { ok: false, message: 'task kind requires <event>' };
+  // #180 — 'focus' is gone. Tasks are events; the Pomodoro is an independent
+  // observer with no task link. 'focus' is no longer a valid kind.
+  if (taskKind === 'focus') {
+    return {
+      ok: false,
+      message: "'focus' is no longer a task kind (#180) — tasks are events; the Pomodoro observes time independently.",
+      data: { exitCode: 1 },
+    };
+  }
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, ref);
   if (!taskNode) return { ok: false, message: `No task node matching "${ref}"` };
@@ -886,21 +895,6 @@ export async function taskKind(
   const ts = taskNode.state as TaskState;
   if (ts.kind === taskKind) {
     return { ok: true, message: `Task "${taskNode.id.slice(0, 8)}" kind is already ${taskKind}.`, data: { id: taskNode.id, kind: taskKind } };
-  }
-
-  // Headless refusal: if toggling focus → event and this task is the active pomo task.
-  if (ts.kind === 'focus' && taskKind === 'event') {
-    const pomoMother = findPomoMother(board);
-    if (pomoMother) {
-      const ps = pomoMother.state as import('../../renderer/components/nodes/PomoNode/types').PomoState;
-      if (ps.status === 'running' && ps.activeTaskId === taskNode.id) {
-        return {
-          ok: false,
-          message: 'cannot toggle kind on active pomo task — open the app or stop pomo first',
-          data: { exitCode: 1 },
-        };
-      }
-    }
   }
 
   const nextState: TaskState = { ...ts, kind: taskKind };
