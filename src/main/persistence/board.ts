@@ -432,6 +432,46 @@ function migrateTaskPlannedMin(board: Record<string, unknown>): Record<string, u
   return board;
 }
 
+/**
+ * #169 — backfill the completion ledger from existing done task nodes. Matches
+ * the old taskSource semantics exactly (done && completedAt; legacy done rows
+ * without completedAt are excluded). Keyed/deduped by taskId so an entry that
+ * already exists (e.g. board saved after the ledger shipped) is not duplicated,
+ * and a later real toggle upserts cleanly. Idempotent: safe to run every load.
+ */
+function migrateCompletionLedger(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  const existing = Array.isArray(board['completions'])
+    ? (board['completions'] as Array<Record<string, unknown>>)
+    : [];
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const c of existing) {
+    if (c && typeof c['taskId'] === 'string') byId.set(c['taskId'] as string, c);
+  }
+  for (const n of nodes) {
+    if (typeof n !== 'object' || n === null) continue;
+    const node = n as { id?: string; kind?: string; state?: Record<string, unknown> | null };
+    if (node.kind !== 'todo.task' || typeof node.id !== 'string') continue;
+    const s = (node.state ?? {}) as Record<string, unknown>;
+    if (s['done'] !== true || typeof s['completedAt'] !== 'string') continue;
+    if (byId.has(node.id)) continue; // don't clobber an existing ledger entry
+    byId.set(node.id, {
+      taskId: node.id,
+      text: typeof s['text'] === 'string' ? s['text'] : '',
+      plannedMin:
+        typeof s['plannedMin'] === 'number'
+          ? s['plannedMin']
+          : typeof s['durationMin'] === 'number'
+            ? s['durationMin']
+            : 25,
+      completedAt: s['completedAt'],
+    });
+  }
+  board['completions'] = Array.from(byId.values());
+  return board;
+}
+
 /** Decision 20: backfill taskNodeId on TodoItems that are missing it. */
 function migrateTodoItemFields(board: Record<string, unknown>): Record<string, unknown> {
   const nodes = board['nodes'];
@@ -560,6 +600,10 @@ export function loadBoardFrom(boardPath: string): unknown {
       // validateBoardInvariants runs last to heal any orphaned TodoItems before
       // the board is handed to the renderer.
       return validateBoardInvariants(
+        // #169: completion-ledger backfill runs outermost — it reads settled
+        // task node done/completedAt state (after all node migrations) and
+        // writes only the top-level `completions` array.
+        migrateCompletionLedger(
         // ADR 0008: migrateLayoutMode + migrateStationSlot run outermost so
         // schemaVersion and stationSlot are settled after all node-level
         // migrations have already run. They read/write only top-level board
@@ -596,6 +640,7 @@ export function loadBoardFrom(boardPath: string): unknown {
               ),
             ),
           ),
+        ),
         ),
       );
     }

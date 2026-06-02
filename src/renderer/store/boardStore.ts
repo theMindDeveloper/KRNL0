@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { saveBoard } from './eventLog';
-import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig } from '../../shared/types';
+import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig, CompletionRecord } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
+import { recordCompletion as recordCompletionLedger, clearCompletion as clearCompletionLedger } from './completionLedger';
 
 const INITIAL_VIEWPORT: BoardViewport = { x: 0, y: 160, zoom: 1 };
 const ZOOM_MIN = 0.25;
@@ -79,6 +80,12 @@ interface BoardStore {
   insertSiblingTaskAfter: (taskNodeId: string, opts?: { text?: string; durationMin?: number }) => void;
   undo: () => void;
   redo: () => void;
+  // #169 — completion ledger. recordCompletion/clearCompletion are upsert-by-
+  // taskId and DO NOT push a history slot: they ride the same set() as the
+  // toggle that triggered them (the toggle already snapshotted), so one undo
+  // reverts both the done-state and the ledger entry together.
+  recordCompletion: (entry: CompletionRecord) => void;
+  clearCompletion: (taskId: string) => void;
   // ADR 0008 § 2.1 / § 4.1 — layout mode and geometry actions.
   // Both persist through the same saveBoard IPC path as all other mutations.
   setLayoutMode: (mode: LayoutMode) => void;
@@ -280,6 +287,24 @@ export const useBoardStore = create<BoardStore>((set) => ({
         board: next,
         history: [...s.history, s.board].slice(-HISTORY_CAP),
         future: s.future.slice(1),
+      };
+    }),
+
+  // #169 — completion ledger writers. No pushHistory: the triggering toggle
+  // already snapshotted the board, so this ledger change shares that undo slot.
+  recordCompletion: (entry) =>
+    set((s) => {
+      if (!s.board) return s;
+      return {
+        board: { ...s.board, completions: recordCompletionLedger(s.board.completions, entry) },
+      };
+    }),
+
+  clearCompletion: (taskId) =>
+    set((s) => {
+      if (!s.board) return s;
+      return {
+        board: { ...s.board, completions: clearCompletionLedger(s.board.completions, taskId) },
       };
     }),
 

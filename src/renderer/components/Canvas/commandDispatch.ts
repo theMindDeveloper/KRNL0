@@ -418,6 +418,32 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
+/**
+ * #169 — sync the completion ledger from a task node's CURRENT state. Upserts
+ * an entry when the task is done (with completedAt), clears it when undone.
+ * Keyed by task id and idempotent, so it is safe to call from every site that
+ * flips a task's done-state (task.toggle, todo.toggle mirror, CLI) without
+ * double-counting. Reads the freshest node from the store by id so callers can
+ * invoke it right after updateNode.
+ */
+function syncCompletionLedger(taskNodeId: string): void {
+  const { board, recordCompletion, clearCompletion } = useBoardStore.getState();
+  const taskNode = board?.nodes.find((n) => n.id === taskNodeId);
+  if (!taskNode || taskNode.kind !== 'todo.task') return;
+  const ts = taskNode.state as TaskState;
+  if (ts.done && ts.completedAt) {
+    recordCompletion({
+      taskId: taskNodeId,
+      text: ts.text,
+      plannedMin: ts.plannedMin ?? ts.durationMin ?? 25,
+      completedAt: ts.completedAt,
+    });
+  } else {
+    clearCompletion(taskNodeId);
+  }
+}
+
+
 /** Remove a set of node ids (and incident edges) from the store in one call. */
 function removeNodeSet(ids: string[]): void {
   const { board } = useBoardStore.getState();
@@ -1614,6 +1640,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
                 { uuid: () => crypto.randomUUID(), now: () => new Date().toISOString() },
               );
               updateNode(prevItem.taskNodeId, { state: mirrored });
+              // #169 — keep the completion ledger in sync with the mirrored node.
+              syncCompletionLedger(prevItem.taskNodeId);
             }
           }
         }
@@ -1694,6 +1722,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         emit('task.completed', `task ${shortId(nodeId)} ${nextTask.done ? 'completed' : 'reopened'}`, {
           refId: nodeId,
         });
+        // #169 — record/clear the durable completion (survives node deletion).
+        syncCompletionLedger(nodeId);
       }
 
       if (prevTask.todoItemId !== null && prevTask.done !== nextTask.done) {

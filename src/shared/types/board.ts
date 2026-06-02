@@ -51,6 +51,20 @@ export interface MotherNodeConfig {
   stationHidden?: boolean;
 }
 
+// #169 — completion ledger entry. Written the moment a task is marked done,
+// independent of the task node, so deleting the node never erases the record
+// of work actually completed. Keyed by taskId (upsert). Removed when the task
+// is reopened (done → undone). Analytics reads this ledger, not live nodes, so:
+//   - created + done + deleted   → retained (entry survives node removal)
+//   - created + undone + deleted → dropped (no entry was ever written)
+//   - created by mistake, deleted → dropped (never completed)
+export interface CompletionRecord {
+  taskId: string;       // the todo.task node id this completion came from
+  text: string;         // task text at completion time (node may be gone later)
+  plannedMin: number;   // budgeted minutes at completion time
+  completedAt: string;  // ISO 8601
+}
+
 export interface Board {
   version: 1;
   schemaVersion: 2;            // bumped from 1 (ADR 0008 § 4.1)
@@ -58,6 +72,9 @@ export interface Board {
   viewport: BoardViewport;
   nodes: Node[];
   edges: Edge[];
+  // #169 — durable completion ledger (see CompletionRecord). Optional so legacy
+  // boards load unchanged; migration backfills from existing done tasks.
+  completions?: CompletionRecord[];
   // ADR 0008 § 2.1 / § 4.1: layout mode, required (migration sets to 'canvas' for legacy)
   layoutMode: LayoutMode;
   // ADR 0008 § 4.1: station geometry; absent until user resizes panels

@@ -114,4 +114,13 @@ export interface BoardLike {
     state: unknown;
     isMother?: boolean;
   }>;
+  // #169 — durable completion ledger. Optional so legacy callers/tests that
+  // only pass nodes still typecheck; taskSource reads this instead of live
+  // node done-state so deleted-but-completed tasks remain in analytics.
+  completions?: ReadonlyArray<{
+    taskId: string;
+    text: string;
+    plannedMin: number;
+    completedAt: string;
+  }>;
 }
