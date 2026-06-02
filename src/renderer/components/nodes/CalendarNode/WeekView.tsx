@@ -7,7 +7,6 @@
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
@@ -54,6 +53,12 @@ function getMondayYMD(anchorYMD: string): string {
 // Return today's YYYY-MM-DD.
 function todayYMD(): string {
   return toYMD(new Date());
+}
+
+// Format an epoch-ms as local "HH:MM".
+function fmtHM(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 // Short day labels Mon-Sun.
@@ -200,8 +205,6 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     onCommand('calendar.setAnchor', { date: addDays(mondayYMD, 7) });
   };
 
-  const reactFlow = useReactFlow();
-
   // 60-second tick for "now" — used to gray out past task blocks (PR #122).
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -230,6 +233,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const map = new Map<string, Array<{
         id: string; kind: 'work' | 'break'; taskId: string | null;
         startMin: number; endMin: number; live: boolean;
+        startMs: number; endMs: number;
       }>>();
       for (const seg of segs) {
         const d = new Date(seg.startMs);
@@ -237,7 +241,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         const startMin = d.getHours() * 60 + d.getMinutes();
         const endMin = Math.min(1440, startMin + Math.max(1, (seg.endMs - seg.startMs) / 60_000));
         const arr = map.get(ymd) ?? [];
-        arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, startMin, endMin, live: seg.live });
+        arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, startMin, endMin, live: seg.live, startMs: seg.startMs, endMs: seg.endMs });
         map.set(ymd, arr);
       }
       return map;
@@ -250,6 +254,22 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     x: number;
     y: number;
   } | null>(null);
+
+  // #6/#7 — a tracked-reality segment with the day it was clipped to, used by
+  // the reality info popup (when it started / ended / duration).
+  type RealitySeg = {
+    id: string; kind: 'work' | 'break'; taskId: string | null;
+    startMin: number; endMin: number; live: boolean; startMs: number; endMs: number;
+  };
+  // #6 — info popup for a clicked tracked-reality (pomo) segment.
+  const [realityPopup, setRealityPopup] = useState<{ seg: RealitySeg; x: number; y: number } | null>(null);
+  // #7 — overlap disambiguation. A right-click enumerates EVERY layer under the
+  // cursor (scheduled task blocks + tracked-reality segments) into one picker so
+  // the user can choose which to act on even when they cover the same minute.
+  type LayerItem =
+    | { kind: 'task'; task: ScheduledTask }
+    | { kind: 'reality'; seg: RealitySeg };
+  const [layerMenu, setLayerMenu] = useState<{ x: number; y: number; items: LayerItem[] } | null>(null);
 
   // ADR 0003 §4 — read placements from the cascade selector, not raw
   // scheduledFor. The selector derives successor start times from the chain's
@@ -498,6 +518,45 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     };
   }
 
+  // ── Overlap disambiguation (#6 / #7) ────────────────────────────────────────
+  // A right-click on a day column enumerates EVERY layer under the cursor —
+  // scheduled task blocks AND tracked-reality (pomo) segments — into a single
+  // picker. This solves both "let me click a pomo section for its info" (#6)
+  // and "a task and a pomo section overlap, how do I select one" (#7) with one
+  // interaction, instead of fighting z-index. Left-click on a task block keeps
+  // its existing direct-open behaviour.
+  function handleColumnContextMenu(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relY = Math.max(0, e.clientY - rect.top);
+    const minute = (relY / rowHeight) * 60;
+
+    const items: LayerItem[] = [];
+    // Task slices covering this minute on this day.
+    for (const slice of slicesByDay.get(dayYMD) ?? []) {
+      if (minute >= slice.sliceStartMin && minute < slice.sliceEndMin) {
+        items.push({ kind: 'task', task: slice.task });
+      }
+    }
+    // Tracked-reality segments covering this minute on this day.
+    for (const seg of realityByDay.get(dayYMD) ?? []) {
+      if (minute >= seg.startMin && minute < seg.endMin) {
+        items.push({ kind: 'reality', seg });
+      }
+    }
+    if (items.length === 0) return;
+
+    // Single hit → act directly, no picker noise.
+    if (items.length === 1) {
+      const only = items[0]!;
+      if (only.kind === 'task') setTaskPopup({ task: only.task, x: e.clientX, y: e.clientY });
+      else setRealityPopup({ seg: only.seg, x: e.clientX, y: e.clientY });
+      return;
+    }
+    setLayerMenu({ x: e.clientX, y: e.clientY, items });
+  }
+
   // ── Task block renderer ─────────────────────────────────────────────────────
 
   function renderTaskBlocks(dayYMD: string) {
@@ -606,20 +665,6 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         setTaskPopup({ task, x: e.clientX, y: e.clientY });
       };
 
-      const handleBlockContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const board = useBoardStore.getState().board;
-        const taskNode = board?.nodes.find((n) => n.id === task.id);
-        if (taskNode) {
-          reactFlow.setCenter(
-            taskNode.position.x + 110,
-            taskNode.position.y + 80,
-            { duration: 400, zoom: 0.9 },
-          );
-        }
-      };
-
       // Visual cue: continuation slices are clipped flat on the top edge,
       // slices that continue past midnight are clipped flat on the bottom.
       const borderTopLeftRadius = isContinuation ? 0 : 4;
@@ -651,7 +696,6 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           onDragOver={handleBlockDragOver}
           onDrop={handleDropOnBlock}
           onClick={handleBlockClick}
-          onContextMenu={handleBlockContextMenu}
           title={task.text + (isContinuation ? ' (continued from previous day)' : '')}
           style={{
             position: 'absolute',
@@ -1254,6 +1298,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               <div
                 key={dayYMD}
                 data-testid={`week-col-${dayYMD}`}
+                onContextMenu={(e) => handleColumnContextMenu(dayYMD, e)}
                 style={{
                   flex: 1,
                   position: 'relative',
@@ -1487,6 +1532,131 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         document.body,
       );
       })()}
+
+      {/* #7 — overlap layer picker. Right-click enumerates every block under the
+          cursor; the user picks which to inspect. */}
+      {layerMenu && createPortal(
+        <>
+          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 2098 }} />
+          <div
+            data-testid="calendar-layer-menu"
+            style={{
+              position: 'fixed',
+              left: Math.min(layerMenu.x + 4, window.innerWidth - 230),
+              top: layerMenu.y + 4,
+              zIndex: 2099,
+              background: 'var(--paper)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 8,
+              padding: 5,
+              minWidth: 200,
+              boxShadow: 'var(--shadow-1)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            <div style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '3px 6px 5px' }}>
+              {layerMenu.items.length} items here
+            </div>
+            {layerMenu.items.map((item, i) => {
+              const isTask = item.kind === 'task';
+              const tone = isTask ? toneVarForTask(item.task.id) : (item.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)');
+              const label = isTask
+                ? item.task.text || 'Untitled task'
+                : `Tracked · ${item.seg.kind === 'work' ? 'focus' : 'break'} ${fmtHM(item.seg.startMs)}–${fmtHM(item.seg.endMs)}`;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  data-testid={`calendar-layer-item-${item.kind}`}
+                  onClick={() => {
+                    if (item.kind === 'task') setTaskPopup({ task: item.task, x: layerMenu.x, y: layerMenu.y });
+                    else setRealityPopup({ seg: item.seg, x: layerMenu.x, y: layerMenu.y });
+                    setLayerMenu(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: 5,
+                    padding: '6px 6px',
+                    cursor: 'pointer',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10.5,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span aria-hidden style={{ width: 9, height: 9, borderRadius: isTask ? 2 : 999, background: tone, flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: 7.5, color: 'var(--ink-4)', textTransform: 'uppercase' }}>{isTask ? 'plan' : 'real'}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>,
+        document.body,
+      )}
+
+      {/* #6 — tracked-reality (pomo) segment info popup. */}
+      {realityPopup && createPortal(
+        <>
+          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+          <div
+            data-testid="calendar-reality-popup"
+            style={{
+              position: 'fixed',
+              left: Math.min(realityPopup.x + 4, window.innerWidth - 250),
+              top: realityPopup.y + 6,
+              zIndex: 1999,
+              background: 'var(--paper)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 8,
+              padding: '12px 14px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--ink)',
+              minWidth: 220,
+              boxShadow: 'var(--shadow-1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 10, height: 10, borderRadius: 999, flexShrink: 0,
+                  background: realityPopup.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)',
+                }}
+              />
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>
+                {realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}
+              </span>
+              {realityPopup.seg.live && (
+                <span style={{ fontSize: 8, color: 'var(--acid)', letterSpacing: '0.08em' }}>◆ LIVE</span>
+              )}
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>tracked reality</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-on-bright)', background: 'var(--rust)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtHM(realityPopup.seg.startMs)}
+              </span>
+              <div style={{ flex: 1, height: 2, borderRadius: 1, background: 'var(--paper-3)' }} />
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', background: 'var(--paper-2)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtHM(realityPopup.seg.endMs)}
+              </span>
+            </div>
+            <div style={{ color: 'var(--ink-3)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Duration · {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
+            </div>
+          </div>
+        </>,
+        document.body,
+      )}
 
       {/* HabitSwapModal — shown after a habit is dropped on a cell.
           Collects kind, time, and duration in one step. */}
