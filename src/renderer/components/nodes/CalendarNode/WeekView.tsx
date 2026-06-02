@@ -7,6 +7,7 @@
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
@@ -203,6 +204,19 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   };
   const handleNext = () => {
     onCommand('calendar.setAnchor', { date: addDays(mondayYMD, 7) });
+  };
+
+  const reactFlow = useReactFlow();
+
+  // Recenter the canvas on a task's node — restored as an explicit popup action
+  // (was previously a right-click side-effect on the block; the right-click is
+  // now the overlap picker, so jump-to-node moved into the task info popup).
+  const jumpToTaskNode = (taskId: string) => {
+    const board = useBoardStore.getState().board;
+    const taskNode = board?.nodes.find((n) => n.id === taskId);
+    if (taskNode) {
+      reactFlow.setCenter(taskNode.position.x + 110, taskNode.position.y + 80, { duration: 400, zoom: 0.9 });
+    }
   };
 
   // 60-second tick for "now" — used to gray out past task blocks (PR #122).
@@ -1505,28 +1519,53 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
             >
               Duration · {taskPopup.task.scheduledDurationMin} min
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                onCommand('calendar.activateTask', { taskId: taskPopup.task.id });
-                setTaskPopup(null);
-              }}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                fontWeight: 600,
-                color: 'var(--ink-on-bright)',
-                background: 'var(--acid)',
-                border: '1px solid var(--acid)',
-                borderRadius: 3,
-                padding: '3px 8px',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-              }}
-            >
-              Activate
-            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  onCommand('calendar.activateTask', { taskId: taskPopup.task.id });
+                  setTaskPopup(null);
+                }}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: 'var(--ink-on-bright)',
+                  background: 'var(--acid)',
+                  border: '1px solid var(--acid)',
+                  borderRadius: 3,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Activate
+              </button>
+              <button
+                type="button"
+                data-testid="calendar-task-jump"
+                onClick={() => {
+                  jumpToTaskNode(taskPopup.task.id);
+                  setTaskPopup(null);
+                }}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: 'var(--ink-2)',
+                  background: 'transparent',
+                  border: '1px solid var(--paper-3)',
+                  borderRadius: 3,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Jump to node →
+              </button>
+            </div>
           </div>
         </>,
         document.body,
