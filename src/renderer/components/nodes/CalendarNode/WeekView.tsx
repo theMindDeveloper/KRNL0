@@ -16,6 +16,7 @@ import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarState } from './types';
+import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
@@ -181,7 +182,15 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   // Column index (0-6) of today, -1 if not in this week.
   const todayColIndex = weekDays.indexOf(today);
 
-  const rowHeight = MIN_ROW_HEIGHT;
+  // #5 — ruler zoom. rowHeight scales with the persisted zoom multiplier so the
+  // user can stretch the grid to clearly read where pomo sections start/end.
+  const zoom = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, state.zoom ?? 1));
+  const rowHeight = MIN_ROW_HEIGHT * zoom;
+  // Sub-mark cadence for the gutter ruler: once a row is tall enough, draw
+  // half-hour (and then quarter-hour) tick labels like "13:30".
+  const subMarks: number[] = rowHeight >= 96 ? [15, 30, 45] : rowHeight >= 52 ? [30] : [];
+
+  const setZoom = (z: number) => onCommand('calendar.setZoom', { zoom: z });
 
   // Sub-header nav handlers.
   const handlePrev = () => {
@@ -1040,6 +1049,47 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               break
             </span>
           </div>
+
+          {/* #5 — ruler zoom controls. Stretch the grid to read pomo/task
+              section boundaries; the gutter gains :30/:15 sub-marks as you go. */}
+          <div
+            data-testid="week-zoom"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
+          >
+            <button
+              type="button"
+              data-testid="week-zoom-out"
+              aria-label="Zoom out"
+              disabled={zoom <= CAL_ZOOM_MIN}
+              onClick={() => setZoom(zoom - CAL_ZOOM_STEP)}
+              style={zoomBtnStyle(zoom <= CAL_ZOOM_MIN)}
+            >
+              −
+            </button>
+            <span
+              data-testid="week-zoom-level"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8.5,
+                color: 'var(--ink-3)',
+                minWidth: 26,
+                textAlign: 'center',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {zoom.toFixed(1)}×
+            </span>
+            <button
+              type="button"
+              data-testid="week-zoom-in"
+              aria-label="Zoom in"
+              disabled={zoom >= CAL_ZOOM_MAX}
+              onClick={() => setZoom(zoom + CAL_ZOOM_STEP)}
+              style={zoomBtnStyle(zoom >= CAL_ZOOM_MAX)}
+            >
+              +
+            </button>
+          </div>
         </div>
         <button
           type="button"
@@ -1115,18 +1165,42 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 key={hour}
                 style={{
                   height: rowHeight,
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'flex-end',
-                  paddingRight: 4,
-                  paddingTop: 1,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
-                  color: 'var(--ink-3)',
+                  position: 'relative',
                   boxSizing: 'border-box',
                 }}
               >
-                {String(hour).padStart(2, '0')}
+                {/* Top-of-hour label, e.g. "13" */}
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 1,
+                    right: 4,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9,
+                    color: 'var(--ink-3)',
+                    lineHeight: 1,
+                  }}
+                >
+                  {String(hour).padStart(2, '0')}
+                </span>
+                {/* #5 ruler sub-marks — appear as the grid is zoomed in, so the
+                    gutter reads like a ruler (13:15 / 13:30 / 13:45). */}
+                {subMarks.map((min) => (
+                  <span
+                    key={min}
+                    style={{
+                      position: 'absolute',
+                      top: (min / 60) * rowHeight - 4,
+                      right: 4,
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 7.5,
+                      color: 'var(--ink-4)',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {String(hour).padStart(2, '0')}:{String(min).padStart(2, '0')}
+                  </span>
+                ))}
               </div>
             );
           })}
@@ -1206,6 +1280,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                         height: rowHeight,
                         boxSizing: 'border-box',
                         borderBottom: '1px solid rgba(154, 145, 128, 0.25)',
+                        // #4 — faint half-hour gridline once the grid is zoomed
+                        // enough to warrant it, so blocks read against a ruler.
+                        backgroundImage:
+                          subMarks.length > 0
+                            ? 'linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(154,145,128,0.12) 50%, transparent calc(50% + 0.5px))'
+                            : undefined,
                       }}
                     />
                   );
@@ -1444,6 +1524,26 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       })()}
     </div>
   );
+}
+
+// Compact zoom button (− / +). Disabled state dims and blocks the cursor.
+function zoomBtnStyle(disabled: boolean): React.CSSProperties {
+  return {
+    width: 18,
+    height: 18,
+    display: 'grid',
+    placeItems: 'center',
+    background: 'var(--paper-2)',
+    border: '1px solid var(--paper-3)',
+    borderRadius: 3,
+    color: disabled ? 'var(--ink-4)' : 'var(--ink-2)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    lineHeight: 1,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    padding: 0,
+    opacity: disabled ? 0.5 : 1,
+  };
 }
 
 // Shared nav button style — mirrors MonthView.

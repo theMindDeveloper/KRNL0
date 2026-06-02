@@ -120,6 +120,7 @@ import {
   calendarSetView,
   calendarSelectDate,
   calendarSetAnchor,
+  calendarSetZoom,
 } from '../nodes/CalendarNode/commands';
 import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types';
 
@@ -312,6 +313,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: calendarSelectDate(calState, args as never) };
         case 'calendar.setAnchor':
           return { state: calendarSetAnchor(calState, args as never) };
+        case 'calendar.setZoom':
+          return { state: calendarSetZoom(calState, args as never) };
         // calendar.schedule: cross-node router (handled in makeCommandHandler).
         // applyCommand returns null here so the router path intercepts it and
         // dispatches task.setSchedule to the target task node.

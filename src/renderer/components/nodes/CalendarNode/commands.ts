@@ -3,6 +3,7 @@
 // calendar.schedule is a cross-node router handled in commandDispatch.ts.
 
 import type { CalendarConfig, CalendarState, CalendarView } from './types';
+import { CAL_ZOOM_MIN, CAL_ZOOM_MAX } from './types';
 
 // calendar.setView — mutates config.view.
 export const calendarSetView = (
@@ -20,6 +21,17 @@ export const calendarSelectDate = (
   // Toggle: clicking the same date again clears the selection.
   const next = state.selectedDate === date ? null : date;
   return { ...state, selectedDate: next };
+};
+
+// calendar.setZoom — set the WeekView ruler zoom (row-height multiplier).
+// Clamped to [CAL_ZOOM_MIN, CAL_ZOOM_MAX]; non-finite input is ignored.
+export const calendarSetZoom = (
+  state: CalendarState,
+  args: { zoom: number },
+): CalendarState => {
+  if (typeof args.zoom !== 'number' || !Number.isFinite(args.zoom)) return state;
+  const zoom = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, args.zoom));
+  return { ...state, zoom };
 };
 
 // calendar.setAnchor — mutates state.anchorDate.
