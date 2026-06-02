@@ -19,6 +19,8 @@
 
 import { useCallback, useMemo } from 'react';
 import type { NodeProps } from '../types';
+import { useBoardStore } from '../../../store/boardStore';
+import { HoldButton } from '../../ui/HoldButton';
 import {
   ActivityStrip,
   CalendarHeatmap,
@@ -796,6 +798,51 @@ function SettingsSidebar({
           })}
         </div>
       ))}
+
+      {/* Danger zone — destructive history wipe (hold to confirm). Clears the
+          completion ledger + pomo session history only; habit logs and the
+          live board are untouched. The label names exactly what dies. */}
+      <div
+        data-testid="analytics-danger-zone"
+        style={{
+          marginTop: 4,
+          paddingTop: 10,
+          borderTop: '1px dashed #3a2a2a',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9,
+            color: '#ff8e64',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            fontWeight: 700,
+          }}
+        >
+          Danger zone
+        </span>
+        <HoldButton
+          testId="analytics-clear-history"
+          label="Clear focus history"
+          holdingLabel="Hold to wipe…"
+          onConfirm={() => useBoardStore.getState().clearFocusHistory()}
+          style={{ width: '100%' }}
+        />
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 8.5,
+            color: '#7d848b',
+            lineHeight: 1.4,
+          }}
+        >
+          Erases completed-task records &amp; pomo sessions. Habits are kept.
+        </span>
+      </div>
     </aside>
   );
 }

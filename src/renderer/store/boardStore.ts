@@ -86,6 +86,14 @@ interface BoardStore {
   // reverts both the done-state and the ledger entry together.
   recordCompletion: (entry: CompletionRecord) => void;
   clearCompletion: (taskId: string) => void;
+  // Destructive, non-undoable: wipe the "what I did" record — the completion
+  // ledger (#169) and every pomo node's session history — leaving the live
+  // board (tasks, habits, layout) untouched. Persists and clears undo/redo so a
+  // stale undo can't resurrect the wiped data. Gated behind hold-to-confirm UI.
+  clearFocusHistory: () => void;
+  // Destructive, non-undoable: replace the entire board with a fresh canonical
+  // seed (factory reset). Persists via the board:reset IPC and clears undo/redo.
+  factoryReset: () => Promise<void>;
   // ADR 0008 § 2.1 / § 4.1 — layout mode and geometry actions.
   // Both persist through the same saveBoard IPC path as all other mutations.
   setLayoutMode: (mode: LayoutMode) => void;
@@ -307,6 +315,32 @@ export const useBoardStore = create<BoardStore>((set) => ({
         board: { ...s.board, completions: clearCompletionLedger(s.board.completions, taskId) },
       };
     }),
+
+  clearFocusHistory: () => {
+    set((s) => {
+      if (!s.board) return s;
+      const { completions: _drop, ...rest } = s.board;
+      void _drop;
+      const cleared: Board = {
+        ...(rest as Board),
+        nodes: s.board.nodes.map((n) =>
+          n.kind === 'pomo'
+            ? { ...n, state: { ...(n.state as Record<string, unknown>), history: [] } }
+            : n,
+        ),
+      };
+      void saveBoard(cleared);
+      // Non-undoable: drop both stacks so a stale snapshot can't restore the
+      // wiped history.
+      return { board: cleared, history: [], future: [] };
+    });
+  },
+
+  factoryReset: async () => {
+    const fresh = (await window.krnl?.boardReset?.()) as Board | undefined;
+    if (!fresh) return;
+    set({ board: fresh, viewport: fresh.viewport, history: [], future: [] });
+  },
 
   // ADR 0008 § 2.1 / § 4.1 — setLayoutMode persists through the same boardSave
   // IPC path used by every other board mutation. No history slot — mode toggle
