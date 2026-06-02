@@ -448,16 +448,24 @@ function syncCompletionLedger(taskNodeId: string): void {
 
 
 /** Remove a set of node ids (and incident edges) from the store in one call. */
-function removeNodeSet(ids: string[]): void {
+function removeNodeSet(ids: string[], opts?: { skipHistory?: boolean }): void {
   const { board } = useBoardStore.getState();
   if (!board) return;
   const idSet = new Set(ids);
-  const { updateNode: _u, addNode: _a, addEdge: _ae } = useBoardStore.getState();
-  void _u; void _a; void _ae;
   // Use the raw set method on the store to do a single atomic update.
+  // #170 — push ONE history slot (pre-mutation board) so the delete is
+  // undoable. The store's removeNode pushes history, but these bulk/cascade
+  // paths bypass it and previously pushed nothing → undo couldn't restore.
+  // skipHistory: when the caller already pushed a slot this action (e.g.
+  // todo.remove updateNode'd the list first), ride that slot so one undo
+  // reverts the whole thing instead of taking two presses.
   useBoardStore.setState((s) => {
     if (!s.board) return s;
+    const historyPatch = opts?.skipHistory
+      ? {}
+      : { history: [...s.history, s.board].slice(-DELETE_HISTORY_CAP), future: [] };
     return {
+      ...historyPatch,
       board: {
         ...s.board,
         nodes: s.board.nodes.filter((n) => !idSet.has(n.id)),
@@ -468,6 +476,9 @@ function removeNodeSet(ids: string[]): void {
     };
   });
 }
+
+// Mirrors boardStore's HISTORY_CAP (not exported). Bulk-delete pushes one slot.
+const DELETE_HISTORY_CAP = 50;
 
 /** Renumber sibling tasks (1-based by createdAt) after add/delete. */
 function renumberSiblings(parentTodoId: string, parentTaskId: string | null): void {
@@ -527,10 +538,15 @@ export function deleteTaskNodesCascade(taskIds: string[]): void {
   if (processed.size === 0) return;
 
   // Apply the fully-mutated workingBoard back to the Zustand store in one
-  // atomic setState so history coalescing treats the entire cascade as one undo step.
+  // atomic setState so the entire cascade is one undo step.
+  // #170 — push ONE history slot (pre-mutation board) so the cascade is
+  // undoable. Previously this pushed nothing, so undo could not restore a
+  // deleted task (the comment claimed "one undo step" but recorded zero).
   useBoardStore.setState((s) => {
     if (!s.board) return s;
     return {
+      history: [...s.history, s.board].slice(-DELETE_HISTORY_CAP),
+      future: [],
       board: {
         ...s.board,
         nodes: workingBoard.nodes as Node[],
@@ -1670,7 +1686,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
               removedItem.taskNodeId,
               currentBoard.nodes as unknown as BoardShape['nodes'],
             );
-            removeNodeSet(descendants);
+            // updateNode above already pushed a history slot for this action.
+            removeNodeSet(descendants, { skipHistory: true });
             const ts = currentBoard.nodes.find(
               (n) => n.id === removedItem.taskNodeId,
             )?.state as TaskState | undefined;
@@ -1703,7 +1720,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           }
         }
         if (taskIds.length > 0) {
-          removeNodeSet(taskIds);
+          // updateNode above already pushed a history slot for this action.
+          removeNodeSet(taskIds, { skipHistory: true });
         }
       }
 
