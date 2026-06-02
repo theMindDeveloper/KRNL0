@@ -9,6 +9,7 @@ import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
+import { makeCommandHandler } from '../../Canvas/commandDispatch';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
@@ -217,6 +218,16 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     if (taskNode) {
       reactFlow.setCenter(taskNode.position.x + 110, taskNode.position.y + 80, { duration: 400, zoom: 0.9 });
     }
+  };
+
+  // #12 — delete a tracked-reality segment by id. Dispatches pomo.deleteSegment
+  // to the pomo mother (history-pushed → undoable; analytics reads history live
+  // so it vanishes there too).
+  const deleteRealitySegment = (segId: string) => {
+    const board = useBoardStore.getState().board;
+    const pomo = board?.nodes.find((n) => n.kind === 'pomo');
+    if (!pomo) return;
+    makeCommandHandler(pomo.id)('pomo.deleteSegment', { id: segId });
   };
 
   // 60-second tick for "now" — used to gray out past task blocks (PR #122).
@@ -882,7 +893,11 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           data-testid="calendar-reality-block"
           data-reality-kind={seg.kind}
           data-reality-live={seg.live ? 'true' : undefined}
-          title={`${isWork ? 'Focus' : 'Break'} (tracked reality)`}
+          title={
+            seg.live
+              ? `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)} → now (recording)`
+              : `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)} (tracked reality)`
+          }
           style={{
             position: 'absolute',
             top: topPx,
@@ -1685,13 +1700,42 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 {fmtHM(realityPopup.seg.startMs)}
               </span>
               <div style={{ flex: 1, height: 2, borderRadius: 1, background: 'var(--paper-3)' }} />
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', background: 'var(--paper-2)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
-                {fmtHM(realityPopup.seg.endMs)}
+              {/* #3 — a live (in-flight) span reads "→ now" so it's obvious it's
+                  still recording, not a fixed end time. */}
+              <span style={{ fontSize: 15, fontWeight: 700, color: realityPopup.seg.live ? 'var(--acid)' : 'var(--ink)', background: 'var(--paper-2)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
+                {realityPopup.seg.live ? 'now' : fmtHM(realityPopup.seg.endMs)}
               </span>
             </div>
             <div style={{ color: 'var(--ink-3)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Duration · {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
+              {realityPopup.seg.live ? 'So far · ' : 'Duration · '}
+              {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
             </div>
+            {/* #12 — delete a recorded segment (removes it from analytics too).
+                The live in-flight span can't be deleted; stop it first. */}
+            {!realityPopup.seg.live && (
+              <button
+                type="button"
+                data-testid="calendar-reality-delete"
+                onClick={() => { deleteRealitySegment(realityPopup.seg.id); setRealityPopup(null); }}
+                style={{
+                  marginTop: 12,
+                  width: '100%',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: '#ff8e64',
+                  background: 'transparent',
+                  border: '1px solid #ff8e64',
+                  borderRadius: 4,
+                  padding: '5px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Delete segment
+              </button>
+            )}
           </div>
         </>,
         document.body,

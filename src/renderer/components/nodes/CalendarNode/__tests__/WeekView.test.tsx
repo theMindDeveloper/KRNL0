@@ -799,3 +799,22 @@ describe('WeekView — overlap disambiguation (#6/#7)', () => {
     expect(popup?.textContent).toMatch(/25 min/);
   });
 });
+
+describe('WeekView — delete tracked-reality segment (#12)', () => {
+  it('delete button removes the segment from the pomo history (and thus analytics)', () => {
+    boardWith([
+      makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
+    ]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+
+    const del = document.querySelector('[data-testid="calendar-reality-delete"]') as HTMLElement;
+    expect(del).toBeTruthy();
+    act(() => { fireEvent.click(del); });
+
+    const pomo = useBoardStore.getState().board!.nodes.find((n) => n.kind === 'pomo')!;
+    expect((pomo.state as { history: unknown[] }).history).toEqual([]);
+  });
+});

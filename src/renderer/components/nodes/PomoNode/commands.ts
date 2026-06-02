@@ -345,6 +345,19 @@ export const pomoStop = (
   return state;
 };
 
+/**
+ * #12 — delete a recorded segment by id. Removes it from history so it vanishes
+ * from the Clock, Calendar AND analytics (pomoSource reads history live). No-op
+ * if the id isn't present. Goes through a normal history-pushed store mutation
+ * so the delete stays undoable.
+ */
+export const pomoDeleteSegment = (state: PomoState, args: { id: string }): PomoState => {
+  if (!args?.id) return state;
+  const next = state.history.filter((r) => r.id !== args.id);
+  if (next.length === state.history.length) return state;
+  return { ...state, history: next };
+};
+
 export const pomoSetLabel = (state: PomoState, args: { label: string }): PomoState => {
   return { ...state, label: args.label };
 };

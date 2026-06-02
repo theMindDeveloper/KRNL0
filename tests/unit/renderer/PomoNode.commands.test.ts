@@ -10,9 +10,34 @@ import {
   pomoBreak,
   pomoExtend,
   pomoStop,
+  pomoDeleteSegment,
   type PomoEnv,
 } from '../../../src/renderer/components/nodes/PomoNode/commands';
 import { defaultPomoState } from '../../../src/renderer/components/nodes/PomoNode/types';
+import type { PomoSessionRecord } from '../../../src/renderer/components/nodes/PomoNode/types';
+
+const seg = (id: string): PomoSessionRecord => ({
+  id, startedAt: '2026-05-10T09:00:00.000Z', endedAt: '2026-05-10T09:25:00.000Z',
+  durationMin: 25, label: '', completed: true, taskId: null, kind: 'work',
+});
+
+describe('pomoDeleteSegment (#12)', () => {
+  it('removes the segment with the matching id', () => {
+    const s = { ...defaultPomoState(), history: [seg('a'), seg('b')] };
+    const next = pomoDeleteSegment(s, { id: 'a' });
+    expect(next.history.map((r) => r.id)).toEqual(['b']);
+  });
+
+  it('is a no-op when the id is absent (same reference)', () => {
+    const s = { ...defaultPomoState(), history: [seg('a')] };
+    expect(pomoDeleteSegment(s, { id: 'zzz' })).toBe(s);
+  });
+
+  it('is a no-op on empty/missing id', () => {
+    const s = { ...defaultPomoState(), history: [seg('a')] };
+    expect(pomoDeleteSegment(s, { id: '' })).toBe(s);
+  });
+});
 
 const T0 = Date.parse('2026-05-10T12:00:00.000Z');
 const env = (nowMs: number, uuid = 'fixed-uuid'): PomoEnv => ({ now: () => nowMs, uuid: () => uuid });
