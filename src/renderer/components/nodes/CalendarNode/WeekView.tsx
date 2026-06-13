@@ -17,7 +17,7 @@ import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarState } from './types';
-import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP } from './types';
+import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, granularityFor } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
@@ -156,6 +156,8 @@ interface WeekViewProps {
   state: CalendarState;
   config: CalendarConfig;
   onCommand: (cmd: string, args: Record<string, unknown>) => void;
+  /** #10 — when true, render a single day (anchorDate) instead of Mon–Sun. */
+  singleDay?: boolean;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -167,7 +169,7 @@ type HabitScheduleKind = 'weekly' | 'daily';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function WeekView({ state, config, onCommand }: WeekViewProps) {
+export function WeekView({ state, config, onCommand, singleDay = false }: WeekViewProps) {
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows
   // the same 24-hour grid.
@@ -176,35 +178,47 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   const rowCount = 24;
   const gridBodyRef = useRef<HTMLDivElement>(null);
 
-  // Compute the Monday that anchors this week.
+  // #10 — day view anchors on anchorDate and shows one column; week view anchors
+  // on the Monday and shows seven. dayCount drives the column grid throughout.
+  const dayCount = singleDay ? 1 : 7;
   const mondayYMD = getMondayYMD(state.anchorDate);
+  const baseYMD = singleDay ? state.anchorDate : mondayYMD;
 
-  // Build array of 7 day YYYY-MM-DD strings (Mon-Sun).
+  // Build the day columns (1 for day view, Mon–Sun for week view).
   const weekDays = useMemo<string[]>(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(mondayYMD, i));
-  }, [mondayYMD]);
+    return Array.from({ length: dayCount }, (_, i) => addDays(baseYMD, i));
+  }, [baseYMD, dayCount]);
 
   const today = todayYMD();
 
-  // Column index (0-6) of today, -1 if not in this week.
+  // Column index of today within the visible range, -1 if not shown.
   const todayColIndex = weekDays.indexOf(today);
 
   // #5 — ruler zoom. rowHeight scales with the persisted zoom multiplier so the
   // user can stretch the grid to clearly read where pomo sections start/end.
   const zoom = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, state.zoom ?? 1));
   const rowHeight = MIN_ROW_HEIGHT * zoom;
-  // Sub-mark cadence for the gutter ruler: once a row is tall enough, draw
-  // half-hour (and then quarter-hour) tick labels like "13:30".
-  const subMarks: number[] = rowHeight >= 96 ? [15, 30, 45] : rowHeight >= 52 ? [30] : [];
+  // #11/#8 — one granularity drives gridlines, gutter labels, AND snapping.
+  const gran = granularityFor(zoom);
+  // Sub-hour marks at every granularity step inside the hour (skip :00).
+  const subMarks: number[] = gran >= 60
+    ? []
+    : Array.from({ length: Math.floor(60 / gran) - 1 }, (_, i) => (i + 1) * gran);
 
   const setZoom = (z: number) => onCommand('calendar.setZoom', { zoom: z });
+  const setToday = () => onCommand('calendar.setAnchor', { date: todayYMD() });
 
-  // Sub-header nav handlers.
+  // #8 — snap preview. While dragging over the grid we track the snapped slot
+  // (day + minute-of-day) and paint a thin band there, so the user sees the
+  // EXACT target slot instead of the whole hour cell lighting up.
+  const [snapPreview, setSnapPreview] = useState<{ dayYMD: string; minute: number } | null>(null);
+
+  // Sub-header nav handlers — step a day in day view, a week otherwise.
   const handlePrev = () => {
-    onCommand('calendar.setAnchor', { date: addDays(mondayYMD, -7) });
+    onCommand('calendar.setAnchor', { date: addDays(baseYMD, -dayCount) });
   };
   const handleNext = () => {
-    onCommand('calendar.setAnchor', { date: addDays(mondayYMD, 7) });
+    onCommand('calendar.setAnchor', { date: addDays(baseYMD, dayCount) });
   };
 
   const reactFlow = useReactFlow();
@@ -286,6 +300,33 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     id: string; kind: 'work' | 'break'; taskId: string | null;
     startMin: number; endMin: number; live: boolean; startMs: number; endMs: number;
   };
+  // #7 — exact-time editor fields inside the task popup (seeded when it opens).
+  const [exactTime, setExactTime] = useState('');
+  const [exactDur, setExactDur] = useState('');
+  useEffect(() => {
+    if (!taskPopup) return;
+    const d = new Date(taskPopup.task.startISO);
+    setExactTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+    setExactDur(String(taskPopup.task.scheduledDurationMin));
+  }, [taskPopup]);
+
+  // #7 — apply the typed exact time + duration to the task (bypasses the grid
+  // snap entirely → solves the "only 15-min grid" complaint). #4 — unschedule
+  // pulls the task off the calendar. Both dispatch to the TASK node.
+  const applyExactTime = (task: ScheduledTask) => {
+    const day = task.startISO.slice(0, 10);
+    const m = /^(\d{1,2}):(\d{2})$/.exec(exactTime.trim());
+    const h = m ? Math.min(23, Math.max(0, parseInt(m[1]!, 10))) : new Date(task.startISO).getHours();
+    const min = m ? Math.min(59, Math.max(0, parseInt(m[2]!, 10))) : 0;
+    const durN = Math.max(1, Math.round(Number(exactDur) || task.scheduledDurationMin));
+    const handler = makeCommandHandler(task.id);
+    handler('task.setPlannedMin', { minutes: durN });
+    handler('task.setSchedule', { scheduledFor: `${day}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`, scheduledDurationMin: durN });
+  };
+  const unscheduleTask = (taskId: string) => {
+    makeCommandHandler(taskId)('task.setSchedule', { scheduledFor: null });
+  };
+
   // #6 — info popup for a clicked tracked-reality (pomo) segment.
   const [realityPopup, setRealityPopup] = useState<{ seg: RealitySeg; x: number; y: number } | null>(null);
   // #7 — overlap disambiguation. A right-click enumerates EVERY layer under the
@@ -300,8 +341,8 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   // scheduledFor. The selector derives successor start times from the chain's
   // single anchor; WeekView no longer cares which task is the anchor for
   // rendering, only the resulting placements.
-  const weekRangeFromISO = `${mondayYMD}T00:00`;
-  const weekRangeToISO = `${addDays(mondayYMD, 7)}T00:00`;
+  const weekRangeFromISO = `${baseYMD}T00:00`;
+  const weekRangeToISO = `${addDays(baseYMD, dayCount)}T00:00`;
   const scheduledTasks = useBoardStore(
     useShallow((s): ScheduledTask[] => {
       if (!s.board) return [];
@@ -485,7 +526,13 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         if (!types.includes('application/krnl-task')) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        e.currentTarget.setAttribute('data-drop-target', 'true');
+        // #8 — instead of lighting the whole hour cell, track the exact snapped
+        // slot under the cursor and render a thin band there (see snapPreview).
+        const rect = e.currentTarget.getBoundingClientRect();
+        const rectH = rect.height > 0 ? rect.height : rowHeight;
+        const within = Math.max(0, Math.min(59, Math.floor(((Number.isFinite(e.clientY) ? e.clientY : 0) - rect.top) / rectH * 60)));
+        const minute = hour * 60 + Math.floor(within / gran) * gran;
+        setSnapPreview((p) => (p && p.dayYMD === dayYMD && p.minute === minute ? p : { dayYMD, minute }));
       },
       onDragLeave: (e: DragEvent<HTMLDivElement>) => {
         e.currentTarget.removeAttribute('data-drop-target');
@@ -493,6 +540,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       onDrop: (e: DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.currentTarget.removeAttribute('data-drop-target');
+        setSnapPreview(null);
 
         // A1: habit drop — capture cell context AND habit payload at drop time,
         // then open HabitSwapModal. We snapshot the habit here because `dragend`
@@ -518,9 +566,9 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           durationMin: number;
         };
         if (!payload.taskId) return;
-        // Compute 15-min snap from mouse Y position within the hour cell.
+        // #11 — snap to the zoom-driven granularity (60/30/15/5), not a fixed 15.
         // Guard against jsdom (clientY undefined, rect.height = 0) so the
-        // computed minute is always a finite integer in [0, 45].
+        // computed minute is always a finite integer in [0, 60-gran].
         const rect = e.currentTarget.getBoundingClientRect();
         const clientY = Number.isFinite(e.clientY) ? e.clientY : 0;
         const rectTop = Number.isFinite(rect.top) ? rect.top : 0;
@@ -528,7 +576,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         const relY = Math.max(0, clientY - rectTop);
         const minuteRaw = Math.floor((relY / rectH) * 60);
         const safeMinute = Number.isFinite(minuteRaw) ? minuteRaw : 0;
-        const snappedMinute = Math.max(0, Math.min(45, Math.floor(safeMinute / 15) * 15));
+        const snappedMinute = Math.max(0, Math.min(60 - gran, Math.floor(safeMinute / gran) * gran));
         const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:${String(snappedMinute).padStart(2, '0')}`;
         onCommand('calendar.schedule', {
           taskId: payload.taskId,
@@ -674,7 +722,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         const absMinute = sliceStartMin + (Number.isFinite(minutesIntoBlock) ? minutesIntoBlock : 0);
         const snappedMin = Math.max(
           0,
-          Math.min(1440 - 15, Math.floor(absMinute / 15) * 15),
+          Math.min(1440 - gran, Math.floor(absMinute / gran) * gran),
         );
         const hour = Math.floor(snappedMin / 60);
         const minute = snappedMin % 60;
@@ -1019,7 +1067,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const weekLabel = formatWeekLabel(mondayYMD);
+  const weekLabel = formatWeekLabel(baseYMD);
 
   return (
     <div
@@ -1064,7 +1112,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               letterSpacing: '0.06em',
             }}
           >
-            Week of {weekLabel}
+            {singleDay ? weekLabel : `Week of ${weekLabel}`}
           </span>
 
           {/* Legend chip — explains the two block treatments used on the
@@ -1122,6 +1170,29 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               break
             </span>
           </div>
+
+          {/* #9 — jump to the current week (like the clock's "now"). */}
+          <button
+            type="button"
+            data-testid="week-today"
+            onClick={setToday}
+            title="Jump to this week"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-2)',
+              background: 'var(--paper-2)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 3,
+              padding: '2px 7px',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Today
+          </button>
 
           {/* #5 — ruler zoom controls. Stretch the grid to read pomo/task
               section boundaries; the gutter gains :30/:15 sub-marks as you go. */}
@@ -1185,7 +1256,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           borderBottom: '1px solid var(--paper-3)',
         }}
       >
-        {weekDays.map((dayYMD, colIdx) => {
+        {weekDays.map((dayYMD) => {
           const isToday = dayYMD === today;
           const dayNum = parseInt(dayYMD.slice(8, 10), 10);
           return (
@@ -1205,7 +1276,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 animation: isToday ? 'krnl-today-pulse 2s ease-in-out infinite' : undefined,
               }}
             >
-              {DAY_LABELS[colIdx]} {dayNum}
+              {DAY_LABELS[ymdToIsoDow(dayYMD) - 1]} {dayNum}
             </div>
           );
         })}
@@ -1311,7 +1382,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               zIndex: 0,
             }}
           >
-            {Array.from({ length: 7 }, (_, i) => (
+            {Array.from({ length: dayCount }, (_, i) => (
               <div
                 key={i}
                 style={{
@@ -1373,6 +1444,43 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
 
                 {/* Issue #166 — tracked reality overlay (work/break spans) */}
                 {renderRealityBlocks(dayYMD)}
+
+                {/* #8 — snap-preview band: the exact slot the drop will land on,
+                    so you see "13:45" not "the 13:00 hour". */}
+                {snapPreview && snapPreview.dayYMD === dayYMD && (
+                  <div
+                    data-testid="calendar-snap-band"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: (snapPreview.minute / 60) * rowHeight,
+                      height: Math.max(3, (gran / 60) * rowHeight),
+                      background: 'color-mix(in srgb, var(--acid) 22%, transparent)',
+                      borderTop: '2px solid var(--acid)',
+                      zIndex: 4,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 2,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 8.5,
+                        fontWeight: 700,
+                        color: 'var(--ink-on-bright)',
+                        background: 'var(--acid)',
+                        padding: '0 3px',
+                        borderRadius: 2,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {String(Math.floor(snapPreview.minute / 60)).padStart(2, '0')}:{String(snapPreview.minute % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1523,16 +1631,35 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               </span>
             </div>
 
-            <div
-              style={{
-                color: 'var(--ink-3)',
-                fontSize: 10,
-                marginBottom: 10,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-              }}
-            >
-              Duration · {taskPopup.task.scheduledDurationMin} min
+            {/* #7 — exact-time editor. Type any start time + duration to place
+                the task precisely, independent of the calendar's snap grid. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <input
+                data-testid="task-popup-time"
+                type="time"
+                value={exactTime}
+                onChange={(e) => setExactTime(e.target.value)}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 5px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)' }}
+              />
+              <input
+                data-testid="task-popup-duration"
+                type="number"
+                min={1}
+                value={exactDur}
+                onChange={(e) => setExactDur(e.target.value)}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{ width: 56, fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 5px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)' }}
+              />
+              <span style={{ fontSize: 9, color: 'var(--ink-3)' }}>min</span>
+              <button
+                type="button"
+                data-testid="task-popup-apply-time"
+                onClick={() => { applyExactTime(taskPopup.task); setTaskPopup(null); }}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: 'var(--ink-on-bright)', background: 'var(--cyan)', border: '1px solid var(--cyan)', borderRadius: 3, padding: '3px 8px', cursor: 'pointer', textTransform: 'uppercase' }}
+              >
+                Set
+              </button>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <button
@@ -1579,6 +1706,28 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 }}
               >
                 Jump to node →
+              </button>
+              {/* #4 — unschedule: pull the task off the calendar. */}
+              <button
+                type="button"
+                data-testid="calendar-task-unschedule"
+                onClick={() => { unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
+                title="Remove this task from the calendar (keeps the task)"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: '#ff8e64',
+                  background: 'transparent',
+                  border: '1px solid #ff8e64',
+                  borderRadius: 3,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Unschedule
               </button>
             </div>
           </div>
