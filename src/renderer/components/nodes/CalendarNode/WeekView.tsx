@@ -213,6 +213,54 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // EXACT target slot instead of the whole hour cell lighting up.
   const [snapPreview, setSnapPreview] = useState<{ dayYMD: string; minute: number } | null>(null);
 
+  // #7 — live resize draft. While dragging a task block's top/bottom edge we
+  // hold a transient override (start-minute delta + duration) so the block
+  // grows/shrinks under the cursor; commit on mouse-up, snapped to granularity.
+  const [resizeDraft, setResizeDraft] = useState<
+    { taskId: string; durationMin: number; startMinDelta: number } | null
+  >(null);
+
+  function startResize(
+    edge: 'top' | 'bottom',
+    task: ScheduledTask,
+    sliceStartMin: number,
+    origDurationMin: number,
+    e: ReactMouseEvent<HTMLDivElement>,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    const originY = e.clientY;
+    const dayYMD = task.startISO.slice(0, 10);
+    let last = { taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 };
+    const onMove = (ev: MouseEvent) => {
+      const deltaMin = Math.round((((ev.clientY - originY) / rowHeight) * 60) / gran) * gran;
+      if (edge === 'bottom') {
+        last = { taskId: task.id, durationMin: Math.max(gran, origDurationMin + deltaMin), startMinDelta: 0 };
+      } else {
+        // Top edge: don't let the start cross the end; clamp the delta.
+        const clamped = Math.min(deltaMin, origDurationMin - gran);
+        last = { taskId: task.id, durationMin: Math.max(gran, origDurationMin - clamped), startMinDelta: clamped };
+      }
+      setResizeDraft(last);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      setResizeDraft(null);
+      const newStartMin = Math.max(0, sliceStartMin + last.startMinDelta);
+      const h = Math.floor(newStartMin / 60);
+      const m = newStartMin % 60;
+      const handler = makeCommandHandler(task.id);
+      handler('task.setPlannedMin', { minutes: last.durationMin });
+      handler('task.setSchedule', {
+        scheduledFor: `${dayYMD}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+        scheduledDurationMin: last.durationMin,
+      });
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
   // Sub-header nav handlers — step a day in day view, a week otherwise.
   const handlePrev = () => {
     onCommand('calendar.setAnchor', { date: addDays(baseYMD, -dayCount) });
@@ -641,10 +689,18 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     return slices.map((slice) => {
       const { task, sliceStartMin, sliceEndMin, isContinuation, hasContinuation } = slice;
 
+      // #7 — apply a live resize draft (if this block is being dragged) so it
+      // grows/shrinks under the cursor before the commit on mouse-up.
+      const draft = resizeDraft && resizeDraft.taskId === task.id ? resizeDraft : null;
+      const effStartMin = sliceStartMin + (draft?.startMinDelta ?? 0);
+      const effLenMin = draft ? draft.durationMin : Math.max(1, sliceEndMin - sliceStartMin);
+
       // Convert minutes-from-midnight to grid-row offsets (rowHeight per hour).
-      const topPx = (sliceStartMin / 60) * rowHeight;
-      const sliceLen = Math.max(1, sliceEndMin - sliceStartMin);
+      const topPx = (effStartMin / 60) * rowHeight;
+      const sliceLen = effLenMin;
       const heightPx = Math.max(10, (sliceLen / 60) * rowHeight);
+      // Resize handles only on a self-contained head block (no cross-midnight).
+      const resizable = !isContinuation && !hasContinuation;
 
       // Side-by-side layout: divide column width equally.
       const { colIndex, colCount } = colLayout.get(task.id) ?? { colIndex: 0, colCount: 1 };
@@ -911,6 +967,22 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             >
               {task.text}
             </span>
+          )}
+          {/* #7 — resize handles: drag the top edge to move the start, the
+              bottom edge to change the duration. Snapped to granularity. */}
+          {resizable && (
+            <>
+              <div
+                data-testid={`task-resize-top-${task.id}`}
+                onMouseDown={(e) => startResize('top', task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e)}
+                style={{ position: 'absolute', top: -2, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 3 }}
+              />
+              <div
+                data-testid={`task-resize-bottom-${task.id}`}
+                onMouseDown={(e) => startResize('bottom', task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e)}
+                style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 3 }}
+              />
+            </>
           )}
         </div>
       );
