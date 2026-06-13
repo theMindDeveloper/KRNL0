@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
-import { makeCommandHandler } from '../../Canvas/commandDispatch';
+import { pomoDeleteSegment } from '../PomoNode/commands';
+import type { PomoState } from '../PomoNode/types';
+import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
@@ -199,8 +201,12 @@ export function ClockNode({
   // #6/#12 — right-click a tracked-reality arc → info popup with delete.
   const [realityPopup, setRealityPopup] = useState<{ seg: RealitySegment; x: number; y: number } | null>(null);
   const deleteClockSegment = (segId: string) => {
-    const pomo = board0?.nodes.find((n) => n.kind === 'pomo');
-    if (pomo) makeCommandHandler(pomo.id)('pomo.deleteSegment', { id: segId });
+    const st = useBoardStore.getState();
+    const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
+    if (!pomo) return;
+    st.updateNode(pomo.id, { state: pomoDeleteSegment(pomo.state as PomoState, { id: segId }) });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
   };
   const fmtClockHM = (ms: number) => {
     const d = new Date(ms);

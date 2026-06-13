@@ -9,7 +9,10 @@ import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
-import { makeCommandHandler } from '../../Canvas/commandDispatch';
+import { taskSetPlannedMin, taskSetSchedule } from '../TaskNode/commands';
+import { pomoDeleteSegment } from '../PomoNode/commands';
+import type { PomoState } from '../PomoNode/types';
+import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
@@ -250,12 +253,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const newStartMin = Math.max(0, sliceStartMin + last.startMinDelta);
       const h = Math.floor(newStartMin / 60);
       const m = newStartMin % 60;
-      const handler = makeCommandHandler(task.id);
-      handler('task.setPlannedMin', { minutes: last.durationMin });
-      handler('task.setSchedule', {
-        scheduledFor: `${dayYMD}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-        scheduledDurationMin: last.durationMin,
-      });
+      const scheduledFor = `${dayYMD}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const durN = last.durationMin;
+      applyTaskState(task.id, (s) =>
+        taskSetSchedule(taskSetPlannedMin(s, { minutes: durN }), { scheduledFor, scheduledDurationMin: durN }),
+      );
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -282,14 +284,28 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     }
   };
 
-  // #12 — delete a tracked-reality segment by id. Dispatches pomo.deleteSegment
-  // to the pomo mother (history-pushed → undoable; analytics reads history live
-  // so it vanishes there too).
+  // Apply a pure TaskState transform to a task node, push history, and persist.
+  // Dispatches via the store directly (not commandDispatch) to keep this heavy
+  // module out of the calendar/clock render graph — importing it statically blew
+  // render-only tests past their 5s timeout.
+  const applyTaskState = (taskId: string, fn: (s: TaskState) => TaskState) => {
+    const st = useBoardStore.getState();
+    const node = st.board?.nodes.find((n) => n.id === taskId);
+    if (!node || node.kind !== 'todo.task') return;
+    st.updateNode(taskId, { state: fn(node.state as TaskState) });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
+  };
+
+  // #12 — delete a tracked-reality segment by id (history-pushed → undoable;
+  // analytics reads history live so it vanishes there too).
   const deleteRealitySegment = (segId: string) => {
-    const board = useBoardStore.getState().board;
-    const pomo = board?.nodes.find((n) => n.kind === 'pomo');
+    const st = useBoardStore.getState();
+    const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
     if (!pomo) return;
-    makeCommandHandler(pomo.id)('pomo.deleteSegment', { id: segId });
+    st.updateNode(pomo.id, { state: pomoDeleteSegment(pomo.state as PomoState, { id: segId }) });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
   };
 
   // 60-second tick for "now" — used to gray out past task blocks (PR #122).
@@ -367,12 +383,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const h = m ? Math.min(23, Math.max(0, parseInt(m[1]!, 10))) : new Date(task.startISO).getHours();
     const min = m ? Math.min(59, Math.max(0, parseInt(m[2]!, 10))) : 0;
     const durN = Math.max(1, Math.round(Number(exactDur) || task.scheduledDurationMin));
-    const handler = makeCommandHandler(task.id);
-    handler('task.setPlannedMin', { minutes: durN });
-    handler('task.setSchedule', { scheduledFor: `${day}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`, scheduledDurationMin: durN });
+    const scheduledFor = `${day}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    applyTaskState(task.id, (s) =>
+      taskSetSchedule(taskSetPlannedMin(s, { minutes: durN }), { scheduledFor, scheduledDurationMin: durN }),
+    );
   };
   const unscheduleTask = (taskId: string) => {
-    makeCommandHandler(taskId)('task.setSchedule', { scheduledFor: null });
+    applyTaskState(taskId, (s) => taskSetSchedule(s, { scheduledFor: null }));
   };
 
   // #6 — info popup for a clicked tracked-reality (pomo) segment.
