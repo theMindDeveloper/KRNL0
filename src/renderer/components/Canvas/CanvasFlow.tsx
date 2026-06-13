@@ -922,7 +922,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         plannedMin: effectivePlanned,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
-        kind: 'focus',
+        kind: 'event', // #180 — Todo creates events only (calendar renders events)
       };
       const newTask: KrnlNode = {
         id: taskNodeId,

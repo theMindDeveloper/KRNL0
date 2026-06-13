@@ -11,6 +11,7 @@ import {
   pomoExtend,
   pomoStop,
   pomoDeleteSegment,
+  pomoDiscard,
   type PomoEnv,
 } from '../../../src/renderer/components/nodes/PomoNode/commands';
 import { defaultPomoState } from '../../../src/renderer/components/nodes/PomoNode/types';
@@ -19,6 +20,29 @@ import type { PomoSessionRecord } from '../../../src/renderer/components/nodes/P
 const seg = (id: string): PomoSessionRecord => ({
   id, startedAt: '2026-05-10T09:00:00.000Z', endedAt: '2026-05-10T09:25:00.000Z',
   durationMin: 25, label: '', completed: true, taskId: null, kind: 'work',
+});
+
+describe('pomoDiscard (#2/#6 — RESET records nothing)', () => {
+  it('running → idle without writing a history record', () => {
+    const running = pomoStart(defaultPomoState(), { label: 'x' }, env(T0));
+    const next = pomoDiscard(running);
+    expect(next.status).toBe('idle');
+    expect(next.startedAt).toBeNull();
+    expect(next.history).toHaveLength(0);
+  });
+
+  it('no-op when idle (same reference)', () => {
+    const s = defaultPomoState();
+    expect(pomoDiscard(s)).toBe(s);
+  });
+
+  it('clears in-flight accumulators', () => {
+    const s = { ...defaultPomoState(), status: 'paused' as const, sessionWorkSec: 120, pausedElapsedMs: 5000, startedAt: '2026-05-10T12:00:00.000Z', pausedAt: '2026-05-10T12:05:00.000Z' };
+    const next = pomoDiscard(s);
+    expect(next.sessionWorkSec).toBe(0);
+    expect(next.pausedElapsedMs).toBe(0);
+    expect(next.history).toHaveLength(0);
+  });
 });
 
 describe('pomoDeleteSegment (#12)', () => {

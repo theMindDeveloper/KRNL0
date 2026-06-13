@@ -358,6 +358,24 @@ export const pomoDeleteSegment = (state: PomoState, args: { id: string }): PomoS
   return { ...state, history: next };
 };
 
+/**
+ * #2/#6 — RESET: abandon the in-flight span and snap to idle WITHOUT writing a
+ * history record. This is the "I don't want to count this" escape hatch, distinct
+ * from STOP (pomoStop, which records) and from PAUSE (which excludes away-time but
+ * keeps the session). No-op when already idle/done.
+ */
+export const pomoDiscard = (state: PomoState): PomoState => {
+  if (state.status === 'idle' || state.status === 'done') return state;
+  return {
+    ...state,
+    status: 'idle',
+    startedAt: null,
+    pausedAt: null,
+    pausedElapsedMs: 0,
+    sessionWorkSec: 0,
+  };
+};
+
 export const pomoSetLabel = (state: PomoState, args: { label: string }): PomoState => {
   return { ...state, label: args.label };
 };

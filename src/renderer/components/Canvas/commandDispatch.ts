@@ -66,6 +66,7 @@ import {
   pomoDevSeedSegment,
   pomoDevClearSeeded,
   pomoDeleteSegment,
+  pomoDiscard,
 } from '../nodes/PomoNode/commands';
 import type { PomoConfig, PomoState, TimerFace } from '../nodes/PomoNode/types';
 import { defaultPomoConfig } from '../nodes/PomoNode/types';
@@ -250,6 +251,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.setFace':   return { config: pomoSetFace(pomoCfg, args as { face: TimerFace }) };
         case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never, pomoCfg) };
         case 'pomo.deleteSegment': return { state: pomoDeleteSegment(s as never, args as never) };
+        case 'pomo.discard': return { state: pomoDiscard(s as never) };
         // DEV-only (#180 viz testing) — seed/clear synthetic reality segments.
         case 'pomo.devSeedSegment': return { state: pomoDevSeedSegment(s as never, args as never) };
         case 'pomo.devClearSeeded': return { state: pomoDevClearSeeded(s as never) };

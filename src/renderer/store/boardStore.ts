@@ -457,7 +457,10 @@ export const useBoardStore = create<BoardStore>((set) => ({
         plannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
-        kind: 'focus',
+        // #180 — Todo creates events only. A parallel sibling MUST be an event
+        // or the calendar selector (which renders kind==='event' only) drops it,
+        // so "2.1" never appears on the calendar/clock even after scheduling.
+        kind: 'event',
       };
 
       const newNode: Node = {
