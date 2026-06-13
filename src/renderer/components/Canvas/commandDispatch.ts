@@ -133,6 +133,7 @@ import {
   clockSetSelectedDate,
   clockAdvanceDay,
   clockGoToday,
+  clockGoNow,
 } from '../nodes/ClockNode/commands';
 import type { ClockState } from '../nodes/ClockNode/types';
 
@@ -339,6 +340,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: clockAdvanceDay(clockState, args as never) };
         case 'clock.goToday':
           return { state: clockGoToday(clockState) };
+        case 'clock.goNow':
+          return { state: clockGoNow(clockState) };
       }
       break;
     }

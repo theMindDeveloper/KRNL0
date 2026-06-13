@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
+import { makeCommandHandler } from '../../Canvas/commandDispatch';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
@@ -193,6 +195,17 @@ export function ClockNode({
   const board0 = useBoardStore((s) => s.board);
   const isLive = pomoIsLive(board0);
   const [liveMs, setLiveMs] = useState(() => Date.now());
+
+  // #6/#12 — right-click a tracked-reality arc → info popup with delete.
+  const [realityPopup, setRealityPopup] = useState<{ seg: RealitySegment; x: number; y: number } | null>(null);
+  const deleteClockSegment = (segId: string) => {
+    const pomo = board0?.nodes.find((n) => n.kind === 'pomo');
+    if (pomo) makeCommandHandler(pomo.id)('pomo.deleteSegment', { id: segId });
+  };
+  const fmtClockHM = (ms: number) => {
+    const d = new Date(ms);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
   useEffect(() => {
     if (!isLive) return;
     setLiveMs(Date.now());
@@ -505,6 +518,16 @@ export function ClockNode({
             title="Jump back to today"
           >
             Today
+          </button>
+          {/* #9 — snap to NOW: today + the 12-hour half that contains this hour. */}
+          <button
+            type="button"
+            className="clock-day-btn"
+            data-testid="clock-day-now"
+            onClick={() => onCommand('clock.goNow', {})}
+            title="Jump to now (today + current 12-hour half)"
+          >
+            Now
           </button>
           <button
             type="button"
@@ -839,6 +862,7 @@ export function ClockNode({
                   data-testid="clock-reality-arc"
                   data-reality-kind={seg.kind}
                   data-reality-live={seg.live ? 'true' : undefined}
+                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setRealityPopup({ seg, x: e.clientX, y: e.clientY }); }}
                   d={sectorPath(seg.startH, seg.endH, R_FACE - 2)}
                   fill={
                     isWork
@@ -850,8 +874,8 @@ export function ClockNode({
                   strokeDasharray={isWork ? undefined : '2 3'}
                   style={
                     seg.live
-                      ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone }
-                      : undefined
+                      ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone, cursor: 'context-menu' }
+                      : { cursor: 'context-menu' }
                   }
                 />
               );
@@ -1147,6 +1171,51 @@ export function ClockNode({
           })}
         </div>
       </div>
+
+      {/* #6/#12 — tracked-reality info + delete popup (right-click an arc). */}
+      {realityPopup && createPortal(
+        <>
+          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+          <div
+            data-testid="clock-reality-popup"
+            style={{
+              position: 'fixed',
+              left: Math.min(realityPopup.x + 4, window.innerWidth - 250),
+              top: realityPopup.y + 6,
+              zIndex: 1999,
+              background: 'var(--paper)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 8,
+              padding: '12px 14px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--ink)',
+              minWidth: 210,
+              boxShadow: 'var(--shadow-1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: realityPopup.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)' }} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}</span>
+              {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid)' }}>◆ LIVE</span>}
+            </div>
+            <div style={{ color: 'var(--ink-3)', fontSize: 10, marginBottom: 10, letterSpacing: '0.04em' }}>
+              {fmtClockHM(realityPopup.seg.startMs)} {realityPopup.seg.live ? '→ now' : `– ${fmtClockHM(realityPopup.seg.endMs)}`}
+              {' · '}{Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
+            </div>
+            {!realityPopup.seg.live && (
+              <button
+                type="button"
+                data-testid="clock-reality-delete"
+                onClick={() => { deleteClockSegment(realityPopup.seg.id); setRealityPopup(null); }}
+                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: '#ff8e64', background: 'transparent', border: '1px solid #ff8e64', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+              >
+                Delete segment
+              </button>
+            )}
+          </div>
+        </>,
+        document.body,
+      )}
     </MotherFrame>
   );
 }
