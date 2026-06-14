@@ -271,23 +271,32 @@ describe('Anchored chain renders task arcs', () => {
 
 describe('Task arcs reflect past / future state', () => {
   it('past tasks (end < nowFloat) have opacity 0.4 or 0.06 (Issue #166)', () => {
-    const todoId = 'todo-past';
-    // Place task far in the past (01:00–02:00) so it's always past.
-    const pastTask = makeTaskNode(
-      'task-past',
-      makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T01:00`, kind: 'event' }),
-    );
-    seedBoard([makeTodoNode(todoId), pastTask]);
+    // Pin wall-clock to midday so a 01:00–02:00 task is reliably in the past.
+    // ClockNode derives nowFloat from new Date(); without this the test failed
+    // when run between 00:00 and 02:00 (the 01:00 task was still in the future).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(`${ANCHOR_DATE}T12:00:00`));
+    try {
+      const todoId = 'todo-past';
+      // Place task in the past (01:00–02:00) relative to the pinned noon.
+      const pastTask = makeTaskNode(
+        'task-past',
+        makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T01:00`, kind: 'event' }),
+      );
+      seedBoard([makeTodoNode(todoId), pastTask]);
 
-    renderClockNode(makeClockState({ linkedTodoId: todoId }));
+      renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    const arcs = getTaskArcPaths();
+      const arcs = getTaskArcPaths();
     expect(arcs.length).toBeGreaterThan(0);
     
-    // The arc's opacity should be 0.4 (outlines) or 0.06 (fill)
-    const opacities = arcs.map((a) => parseFloat(a.getAttribute('opacity') ?? '1'));
-    expect(opacities).toContain(0.4);
-    expect(opacities).toContain(0.06);
+      // The arc's opacity should be 0.4 (outlines) or 0.06 (fill)
+      const opacities = arcs.map((a) => parseFloat(a.getAttribute('opacity') ?? '1'));
+      expect(opacities).toContain(0.4);
+      expect(opacities).toContain(0.06);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

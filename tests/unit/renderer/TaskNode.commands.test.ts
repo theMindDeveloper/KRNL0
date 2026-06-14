@@ -22,6 +22,7 @@ import {
   taskSetCurrentSessionElapsedSec,
   taskClearCurrentSessionElapsedSec,
   taskSetDuration,
+  taskSetPlannedMin,
 } from '../../../src/renderer/components/nodes/TaskNode/commands';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
 
@@ -46,6 +47,33 @@ function makeTaskState(overrides: Partial<TaskState> = {}): TaskState {
     ...overrides,
   };
 }
+
+// ── taskSetPlannedMin ───────────────────────────────────────────────────────
+describe('taskSetPlannedMin', () => {
+  it('updates plannedMin', () => {
+    const s = makeTaskState({ plannedMin: 25 });
+    expect(taskSetPlannedMin(s, { minutes: 60 }).plannedMin).toBe(60);
+  });
+
+  it('floors at 1 and rounds', () => {
+    expect(taskSetPlannedMin(makeTaskState(), { minutes: 0 }).plannedMin).toBe(1);
+    expect(taskSetPlannedMin(makeTaskState(), { minutes: 40.6 }).plannedMin).toBe(41);
+  });
+
+  it('does NOT add scheduledDurationMin when the task is unscheduled', () => {
+    const next = taskSetPlannedMin(makeTaskState(), { minutes: 50 });
+    expect(next.scheduledDurationMin).toBeUndefined();
+  });
+
+  it('re-syncs scheduledDurationMin so an anchored calendar block resizes (resize bug)', () => {
+    // A task dropped on the calendar carries scheduledDurationMin = plannedMin.
+    // Editing the ETA must move BOTH so the block grows, not just push successors.
+    const s = makeTaskState({ plannedMin: 25, scheduledDurationMin: 25 });
+    const next = taskSetPlannedMin(s, { minutes: 90 });
+    expect(next.plannedMin).toBe(90);
+    expect(next.scheduledDurationMin).toBe(90);
+  });
+});
 
 // ── taskToggle ────────────────────────────────────────────────────────────────
 

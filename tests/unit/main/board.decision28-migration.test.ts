@@ -35,7 +35,7 @@ describe('Decision 28 — board migration: task kind backfill', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('backfills kind=focus when the kind field is absent (pre-Decision-28 board)', () => {
+  it('backfills kind=event when the kind field is absent (#180 — tasks are events)', () => {
     const legacy = {
       version: 1,
       schemaVersion: 1,
@@ -81,10 +81,10 @@ describe('Decision 28 — board migration: task kind backfill', () => {
     const loaded = loadBoardFrom(path) as LoadedBoard;
     const task = loaded.nodes.find((n) => n.id === 'task-no-kind')!;
     expect(task).toBeDefined();
-    expect(task.state?.['kind']).toBe('focus');
+    expect(task.state?.['kind']).toBe('event');
   });
 
-  it('rewrites kind=garbage to focus (invalid kind field)', () => {
+  it('rewrites kind=garbage to event (invalid kind field, #180)', () => {
     const legacy = {
       version: 1,
       schemaVersion: 1,
@@ -130,7 +130,7 @@ describe('Decision 28 — board migration: task kind backfill', () => {
     const loaded = loadBoardFrom(path) as LoadedBoard;
     const task = loaded.nodes.find((n) => n.id === 'task-bad-kind')!;
     expect(task).toBeDefined();
-    expect(task.state?.['kind']).toBe('focus');
+    expect(task.state?.['kind']).toBe('event');
   });
 
   it('preserves kind=event when already set to a valid value', () => {
@@ -275,10 +275,10 @@ describe('Decision 28 — board migration: task kind backfill', () => {
     const loaded = loadBoardFrom(path) as LoadedBoard;
 
     const taskNoKind = loaded.nodes.find((n) => n.id === 'task-no-kind')!;
-    expect(taskNoKind.state?.['kind']).toBe('focus');
+    expect(taskNoKind.state?.['kind']).toBe('event');
 
     const taskBad = loaded.nodes.find((n) => n.id === 'task-bad')!;
-    expect(taskBad.state?.['kind']).toBe('focus');
+    expect(taskBad.state?.['kind']).toBe('event');
 
     const taskEvent = loaded.nodes.find((n) => n.id === 'task-event')!;
     expect(taskEvent.state?.['kind']).toBe('event');

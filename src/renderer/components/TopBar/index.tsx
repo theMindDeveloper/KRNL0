@@ -7,10 +7,13 @@
  */
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutModeToggle } from '../ui/LayoutModeToggle';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { isDarkOnly } from '../ChassisLayer/dockRegistry';
+import { HoldButton } from '../ui/HoldButton';
+import { useBoardStore } from '../../store/boardStore';
 
 type Theme = 'light' | 'dark';
 
@@ -45,6 +48,7 @@ function applyTheme(theme: Theme): void {
 export function TopBar() {
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
   const [dockStyle] = useDockStyle();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const rf = useReactFlow();
 
   // Some dock skins declare themselves dark-only (see dockRegistry.theme).
@@ -192,8 +196,110 @@ export function TopBar() {
         {!darkOnly && (
           <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
         )}
+        <TopBarButton label="⚙" onClick={() => setSettingsOpen(true)} testId="topbar-settings" />
       </div>
+
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} />
+      )}
     </div>
+  );
+}
+
+// ── Program settings modal (factory reset) ──────────────────────────────────
+
+function SettingsModal({ onClose }: { onClose: () => void }) {
+  const factoryReset = useBoardStore((s) => s.factoryReset);
+  return createPortal(
+    <div
+      data-testid="settings-modal"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 4000,
+        background: 'rgba(0,0,0,0.55)',
+        display: 'grid',
+        placeItems: 'center',
+        WebkitAppRegion: 'no-drag',
+      } as React.CSSProperties}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 380,
+          maxWidth: '90vw',
+          background: 'var(--paper)',
+          border: '1px solid var(--paper-3)',
+          borderRadius: 10,
+          padding: '18px 20px',
+          boxShadow: 'var(--shadow-1)',
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--ink)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em' }}>
+            Settings
+          </span>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            data-testid="settings-close"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--ink-3)',
+              cursor: 'pointer',
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          style={{
+            border: '1px solid #3a2a2a',
+            borderRadius: 8,
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 9.5,
+              color: '#ff8e64',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              fontWeight: 700,
+            }}
+          >
+            Factory reset
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+            Deletes the current board — all tasks, habits, schedules, history and
+            layout — and starts fresh from the default workspace. This cannot be
+            undone.
+          </span>
+          <HoldButton
+            testId="settings-factory-reset"
+            label="Reset everything"
+            holdingLabel="Hold to reset…"
+            onConfirm={() => {
+              void factoryReset();
+              onClose();
+            }}
+            style={{ width: '100%' }}
+          />
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -125,7 +125,7 @@ export function createTodoTaskPair(
     plannedMin,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
-    kind: 'focus',
+    kind: 'event', // #180 — Todo creates events only (calendar renders events)
   };
   const taskNode: AnyNode = {
     id: taskNodeId,

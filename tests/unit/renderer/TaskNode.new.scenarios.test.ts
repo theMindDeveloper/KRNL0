@@ -100,20 +100,12 @@ describe('F8 — TaskNode card opacity is 0.4 when done', () => {
   });
 });
 
-// ── F9 — Body DOUBLE-click loads task into pomo (selection-decoupled) ─────────
+// ── F9 — #180: body double-click no longer loads into pomo ───────────────────
 
-describe('F9 — Body double-click fires task.loadIntoPomo', () => {
-  it('double-clicking the root body fires task.loadIntoPomo when not done', () => {
+describe('F9 — #180 task body is decoupled from the pomo timer', () => {
+  it('double-clicking the root body does NOT fire task.loadIntoPomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
-    const root = screen.getByTestId('task-node-root');
-    fireEvent.doubleClick(root);
-    expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
-  });
-
-  it('does NOT fire task.loadIntoPomo when done = true', () => {
-    const onCommand = vi.fn();
-    renderTaskNode(makeTaskState({ done: true }), onCommand);
     const root = screen.getByTestId('task-node-root');
     fireEvent.doubleClick(root);
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');

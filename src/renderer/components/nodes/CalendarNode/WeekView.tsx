@@ -9,6 +9,10 @@ import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
+import { taskSetPlannedMin, taskSetSchedule } from '../TaskNode/commands';
+import { pomoDeleteSegment } from '../PomoNode/commands';
+import type { PomoState } from '../PomoNode/types';
+import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
@@ -16,6 +20,7 @@ import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarState } from './types';
+import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, granularityFor } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
@@ -53,6 +58,12 @@ function getMondayYMD(anchorYMD: string): string {
 // Return today's YYYY-MM-DD.
 function todayYMD(): string {
   return toYMD(new Date());
+}
+
+// Format an epoch-ms as local "HH:MM".
+function fmtHM(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 // Short day labels Mon-Sun.
@@ -148,6 +159,8 @@ interface WeekViewProps {
   state: CalendarState;
   config: CalendarConfig;
   onCommand: (cmd: string, args: Record<string, unknown>) => void;
+  /** #10 — when true, render a single day (anchorDate) instead of Mon–Sun. */
+  singleDay?: boolean;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -159,7 +172,7 @@ type HabitScheduleKind = 'weekly' | 'daily';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function WeekView({ state, config, onCommand }: WeekViewProps) {
+export function WeekView({ state, config, onCommand, singleDay = false }: WeekViewProps) {
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows
   // the same 24-hour grid.
@@ -168,30 +181,132 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
   const rowCount = 24;
   const gridBodyRef = useRef<HTMLDivElement>(null);
 
-  // Compute the Monday that anchors this week.
+  // #10 — day view anchors on anchorDate and shows one column; week view anchors
+  // on the Monday and shows seven. dayCount drives the column grid throughout.
+  const dayCount = singleDay ? 1 : 7;
   const mondayYMD = getMondayYMD(state.anchorDate);
+  const baseYMD = singleDay ? state.anchorDate : mondayYMD;
 
-  // Build array of 7 day YYYY-MM-DD strings (Mon-Sun).
+  // Build the day columns (1 for day view, Mon–Sun for week view).
   const weekDays = useMemo<string[]>(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(mondayYMD, i));
-  }, [mondayYMD]);
+    return Array.from({ length: dayCount }, (_, i) => addDays(baseYMD, i));
+  }, [baseYMD, dayCount]);
 
   const today = todayYMD();
 
-  // Column index (0-6) of today, -1 if not in this week.
+  // Column index of today within the visible range, -1 if not shown.
   const todayColIndex = weekDays.indexOf(today);
 
-  const rowHeight = MIN_ROW_HEIGHT;
+  // #5 — ruler zoom. rowHeight scales with the persisted zoom multiplier so the
+  // user can stretch the grid to clearly read where pomo sections start/end.
+  const zoom = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, state.zoom ?? 1));
+  const rowHeight = MIN_ROW_HEIGHT * zoom;
+  // #11/#8 — one granularity drives gridlines, gutter labels, AND snapping.
+  const gran = granularityFor(zoom);
+  // Sub-hour marks at every granularity step inside the hour (skip :00).
+  const subMarks: number[] = gran >= 60
+    ? []
+    : Array.from({ length: Math.floor(60 / gran) - 1 }, (_, i) => (i + 1) * gran);
 
-  // Sub-header nav handlers.
+  const setZoom = (z: number) => onCommand('calendar.setZoom', { zoom: z });
+  const setToday = () => onCommand('calendar.setAnchor', { date: todayYMD() });
+
+  // #8 — snap preview. While dragging over the grid we track the snapped slot
+  // (day + minute-of-day) and paint a thin band there, so the user sees the
+  // EXACT target slot instead of the whole hour cell lighting up.
+  const [snapPreview, setSnapPreview] = useState<{ dayYMD: string; minute: number } | null>(null);
+
+  // #7 — live resize draft. While dragging a task block's top/bottom edge we
+  // hold a transient override (start-minute delta + duration) so the block
+  // grows/shrinks under the cursor; commit on mouse-up, snapped to granularity.
+  const [resizeDraft, setResizeDraft] = useState<
+    { taskId: string; durationMin: number; startMinDelta: number } | null
+  >(null);
+
+  function startResize(
+    edge: 'top' | 'bottom',
+    task: ScheduledTask,
+    sliceStartMin: number,
+    origDurationMin: number,
+    e: ReactMouseEvent<HTMLDivElement>,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    const originY = e.clientY;
+    const dayYMD = task.startISO.slice(0, 10);
+    let last = { taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 };
+    const onMove = (ev: MouseEvent) => {
+      const deltaMin = Math.round((((ev.clientY - originY) / rowHeight) * 60) / gran) * gran;
+      if (edge === 'bottom') {
+        last = { taskId: task.id, durationMin: Math.max(gran, origDurationMin + deltaMin), startMinDelta: 0 };
+      } else {
+        // Top edge: don't let the start cross the end; clamp the delta.
+        const clamped = Math.min(deltaMin, origDurationMin - gran);
+        last = { taskId: task.id, durationMin: Math.max(gran, origDurationMin - clamped), startMinDelta: clamped };
+      }
+      setResizeDraft(last);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      setResizeDraft(null);
+      const newStartMin = Math.max(0, sliceStartMin + last.startMinDelta);
+      const h = Math.floor(newStartMin / 60);
+      const m = newStartMin % 60;
+      const scheduledFor = `${dayYMD}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const durN = last.durationMin;
+      applyTaskState(task.id, (s) =>
+        taskSetSchedule(taskSetPlannedMin(s, { minutes: durN }), { scheduledFor, scheduledDurationMin: durN }),
+      );
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  // Sub-header nav handlers — step a day in day view, a week otherwise.
   const handlePrev = () => {
-    onCommand('calendar.setAnchor', { date: addDays(mondayYMD, -7) });
+    onCommand('calendar.setAnchor', { date: addDays(baseYMD, -dayCount) });
   };
   const handleNext = () => {
-    onCommand('calendar.setAnchor', { date: addDays(mondayYMD, 7) });
+    onCommand('calendar.setAnchor', { date: addDays(baseYMD, dayCount) });
   };
 
   const reactFlow = useReactFlow();
+
+  // Recenter the canvas on a task's node — restored as an explicit popup action
+  // (was previously a right-click side-effect on the block; the right-click is
+  // now the overlap picker, so jump-to-node moved into the task info popup).
+  const jumpToTaskNode = (taskId: string) => {
+    const board = useBoardStore.getState().board;
+    const taskNode = board?.nodes.find((n) => n.id === taskId);
+    if (taskNode) {
+      reactFlow.setCenter(taskNode.position.x + 110, taskNode.position.y + 80, { duration: 400, zoom: 0.9 });
+    }
+  };
+
+  // Apply a pure TaskState transform to a task node, push history, and persist.
+  // Dispatches via the store directly (not commandDispatch) to keep this heavy
+  // module out of the calendar/clock render graph — importing it statically blew
+  // render-only tests past their 5s timeout.
+  const applyTaskState = (taskId: string, fn: (s: TaskState) => TaskState) => {
+    const st = useBoardStore.getState();
+    const node = st.board?.nodes.find((n) => n.id === taskId);
+    if (!node || node.kind !== 'todo.task') return;
+    st.updateNode(taskId, { state: fn(node.state as TaskState) });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
+  };
+
+  // #12 — delete a tracked-reality segment by id (history-pushed → undoable;
+  // analytics reads history live so it vanishes there too).
+  const deleteRealitySegment = (segId: string) => {
+    const st = useBoardStore.getState();
+    const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
+    if (!pomo) return;
+    st.updateNode(pomo.id, { state: pomoDeleteSegment(pomo.state as PomoState, { id: segId }) });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
+  };
 
   // 60-second tick for "now" — used to gray out past task blocks (PR #122).
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -221,6 +336,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const map = new Map<string, Array<{
         id: string; kind: 'work' | 'break'; taskId: string | null;
         startMin: number; endMin: number; live: boolean;
+        startMs: number; endMs: number;
       }>>();
       for (const seg of segs) {
         const d = new Date(seg.startMs);
@@ -228,7 +344,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         const startMin = d.getHours() * 60 + d.getMinutes();
         const endMin = Math.min(1440, startMin + Math.max(1, (seg.endMs - seg.startMs) / 60_000));
         const arr = map.get(ymd) ?? [];
-        arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, startMin, endMin, live: seg.live });
+        arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, startMin, endMin, live: seg.live, startMs: seg.startMs, endMs: seg.endMs });
         map.set(ymd, arr);
       }
       return map;
@@ -242,12 +358,56 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     y: number;
   } | null>(null);
 
+  // #6/#7 — a tracked-reality segment with the day it was clipped to, used by
+  // the reality info popup (when it started / ended / duration).
+  type RealitySeg = {
+    id: string; kind: 'work' | 'break'; taskId: string | null;
+    startMin: number; endMin: number; live: boolean; startMs: number; endMs: number;
+  };
+  // #7 — exact-time editor fields inside the task popup (seeded when it opens).
+  const [exactTime, setExactTime] = useState('');
+  const [exactDur, setExactDur] = useState('');
+  useEffect(() => {
+    if (!taskPopup) return;
+    const d = new Date(taskPopup.task.startISO);
+    setExactTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+    setExactDur(String(taskPopup.task.scheduledDurationMin));
+  }, [taskPopup]);
+
+  // #7 — apply the typed exact time + duration to the task (bypasses the grid
+  // snap entirely → solves the "only 15-min grid" complaint). #4 — unschedule
+  // pulls the task off the calendar. Both dispatch to the TASK node.
+  const applyExactTime = (task: ScheduledTask) => {
+    const day = task.startISO.slice(0, 10);
+    const m = /^(\d{1,2}):(\d{2})$/.exec(exactTime.trim());
+    const h = m ? Math.min(23, Math.max(0, parseInt(m[1]!, 10))) : new Date(task.startISO).getHours();
+    const min = m ? Math.min(59, Math.max(0, parseInt(m[2]!, 10))) : 0;
+    const durN = Math.max(1, Math.round(Number(exactDur) || task.scheduledDurationMin));
+    const scheduledFor = `${day}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    applyTaskState(task.id, (s) =>
+      taskSetSchedule(taskSetPlannedMin(s, { minutes: durN }), { scheduledFor, scheduledDurationMin: durN }),
+    );
+  };
+  const unscheduleTask = (taskId: string) => {
+    applyTaskState(taskId, (s) => taskSetSchedule(s, { scheduledFor: null }));
+  };
+
+  // #6 — info popup for a clicked tracked-reality (pomo) segment.
+  const [realityPopup, setRealityPopup] = useState<{ seg: RealitySeg; x: number; y: number } | null>(null);
+  // #7 — overlap disambiguation. A right-click enumerates EVERY layer under the
+  // cursor (scheduled task blocks + tracked-reality segments) into one picker so
+  // the user can choose which to act on even when they cover the same minute.
+  type LayerItem =
+    | { kind: 'task'; task: ScheduledTask }
+    | { kind: 'reality'; seg: RealitySeg };
+  const [layerMenu, setLayerMenu] = useState<{ x: number; y: number; items: LayerItem[] } | null>(null);
+
   // ADR 0003 §4 — read placements from the cascade selector, not raw
   // scheduledFor. The selector derives successor start times from the chain's
   // single anchor; WeekView no longer cares which task is the anchor for
   // rendering, only the resulting placements.
-  const weekRangeFromISO = `${mondayYMD}T00:00`;
-  const weekRangeToISO = `${addDays(mondayYMD, 7)}T00:00`;
+  const weekRangeFromISO = `${baseYMD}T00:00`;
+  const weekRangeToISO = `${addDays(baseYMD, dayCount)}T00:00`;
   const scheduledTasks = useBoardStore(
     useShallow((s): ScheduledTask[] => {
       if (!s.board) return [];
@@ -431,7 +591,13 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         if (!types.includes('application/krnl-task')) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        e.currentTarget.setAttribute('data-drop-target', 'true');
+        // #8 — instead of lighting the whole hour cell, track the exact snapped
+        // slot under the cursor and render a thin band there (see snapPreview).
+        const rect = e.currentTarget.getBoundingClientRect();
+        const rectH = rect.height > 0 ? rect.height : rowHeight;
+        const within = Math.max(0, Math.min(59, Math.floor(((Number.isFinite(e.clientY) ? e.clientY : 0) - rect.top) / rectH * 60)));
+        const minute = hour * 60 + Math.floor(within / gran) * gran;
+        setSnapPreview((p) => (p && p.dayYMD === dayYMD && p.minute === minute ? p : { dayYMD, minute }));
       },
       onDragLeave: (e: DragEvent<HTMLDivElement>) => {
         e.currentTarget.removeAttribute('data-drop-target');
@@ -439,6 +605,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       onDrop: (e: DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.currentTarget.removeAttribute('data-drop-target');
+        setSnapPreview(null);
 
         // A1: habit drop — capture cell context AND habit payload at drop time,
         // then open HabitSwapModal. We snapshot the habit here because `dragend`
@@ -464,9 +631,9 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           durationMin: number;
         };
         if (!payload.taskId) return;
-        // Compute 15-min snap from mouse Y position within the hour cell.
+        // #11 — snap to the zoom-driven granularity (60/30/15/5), not a fixed 15.
         // Guard against jsdom (clientY undefined, rect.height = 0) so the
-        // computed minute is always a finite integer in [0, 45].
+        // computed minute is always a finite integer in [0, 60-gran].
         const rect = e.currentTarget.getBoundingClientRect();
         const clientY = Number.isFinite(e.clientY) ? e.clientY : 0;
         const rectTop = Number.isFinite(rect.top) ? rect.top : 0;
@@ -474,7 +641,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         const relY = Math.max(0, clientY - rectTop);
         const minuteRaw = Math.floor((relY / rectH) * 60);
         const safeMinute = Number.isFinite(minuteRaw) ? minuteRaw : 0;
-        const snappedMinute = Math.max(0, Math.min(45, Math.floor(safeMinute / 15) * 15));
+        const snappedMinute = Math.max(0, Math.min(60 - gran, Math.floor(safeMinute / gran) * gran));
         const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:${String(snappedMinute).padStart(2, '0')}`;
         onCommand('calendar.schedule', {
           taskId: payload.taskId,
@@ -489,6 +656,45 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     };
   }
 
+  // ── Overlap disambiguation (#6 / #7) ────────────────────────────────────────
+  // A right-click on a day column enumerates EVERY layer under the cursor —
+  // scheduled task blocks AND tracked-reality (pomo) segments — into a single
+  // picker. This solves both "let me click a pomo section for its info" (#6)
+  // and "a task and a pomo section overlap, how do I select one" (#7) with one
+  // interaction, instead of fighting z-index. Left-click on a task block keeps
+  // its existing direct-open behaviour.
+  function handleColumnContextMenu(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relY = Math.max(0, e.clientY - rect.top);
+    const minute = (relY / rowHeight) * 60;
+
+    const items: LayerItem[] = [];
+    // Task slices covering this minute on this day.
+    for (const slice of slicesByDay.get(dayYMD) ?? []) {
+      if (minute >= slice.sliceStartMin && minute < slice.sliceEndMin) {
+        items.push({ kind: 'task', task: slice.task });
+      }
+    }
+    // Tracked-reality segments covering this minute on this day.
+    for (const seg of realityByDay.get(dayYMD) ?? []) {
+      if (minute >= seg.startMin && minute < seg.endMin) {
+        items.push({ kind: 'reality', seg });
+      }
+    }
+    if (items.length === 0) return;
+
+    // Single hit → act directly, no picker noise.
+    if (items.length === 1) {
+      const only = items[0]!;
+      if (only.kind === 'task') setTaskPopup({ task: only.task, x: e.clientX, y: e.clientY });
+      else setRealityPopup({ seg: only.seg, x: e.clientX, y: e.clientY });
+      return;
+    }
+    setLayerMenu({ x: e.clientX, y: e.clientY, items });
+  }
+
   // ── Task block renderer ─────────────────────────────────────────────────────
 
   function renderTaskBlocks(dayYMD: string) {
@@ -500,10 +706,18 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
     return slices.map((slice) => {
       const { task, sliceStartMin, sliceEndMin, isContinuation, hasContinuation } = slice;
 
+      // #7 — apply a live resize draft (if this block is being dragged) so it
+      // grows/shrinks under the cursor before the commit on mouse-up.
+      const draft = resizeDraft && resizeDraft.taskId === task.id ? resizeDraft : null;
+      const effStartMin = sliceStartMin + (draft?.startMinDelta ?? 0);
+      const effLenMin = draft ? draft.durationMin : Math.max(1, sliceEndMin - sliceStartMin);
+
       // Convert minutes-from-midnight to grid-row offsets (rowHeight per hour).
-      const topPx = (sliceStartMin / 60) * rowHeight;
-      const sliceLen = Math.max(1, sliceEndMin - sliceStartMin);
+      const topPx = (effStartMin / 60) * rowHeight;
+      const sliceLen = effLenMin;
       const heightPx = Math.max(10, (sliceLen / 60) * rowHeight);
+      // Resize handles only on a self-contained head block (no cross-midnight).
+      const resizable = !isContinuation && !hasContinuation;
 
       // Side-by-side layout: divide column width equally.
       const { colIndex, colCount } = colLayout.get(task.id) ?? { colIndex: 0, colCount: 1 };
@@ -517,7 +731,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const scheduledEndMs =
         new Date(task.startISO).getTime() + task.scheduledDurationMin * 60_000;
       const isPast = scheduledEndMs <= nowMs;
-      const isGrayed = task.done || isPast;
+      // #171 — completed and overrun must read differently. Done tasks get a
+      // ✓ badge (and the grey treatment); overrun = scheduled time elapsed but
+      // never marked done, which stays greyed-only with no checkmark.
+      const isDone = task.done;
+      const isOverrun = isPast && !task.done;
+      const isGrayed = isDone || isOverrun;
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         setTaskPopup(null);
@@ -576,7 +795,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
         const absMinute = sliceStartMin + (Number.isFinite(minutesIntoBlock) ? minutesIntoBlock : 0);
         const snappedMin = Math.max(
           0,
-          Math.min(1440 - 15, Math.floor(absMinute / 15) * 15),
+          Math.min(1440 - gran, Math.floor(absMinute / gran) * gran),
         );
         const hour = Math.floor(snappedMin / 60);
         const minute = snappedMin % 60;
@@ -590,20 +809,6 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const handleBlockClick = (e: ReactMouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
         setTaskPopup({ task, x: e.clientX, y: e.clientY });
-      };
-
-      const handleBlockContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const board = useBoardStore.getState().board;
-        const taskNode = board?.nodes.find((n) => n.id === task.id);
-        if (taskNode) {
-          reactFlow.setCenter(
-            taskNode.position.x + 110,
-            taskNode.position.y + 80,
-            { duration: 400, zoom: 0.9 },
-          );
-        }
       };
 
       // Visual cue: continuation slices are clipped flat on the top edge,
@@ -637,7 +842,6 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           onDragOver={handleBlockDragOver}
           onDrop={handleDropOnBlock}
           onClick={handleBlockClick}
-          onContextMenu={handleBlockContextMenu}
           title={task.text + (isContinuation ? ' (continued from previous day)' : '')}
           style={{
             position: 'absolute',
@@ -690,6 +894,27 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               }}
             >
               ↓
+            </span>
+          )}
+          {/* #171 — completed marker. A done task shows a ✓ so it reads as
+              "finished" rather than just "greyed", distinguishing it from an
+              overrun (elapsed-but-undone) block which carries no checkmark. */}
+          {isDone && !isContinuation && (
+            <span
+              data-testid={`task-done-check-${task.id}`}
+              style={{
+                position: 'absolute',
+                top: 1,
+                right: 3,
+                fontSize: 9,
+                fontWeight: 700,
+                color: 'var(--acid)',
+                fontFamily: 'var(--font-mono)',
+                lineHeight: 1,
+                pointerEvents: 'none',
+              }}
+            >
+              ✓
             </span>
           )}
           {/* Decision 28 §6 — work/break sub-regions.
@@ -760,12 +985,34 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               {task.text}
             </span>
           )}
+          {/* #7 — resize handles: drag the top edge to move the start, the
+              bottom edge to change the duration. Snapped to granularity. */}
+          {resizable && (
+            <>
+              <div
+                data-testid={`task-resize-top-${task.id}`}
+                onMouseDown={(e) => startResize('top', task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e)}
+                style={{ position: 'absolute', top: -2, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 3 }}
+              />
+              <div
+                data-testid={`task-resize-bottom-${task.id}`}
+                onMouseDown={(e) => startResize('bottom', task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e)}
+                style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 3 }}
+              />
+            </>
+          )}
         </div>
       );
     });
   }
 
-  // ── Tracked-reality block renderer (Issue #166) ─────────────────────────────
+  // ── Tracked-reality block renderer (#180) ───────────────────────────────────
+  // #180 dual visualization: the Pomodoro is an OBSERVER. Its tracked work/break
+  // segments render as an ambient BACKGROUND WASH spanning the full column,
+  // sitting BEHIND event blocks (low z-index, no hard border). Events — the
+  // PLAN — are bordered foreground blocks that overlap on top. This makes "what
+  // actually happened" (wash) and "what I planned" (block) co-readable even when
+  // they cover the same time. Work = warm rust tint; break = neutral striped.
   function renderRealityBlocks(dayYMD: string) {
     const segs = realityByDay.get(dayYMD);
     if (!segs || segs.length === 0) return null;
@@ -773,31 +1020,40 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       const topPx = (seg.startMin / 60) * rowHeight;
       const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
-      const tone = isWork
-        ? (seg.taskId ? TASK_TONE_VAR[colorForTask(seg.taskId)] : 'var(--rust)')
-        : 'var(--ink-3)';
+      // Reality wash uses a single ambient palette (NOT per-task colour — the
+      // pomo has no task). Work = rust wash, break = neutral ink stripes.
+      const tone = isWork ? 'var(--rust)' : 'var(--ink-3)';
+      const liveGlow = seg.live ? 0.22 : 0.14;
       return (
         <div
           key={`reality-${seg.id}`}
           data-testid="calendar-reality-block"
           data-reality-kind={seg.kind}
           data-reality-live={seg.live ? 'true' : undefined}
-          title={`${isWork ? 'Focus' : 'Break'} (tracked)`}
+          title={
+            seg.live
+              ? `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)} → now (recording)`
+              : `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)} (tracked reality)`
+          }
           style={{
             position: 'absolute',
             top: topPx,
-            left: 1,
-            right: 1,
+            // Full-column ambient wash — spans edge to edge, behind events.
+            left: 0,
+            right: 0,
             height: heightPx,
-            background: isWork ? tone : 'transparent',
+            background: isWork
+              ? `color-mix(in srgb, ${tone} ${seg.live ? 22 : 14}%, transparent)`
+              : 'transparent',
             backgroundImage: isWork
               ? undefined
-              : `repeating-linear-gradient(135deg, ${tone} 0 1px, transparent 1px 4px)`,
-            border: `1px solid ${tone}`,
-            borderRadius: 2,
-            zIndex: 3,
-            boxShadow: seg.live ? `0 0 6px ${tone}` : undefined,
-            opacity: seg.live ? 0.55 : 0.4,
+              : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 30%, transparent) 0 2px, transparent 2px 7px)`,
+            // No hard border — a soft left accent rail marks the segment edge so
+            // the wash reads as "ambient happened-time", distinct from a block.
+            borderLeft: `2px solid color-mix(in srgb, ${tone} ${seg.live ? 70 : 45}%, transparent)`,
+            // Behind event blocks (zIndex 2) and habits, above the grid.
+            zIndex: 0,
+            boxShadow: seg.live ? `inset 0 0 12px color-mix(in srgb, ${tone} ${liveGlow * 100}%, transparent)` : undefined,
             pointerEvents: 'none',
           }}
         />
@@ -900,7 +1156,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const weekLabel = formatWeekLabel(mondayYMD);
+  const weekLabel = formatWeekLabel(baseYMD);
 
   return (
     <div
@@ -945,7 +1201,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               letterSpacing: '0.06em',
             }}
           >
-            Week of {weekLabel}
+            {singleDay ? weekLabel : `Week of ${weekLabel}`}
           </span>
 
           {/* Legend chip — explains the two block treatments used on the
@@ -1003,6 +1259,70 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               break
             </span>
           </div>
+
+          {/* #9 — jump to the current week (like the clock's "now"). */}
+          <button
+            type="button"
+            data-testid="week-today"
+            onClick={setToday}
+            title="Jump to this week"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 8.5,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-2)',
+              background: 'var(--paper-2)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 3,
+              padding: '2px 7px',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Today
+          </button>
+
+          {/* #5 — ruler zoom controls. Stretch the grid to read pomo/task
+              section boundaries; the gutter gains :30/:15 sub-marks as you go. */}
+          <div
+            data-testid="week-zoom"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
+          >
+            <button
+              type="button"
+              data-testid="week-zoom-out"
+              aria-label="Zoom out"
+              disabled={zoom <= CAL_ZOOM_MIN}
+              onClick={() => setZoom(zoom - CAL_ZOOM_STEP)}
+              style={zoomBtnStyle(zoom <= CAL_ZOOM_MIN)}
+            >
+              −
+            </button>
+            <span
+              data-testid="week-zoom-level"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8.5,
+                color: 'var(--ink-3)',
+                minWidth: 26,
+                textAlign: 'center',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {zoom.toFixed(1)}×
+            </span>
+            <button
+              type="button"
+              data-testid="week-zoom-in"
+              aria-label="Zoom in"
+              disabled={zoom >= CAL_ZOOM_MAX}
+              onClick={() => setZoom(zoom + CAL_ZOOM_STEP)}
+              style={zoomBtnStyle(zoom >= CAL_ZOOM_MAX)}
+            >
+              +
+            </button>
+          </div>
         </div>
         <button
           type="button"
@@ -1025,7 +1345,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
           borderBottom: '1px solid var(--paper-3)',
         }}
       >
-        {weekDays.map((dayYMD, colIdx) => {
+        {weekDays.map((dayYMD) => {
           const isToday = dayYMD === today;
           const dayNum = parseInt(dayYMD.slice(8, 10), 10);
           return (
@@ -1045,7 +1365,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 animation: isToday ? 'krnl-today-pulse 2s ease-in-out infinite' : undefined,
               }}
             >
-              {DAY_LABELS[colIdx]} {dayNum}
+              {DAY_LABELS[ymdToIsoDow(dayYMD) - 1]} {dayNum}
             </div>
           );
         })}
@@ -1078,18 +1398,42 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                 key={hour}
                 style={{
                   height: rowHeight,
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'flex-end',
-                  paddingRight: 4,
-                  paddingTop: 1,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
-                  color: 'var(--ink-3)',
+                  position: 'relative',
                   boxSizing: 'border-box',
                 }}
               >
-                {String(hour).padStart(2, '0')}
+                {/* Top-of-hour label, e.g. "13" */}
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 1,
+                    right: 4,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9,
+                    color: 'var(--ink-3)',
+                    lineHeight: 1,
+                  }}
+                >
+                  {String(hour).padStart(2, '0')}
+                </span>
+                {/* #5 ruler sub-marks — appear as the grid is zoomed in, so the
+                    gutter reads like a ruler (13:15 / 13:30 / 13:45). */}
+                {subMarks.map((min) => (
+                  <span
+                    key={min}
+                    style={{
+                      position: 'absolute',
+                      top: (min / 60) * rowHeight - 4,
+                      right: 4,
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 7.5,
+                      color: 'var(--ink-4)',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {String(hour).padStart(2, '0')}:{String(min).padStart(2, '0')}
+                  </span>
+                ))}
               </div>
             );
           })}
@@ -1127,7 +1471,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               zIndex: 0,
             }}
           >
-            {Array.from({ length: 7 }, (_, i) => (
+            {Array.from({ length: dayCount }, (_, i) => (
               <div
                 key={i}
                 style={{
@@ -1143,6 +1487,7 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               <div
                 key={dayYMD}
                 data-testid={`week-col-${dayYMD}`}
+                onContextMenu={(e) => handleColumnContextMenu(dayYMD, e)}
                 style={{
                   flex: 1,
                   position: 'relative',
@@ -1169,6 +1514,12 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
                         height: rowHeight,
                         boxSizing: 'border-box',
                         borderBottom: '1px solid rgba(154, 145, 128, 0.25)',
+                        // #4 — faint half-hour gridline once the grid is zoomed
+                        // enough to warrant it, so blocks read against a ruler.
+                        backgroundImage:
+                          subMarks.length > 0
+                            ? 'linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(154,145,128,0.12) 50%, transparent calc(50% + 0.5px))'
+                            : undefined,
                       }}
                     />
                   );
@@ -1182,6 +1533,43 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
 
                 {/* Issue #166 — tracked reality overlay (work/break spans) */}
                 {renderRealityBlocks(dayYMD)}
+
+                {/* #8 — snap-preview band: the exact slot the drop will land on,
+                    so you see "13:45" not "the 13:00 hour". */}
+                {snapPreview && snapPreview.dayYMD === dayYMD && (
+                  <div
+                    data-testid="calendar-snap-band"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: (snapPreview.minute / 60) * rowHeight,
+                      height: Math.max(3, (gran / 60) * rowHeight),
+                      background: 'color-mix(in srgb, var(--acid) 22%, transparent)',
+                      borderTop: '2px solid var(--acid)',
+                      zIndex: 4,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 2,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 8.5,
+                        fontWeight: 700,
+                        color: 'var(--ink-on-bright)',
+                        background: 'var(--acid)',
+                        padding: '0 3px',
+                        borderRadius: 2,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {String(Math.floor(snapPreview.minute / 60)).padStart(2, '0')}:{String(snapPreview.minute % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1332,44 +1720,264 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
               </span>
             </div>
 
-            <div
-              style={{
-                color: 'var(--ink-3)',
-                fontSize: 10,
-                marginBottom: 10,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-              }}
-            >
-              Duration · {taskPopup.task.scheduledDurationMin} min
+            {/* #7 — exact-time editor. Type any start time + duration to place
+                the task precisely, independent of the calendar's snap grid. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <input
+                data-testid="task-popup-time"
+                type="time"
+                value={exactTime}
+                onChange={(e) => setExactTime(e.target.value)}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 5px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)' }}
+              />
+              <input
+                data-testid="task-popup-duration"
+                type="number"
+                min={1}
+                value={exactDur}
+                onChange={(e) => setExactDur(e.target.value)}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{ width: 56, fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 5px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)' }}
+              />
+              <span style={{ fontSize: 9, color: 'var(--ink-3)' }}>min</span>
+              <button
+                type="button"
+                data-testid="task-popup-apply-time"
+                onClick={() => { applyExactTime(taskPopup.task); setTaskPopup(null); }}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: 'var(--ink-on-bright)', background: 'var(--cyan)', border: '1px solid var(--cyan)', borderRadius: 3, padding: '3px 8px', cursor: 'pointer', textTransform: 'uppercase' }}
+              >
+                Set
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                onCommand('calendar.activateTask', { taskId: taskPopup.task.id });
-                setTaskPopup(null);
-              }}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                fontWeight: 600,
-                color: 'var(--ink-on-bright)',
-                background: 'var(--acid)',
-                border: '1px solid var(--acid)',
-                borderRadius: 3,
-                padding: '3px 8px',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-              }}
-            >
-              Activate
-            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  onCommand('calendar.activateTask', { taskId: taskPopup.task.id });
+                  setTaskPopup(null);
+                }}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: 'var(--ink-on-bright)',
+                  background: 'var(--acid)',
+                  border: '1px solid var(--acid)',
+                  borderRadius: 3,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Activate
+              </button>
+              <button
+                type="button"
+                data-testid="calendar-task-jump"
+                onClick={() => {
+                  jumpToTaskNode(taskPopup.task.id);
+                  setTaskPopup(null);
+                }}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: 'var(--ink-2)',
+                  background: 'transparent',
+                  border: '1px solid var(--paper-3)',
+                  borderRadius: 3,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Jump to node →
+              </button>
+              {/* #4 — unschedule: pull the task off the calendar. */}
+              <button
+                type="button"
+                data-testid="calendar-task-unschedule"
+                onClick={() => { unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
+                title="Remove this task from the calendar (keeps the task)"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: '#ff8e64',
+                  background: 'transparent',
+                  border: '1px solid #ff8e64',
+                  borderRadius: 3,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Unschedule
+              </button>
+            </div>
           </div>
         </>,
         document.body,
       );
       })()}
+
+      {/* #7 — overlap layer picker. Right-click enumerates every block under the
+          cursor; the user picks which to inspect. */}
+      {layerMenu && createPortal(
+        <>
+          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 2098 }} />
+          <div
+            data-testid="calendar-layer-menu"
+            style={{
+              position: 'fixed',
+              left: Math.min(layerMenu.x + 4, window.innerWidth - 230),
+              top: layerMenu.y + 4,
+              zIndex: 2099,
+              background: 'var(--paper)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 8,
+              padding: 5,
+              minWidth: 200,
+              boxShadow: 'var(--shadow-1)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            <div style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '3px 6px 5px' }}>
+              {layerMenu.items.length} items here
+            </div>
+            {layerMenu.items.map((item, i) => {
+              const isTask = item.kind === 'task';
+              const tone = isTask ? toneVarForTask(item.task.id) : (item.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)');
+              const label = isTask
+                ? item.task.text || 'Untitled task'
+                : `Tracked · ${item.seg.kind === 'work' ? 'focus' : 'break'} ${fmtHM(item.seg.startMs)}–${fmtHM(item.seg.endMs)}`;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  data-testid={`calendar-layer-item-${item.kind}`}
+                  onClick={() => {
+                    if (item.kind === 'task') setTaskPopup({ task: item.task, x: layerMenu.x, y: layerMenu.y });
+                    else setRealityPopup({ seg: item.seg, x: layerMenu.x, y: layerMenu.y });
+                    setLayerMenu(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: 5,
+                    padding: '6px 6px',
+                    cursor: 'pointer',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10.5,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span aria-hidden style={{ width: 9, height: 9, borderRadius: isTask ? 2 : 999, background: tone, flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: 7.5, color: 'var(--ink-4)', textTransform: 'uppercase' }}>{isTask ? 'plan' : 'real'}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>,
+        document.body,
+      )}
+
+      {/* #6 — tracked-reality (pomo) segment info popup. */}
+      {realityPopup && createPortal(
+        <>
+          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+          <div
+            data-testid="calendar-reality-popup"
+            style={{
+              position: 'fixed',
+              left: Math.min(realityPopup.x + 4, window.innerWidth - 250),
+              top: realityPopup.y + 6,
+              zIndex: 1999,
+              background: 'var(--paper)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 8,
+              padding: '12px 14px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--ink)',
+              minWidth: 220,
+              boxShadow: 'var(--shadow-1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 10, height: 10, borderRadius: 999, flexShrink: 0,
+                  background: realityPopup.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)',
+                }}
+              />
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>
+                {realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}
+              </span>
+              {realityPopup.seg.live && (
+                <span style={{ fontSize: 8, color: 'var(--acid)', letterSpacing: '0.08em' }}>◆ LIVE</span>
+              )}
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>tracked reality</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-on-bright)', background: 'var(--rust)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtHM(realityPopup.seg.startMs)}
+              </span>
+              <div style={{ flex: 1, height: 2, borderRadius: 1, background: 'var(--paper-3)' }} />
+              {/* #3 — a live (in-flight) span reads "→ now" so it's obvious it's
+                  still recording, not a fixed end time. */}
+              <span style={{ fontSize: 15, fontWeight: 700, color: realityPopup.seg.live ? 'var(--acid)' : 'var(--ink)', background: 'var(--paper-2)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
+                {realityPopup.seg.live ? 'now' : fmtHM(realityPopup.seg.endMs)}
+              </span>
+            </div>
+            <div style={{ color: 'var(--ink-3)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              {realityPopup.seg.live ? 'So far · ' : 'Duration · '}
+              {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
+            </div>
+            {/* #12 — delete a recorded segment (removes it from analytics too).
+                The live in-flight span can't be deleted; stop it first. */}
+            {!realityPopup.seg.live && (
+              <button
+                type="button"
+                data-testid="calendar-reality-delete"
+                onClick={() => { deleteRealitySegment(realityPopup.seg.id); setRealityPopup(null); }}
+                style={{
+                  marginTop: 12,
+                  width: '100%',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: '#ff8e64',
+                  background: 'transparent',
+                  border: '1px solid #ff8e64',
+                  borderRadius: 4,
+                  padding: '5px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Delete segment
+              </button>
+            )}
+          </div>
+        </>,
+        document.body,
+      )}
 
       {/* HabitSwapModal — shown after a habit is dropped on a cell.
           Collects kind, time, and duration in one step. */}
@@ -1407,6 +2015,26 @@ export function WeekView({ state, config, onCommand }: WeekViewProps) {
       })()}
     </div>
   );
+}
+
+// Compact zoom button (− / +). Disabled state dims and blocks the cursor.
+function zoomBtnStyle(disabled: boolean): React.CSSProperties {
+  return {
+    width: 18,
+    height: 18,
+    display: 'grid',
+    placeItems: 'center',
+    background: 'var(--paper-2)',
+    border: '1px solid var(--paper-3)',
+    borderRadius: 3,
+    color: disabled ? 'var(--ink-4)' : 'var(--ink-2)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 11,
+    lineHeight: 1,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    padding: 0,
+    opacity: disabled ? 0.5 : 1,
+  };
 }
 
 // Shared nav button style — mirrors MonthView.

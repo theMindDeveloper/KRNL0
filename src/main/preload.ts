@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('krnl', {
   // Board persistence
   boardLoad: () => ipcRenderer.invoke('board:load'),
   boardSave: (data: unknown) => ipcRenderer.invoke('board:save', data),
+  boardReset: () => ipcRenderer.invoke('board:reset'),
   boardSaveViewport: (viewport: { x: number; y: number; zoom: number }) =>
     ipcRenderer.invoke('board:saveViewport', viewport),
 

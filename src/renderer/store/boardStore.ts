@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { saveBoard } from './eventLog';
-import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig } from '../../shared/types';
+import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig, CompletionRecord } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
+import { recordCompletion as recordCompletionLedger, clearCompletion as clearCompletionLedger } from './completionLedger';
 
 const INITIAL_VIEWPORT: BoardViewport = { x: 0, y: 160, zoom: 1 };
 const ZOOM_MIN = 0.25;
@@ -79,6 +80,20 @@ interface BoardStore {
   insertSiblingTaskAfter: (taskNodeId: string, opts?: { text?: string; durationMin?: number }) => void;
   undo: () => void;
   redo: () => void;
+  // #169 — completion ledger. recordCompletion/clearCompletion are upsert-by-
+  // taskId and DO NOT push a history slot: they ride the same set() as the
+  // toggle that triggered them (the toggle already snapshotted), so one undo
+  // reverts both the done-state and the ledger entry together.
+  recordCompletion: (entry: CompletionRecord) => void;
+  clearCompletion: (taskId: string) => void;
+  // Destructive, non-undoable: wipe the "what I did" record — the completion
+  // ledger (#169) and every pomo node's session history — leaving the live
+  // board (tasks, habits, layout) untouched. Persists and clears undo/redo so a
+  // stale undo can't resurrect the wiped data. Gated behind hold-to-confirm UI.
+  clearFocusHistory: () => void;
+  // Destructive, non-undoable: replace the entire board with a fresh canonical
+  // seed (factory reset). Persists via the board:reset IPC and clears undo/redo.
+  factoryReset: () => Promise<void>;
   // ADR 0008 § 2.1 / § 4.1 — layout mode and geometry actions.
   // Both persist through the same saveBoard IPC path as all other mutations.
   setLayoutMode: (mode: LayoutMode) => void;
@@ -283,6 +298,50 @@ export const useBoardStore = create<BoardStore>((set) => ({
       };
     }),
 
+  // #169 — completion ledger writers. No pushHistory: the triggering toggle
+  // already snapshotted the board, so this ledger change shares that undo slot.
+  recordCompletion: (entry) =>
+    set((s) => {
+      if (!s.board) return s;
+      return {
+        board: { ...s.board, completions: recordCompletionLedger(s.board.completions, entry) },
+      };
+    }),
+
+  clearCompletion: (taskId) =>
+    set((s) => {
+      if (!s.board) return s;
+      return {
+        board: { ...s.board, completions: clearCompletionLedger(s.board.completions, taskId) },
+      };
+    }),
+
+  clearFocusHistory: () => {
+    set((s) => {
+      if (!s.board) return s;
+      const { completions: _drop, ...rest } = s.board;
+      void _drop;
+      const cleared: Board = {
+        ...(rest as Board),
+        nodes: s.board.nodes.map((n) =>
+          n.kind === 'pomo'
+            ? { ...n, state: { ...(n.state as Record<string, unknown>), history: [] } }
+            : n,
+        ),
+      };
+      void saveBoard(cleared);
+      // Non-undoable: drop both stacks so a stale snapshot can't restore the
+      // wiped history.
+      return { board: cleared, history: [], future: [] };
+    });
+  },
+
+  factoryReset: async () => {
+    const fresh = (await window.krnl?.boardReset?.()) as Board | undefined;
+    if (!fresh) return;
+    set({ board: fresh, viewport: fresh.viewport, history: [], future: [] });
+  },
+
   // ADR 0008 § 2.1 / § 4.1 — setLayoutMode persists through the same boardSave
   // IPC path used by every other board mutation. No history slot — mode toggle
   // is not undoable (intentional; matches Decision 13 anchor-position behaviour).
@@ -398,7 +457,10 @@ export const useBoardStore = create<BoardStore>((set) => ({
         plannedMin,
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
-        kind: 'focus',
+        // #180 — Todo creates events only. A parallel sibling MUST be an event
+        // or the calendar selector (which renders kind==='event' only) drops it,
+        // so "2.1" never appears on the calendar/clock even after scheduling.
+        kind: 'event',
       };
 
       const newNode: Node = {

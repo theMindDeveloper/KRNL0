@@ -73,11 +73,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Tests are currently broken on main (tracked separately). Run them for
-      # visibility but don't block the release.
+      # Suite is green on main (#145 restored after #166 merge). Tests now gate
+      # the release — a failure here blocks the pipeline.
       - name: Test
         run: npm test
-        continue-on-error: true
 
       - name: Build renderer + main
         run: npm run build

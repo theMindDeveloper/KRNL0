@@ -20,6 +20,15 @@ export function CalendarNode({
   // Placeholder body — replaced by real views in Slices 2/3/4.
   const renderBody = () => {
     switch (config.view) {
+      case 'day':
+        return (
+          <WeekView
+            state={node.state as CalendarState}
+            config={config}
+            onCommand={onCommand}
+            singleDay
+          />
+        );
       case 'week':
         return (
           <WeekView
@@ -91,7 +100,7 @@ export function CalendarNode({
           fontSize: 10,
         }}
       >
-        {(['week', 'month', 'year'] as const).map((view) => (
+        {(['day', 'week', 'month', 'year'] as const).map((view) => (
           <button
             key={view}
             type="button"

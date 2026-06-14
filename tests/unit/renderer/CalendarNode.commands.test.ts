@@ -3,7 +3,9 @@ import {
   calendarSelectDate,
   calendarSetAnchor,
   calendarSetView,
+  calendarSetZoom,
 } from '../../../src/renderer/components/nodes/CalendarNode/commands';
+import { CAL_ZOOM_MIN, CAL_ZOOM_MAX } from '../../../src/renderer/components/nodes/CalendarNode/types';
 import type { CalendarState, CalendarConfig } from '../../../src/renderer/components/nodes/CalendarNode/types';
 import { defaultCalendarConfig } from '../../../src/renderer/components/nodes/CalendarNode/types';
 
@@ -70,6 +72,28 @@ describe('calendarSetAnchor', () => {
     const original = makeState({ anchorDate: '2026-05-14' });
     calendarSetAnchor(original, { date: '2026-06-01' });
     expect(original.anchorDate).toBe('2026-05-14');
+  });
+});
+
+describe('calendarSetZoom', () => {
+  it('sets a zoom within range', () => {
+    expect(calendarSetZoom(makeState(), { zoom: 2.5 }).zoom).toBe(2.5);
+  });
+
+  it('clamps below min and above max', () => {
+    expect(calendarSetZoom(makeState(), { zoom: 0.1 }).zoom).toBe(CAL_ZOOM_MIN);
+    expect(calendarSetZoom(makeState(), { zoom: 999 }).zoom).toBe(CAL_ZOOM_MAX);
+  });
+
+  it('ignores non-finite input (returns state unchanged)', () => {
+    const s = makeState({ zoom: 2 });
+    expect(calendarSetZoom(s, { zoom: NaN }).zoom).toBe(2);
+  });
+
+  it('does not mutate original state', () => {
+    const original = makeState({ zoom: 1 });
+    calendarSetZoom(original, { zoom: 3 });
+    expect(original.zoom).toBe(1);
   });
 });
 

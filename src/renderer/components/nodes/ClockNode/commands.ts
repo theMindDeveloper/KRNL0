@@ -55,3 +55,13 @@ export const clockGoToday = (s: ClockState): ClockState => ({
   ...s,
   selectedDate: todayLocalYMD(),
 });
+
+/**
+ * #9 — snap to NOW: today's date AND the 12-hour window (AM/PM) that contains the
+ * current hour, so the live half of the day is on screen in one click.
+ */
+export const clockGoNow = (s: ClockState): ClockState => ({
+  ...s,
+  selectedDate: todayLocalYMD(),
+  viewWindow: new Date().getHours() >= 12 ? 1 : 0,
+});

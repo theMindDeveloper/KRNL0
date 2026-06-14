@@ -1,7 +1,7 @@
 // Decision #9 / Decision #22 — Pomodoro FSM. Pure handlers: (state, args) => state.
 // Time and id sources are injected so tests can pin them.
 
-import type { PomoConfig, PomoSessionRecord, PomoState, TimerFace } from './types';
+import type { PomoConfig, PomoSegmentKind, PomoSessionRecord, PomoState, TimerFace } from './types';
 import { defaultPomoConfig } from './types';
 import { isLongBreakAfter } from './pomoRules';
 
@@ -345,6 +345,37 @@ export const pomoStop = (
   return state;
 };
 
+/**
+ * #12 — delete a recorded segment by id. Removes it from history so it vanishes
+ * from the Clock, Calendar AND analytics (pomoSource reads history live). No-op
+ * if the id isn't present. Goes through a normal history-pushed store mutation
+ * so the delete stays undoable.
+ */
+export const pomoDeleteSegment = (state: PomoState, args: { id: string }): PomoState => {
+  if (!args?.id) return state;
+  const next = state.history.filter((r) => r.id !== args.id);
+  if (next.length === state.history.length) return state;
+  return { ...state, history: next };
+};
+
+/**
+ * #2/#6 — RESET: abandon the in-flight span and snap to idle WITHOUT writing a
+ * history record. This is the "I don't want to count this" escape hatch, distinct
+ * from STOP (pomoStop, which records) and from PAUSE (which excludes away-time but
+ * keeps the session). No-op when already idle/done.
+ */
+export const pomoDiscard = (state: PomoState): PomoState => {
+  if (state.status === 'idle' || state.status === 'done') return state;
+  return {
+    ...state,
+    status: 'idle',
+    startedAt: null,
+    pausedAt: null,
+    pausedElapsedMs: 0,
+    sessionWorkSec: 0,
+  };
+};
+
 export const pomoSetLabel = (state: PomoState, args: { label: string }): PomoState => {
   return { ...state, label: args.label };
 };
@@ -426,3 +457,44 @@ function clampPositive(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.max(1, Math.round(value));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEV-ONLY (#180 visualization testing). Not wired into production UI — the
+// PomoNode only renders the dev panel under import.meta.env.DEV. These let you
+// inspect how tracked-reality work/break segments paint on the Clock + Calendar
+// without waiting out a real session.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Append a synthetic tracked segment to history, ending "now" and spanning
+ * back `minutes`. `kind` picks work vs break. Lets you eyeball the reality
+ * wash/wedge instantly. Dev tool only.
+ */
+export const pomoDevSeedSegment = (
+  state: PomoState,
+  args: { kind?: PomoSegmentKind; minutes?: number; agoMin?: number } = {},
+  env: PomoEnv = defaultEnv,
+): PomoState => {
+  const kind: PomoSegmentKind = args.kind === 'break' ? 'break' : 'work';
+  const minutes = Math.max(1, Math.round(args.minutes ?? 25));
+  const agoMin = Math.max(0, Math.round(args.agoMin ?? 0));
+  const endMs = env.now() - agoMin * 60_000;
+  const startMs = endMs - minutes * 60_000;
+  const rec: PomoSessionRecord = {
+    id: env.uuid(),
+    startedAt: toIso(startMs),
+    endedAt: toIso(endMs),
+    durationMin: minutes,
+    label: 'DEV',
+    completed: kind === 'work',
+    taskId: null,
+    kind,
+  };
+  return { ...state, history: [...state.history, rec] };
+};
+
+/** Remove all DEV-seeded segments (label === 'DEV'). Dev tool only. */
+export const pomoDevClearSeeded = (state: PomoState): PomoState => ({
+  ...state,
+  history: state.history.filter((r) => r.label !== 'DEV'),
+});
