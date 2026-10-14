@@ -596,3 +596,29 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **PRs / Commits:** `508bdc6` (commit), [#178](https://github.com/theMindDeveloper/KRNL0/pull/178) (PR)
 **Files changed:** 17 files across `src/main`, `src/renderer`, and `tests/`.
 **Summary:** Pomodoro reworked as a live observer. Focus tasks (`kind: 'focus'`) no longer pre-draw scheduled blocks on Clock and Calendar, appearing only as they are tracked live in real time. Event tasks (`kind: 'event'`) are fully decoupled from the timer, hiding START/PAUSE buttons and blocking card double-clicking/loading. Event tasks and habits now render as thin hollow/outlined arcs (3 SVG paths: 1 background fill with `sw - 2` at 0.15 opacity, 2 thin outlines at `sw ± 3` with `strokeWidth = 1`). Tracked reality (Pomo work/break segments) draws as bold filled arcs/blocks. "Are you done?" prompt on pomo end supports EXTEND (continue drawing work arc), BREAK (draw break arc), or STOP. Unit/integration tests updated and typecheck passes with 0 errors.
+
+---
+
+## [2026-05-31 → 2026-06-15] — #180: retire "focus" kind, tasks become events tracked live; calendar/clock catch-up
+
+**Type:** Feature + Architecture + Bug Fix (batch catch-up entry)
+**Commits:** `6a392b2` … `f67b5b5` (26 commits, PR #179 and prior unlabeled merges)
+**Files changed:** Across `src/renderer/components/nodes/{CalendarNode,ClockNode,TaskNode,TodoNode}`, `src/renderer/analytics/`, `src/sys/commands/task.ts`, `.github/workflows/release.yml`.
+
+**Summary:** This entry catches HISTORY.md up to a batch of commits that landed on `origin/main` without a history entry at merge time, discovered while reconciling local `main` (which still held `508bdc6`/#178 as its tip) with `origin/main`. Grouped by theme:
+
+- **#180 — retire the `focus`/`event` kind split (the core change).** Decision 28's two-kind model is gone. Every task is now created as a plain event (`feat(todo): #180 slice 1` — Todo creates events only; `slice 1b` — CLI task spawns do the same). The Pomodoro timer's own start/pause controls are removed from TaskNode (`slice 2`) — Pomo no longer runs a pre-planned countdown against a task. Instead, Calendar and Clock now draw **two layers simultaneously**: the planned block (from the task's schedule) and the **live-tracked reality** (what Pomo actually observed happening), side by side (`slice 3` — dual plan-vs-reality visualization; `slice 4` — migration that converts all existing `focus` tasks to events on load). A dev panel (`f82107a`) was added to seed fake tracked-reality segments for visual testing without having to run a real Pomo session.
+- **#169 — completion ledger (`c949e72`).** Deleting a task used to erase its done-work from analytics. A separate ledger now records completed segments independently of the task's lifecycle, so analytics stay correct after deletion.
+- **#170 — undoable cascade delete (`6370bf7`).** Deleting a task that cascades to linked TodoItems can now be undone in one step.
+- **#171 — completed vs. overrun distinction (`c3c5ec5`).** Calendar/analytics now visually distinguish a task that finished on time from one that ran over.
+- **Calendar UX pass:** Notion-style grid with granularity zoom, snap band, exact-time entry, and day view (`6268c7e`); drag-resize of task blocks with live snapped preview (`ee6fe5b`); ruler zoom on the week grid (`db76cc5`); right-click layer picker for overlapping Pomo sections (`59f2d57`); live-recording label + delete-tracked-segment (`8ca3152`); jump-to-node restored as an explicit popup action (`0299471`); editing a task's time now resizes only its own block, not successors (`9407890`); parallel-task color-collision and pomo-control-clarity fixes (`eb3baf1`).
+- **Clock parity (`3319123`):** now-snap behavior and right-click pomo-segment info/delete, matching Calendar's interaction model.
+- **Perf (`953003f`):** Calendar/Clock render path dispatches through the store directly instead of `commandDispatch`, cutting a layer of indirection on every tick.
+- **Settings (`69bdaf0`):** destructive actions — clear focus history, factory reset.
+- **Input polish (`cc8ae37`, #177):** text/number fields select their pre-filled value on focus.
+- **CI (`6a392b2`, #145):** release workflow now gates on a green test suite.
+- **Infra:** a Windows-build/package-upgrade change (`fdf9f22`) was shipped and then reverted (`f67b5b5`) in the same window.
+
+**Why documented retroactively:** Hard rule requires a HISTORY.md entry before any merge to `main`, but this batch reached `origin/main` without one. Local `main` had fallen 26 commits behind while a different local commit (`9ebb796`) sat on top of the old tip; completing the already-staged merge brought both histories together. This entry closes that gap so the log matches what's actually running.
+
+**Tests:** Post-merge, full suite green — 110 test files / 1407 tests passed, 0 typecheck errors.
