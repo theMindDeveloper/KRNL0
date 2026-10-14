@@ -726,3 +726,95 @@ describe('WeekView — habit block visualisation', () => {
     }
   });
 });
+
+// ── #6 / #7 — overlap disambiguation + reality info ────────────────────────────
+
+function makePomoWithHistory(id: string, startISO: string, endISO: string, kind: 'work' | 'break' = 'work') {
+  return {
+    id,
+    kind: 'pomo',
+    position: { x: 0, y: 0 },
+    isMother: true,
+    state: {
+      status: 'idle',
+      startedAt: null,
+      activeTaskId: null,
+      label: '',
+      history: [
+        { id: 'seg-1', startedAt: startISO, endedAt: endISO, durationMin: 25, completed: true, kind, label: '' },
+      ],
+    },
+    config: {},
+  };
+}
+
+function boardWith(nodes: unknown[]) {
+  useBoardStore.setState({
+    board: {
+      version: 1,
+      schemaVersion: 2,
+      savedAt: new Date().toISOString(),
+      viewport: { x: 0, y: 0, zoom: 1 },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      nodes: nodes as any,
+      edges: [],
+      layoutMode: 'canvas',
+    },
+  });
+}
+
+describe('WeekView — overlap disambiguation (#6/#7)', () => {
+  it('right-click where a task and a tracked-reality segment overlap opens the layer picker', () => {
+    // Both span 09:00–09:25 on Monday 2026-05-11.
+    boardWith([
+      makeTask('task-a', '2026-05-11T09:00', 25),
+      makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
+    ]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    // rowHeight = 28 (zoom 1); minute 540 (09:00) → clientY 252.
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+
+    const menu = document.querySelector('[data-testid="calendar-layer-menu"]');
+    expect(menu).toBeTruthy();
+    expect(document.querySelector('[data-testid="calendar-layer-item-task"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="calendar-layer-item-reality"]')).toBeTruthy();
+  });
+
+  it('picking the reality item shows the tracked-reality info popup with start/end', () => {
+    boardWith([
+      makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
+    ]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    // Single hit → opens the reality popup directly (no menu).
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+
+    const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
+    expect(popup).toBeTruthy();
+    expect(popup?.textContent).toMatch(/09:00/);
+    expect(popup?.textContent).toMatch(/09:25/);
+    expect(popup?.textContent).toMatch(/25 min/);
+  });
+});
+
+describe('WeekView — delete tracked-reality segment (#12)', () => {
+  it('delete button removes the segment from the pomo history (and thus analytics)', () => {
+    boardWith([
+      makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
+    ]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+
+    const del = document.querySelector('[data-testid="calendar-reality-delete"]') as HTMLElement;
+    expect(del).toBeTruthy();
+    act(() => { fireEvent.click(del); });
+
+    const pomo = useBoardStore.getState().board!.nodes.find((n) => n.kind === 'pomo')!;
+    expect((pomo.state as { history: unknown[] }).history).toEqual([]);
+  });
+});

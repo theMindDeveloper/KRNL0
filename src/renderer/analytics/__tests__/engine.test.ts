@@ -52,6 +52,11 @@ const board: BoardLike = {
       },
     },
   ],
+  // #169 — task.completed events now come from the ledger, not live nodes.
+  completions: [
+    { taskId: 't1', text: 'a', plannedMin: 25, completedAt: '2026-05-10T09:00:00.000Z' },
+    { taskId: 't2', text: 'b', plannedMin: 25, completedAt: '2026-05-11T16:30:00.000Z' },
+  ],
 };
 
 describe('analytics engine', () => {

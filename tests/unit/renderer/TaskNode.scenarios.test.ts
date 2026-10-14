@@ -101,25 +101,25 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
     });
   });
 
-  // ── F2 — START button dispatches task.startPomo (Decision 22.2 Fix 1) ────
-  // The old "+ pomo" button (.task-pomo-btn) was replaced by task-start-btn /
-  // task-pause-btn. task-start-btn dispatches task.startPomo (same auto-start
-  // path as the old button). task.spawnPomo is still handled by the dispatcher
-  // but the UI no longer references it directly.
-  describe('F2 — START button dispatches task.startPomo', () => {
-    it('START button exists when done=false and task is not active', () => {
+  // ── F2 — #180: tasks have no pomo timer controls ─────────────────────────
+  // The Pomodoro is an independent observer. Tasks are events and carry no
+  // START/PAUSE buttons and no kind toggle.
+  describe('F2 — #180 task carries no pomo timer controls', () => {
+    it('no START button is rendered', () => {
       const onCommand = vi.fn();
       renderTaskNode(makeTaskState({ done: false }), onCommand);
-      const btn = screen.getByTestId('task-start-btn') as HTMLElement;
-      expect(btn).not.toBeNull();
+      expect(screen.queryByTestId('task-start-btn')).toBeNull();
     });
 
-    it('clicking START button dispatches task.startPomo', () => {
+    it('no PAUSE button is rendered', () => {
       const onCommand = vi.fn();
       renderTaskNode(makeTaskState({ done: false }), onCommand);
-      const btn = screen.getByTestId('task-start-btn') as HTMLElement;
-      fireEvent.click(btn);
-      expect(onCommand).toHaveBeenCalledWith('task.startPomo');
+      expect(screen.queryByTestId('task-pause-btn')).toBeNull();
+    });
+
+    it('no kind-toggle pill is rendered', () => {
+      renderTaskNode(makeTaskState({ done: false }));
+      expect(screen.queryByTestId('task-kind-toggle')).toBeNull();
     });
 
     it('.task-pomo-btn no longer exists (old button removed)', () => {
@@ -168,25 +168,17 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
     });
   });
 
-  // ── F4b — Done state hides START button; shows neither START nor STOP ────
-  // Decision 22.2: the old .task-pomo-btn is gone. task-start-btn is hidden
-  // when done=true. task-pause-btn is only shown when the task is the active
-  // pomo task (isActive). When done=true, neither button should be present.
-  describe('F4b — Done state hides START button (Decision 22.2)', () => {
-    it('task-start-btn is not present when done is true', () => {
+  // ── F4b — #180: no timer buttons regardless of done state ────────────────
+  describe('F4b — #180 no START/PAUSE buttons in any state', () => {
+    it('no task-start-btn when done is true', () => {
       renderTaskNode(makeTaskState({ done: true }));
-      const btn = document.queryByTestId ? document.queryByTestId('task-start-btn') : document.querySelector('[data-testid="task-start-btn"]');
-      expect(btn).toBeNull();
+      expect(document.querySelector('[data-testid="task-start-btn"]')).toBeNull();
     });
 
-    it('task-start-btn is present when done is false (and task not active)', () => {
+    it('no task-start-btn when done is false (events are not timer-driven)', () => {
       renderTaskNode(makeTaskState({ done: false }));
-      // task is not active (pomoRuntime.activeTaskId will be null with no board store),
-      // so START should be shown and STOP should not.
-      const startBtn = document.querySelector('[data-testid="task-start-btn"]');
-      expect(startBtn).not.toBeNull();
-      const stopBtn = document.querySelector('[data-testid="task-pause-btn"]');
-      expect(stopBtn).toBeNull();
+      expect(document.querySelector('[data-testid="task-start-btn"]')).toBeNull();
+      expect(document.querySelector('[data-testid="task-pause-btn"]')).toBeNull();
     });
   });
 

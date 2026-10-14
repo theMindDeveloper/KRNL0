@@ -84,75 +84,40 @@ function renderTaskNode(
   );
 }
 
-describe('Decision 28 — event-kind UX gates', () => {
-  // ── Toggle button presence ─────────────────────────────────────────────────
-
-  it('toggle icon button is present with data-testid="task-kind-toggle" for focus task', () => {
+// #180 — Tasks are events, fully decoupled from the Pomodoro. The kind toggle
+// and the START/PAUSE timer controls are removed; nothing loads a task into the
+// pomo. (Supersedes the Decision-28 toggle UX.)
+describe('#180 — task is fully decoupled from the pomo timer', () => {
+  it('no kind-toggle pill is rendered for a focus task', () => {
     renderTaskNode(makeTaskState({ kind: 'focus' }));
-    const btn = screen.getByTestId('task-kind-toggle');
-    expect(btn).not.toBeNull();
-    expect(btn.tagName.toLowerCase()).toBe('button');
+    expect(screen.queryByTestId('task-kind-toggle')).toBeNull();
   });
 
-  it('toggle icon button is present with data-testid="task-kind-toggle" for event task', () => {
+  it('no kind-toggle pill is rendered for an event task', () => {
     renderTaskNode(makeTaskState({ kind: 'event' }));
-    const btn = screen.getByTestId('task-kind-toggle');
-    expect(btn).not.toBeNull();
-    expect(btn.tagName.toLowerCase()).toBe('button');
+    expect(screen.queryByTestId('task-kind-toggle')).toBeNull();
   });
 
-  it('toggle button shows POMO label when kind=focus', () => {
-    renderTaskNode(makeTaskState({ kind: 'focus' }));
-    const btn = screen.getByTestId('task-kind-toggle');
-    expect(btn.textContent).toContain('POMO');
-  });
-
-  it('toggle button shows EVENT label when kind=event', () => {
-    renderTaskNode(makeTaskState({ kind: 'event' }));
-    const btn = screen.getByTestId('task-kind-toggle');
-    expect(btn.textContent).toContain('EVENT');
-  });
-
-  it('toggle button has aria-label "Toggle to event" when kind=focus', () => {
-    renderTaskNode(makeTaskState({ kind: 'focus' }));
-    const btn = screen.getByTestId('task-kind-toggle');
-    expect(btn.getAttribute('aria-label')).toBe('Toggle to event');
-  });
-
-  it('toggle button has aria-label "Toggle to focus" when kind=event', () => {
-    renderTaskNode(makeTaskState({ kind: 'event' }));
-    const btn = screen.getByTestId('task-kind-toggle');
-    expect(btn.getAttribute('aria-label')).toBe('Toggle to focus');
-  });
-
-  it('clicking toggle button dispatches task.toggleKind', () => {
-    const onCommand = vi.fn();
-    renderTaskNode(makeTaskState({ kind: 'focus' }), onCommand);
-    const btn = screen.getByTestId('task-kind-toggle');
-    fireEvent.click(btn);
-    expect(onCommand).toHaveBeenCalledWith('task.toggleKind');
-  });
-
-  // Issue 166: event tasks do NOT show START/PAUSE and do NOT load into pomo
-  it('START button is ABSENT when kind=event and task is not done', () => {
+  it('no START button is rendered (event task)', () => {
     renderTaskNode(makeTaskState({ kind: 'event', done: false }));
-    const btn = document.querySelector('[data-testid="task-start-btn"]');
-    expect(btn).toBeNull();
+    expect(document.querySelector('[data-testid="task-start-btn"]')).toBeNull();
   });
 
-  it('double-click on card body does NOT load event task into pomo', () => {
+  it('no START button is rendered (legacy focus task)', () => {
+    renderTaskNode(makeTaskState({ kind: 'focus', done: false }));
+    expect(document.querySelector('[data-testid="task-start-btn"]')).toBeNull();
+  });
+
+  it('no PAUSE button is rendered', () => {
+    renderTaskNode(makeTaskState({ kind: 'focus', done: false }));
+    expect(document.querySelector('[data-testid="task-pause-btn"]')).toBeNull();
+  });
+
+  it('double-click on card body does NOT load a task into pomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ kind: 'event' }), onCommand);
     const root = screen.getByTestId('task-node-root');
     fireEvent.doubleClick(root);
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
-  });
-
-  // ── Focus-kind regression guard ────────────────────────────────────────────
-
-  it('START button is present when kind=focus and task is not done', () => {
-    renderTaskNode(makeTaskState({ kind: 'focus', done: false }));
-    const btn = screen.getByTestId('task-start-btn');
-    expect(btn).not.toBeNull();
   });
 });

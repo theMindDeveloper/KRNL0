@@ -5,7 +5,7 @@ import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
-import { loadBoardFrom, saveBoardTo } from '../persistence/board';
+import { loadBoardFrom, saveBoardTo, seedBoard } from '../persistence/board';
 import { notifyBoardChanged } from '../boardIo';
 import { renderMotd } from '../rpc/motd';
 import type { RpcServer } from '../rpc/server';
@@ -68,6 +68,14 @@ export function registerHandlers(rpcServer?: RpcServer): void {
 
   ipcMain.handle('board:save', async (_event, data: unknown) => {
     saveBoard(data);
+  });
+
+  // Factory reset — overwrite board.json with a fresh canonical seed and return
+  // the loaded (migrated/validated) board so the renderer can adopt it directly.
+  // Destructive and intentional: the renderer gates this behind a hold-to-confirm.
+  ipcMain.handle('board:reset', async () => {
+    saveBoard(seedBoard());
+    return loadBoard();
   });
 
   ipcMain.handle('board:saveViewport', async (_event, viewport: unknown) => {

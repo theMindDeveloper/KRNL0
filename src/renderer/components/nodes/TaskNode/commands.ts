@@ -63,6 +63,15 @@ export const taskSetPlannedMin = (
 ): TaskState => {
   if (typeof args.minutes !== 'number' || !Number.isFinite(args.minutes)) return state;
   const plannedMin = Math.max(1, Math.round(args.minutes));
+  // Keep the calendar block in sync. When a task is anchored on the calendar,
+  // its block height is driven by scheduledDurationMin (the per-placement
+  // override), not plannedMin. If we only bumped plannedMin the successors
+  // would cascade but the edited block itself would stay frozen at its old
+  // size — the reported "edit time only pushes the next task" bug. Since for
+  // event tasks scheduledDurationMin IS the total duration, re-sync it.
+  if (typeof state.scheduledDurationMin === 'number') {
+    return { ...state, plannedMin, scheduledDurationMin: plannedMin };
+  }
   return { ...state, plannedMin };
 };
 

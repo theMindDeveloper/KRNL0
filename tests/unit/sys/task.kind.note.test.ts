@@ -94,44 +94,28 @@ afterEach(() => {
   if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
 });
 
-describe('task kind', () => {
-  it('sets kind from focus to event', async () => {
-    const id = seedBoard({ taskKind: 'focus' });
+describe('task kind (#180 — event-only)', () => {
+  // #180: 'focus' is no longer a task kind. Tasks are events; the Pomodoro is
+  // an independent observer with no task link. Loading a board also migrates
+  // any legacy 'focus' task to 'event'.
+
+  it('setting kind to event is accepted (already event after migration)', async () => {
+    const id = seedBoard({ taskKind: 'event' });
     const res = await taskKind(ctx, id, 'event');
     expect(res.ok).toBe(true);
     expect(readTaskState(id).kind).toBe('event');
   });
 
-  it('sets kind from event to focus', async () => {
+  it("refuses 'focus' as a target kind (no longer exists)", async () => {
     const id = seedBoard({ taskKind: 'event' });
     const res = await taskKind(ctx, id, 'focus');
-    expect(res.ok).toBe(true);
-    expect(readTaskState(id).kind).toBe('focus');
-  });
-
-  it('is a no-op when already the same kind', async () => {
-    const id = seedBoard({ taskKind: 'focus' });
-    const res = await taskKind(ctx, id, 'focus');
-    expect(res.ok).toBe(true);
-    expect(readTaskState(id).kind).toBe('focus');
-  });
-
-  it('refuses toggling focus→event on active pomo task (headless)', async () => {
-    const id = seedBoard({ taskKind: 'focus', pomoStatus: 'running', activeTaskId: 'task-aaaa1111' });
-    const res = await taskKind(ctx, id, 'event');
     expect(res.ok).toBe(false);
-    expect(res.message).toMatch(/cannot toggle kind on active pomo task/);
-  });
-
-  it('allows toggling event→focus even if pomo running (correct direction)', async () => {
-    const id = seedBoard({ taskKind: 'event', pomoStatus: 'running', activeTaskId: 'task-aaaa1111' });
-    const res = await taskKind(ctx, id, 'focus');
-    expect(res.ok).toBe(true);
+    expect(res.message).toMatch(/focus.*no longer/i);
   });
 
   it('refuses with missing ref', async () => {
     seedBoard();
-    const res = await taskKind(ctx, undefined, 'focus');
+    const res = await taskKind(ctx, undefined, 'event');
     expect(res.ok).toBe(false);
   });
 
@@ -142,7 +126,7 @@ describe('task kind', () => {
   });
 
   it('resolves task by id prefix', async () => {
-    const id = seedBoard({ taskKind: 'focus' });
+    const id = seedBoard({ taskKind: 'event' });
     const res = await taskKind(ctx, id.slice(0, 8), 'event');
     expect(res.ok).toBe(true);
     expect(readTaskState(id).kind).toBe('event');

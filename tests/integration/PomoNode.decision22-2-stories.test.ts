@@ -229,16 +229,15 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     expect(oldBtnClass).toBeNull();
   });
 
-  it('T1.2: when !done && !isActive, task-start-btn is rendered', () => {
-    // No board store seeded → pomo activeTaskId defaults to null → !isActive
+  it('T1.2: #180 — no task-start-btn is rendered (tasks are events, not timer-driven)', () => {
     renderTaskNode(makeTaskState({ done: false }));
-    const startBtn = screen.getByTestId('task-start-btn');
-    expect(startBtn).toBeTruthy();
+    expect(document.querySelector('[data-testid="task-start-btn"]')).toBeNull();
   });
 
-  it('T1.3: when isActiveRunning (activeTaskId matches + status=running), task-pause-btn is shown and task-start-btn is NOT', () => {
-    // Seed the store so the task appears as the active running one
-    const pomoState = makePomoState({ activeTaskId: 'task-1', status: 'running', startedAt: new Date().toISOString() });
+  it('T1.3: #180 — no task-pause-btn even when a pomo session is running', () => {
+    // Seed a running pomo. Under #180 the pomo is independent — it carries no
+    // activeTaskId concept, and the task still shows no timer button.
+    const pomoState = makePomoState({ status: 'running', startedAt: new Date().toISOString() });
     const board: Board = {
       version: 1,
       schemaVersion: 1,
@@ -258,43 +257,15 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
     };
     useBoardStore.setState({ board });
     renderTaskNode(makeTaskState({ done: false }));
-    // task-pause-btn should exist (isActiveRunning === true)
-    const pauseBtn = screen.getByTestId('task-pause-btn');
-    expect(pauseBtn).toBeTruthy();
-    // task-start-btn should NOT exist
-    const startBtn = document.querySelector('[data-testid="task-start-btn"]');
-    expect(startBtn).toBeNull();
+    expect(document.querySelector('[data-testid="task-pause-btn"]')).toBeNull();
+    expect(document.querySelector('[data-testid="task-start-btn"]')).toBeNull();
   });
 
-  it('T1.4: clicking task-start-btn dispatches task.startPomo', () => {
+  it('T1.4: #180 — task body/click never dispatches a pomo timer command', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
-    const startBtn = screen.getByTestId('task-start-btn');
-    fireEvent.click(startBtn);
-    expect(onCommand).toHaveBeenCalledWith('task.startPomo');
-    expect(onCommand).not.toHaveBeenCalledWith('task.spawnPomo');
+    expect(onCommand).not.toHaveBeenCalledWith('task.startPomo');
     expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
-  });
-
-  it('T1.5: clicking task-pause-btn dispatches task.pausePomo', () => {
-    const pomoState = makePomoState({ activeTaskId: 'task-1', status: 'running', startedAt: new Date().toISOString() });
-    const board: Board = {
-      version: 1,
-      schemaVersion: 1,
-      viewport: { x: 0, y: 0, zoom: 1 },
-      nodes: [
-        { id: 'pomo-1', kind: 'pomo', position: { x: 0, y: 0 }, isMother: true, state: pomoState, config: makePomoConfig() },
-      ],
-      edges: [],
-      savedAt: '2026-05-13T10:00:00.000Z',
-    };
-    useBoardStore.setState({ board });
-
-    const onCommand = vi.fn();
-    renderTaskNode(makeTaskState({ done: false }), onCommand);
-    const pauseBtn = screen.getByTestId('task-pause-btn');
-    fireEvent.click(pauseBtn);
-    expect(onCommand).toHaveBeenCalledWith('task.pausePomo');
   });
 
   it('T1.6: task.pausePomo on a running active task — pomo goes to paused, no history record, activeTaskId preserved, no commit to secondsAccumulated yet', () => {
@@ -401,12 +372,12 @@ describe('Story 1 — Per-task START / STOP shortcut (Decision 22.2 Fix 1)', () 
 
 describe('Story 2 — Body double-click loads task into pomo (no auto-start) (Decision 22.2 Fix 2)', () => {
 
-  it('T2.1: body double-click on a TaskNode dispatches task.loadIntoPomo (NOT task.startPomo)', () => {
+  it('T2.1: #180 — body double-click does NOT load a task into the pomo', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     const root = screen.getByTestId('task-node-root');
     fireEvent.doubleClick(root);
-    expect(onCommand).toHaveBeenCalledWith('task.loadIntoPomo');
+    expect(onCommand).not.toHaveBeenCalledWith('task.loadIntoPomo');
     expect(onCommand).not.toHaveBeenCalledWith('task.startPomo');
     expect(onCommand).not.toHaveBeenCalledWith('task.spawnPomo');
   });

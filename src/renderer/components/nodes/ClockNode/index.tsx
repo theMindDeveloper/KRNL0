@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
+import { pomoDeleteSegment } from '../PomoNode/commands';
+import type { PomoState } from '../PomoNode/types';
+import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
@@ -51,6 +55,24 @@ function arcPath(startH: number, endH: number, r: number): string {
   const y2 = CY + r * Math.sin(a2);
   const large = span > 6 ? 1 : 0;
   return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+}
+
+/**
+ * #180 — filled pie sector from the dial centre out to radius r, spanning
+ * [startH, endH]. Used to draw tracked-reality as an ambient background WASH
+ * on the dial face (behind the ticks/numbers/event lanes), distinct from the
+ * thin outlined event arcs on the outer track lanes.
+ */
+function sectorPath(startH: number, endH: number, r: number): string {
+  const span = Math.max(0.05, endH - startH);
+  const a1 = hourToRad(startH);
+  const a2 = hourToRad(startH + span);
+  const x1 = CX + r * Math.cos(a1);
+  const y1 = CY + r * Math.sin(a1);
+  const x2 = CX + r * Math.cos(a2);
+  const y2 = CY + r * Math.sin(a2);
+  const large = span > 6 ? 1 : 0;
+  return `M ${CX} ${CY} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
 }
 
 /** Format hour-float as "9:30am". */
@@ -175,6 +197,21 @@ export function ClockNode({
   const board0 = useBoardStore((s) => s.board);
   const isLive = pomoIsLive(board0);
   const [liveMs, setLiveMs] = useState(() => Date.now());
+
+  // #6/#12 — right-click a tracked-reality arc → info popup with delete.
+  const [realityPopup, setRealityPopup] = useState<{ seg: RealitySegment; x: number; y: number } | null>(null);
+  const deleteClockSegment = (segId: string) => {
+    const st = useBoardStore.getState();
+    const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
+    if (!pomo) return;
+    st.updateNode(pomo.id, { state: pomoDeleteSegment(pomo.state as PomoState, { id: segId }) });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
+  };
+  const fmtClockHM = (ms: number) => {
+    const d = new Date(ms);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
   useEffect(() => {
     if (!isLive) return;
     setLiveMs(Date.now());
@@ -488,6 +525,16 @@ export function ClockNode({
           >
             Today
           </button>
+          {/* #9 — snap to NOW: today + the 12-hour half that contains this hour. */}
+          <button
+            type="button"
+            className="clock-day-btn"
+            data-testid="clock-day-now"
+            onClick={() => onCommand('clock.goNow', {})}
+            title="Jump to now (today + current 12-hour half)"
+          >
+            Now
+          </button>
           <button
             type="button"
             className="clock-day-btn"
@@ -745,43 +792,9 @@ export function ClockNode({
               return [...tracks, ...arcs];
             })()}
 
-            {/* Issue #166 — tracked REALITY ring. Sits just outside the tick
-                marks and inside the scheduled-event lanes, so "what happened"
-                reads as a bold filled band hugging the dial, visually distinct
-                from the thin hollow event plan arcs further out. Work = filled
-                tone (rust when unlabeled), break = dashed neutral. The live
-                segment pulses. */}
-            {(() => {
-              // Reality arcs ride the innermost task track ring so they appear
-              // ON the trail lines, not in the dead zone between face and lanes.
-              const R_REALITY = trackBaseR; // 92 — same radius as lane 0
-              return realitySegments.map((seg) => {
-                const isWork = seg.kind === 'work';
-                const tone = isWork
-                  ? (seg.taskId ? TONE_VAR[colorFor(seg.taskId)] : 'var(--rust)')
-                  : 'var(--ink-3)';
-                return (
-                  <path
-                    key={`reality-${seg.id}`}
-                    data-testid="clock-reality-arc"
-                    data-reality-kind={seg.kind}
-                    data-reality-live={seg.live ? 'true' : undefined}
-                    d={arcPath(seg.startH, seg.endH, R_REALITY)}
-                    fill="none"
-                    stroke={tone}
-                    strokeWidth={isWork ? 6 : 4}
-                    strokeLinecap="round"
-                    strokeDasharray={isWork ? undefined : '2 3'}
-                    opacity={seg.live ? 1 : 0.85}
-                    style={
-                      seg.live
-                        ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone }
-                        : undefined
-                    }
-                  />
-                );
-              });
-            })()}
+            {/* #180 — tracked reality moved to a dial-face wash (drawn above,
+                under the ticks). The old lane-ring stroke is gone so reality
+                and event arcs no longer share the track lanes. */}
 
             {/* Now-pointer — spans exactly the train-track band.
                 Only rendered when viewing today.
@@ -837,6 +850,42 @@ export function ClockNode({
               stroke="var(--paper-3)"
               strokeWidth={1}
             />
+
+            {/* #180 — tracked-reality WASH on the dial face. The Pomodoro is an
+                observer: its work/break segments paint as soft filled pie wedges
+                from the dial centre, UNDER the ticks/numerals/hands and far
+                inside the outlined event arcs on the outer lanes. This is the
+                "what actually happened" ambient layer; events (the plan) read as
+                crisp arcs on the track lanes. Work = rust wash, break = neutral
+                dashed wedge. The live segment glows. */}
+            {realitySegments.map((seg) => {
+              const isWork = seg.kind === 'work';
+              const tone = isWork ? 'var(--rust)' : 'var(--ink-3)';
+              const fillPct = isWork ? (seg.live ? 26 : 18) : 0;
+              return (
+                <path
+                  key={`reality-${seg.id}`}
+                  data-testid="clock-reality-arc"
+                  data-reality-kind={seg.kind}
+                  data-reality-live={seg.live ? 'true' : undefined}
+                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setRealityPopup({ seg, x: e.clientX, y: e.clientY }); }}
+                  d={sectorPath(seg.startH, seg.endH, R_FACE - 2)}
+                  fill={
+                    isWork
+                      ? `color-mix(in srgb, ${tone} ${fillPct}%, transparent)`
+                      : `color-mix(in srgb, ${tone} 10%, transparent)`
+                  }
+                  stroke={`color-mix(in srgb, ${tone} ${seg.live ? 60 : 40}%, transparent)`}
+                  strokeWidth={isWork ? 1 : 0.75}
+                  strokeDasharray={isWork ? undefined : '2 3'}
+                  style={
+                    seg.live
+                      ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone, cursor: 'context-menu' }
+                      : { cursor: 'context-menu' }
+                  }
+                />
+              );
+            })}
 
             {/* 60 tick marks */}
             {Array.from({ length: 60 }).map((_, i) => {
@@ -1128,6 +1177,51 @@ export function ClockNode({
           })}
         </div>
       </div>
+
+      {/* #6/#12 — tracked-reality info + delete popup (right-click an arc). */}
+      {realityPopup && createPortal(
+        <>
+          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+          <div
+            data-testid="clock-reality-popup"
+            style={{
+              position: 'fixed',
+              left: Math.min(realityPopup.x + 4, window.innerWidth - 250),
+              top: realityPopup.y + 6,
+              zIndex: 1999,
+              background: 'var(--paper)',
+              border: '1px solid var(--paper-3)',
+              borderRadius: 8,
+              padding: '12px 14px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--ink)',
+              minWidth: 210,
+              boxShadow: 'var(--shadow-1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: realityPopup.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)' }} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}</span>
+              {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid)' }}>◆ LIVE</span>}
+            </div>
+            <div style={{ color: 'var(--ink-3)', fontSize: 10, marginBottom: 10, letterSpacing: '0.04em' }}>
+              {fmtClockHM(realityPopup.seg.startMs)} {realityPopup.seg.live ? '→ now' : `– ${fmtClockHM(realityPopup.seg.endMs)}`}
+              {' · '}{Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
+            </div>
+            {!realityPopup.seg.live && (
+              <button
+                type="button"
+                data-testid="clock-reality-delete"
+                onClick={() => { deleteClockSegment(realityPopup.seg.id); setRealityPopup(null); }}
+                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: '#ff8e64', background: 'transparent', border: '1px solid #ff8e64', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+              >
+                Delete segment
+              </button>
+            )}
+          </div>
+        </>,
+        document.body,
+      )}
     </MotherFrame>
   );
 }

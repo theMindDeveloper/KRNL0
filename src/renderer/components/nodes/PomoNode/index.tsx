@@ -45,6 +45,16 @@ export function primaryButtonLabel(status: PomoState['status']): string {
   }
 }
 
+/** #6 — tooltip for the primary button, per status. */
+export function primaryTooltip(status: PomoState['status']): string {
+  switch (status) {
+    case 'running': return 'Pause — step away; away-time is excluded from the record';
+    case 'paused':  return 'Resume the session';
+    case 'break':   return 'Skip break — record the break up to now, ready for the next session';
+    default:        return 'Start a session';
+  }
+}
+
 /** Pip state for session pip at index i (F6 + Decision 22 derived plannedSessions). */
 export function pipState(
   i: number,
@@ -200,8 +210,9 @@ export function PomoNode({
   const handleBreak = () => onCommand('pomo.break');
   const handleStop = () => onCommand('pomo.stop');
   const handleExtend = () => onCommand('pomo.extend');
-  // RESET keeps cancelling the in-flight session back to idle.
-  const handleReset = () => onCommand('pomo.stop');
+  // RESET discards the in-flight session WITHOUT recording it (#2/#6) — distinct
+  // from STOP, which records. Snaps back to idle.
+  const handleReset = () => onCommand('pomo.discard');
 
   const buttonLabel = primaryButtonLabel(state.status);
 
@@ -605,10 +616,16 @@ export function PomoNode({
             </span>
           </div>
 
-          {/* Issue #166 — observer-model controls. At the work threshold a
-              "Are you done?" prompt offers EXTEND / BREAK / STOP. Otherwise the
-              row adapts to status: running = PAUSE + BREAK + STOP, paused =
-              RESUME + STOP, break = END BREAK, idle = RESET + START. */}
+          {/* Issue #166 — observer-model controls. Every control carries a
+              hover tooltip (#6) explaining exactly what it does:
+                STOP  = record this session & end (kept work counts)
+                RESET = discard, record NOTHING (#2 — only mid-session)
+                BREAK = switch to a break (records the work so far)
+                PAUSE = step away; away-time is excluded from the record
+                EXTEND= keep going, count this pomodoro, start a fresh span
+                SKIP BREAK = record the break up to now → ready for next session
+              At the work threshold a prompt offers EXTEND / BREAK / STOP.
+              RESET is intentionally absent when idle/done (nothing to reset). */}
           {promptDone ? (
             <div
               data-testid="pomo-prompt"
@@ -635,36 +652,114 @@ export function PomoNode({
                 Are you done?
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button type="button" data-testid="pomo-extend" onClick={handleExtend} style={ghostBtnStyle}>EXTEND</button>
-                <button type="button" data-testid="pomo-break" onClick={handleBreak} style={ghostBtnStyle}>BREAK</button>
-                <button type="button" data-testid="pomo-primary" onClick={handleStop} style={primaryBtnStyle}>STOP</button>
+                <button type="button" data-testid="pomo-extend" onClick={handleExtend} style={ghostBtnStyle} title="Keep going — count this pomodoro and start a fresh span">EXTEND</button>
+                <button type="button" data-testid="pomo-break" onClick={handleBreak} style={ghostBtnStyle} title="Take a break — records the work so far, then times your break">BREAK</button>
+                <button type="button" data-testid="pomo-primary" onClick={handleStop} style={primaryBtnStyle} title="Stop — record this session and end">STOP</button>
               </div>
             </div>
           ) : (
             <div className="pomo-controls" style={{ display: 'flex', gap: 6 }}>
-              <button
-                type="button"
-                data-testid="pomo-reset"
-                onClick={isActiveSession ? handleStop : handleReset}
-                className="pomo-btn ghost"
-                style={ghostBtnStyle}
-              >
-                {isActiveSession ? 'STOP' : 'RESET'}
-              </button>
+              {/* RESET — discard without recording. Mid-session only. */}
+              {isActiveSession && state.status !== 'break' && (
+                <button
+                  type="button"
+                  data-testid="pomo-reset"
+                  onClick={handleReset}
+                  className="pomo-btn ghost"
+                  style={ghostBtnStyle}
+                  title="Reset — discard this session, record nothing"
+                >
+                  RESET
+                </button>
+              )}
               {state.status === 'running' && (
-                <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={ghostBtnStyle}>
-                  BREAK
+                <>
+                  <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={ghostBtnStyle} title="Take a break — records the work so far, then times your break">
+                    BREAK
+                  </button>
+                  <button type="button" data-testid="pomo-stop" onClick={handleStop} className="pomo-btn ghost" style={ghostBtnStyle} title="Stop — record this session and end">
+                    STOP
+                  </button>
+                </>
+              )}
+              {state.status === 'paused' && (
+                <button type="button" data-testid="pomo-stop" onClick={handleStop} className="pomo-btn ghost" style={ghostBtnStyle} title="Stop — record this session and end">
+                  STOP
                 </button>
               )}
               <button
                 type="button"
                 data-testid="pomo-primary"
-                onClick={handlePrimary}
+                onClick={state.status === 'break' ? handleStop : handlePrimary}
                 className="pomo-btn"
                 style={primaryBtnStyle}
+                title={primaryTooltip(state.status)}
               >
-                {buttonLabel}
+                {state.status === 'break' ? 'SKIP BREAK' : buttonLabel}
               </button>
+            </div>
+          )}
+
+          {/* DEV-only (#180) — seed synthetic tracked-reality segments so the
+              Clock dial wash + Calendar background wash can be inspected without
+              running a real session. Stripped from production builds. */}
+          {import.meta.env.DEV && (
+            <div
+              data-testid="pomo-dev-viz"
+              style={{
+                marginTop: 4,
+                padding: '6px 8px',
+                border: '1px dashed var(--ink-4)',
+                borderRadius: 5,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 5,
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8.5,
+                color: 'var(--ink-4)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+              }}>
+                dev · seed reality
+              </span>
+              <div style={{ display: 'flex', gap: 5 }}>
+                <button
+                  type="button"
+                  data-testid="pomo-dev-seed-work"
+                  onClick={() => onCommand('pomo.devSeedSegment', { kind: 'work', minutes: 30, agoMin: 0 })}
+                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
+                >
+                  +30m WORK
+                </button>
+                <button
+                  type="button"
+                  data-testid="pomo-dev-seed-break"
+                  onClick={() => onCommand('pomo.devSeedSegment', { kind: 'break', minutes: 10, agoMin: 0 })}
+                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
+                >
+                  +10m BREAK
+                </button>
+                <button
+                  type="button"
+                  data-testid="pomo-dev-clear"
+                  onClick={() => onCommand('pomo.devClearSeeded')}
+                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
+                >
+                  CLEAR
+                </button>
+              </div>
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8,
+                color: 'var(--ink-4)',
+                lineHeight: 1.3,
+              }}>
+                seeds segments ending now → see Clock dial + Calendar today
+              </span>
             </div>
           )}
 

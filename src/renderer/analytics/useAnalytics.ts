@@ -22,15 +22,18 @@ export function useAnalytics(): AnalyticsResult {
   // elsewhere; those updates must not invalidate the analytics memo.
   const nodes = useBoardStore((s) => s.board?.nodes);
   const edges = useBoardStore((s) => s.board?.edges);
+  // #169 — completion ledger feeds taskSource; subscribe so a record/clear
+  // re-buckets analytics even when no node changed in the same tick.
+  const completions = useBoardStore((s) => s.board?.completions);
 
   return useMemo<AnalyticsResult>(() => {
-    const board: BoardLike = { nodes: nodes ?? [] };
+    const board: BoardLike = { nodes: nodes ?? [], completions: completions ?? [] };
     return buildAnalytics(board);
     // `edges` is included in the dep so re-derivation runs when the board
     // structure changes — even though no current source reads edges, future
     // sources (e.g. task-chain progress) will.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges]);
+  }, [nodes, edges, completions]);
 }
 
 export type { AnalyticsResult } from './types';

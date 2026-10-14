@@ -220,9 +220,10 @@ describe('task.addNext — creates a sibling-level sequential successor', () => 
     expect(source.startISO).toBe('2026-05-20T10:00');
     expect(source.endISO).toBe('2026-05-20T10:25');
     // Next: starts exactly when source ends.
-    // Decision 28: new task is kind='focus', 30 min = 25+5+5=35 effective → ends 11:00.
+    // #180: Todo creates EVENTS only — no break expansion. Next (event 30min)
+    // runs 10:25–10:55 exactly.
     expect(next.startISO).toBe('2026-05-20T10:25');
-    expect(next.endISO).toBe('2026-05-20T11:00');
+    expect(next.endISO).toBe('2026-05-20T10:55');
   });
 
   it('no-op when text is empty / whitespace', () => {

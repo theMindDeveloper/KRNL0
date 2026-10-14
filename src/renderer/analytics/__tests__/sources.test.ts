@@ -6,20 +6,14 @@ import type { BoardLike } from '../types';
 
 const makeBoard = (nodes: BoardLike['nodes']): BoardLike => ({ nodes });
 
-describe('taskSource', () => {
-  it('emits one event per completed task with completedAt', () => {
-    const board = makeBoard([
-      {
-        id: 't1',
-        kind: 'todo.task',
-        state: { done: true, completedAt: '2026-05-10T09:00:00.000Z', text: 'a' },
-      },
-      {
-        id: 't2',
-        kind: 'todo.task',
-        state: { done: false, text: 'b' },
-      },
-    ]);
+describe('taskSource (#169 — reads completion ledger, not live nodes)', () => {
+  it('emits one event per completion-ledger entry', () => {
+    const board: BoardLike = {
+      nodes: [],
+      completions: [
+        { taskId: 't1', text: 'a', plannedMin: 25, completedAt: '2026-05-10T09:00:00.000Z' },
+      ],
+    };
     const events = taskSource.collect(board);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -29,18 +23,30 @@ describe('taskSource', () => {
     });
   });
 
-  it('excludes legacy done:true rows without completedAt', () => {
-    const board = makeBoard([
-      { id: 't1', kind: 'todo.task', state: { done: true, text: 'legacy' } },
-    ]);
-    expect(taskSource.collect(board)).toEqual([]);
+  it('counts a completion even when its task node no longer exists (#169 core)', () => {
+    // No todo.task node on the board — only the ledger entry survives.
+    const board: BoardLike = {
+      nodes: [{ id: 'p', kind: 'pomo', state: {} }],
+      completions: [
+        { taskId: 'gone', text: 'deleted but was done', plannedMin: 50, completedAt: '2026-05-11T08:00:00.000Z' },
+      ],
+    };
+    const events = taskSource.collect(board);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.metadata).toMatchObject({ taskId: 'gone', plannedMin: 50 });
   });
 
-  it('ignores non-task nodes', () => {
-    const board = makeBoard([
-      { id: 'p', kind: 'pomo', state: {} },
-      { id: 'h', kind: 'habit', state: {} },
-    ]);
+  it('emits nothing when the ledger is empty or absent', () => {
+    expect(taskSource.collect({ nodes: [{ id: 't1', kind: 'todo.task', state: { done: true } }] })).toEqual([]);
+    expect(taskSource.collect({ nodes: [], completions: [] })).toEqual([]);
+  });
+
+  it('does not read live node done-state (only the ledger)', () => {
+    // A done node with NO ledger entry must NOT be counted.
+    const board: BoardLike = {
+      nodes: [{ id: 't1', kind: 'todo.task', state: { done: true, completedAt: '2026-05-10T09:00:00.000Z' } }],
+      completions: [],
+    };
     expect(taskSource.collect(board)).toEqual([]);
   });
 });

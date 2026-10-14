@@ -62,7 +62,7 @@ export function NumberStepper({
           const raw = Number(e.target.value);
           if (Number.isFinite(raw)) onChange(clamp(raw));
         }}
-        onFocus={() => setFocused(true)}
+        onFocus={(e) => { setFocused(true); e.currentTarget.select(); }}
         onBlur={() => setFocused(false)}
         onKeyDown={stop}
         style={{

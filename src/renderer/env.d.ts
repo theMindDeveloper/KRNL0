@@ -23,6 +23,7 @@ interface KrnlAssetReadResult {
 interface KrnlBridge {
   boardLoad: () => Promise<unknown>
   boardSave: (data: unknown) => Promise<void>
+  boardReset: () => Promise<unknown>
   boardSaveViewport: (viewport: { x: number; y: number; zoom: number }) => Promise<void>
   ptyCreate: (cols: number, rows: number) => Promise<{ sessionId: string; motd: string }>
   ptyWrite: (sessionId: string, data: string) => Promise<void>
