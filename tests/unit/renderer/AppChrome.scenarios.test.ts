@@ -60,6 +60,11 @@ vi.mock('../../../src/renderer/store/boardStore', () => ({
 import { TopBar } from '../../../src/renderer/components/TopBar';
 import { StatusBar } from '../../../src/renderer/components/StatusBar';
 import { Dock } from '../../../src/renderer/components/Dock';
+import { setDockStyle } from '../../../src/renderer/components/ChassisLayer/useDockStyle';
+
+// These scenarios exercise the light/dark toggle, which only exists on
+// styles that support both modes. Pro (the default) is dark-only.
+beforeEach(() => setDockStyle('classic'));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

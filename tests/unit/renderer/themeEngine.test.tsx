@@ -68,9 +68,10 @@ describe('F2 — tokens are written on <html>', () => {
 });
 
 describe('F3 — Classic keeps the original look', () => {
-  it('Classic is the default style', async () => {
-    const { DEFAULT_DOCK_STYLE } = await import('../../../src/renderer/components/ChassisLayer/dockRegistry');
-    expect(DEFAULT_DOCK_STYLE).toBe('classic');
+  it('Pro is the default style; Classic stays available', async () => {
+    const { DEFAULT_DOCK_STYLE, DOCK_STYLES } = await import('../../../src/renderer/components/ChassisLayer/dockRegistry');
+    expect(DEFAULT_DOCK_STYLE).toBe('pro');
+    expect(DOCK_STYLES).toContain('classic');
   });
 
   it('Classic only sets --k-* tokens, never the existing palette', () => {

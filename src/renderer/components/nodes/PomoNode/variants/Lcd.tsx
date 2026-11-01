@@ -97,7 +97,7 @@ export function Lcd({ m, s, running }: TimerFaceProps) {
             className="colon"
             data-testid="pomo-colon"
             style={{
-              color: 'var(--acid)',
+              color: 'var(--accent-on-dark)',
               animation: colonAnimation,
             }}
           >

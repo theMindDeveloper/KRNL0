@@ -4066,16 +4066,22 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
    :hover / :active to give a clear "I am draggable / I am being
    dragged" cue without lingering after release.
    ============================================================ */
+/* Invisible at rest: frames sit flush, no divider line between panels.
+   A 1px seam line appears only while hovering or dragging the handle. */
 .station-splitter {
-  background: var(--paper-3);
-  transition: background 120ms ease;
+  background: transparent;
+  --seam: transparent;
+  background-image: linear-gradient(var(--seam), var(--seam));
+  background-repeat: no-repeat;
+  background-position: center;
+  transition: --seam 120ms ease;
 }
-.station-splitter:hover {
-  background: var(--ink-4, #6e6655);
-}
-.station-splitter:active {
-  background: var(--ink-3, #b3aa97);
-}
+.station-splitter[aria-orientation="vertical"],
+.station-splitter[data-panel-group-direction="horizontal"] { background-size: 1px 100%; }
+.station-splitter[aria-orientation="horizontal"],
+.station-splitter[data-panel-group-direction="vertical"] { background-size: 100% 1px; }
+.station-splitter:hover { --seam: var(--ink-4, #6e6655); }
+.station-splitter:active { --seam: var(--ink-3, #b3aa97); }
 .station-splitter:focus,
 .station-splitter:focus-visible {
   outline: none;
@@ -4101,107 +4107,33 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 
 /* ============================================================
-   PANEL TOGGLES IN THE TOP BAR — per frame style (ADR 0009 F9).
-   The Station panel toggles render inside the TopBar for every
-   style; each style dresses them in its own hardware language.
+   PANEL TOGGLES IN THE TOP BAR (ADR 0009 F9).
+   One quiet treatment for every style: plain text, no bevel, no
+   border. The open panel gets a 2px accent underline. Each style
+   tints it only through its tokens (--ink*, --acid-ink).
    ============================================================ */
-[data-testid="topbar-panel-toggles"] .krnl-panel-toggle { height: 26px; }
-
-/* Pro — segmented group of matte keys */
-[data-dock="pro"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  background: linear-gradient(180deg, #2e2e2e, #262626) !important;
-  border-color: #0a0a0a !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
-}
-
-/* Synthesizer — rubber keys with a lit LED bar */
-[data-dock="synthesizer"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  border-radius: 5px !important;
-  background: linear-gradient(180deg, #4a443a, #2a261e) !important;
-  border-color: #0e0c09 !important;
-  color: #d8d0bc !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #0e0c09;
-}
-[data-dock="synthesizer"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  box-shadow: inset 0 -3px 0 #c9f158, inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #0e0c09, 0 0 10px rgba(201, 241, 88, 0.25);
-}
-
-/* Telemetry — numbered bay switches in phosphor */
-[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  border-radius: 0 !important;
-  border: 1px solid rgba(201, 241, 88, 0.18) !important;
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  height: 26px;
   background: transparent !important;
-  color: #7f9452 !important;
-}
-[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  border-color: rgba(201, 241, 88, 0.55) !important;
-  background: rgba(201, 241, 88, 0.08) !important;
-  color: #c9f158 !important;
-  text-shadow: 0 0 6px rgba(201, 241, 88, 0.6);
-}
-/* Light paper: phosphor green is unreadable, so the toggles go deep olive. */
-html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  border-color: rgba(63, 92, 10, 0.3) !important;
-  color: #4a5e22 !important;
-}
-html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  border-color: rgba(63, 92, 10, 0.7) !important;
-  background: rgba(63, 92, 10, 0.12) !important;
-  color: #2f4012 !important;
-  text-shadow: none;
-}
-
-/* KRNL Dock — stencil labels, red rocker lamp when on */
-[data-dock="krnl-dock"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  font-family: 'Stardos Stencil', var(--font-mono) !important;
-  letter-spacing: 0.08em !important;
-  border-radius: 2px !important;
-  background: #141513 !important;
-  border: 1px solid #000 !important;
-  box-shadow: inset 0 0 0 1px #2a2d27;
-}
-[data-dock="krnl-dock"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  color: #f0ecdc !important;
-  box-shadow: inset 0 0 0 1px #2a2d27, inset 3px 0 0 #ff5a3c, 0 0 8px rgba(255, 90, 60, 0.35);
-}
-
-/* Blueprint — drawing checkboxes */
-[data-dock="blueprint"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  border: 0 !important;
   border-radius: 0 !important;
-  background: transparent !important;
-  border: 1px dashed var(--frame-edge) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  color: var(--ink-3) !important;
 }
-[data-dock="blueprint"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  border-style: solid !important;
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle:hover {
   color: var(--ink) !important;
 }
-
-/* Macintosh — menu-style items, inverted when on */
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  color: var(--ink) !important;
+  box-shadow: inset 0 -2px 0 var(--acid-ink, var(--acid)) !important;
+}
+/* Mac keeps its Chicago-style face; everything else stays mono. */
 [data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
   font-family: 'Pixelify Sans', var(--font-mono) !important;
   text-transform: none !important;
   letter-spacing: 0 !important;
   font-size: 12px !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  border: 0 !important;
-}
-[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  background: var(--ink) !important;
-  color: var(--node-bg) !important;
-}
-
-/* Submarine — brass toggles */
-[data-dock="submarine"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  border-radius: 12px !important;
-  border: 1px solid #6e521c !important;
-  background: radial-gradient(circle at 50% 30%, #3a2a18, #1a130d) !important;
-  color: #a8956a !important;
-}
-[data-dock="submarine"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  color: #1a1004 !important;
-  background: radial-gradient(circle at 50% 30%, #ffe2a0, #f0b850 60%, #a8701c) !important;
-  box-shadow: 0 0 10px rgba(240, 184, 80, 0.4);
 }
 
 /* ============================================================

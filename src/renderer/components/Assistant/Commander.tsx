@@ -109,7 +109,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
           }}
         >
           <span>
-            <span style={{ color: 'var(--acid)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
+            <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
               ▸
             </span>
             commander · new session
@@ -188,7 +188,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
               style={{
                 ...btnStyle,
                 flex: 1,
-                color: valid ? 'var(--acid)' : 'var(--ink-4)',
+                color: valid ? 'var(--accent-on-dark)' : 'var(--ink-4)',
                 borderColor: valid ? 'rgba(201,241,88,0.5)' : 'rgba(201,241,88,0.15)',
                 background: valid ? 'rgba(201,241,88,0.08)' : 'transparent',
                 cursor: valid ? 'pointer' : 'not-allowed',
