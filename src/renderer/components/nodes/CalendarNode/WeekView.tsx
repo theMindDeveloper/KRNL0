@@ -121,9 +121,16 @@ interface TaskSlice {
 // into columns that stay free for its whole interval.
 function computeColumnLayout(
   slices: TaskSlice[],
+  minVisualMin = 0,
 ): Map<string, { colIndex: number; colCount: number; span: number }> {
+  // Pack by the DRAWN extent: a short block is stretched to a minimum height,
+  // so two tasks that don't overlap in time can still overlap on screen.
   const lanes = packLanes(
-    slices.map((sl) => ({ id: sl.task.id, start: sl.sliceStartMin, end: sl.sliceEndMin })),
+    slices.map((sl) => ({
+      id: sl.task.id,
+      start: sl.sliceStartMin,
+      end: Math.max(sl.sliceEndMin, sl.sliceStartMin + minVisualMin),
+    })),
   );
   const result = new Map<string, { colIndex: number; colCount: number; span: number }>();
   for (const [id, p] of lanes) result.set(id, { colIndex: p.lane, colCount: p.laneCount, span: p.span });
@@ -174,7 +181,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // length so it scales with the column: wide in the day view (carries a
   // minutes label), at most 12% of a narrow week column (station panels can
   // be ~25px per day).
-  const rail = singleDay ? '40px' : 'min(7px, 12%)';
+  const rail = singleDay ? 'min(30px, 12%)' : 'min(7px, 12%)';
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows
   // the same 24-hour grid.
@@ -182,6 +189,19 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   const hourRange = { start: 0, end: 23 };
   const rowCount = 24;
   const gridBodyRef = useRef<HTMLDivElement>(null);
+  // Real grid width, so blocks know how many pixels they actually have and
+  // only draw the text that fits (station panels give ~25px per day).
+  const [gridW, setGridW] = useState(0);
+  useEffect(() => {
+    const el = gridBodyRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const w = Math.round(entries[0]?.contentRect.width ?? 0);
+      setGridW((prev) => (prev === w ? prev : w));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // #10 — day view anchors on anchorDate and shows one column; week view anchors
   // on the Monday and shows seven. dayCount drives the column grid throughout.
@@ -759,7 +779,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const slices = slicesByDay.get(dayYMD);
     if (!slices || slices.length === 0) return null;
 
-    const colLayout = computeColumnLayout(slices);
+    const colLayout = computeColumnLayout(slices, (MIN_BLOCK_PX / rowHeight) * 60);
 
     return slices.map((slice) => {
       const { task, sliceStartMin, sliceEndMin, isContinuation, hasContinuation } = slice;
@@ -900,8 +920,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
       // Per-task tone — shared palette with Clock + Todo so users can link
       // the same task visually across surfaces.
-      const taskTone = isGrayed ? 'var(--ink-4)' : toneVarForTask(task.id);
-      const compact = heightPx < 28;
+      const taskTone = toneVarForTask(task.id);
+      // How much text fits: measured column width × this block's lanes.
+      // Unmeasured (tests / first paint) counts as roomy.
+      const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
+      const railNum = Math.min(singleDay ? 30 : 7, colPx * 0.12);
+      const widthPx = ((colPx - railNum) * span) / colCount - 3;
+      const detail: 'none' | 'title' | 'full' =
+        widthPx < 34 || heightPx < 14 ? 'none' : widthPx < 110 || heightPx < 32 ? 'title' : 'full';
 
       return (
         <div
@@ -925,11 +951,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 1px)`,
             right: `calc((100% - ${rail}) * ${rightFrac} + 2px)`,
             height: heightPx,
-            background: isGrayed
-              ? 'var(--paper-3)'
-              : `color-mix(in srgb, ${taskTone} ${isMissed ? 8 : 16}%, var(--paper))`,
-            border: `1px ${isMissed ? 'dashed' : 'solid'} color-mix(in srgb, ${isGrayed ? 'var(--ink-4)' : taskTone} 70%, transparent)`,
-            borderLeft: `3px solid ${isGrayed ? 'var(--ink-4)' : taskTone}`,
+            // Calm by default: a tinted card with a solid colour edge. Done
+            // fades; missed is a lighter tint; overrun is a rust strip on the
+            // right edge (drawn below) — states that survive any block size.
+            background: `color-mix(in srgb, ${taskTone} ${isMissed ? 12 : 24}%, var(--paper))`,
+            borderLeft: `3px solid ${taskTone}`,
             borderTopLeftRadius,
             borderTopRightRadius,
             borderBottomLeftRadius,
@@ -937,18 +963,20 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             cursor: isContinuation ? 'pointer' : 'grab',
             overflow: 'hidden',
             zIndex: 2,
-            padding: compact ? '0 4px' : '2px 5px',
-            opacity: isGrayed ? 0.55 : isMissed ? 0.8 : 1,
-            boxShadow: '0 1px 0 rgba(0,0,0,0.25)',
+            padding: detail === 'full' ? '3px 6px' : detail === 'title' ? '0 4px' : 0,
+            opacity: isGrayed ? 0.45 : 1,
+            boxShadow: '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
             display: 'flex',
-            flexDirection: compact ? 'row' : 'column',
-            alignItems: compact ? 'center' : 'stretch',
-            gap: compact ? 5 : 1,
+            flexDirection: 'column',
+            // A one-line title sits centred in short blocks instead of being
+            // clipped at the top.
+            justifyContent: detail === 'title' ? 'center' : 'flex-start',
+            gap: 1,
           }}
         >
           {/* Continuation arrows — ↑ on continuation slices, ↓ on slices that
               spill into the next day. */}
-          {isContinuation && (
+          {isContinuation && detail !== 'none' && (
             <span
               style={{
                 position: 'absolute',
@@ -964,7 +992,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               ↑
             </span>
           )}
-          {hasContinuation && (
+          {hasContinuation && detail !== 'none' && (
             <span
               style={{
                 position: 'absolute',
@@ -983,7 +1011,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           {/* #171 — completed marker. A done task shows a ✓ so it reads as
               "finished" rather than just "greyed", distinguishing it from an
               overrun (elapsed-but-undone) block which carries no checkmark. */}
-          {isDone && !isContinuation && (
+          {isDone && !isContinuation && detail === 'full' && (
             <span
               data-testid={`task-done-check-${task.id}`}
               style={{
@@ -1050,55 +1078,46 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               })()}
             </>
           )}
-          {/* Label: title + time range. Compact (short) blocks put the start
-              time in front of the title on one line so even a 20-minute task
-              in a crowded hour stays readable. */}
-          {compact && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-3)', flexShrink: 0, pointerEvents: 'none', position: 'relative', zIndex: 1, paddingLeft: isContinuation ? 10 : 0 }}>
-              {fmtMinOfDay(blockStartMin)}
-            </span>
-          )}
-          <span
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: compact ? 10 : 11,
-              fontWeight: 600,
-              color: isGrayed ? 'var(--ink-3)' : 'var(--ink)',
-              textDecorationLine: isDone ? 'line-through' : 'none',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: 'block',
-              minWidth: 0,
-              paddingLeft: !compact && isContinuation ? 10 : 0,
-              paddingRight: isDone || overrunMin > 0 ? 14 : 0,
-              pointerEvents: 'none',
-              position: 'relative',
-              zIndex: 1,
-              lineHeight: 1.25,
-            }}
-          >
-            {task.text}
-          </span>
-          {!compact && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
-              {fmtMinOfDay(blockStartMin)}–{fmtMinOfDay(blockEndMin)}
-              {isMissed ? ' · missed' : ''}
-              {trackedMin > 0 && !isMissed ? ` · ${fmtDur(trackedMin)} tracked` : ''}
-            </span>
-          )}
-          {/* Overrun: more time tracked than planned. */}
-          {overrunMin > 0 && !isContinuation && (
+          {/* Label — only what fits (see `detail`). Everything else is in the
+              hover title and the click popup. */}
+          {detail !== 'none' && (
             <span
-              data-testid={`task-overrun-${task.id}`}
               style={{
-                position: 'absolute', top: 2, right: isDone ? 14 : 3,
-                fontFamily: 'var(--font-mono)', fontSize: 8.5, fontWeight: 700,
-                color: 'var(--rust)', pointerEvents: 'none', zIndex: 1,
+                fontFamily: 'var(--font-sans)',
+                fontSize: detail === 'full' ? 11.5 : 10,
+                fontWeight: 600,
+                color: 'var(--ink)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'block',
+                minWidth: 0,
+                paddingLeft: isContinuation ? 10 : 0,
+                paddingRight: isDone && detail === 'full' ? 12 : 0,
+                pointerEvents: 'none',
+                position: 'relative',
+                zIndex: 1,
+                lineHeight: 1.2,
               }}
             >
-              +{fmtDur(overrunMin)}
+              {task.text}
             </span>
+          )}
+          {detail === 'full' && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
+              {fmtMinOfDay(blockStartMin)}–{fmtMinOfDay(blockEndMin)}
+              {overrunMin > 0
+                ? <span data-testid={`task-overrun-${task.id}`} style={{ color: 'var(--rust)', fontWeight: 700 }}> · +{fmtDur(overrunMin)} over</span>
+                : trackedMin > 0 ? ` · ${fmtDur(trackedMin)} tracked` : ''}
+            </span>
+          )}
+          {/* Overrun at any size: a rust strip on the right edge. */}
+          {overrunMin > 0 && !isContinuation && (
+            <span
+              aria-hidden
+              data-testid={detail === 'full' ? undefined : `task-overrun-${task.id}`}
+              style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 3, background: 'var(--rust)', pointerEvents: 'none', zIndex: 1 }}
+            />
           )}
           {/* #7 — resize handles: drag the top edge to move the start, the
               bottom edge to change the duration. Snapped to granularity. */}
