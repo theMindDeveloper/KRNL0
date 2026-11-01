@@ -506,6 +506,36 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           justifyContent: 'space-between',
         }}
       >
+        {/* Drag to the Calendar: the grip starts an HTML5 drag with the
+            same payload the Todo rows use; the rest of the node still moves
+            on the canvas (React Flow ignores .nodrag). */}
+        {!state.done && (
+          <span
+            data-testid="task-calendar-grip"
+            className="nodrag"
+            draggable
+            title="Drag onto the Calendar to schedule"
+            onDragStart={(e) => {
+              e.stopPropagation();
+              e.dataTransfer.setData(
+                'application/krnl-task',
+                JSON.stringify({ taskId, durationMin: state.plannedMin }),
+              );
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            style={{
+              cursor: 'grab',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12,
+              lineHeight: 1,
+              color: 'var(--ink-3)',
+              padding: '0 6px 0 0',
+              userSelect: 'none',
+            }}
+          >
+            ⠿
+          </span>
+        )}
         {/* F1: "task · #NN L{layer}" */}
         <span
           data-testid="task-header"

@@ -1130,14 +1130,20 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     // ADR 0005: anchors are independent fixpoints; no chain-wide clearing.
     if (node.kind === 'calendar' && command === 'calendar.schedule') {
       const scheduleArgs = args as {
-        taskId: string;
+        taskId?: string;
+        itemId?: string;
         scheduledFor: string;
         scheduledDurationMin?: number;
       };
-      if (!scheduleArgs.taskId || !scheduleArgs.scheduledFor) return;
+      if (!scheduleArgs.scheduledFor) return;
+      // A Todo row dragged before it has a task node: create the task (linked
+      // both ways, like todo.add does), then schedule it below.
+      const taskId: string | null = scheduleArgs.taskId
+        ?? (scheduleArgs.itemId ? promoteTodoItemToTask(scheduleArgs.itemId, scheduleArgs.scheduledDurationMin) : null);
+      if (!taskId) return;
       const currentBoard = useBoardStore.getState().board;
       if (!currentBoard) return;
-      const targetTask = currentBoard.nodes.find((n) => n.id === scheduleArgs.taskId);
+      const targetTask = currentBoard.nodes.find((n) => n.id === taskId);
       if (!targetTask || targetTask.kind !== 'todo.task') return;
       const prevTask = targetTask.state as TaskState;
 
@@ -1148,7 +1154,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         schedPatch.scheduledDurationMin = scheduleArgs.scheduledDurationMin;
       }
       const nextTaskState = taskSetSchedule(prevTask, schedPatch);
-      updateNode(scheduleArgs.taskId, { state: nextTaskState });
+      updateNode(taskId, { state: nextTaskState });
       // Mirror to linked TodoItem.
       if (prevTask.todoItemId !== null && prevTask.parentTodoId) {
         const freshBoard = useBoardStore.getState().board;
@@ -1601,4 +1607,57 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     const updatedBoard = useBoardStore.getState().board;
     if (updatedBoard) void saveBoard(updatedBoard);
   };
+}
+
+/**
+ * Create a TaskNode for a TodoItem that has none yet and link the two
+ * (Decision 20 back-link). Used when a Todo row is dropped on the Calendar.
+ * Returns the new task id, or the existing one, or null if the item is gone.
+ */
+function promoteTodoItemToTask(itemId: string, plannedMin?: number): string | null {
+  const board = useBoardStore.getState().board;
+  if (!board) return null;
+  const todoNode = board.nodes.find(
+    (n) => n.kind === 'todo' && (n.state as TodoState).items.some((i) => i.id === itemId),
+  );
+  if (!todoNode) return null;
+  const item = (todoNode.state as TodoState).items.find((i) => i.id === itemId)!;
+  if (item.taskNodeId) return item.taskNodeId;
+  const siblings = board.nodes.filter((n) => {
+    if (n.kind !== 'todo.task') return false;
+    const ts = n.state as TaskState;
+    return ts.parentTodoId === todoNode.id && ts.parentTaskId === null;
+  });
+  const minutes = Math.max(1, Math.round(plannedMin ?? 25));
+  const taskState: TaskState = {
+    text: item.text,
+    done: false,
+    ...(item.tag !== undefined ? { tag: item.tag } : {}),
+    durationMin: minutes,
+    eta: `~${minutes} min`,
+    sequenceNumber: siblings.length + 1,
+    layer: 0,
+    createdAt: new Date().toISOString(),
+    parentTodoId: todoNode.id,
+    parentTaskId: null,
+    todoItemId: itemId,
+    pomoSessionsCompleted: 0,
+    plannedMin: minutes,
+    secondsAccumulated: 0,
+    currentSessionElapsedSec: 0,
+    kind: 'event',
+  };
+  const taskNodeId = `task-${crypto.randomUUID()}`;
+  const { addNode, updateNode } = useBoardStore.getState();
+  addNode({
+    id: taskNodeId,
+    kind: 'todo.task',
+    position: { x: todoNode.position.x, y: todoNode.position.y + 580 + siblings.length * 8 },
+    isMother: false,
+    state: taskState,
+    config: { showDuration: true },
+  });
+  updateNode(todoNode.id, { state: todoLinkTask(todoNode.state as TodoState, { itemId, taskNodeId }) });
+  emit('task.created', `task ${shortId(taskNodeId)} added via calendar drop`, { refId: taskNodeId });
+  return taskNodeId;
 }
