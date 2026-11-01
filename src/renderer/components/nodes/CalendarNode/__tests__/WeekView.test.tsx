@@ -35,6 +35,9 @@ function makeState(overrides: Partial<CalendarState> = {}): CalendarState {
     selectedDate: null,
     // 2026-05-11 is a Monday — use it as a stable test anchor.
     anchorDate: '2026-05-11',
+    // Pixel assertions below are written for 1× (28px/hour); the product
+    // default is 2× (see WeekView).
+    zoom: 1,
     ...overrides,
   };
 }

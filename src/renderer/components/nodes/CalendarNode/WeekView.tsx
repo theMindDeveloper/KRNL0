@@ -221,7 +221,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
   // #5 — ruler zoom. rowHeight scales with the persisted zoom multiplier so the
   // user can stretch the grid to clearly read where pomo sections start/end.
-  const zoom = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, state.zoom ?? 1));
+  // Default 2× (56px per hour): at 1× a 20-minute task is a ~10px sliver.
+  // The whole day doesn't need to fit — the grid scrolls (see below).
+  const zoom = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, state.zoom ?? 2));
   const rowHeight = MIN_ROW_HEIGHT * zoom;
   // #11/#8 — one granularity drives gridlines, gutter labels, AND snapping.
   const gran = granularityFor(zoom);
@@ -594,6 +596,32 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     }
     return map;
   }, [scheduledTasks, weekDays]);
+
+  // Open scrolled to where the day happens — 90 min before now when today is
+  // shown, else the earliest planned block in view — instead of midnight.
+  // Runs once per shown range so it never fights the user's own scrolling.
+  const autoScrolledFor = useRef<string | null>(null);
+  useEffect(() => {
+    const el = gridBodyRef.current;
+    const key = `${baseYMD}:${dayCount}`;
+    if (!el || autoScrolledFor.current === key) return;
+    autoScrolledFor.current = key;
+    let target = 8 * 60;
+    let found = false;
+    for (const ymd of weekDays) {
+      for (const sl of slicesByDay.get(ymd) ?? []) {
+        if (!found || sl.sliceStartMin < target) target = sl.sliceStartMin;
+        found = true;
+      }
+    }
+    const todayYmd = todayYMD();
+    if (weekDays.includes(todayYmd)) {
+      const now = new Date();
+      // Today: start a little before now (what's next matters most).
+      target = Math.max(0, now.getHours() * 60 + now.getMinutes() - 90);
+    }
+    el.scrollTop = Math.max(0, ((target - 20) / 60) * rowHeight);
+  }, [baseYMD, dayCount, weekDays, slicesByDay, rowHeight]);
 
   // Whether any task is scheduled this week (controls empty-state hint).
   const hasTasksThisWeek = slicesByDay.size > 0;
