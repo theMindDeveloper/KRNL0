@@ -342,7 +342,7 @@ describe('sys task delete', () => {
 // ── taskStartPomo ──────────────────────────────────────────────────────────────
 
 describe('sys task startPomo', () => {
-  it('starts the Pomo mother with task label and durationMin', async () => {
+  it('tags the Pomo mother with the task and starts it at its own session length', async () => {
     const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'deep work', 45);
     const taskId = (addRes.data as { id: string }).id;
     const pomoRes = await taskStartPomo(ctx, taskId);
@@ -351,7 +351,9 @@ describe('sys task startPomo', () => {
     const ps = pomo.state as PomoState;
     expect(ps.status).toBe('running');
     expect(ps.label).toBe('deep work');
-    expect(ps.durationMin).toBe(45);
+    expect(ps.activeTaskId).toBe(taskId);
+    // The 45-min estimate is a plan, not the timer length.
+    expect(ps.durationMin).not.toBe(45);
   });
 
   it('returns error when task id is missing', async () => {
@@ -433,6 +435,8 @@ describe('sys task duration', () => {
     const task = findTasks().find((t) => t.id === taskId)!;
     expect((task.state as TaskState).durationMin).toBe(45);
     expect((task.state as TaskState).eta).toBe('~45 min');
+    // The calendar reads plannedMin — it must follow the duration (#168).
+    expect((task.state as TaskState).plannedMin).toBe(45);
   });
 
   it('returns error when task id is missing', async () => {

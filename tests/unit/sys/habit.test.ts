@@ -7,7 +7,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   cliAdd,
-  cliDone,
+  cliDone, cliUndo,
   cliStreak,
   cliColor,
   cliRemove,
@@ -93,11 +93,28 @@ describe('sys habit done', () => {
     expect(findMother().state.habits[0]!.log).toContain('2025-01-01');
   });
 
-  it('toggles off when called twice for same date', async () => {
+  it('is idempotent — calling twice keeps the day marked', async () => {
     await cliAdd(ctx, 'run');
     await cliDone(ctx, 'run', '2025-01-01');
+    const again = await cliDone(ctx, 'run', '2025-01-01');
+    expect(again.ok).toBe(true);
+    expect(findMother().state.habits[0]!.log).toEqual(['2025-01-01']);
+  });
+
+  it('habit undo un-marks the day and is idempotent too', async () => {
+    await cliAdd(ctx, 'run');
     await cliDone(ctx, 'run', '2025-01-01');
+    await cliUndo(ctx, 'run', '2025-01-01');
+    const again = await cliUndo(ctx, 'run', '2025-01-01');
+    expect(again.ok).toBe(true);
     expect(findMother().state.habits[0]!.log).not.toContain('2025-01-01');
+  });
+
+  it('rejects a malformed or impossible --date', async () => {
+    await cliAdd(ctx, 'run');
+    expect((await cliDone(ctx, 'run', '2025-1-5')).ok).toBe(false);
+    expect((await cliDone(ctx, 'run', '2025-02-30')).ok).toBe(false);
+    expect(findMother().state.habits[0]!.log).toEqual([]);
   });
 
   it('rejects a future date', async () => {

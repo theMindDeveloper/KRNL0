@@ -154,37 +154,24 @@ export function PomoNode({
 
   const isTaskMode = state.activeTaskId !== null;
 
-  // A.6 — derive pip count + session counter from the active task.
-  // Issue #166: event tasks are gated from pomo at load time (commandDispatch),
-  // so activeTaskKind is always 'focus' here. Plan breakdown stripped — pips
-  // now show REALITY (completed sessions) only, no pre-computed break lines.
-  const { activeTaskPlannedMin, activeTaskPomoSessionsCompleted } = useBoardStore(
-    useShallow((s) => {
-      const id = state.activeTaskId;
-      if (!id || !s.board) {
-        return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
-      }
-      const t = s.board.nodes.find((n) => n.id === id);
-      if (!t) {
-        return { activeTaskPlannedMin: null, activeTaskPomoSessionsCompleted: 0 };
-      }
-      const ts = t.state as TaskState;
-      return {
-        activeTaskPlannedMin: ts.plannedMin ?? null,
-        activeTaskPomoSessionsCompleted: ts.pomoSessionsCompleted ?? 0,
-      };
-    }),
-  );
-
-  const pipCount = isTaskMode && activeTaskPlannedMin
-    ? Math.max(1, Math.ceil(activeTaskPlannedMin / config.sessionMin))
-    : config.longBreakEvery;
-
-  // A.6 — when in task mode, use the per-task session counter
-  const sessionsForDisplay = isTaskMode
-    ? activeTaskPomoSessionsCompleted
-    : state.sessionsCompleted;
+  // Plan vs reality — pips count the pomo's own completed sessions within the
+  // long-break cycle. The tagged task's estimate no longer sets a session
+  // quota: the pomo observes, it doesn't plan.
+  const pipCount = config.longBreakEvery;
+  const sessionsForDisplay = state.sessionsCompleted;
   const completedDots = sessionsForDisplay % pipCount;
+
+  // Open tasks the session can be tagged with (what was this time spent on?).
+  const tagOptions = useBoardStore(
+    useShallow((s) =>
+      (s.board?.nodes ?? [])
+        .filter((n) => n.kind === 'todo.task' && !(n.state as TaskState).done && (n.state as TaskState).parentTaskId === null)
+        .map((n) => `${n.id}\u0000${(n.state as TaskState).text}`),
+    ),
+  ).map((pair) => {
+    const [id, text] = pair.split('\u0000') as [string, string];
+    return { id, text };
+  });
 
   // Today's pomo cycle counter — counts COMPLETED sessions whose endedAt
   // falls on the local date today. A full cycle = `longBreakEvery` sessions
@@ -278,9 +265,9 @@ export function PomoNode({
   const activeFace: TimerFace = config.face ?? defaultFace;
 
   const headerLeft = isTaskMode
-    ? `TASK · ${truncate(state.label || 'task', 18)}`
+    ? `ON · ${truncate(state.label || 'task', 18)}`
     : 'DEEP WORK';
-  const headerRight = isTaskMode ? '· ACTIVE' : '· POMO.025';
+  const headerRight = isTaskMode ? '· TAGGED' : '· POMO.025';
 
   // A.2 — gear disabled while session is in-flight (running, paused, break)
   const gearDisabled = state.status !== 'idle' && state.status !== 'done';
@@ -638,6 +625,53 @@ export function PomoNode({
                 SKIP BREAK = record the break up to now → ready for next session
               At the work threshold a prompt offers EXTEND / BREAK / STOP.
               RESET is intentionally absent when idle/done (nothing to reset). */}
+          {/* Plan vs reality — what is this time being spent on? The tag is
+              only a label on the recorded spans; changing it never resets
+              the timer, and recorded spans can be retagged later from the
+              Calendar/Clock. Starting untagged suggests the task planned now. */}
+          <label
+            data-testid="pomo-tag"
+            title="What is this session spent on? Only labels the recorded time — it never controls the timer."
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 8px',
+              border: `1px solid ${isTaskMode ? 'var(--acid)' : 'var(--paper-3)'}`,
+              borderRadius: 5,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              letterSpacing: '0.06em',
+              color: 'var(--ink-3)',
+            }}
+          >
+            <span style={{ color: isTaskMode ? 'var(--acid)' : 'var(--ink-4)' }}>●</span>
+            <span>ON</span>
+            <select
+              aria-label="Tag this session with a task"
+              value={state.activeTaskId ?? ''}
+              onChange={(e) => onCommand('pomo.tag', { taskId: e.target.value === '' ? null : e.target.value })}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                background: 'transparent',
+                color: 'var(--ink)',
+                border: 'none',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10.5,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="">untagged</option>
+              {state.activeTaskId !== null && !tagOptions.some((o) => o.id === state.activeTaskId) && (
+                <option value={state.activeTaskId}>{state.label || 'task'}</option>
+              )}
+              {tagOptions.map((o) => (
+                <option key={o.id} value={o.id}>{truncate(o.text, 28)}</option>
+              ))}
+            </select>
+          </label>
+
           {promptDone ? (
             <div
               data-testid="pomo-prompt"

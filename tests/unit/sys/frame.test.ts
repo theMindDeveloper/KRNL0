@@ -123,6 +123,15 @@ describe('frame add', () => {
     expect(frames[0]!.state.childIds).toEqual(['source-node']);
   });
 
+  it('--near a mother node frames it without capturing it as a child', async () => {
+    seedBoard([
+      { id: 'mother-pomo', kind: 'pomo', isMother: true, position: { x: 0, y: 0 }, state: {} as FrameState } as NodeLike,
+    ]);
+    const res = await frameAdd(ctx, { near: 'mother-pomo' });
+    expect(res.ok).toBe(true);
+    expect(getFrames()[0]!.state.childIds).toEqual([]);
+  });
+
   it('--near with id prefix works', async () => {
     const res = await frameAdd(ctx, { near: 'source' });
     expect(res.ok).toBe(true);

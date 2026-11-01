@@ -288,6 +288,13 @@ describe('taskSetDuration', () => {
     expect(next.eta).toBe('~45 min');
   });
 
+  it('#168 — keeps plannedMin and an anchored block override in step', () => {
+    const s = makeTaskState({ durationMin: 25, plannedMin: 25, scheduledFor: '2026-11-02T09:00', scheduledDurationMin: 25 });
+    const next = taskSetDuration(s, { durationMin: 60 });
+    expect(next.plannedMin).toBe(60);
+    expect(next.scheduledDurationMin).toBe(60);
+  });
+
   it('clamps minimum to 1', () => {
     const s = makeTaskState({ durationMin: 20 });
     expect(taskSetDuration(s, { durationMin: 0 }).durationMin).toBe(1);

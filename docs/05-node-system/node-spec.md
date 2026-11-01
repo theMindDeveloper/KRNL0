@@ -160,3 +160,21 @@ When a non-mother node is connected to another non-mother node via Handle drag, 
 ```
 
 `CLAUDE.md` and `skills/*.md` ship inside the codebase and are committed to git. The Brain layer points at them by absolute path when spawning Claude Code. They are not user config — they are part of the system.
+
+---
+
+## Pomo ↔ task: tagging, not control (Decision 31)
+
+The pomodoro is an observer. A task never starts, stops, resets or sizes it. A task can only tag what it records.
+
+| Command | Node | Effect |
+|---|---|---|
+| `pomo.tag { taskId \| null }` | pomo | Sets `activeTaskId` and `label`, the tag stamped on spans recorded from now on. The timer is untouched. |
+| `pomo.retagSegment { id, taskId \| null }` | pomo | Changes which task a recorded span counts toward. |
+| `task.startPomo` / `task.spawnPomo` | task | Tags the pomo with the task and starts it at the pomo's own `sessionMin` if idle. A running session keeps running. |
+| `task.loadIntoPomo` | task | Toggles the tag (tag ↔ untag). It no longer loads, pauses or resets. |
+| `todo.startPomoForItem` | todo | Same as `task.startPomo` for the row's task. |
+| `todo.loadTaskForItem` | todo | No-op. A row click never touches the pomo. |
+
+`pomo.start` with no tag tags the session with the open task whose planned block contains "now". Tracked time per task is derived (`store/trackedTime.ts`). `secondsAccumulated`, `pomoSessionsCompleted` and `currentSessionElapsedSec` on `TaskState` are legacy fields and are no longer written. CLI: `krnl pomo tag`, `krnl pomo retag`, `krnl task pomo`.
+

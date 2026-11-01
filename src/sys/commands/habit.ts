@@ -149,42 +149,66 @@ export async function cliAdd(ctx: HabitCtx, name: string | undefined): Promise<S
   };
 }
 
-export async function cliDone(
+/** True iff `s` is a real calendar date in strict `YYYY-MM-DD` form. */
+function isValidYMD(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split('-').map(Number) as [number, number, number];
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+/**
+ * `habit done` / `habit undo` — set (not toggle) a day's mark, so retrying a
+ * command never flips it back. Both are no-ops when the day is already in the
+ * requested state.
+ */
+async function setHabitDay(
   ctx: HabitCtx,
   idOrName: string | undefined,
   date: string | undefined,
+  done: boolean,
 ): Promise<SysResult> {
-  if (!idOrName) return { ok: false, message: 'habit done requires <id|name>' };
+  const verb = done ? 'habit done' : 'habit undo';
+  if (!idOrName) return { ok: false, message: `${verb} requires <id|name>` };
+  const targetDate = date ?? todayLocal();
+  if (!isValidYMD(targetDate)) {
+    return { ok: false, message: `${verb}: --date must be YYYY-MM-DD, got "${targetDate}"` };
+  }
+  if (targetDate > todayLocal()) {
+    return { ok: false, message: `${verb}: ${targetDate} is in the future` };
+  }
   const board = loadBoard(ctx);
   const mother = findMother(board);
   if (!mother) return notFound();
   const resolved = resolveHabit(mother.state, idOrName);
   if ('error' in resolved) return { ok: false, message: resolved.error };
-  const targetDate = date ?? todayLocal();
-  const before = resolved.habit.log.includes(targetDate);
-  const next = habitToggleDay(mother.state, { id: resolved.habit.id, date: targetDate }, {
+  const data = { id: resolved.habit.id, date: targetDate, done };
+  if (resolved.habit.log.includes(targetDate) === done) {
+    return {
+      ok: true,
+      message: `${verb}: "${resolved.habit.name}" already ${done ? 'marked' : 'unmarked'} ${targetDate}`,
+      data,
+    };
+  }
+  mother.state = habitToggleDay(mother.state, { id: resolved.habit.id, date: targetDate }, {
     uuid: () => randomUUID(),
     now: () => new Date().toISOString(),
     today: todayLocal,
   });
-  // If the toggle was a no-op (date out of range), surface the reason.
-  const afterHabit = next.habits.find((h) => h.id === resolved.habit.id)!;
-  const after = afterHabit.log.includes(targetDate);
-  if (before === after) {
-    return {
-      ok: false,
-      message: `habit done: date ${targetDate} is out of range for "${resolved.habit.name}" (must be ≥ createdAt and ≤ today).`,
-    };
-  }
-  mother.state = next;
   writeBoard(ctx, board, mother);
   return {
     ok: true,
-    message: after
-      ? `habit done: "${resolved.habit.name}" marked ${targetDate}`
-      : `habit done: "${resolved.habit.name}" unmarked ${targetDate}`,
-    data: { id: resolved.habit.id, date: targetDate, done: after },
+    message: `${verb}: "${resolved.habit.name}" ${done ? 'marked' : 'unmarked'} ${targetDate}`,
+    data,
   };
+}
+
+export function cliDone(ctx: HabitCtx, idOrName: string | undefined, date: string | undefined): Promise<SysResult> {
+  return setHabitDay(ctx, idOrName, date, true);
+}
+
+export function cliUndo(ctx: HabitCtx, idOrName: string | undefined, date: string | undefined): Promise<SysResult> {
+  return setHabitDay(ctx, idOrName, date, false);
 }
 
 export async function cliStreak(
@@ -197,7 +221,7 @@ export async function cliStreak(
   if (!mother) return notFound();
   const resolved = resolveHabit(mother.state, idOrName);
   if ('error' in resolved) return { ok: false, message: resolved.error };
-  const n = calcStreak(resolved.habit.log, todayLocal());
+  const n = calcStreak(resolved.habit.log, todayLocal(), resolved.habit.schedule ?? undefined);
   return {
     ok: true,
     message: `streak for "${resolved.habit.name}": ${n} day${n === 1 ? '' : 's'}`,
@@ -296,7 +320,7 @@ export async function cliList(ctx: HabitCtx, json = false): Promise<SysResult> {
     name: h.name,
     color: h.color,
     archived: h.archived,
-    streak: calcStreak(h.log, today),
+    streak: calcStreak(h.log, today, h.schedule ?? undefined),
     logCount: h.log.length,
   }));
   if (json) {
@@ -524,7 +548,7 @@ export async function cliShow(
   if ('error' in resolved) return { ok: false, message: resolved.error };
   const h = resolved.habit;
   const today = todayLocal();
-  const streak = calcStreak(h.log, today);
+  const streak = calcStreak(h.log, today, h.schedule ?? undefined);
 
   const data: {
     id: string;

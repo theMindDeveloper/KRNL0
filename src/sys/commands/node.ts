@@ -226,6 +226,11 @@ export async function nodeSetPosition(
   const idx = board.nodes.findIndex((n) => n.id === r.id);
   if (idx === -1) return { ok: false, message: `node "${r.id}" not found.` };
   const node = board.nodes[idx]!;
+  if (node.isMother === true) {
+    // Mother nodes are fixed-position (hard rule 6); migrateMotherPositions
+    // would snap it back on the next load anyway.
+    return { ok: false, message: `node ${node.id} is a mother node and cannot be moved.` };
+  }
   board.nodes[idx] = { ...node, position: { x, y } };
   saveBoard(ctx, board);
   return {

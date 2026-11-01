@@ -62,6 +62,10 @@ interface BoardStore {
   history: Board[];
   future: Board[];
   setBoard: (board: Board) => void;
+  /** Adopt a board re-read from disk after an external (sys CLI) change.
+   *  Unlike setBoard it keeps undo history and the live viewport; if the
+   *  content changed, the pre-reload board becomes one undo step. */
+  reloadBoard: (board: Board) => void;
   setHoveredNodeId: (id: string | null) => void;
   updateNode: (id: string, patch: Partial<Node>, opts?: { skipHistory?: boolean }) => void;
   addNode: (node: Node) => void;
@@ -108,7 +112,10 @@ const HISTORY_CAP = 50;
 // the microtask queue drains.
 let _coalescing = false;
 
-function pushHistory(s: BoardStore): { history: Board[]; future: Board[] } {
+/** Exported so bulk paths that call setState directly (cascade delete) take
+ *  part in the same per-task coalescing — otherwise a delete followed by an
+ *  updateNode in the same tick cost two Ctrl+Z presses. */
+export function pushHistory(s: BoardStore): { history: Board[]; future: Board[] } {
   if (!s.board) return { history: s.history, future: s.future };
   if (_coalescing) return { history: s.history, future: s.future };
   _coalescing = true;
@@ -134,6 +141,20 @@ export const useBoardStore = create<BoardStore>((set) => ({
   setHoveredNodeId: (id) => set({ hoveredNodeId: id }),
 
   setBoard: (board) => set({ board, viewport: board.viewport, history: [], future: [] }),
+
+  reloadBoard: (board) =>
+    set((s) => {
+      if (!s.board) return { board, viewport: board.viewport, history: [], future: [] };
+      const same =
+        JSON.stringify(s.board.nodes) === JSON.stringify(board.nodes) &&
+        JSON.stringify(s.board.edges) === JSON.stringify(board.edges);
+      if (same) return { board };
+      return {
+        board,
+        history: [...s.history, s.board].slice(-HISTORY_CAP),
+        future: [],
+      };
+    }),
 
   updateNode: (id, patch, opts) =>
     set((s) => {

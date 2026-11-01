@@ -85,4 +85,52 @@ describe('#170 — undo task delete', () => {
     const item = (useBoardStore.getState().board!.nodes.find((n) => n.id === 'todo-mother')!.state as TodoState).items.find((i) => i.id === 'item-1');
     expect(item).toBeDefined();
   });
+
+  it('undoing task.delete also restores the linked todo item (snapshot not mutated in place)', () => {
+    useBoardStore.getState().setBoard(makeBoard());
+    makeCommandHandler('task-1')('task.delete', {});
+    const items = () =>
+      (useBoardStore.getState().board!.nodes.find((n) => n.id === 'todo-mother')!.state as TodoState).items;
+    expect(items()).toHaveLength(0);
+
+    useBoardStore.getState().undo();
+    expect(hasTask()).toBe(true);
+    expect(items().map((i) => i.id)).toEqual(['item-1']);
+  });
+
+  it('a board reload from disk (CLI change) keeps the undo history', () => {
+    useBoardStore.getState().setBoard(makeBoard());
+    makeCommandHandler('task-1')('task.delete', {});
+    const afterDelete = useBoardStore.getState().board!;
+    useBoardStore.getState().reloadBoard({ ...afterDelete, savedAt: '2026-05-10T11:00:00.000Z' });
+    expect(useBoardStore.getState().history.length).toBeGreaterThan(0);
+    useBoardStore.getState().undo();
+    expect(hasTask()).toBe(true);
+  });
+
+  it('removing a todo item clears a pomo that was running on its task (no phantom session)', () => {
+    const b = makeBoard();
+    b.nodes.push({
+      id: 'mother-pomo', kind: 'pomo', position: { x: 0, y: 0 }, isMother: true,
+      state: {
+        status: 'running', startedAt: new Date().toISOString(), durationMin: 25, breakMin: 5,
+        label: 'Write report', sessionsCompleted: 0, activeTaskId: 'task-1', history: [],
+        pausedAt: null, pausedElapsedMs: 0, sessionWorkSec: 0,
+      },
+      config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
+    });
+    useBoardStore.getState().setBoard(b);
+    makeCommandHandler('todo-mother')('todo.remove', { id: 'item-1' });
+
+    const pomo = useBoardStore.getState().board!.nodes.find((n) => n.id === 'mother-pomo')!;
+    expect((pomo.state as { activeTaskId: string | null }).activeTaskId).toBeNull();
+    expect(hasTask()).toBe(false);
+
+    // Still a single undo step.
+    useBoardStore.getState().undo();
+    expect(hasTask()).toBe(true);
+    const restored = useBoardStore.getState().board!.nodes.find((n) => n.id === 'mother-pomo')!;
+    expect((restored.state as { activeTaskId: string | null }).activeTaskId).toBe('task-1');
+  });
 });
+

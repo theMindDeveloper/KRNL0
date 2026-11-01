@@ -59,11 +59,33 @@ export const pomoResume = (
   env: PomoEnv = defaultEnv,
 ): PomoState => {
   if (state.status !== 'paused') return state;
-  const startedAt = toIso(env.now() - state.pausedElapsedMs);
+  // Close the pre-pause work as its own span and open a fresh one at `now`, so
+  // the Clock/Calendar draw the pause gap as a gap (not as work) and a pause
+  // that crosses midnight stays on the right day. The worked time carries over
+  // in `sessionWorkSec`, so the threshold still counts the whole pomodoro.
+  const now = env.now();
+  const history =
+    state.startedAt !== null && state.pausedElapsedMs > 0
+      ? [
+          ...state.history,
+          {
+            id: env.uuid(),
+            startedAt: state.startedAt,
+            endedAt: state.pausedAt ?? toIso(Date.parse(state.startedAt) + state.pausedElapsedMs),
+            durationMin: Math.max(0, Math.round(state.pausedElapsedMs / 60_000)),
+            label: state.label,
+            completed: false,
+            taskId: state.activeTaskId,
+            kind: 'work' as const,
+          },
+        ]
+      : state.history;
   return {
     ...state,
     status: 'running',
-    startedAt,
+    startedAt: toIso(now),
+    sessionWorkSec: (state.sessionWorkSec ?? 0) + state.pausedElapsedMs / 1000,
+    history,
     pausedAt: null,
     pausedElapsedMs: 0,
   };
@@ -113,7 +135,9 @@ export const pomoComplete = (
 ): PomoState => {
   if (state.status !== 'running' || state.startedAt === null) return state;
   const now = env.now();
-  if (now - Date.parse(state.startedAt) < state.durationMin * 60_000) return state;
+  if ((state.sessionWorkSec ?? 0) * 1000 + now - Date.parse(state.startedAt) < state.durationMin * 60_000) {
+    return state;
+  }
   const config = args.config ?? defaultPomoConfig();
   const nextSessions = state.sessionsCompleted + 1;
   const record: PomoSessionRecord = {
@@ -419,6 +443,34 @@ export const pomoSetConfig = (
  * Passing the live PomoConfig is required for the snap-to-default behavior;
  * omitting it preserves the current durations (legacy call sites).
  */
+/**
+ * Plan vs reality — tag what the pomo is observing. Sets the task id stamped
+ * onto spans recorded from now on (and onto the in-flight span when it
+ * closes). Never touches the timer itself: no cancel, no duration change.
+ */
+export const pomoSetTag = (
+  state: PomoState,
+  args: { taskId: string | null; label?: string },
+): PomoState => {
+  const label = args.taskId === null ? '' : (args.label ?? state.label);
+  if (state.activeTaskId === args.taskId && state.label === label) return state;
+  return { ...state, activeTaskId: args.taskId, label };
+};
+
+/** Retag an already-recorded span (fix "what was this time spent on" later). */
+export const pomoRetagSegment = (
+  state: PomoState,
+  args: { id: string; taskId: string | null; label?: string },
+): PomoState => {
+  let changed = false;
+  const history = state.history.map((r) => {
+    if (r.id !== args.id) return r;
+    changed = true;
+    return { ...r, taskId: args.taskId, label: args.taskId === null ? '' : (args.label ?? r.label) };
+  });
+  return changed ? { ...state, history } : state;
+};
+
 export const pomoClearActiveTask = (
   state: PomoState,
   config?: PomoConfig,

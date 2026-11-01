@@ -104,12 +104,14 @@ function countByKind(board: BoardShape): Record<string, number> {
   return out;
 }
 
-// Save/load remain stubs — board.json autosaves on every mutation already.
+// Save/load to a custom path are not implemented — board.json autosaves on
+// every mutation. Only the no-path save (a no-op) reports success.
 export async function boardSave(path?: string): Promise<SysResult> {
-  return { ok: true, message: `[stub] board save → ${path ?? 'default'} (board autosaves on every mutation)` };
+  if (!path) return { ok: true, message: 'board autosaves on every mutation; nothing to do.' };
+  return { ok: false, message: `board save to a custom path is not implemented yet (got ${path}).` };
 }
 
 export async function boardLoad(path?: string): Promise<SysResult> {
   if (!path) return { ok: false, message: 'board load requires a <path>' };
-  return { ok: true, message: `[stub] board load ← ${path}` };
+  return { ok: false, message: `board load from a file is not implemented yet (got ${path}).` };
 }

@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { todoAdd, todoList, todoCheck, type TodoCtx } from '../../../src/sys/commands/todo';
+import { taskToggle } from '../../../src/sys/commands/task';
 import type { TodoState } from '../../../src/renderer/components/nodes/TodoNode/types';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
 
@@ -172,5 +173,36 @@ describe('todo check — prefix and text resolution (issue #117 §1)', () => {
     await todoAdd(ctx, 'pay rent');
     const res = await todoCheck(ctx, 'pay rent');
     expect(res.ok).toBe(true);
+  });
+});
+
+describe('CLI completion sync (Decision 20 + #169)', () => {
+  const completions = () => (readBoard() as unknown as { completions?: { taskId: string }[] }).completions ?? [];
+
+  it('todo check marks the linked task done and records the completion', async () => {
+    const res = await todoAdd(ctx, 'Ship it');
+    const { todoItemId, taskNodeId } = res.data as { todoItemId: string; taskNodeId: string };
+    await todoCheck(ctx, todoItemId);
+
+    const task = readBoard().nodes.find((n) => n.id === taskNodeId)!;
+    expect((task.state as TaskState).done).toBe(true);
+    expect((task.state as TaskState).completedAt).toBeTruthy();
+    expect(completions().map((c) => c.taskId)).toEqual([taskNodeId]);
+
+    await todoCheck(ctx, todoItemId);
+    expect((readBoard().nodes.find((n) => n.id === taskNodeId)!.state as TaskState).done).toBe(false);
+    expect(completions()).toEqual([]);
+  });
+
+  it('task toggle records and then clears the completion ledger', async () => {
+    const res = await todoAdd(ctx, 'Write report');
+    const { taskNodeId, todoItemId } = res.data as { todoItemId: string; taskNodeId: string };
+    await taskToggle({ boardPath }, taskNodeId);
+    expect(completions().map((c) => c.taskId)).toEqual([taskNodeId]);
+    const item = (readBoard().nodes.find((n) => n.id === TODO_MOTHER)!.state as TodoState).items.find((i) => i.id === todoItemId)!;
+    expect(item.done).toBe(true);
+
+    await taskToggle({ boardPath }, taskNodeId);
+    expect(completions()).toEqual([]);
   });
 });

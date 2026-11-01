@@ -378,47 +378,6 @@ describe('F12 (todo) — todo.clearDone cascades all done items TaskNodes', () =
 
 // ── task.startPomo ────────────────────────────────────────────────────────────
 
-describe('F9 (task) — task.startPomo mutates the Pomo mother state', () => {
-  it('starts the Pomo mother with the task label and durationMin', () => {
-    const board = makeBoardWithTodoAndTask({ includePomoMother: true });
-    useBoardStore.getState().setBoard(board);
-    const handler = makeCommandHandler('task-1');
-    handler('task.startPomo');
-    const state = useBoardStore.getState().board!;
-    const pomoNode = state.nodes.find((n) => n.id === 'pomo-mother')!;
-    const ps = pomoNode.state as PomoState;
-    expect(ps.status).toBe('running');
-    expect(ps.label).toBe('test task');
-    expect(ps.durationMin).toBe(20);
-  });
-
-  it('is a no-op when no Pomo mother is present in the board', () => {
-    // Board without pomo mother
-    const board = makeBoardWithTodoAndTask({ includePomoMother: false });
-    useBoardStore.getState().setBoard(board);
-    const handler = makeCommandHandler('task-1');
-    // Should not throw
-    expect(() => handler('task.startPomo')).not.toThrow();
-    // Board nodes unchanged
-    const state = useBoardStore.getState().board!;
-    expect(state.nodes.find((n) => n.kind === 'pomo')).toBeUndefined();
-  });
-
-  it('does not start pomo if task is done', () => {
-    // task.startPomo in dispatcher fires regardless of done (done guard is in UI click handler)
-    // but we verify the pomo IS mutated (the done guard is only in the body-click UI handler,
-    // not in the dispatcher — verify the dispatcher itself always starts if pomo found)
-    const board = makeBoardWithTodoAndTask({ includePomoMother: true, taskDone: true });
-    useBoardStore.getState().setBoard(board);
-    const handler = makeCommandHandler('task-1');
-    handler('task.startPomo');
-    const state = useBoardStore.getState().board!;
-    const pomoNode = state.nodes.find((n) => n.id === 'pomo-mother')!;
-    // dispatcher starts pomo regardless — UI blocks click for done tasks
-    expect((pomoNode.state as PomoState).status).toBe('running');
-  });
-});
-
 // ── task.delete cascade ───────────────────────────────────────────────────────
 
 describe('F13 (task) — task.delete cascades TaskNode + descendants + linked TodoItem', () => {

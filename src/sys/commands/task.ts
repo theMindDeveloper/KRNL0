@@ -8,6 +8,7 @@ import {
   taskToggle as fsmTaskToggle,
   taskEdit as fsmTaskEdit,
   taskSetSchedule as fsmTaskSetSchedule,
+  taskSetDuration as fsmTaskSetDuration,
 } from '../../renderer/components/nodes/TaskNode/commands';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import {
@@ -25,7 +26,7 @@ import {
 import {
   deleteTaskCascade,
   renumberSiblings as sharedRenumberSiblings,
-  stampCompletedAt,
+  taskToggleMirror,
 } from '../../shared/dispatch/task';
 import {
   resolveNodeRef,
@@ -34,6 +35,7 @@ import {
 } from '../../shared/dispatch/resolveRef';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
 import { TASK_STEP_X, TASK_STEP_Y, MOTHER_OFFSET_Y } from '../layout';
+import { wouldCreateChainCycle } from '../../renderer/store/chainWalker';
 
 export interface TaskCtx {
   boardPath: string;
@@ -280,23 +282,12 @@ export async function taskToggle(
   if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
   taskId = taskNode.id;
 
-  const prevState = taskNode.state as TaskState;
+  // Shared with the renderer: toggles, stamps completedAt, mirrors to the
+  // TodoItem and records/clears the completion ledger (#169).
   const env = { uuid: () => randomUUID(), now: () => new Date().toISOString() };
-  const nextState = stampCompletedAt(prevState, fsmTaskToggle(prevState), env);
-  updateNode(board, taskId, { ...taskNode, state: nextState });
-
-  // Mirror to linked TodoItem
-  if (prevState.todoItemId !== null) {
-    const todoMother = findNode(board, prevState.parentTodoId);
-    if (todoMother && todoMother.kind === 'todo') {
-      const todoState = todoMother.state as TodoState;
-      const item = todoState.items.find((i) => i.id === prevState.todoItemId);
-      if (item && item.done !== nextState.done) {
-        const newTodo = fsmTodoToggle(todoState, { id: prevState.todoItemId }, env);
-        updateNode(board, todoMother.id, { ...todoMother, state: newTodo });
-      }
-    }
-  }
+  const result = taskToggleMirror(board, taskId, env);
+  if (!result) return { ok: false, message: `No task node matching "${taskId}"` };
+  const nextState = { done: result.done };
 
   saveBoard(ctx, board);
   return {
@@ -340,16 +331,24 @@ export async function taskStartPomo(
   const pomoMother = findPomoMother(board);
   if (!pomoMother) return { ok: false, message: 'No pomo mother node found in board.' };
 
+  // Plan vs reality: tag the pomo with this task and start it if idle. The
+  // session length is the pomo's own setting — the task estimate is a plan,
+  // not a timer. A running session keeps running; only its tag changes.
   const ts = taskNode.state as TaskState;
-  const nextPomoState = fsmPomoStart(pomoMother.state as PomoState, {
-    label: ts.text,
-    durationMin: ts.durationMin,
-  });
+  const ps = pomoMother.state as PomoState;
+  const cfg = (pomoMother['config'] ?? {}) as { sessionMin?: number };
+  const tagged: PomoState = { ...ps, activeTaskId: taskId, label: ts.text };
+  const started = ps.status === 'idle' || ps.status === 'done';
+  const nextPomoState = started
+    ? fsmPomoStart(tagged, { durationMin: cfg.sessionMin ?? 25 })
+    : tagged;
   updateNode(board, pomoMother.id, { ...pomoMother, state: nextPomoState });
   saveBoard(ctx, board);
   return {
     ok: true,
-    message: `Pomo started for "${ts.text}" (${ts.durationMin} min).`,
+    message: started
+      ? `Pomo started on "${ts.text}".`
+      : `Pomo (already ${ps.status}) is now tagged "${ts.text}".`,
   };
 }
 
@@ -451,18 +450,15 @@ export async function taskDuration(
     }
   }
 
-  const ts = taskNode.state as TaskState;
-  const nextState: TaskState = {
-    ...ts,
-    durationMin: minutes,
-    eta: `~${minutes} min`,
-  };
+  // Same FSM as the UI: also updates plannedMin/scheduledDurationMin so the
+  // calendar block actually resizes.
+  const nextState = fsmTaskSetDuration(taskNode.state as TaskState, { durationMin: minutes });
   updateNode(board, taskId, { ...taskNode, state: nextState });
   saveBoard(ctx, board);
   return {
     ok: true,
-    message: `Task "${taskId.slice(0, 8)}" duration set to ${minutes} min.`,
-    data: { id: taskId, durationMin: minutes },
+    message: `Task "${taskId.slice(0, 8)}" duration set to ${nextState.durationMin} min.`,
+    data: { id: taskId, durationMin: nextState.durationMin },
   };
 }
 
@@ -636,6 +632,9 @@ export async function taskChain(ctx: TaskCtx, refs: string[]): Promise<SysResult
         e.to.command === 'task.activate',
     );
     if (exists) continue;
+    if (wouldCreateChainCycle(board.edges, fromId, toId)) {
+      return { ok: false, message: `task chain: linking ${fromId.slice(0, 8)} → ${toId.slice(0, 8)} would create a loop.` };
+    }
     board.edges = [
       ...board.edges,
       {
@@ -658,6 +657,26 @@ export async function taskChain(ctx: TaskCtx, refs: string[]): Promise<SysResult
 // ── ADR 0003/0005 — taskSchedule / taskUnschedule ────────────────────────────
 
 /**
+ * Normalize a `--at` value to the local "YYYY-MM-DDTHH:MM" shape the calendar
+ * writes and the schedule selector compares lexicographically. Values with a
+ * `Z` or offset are converted to local time; free text ("tomorrow") and
+ * impossible dates return null.
+ */
+export function normalizeScheduleAt(at: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/.exec(at.trim());
+  if (!m) return null;
+  const d = new Date(m[7] ? at.trim() : `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? '00'}`);
+  if (Number.isNaN(d.getTime())) return null;
+  if (!m[7]) {
+    // Local input: reject rollovers such as 2026-02-30 or 25:00.
+    if (d.getFullYear() !== Number(m[1]) || d.getMonth() + 1 !== Number(m[2]) || d.getDate() !== Number(m[3])
+      || d.getHours() !== Number(m[4]) || d.getMinutes() !== Number(m[5])) return null;
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
  * `krnl task schedule <ref> --at <ISO> [--duration <min>]`
  * Sets scheduledFor (and optional scheduledDurationMin) on a TaskNode, then
  * mirrors to the linked TodoItem via todoSetItemSchedule.
@@ -670,6 +689,11 @@ export async function taskSchedule(
 ): Promise<SysResult> {
   if (!taskId) return { ok: false, message: 'task schedule requires a <ref>' };
   if (!at) return { ok: false, message: 'task schedule requires --at <ISO>' };
+  const normalized = normalizeScheduleAt(at);
+  if (normalized === null) {
+    return { ok: false, message: `task schedule: --at must be an ISO datetime like 2026-11-02T09:30, got "${at}"` };
+  }
+  at = normalized;
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
   if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };

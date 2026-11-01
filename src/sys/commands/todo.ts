@@ -11,6 +11,8 @@ import {
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
 import { defaultTodoConfig } from '../../renderer/components/nodes/TodoNode/types';
 import { createTodoTaskPair } from '../../shared/dispatch/todo';
+import { taskToggleMirror } from '../../shared/dispatch/task';
+import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import { resolveTodoItemRef, resolutionError } from '../../shared/dispatch/resolveRef';
 import type { BoardShape } from '../../shared/dispatch/types';
 
@@ -88,6 +90,14 @@ export async function todoCheck(ctx: TodoCtx, id?: string): Promise<SysResult> {
   const updated = nextState.items.find((i) => i.id === r.id.itemId);
 
   board.nodes[motherIdx] = { ...motherNode, state: nextState };
+  // Mirror to the linked TaskNode like the UI does, so the task's done flag,
+  // completedAt and the completion ledger agree with the Todo list.
+  if (updated && item.taskNodeId) {
+    const task = board.nodes.find((n) => n.id === item.taskNodeId && n.kind === 'todo.task');
+    if (task && (task.state as TaskState).done !== updated.done) {
+      taskToggleMirror(board, task.id, env);
+    }
+  }
   saveBoard(ctx, board);
   return {
     ok: true,

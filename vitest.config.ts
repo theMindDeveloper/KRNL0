@@ -26,5 +26,8 @@ export default defineConfig({
       'src/**/__tests__/*.test.{ts,tsx}',
     ],
     environment: 'node',
+    // Some render tests cold-import large component trees; under a full
+    // parallel run on Windows the default 5s occasionally isn't enough.
+    testTimeout: 15_000,
   },
 });

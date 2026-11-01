@@ -11,6 +11,37 @@
 import type { Edge, Node } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 
+/**
+ * True iff adding a `task.next` edge from → to would close a loop (to already
+ * reaches from). A chain with a pure cycle has no start task, so walkChain
+ * returns nothing and every task in it vanishes from Calendar and Clock.
+ * Structurally typed so the sys CLI's edge shape works too.
+ */
+export function wouldCreateChainCycle(
+  edges: readonly { from: { nodeId: string; event: string }; to: { nodeId: string } }[],
+  fromId: string,
+  toId: string,
+): boolean {
+  if (fromId === toId) return true;
+  const nexts = new Map<string, string[]>();
+  for (const e of edges) {
+    if (e.from.event !== 'task.next') continue;
+    const list = nexts.get(e.from.nodeId);
+    if (list) list.push(e.to.nodeId);
+    else nexts.set(e.from.nodeId, [e.to.nodeId]);
+  }
+  const seen = new Set<string>();
+  const stack = [toId];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (id === fromId) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const n of nexts.get(id) ?? []) stack.push(n);
+  }
+  return false;
+}
+
 // ── Public types ──────────────────────────────────────────────────────────────
 
 export interface ChainEntry {

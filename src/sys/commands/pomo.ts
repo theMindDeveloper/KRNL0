@@ -6,9 +6,16 @@ import {
   pomoStop as fsmStop,
   pomoBreak as fsmBreak,
   pomoExtend as fsmExtend,
+  pomoPause as fsmPause,
+  pomoResume as fsmResume,
+  pomoDiscard as fsmDiscard,
   type PomoEnv,
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
+import { resolveNodeRef, resolutionError } from '../../shared/dispatch/resolveRef';
+import type { BoardShape } from '../../shared/dispatch/types';
+import { selectSchedule } from '../../renderer/store/scheduleSelector';
+import type { Board } from '../../shared/types';
 
 const VALID_FACES: readonly TimerFace[] = TIMER_FACES;
 function isTimerFace(v: unknown): v is TimerFace {
@@ -43,21 +50,81 @@ const cliEnv = (): PomoEnv => ({
 });
 
 export function pomoStart(label?: string, minutes?: number): SysResult {
-  let found = false;
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);
     if (!node) return;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    if (prev.status === 'running' || prev.status === 'paused') {
+      // fsmStart is a no-op here — say so instead of claiming a fresh start.
+      result = { ok: false, message: `pomo is already ${prev.status}` };
+      return;
+    }
     const cfg = node['config'] ?? {};
     const sessionMin = minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
-    const prev = (node['state'] ?? {}) as Partial<PomoState>;
-    const startArgs: { label?: string; durationMin?: number } = { durationMin: sessionMin };
+    const startArgs: { label?: string; durationMin?: number; activeTaskId?: string | null } = { durationMin: sessionMin };
     if (label !== undefined) startArgs.label = label;
-    const next = fsmStart({ ...defaultState(prev) }, startArgs, cliEnv());
-    node['state'] = next;
-    found = true;
+    // Same as the UI: an untagged start is tagged with the open task whose
+    // planned block contains "now" (time-model F5).
+    const suggested = label === undefined && prev.activeTaskId === null ? plannedTaskNow(board) : null;
+    if (suggested) {
+      startArgs.activeTaskId = suggested.id;
+      startArgs.label = suggested.text;
+    }
+    node['state'] = fsmStart(prev, startArgs, cliEnv());
+    result = { ok: true, message: suggested ? `Pomodoro started on "${suggested.text}"` : 'Pomodoro started' };
   });
-  if (!found) return { ok: false, message: 'No Pomodoro node found on the board' };
-  return { ok: true, message: 'Pomodoro started' };
+  return result;
+}
+
+/** The open task whose planned calendar block contains now, if any. */
+function plannedTaskNow(board: { nodes: Array<Record<string, unknown>>; edges?: unknown }): { id: string; text: string } | null {
+  const b = { ...board, edges: Array.isArray(board.edges) ? board.edges : [] } as unknown as Board;
+  const now = Date.now();
+  for (const p of selectSchedule(b).placements.values()) {
+    const s = new Date(p.startISO).getTime();
+    const e = new Date(p.endISO).getTime();
+    if (!(s <= now && now < e)) continue;
+    const node = board.nodes.find((n) => n['id'] === p.taskId);
+    const st = (node?.['state'] ?? {}) as { done?: boolean; text?: string };
+    if (node && !st.done) return { id: p.taskId, text: st.text ?? '' };
+  }
+  return null;
+}
+
+/** Shared shape for the simple state-transition verbs below. */
+function pomoTransition(
+  allowed: readonly PomoState['status'][],
+  verb: string,
+  apply: (prev: PomoState) => PomoState,
+  okMsg: string,
+): SysResult {
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  getBoardIo().mutateBoard((board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    if (!allowed.includes(prev.status)) {
+      result = { ok: false, message: `pomo is ${prev.status} — can only ${verb} while ${allowed.join(' or ')}` };
+      return;
+    }
+    node['state'] = apply(prev);
+    result = { ok: true, message: okMsg };
+  });
+  return result;
+}
+
+export function pomoPause(): SysResult {
+  return pomoTransition(['running'], 'pause', (s) => fsmPause(s, {}, cliEnv()), 'Pomodoro paused');
+}
+
+export function pomoResume(): SysResult {
+  return pomoTransition(['paused'], 'resume', (s) => fsmResume(s, {}, cliEnv()), 'Pomodoro resumed');
+}
+
+/** Abandon the in-flight span without recording it (the UI's RESET). */
+export function pomoDiscard(): SysResult {
+  return pomoTransition(['running', 'paused', 'break'], 'discard', (s) => fsmDiscard(s), 'Pomodoro discarded');
 }
 
 /** Issue #166 — record the in-flight segment before going idle. */
@@ -110,6 +177,76 @@ export function pomoExtend(): SysResult {
   });
   if (!found) return { ok: false, message: msg };
   return { ok: true, message: msg };
+}
+
+/** Resolve a task ref for tagging; 'none' clears the tag. */
+function resolveTag(board: BoardShape, ref: string): { taskId: string | null; label: string } | { error: string } {
+  if (ref === 'none') return { taskId: null, label: '' };
+  const r = resolveNodeRef(board, ref);
+  if (!r.ok) return { error: resolutionError('task', ref, r) };
+  const node = board.nodes.find((n) => n.id === r.id);
+  if (!node || node.kind !== 'todo.task') return { error: `"${ref}" is not a task` };
+  return { taskId: node.id, label: String((node.state as { text?: string }).text ?? '') };
+}
+
+export interface PomoTagCtx {
+  boardPath: string;
+  onBoardChanged?: () => void;
+}
+
+/** Load → mutate → save for the tag verbs (path-based, so it's testable). */
+function mutatePomoBoard(ctx: PomoTagCtx, fn: (board: BoardLike) => void): void {
+  const raw = loadBoardFrom(ctx.boardPath) as BoardLike | null;
+  if (!raw) return;
+  const board: BoardLike = {
+    ...((raw as unknown) as Record<string, unknown>),
+    nodes: Array.isArray(raw.nodes) ? raw.nodes : [],
+    edges: Array.isArray(raw.edges) ? raw.edges : [],
+  };
+  fn(board);
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+}
+
+/** `krnl pomo tag <taskRef|none>` — label what the pomo is observing. */
+export function pomoTag(ctx: PomoTagCtx, ref: string | undefined): SysResult {
+  if (!ref) return { ok: false, message: 'pomo tag requires <taskRef|none>' };
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  mutatePomoBoard(ctx, (board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const tag = resolveTag(board as unknown as BoardShape, ref);
+    if ('error' in tag) { result = { ok: false, message: tag.error }; return; }
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    node['state'] = { ...prev, activeTaskId: tag.taskId, label: tag.label };
+    result = { ok: true, message: tag.taskId ? `pomo tagged "${tag.label}"` : 'pomo untagged' };
+  });
+  return result;
+}
+
+/** `krnl pomo retag <segmentId> <taskRef|none>` — fix what recorded time was spent on. */
+export function pomoRetag(ctx: PomoTagCtx, segmentId: string | undefined, ref: string | undefined): SysResult {
+  if (!segmentId || !ref) return { ok: false, message: 'pomo retag requires <segmentId> <taskRef|none>' };
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  mutatePomoBoard(ctx, (board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const tag = resolveTag(board as unknown as BoardShape, ref);
+    if ('error' in tag) { result = { ok: false, message: tag.error }; return; }
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    const matches = prev.history.filter((r) => r.id.startsWith(segmentId));
+    if (matches.length !== 1) {
+      result = { ok: false, message: matches.length === 0 ? `no segment "${segmentId}"` : `segment "${segmentId}" is ambiguous` };
+      return;
+    }
+    const id = matches[0]!.id;
+    node['state'] = {
+      ...prev,
+      history: prev.history.map((r) => (r.id === id ? { ...r, taskId: tag.taskId, label: tag.label } : r)),
+    };
+    result = { ok: true, message: `segment ${id.slice(0, 8)} → ${tag.taskId ? `"${tag.label}"` : 'untagged'}` };
+  });
+  return result;
 }
 
 /** Issue #166 — segment-aware status: shows what is currently happening. */

@@ -69,10 +69,12 @@ export const taskSetPlannedMin = (
   // would cascade but the edited block itself would stay frozen at its old
   // size — the reported "edit time only pushes the next task" bug. Since for
   // event tasks scheduledDurationMin IS the total duration, re-sync it.
+  // durationMin/eta mirror the estimate so every view shows the same number.
+  const mirrors = { plannedMin, durationMin: plannedMin, eta: `~${plannedMin} min` };
   if (typeof state.scheduledDurationMin === 'number') {
-    return { ...state, plannedMin, scheduledDurationMin: plannedMin };
+    return { ...state, ...mirrors, scheduledDurationMin: plannedMin };
   }
-  return { ...state, plannedMin };
+  return { ...state, ...mirrors };
 };
 
 // task.setCurrentSessionElapsedSec — Decision 22.1: write the in-flight session
@@ -92,13 +94,15 @@ export const taskClearCurrentSessionElapsedSec = (state: TaskState): TaskState =
   return { ...state, currentSessionElapsedSec: 0 };
 };
 
-// task.setDuration — update the estimated duration.
+// task.setDuration — update the estimated duration. The calendar/clock read
+// plannedMin (and scheduledDurationMin on anchors), so keep those in step —
+// otherwise the edit reports success but the block never changes size (#168).
 export const taskSetDuration = (
   state: TaskState,
   args: { durationMin: number },
 ): TaskState => {
   const min = Math.max(1, Math.min(480, Math.round(args.durationMin)));
-  return { ...state, durationMin: min, eta: `~${min} min` };
+  return taskSetPlannedMin({ ...state, durationMin: min, eta: `~${min} min` }, { minutes: min });
 };
 
 // task.setSchedule — ADR 0001: set or clear the scheduled datetime for a task.

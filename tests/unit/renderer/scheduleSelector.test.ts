@@ -6,7 +6,8 @@
  *   2. Mid-chain anchor — predecessors absent from output.
  *   3. Parallel-fork sharing startISO; group cumulative = max(branch.plannedMin).
  *   4. Multi-todo independent anchors.
- *   5. Multi-anchor chain — each anchor is an independent fixpoint (ADR 0005).
+ *   5. Multi-anchor chain — each anchor pins its own start (ADR 0005), but is
+ *      pushed past its predecessor's end when they would overlap (#168).
  *   6. Breaks invisible (cascade math uses plannedMin only).
  *   7. Anchor's own scheduledDurationMin override applies.
  *   8. selectScheduledTasksForRange filters by [from, to).
@@ -292,7 +293,7 @@ describe('Test 6 — Breaks are invisible to calendar', () => {
 // ── Test 7 — Anchor's scheduledDurationMin override applies to anchor only ─
 
 describe('Test 7 — scheduledDurationMin override on anchor', () => {
-  it('anchor endISO uses override; successor still uses anchor.plannedMin offset', () => {
+  it('anchor endISO uses override; successor starts where the block ends (#168)', () => {
     _taskSeq = 0;
     const todoId = 'todo-override';
     // kind='event' to preserve pre-Decision-28 timing expectations.
@@ -311,8 +312,9 @@ describe('Test 7 — scheduledDurationMin override on anchor', () => {
     const { placements } = selectSchedule(board);
     // Anchor block visually spans 45 min via override.
     expect(placements.get('t1')?.endISO).toBe('2026-05-20T10:45');
-    // ADR 0003 §3.7: successor start uses plannedMin offset (25), not override.
-    expect(placements.get('t2')?.startISO).toBe('2026-05-20T10:25');
+    // #168 (supersedes ADR 0003 §3.7): successor starts at the block's end,
+    // otherwise the resized anchor overlaps it.
+    expect(placements.get('t2')?.startISO).toBe('2026-05-20T10:45');
   });
 });
 
@@ -547,7 +549,7 @@ describe('Test 14 — Anchored branch in parallel group (ADR 0005 §4)', () => {
 // ── Test 15 — Backwards-in-time anchor renders as written ────────────────────
 
 describe('Test 15 — Backwards-in-time anchor (ADR 0005 §"Backwards-in-time anchors")', () => {
-  it('A@14:00, B derives@14:25, C@08:00 — no reorder, no warning', () => {
+  it('A@14:00, B derives@14:25, C@08:00 — C is pushed after B (#168), no reorder', () => {
     _taskSeq = 0;
     const todoId = 'todo-out-of-order';
     const a = makeTaskNode('a', todoId, 25, { scheduledFor: '2026-05-20T14:00' });
@@ -562,8 +564,9 @@ describe('Test 15 — Backwards-in-time anchor (ADR 0005 §"Backwards-in-time an
     expect(placements.size).toBe(3);
     expect(placements.get('a')?.startISO).toBe('2026-05-20T14:00');
     expect(placements.get('b')?.startISO).toBe('2026-05-20T14:25');
-    // C's own anchor renders as written — even though it's before A.
-    expect(placements.get('c')?.startISO).toBe('2026-05-20T08:00');
+    // #168: an anchor can't start before its predecessor ends, so C@08:00 is
+    // pushed to B's end. It stays an anchor (its own scheduledFor is kept).
+    expect(placements.get('c')?.startISO).toBe('2026-05-20T14:50');
     expect(placements.get('c')?.isAnchor).toBe(true);
   });
 });

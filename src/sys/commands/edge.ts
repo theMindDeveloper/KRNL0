@@ -7,6 +7,7 @@ import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { BoardShape, AnyEdge } from '../../shared/dispatch/types';
 import { resolveNodeRef, resolveEdgeRef, resolutionError } from '../../shared/dispatch/resolveRef';
+import { wouldCreateChainCycle } from '../../renderer/store/chainWalker';
 
 export interface EdgeCtx {
   boardPath: string;
@@ -55,6 +56,10 @@ export async function edgeAdd(
   if (!fromR.ok) return { ok: false, message: resolutionError('--from node', fromEp.ref, fromR) };
   const toR = resolveNodeRef(board, toEp.ref);
   if (!toR.ok) return { ok: false, message: resolutionError('--to node', toEp.ref, toR) };
+
+  if (fromEp.name === 'task.next' && wouldCreateChainCycle(board.edges, fromR.id, toR.id)) {
+    return { ok: false, message: 'edge add: this task.next edge would make the chain loop back on itself' };
+  }
 
   const edge: AnyEdge = {
     id: `edge-${randomUUID()}`,

@@ -230,8 +230,8 @@ describe('User-board fixture — focus vs event tasks pre-drawing (Issue #166)',
       (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
     );
 
-    // 3 tasks * 3 paths = 9 total paths
-    expect(taskArcPaths).toHaveLength(9);
+    // One solid plan arc per task
+    expect(taskArcPaths).toHaveLength(3);
 
     // Each arc stroke is a var(--token) CSS variable
     for (const arc of taskArcPaths) {

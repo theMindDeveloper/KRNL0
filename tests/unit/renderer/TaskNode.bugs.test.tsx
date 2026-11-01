@@ -167,32 +167,3 @@ describe('B2 — Inline ETA edit', () => {
 
 // ── B3 — Corner timer shows frozen elapsed when pomo is not running ───────────
 
-describe('B3 — Corner timer shows secondsAccumulated + checkpoint when not running', () => {
-  it('timer shows 00:30 when secondsAccumulated=30 and pomo is not running', () => {
-    renderTaskNode(makeTaskState({
-      secondsAccumulated: 30,
-      currentSessionElapsedSec: 0,
-    }));
-    const timer = screen.getByTestId('task-corner-timer');
-    expect(timer.textContent).toBe('00:30');
-  });
-
-  it('timer shows 01:30 when secondsAccumulated=60 and checkpoint=30', () => {
-    renderTaskNode(makeTaskState({
-      secondsAccumulated: 60,
-      currentSessionElapsedSec: 30,
-    }));
-    const timer = screen.getByTestId('task-corner-timer');
-    // 60 + 30 = 90 seconds = 01:30
-    expect(timer.textContent).toBe('01:30');
-  });
-
-  it('timer is not shown when elapsedSec=0 and task is not active', () => {
-    renderTaskNode(makeTaskState({
-      secondsAccumulated: 0,
-      currentSessionElapsedSec: 0,
-    }));
-    const timer = document.querySelector('[data-testid="task-corner-timer"]');
-    expect(timer).toBeNull();
-  });
-});

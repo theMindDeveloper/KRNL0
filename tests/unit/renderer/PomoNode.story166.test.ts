@@ -130,13 +130,15 @@ describe('Story: pause/resume work accumulation', () => {
     // 15 more min work
     s = pomoStop(s, {}, e(T0 + 30 * MIN, 'w1'));
 
-    expect(s.history).toHaveLength(1);
-    const rec = s.history[0]!;
-    // Actual span 10+15 = 25 min (pause gap excluded from durationMin)
-    // durationMin on stop record = pausedElapsedMs / 60s
+    // Two work spans: 9:00–9:10 and 9:15–9:30. The 5-min pause is a gap.
+    expect(s.history).toHaveLength(2);
+    const [first, rec] = s.history as [typeof s.history[0], typeof s.history[0]];
+    expect(first.endedAt).toBe(new Date(T0 + 10 * MIN).toISOString());
+    expect(rec.startedAt).toBe(new Date(T0 + 15 * MIN).toISOString());
     expect(rec.kind).toBe('work');
     // completed iff workedSec >= 25*60. workedSec = 10*60 + 15*60 = 25*60 → reached
     expect(rec.completed).toBe(true);
+    expect(s.sessionsCompleted).toBe(1);
   });
 });
 

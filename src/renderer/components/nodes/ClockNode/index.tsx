@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
-import { pomoDeleteSegment } from '../PomoNode/commands';
+import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
+import { packLanes } from '../../../store/laneLayout';
+import { toneVarForTask } from '../../../utils/taskColor';
 import type { PomoState } from '../PomoNode/types';
 import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
@@ -233,6 +235,22 @@ export function ClockNode({
     const b = useBoardStore.getState().board;
     if (b) void saveBoard(b);
   };
+  // Plan vs reality — change which task a recorded span counts toward.
+  const retagClockSegment = (segId: string, taskId: string | null) => {
+    const st = useBoardStore.getState();
+    const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
+    if (!pomo) return;
+    const task = taskId ? st.board?.nodes.find((n) => n.id === taskId) : undefined;
+    st.updateNode(pomo.id, {
+      state: pomoRetagSegment(pomo.state as PomoState, {
+        id: segId,
+        taskId,
+        ...(task ? { label: (task.state as { text: string }).text } : {}),
+      }),
+    });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
+  };
   const fmtClockHM = (ms: number) => {
     const d = new Date(ms);
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -419,29 +437,34 @@ export function ClockNode({
   // Active-task / now-pointer concepts only apply when the user is viewing
   // today. On any other day, `now` has no meaning relative to the day being
   // shown — silently lighting up a task as "active" would be a lie.
-  const activeIdx = isToday
+  // "Now" is only on this dial when the shown 12-hour half contains it —
+  // in the AM half at 17:14 the pointer used to sit at 5 o'clock (05:14).
+  const nowInWindow = isToday && (viewWindow === 1 ? nowFloat >= 12 : nowFloat < 12);
+  const activeIdx = nowInWindow
     ? tasks.findIndex((t) => nowFloat >= t.start && nowFloat < t.end)
     : -1;
 
-  // Hoisted track-geometry constants — also consumed by the now-pointer
-  // so it spans exactly from the innermost ring inner-edge to the outermost
-  // ring outer-edge (no spill under the clock, no overshoot past max ring).
-  const TRACK_STROKE = 7;
-  const TRACK_LANE_GAP = 2;
-  const trackBaseR = R_TICK_OUT + 8; // center radius of lane 0
-  const trackTotalLanes = (() => {
-    // Re-run the same overlap lane assignment used inside the SVG IIFE
-    // to know how many concentric tracks exist.
-    const sorted = [...tasks].sort((a, b) => a.start - b.start);
-    const ends: number[] = [];
-    for (const t of sorted) {
-      const lane = ends.findIndex((end) => end <= t.start);
-      if (lane === -1) ends.push(t.end);
-      else ends[lane] = t.end;
-    }
-    return Math.max(1, ends.length);
-  })();
-  const trackInnerEdge = trackBaseR - TRACK_STROKE / 2;
+  // Ring geometry (outward from the dial):
+  //   face (R_FACE) → reality ring (what the pomo observed) → plan lanes
+  //   (one concentric lane per parallel task, from the shared lane packer so
+  //   Clock and Calendar agree on which tasks run in parallel).
+  // Pomo is drawn as colour INSIDE the face (wedges); task arcs ("worms")
+  // ride lanes just outside it.
+  const REALITY_R = R_FACE;
+  const REALITY_SW = 0;
+  const trackBaseR = R_FACE + 9; // center radius of plan lane 0
+  const laneByTaskId = useMemo(() => {
+    const lanes = packLanes(tasks.map((t) => ({ id: t.id, start: t.start, end: t.end })));
+    const m = new Map<string, number>();
+    for (const [id, pl] of lanes) m.set(id, pl.lane);
+    return m;
+  }, [tasks]);
+  const trackTotalLanes = Math.max(1, ...[...laneByTaskId.values()].map((l) => l + 1));
+  // Thinner lanes when many run in parallel, so the dial doesn't shrink to
+  // make room for them (the viewBox grows with the outermost lane).
+  const TRACK_STROKE = trackTotalLanes <= 2 ? 7 : trackTotalLanes <= 4 ? 5 : 4;
+  const TRACK_LANE_GAP = trackTotalLanes <= 2 ? 2 : 1.5;
+  const trackInnerEdge = REALITY_R - REALITY_SW / 2;
   const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
 
   const activeProgress = activeIdx >= 0
@@ -662,33 +685,29 @@ export function ClockNode({
           }
         >
           <svg
-            viewBox="0 0 240 240"
+            viewBox={(() => {
+              // Grow the drawing area with the plan lanes so many parallel
+              // tasks are never clipped by the panel (240 = the base dial).
+              const half = Math.max(120, Math.ceil(trackOuterEdge + 4));
+              return `${CX - half} ${CY - half} ${half * 2} ${half * 2}`;
+            })()}
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
           >
             {/* Frame-style bezel (ADR 0009) — under everything, Classic draws none. */}
             <ClockBezel kind={clockSkin.bezel} outerR={trackOuterEdge} />
 
+            <defs>
+              <pattern id="clock-break-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="1.2" height="4" fill="var(--ink-3)" />
+              </pattern>
+            </defs>
             {/* Train-track concentric lanes.
                 One gray "track" circle per overlapping-task lane.
                 Tasks ride their assigned lane's track.
                 Stroke width auto-shrinks as lanes are added so all rings
                 fit within the outer band without crossing the numerals. */}
             {(() => {
-              // ── Lane assignment (interval-graph coloring on time overlap) ──
-              const sortedByStart = [...tasks].sort((a, b) => a.start - b.start);
-              const laneEnds: number[] = [];
-              const laneByTaskId = new Map<string, number>();
-              for (const t of sortedByStart) {
-                let lane = laneEnds.findIndex((end) => end <= t.start);
-                if (lane === -1) {
-                  lane = laneEnds.length;
-                  laneEnds.push(t.end);
-                } else {
-                  laneEnds[lane] = t.end;
-                }
-                laneByTaskId.set(t.id, lane);
-              }
-              const totalLanes = Math.max(1, laneEnds.length);
+              const totalLanes = trackTotalLanes;
 
               // ── Geometry: tracks grow OUTWARD from the clock edge ──
               // Lane 0 = innermost, sits just outside the clock face.
@@ -715,7 +734,8 @@ export function ClockNode({
                     fill="none"
                     stroke="var(--k-clock-track, var(--paper-3))"
                     strokeWidth={stroke}
-                    opacity={0.55}
+                    // Faint guide only — empty lanes were heavy grey rings.
+                    opacity={0.18}
                   />,
                 );
               }
@@ -744,36 +764,18 @@ export function ClockNode({
                   cap: 'round' | 'butt',
                 ): React.ReactElement => (
                   <g key={`${key}-base`}>
-                    {/* Light transparent background fill */}
                     <path
+                      data-testid="clock-plan-arc"
                       d={arcPath(s, e, r)}
                       fill="none"
                       stroke={t.colorVar}
-                      strokeWidth={sw - 2}
+                      strokeWidth={sw}
                       strokeLinecap={cap}
-                      opacity={opacity * 0.15}
+                      opacity={opacity * (active ? 0.95 : 0.7)}
                       style={activeStyle}
-                    />
-                    {/* Outer outline */}
-                    <path
-                      d={arcPath(s, e, r + (sw - 1) / 2)}
-                      fill="none"
-                      stroke={t.colorVar}
-                      strokeWidth={1}
-                      strokeLinecap={cap}
-                      opacity={opacity}
-                      style={activeStyle}
-                    />
-                    {/* Inner outline */}
-                    <path
-                      d={arcPath(s, e, r - (sw - 1) / 2)}
-                      fill="none"
-                      stroke={t.colorVar}
-                      strokeWidth={1}
-                      strokeLinecap={cap}
-                      opacity={opacity}
-                      style={activeStyle}
-                    />
+                    >
+                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)}`}</title>
+                    </path>
                   </g>
                 );
 
@@ -834,7 +836,7 @@ export function ClockNode({
                 stroke, no extra DOM cost) and a tiny dot with a small
                 pulse. No SVG filter halos: previous version's glow
                 overflowed the node's clip box. */}
-            {isToday && (() => {
+            {nowInWindow && (() => {
               const pIn  = pt(nowFloat, trackInnerEdge);
               const pOut = pt(nowFloat, trackOuterEdge);
               const pDot = pt(nowFloat, trackBaseR);
@@ -879,39 +881,39 @@ export function ClockNode({
               strokeWidth={1}
             />
 
-            {/* #180 — tracked-reality WASH on the dial face. The Pomodoro is an
-                observer: its work/break segments paint as soft filled pie wedges
-                from the dial centre, UNDER the ticks/numerals/hands and far
-                inside the outlined event arcs on the outer lanes. This is the
-                "what actually happened" ambient layer; events (the plan) read as
-                crisp arcs on the track lanes. Work = rust wash, break = neutral
-                dashed wedge. The live segment glows. */}
+            {/* Pomo = colour inside the clock: each recorded span fills its
+                wedge of the face, in the colour of the task it is tagged with
+                (acid when untagged); breaks are a faint hatched wedge; a pause
+                is empty face. Drawn under the ticks, numerals and hands.
+                Click a wedge for times, retag and delete. */}
             {realitySegments.map((seg) => {
               const isWork = seg.kind === 'work';
-              const tone = isWork ? 'var(--rust)' : 'var(--ink-3)';
-              const fillPct = isWork ? (seg.live ? 26 : 18) : 0;
+              const tone = isWork ? (seg.taskId ? toneVarForTask(seg.taskId) : 'var(--acid)') : 'var(--ink-3)';
+              const open = (e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setRealityPopup({ seg, x: e.clientX, y: e.clientY });
+              };
               return (
                 <path
                   key={`reality-${seg.id}`}
                   data-testid="clock-reality-arc"
                   data-reality-kind={seg.kind}
                   data-reality-live={seg.live ? 'true' : undefined}
-                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setRealityPopup({ seg, x: e.clientX, y: e.clientY }); }}
-                  d={sectorPath(seg.startH, seg.endH, R_FACE - 2)}
-                  fill={
-                    isWork
-                      ? `color-mix(in srgb, ${tone} ${fillPct}%, transparent)`
-                      : `color-mix(in srgb, ${tone} 10%, transparent)`
-                  }
-                  stroke={`color-mix(in srgb, ${tone} ${seg.live ? 60 : 40}%, transparent)`}
-                  strokeWidth={isWork ? 1 : 0.75}
-                  strokeDasharray={isWork ? undefined : '2 3'}
+                  onClick={open}
+                  onContextMenu={open}
+                  d={sectorPath(seg.startH, seg.endH, R_FACE - 1)}
+                  fill={isWork ? tone : 'url(#clock-break-hatch)'}
+                  stroke="none"
+                  opacity={isWork ? (seg.live ? 0.42 : 0.3) : 0.5}
                   style={
                     seg.live
-                      ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone, cursor: 'context-menu' }
-                      : { cursor: 'context-menu' }
+                      ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone, cursor: 'pointer' }
+                      : { cursor: 'pointer' }
                   }
-                />
+                >
+                  <title>{`${isWork ? 'Focus' : 'Break'} · ${fmtClockHM(seg.startMs)}${seg.live ? ' → now' : `–${fmtClockHM(seg.endMs)}`}`}</title>
+                </path>
               );
             })}
 
@@ -1138,6 +1140,9 @@ export function ClockNode({
           {tasks.map((t, i) => {
             const ended = isToday && nowFloat >= t.end;
             const on    = i === activeIdx;
+            // Strike through only what is actually done; a past task that is
+            // still open is just dimmed (striking it read as "finished").
+            const isDone = taskInfo.get(t.id)?.done === true;
             return (
               <div
                 key={t.id}
@@ -1183,7 +1188,7 @@ export function ClockNode({
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    textDecoration: ended ? 'line-through' : 'none',
+                    textDecoration: isDone ? 'line-through' : 'none',
                     textDecorationColor: 'var(--ink-4)',
                   }}
                 >
@@ -1235,6 +1240,28 @@ export function ClockNode({
               {fmtClockHM(realityPopup.seg.startMs)} {realityPopup.seg.live ? '→ now' : `– ${fmtClockHM(realityPopup.seg.endMs)}`}
               {' · '}{Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
             </div>
+            {realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Counts toward
+                <select
+                  data-testid="clock-reality-retag"
+                  value={realityPopup.seg.taskId ?? ''}
+                  onChange={(e) => {
+                    const taskId = e.target.value === '' ? null : e.target.value;
+                    retagClockSegment(realityPopup.seg.id, taskId);
+                    setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } });
+                  }}
+                  style={{ flex: 1, minWidth: 0, background: 'var(--paper-2)', color: 'var(--ink)', border: '1px solid var(--paper-3)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 4px', textTransform: 'none' }}
+                >
+                  <option value="">untagged</option>
+                  {(board0?.nodes ?? [])
+                    .filter((n) => n.kind === 'todo.task' && (n.state as { parentTaskId: string | null }).parentTaskId === null)
+                    .map((n) => (
+                      <option key={n.id} value={n.id}>{(n.state as { text: string }).text}</option>
+                    ))}
+                </select>
+              </label>
+            )}
             {!realityPopup.seg.live && (
               <button
                 type="button"

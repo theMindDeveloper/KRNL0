@@ -191,6 +191,13 @@ describe('node set-position', () => {
     const parsed = JSON.parse(read.message!) as { position: { x: number; y: number } };
     expect(parsed.position).toEqual({ x: 1234, y: 5678 });
   });
+
+  it('refuses to move a mother node (fixed-position, rule 6)', async () => {
+    const ctx: NodeCtx = { boardPath };
+    const res = await nodeSetPosition(ctx, TODO_MOTHER, 10, 10);
+    expect(res.ok).toBe(false);
+    expect(res.message).toMatch(/mother node/);
+  });
 });
 
 // ── edge add / remove / list / enable / disable ────────────────────────────

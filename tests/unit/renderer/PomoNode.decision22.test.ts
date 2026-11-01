@@ -201,16 +201,19 @@ describe('Decision 22.1 — pause/resume', () => {
   // ── pomoResume ─────────────────────────────────────────────────────────────
 
   describe('pomoResume', () => {
-    it('paused → running: offsets startedAt to honour pausedElapsedMs', () => {
+    it('paused → running: records the pre-pause span and opens a fresh one', () => {
       const running = pomoStart(defaultPomoState(), {}, env(T0));
       const paused = pomoPause(running, {}, env(T0 + 10_000));
       // Resume 60 seconds after start (50s after pause)
-      const resumed = pomoResume(paused, {}, env(T0 + 60_000));
+      const resumed = pomoResume(paused, {}, env(T0 + 60_000, 'span-1'));
       expect(resumed.status).toBe('running');
-      // startedAt should be T0+60_000 - 10_000 = T0+50_000
-      expect(resumed.startedAt).toBe(new Date(T0 + 50_000).toISOString());
-      // now - startedAt === pausedElapsedMs
-      expect(Date.parse(resumed.startedAt!) - T0).toBe(50_000);
+      // New span starts at the resume moment — the pause gap is not work.
+      expect(resumed.startedAt).toBe(new Date(T0 + 60_000).toISOString());
+      // Pre-pause span [T0, T0+10s] is recorded; worked time carries over.
+      expect(resumed.history).toHaveLength(1);
+      expect(resumed.history[0]!.startedAt).toBe(new Date(T0).toISOString());
+      expect(resumed.history[0]!.endedAt).toBe(new Date(T0 + 10_000).toISOString());
+      expect(resumed.sessionWorkSec).toBe(10);
       expect(resumed.pausedAt).toBeNull();
       expect(resumed.pausedElapsedMs).toBe(0);
     });
@@ -273,8 +276,9 @@ describe('Decision 22.1 — pause/resume', () => {
       const paused = pomoPause(started, {}, env(T0 + 5_000));
       const resumed = pomoResume(paused, {}, env(T0 + 30_000));
       const cancelled = pomoCancel(resumed, {}, env(T0 + 60_000, 'final'));
-      expect(cancelled.history).toHaveLength(1);
-      expect(cancelled.history[0]!.completed).toBe(false);
+      // Pre-pause span (recorded on resume) + the cancelled post-resume span.
+      expect(cancelled.history).toHaveLength(2);
+      expect(cancelled.history.every((r) => r.completed === false)).toBe(true);
       expect(cancelled.status).toBe('idle');
       expect(cancelled.pausedAt).toBeNull();
       expect(cancelled.pausedElapsedMs).toBe(0);

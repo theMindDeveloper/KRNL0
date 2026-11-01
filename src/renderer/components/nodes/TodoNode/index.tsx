@@ -551,12 +551,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   <span
                     className="todo-text"
                     onDoubleClick={() => !item.done && startEdit(item.id, item.text)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (item.taskNodeId !== null && !item.done) {
-                        onCommand('todo.loadTaskForItem', { itemId: item.id });
-                      }
-                    }}
+                    onClick={(e) => e.stopPropagation()}
                     style={{
                       flex: 1,
                       fontFamily: 'var(--font-sans)',

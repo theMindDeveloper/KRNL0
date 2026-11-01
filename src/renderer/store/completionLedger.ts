@@ -34,7 +34,7 @@ export function clearCompletion(
   ledger: readonly CompletionRecord[] | undefined,
   taskId: string,
 ): CompletionRecord[] {
-  const base = ledger ?? [];
+  const base = (ledger ?? []) as CompletionRecord[];
   const next = base.filter((c) => c.taskId !== taskId);
-  return next.length === base.length ? [...base] : next;
+  return next.length === base.length ? base : next;
 }
