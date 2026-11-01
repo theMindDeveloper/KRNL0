@@ -353,7 +353,7 @@ export function PomoNode({
       `}</style>
 
       {/* Header — title + bullet + gear (A.1: gear is last flex child = right side) */}
-      <div
+      <div className="krnl-node-header"
         style={{
           padding: '7px 12px 6px',
           borderBottom: '1px solid var(--paper-2)',

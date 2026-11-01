@@ -200,7 +200,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       >
         {/* Header — .term-head */}
         <div
-          className="term-head"
+          className="term-head krnl-node-header"
           style={{
             background: 'var(--term-bg-2)',
             padding: '8px 12px',

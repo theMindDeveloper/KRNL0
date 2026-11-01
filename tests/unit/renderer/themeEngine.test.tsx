@@ -113,8 +113,7 @@ describe('F7 — default Pomo face', () => {
 });
 
 describe('F9 — panel-toggle slot', () => {
-  it('legacy styles keep the separate row; Pro moves toggles to the top bar', () => {
-    expect(MANIFESTS.classic.slots.panelToggles).toBe('row');
-    expect(MANIFESTS.pro.slots.panelToggles).toBe('topbar');
+  it('every style, Classic included, puts the toggles in the top bar', () => {
+    for (const id of FRAME_STYLE_IDS) expect(MANIFESTS[id].slots.panelToggles, id).toBe('topbar');
   });
 });

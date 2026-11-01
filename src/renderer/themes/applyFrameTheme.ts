@@ -38,6 +38,8 @@ export function applyFrameTheme(id: FrameStyleId, mode: FrameMode, root: HTMLEle
   const entries = Object.entries(tokensFor(id, mode));
   for (const [key, value] of entries) root.style.setProperty(key, value);
   applied = entries.map(([key]) => key);
+  // F10 — bundled fonts load on demand; a failure only costs the fallback font.
+  void MANIFESTS[id].loadFonts?.().catch(() => undefined);
   if (id === 'classic') root.removeAttribute('data-dock');
   else root.setAttribute('data-dock', id);
 }

@@ -474,7 +474,7 @@ export function ClockNode({
         }}
       >
         {/* Header */}
-        <div
+        <div className="krnl-node-header"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -943,7 +943,7 @@ export function ClockNode({
                   y={p.y}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fontFamily="var(--font-mono)"
+                  fontFamily="var(--k-clock-font, var(--font-mono))"
                   fontSize={11}
                   fontWeight={n === 12 ? 700 : 600}
                   fill={n === 12 ? 'var(--rust)' : 'var(--k-clock-num, var(--ink-2))'}
@@ -973,7 +973,7 @@ export function ClockNode({
               y={CY - 28}
               textAnchor="middle"
               dominantBaseline="central"
-              fontFamily="var(--font-mono)"
+              fontFamily="var(--k-clock-font, var(--font-mono))"
               fontSize={8}
               letterSpacing="1.4"
               fill="var(--k-clock-readout, var(--ink-4))"

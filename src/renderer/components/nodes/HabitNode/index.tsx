@@ -170,7 +170,7 @@ export function HabitNode({
     >
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, flex: 1 }}>
         {/* Header */}
-        <div
+        <div className="krnl-node-header"
           style={{
             padding: '7px 10px 6px 16px',
             borderBottom: '1px solid var(--paper-3)',

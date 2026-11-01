@@ -68,7 +68,7 @@ export function CalendarNode({
       position={node.position}
     >
       {/* Header */}
-      <div
+      <div className="krnl-node-header"
         style={{
           padding: '12px 16px 10px',
           borderBottom: '1px solid var(--paper-3)',

@@ -347,7 +347,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
-        <div
+        <div className="krnl-node-header"
           style={{
             padding: '7px 10px 6px',
             borderBottom: '1px solid var(--paper-3)',

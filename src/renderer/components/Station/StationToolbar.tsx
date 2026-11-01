@@ -121,6 +121,7 @@ function ToolbarBtn({
   return (
     <button
       type="button"
+      className="krnl-panel-toggle"
       title={`${active ? 'Hide' : 'Show'} ${label}`}
       aria-pressed={active}
       onClick={onClick}

@@ -63,7 +63,7 @@ export function Lcd({ m, s, running }: TimerFaceProps) {
           className="digits"
           data-testid="pomo-clock"
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "var(--k-lcd-font, 'JetBrains Mono', monospace)",
             fontWeight: 700,
             fontSize: 78,
             letterSpacing: '-0.06em',

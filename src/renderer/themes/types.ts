@@ -38,6 +38,8 @@ export interface ClockSkin {
 export interface ThemeManifest {
   /** Tokens per supported mode. A missing mode falls back to the other one. */
   tokens: Partial<Record<FrameMode, TokenMap>>;
+  /** Bundled fonts this style needs, loaded only while it is active (F10). */
+  loadFonts?: () => Promise<unknown>;
   components: {
     /** Default Timer face; only used when the node has no face of its own (F7). */
     pomo: { face?: PomoFace };
