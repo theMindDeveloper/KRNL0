@@ -10,11 +10,13 @@ import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../store/boardStore';
 import { taskSetPlannedMin, taskSetSchedule } from '../TaskNode/commands';
-import { pomoDeleteSegment } from '../PomoNode/commands';
+import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
 import type { PomoState } from '../PomoNode/types';
 import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
-import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
+import { selectScheduledTasksForRange, selectSchedule } from '../../../store/scheduleSelector';
+import { packLanes } from '../../../store/laneLayout';
+import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
 import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
@@ -113,38 +115,32 @@ interface TaskSlice {
   hasContinuation: boolean; // true if the task continues past this day
 }
 
-// Assign non-overlapping columns to slices using a greedy interval-graph
-// approach. Slices on the same day are laid out side-by-side when they overlap
-// in time.
+// Side-by-side columns for overlapping slices — the shared lane packer
+// (store/laneLayout.ts) so Calendar and Clock agree on parallel tasks. Every
+// slice in an overlap cluster gets the same column count, and a slice widens
+// into columns that stay free for its whole interval.
 function computeColumnLayout(
   slices: TaskSlice[],
-): Map<string, { colIndex: number; colCount: number }> {
-  if (slices.length === 0) return new Map();
-  const intervals = slices.map((s) => ({
-    id: s.task.id,
-    startMin: s.sliceStartMin,
-    endMin: s.sliceEndMin,
-  }));
-  const sorted = [...intervals].sort((a, b) => a.startMin - b.startMin);
-  const colEndMin: number[] = [];
-  const assignments = new Map<string, number>();
-  for (const interval of sorted) {
-    let col = 0;
-    while (col < colEndMin.length && (colEndMin[col] ?? 0) > interval.startMin) col++;
-    assignments.set(interval.id, col);
-    colEndMin[col] = interval.endMin;
-  }
-  const result = new Map<string, { colIndex: number; colCount: number }>();
-  for (const interval of intervals) {
-    const colIndex = assignments.get(interval.id) ?? 0;
-    let maxCol = colIndex;
-    for (const other of intervals) {
-      if (other.id !== interval.id && interval.startMin < other.endMin && other.startMin < interval.endMin)
-        maxCol = Math.max(maxCol, assignments.get(other.id) ?? 0);
-    }
-    result.set(interval.id, { colIndex, colCount: maxCol + 1 });
-  }
+): Map<string, { colIndex: number; colCount: number; span: number }> {
+  const lanes = packLanes(
+    slices.map((sl) => ({ id: sl.task.id, start: sl.sliceStartMin, end: sl.sliceEndMin })),
+  );
+  const result = new Map<string, { colIndex: number; colCount: number; span: number }>();
+  for (const [id, p] of lanes) result.set(id, { colIndex: p.lane, colCount: p.laneCount, span: p.span });
   return result;
+}
+
+function fmtDur(min: number): string {
+  const m = Math.max(0, Math.round(min));
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h === 0) return `${r}m`;
+  return r === 0 ? `${h}h` : `${h}h${String(r).padStart(2, '0')}`;
+}
+
+function fmtMinOfDay(min: number): string {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
 interface ScheduledHabit {
@@ -167,12 +163,16 @@ interface WeekViewProps {
 
 const GUTTER_WIDTH = 36; // px — time gutter width
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
+const MIN_BLOCK_PX = 14; // px — a planned block is never thinner than one text line
 
 type HabitScheduleKind = 'weekly' | 'daily';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function WeekView({ state, config, onCommand, singleDay = false }: WeekViewProps) {
+  // Width of the per-day reality rail (left edge of each column). Wider in
+  // the day view, where it also carries a minutes label.
+  const railPx = singleDay ? 40 : 7;
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows
   // the same 24-hour grid.
@@ -308,6 +308,23 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     if (b) void saveBoard(b);
   };
 
+  // Plan vs reality — change which task a recorded span counts toward.
+  const retagRealitySegment = (segId: string, taskId: string | null) => {
+    const st = useBoardStore.getState();
+    const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
+    if (!pomo) return;
+    const task = taskId ? st.board?.nodes.find((n) => n.id === taskId) : undefined;
+    st.updateNode(pomo.id, {
+      state: pomoRetagSegment(pomo.state as PomoState, {
+        id: segId,
+        taskId,
+        ...(task ? { label: (task.state as TaskState).text } : {}),
+      }),
+    });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
+  };
+
   // 60-second tick for "now" — used to gray out past task blocks (PR #122).
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -339,17 +356,60 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         startMs: number; endMs: number;
       }>>();
       for (const seg of segs) {
-        const d = new Date(seg.startMs);
-        const ymd = toYMD(d);
-        const startMin = d.getHours() * 60 + d.getMinutes();
-        const endMin = Math.min(1440, startMin + Math.max(1, (seg.endMs - seg.startMs) / 60_000));
-        const arr = map.get(ymd) ?? [];
-        arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, startMin, endMin, live: seg.live, startMs: seg.startMs, endMs: seg.endMs });
-        map.set(ymd, arr);
+        // Split a span that crosses midnight into one piece per day.
+        let cursor = seg.startMs;
+        for (let guard = 0; guard < 14 && cursor < seg.endMs; guard++) {
+          const d = new Date(cursor);
+          const ymd = toYMD(d);
+          const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+          const pieceEnd = Math.min(seg.endMs, dayEnd);
+          const startMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+          const endMin = Math.min(1440, startMin + Math.max(1, (pieceEnd - cursor) / 60_000));
+          const arr = map.get(ymd) ?? [];
+          arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, startMin, endMin, live: seg.live, startMs: seg.startMs, endMs: seg.endMs });
+          map.set(ymd, arr);
+          cursor = pieceEnd;
+        }
       }
       return map;
     }),
   );
+
+  // Plan vs reality — tracked seconds per task (tagged pomo work spans), used
+  // to flag an overrun on the planned block.
+  const pomoNodeForTracked = useBoardStore(selectPomoNode);
+  const trackedByTask = useMemo(
+    () => trackedSecondsByTask(pomoOnlyBoard(pomoNodeForTracked), liveMs),
+    [pomoNodeForTracked, liveMs],
+  );
+
+  // Open root tasks a reality span can be retagged to.
+  const retagOptions = useBoardStore(
+    useShallow((s) =>
+      (s.board?.nodes ?? [])
+        .filter((n) => n.kind === 'todo.task' && (n.state as TaskState).parentTaskId === null)
+        .map((n) => `${n.id}\u0000${(n.state as TaskState).text}`),
+    ),
+  );
+
+  // #168/#172 — when a drop lands later than requested (the chain pushes a
+  // task after its predecessor), say so instead of silently moving it.
+  const [pushNotice, setPushNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pushNotice) return;
+    const id = setTimeout(() => setPushNotice(null), 4500);
+    return () => clearTimeout(id);
+  }, [pushNotice]);
+  const scheduleTask = (taskId: string, scheduledFor: string, scheduledDurationMin: number) => {
+    onCommand('calendar.schedule', { taskId, scheduledFor, scheduledDurationMin });
+    const board = useBoardStore.getState().board;
+    const placed = board ? selectSchedule(board).placements.get(taskId) : undefined;
+    if (placed && placed.startISO.slice(0, 16) !== scheduledFor.slice(0, 16)) {
+      const task = board?.nodes.find((n) => n.id === taskId);
+      const name = task ? (task.state as TaskState).text : 'Task';
+      setPushNotice(`“${name}” placed at ${placed.startISO.slice(11, 16)} — after the task before it in its chain`);
+    }
+  };
 
   // Popup shown when a task block is clicked (PR #122).
   const [taskPopup, setTaskPopup] = useState<{
@@ -643,11 +703,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         const safeMinute = Number.isFinite(minuteRaw) ? minuteRaw : 0;
         const snappedMinute = Math.max(0, Math.min(60 - gran, Math.floor(safeMinute / gran) * gran));
         const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:${String(snappedMinute).padStart(2, '0')}`;
-        onCommand('calendar.schedule', {
-          taskId: payload.taskId,
-          scheduledFor,
-          scheduledDurationMin: payload.durationMin,
-        });
+        scheduleTask(payload.taskId, scheduledFor, payload.durationMin);
         // 240ms acid flash.
         e.currentTarget.classList.add('calendar-cell--just-dropped');
         const el = e.currentTarget;
@@ -715,15 +771,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // Convert minutes-from-midnight to grid-row offsets (rowHeight per hour).
       const topPx = (effStartMin / 60) * rowHeight;
       const sliceLen = effLenMin;
-      const heightPx = Math.max(10, (sliceLen / 60) * rowHeight);
+      const heightPx = Math.max(MIN_BLOCK_PX, (sliceLen / 60) * rowHeight);
       // Resize handles only on a self-contained head block (no cross-midnight).
       const resizable = !isContinuation && !hasContinuation;
 
-      // Side-by-side layout: divide column width equally.
-      const { colIndex, colCount } = colLayout.get(task.id) ?? { colIndex: 0, colCount: 1 };
-      const colWidthPct = 100 / colCount;
-      const leftPct = colIndex * colWidthPct;
-      const rightPct = 100 - (colIndex + 1) * colWidthPct;
+      // Side-by-side layout inside the plan area (right of the reality rail):
+      // equal columns per overlap cluster, widened over free columns.
+      const { colIndex, colCount, span } = colLayout.get(task.id) ?? { colIndex: 0, colCount: 1, span: 1 };
+      const leftFrac = colIndex / colCount;
+      const rightFrac = (colCount - colIndex - span) / colCount;
 
       // Gray out if done OR if the WHOLE scheduled task has finished (not just
       // this slice — a multi-day task should not gray out the morning slice
@@ -734,9 +790,20 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // #171 — completed and overrun must read differently. Done tasks get a
       // ✓ badge (and the grey treatment); overrun = scheduled time elapsed but
       // never marked done, which stays greyed-only with no checkmark.
+      // Plan vs reality: done (✓), missed (planned time passed, still open)
+      // and overrun (more tracked than planned) each read differently.
       const isDone = task.done;
-      const isOverrun = isPast && !task.done;
-      const isGrayed = isDone || isOverrun;
+      const isMissed = isPast && !task.done;
+      const isGrayed = isDone;
+      const trackedMin = (trackedByTask.get(task.id) ?? 0) / 60;
+      const overrunMin = Math.round(trackedMin - task.plannedMin);
+      // Labels show the task's real start/end, not this day's slice edges
+      // (a 22:30–01:00 block must not read "22:30–00:00").
+      const taskStartDate = new Date(task.startISO);
+      const blockStartMin = draft
+        ? effStartMin
+        : taskStartDate.getHours() * 60 + taskStartDate.getMinutes();
+      const blockEndMin = blockStartMin + (draft ? effLenMin : task.scheduledDurationMin);
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         setTaskPopup(null);
@@ -799,11 +866,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         );
         const hour = Math.floor(snappedMin / 60);
         const minute = snappedMin % 60;
-        onCommand('calendar.schedule', {
-          taskId: payload.taskId,
-          scheduledFor: `${dayYMD}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-          scheduledDurationMin: payload.durationMin,
-        });
+        scheduleTask(
+          payload.taskId,
+          `${dayYMD}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+          payload.durationMin,
+        );
       };
 
       const handleBlockClick = (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -832,6 +899,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // Per-task tone — shared palette with Clock + Todo so users can link
       // the same task visually across surfaces.
       const taskTone = isGrayed ? 'var(--ink-4)' : toneVarForTask(task.id);
+      const compact = heightPx < 28;
 
       return (
         <div
@@ -842,15 +910,24 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           onDragOver={handleBlockDragOver}
           onDrop={handleDropOnBlock}
           onClick={handleBlockClick}
-          title={task.text + (isContinuation ? ' (continued from previous day)' : '')}
+          data-plan-state={isDone ? 'done' : isMissed ? 'missed' : 'planned'}
+          title={
+            `${task.text} · ${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)} · plan ${fmtDur(task.plannedMin)}` +
+            (trackedMin > 0 ? ` · tracked ${fmtDur(trackedMin)}` : '') +
+            (isMissed ? ' · missed' : '') +
+            (isContinuation ? ' (continued from previous day)' : '')
+          }
           style={{
             position: 'absolute',
             top: topPx,
-            left: `calc(${leftPct}% + 2px)`,
-            right: `calc(${rightPct}% + 2px)`,
+            left: `calc(${railPx}px + (100% - ${railPx}px) * ${leftFrac} + 1px)`,
+            right: `calc((100% - ${railPx}px) * ${rightFrac} + 2px)`,
             height: heightPx,
-            background: isGrayed ? 'var(--paper-3)' : 'color-mix(in srgb, ' + taskTone + ' 18%, transparent)',
-            border: `1px solid ${isGrayed ? 'var(--ink-4)' : taskTone}`,
+            background: isGrayed
+              ? 'var(--paper-3)'
+              : `color-mix(in srgb, ${taskTone} ${isMissed ? 8 : 16}%, var(--paper))`,
+            border: `1px ${isMissed ? 'dashed' : 'solid'} color-mix(in srgb, ${isGrayed ? 'var(--ink-4)' : taskTone} 70%, transparent)`,
+            borderLeft: `3px solid ${isGrayed ? 'var(--ink-4)' : taskTone}`,
             borderTopLeftRadius,
             borderTopRightRadius,
             borderBottomLeftRadius,
@@ -858,8 +935,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             cursor: isContinuation ? 'pointer' : 'grab',
             overflow: 'hidden',
             zIndex: 2,
-            padding: '1px 3px',
-            opacity: isGrayed ? 0.5 : 1,
+            padding: compact ? '0 4px' : '2px 5px',
+            opacity: isGrayed ? 0.55 : isMissed ? 0.8 : 1,
+            boxShadow: '0 1px 0 rgba(0,0,0,0.25)',
+            display: 'flex',
+            flexDirection: compact ? 'row' : 'column',
+            alignItems: compact ? 'center' : 'stretch',
+            gap: compact ? 5 : 1,
           }}
         >
           {/* Continuation arrows — ↑ on continuation slices, ↓ on slices that
@@ -966,23 +1048,54 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               })()}
             </>
           )}
-          {heightPx >= 12 && (
+          {/* Label: title + time range. Compact (short) blocks put the start
+              time in front of the title on one line so even a 20-minute task
+              in a crowded hour stays readable. */}
+          {compact && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-3)', flexShrink: 0, pointerEvents: 'none', position: 'relative', zIndex: 1, paddingLeft: isContinuation ? 10 : 0 }}>
+              {fmtMinOfDay(blockStartMin)}
+            </span>
+          )}
+          <span
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: compact ? 10 : 11,
+              fontWeight: 600,
+              color: isGrayed ? 'var(--ink-3)' : 'var(--ink)',
+              textDecorationLine: isDone ? 'line-through' : 'none',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+              minWidth: 0,
+              paddingLeft: !compact && isContinuation ? 10 : 0,
+              paddingRight: isDone || overrunMin > 0 ? 14 : 0,
+              pointerEvents: 'none',
+              position: 'relative',
+              zIndex: 1,
+              lineHeight: 1.25,
+            }}
+          >
+            {task.text}
+          </span>
+          {!compact && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
+              {fmtMinOfDay(blockStartMin)}–{fmtMinOfDay(blockEndMin)}
+              {isMissed ? ' · missed' : ''}
+              {trackedMin > 0 && !isMissed ? ` · ${fmtDur(trackedMin)} tracked` : ''}
+            </span>
+          )}
+          {/* Overrun: more time tracked than planned. */}
+          {overrunMin > 0 && !isContinuation && (
             <span
+              data-testid={`task-overrun-${task.id}`}
               style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                color: 'var(--ink-2)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: 'block',
-                paddingLeft: isContinuation ? 10 : 0,
-                pointerEvents: 'none',
-                position: 'relative',
-                zIndex: 1,
+                position: 'absolute', top: 2, right: isDone ? 14 : 3,
+                fontFamily: 'var(--font-mono)', fontSize: 8.5, fontWeight: 700,
+                color: 'var(--rust)', pointerEvents: 'none', zIndex: 1,
               }}
             >
-              {task.text}
+              +{fmtDur(overrunMin)}
             </span>
           )}
           {/* #7 — resize handles: drag the top edge to move the start, the
@@ -1006,57 +1119,64 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     });
   }
 
-  // ── Tracked-reality block renderer (#180) ───────────────────────────────────
-  // #180 dual visualization: the Pomodoro is an OBSERVER. Its tracked work/break
-  // segments render as an ambient BACKGROUND WASH spanning the full column,
-  // sitting BEHIND event blocks (low z-index, no hard border). Events — the
-  // PLAN — are bordered foreground blocks that overlap on top. This makes "what
-  // actually happened" (wash) and "what I planned" (block) co-readable even when
-  // they cover the same time. Work = warm rust tint; break = neutral striped.
+  // ── Tracked-reality rail (plan vs reality) ─────────────────────────────────
+  // Reality gets its own rail on the left edge of each day column instead of a
+  // full-width wash behind the plan (which was hard to tell apart from the
+  // planned blocks). Work = solid, coloured by the task it is tagged with
+  // (acid when untagged); break = hatched; a pause is a visible gap. Clicking a
+  // span opens its info popup (times, retag, delete).
   function renderRealityBlocks(dayYMD: string) {
     const segs = realityByDay.get(dayYMD);
     if (!segs || segs.length === 0) return null;
-    return segs.map((seg) => {
+    return segs.map((seg, i) => {
       const topPx = (seg.startMin / 60) * rowHeight;
       const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
-      // Reality wash uses a single ambient palette (NOT per-task colour — the
-      // pomo has no task). Work = rust wash, break = neutral ink stripes.
-      const tone = isWork ? 'var(--rust)' : 'var(--ink-3)';
-      const liveGlow = seg.live ? 0.22 : 0.14;
+      const tone = isWork ? (seg.taskId ? toneVarForTask(seg.taskId) : 'var(--acid)') : 'var(--ink-3)';
+      const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
+      const showLabel = singleDay && heightPx >= 14;
       return (
         <div
-          key={`reality-${seg.id}`}
+          key={`reality-${seg.id}-${i}`}
           data-testid="calendar-reality-block"
           data-reality-kind={seg.kind}
           data-reality-live={seg.live ? 'true' : undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+            setRealityPopup({ seg, x: e.clientX, y: e.clientY });
+          }}
           title={
             seg.live
               ? `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)} → now (recording)`
-              : `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)} (tracked reality)`
+              : `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)} · ${minutes}m`
           }
           style={{
             position: 'absolute',
             top: topPx,
-            // Full-column ambient wash — spans edge to edge, behind events.
-            left: 0,
-            right: 0,
+            left: 1,
+            width: railPx - 2,
             height: heightPx,
-            background: isWork
-              ? `color-mix(in srgb, ${tone} ${seg.live ? 22 : 14}%, transparent)`
-              : 'transparent',
+            background: isWork ? `color-mix(in srgb, ${tone} ${seg.live ? 95 : 80}%, transparent)` : 'transparent',
             backgroundImage: isWork
               ? undefined
-              : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 30%, transparent) 0 2px, transparent 2px 7px)`,
-            // No hard border — a soft left accent rail marks the segment edge so
-            // the wash reads as "ambient happened-time", distinct from a block.
-            borderLeft: `2px solid color-mix(in srgb, ${tone} ${seg.live ? 70 : 45}%, transparent)`,
-            // Behind event blocks (zIndex 2) and habits, above the grid.
-            zIndex: 0,
-            boxShadow: seg.live ? `inset 0 0 12px color-mix(in srgb, ${tone} ${liveGlow * 100}%, transparent)` : undefined,
-            pointerEvents: 'none',
+              : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 55%, transparent) 0 2px, transparent 2px 6px)`,
+            border: isWork ? 'none' : `1px solid color-mix(in srgb, ${tone} 50%, transparent)`,
+            borderRadius: 2,
+            zIndex: 3,
+            cursor: 'pointer',
+            boxShadow: seg.live ? `0 0 8px color-mix(in srgb, ${tone} 60%, transparent)` : undefined,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
           }}
-        />
+        >
+          {showLabel && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, fontWeight: 700, color: isWork ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)', paddingTop: 1, pointerEvents: 'none' }}>
+              {minutes}m
+            </span>
+          )}
+        </div>
       );
     });
   }
@@ -1097,14 +1217,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={{
             position: 'absolute',
             top: topPx,
-            left: 2,
+            // Plan layer, right of the reality rail. A tinted block with a
+            // coloured edge (like tasks) instead of a solid bright bar, so a
+            // habit no longer shouts over tasks and tracked time.
+            left: railPx + 1,
             right: 2,
             height: blockHeight,
-            background: `var(--${habit.color})`,
-            // Bumped from 0.7 → 0.9 so the dark text on bright fill
-            // doesn't get washed out by alpha. Contrast was the user's
-            // explicit complaint; opacity was making it worse.
-            opacity: 0.9,
+            background: `color-mix(in srgb, var(--${habit.color}) 22%, var(--paper))`,
+            borderLeft: `3px solid var(--${habit.color})`,
             borderRadius: 2,
             overflow: 'hidden',
             zIndex: 1,
@@ -1123,7 +1243,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 lineHeight: 1,
                 flexShrink: 0,
                 // Theme-locked dark — see tokens.css --ink-on-bright.
-                color: 'var(--ink-on-bright)',
+                color: 'var(--ink)',
               }}
             >
               {habit.icon}
@@ -1138,7 +1258,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               // never light text on a bright accent bg. Habit colors are
               // all bright/tinted, so the label is locked to dark in
               // every theme.
-              color: 'var(--ink-on-bright)',
+              color: 'var(--ink)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -1895,6 +2015,24 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         document.body,
       )}
 
+      {/* #168/#172 — tell the user when a drop was pushed later by its chain. */}
+      {pushNotice && createPortal(
+        <div
+          role="status"
+          data-testid="calendar-push-notice"
+          onClick={() => setPushNotice(null)}
+          style={{
+            position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)', zIndex: 2100,
+            background: 'var(--paper)', border: '1px solid var(--acid)', borderRadius: 6,
+            padding: '8px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)',
+            boxShadow: 'var(--shadow-1)', cursor: 'pointer', maxWidth: 520,
+          }}
+        >
+          {pushNotice}
+        </div>,
+        document.body,
+      )}
+
       {/* #6 — tracked-reality (pomo) segment info popup. */}
       {realityPopup && createPortal(
         <>
@@ -1948,6 +2086,29 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               {realityPopup.seg.live ? 'So far · ' : 'Duration · '}
               {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
             </div>
+            {/* Plan vs reality — which task this time counts toward. Only work
+                spans carry a tag; the live span is retagged from the Pomo. */}
+            {realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Counts toward
+                <select
+                  data-testid="calendar-reality-retag"
+                  value={realityPopup.seg.taskId ?? ''}
+                  onChange={(e) => {
+                    const taskId = e.target.value === '' ? null : e.target.value;
+                    retagRealitySegment(realityPopup.seg.id, taskId);
+                    setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } });
+                  }}
+                  style={{ flex: 1, minWidth: 0, background: 'var(--paper-2)', color: 'var(--ink)', border: '1px solid var(--paper-3)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 4px', textTransform: 'none' }}
+                >
+                  <option value="">untagged</option>
+                  {retagOptions.map((pair) => {
+                    const [id, text] = pair.split('\u0000') as [string, string];
+                    return <option key={id} value={id}>{text}</option>;
+                  })}
+                </select>
+              </label>
+            )}
             {/* #12 — delete a recorded segment (removes it from analytics too).
                 The live in-flight span can't be deleted; stop it first. */}
             {!realityPopup.seg.live && (

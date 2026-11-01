@@ -187,8 +187,8 @@ describe('ClockNode — focus vs event tasks pre-drawing (Issue #166)', () => {
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    // 1 event task renders as 3 paths (1 background, 2 outlines)
-    expect(getAllArcPaths()).toHaveLength(3);
+    // 1 event task renders as one solid plan arc in its lane
+    expect(getAllArcPaths()).toHaveLength(1);
     
     // No break overlays
     expect(getBreakArcs()).toHaveLength(0);

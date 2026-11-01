@@ -231,10 +231,11 @@ describe('Anchored chain renders task arcs', () => {
 
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
 
-    expect(getTaskArcPaths()).toHaveLength(9);
+    // One solid plan arc per task.
+    expect(getTaskArcPaths()).toHaveLength(3);
   });
 
-  it('task arcs use strokeWidth 12 for non-active background fill (Issue #166)', () => {
+  it('plan arcs are solid lane-width strokes, not hairline outlines', () => {
     const todoId = 'todo-sw';
     const t1 = makeTaskNode(
       't-sw-1',
@@ -248,11 +249,7 @@ describe('Anchored chain renders task arcs', () => {
     const arcs = getTaskArcPaths();
     expect(arcs.length).toBeGreaterThanOrEqual(1);
     
-    // Find background fill path (strokeWidth 5) and outline paths (strokeWidth 1)
-    const hasSw5 = arcs.some((a) => a.getAttribute('stroke-width') === '5');
-    const hasSw1 = arcs.some((a) => a.getAttribute('stroke-width') === '1');
-    expect(hasSw5).toBe(true);
-    expect(hasSw1).toBe(true);
+    for (const a of arcs) expect(a.getAttribute('stroke-width')).toBe('7');
   });
 
   it('chain with no anchor renders no task arcs', () => {
@@ -270,7 +267,7 @@ describe('Anchored chain renders task arcs', () => {
 // ── Past / active task display ────────────────────────────────────────────────
 
 describe('Task arcs reflect past / future state', () => {
-  it('past tasks (end < nowFloat) have opacity 0.4 or 0.06 (Issue #166)', () => {
+  it('past tasks (end < nowFloat) are dimmed', () => {
     // Pin wall-clock to midday so a 01:00–02:00 task is reliably in the past.
     // ClockNode derives nowFloat from new Date(); without this the test failed
     // when run between 00:00 and 02:00 (the 01:00 task was still in the future).
@@ -290,10 +287,9 @@ describe('Task arcs reflect past / future state', () => {
       const arcs = getTaskArcPaths();
     expect(arcs.length).toBeGreaterThan(0);
     
-      // The arc's opacity should be 0.4 (outlines) or 0.06 (fill)
+      // Ended plan arcs fade to 40% of the normal 0.7.
       const opacities = arcs.map((a) => parseFloat(a.getAttribute('opacity') ?? '1'));
-      expect(opacities).toContain(0.4);
-      expect(opacities).toContain(0.06);
+      for (const o of opacities) expect(o).toBeCloseTo(0.28, 5);
     } finally {
       vi.useRealTimers();
     }
