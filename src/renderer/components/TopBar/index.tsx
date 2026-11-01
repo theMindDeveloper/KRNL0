@@ -187,6 +187,7 @@ export function TopBar() {
         {/* Live badge */}
         <span
           data-testid="topbar-live-badge"
+          className="krnl-live-badge"
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 10,
