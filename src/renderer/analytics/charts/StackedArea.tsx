@@ -20,7 +20,7 @@ export function StackedArea({ data, width = 480, height = 140 }: StackedAreaProp
   if (data.length === 0) {
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <text x={width / 2} y={height / 2} fontSize={10} textAnchor="middle" fill="#7d848b" fontFamily="var(--font-mono)">
+        <text x={width / 2} y={height / 2} fontSize={10} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
           no data
         </text>
       </svg>
@@ -123,7 +123,7 @@ export function StackedArea({ data, width = 480, height = 140 }: StackedAreaProp
         {seriesDefs.map((sd, i) => (
           <g key={sd.key} transform={`translate(${-i * 64}, 0)`}>
             <rect x={-58} y={0} width={6} height={6} fill={sd.color} fillOpacity={0.8} />
-            <text x={-48} y={6} fontSize={8} fill="#c8cdd3" fontFamily="var(--font-mono)" textAnchor="start">
+            <text x={-48} y={6} fontSize={8} fill="var(--k-an-ink-2, #c8cdd3)" fontFamily="var(--font-mono)" textAnchor="start">
               {sd.label}
             </text>
           </g>

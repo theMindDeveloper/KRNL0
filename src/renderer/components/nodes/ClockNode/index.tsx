@@ -23,6 +23,8 @@ export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 
 // Shared palette across Clock, Calendar, Todo. See src/renderer/utils/taskColor.ts.
 import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
+import { useFrameTheme } from '../../../themes/useFrameTheme';
+import { ClockBezel } from './ClockBezel';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -159,6 +161,27 @@ function habitOnDow(schedule: HabitSchedule, isoDow: IsoDow): boolean {
   }
 }
 
+/**
+ * Hour/minute hand, drawn pointing along +x (the parent <g> rotates it).
+ * 'line' is the original Classic hand; 'sword' and 'block' are frame-style
+ * variants (ADR 0009 F6). Same length and pivot in every style.
+ */
+function Hand({ kind, back, len, width }: { kind: 'line' | 'sword' | 'block'; back: number; len: number; width: number }) {
+  const color = 'var(--k-clock-hand, var(--ink))';
+  if (kind === 'sword') {
+    const w = width * 1.4;
+    return <path d={`M ${CX - back} ${CY} L ${CX} ${CY - w} L ${CX + len} ${CY} L ${CX} ${CY + w} Z`} fill={color} />;
+  }
+  return (
+    <line
+      x1={CX - back} y1={CY} x2={CX + len} y2={CY}
+      stroke={color}
+      strokeWidth={kind === 'block' ? width * 2 : width}
+      strokeLinecap={kind === 'block' ? 'butt' : 'round'}
+    />
+  );
+}
+
 export function ClockNode({
   node,
   onCommand,
@@ -175,6 +198,8 @@ export function ClockNode({
   // filtering. Defaults to today; the day-selector UI below lets the user
   // page through other days without touching the wall-clock hands.
   const { viewWindow, selectedDate } = node.state;
+  // ADR 0009 F6 — the frame style only restyles the dial; every feature stays.
+  const clockSkin = useFrameTheme().manifest.components.clock;
 
   // PERF (Wave C+): the previous 1-second setInterval re-rendered this
   // entire SVG (60 ticks + 12 numerals + arcs + 3 hands + meridiem + task
@@ -472,7 +497,7 @@ export function ClockNode({
         }}
       >
         {/* Header */}
-        <div
+        <div className="krnl-node-header"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -668,6 +693,9 @@ export function ClockNode({
             })()}
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
           >
+            {/* Frame-style bezel (ADR 0009) — under everything, Classic draws none. */}
+            <ClockBezel kind={clockSkin.bezel} outerR={trackOuterEdge} />
+
             <defs>
               <pattern id="clock-break-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                 <rect width="1.2" height="4" fill="var(--ink-3)" />
@@ -704,7 +732,7 @@ export function ClockNode({
                     key={`track-${lane}`}
                     cx={CX} cy={CY} r={radiusForLane(lane)}
                     fill="none"
-                    stroke="var(--paper-3)"
+                    stroke="var(--k-clock-track, var(--paper-3))"
                     strokeWidth={stroke}
                     // Faint guide only — empty lanes were heavy grey rings.
                     opacity={0.18}
@@ -779,7 +807,7 @@ export function ClockNode({
                         data-break-kind={seg.kind}
                         d={arcPath(segCursor, segEnd, r)}
                         fill="none"
-                        stroke="var(--paper-3)"
+                        stroke="var(--k-clock-track, var(--paper-3))"
                         strokeWidth={breakStroke}
                         strokeLinecap="butt"
                         opacity={opacity}
@@ -825,7 +853,7 @@ export function ClockNode({
                   <line
                     x1={pIn.x} y1={pIn.y}
                     x2={pOut.x} y2={pOut.y}
-                    stroke="#fff5ec"
+                    stroke="var(--k-pointer-core, #fff5ec)"
                     strokeWidth={0.8}
                     strokeLinecap="round"
                     opacity={0.9}
@@ -833,7 +861,7 @@ export function ClockNode({
                   <circle
                     cx={pDot.x} cy={pDot.y} r={3}
                     fill="var(--rust)"
-                    stroke="#fff5ec"
+                    stroke="var(--k-pointer-core, #fff5ec)"
                     strokeWidth={0.8}
                     style={{
                       animation: 'clock-now-pulse 2s ease-in-out infinite',
@@ -848,8 +876,8 @@ export function ClockNode({
             {/* Inner face */}
             <circle
               cx={CX} cy={CY} r={R_FACE}
-              fill="var(--node-bg)"
-              stroke="var(--paper-3)"
+              fill="var(--k-clock-face, var(--node-bg))"
+              stroke="var(--k-clock-face-edge, var(--paper-3))"
               strokeWidth={1}
             />
 
@@ -901,7 +929,7 @@ export function ClockNode({
                   y1={CY + r1 * Math.sin(a)}
                   x2={CX + R_TICK_OUT * Math.cos(a)}
                   y2={CY + R_TICK_OUT * Math.sin(a)}
-                  stroke={isHour ? 'var(--ink-2)' : 'var(--ink-3)'}
+                  stroke={isHour ? 'var(--k-clock-tick-major, var(--ink-2))' : 'var(--k-clock-tick-minor, var(--ink-3))'}
                   strokeWidth={isHour ? 1.5 : 0.8}
                 />
               );
@@ -917,10 +945,10 @@ export function ClockNode({
                   y={p.y}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fontFamily="var(--font-mono)"
+                  fontFamily="var(--k-clock-font, var(--font-mono))"
                   fontSize={11}
                   fontWeight={n === 12 ? 700 : 600}
-                  fill={n === 12 ? 'var(--rust)' : 'var(--ink-2)'}
+                  fill={n === 12 ? 'var(--rust)' : 'var(--k-clock-num, var(--ink-2))'}
                   letterSpacing="0.02em"
                 >
                   {n}
@@ -933,15 +961,24 @@ export function ClockNode({
                 minute / second hands. Previously rendered as an HTML
                 overlay sibling of the SVG, which floated above
                 everything and crossed the minute hand. */}
+            {clockSkin.readoutWindow && (
+              <rect
+                data-testid="clock-readout-window"
+                x={CX - 19} y={CY - 34} width={38} height={12} rx={2}
+                fill="var(--k-clock-face, var(--node-bg))"
+                stroke="var(--k-clock-tick-minor, var(--paper-3))"
+                strokeWidth={0.8}
+              />
+            )}
             <text
               x={CX}
               y={CY - 28}
               textAnchor="middle"
               dominantBaseline="central"
-              fontFamily="var(--font-mono)"
+              fontFamily="var(--k-clock-font, var(--font-mono))"
               fontSize={8}
               letterSpacing="1.4"
-              fill="var(--ink-4)"
+              fill="var(--k-clock-readout, var(--ink-4))"
               style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
             >
               {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
@@ -949,22 +986,12 @@ export function ClockNode({
 
             {/* Hour hand */}
             <g transform={`rotate(${hourAng - 90} ${CX} ${CY})`}>
-              <line
-                x1={CX - 8} y1={CY} x2={CX + 38} y2={CY}
-                stroke="var(--ink)"
-                strokeWidth={3.2}
-                strokeLinecap="round"
-              />
+              <Hand kind={clockSkin.hand} back={8} len={38} width={3.2} />
             </g>
 
             {/* Minute hand */}
             <g transform={`rotate(${minAng - 90} ${CX} ${CY})`}>
-              <line
-                x1={CX - 10} y1={CY} x2={CX + 56} y2={CY}
-                stroke="var(--ink)"
-                strokeWidth={2}
-                strokeLinecap="round"
-              />
+              <Hand kind={clockSkin.hand} back={10} len={56} width={2} />
             </g>
 
             {/* Second hand — CSS keyframe sweep (60s linear infinite).
@@ -989,7 +1016,7 @@ export function ClockNode({
             </g>
 
             {/* Hub */}
-            <circle cx={CX} cy={CY} r={5} fill="var(--ink)" />
+            <circle cx={CX} cy={CY} r={5} fill="var(--k-clock-hand, var(--ink))" />
             <circle cx={CX} cy={CY} r={1.6} fill="var(--acid)" />
           </svg>
 
@@ -1207,7 +1234,7 @@ export function ClockNode({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: realityPopup.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)' }} />
               <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}</span>
-              {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid)' }}>◆ LIVE</span>}
+              {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>◆ LIVE</span>}
             </div>
             <div style={{ color: 'var(--ink-3)', fontSize: 10, marginBottom: 10, letterSpacing: '0.04em' }}>
               {fmtClockHM(realityPopup.seg.startMs)} {realityPopup.seg.live ? '→ now' : `– ${fmtClockHM(realityPopup.seg.endMs)}`}

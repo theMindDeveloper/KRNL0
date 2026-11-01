@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
+import { TIMER_FACES } from './types';
 import { defaultPomoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL, MotherFrameStationContext } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
@@ -11,6 +12,9 @@ import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
 import { Vapor } from './variants/Vapor';
+import { Vu } from './variants/Vu';
+import { Outline } from './variants/Outline';
+import { useFrameTheme } from '../../../themes/useFrameTheme';
 
 const TICK_MS = 500;
 
@@ -253,10 +257,11 @@ export function PomoNode({
   // pick a default per theme: 'blocks' on light, 'vapor' on dark. The
   // user's explicit choice is preserved across theme toggles since we
   // only fall back when config.face is undefined.
-  const themeIsDark =
-    typeof document !== 'undefined' &&
-    document.documentElement.getAttribute('data-theme') === 'dark';
-  const defaultFace: TimerFace = themeIsDark ? 'vapor' : 'blocks';
+  // ADR 0009 F7 — a frame style may name its own default face; the user's
+  // explicit config.face still always wins.
+  const { mode: frameMode, manifest: frameManifest } = useFrameTheme();
+  const themeIsDark = frameMode === 'dark';
+  const defaultFace: TimerFace = frameManifest.components.pomo.face ?? (themeIsDark ? 'vapor' : 'blocks');
   const activeFace: TimerFace = config.face ?? defaultFace;
 
   const headerLeft = isTaskMode
@@ -335,7 +340,7 @@ export function PomoNode({
       `}</style>
 
       {/* Header — title + bullet + gear (A.1: gear is last flex child = right side) */}
-      <div
+      <div className="krnl-node-header"
         style={{
           padding: '7px 12px 6px',
           borderBottom: '1px solid var(--paper-2)',
@@ -357,7 +362,7 @@ export function PomoNode({
         <span
           data-testid="pomo-header-label"
           style={{
-            color: isTaskMode ? 'var(--acid)' : 'var(--ink-2)',
+            color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-2)',
             fontWeight: 500,
           }}
         >
@@ -441,8 +446,9 @@ export function PomoNode({
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {(['ascii', 'lcd', 'blocks', 'vapor'] as const).map((face) => {
-              const isActive = (config.face ?? defaultFace) === face;
+            {(['auto', ...TIMER_FACES] as const).map((face) => {
+              // 'auto' = no saved face: the frame style picks (ADR 0009 F7).
+              const isActive = face === 'auto' ? config.face === undefined : config.face === face;
               return (
                 <button
                   key={face}
@@ -536,6 +542,12 @@ export function PomoNode({
           )}
           {activeFace === 'vapor' && (
             <Vapor m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'vu' && (
+            <Vu m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'outline' && (
+            <Outline m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
           )}
 
           {/* Today's full-cycle counter — distinct visual from the session pips
@@ -678,7 +690,7 @@ export function PomoNode({
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
                 fontWeight: 700,
-                color: 'var(--acid)',
+                color: 'var(--acid-ink, var(--acid))',
                 textTransform: 'uppercase',
                 letterSpacing: '0.06em',
                 textAlign: 'center',
@@ -901,7 +913,7 @@ function CycleCounter({
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 8.5,
-              color: 'var(--acid)',
+              color: 'var(--acid-ink, var(--acid))',
               letterSpacing: '0.06em',
               marginLeft: 1,
             }}

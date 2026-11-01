@@ -19,13 +19,17 @@
   /* Ink — slightly deeper so type stays readable on the warmer paper. */
   --ink:      #1a1612;
   --ink-2:    #38302a;
-  --ink-3:    #6e6450;
-  --ink-4:    #998d72;
+  /* ink-3/4 darkened for WCAG AA on node-bg (ADR 0009 contrast pass). */
+  --ink-3:    #554b38;
+  --ink-4:    #5f5541;
 
   /* Signal — invariant across light/dark */
   --acid:       #c9f158;
   --acid-glow:  #d8ff6e;
   --acid-faint: rgba(201, 241, 88, 0.08);
+  /* Acid used as TEXT: bright acid is unreadable on paper, so light mode
+     gets a deep green. Dark mode maps straight back to --acid. */
+  --acid-ink:   #3f5c0a;
   --spine:     #5e7d1d;
   --spine-hot: #7ea22b;
   --rust:      #c8553d;
@@ -125,8 +129,9 @@
 
   --ink:   #f4efe2;
   --ink-2: #ddd6c6;
-  --ink-3: #968d7a;
-  --ink-4: #6a6253;
+  --ink-3: #b3aa94;
+  --ink-4: #8f8572;
+  --acid-ink: var(--acid);
 
   --spine:     #7ea22b;
   --spine-hot: #a8d244;
@@ -693,4 +698,58 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .habit-year-row {
   contain: layout style;
+}
+
+/* ── ADR 0009 look switch ─────────────────────────────────────────────
+   Light/dark and frame-style changes run inside a View Transition
+   (themes/transition.ts). The new look grows as a circle from the pointer
+   that asked for it; the old look stays put underneath. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+:root[data-look-switching]::view-transition-new(root) {
+  animation: krnl-look-reveal 560ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@keyframes krnl-look-reveal {
+  from { clip-path: circle(0 at var(--krnl-vt-x, 50%) var(--krnl-vt-y, 0)); }
+  to   { clip-path: circle(var(--krnl-vt-r, 150vmax) at var(--krnl-vt-x, 50%) var(--krnl-vt-y, 0)); }
+}
+
+/* Top-bar buttons: readable at rest, firmer on hover, a physical press. */
+.krnl-topbar-btn {
+  transition: color 160ms cubic-bezier(0.32, 0.72, 0, 1),
+              border-color 160ms cubic-bezier(0.32, 0.72, 0, 1),
+              background-color 160ms cubic-bezier(0.32, 0.72, 0, 1),
+              transform 120ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.krnl-topbar-btn:hover {
+  color: var(--ink) !important;
+  border-color: var(--ink-4) !important;
+  background: var(--paper-2) !important;
+}
+.krnl-topbar-btn:active,
+.krnl-panel-toggle:active {
+  transform: translateY(1px) scale(0.98);
+}
+.krnl-topbar-btn:focus-visible {
+  outline: 2px solid var(--rust);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .krnl-topbar-btn, .krnl-panel-toggle { transition: none; }
+  .krnl-topbar-btn:active, .krnl-panel-toggle:active { transform: none; }
+}
+
+/* "◆ live" breathes slowly; the floor stays readable (never under 0.75). */
+.krnl-live-badge {
+  animation: krnl-live-breathe 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes krnl-live-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.75; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .krnl-live-badge { animation: none; }
 }

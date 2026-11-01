@@ -6,12 +6,15 @@
  * Theme toggle writes data-theme on <html> and persists to localStorage.
  */
 
-import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useLayoutEffect } from 'react';
+import { createPortal, flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutModeToggle } from '../ui/LayoutModeToggle';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { isDarkOnly } from '../ChassisLayer/dockRegistry';
+import { StationToolbar } from '../Station/StationToolbar';
+import { MANIFESTS } from '../../themes/manifests';
+import { runLookTransition } from '../../themes/transition';
 import { HoldButton } from '../ui/HoldButton';
 import { useBoardStore } from '../../store/boardStore';
 
@@ -54,19 +57,26 @@ export function TopBar() {
   // Some dock skins declare themselves dark-only (see dockRegistry.theme).
   // Hide the theme toggle while one is selected and force the global theme
   // to dark for visual consistency.
+  //
+  // The user's choice (`theme`) is kept apart from what is shown: a dark-only
+  // style shows dark without overwriting the saved preference, so switching
+  // back to Classic restores light mode instead of leaving the user stuck.
   const darkOnly = isDarkOnly(dockStyle);
-  useEffect(() => {
-    if (darkOnly && theme !== 'dark') setTheme('dark');
-  }, [darkOnly, theme]);
+  const isStationLayout = useBoardStore((s) => s.board?.layoutMode === 'station');
+  const shownTheme: Theme = darkOnly ? 'dark' : theme;
 
-  // Sync theme to DOM on mount and whenever it changes.
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+  // Layout effect, so a style switch inside a View Transition paints the
+  // right mode in the same frame (see themes/transition.ts).
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute('data-theme', shownTheme);
+  }, [shownTheme]);
 
   const handleThemeToggle = () => {
     const next: Theme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
+    runLookTransition(() => {
+      applyTheme(next);
+      flushSync(() => setTheme(next));
+    });
   };
 
   const handleFit = () => {
@@ -177,10 +187,11 @@ export function TopBar() {
         {/* Live badge */}
         <span
           data-testid="topbar-live-badge"
+          className="krnl-live-badge"
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 10,
-            color: 'var(--acid)',
+            color: 'var(--acid-ink, var(--acid))',
             letterSpacing: '0.04em',
             userSelect: 'none',
           }}
@@ -188,6 +199,13 @@ export function TopBar() {
           ◆ live
         </span>
       </div>
+
+      {/* Centre: Station panel toggles when the frame style slots them here (ADR 0009 F9). */}
+      {isStationLayout && MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
+        <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <StationToolbar variant="inline" />
+        </div>
+      )}
 
       {/* Right: action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
@@ -314,6 +332,7 @@ function TopBarButton({ label, onClick, testId }: TopBarButtonProps) {
     <button
       type="button"
       data-testid={testId}
+      className="krnl-topbar-btn"
       onClick={onClick}
       style={{
         background: 'transparent',

@@ -39,6 +39,8 @@ import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { StationCell } from './StationCell';
 import { EmbeddedCanvasCell } from './EmbeddedCanvasCell';
 import { StationToolbar } from './StationToolbar';
+import { isStationHidden } from './stationVisibility';
+import { useFrameTheme } from '../../themes/useFrameTheme';
 import { SLOT_DEFAULTS } from './SlotResolver';
 import type { MotherNodeConfig, StationSlot } from '../../../shared/types';
 import type { Node } from '../../../shared/types/node';
@@ -83,17 +85,11 @@ const TOP_ROW_DEFS: ReadonlyArray<{
   { panelId: PANEL_IDS.colCal,   defaultSize: SLOT_DEFAULTS.columns['top-right-upper'], slot: 'top-right-upper' },
 ];
 
-// Terminal mother is default-hidden across every dock variant — users opt in
-// via the StationToolbar toggle. Other mothers stay default-visible.
-export function isStationHidden(node: Node | undefined): boolean {
-  if (!node) return true; // missing == hidden
-  const cfg = (node.config ?? {}) as MotherNodeConfig;
-  if (cfg.stationHidden !== undefined) return !!cfg.stationHidden;
-  if (node.kind === 'term') return true;
-  return false;
-}
+// isStationHidden moved to ./stationVisibility; re-exported for existing callers.
+export { isStationHidden } from './stationVisibility';
 
 export function StationLayout() {
+  const panelSlot = useFrameTheme().manifest.slots.panelToggles;
   const setLayoutGeometry = useBoardStore((s) => s.setLayoutGeometry);
   const storedGeometry = useBoardStore((s) => s.board?.layoutGeometry?.station);
   const board = useBoardStore((s) => s.board);
@@ -240,7 +236,8 @@ export function StationLayout() {
           zIndex: 1,
         }}
       >
-        <StationToolbar />
+        {/* ADR 0009 F9 — styles that slot the toggles elsewhere drop this row. */}
+        {panelSlot === 'row' && <StationToolbar />}
 
         {/* If everything is hidden, show a hint instead of an empty Group
             (RPL crashes on zero panels). */}

@@ -8,6 +8,8 @@ import { HEADER_LABEL, LIVE_BADGE_TEXT } from './constants';
 import { startTerminalSession } from './session';
 import { MotdBanner } from './MotdBanner';
 import pkg from '../../../../../package.json';
+import { useFrameTheme } from '../../../themes/useFrameTheme';
+import { xtermFor } from '../../../themes/applyFrameTheme';
 
 export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL }: NodeProps<TermState, TermConfig>) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,6 +19,14 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  // xterm colours come from the frame-style manifest and follow live switches (ADR 0009 F8).
+  const { style: frameStyle, mode: frameMode } = useFrameTheme();
+  const xtermColors = xtermFor(frameStyle, frameMode);
+  const xtermColorsRef = useRef(xtermColors);
+  xtermColorsRef.current = xtermColors;
+  useEffect(() => {
+    if (termRef.current && xtermColors) termRef.current.options.theme = { ...xtermColors };
+  }, [xtermColors]);
 
   const copySelection = () => {
     const sel = termRef.current?.getSelection() ?? '';
@@ -39,12 +49,12 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     const term = new Terminal({
       fontSize: node.config?.fontSize ?? 11.5,
       fontFamily: "'JetBrains Mono', monospace",
-      theme: {
+      theme: { ...(xtermColorsRef.current ?? {
         background: '#05040a',
         foreground: '#d4cfc0',
         cursor: '#c9f158',
         cursorAccent: '#0e0d0b',
-      },
+      }) },
       cursorBlink: true,
       scrollback: 5000,
       // No smoothScrollDuration — the animation feels heavy on macOS
@@ -190,14 +200,14 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       >
         {/* Header — .term-head */}
         <div
-          className="term-head"
+          className="term-head krnl-node-header"
           style={{
             background: 'var(--term-bg-2)',
             padding: '8px 12px',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            borderBottom: '1px solid #2a241c',
+            borderBottom: '1px solid var(--k-term-border, #2a241c)',
           }}
         >
           {/* Traffic lights — .lights */}

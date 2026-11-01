@@ -16,7 +16,10 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { DOCK_STYLES, DEFAULT_DOCK_STYLE, type DockStyle } from './dockRegistry';
+import { applyFrameTheme, currentMode } from '../../themes/applyFrameTheme';
+import { runLookTransition } from '../../themes/transition';
 
 export type { DockStyle } from './dockRegistry';
 export { DOCK_STYLES } from './dockRegistry';
@@ -31,11 +34,8 @@ function readStored(): DockStyle {
 
 function apply(style: DockStyle) {
   if (typeof document === 'undefined') return;
-  if (style === 'classic') {
-    document.documentElement.removeAttribute('data-dock');
-  } else {
-    document.documentElement.setAttribute('data-dock', style);
-  }
+  // Writes data-dock and the style's tokens on <html> (ADR 0009).
+  applyFrameTheme(style, currentMode());
 }
 
 let current: DockStyle = readStored();
@@ -44,12 +44,34 @@ const subscribers = new Set<(s: DockStyle) => void>();
 function setCurrent(next: DockStyle) {
   if (next === current) return;
   current = next;
-  apply(next);
   try { localStorage.setItem(STORAGE_KEY, next); } catch { /* ignore */ }
-  subscribers.forEach((fn) => fn(next));
+  // Tokens and every subscriber's re-render land inside one View Transition
+  // frame, so the new style is revealed whole instead of half-repainted.
+  runLookTransition(() => {
+    apply(next);
+    flushSync(() => subscribers.forEach((fn) => fn(next)));
+  });
 }
 
 apply(current);
+
+// Light/dark is a separate axis owned by TopBar; re-apply the style's tokens
+// for the new mode whenever data-theme changes.
+if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+  new MutationObserver(() => apply(current)).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+}
+
+/** Imperative access for the sys CLI bridge (useCliDispatch). */
+export function getDockStyle(): DockStyle {
+  return current;
+}
+
+export function setDockStyle(next: DockStyle): void {
+  setCurrent(next);
+}
 
 export function useDockStyle(): [DockStyle, (s: DockStyle) => void] {
   const [style, setLocal] = useState<DockStyle>(current);

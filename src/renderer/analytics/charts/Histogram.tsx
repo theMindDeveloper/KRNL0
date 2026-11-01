@@ -56,7 +56,7 @@ export function Histogram({
   if (buckets.length === 0) {
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <text x={width / 2} y={height / 2} fontSize={10} textAnchor="middle" fill="#7d848b" fontFamily="var(--font-mono)">
+        <text x={width / 2} y={height / 2} fontSize={10} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
           no data
         </text>
       </svg>
@@ -109,7 +109,7 @@ export function Histogram({
                 y={y - 3}
                 fontSize={7.5}
                 textAnchor="middle"
-                fill="#c8cdd3"
+                fill="var(--k-an-ink-2, #c8cdd3)"
                 fontFamily="var(--font-mono)"
               >
                 {count}

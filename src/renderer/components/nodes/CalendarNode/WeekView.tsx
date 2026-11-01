@@ -1092,7 +1092,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 top: 1,
                 left: 2,
                 fontSize: 9,
-                color: 'var(--acid)',
+                color: 'var(--acid-ink, var(--acid))',
                 fontFamily: 'var(--font-mono)',
                 lineHeight: 1,
                 pointerEvents: 'none',
@@ -1108,7 +1108,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 bottom: 1,
                 right: 2,
                 fontSize: 9,
-                color: 'var(--acid)',
+                color: 'var(--acid-ink, var(--acid))',
                 fontFamily: 'var(--font-mono)',
                 lineHeight: 1,
                 pointerEvents: 'none',
@@ -1129,7 +1129,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 right: 3,
                 fontSize: 9,
                 fontWeight: 700,
-                color: 'var(--acid)',
+                color: 'var(--acid-ink, var(--acid))',
                 fontFamily: 'var(--font-mono)',
                 lineHeight: 1,
                 pointerEvents: 'none',
@@ -1812,7 +1812,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 padding: '4px 0 3px',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 9,
-                color: isToday ? 'var(--acid)' : 'var(--ink-3)',
+                color: isToday ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
                 animation: isToday ? 'krnl-today-pulse 2s ease-in-out infinite' : undefined,
@@ -1941,7 +1941,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 key={i}
                 style={{
                   flex: 1,
-                  borderLeft: i > 0 ? '1px solid rgba(154, 145, 128, 0.25)' : undefined,
+                  borderLeft: i > 0 ? '1px solid var(--k-cal-grid, rgba(154, 145, 128, 0.25))' : undefined,
                 }}
               />
             ))}
@@ -1956,7 +1956,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 style={{
                   flex: 1,
                   position: 'relative',
-                  background: isToday ? 'rgba(201, 241, 88, 0.08)' : 'transparent',
+                  background: isToday ? 'var(--k-cal-today, rgba(201, 241, 88, 0.08))' : 'transparent',
                   // borderLeft moved to the absolute overlay above so lines
                   // span the full scroll content, not just clientHeight.
                 }}
@@ -1978,7 +1978,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                       style={{
                         height: rowHeight,
                         boxSizing: 'border-box',
-                        borderBottom: '1px solid rgba(154, 145, 128, 0.25)',
+                        borderBottom: '1px solid var(--k-cal-grid, rgba(154, 145, 128, 0.25))',
                         // #4 — faint half-hour gridline once the grid is zoomed
                         // enough to warrant it, so blocks read against a ruler.
                         backgroundImage:
@@ -2069,7 +2069,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             fontSize: 9,
             color: 'var(--ink-4)',
             letterSpacing: '0.08em',
-            opacity: 0.45,
+            opacity: 0.85,
             pointerEvents: 'none',
           }}
         >
@@ -2411,7 +2411,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 {realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}
               </span>
               {realityPopup.seg.live && (
-                <span style={{ fontSize: 8, color: 'var(--acid)', letterSpacing: '0.08em' }}>◆ LIVE</span>
+                <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em' }}>◆ LIVE</span>
               )}
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>tracked reality</span>
@@ -2423,7 +2423,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               <div style={{ flex: 1, height: 2, borderRadius: 1, background: 'var(--paper-3)' }} />
               {/* #3 — a live (in-flight) span reads "→ now" so it's obvious it's
                   still recording, not a fixed end time. */}
-              <span style={{ fontSize: 15, fontWeight: 700, color: realityPopup.seg.live ? 'var(--acid)' : 'var(--ink)', background: 'var(--paper-2)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: realityPopup.seg.live ? 'var(--acid-ink, var(--acid))' : 'var(--ink)', background: 'var(--paper-2)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
                 {realityPopup.seg.live ? 'now' : fmtHM(realityPopup.seg.endMs)}
               </span>
             </div>

@@ -57,7 +57,9 @@ export interface PomoState {
   pausedElapsedMs: number;
 }
 
-export type TimerFace = 'ascii' | 'lcd' | 'blocks' | 'vapor';
+/** Every Timer face. 'vu' and 'outline' added with the theme engine (ADR 0009). */
+export const TIMER_FACES = ['ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline'] as const;
+export type TimerFace = (typeof TIMER_FACES)[number];
 
 export interface PomoConfig {
   sessionMin: number;

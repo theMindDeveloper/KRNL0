@@ -397,7 +397,7 @@ export function HabitContextMenu({
                 background: 'var(--paper-2)',
                 border: '1px solid var(--acid)',
                 borderRadius: 3,
-                color: 'var(--acid)',
+                color: 'var(--acid-ink, var(--acid))',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 10,
                 cursor: 'pointer',

@@ -347,7 +347,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
       <div style={{ overflow: 'hidden', borderRadius: 6 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
-        <div
+        <div className="krnl-node-header"
           style={{
             padding: '7px 10px 6px',
             borderBottom: '1px solid var(--paper-3)',
@@ -519,7 +519,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   aria-label={item.done ? 'Mark undone' : 'Mark done'}
                 >
                   {item.done && (
-                    <span style={{ fontSize: 9, color: 'var(--acid)', fontWeight: 700, lineHeight: 1 }}>
+                    <span style={{ fontSize: 9, color: 'var(--acid-ink, var(--acid))', fontWeight: 700, lineHeight: 1 }}>
                       ✓
                     </span>
                   )}
@@ -626,7 +626,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                         <span style={{ opacity: 0.5 }}>·</span>
                         <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
                         <span style={{ opacity: 0.5 }}>·</span>
-                        <span style={{ color: 'var(--acid)' }}>{bd.effectiveMin}m</span>
+                        <span style={{ color: 'var(--acid-ink, var(--acid))' }}>{bd.effectiveMin}m</span>
                       </span>
                     );
                   })()

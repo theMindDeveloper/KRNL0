@@ -18,8 +18,8 @@
    ============================================================ */
 
 /* Classic MotherFrame badge + corners hidden under all dock variants. */
-[data-dock] .mother-frame__corners,
-[data-dock] .mother-frame__badge { display: none !important; }
+[data-dock]:not([data-dock="pro"]) .mother-frame__corners,
+[data-dock]:not([data-dock="pro"]) .mother-frame__badge { display: none !important; }
 
 /* Synth GRID knob toggle — hides both background dot layers when off. */
 html[data-grid="off"] .react-flow__background { display: none !important; }
@@ -78,25 +78,14 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
  *   4-5px           : dark inner groove
  *   5+              : content area (visible through transparent ::before) */
 [data-dock="krnl-dock"] .mother-frame {
+  /* Palette tokens live in the theme manifest (src/renderer/themes/manifests.ts). */
   border-radius: 0 !important;
   border: 0 !important;
   background: #1a1814 !important;
   box-shadow: 0 4px 14px rgba(0,0,0,0.6) !important;
   transition: none !important;
-  /* KRNL Dock mothers are permanently dark (rack interior look). In light
-   * mode the global --ink resolves to dark, which made body copy invisible
-   * (dark-on-dark). Force the ink scale local to each mother so children
-   * that read `var(--ink)` resolve to the light scale even on a light
-   * theme. The paper vars also flip so any var(--paper-...) lookup matches
-   * the dark surface. */
-  --paper:   #14130f;
-  --paper-2: #1f1d18;
-  --paper-3: #2f2b24;
-  --node-bg: #1c1a13;
-  --ink:     #f4efe2;
-  --ink-2:   #ddd6c6;
-  --ink-3:   #968d7a;
-  --ink-4:   #6a6253;
+  /* KRNL Dock is dark-only; its dark ink/paper scale comes from the manifest
+   * on <html>, so mothers and child nodes share it. */
   color: var(--ink);
 }
 [data-dock="krnl-dock"] .mother-frame:hover {
@@ -212,7 +201,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.22em;
-  color: rgba(212,207,192,0.55);
+  color: rgba(212,207,192, 0.79);
   text-transform: uppercase;
 }
 .md-synth-top .pwr {
@@ -245,7 +234,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 .md-synth-top .hp {
   font-family: var(--font-mono);
   font-size: 9.5px;
-  color: rgba(212,207,192,0.45);
+  color: rgba(212,207,192, 0.69);
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -299,7 +288,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 7.5px;
   letter-spacing: 0.22em;
-  color: rgba(212,207,192,0.5);
+  color: rgba(212,207,192, 0.74);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -346,7 +335,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 7px;
   letter-spacing: 0.16em;
-  color: rgba(212,207,192,0.45);
+  color: rgba(212,207,192, 0.69);
   width: 14px;
   text-align: right;
   margin-right: 4px;
@@ -411,12 +400,12 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 7px;
   letter-spacing: 0.18em;
-  color: rgba(212,207,192,0.55);
+  color: rgba(212,207,192, 0.79);
   text-transform: uppercase;
 }
 .md-synth-jacks .arrow {
   font-family: var(--font-mono);
-  color: rgba(201,241,88,0.6);
+  color: rgba(201,241,88, 0.84);
   font-size: 14px;
 }
 
@@ -454,7 +443,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 7.5px;
   letter-spacing: 0.18em;
-  color: rgba(212,207,192,0.45);
+  color: rgba(212,207,192, 0.69);
   text-align: right;
   text-transform: uppercase;
 }
@@ -463,7 +452,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   text-shadow: 0 0 4px rgba(201,241,88,0.4);
 }
 .md-synth-serial-link {
-  color: rgba(212,207,192,0.55);
+  color: rgba(212,207,192, 0.79);
   text-decoration: none;
   pointer-events: auto;
   transition: color 160ms;
@@ -609,7 +598,7 @@ html:not([data-theme="dark"]) .md-tel-gauge .track::before {
   background: linear-gradient(90deg, var(--rust) 0%, var(--spine) 60%, var(--spine) 100%);
   box-shadow: 0 0 4px rgba(94,125,29,0.4);
 }
-html:not([data-theme="dark"]) .md-tel-gauge .ticks { color: rgba(60,50,30,0.55); }
+html:not([data-theme="dark"]) .md-tel-gauge .ticks { color: rgba(60,50,30, 0.79); }
 html:not([data-theme="dark"]) .md-tel-bot {
   background: rgba(255, 250, 230, 0.92);
   border-color: rgba(94,125,29,0.25);
@@ -688,7 +677,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-cell .k {
   font-size: 7.5px;
   letter-spacing: 0.22em;
-  color: rgba(212,207,192,0.5);
+  color: rgba(212,207,192, 0.74);
   text-transform: uppercase;
   display: flex; gap: 6px;
 }
@@ -716,7 +705,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-cell .sub {
   font-size: 7.5px;
   letter-spacing: 0.2em;
-  color: rgba(212,207,192,0.42);
+  color: rgba(212,207,192, 0.66);
   margin-top: 4px;
   text-transform: uppercase;
 }
@@ -771,7 +760,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   display: flex;
   justify-content: space-between;
   font-size: 6.5px;
-  color: rgba(212,207,192,0.4);
+  color: rgba(212,207,192, 0.64);
   letter-spacing: 0.1em;
   margin-top: 2px;
   font-family: var(--font-mono);
@@ -825,7 +814,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-bay .id {
   font-size: 7px;
   letter-spacing: 0.18em;
-  color: rgba(212,207,192,0.5);
+  color: rgba(212,207,192, 0.74);
   text-transform: uppercase;
   padding-right: 12px;       /* keep pip from overlapping text */
   white-space: nowrap;
@@ -877,7 +866,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   text-overflow: ellipsis;
 }
 .md-tel-bay .bay-metric .bay-sub {
-  color: rgba(212,207,192,0.45);
+  color: rgba(212,207,192, 0.69);
   font-size: 7.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -929,7 +918,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-size: 9px;
   line-height: 1.25;
   letter-spacing: 0.04em;
-  color: rgba(212,207,192,0.5);
+  color: rgba(212,207,192, 0.74);
   gap: 1px;
 }
 .md-tel-log .row { line-height: 1.25; }
@@ -941,7 +930,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   margin-bottom: 2px;
 }
 .md-tel-log .row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.md-tel-log .row .ts { color: rgba(201,241,88,0.65); margin-right: 6px; }
+.md-tel-log .row .ts { color: rgba(201,241,88, 0.84); margin-right: 6px; }
 .md-tel-log .row .rust { color: var(--rust); }
 
 /* Side panel — horizontal layout. Wider, shallower so content sits in one
@@ -980,7 +969,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   align-items: center;
   gap: 6px;
   font-size: 7.5px;
-  color: rgba(212,207,192,0.55);
+  color: rgba(212,207,192, 0.79);
   letter-spacing: 0.06em;
   white-space: nowrap;
   min-width: 0;
@@ -1260,7 +1249,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   text-transform: uppercase;
   line-height: 1;
 }
-.dsp-tile.is-active .dsp-tile__sub { color: rgba(201,241,88,0.55); }
+.dsp-tile.is-active .dsp-tile__sub { color: rgba(201,241,88, 0.79); }
 
 .dsp-tile__check {
   position: absolute;
@@ -1308,7 +1297,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --dk-ch-2: #3a3d36;
   --dk-ch-3: #2f322c;
   --dk-phos: #b8d957;
-  --dk-phos-dim: #5a6b3a;
+  --dk-phos-dim: #7d9450; /* lifted for AA text contrast */
   --dk-phos-glow: #b8d95740;
   --dk-amber: #d9a23a;
   --dk-amber-dim: #6b4f1c;
@@ -1452,7 +1441,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-size: 8px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #8a8e82;
+  color: #a6aa9c;
   padding: 3px 8px 1px;
   background: linear-gradient(180deg, #2a2d27 0%, #1a1c18 100%);
   border-bottom: 1px solid #0a0c08;
@@ -1734,7 +1723,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 6px;
   letter-spacing: 0.16em;
-  color: rgba(138,142,130,0.55);
+  color: rgba(166,170,156,0.9);
   font-weight: 500;
 }
 
@@ -1827,7 +1816,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 6.5px;
   letter-spacing: 0.14em;
-  color: rgba(138,142,130,0.7);
+  color: rgba(166,170,156,0.88);
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -2080,7 +2069,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 5.5px;
   letter-spacing: 0.06em;
-  color: rgba(138,142,130,0.7);
+  color: rgba(166,170,156,0.88);
   font-weight: 600;
   text-transform: uppercase;
   max-width: 44px;
@@ -2145,7 +2134,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .dk-traffic span:nth-child(2) { background: #d9a23a; }
 .dk-traffic span:nth-child(3) { background: #5a9a3a; }
 .dk-term-title {
-  font-size: 9px; letter-spacing: 0.16em; color: #8a8e82;
+  font-size: 9px; letter-spacing: 0.16em; color: #a6aa9c;
   margin-left: 4px;
 }
 .dk-term-title .dk-dot { color: #3a3d36; margin: 0 4px; }
@@ -2293,12 +2282,12 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --bp-paper:   #f3ecda;
   --bp-paper-2: #e8ddc1;
   --bp-ink:     #1f2a3a;
-  --bp-ink-2:   rgba(31, 42, 58, 0.62);
-  --bp-ink-3:   rgba(31, 42, 58, 0.32);
-  --bp-line:    #5e7d1d;          /* spine — dimension callouts */
+  --bp-ink-2:   rgba(31, 42, 58, 0.80);
+  --bp-ink-3:   rgba(31, 42, 58, 0.62);
+  --bp-line:    #4d6918;          /* spine — dimension callouts */
   --bp-line-2:  rgba(94, 125, 29, 0.45);
   --bp-accent:  #c8553d;          /* rust — REV numbers, section marker */
-  --bp-warm:    #b8771e;          /* drafting-pencil amber — credit, clock val */
+  --bp-warm:    #8a5410;          /* drafting-pencil amber — credit, clock val */
   --bp-olive:   #3a5414;          /* deeper olive for dimension numerals */
   --bp-graphite:#5a6677;          /* graphite — secondary text */
   --bp-grid:    rgba(31, 42, 58, 0.08);
@@ -2353,8 +2342,8 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --bp-paper:   #0a1525;
   --bp-paper-2: #112038;
   --bp-ink:     #cfe7ff;
-  --bp-ink-2:   rgba(207, 231, 255, 0.62);
-  --bp-ink-3:   rgba(207, 231, 255, 0.30);
+  --bp-ink-2:   rgba(207, 231, 255, 0.78);
+  --bp-ink-3:   rgba(207, 231, 255, 0.58);
   --bp-line:    #7ec8e3;
   --bp-line-2:  rgba(126, 200, 227, 0.40);
   --bp-accent:  #e87a5f;   /* terracotta — REV column, section cut letters */
@@ -2376,27 +2365,9 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
  * Light: warm drafting paper, dark blue-grey ink, spine-green dimension
  * accents. Dark: deep navy paper, cyan ink, cyan accents. */
 [data-dock="blueprint"] .mother-frame {
+  /* Palette tokens live in the theme manifest (src/renderer/themes/manifests.ts). */
   /* Background + ink */
-  --paper:        #f0e6cc;
-  --paper-2:      #e2d6b6;
-  --paper-3:      #c8bb99;
-  --node-bg:      #f8eed4;
-  --ink:          #1f2a3a;
-  --ink-2:        rgba(31, 42, 58, 0.82);
-  --ink-3:        rgba(31, 42, 58, 0.55);
-  --ink-4:        rgba(31, 42, 58, 0.32);
-  --ink-on-bright:#0a1525;
   /* Accents — spine green replaces acid; rust kept for warnings */
-  --acid:         #5e7d1d;
-  --acid-glow:    #7ea22b;
-  --acid-faint:   rgba(94, 125, 29, 0.10);
-  --spine:        #5e7d1d;
-  --spine-hot:    #7ea22b;
-  --rust:         #c8553d;
-  --rust-deep:    #a83e2a;
-  --cyan:         #2f4012;
-  --frame-bg:     rgba(94, 125, 29, 0.05);
-  --frame-edge:   rgba(94, 125, 29, 0.42);
   /* Bezel */
   border-radius: 2px !important;
   border: 0 !important;
@@ -2408,25 +2379,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   background: var(--paper) !important;
 }
 [data-theme="dark"][data-dock="blueprint"] .mother-frame {
-  --paper:        #0c1a2e;
-  --paper-2:      #142441;
-  --paper-3:      #1e3358;
-  --node-bg:      #0e1c34;
-  --ink:          #d8eaff;
-  --ink-2:        rgba(216, 234, 255, 0.78);
-  --ink-3:        rgba(216, 234, 255, 0.50);
-  --ink-4:        rgba(216, 234, 255, 0.30);
-  --ink-on-bright:#0a1525;
-  --acid:         #7ec8e3;
-  --acid-glow:    #a8e0ff;
-  --acid-faint:   rgba(126, 200, 227, 0.12);
-  --spine:        #7ec8e3;
-  --spine-hot:    #a8e0ff;
-  --rust:         #e87a5f;
-  --rust-deep:    #c8553d;
-  --cyan:         #7ec8e3;
-  --frame-bg:     rgba(126, 200, 227, 0.05);
-  --frame-edge:   rgba(126, 200, 227, 0.40);
+  /* Palette tokens live in the theme manifest (src/renderer/themes/manifests.ts). */
   box-shadow:
     inset 0 0 0 1px rgba(126, 200, 227, 0.40),
     inset 0 0 0 2px rgba(0, 0, 0, 0.55),
@@ -2932,13 +2885,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   text-transform: uppercase;
   margin-top: 2px;
 }
-[data-theme="dark"] .md-mac-brand-meta .v { color: rgba(220, 210, 188, 0.65); }
+[data-theme="dark"] .md-mac-brand-meta .v { color: rgba(220, 210, 188, 0.84); }
 
 /* Smiling-Mac glyph on the CRT bezel — Susan Kare's classic ROM icon */
 .md-mac-smiley {
   position: absolute;
   left: 12px; bottom: 10px;
-  color: rgba(245, 220, 160, 0.62);
+  color: rgba(245, 220, 160, 0.84);
   opacity: 0.78;
   pointer-events: none;
   filter: drop-shadow(0 0 4px rgba(255, 220, 140, 0.25));
@@ -2987,13 +2940,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.18em;
-  color: rgba(220, 200, 160, 0.65);
+  color: rgba(220, 200, 160, 0.84);
   text-transform: lowercase;
 }
 .md-mac-floppy-eject {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: rgba(220, 200, 160, 0.4);
+  color: rgba(220, 200, 160, 0.64);
 }
 .md-mac-floppy-sub {
   font-family: var(--font-mono);
@@ -3215,28 +3168,9 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
  * colour accents. The original 128K display literally couldn't show
  * colour. Dark theme inverts: night-mode Mac with cream-on-black. */
 [data-dock="macintosh"] .mother-frame {
-  --paper:        #faf3df;
-  --paper-2:      #f0e6c8;
-  --paper-3:      #d8cdaa;
-  --node-bg:      #fffbe8;
-  --ink:          #050505;
-  --ink-2:        #1a1a1a;
-  --ink-3:        rgba(5, 5, 5, 0.55);
-  --ink-4:        rgba(5, 5, 5, 0.32);
-  --ink-on-bright:#050505;
+  /* Palette tokens live in the theme manifest (src/renderer/themes/manifests.ts). */
   /* Monochrome — every accent collapses to greyscale, true 1-bit feel.
    * Pomo "rust" stays distinguishable via a slightly warmer charcoal. */
-  --acid:         #050505;
-  --acid-glow:    #2a2a2a;
-  --acid-faint:   rgba(5, 5, 5, 0.10);
-  --spine:        #1f1f1f;
-  --spine-hot:    #050505;
-  --rust:         #2a1a14;
-  --rust-deep:    #050505;
-  --cyan:         #050505;
-  --plum:         #1f1f1f;
-  --frame-bg:     rgba(5, 5, 5, 0.04);
-  --frame-edge:   rgba(5, 5, 5, 0.55);
   border-radius: 3px !important;
   border: 0 !important;
   background: var(--paper) !important;
@@ -3247,26 +3181,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
     0 2px 0 rgba(0, 0, 0, 0.35) !important;
 }
 [data-theme="dark"][data-dock="macintosh"] .mother-frame {
-  --paper:        #14110c;
-  --paper-2:      #1f1b14;
-  --paper-3:      #2c261c;
-  --node-bg:      #0a0807;
-  --ink:          #f5efde;
-  --ink-2:        #d4cdb8;
-  --ink-3:        rgba(245, 239, 222, 0.55);
-  --ink-4:        rgba(245, 239, 222, 0.32);
-  --ink-on-bright:#0a0807;
-  --acid:         #f5efde;
-  --acid-glow:    #ffffff;
-  --acid-faint:   rgba(245, 239, 222, 0.10);
-  --spine:        #d4cdb8;
-  --spine-hot:    #f5efde;
-  --rust:         #e8d8b0;
-  --rust-deep:    #f5efde;
-  --cyan:         #f5efde;
-  --plum:         #d4cdb8;
-  --frame-bg:     rgba(245, 239, 222, 0.04);
-  --frame-edge:   rgba(245, 239, 222, 0.40);
+  /* Palette tokens live in the theme manifest (src/renderer/themes/manifests.ts). */
   box-shadow:
     inset 0 0 0 1px rgba(245, 239, 222, 0.55),
     inset 0 0 0 2px rgba(0, 0, 0, 0.65),
@@ -3292,7 +3207,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --sub-phos:     #8aff5a;
   --sub-red:      #ff6450;
   --sub-ink:      #d4c69e;
-  --sub-ink-dim:  rgba(212, 198, 158, 0.55);
+  --sub-ink-dim:  rgba(212, 198, 158, 0.74);
 
   background:
     repeating-linear-gradient(90deg,
@@ -3743,7 +3658,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   border-bottom: 1px solid rgba(138, 255, 90, 0.25);
   font-size: 6.5px;
   letter-spacing: 0.18em;
-  color: rgba(138, 255, 90, 0.55);
+  color: rgba(138, 255, 90, 0.79);
   text-transform: uppercase;
 }
 .md-sub-radar-row {
@@ -3769,7 +3684,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 .md-sub-radar-row.sev-err  .brg, .md-sub-radar-row.sev-err  .desc { color: var(--sub-red); text-shadow: 0 0 4px rgba(255,100,80,0.45); }
 .md-sub-radar-row.sev-warn .brg { color: var(--sub-needle); }
-.md-sub-radar-row.empty .desc { color: rgba(138, 255, 90, 0.4); font-style: italic; }
+.md-sub-radar-row.empty .desc { color: rgba(138, 255, 90, 0.64); font-style: italic; }
 
 /* ── 07 — Small/mini instruments (oxygen, pressure) ────────────────── */
 .md-sub-small-mod { justify-content: center; gap: 3px; }
@@ -4130,26 +4045,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
  * brass-yellow accents, and sonar-phosphor green for active states.
  * Dark-only by design. */
 [data-dock="submarine"] .mother-frame {
-  --paper:        #1a1410;
-  --paper-2:      #261c14;
-  --paper-3:      #38291c;
-  --node-bg:      #110a06;
-  --ink:          #d4c69e;
-  --ink-2:        rgba(212, 198, 158, 0.82);
-  --ink-3:        rgba(212, 198, 158, 0.55);
-  --ink-4:        rgba(212, 198, 158, 0.32);
-  --ink-on-bright:#1a1408;
-  --acid:         #f0b850;
-  --acid-glow:    #f0d090;
-  --acid-faint:   rgba(240, 184, 80, 0.12);
-  --spine:        #b88a3a;
-  --spine-hot:    #f0b850;
-  --rust:         #ff6450;
-  --rust-deep:    #c8553d;
-  --cyan:         #8aff5a;
-  --plum:         #e8d8a8;
-  --frame-bg:     rgba(184, 138, 58, 0.08);
-  --frame-edge:   rgba(232, 200, 118, 0.40);
+  /* Palette tokens live in the theme manifest (src/renderer/themes/manifests.ts). */
   border-radius: 4px !important;
   border: 0 !important;
   background: var(--paper) !important;
@@ -4183,4 +4079,245 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .station-splitter:focus,
 .station-splitter:focus-visible {
   outline: none;
+}
+
+
+/* ============================================================
+   PRO — matte graphite (ADR 0009). Chromeless like Classic: the
+   colours come from the Pro manifest tokens on <html>; this block
+   only adjusts the per-node bezel and the slot badge/corners.
+   ============================================================ */
+[data-dock="pro"] .mother-frame {
+  border-color: #070707 !important;
+}
+[data-dock="pro"] .mother-frame__badge {
+  background: #181818 !important;
+  border-color: #070707 !important;
+  border-radius: 3px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+[data-dock="pro"] .mother-frame__corners {
+  opacity: 0.45;
+}
+
+/* ============================================================
+   PANEL TOGGLES IN THE TOP BAR — per frame style (ADR 0009 F9).
+   The Station panel toggles render inside the TopBar for every
+   style; each style dresses them in its own hardware language.
+   ============================================================ */
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle { height: 26px; }
+
+/* Pro — segmented group of matte keys */
+[data-dock="pro"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  background: linear-gradient(180deg, #2e2e2e, #262626) !important;
+  border-color: #0a0a0a !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+/* Synthesizer — rubber keys with a lit LED bar */
+[data-dock="synthesizer"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  border-radius: 5px !important;
+  background: linear-gradient(180deg, #4a443a, #2a261e) !important;
+  border-color: #0e0c09 !important;
+  color: #d8d0bc !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #0e0c09;
+}
+[data-dock="synthesizer"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  box-shadow: inset 0 -3px 0 #c9f158, inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #0e0c09, 0 0 10px rgba(201, 241, 88, 0.25);
+}
+
+/* Telemetry — numbered bay switches in phosphor */
+[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  border-radius: 0 !important;
+  border: 1px solid rgba(201, 241, 88, 0.18) !important;
+  background: transparent !important;
+  color: #7f9452 !important;
+}
+[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  border-color: rgba(201, 241, 88, 0.55) !important;
+  background: rgba(201, 241, 88, 0.08) !important;
+  color: #c9f158 !important;
+  text-shadow: 0 0 6px rgba(201, 241, 88, 0.6);
+}
+/* Light paper: phosphor green is unreadable, so the toggles go deep olive. */
+html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  border-color: rgba(63, 92, 10, 0.3) !important;
+  color: #4a5e22 !important;
+}
+html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  border-color: rgba(63, 92, 10, 0.7) !important;
+  background: rgba(63, 92, 10, 0.12) !important;
+  color: #2f4012 !important;
+  text-shadow: none;
+}
+
+/* KRNL Dock — stencil labels, red rocker lamp when on */
+[data-dock="krnl-dock"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  font-family: 'Stardos Stencil', var(--font-mono) !important;
+  letter-spacing: 0.08em !important;
+  border-radius: 2px !important;
+  background: #141513 !important;
+  border: 1px solid #000 !important;
+  box-shadow: inset 0 0 0 1px #2a2d27;
+}
+[data-dock="krnl-dock"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  color: #f0ecdc !important;
+  box-shadow: inset 0 0 0 1px #2a2d27, inset 3px 0 0 #ff5a3c, 0 0 8px rgba(255, 90, 60, 0.35);
+}
+
+/* Blueprint — drawing checkboxes */
+[data-dock="blueprint"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 1px dashed var(--frame-edge) !important;
+}
+[data-dock="blueprint"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  border-style: solid !important;
+  color: var(--ink) !important;
+}
+
+/* Macintosh — menu-style items, inverted when on */
+[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  font-family: 'Pixelify Sans', var(--font-mono) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  background: var(--ink) !important;
+  color: var(--node-bg) !important;
+}
+
+/* Submarine — brass toggles */
+[data-dock="submarine"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  border-radius: 12px !important;
+  border: 1px solid #6e521c !important;
+  background: radial-gradient(circle at 50% 30%, #3a2a18, #1a130d) !important;
+  color: #a8956a !important;
+}
+[data-dock="submarine"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  color: #1a1004 !important;
+  background: radial-gradient(circle at 50% 30%, #ffe2a0, #f0b850 60%, #a8701c) !important;
+  box-shadow: 0 0 10px rgba(240, 184, 80, 0.4);
+}
+
+/* ============================================================
+   COMPONENT SKINS FROM THE DESIGN DRAFTS (ADR 0009 phase 4).
+   Decoration only, keyed on .mother-frame and .krnl-node-header.
+   Every control and readout inside the nodes is untouched.
+   ============================================================ */
+body { counter-reset: krnl-mother; }
+.mother-frame { counter-increment: krnl-mother; }
+
+/* Macintosh — every mother is a System 1 window: 2px black frame, hard
+   shadow, striped title bar with a close box, titles knocked out in white. */
+[data-dock="macintosh"] .mother-frame {
+  border-radius: 0 !important;
+  box-shadow: inset 0 0 0 2px var(--ink), 4px 4px 0 var(--ink) !important;
+}
+[data-dock="macintosh"] .krnl-node-header {
+  position: relative;
+  padding-left: 30px !important;
+  background:
+    repeating-linear-gradient(180deg, var(--ink) 0 1px, transparent 1px 3px) 4px 50% / calc(100% - 8px) 11px no-repeat,
+    var(--node-bg) !important;
+  border-bottom: 2px solid var(--ink) !important;
+}
+[data-dock="macintosh"] .krnl-node-header > * {
+  position: relative;
+  background: var(--node-bg);
+  padding: 0 6px;
+}
+/* Transparent header buttons (gear, ×) would sit on the stripes: give them
+   the plate colour so the glyph never lands ink-on-ink. */
+[data-dock="macintosh"] .krnl-node-header > button {
+  background: var(--node-bg) !important;
+}
+[data-dock="macintosh"] .krnl-node-header > :empty:not(button):not(svg):not(img) {
+  background: transparent;
+  padding: 0;
+}
+[data-dock="macintosh"] .krnl-node-header::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  margin-top: -6px;
+  background: var(--node-bg);
+  border: 1px solid var(--ink);
+  box-shadow: 0 0 0 2px var(--node-bg);
+}
+
+/* Submarine — brass module number tag on every header + corner rivets. */
+[data-dock="submarine"] .krnl-node-header::before {
+  content: counter(krnl-mother, decimal-leading-zero);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #1a1408;
+  background: #b88a3a;
+  padding: 1px 5px;
+  border-radius: 1px;
+  margin-right: 8px;
+}
+[data-dock="submarine"] .mother-frame::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  pointer-events: none;
+  z-index: 6;
+  background:
+    radial-gradient(circle at 0 0, #e8c876 0 2px, transparent 2.5px),
+    radial-gradient(circle at 100% 0, #e8c876 0 2px, transparent 2.5px),
+    radial-gradient(circle at 0 100%, #e8c876 0 2px, transparent 2.5px),
+    radial-gradient(circle at 100% 100%, #e8c876 0 2px, transparent 2.5px);
+  opacity: 0.7;
+}
+
+/* Telemetry — glowing acid corner brackets on every module. */
+[data-dock="telemetry"] .mother-frame::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  z-index: 6;
+  background:
+    linear-gradient(#c9f158, #c9f158) 0 0 / 12px 2px no-repeat,
+    linear-gradient(#c9f158, #c9f158) 0 0 / 2px 12px no-repeat,
+    linear-gradient(#c9f158, #c9f158) 100% 100% / 12px 2px no-repeat,
+    linear-gradient(#c9f158, #c9f158) 100% 100% / 2px 12px no-repeat;
+  filter: drop-shadow(0 0 4px #c9f158);
+}
+
+/* Synthesizer — a panel screw at the right end of every header. */
+[data-dock="synthesizer"] .krnl-node-header { position: relative; padding-right: 30px !important; }
+[data-dock="synthesizer"] .krnl-node-header::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #8a8478, #2a261e 70%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* KRNL Dock — stencilled header labels. */
+[data-dock="krnl-dock"] .krnl-node-header {
+  font-family: 'Stardos Stencil', var(--font-mono) !important;
+  letter-spacing: 0.1em !important;
+}
+
+/* Blueprint — headers read as a drawing's title strip. */
+[data-dock="blueprint"] .krnl-node-header {
+  border-bottom: 1px solid var(--frame-edge) !important;
+  background: repeating-linear-gradient(90deg, transparent 0 15px, var(--acid-faint) 15px 16px) !important;
 }

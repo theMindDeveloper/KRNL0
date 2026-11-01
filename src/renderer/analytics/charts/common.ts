@@ -13,8 +13,9 @@ export function linearScale(domainMax: number, rangeMax: number): (v: number) =>
 
 // Chart colors.
 //
-// AnalyticsNode's chrome is always dark (hardcoded #16181a gradient) — it
-// doesn't follow the global theme. Therefore axis / label / grid tokens
+// AnalyticsNode's chrome reads --k-an-* tokens (ADR 0009): Classic keeps the
+// original dark slate (the fallbacks); other frame styles map them to their
+// own palette. Without a frame style it doesn't follow the global theme. Therefore axis / label / grid tokens
 // must NOT use --ink-3 / --ink-4 / --paper-3 (which flip per theme and go
 // olive-tan in light mode, leaving chart labels barely visible on the dark
 // chart bg). Locked to bright greys instead so the labels read in every
@@ -26,9 +27,9 @@ export function linearScale(domainMax: number, rangeMax: number): (v: number) =>
 export const COLOR_TASK = 'var(--cyan)';
 export const COLOR_HABIT = 'var(--acid)';
 export const COLOR_FOCUS = 'var(--rust)';
-export const COLOR_GRID = '#2a2e33';
-export const COLOR_AXIS = '#aab0b7';
-export const COLOR_LABEL = '#c8cdd3';
+export const COLOR_GRID = 'var(--k-an-line-2, #2a2e33)';
+export const COLOR_AXIS = 'var(--k-an-ink-2b, #aab0b7)';
+export const COLOR_LABEL = 'var(--k-an-ink-2, #c8cdd3)';
 
 export const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 export const MONTH_LABELS = [

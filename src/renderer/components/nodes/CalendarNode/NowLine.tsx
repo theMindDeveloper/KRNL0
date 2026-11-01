@@ -91,7 +91,7 @@ export function NowLine({
           left: gutterWidth,
           right: 0,
           height: 1,
-          background: '#ef4444',
+          background: 'var(--k-now, #ef4444)',
           boxShadow: '0 0 4px rgba(239, 68, 68, 0.7)',
         }}
       />
@@ -105,7 +105,7 @@ export function NowLine({
           width: 5,
           height: 5,
           borderRadius: '50%',
-          background: '#ef4444',
+          background: 'var(--k-now, #ef4444)',
           boxShadow: '0 0 6px rgba(239, 68, 68, 0.8)',
         }}
       />

@@ -242,8 +242,9 @@
 
 /* ── Calendar today-cell pulse ───────────────────────────────────────────── */
 @keyframes krnl-today-pulse {
-  0%, 100% { opacity: 0.4; }
-  50%       { opacity: 0.9; }
+  /* Floor raised from 0.4: the today label must stay readable mid-pulse. */
+  0%, 100% { opacity: 0.72; }
+  50%       { opacity: 1; }
 }
 
 /* PR7 — Calendar MonthView today highlight. The user asked for a solid

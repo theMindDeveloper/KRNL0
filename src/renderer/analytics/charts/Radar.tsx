@@ -44,7 +44,7 @@ export function Radar({
   if (n < 3) {
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <text x={cx} y={cy} fontSize={10} textAnchor="middle" fill="#7d848b" fontFamily="var(--font-mono)">
+        <text x={cx} y={cy} fontSize={10} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
           need at least 3 axes
         </text>
       </svg>
@@ -130,7 +130,7 @@ export function Radar({
               y={labelP.y + 13}
               fontSize={8}
               textAnchor="middle"
-              fill="#7d848b"
+              fill="var(--k-an-ink-4, #7d848b)"
               fontFamily="var(--font-mono)"
             >
               {Math.round(a.value)}
@@ -171,7 +171,7 @@ export function Radar({
             cy={p.y}
             r={2.6}
             fill={color}
-            stroke="#0e1012"
+            stroke="var(--k-an-bg, #0e1012)"
             strokeWidth={1}
           />
         );

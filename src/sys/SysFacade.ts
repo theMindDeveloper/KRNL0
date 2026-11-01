@@ -33,7 +33,8 @@ import {
 } from './commands/analytics';
 import type { AnalyticsCtx } from './commands/analytics';
 import { logTail, logStats, requiresRenderer as logRequiresRenderer } from './commands/log';
-import { themeShow } from './commands/theme';
+import { themeShow, themeFrames } from './commands/theme';
+import { isFrameStyleId } from '../shared/frameStyles';
 import type { ThemeCtx } from './commands/theme';
 import {
   generateHelp,
@@ -286,7 +287,25 @@ export class SysFacade {
     if (command.kind === 'theme') {
       if (command.sub === 'show') {
         const tCtx: ThemeCtx = { boardPath: this.deps.boardPath };
+        // The frame style is a per-window preference (ADR 0009 §5); ask the
+        // renderer when one is open, otherwise report it as unknown.
+        if (this.deps.cliDispatch) {
+          const r = await this.deps.cliDispatch('theme.frame.get', {});
+          if (r.ok) tCtx.frame = r.message;
+        }
         return themeShow(tCtx, command.json);
+      }
+      if (command.sub === 'frames') {
+        return themeFrames(command.json);
+      }
+      if (command.sub === 'frame') {
+        if (!isFrameStyleId(command.value)) {
+          return { ok: false, message: command.value ? `Unknown frame style: ${command.value}` : 'theme frame requires <id> (see: sys theme frames)' };
+        }
+        if (!this.deps.cliDispatch) {
+          return { ok: false, message: 'theme frame requires an open renderer window', data: { exitCode: 2 } };
+        }
+        return this.deps.cliDispatch('theme.frame', { value: command.value });
       }
       if (command.sub === 'set') {
         if (!command.value || !['light', 'dark'].includes(command.value)) {
