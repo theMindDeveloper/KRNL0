@@ -2731,8 +2731,8 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 /* ============================================================
    MACINTOSH — System 1 Finder desktop (rebuilt, ADR 0009 phase 5)
    ============================================================
-   Flat desktop, a 26px menu bar and a 24px info bar. Panels are the
-   windows; their striped title bars live in the component skins below. */
+   Flat desktop only. The menu bar is the app's top bar and the footer is
+   the status bar (styled in the Macintosh component skins below). */
 .dock-chassis.dock-macintosh {
   --mac-desk:  #e4dfcd;
   --mac-bar:   #fbf8ee;
@@ -2746,57 +2746,6 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --mac-ink:   #f5efde;
   --mac-dim:   rgba(245, 239, 222, 0.7);
 }
-
-.md-mac-menubar,
-.md-mac-infobar {
-  position: absolute;
-  left: 0; right: 0;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 0 14px;
-  background: var(--mac-bar);
-  color: var(--mac-ink);
-  font-family: 'Pixelify Sans', var(--font-mono), monospace;
-  z-index: 2;
-}
-.md-mac-menubar {
-  top: 0;
-  height: 26px;
-  font-size: 13px;
-  border-bottom: 1px solid var(--mac-ink);
-}
-.md-mac-infobar {
-  bottom: 0;
-  height: 24px;
-  font-size: 12px;
-  color: var(--mac-dim);
-  border-top: 1px solid var(--mac-ink);
-}
-.md-mac-spacer { flex: 1; }
-.md-mac-mark { display: inline-flex; color: var(--mac-ink); }
-.md-mac-title { font-weight: 700; margin-left: -8px; }
-.md-mac-item { white-space: nowrap; }
-.md-mac-board { color: var(--mac-dim); }
-.md-mac-menu-btn {
-  pointer-events: auto;
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  padding: 2px 8px;
-  cursor: pointer;
-}
-/* Classic menu highlight: inverted while pressed or hovered. */
-.md-mac-menu-btn:hover,
-.md-mac-menu-btn:focus-visible {
-  background: var(--mac-ink);
-  color: var(--mac-bar);
-  outline: none;
-}
-.md-mac-pomo { color: var(--mac-dim); }
-.md-mac-pomo.is-running { color: var(--mac-ink); }
-.md-mac-clock { font-variant-numeric: tabular-nums; }
 
 /* ============================================================
    SUBMARINE chassis — brass periscope console (dark-only)
@@ -3752,45 +3701,87 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 body { counter-reset: krnl-mother; }
 .mother-frame { counter-increment: krnl-mother; }
 
-/* Macintosh — every mother is a System 1 window: 2px black frame, hard
-   shadow, striped title bar with a close box, titles knocked out in white. */
+/* ── Macintosh — retro Mac windows (rebuilt) ─────────────────────────
+   No extra bars: the app's own top bar is the menu bar and the status bar
+   is the Finder footer. Every panel is a classic window: 1px black frame,
+   hard 2px drop shadow, a plain title bar with a close box, Chicago-style
+   sentence-case titles. Hover inverts, like a Mac menu item. */
 [data-dock="macintosh"] .mother-frame {
   border-radius: 0 !important;
-  box-shadow: inset 0 0 0 2px var(--ink), 2px 2px 0 var(--ink) !important;
+  border: 0 !important;
+  box-shadow: inset 0 0 0 1px var(--ink), 2px 2px 0 var(--ink) !important;
 }
 [data-dock="macintosh"] .krnl-node-header {
   position: relative;
-  padding-left: 30px !important;
-  background:
-    repeating-linear-gradient(180deg, var(--ink) 0 1px, transparent 1px 3px) 4px 50% / calc(100% - 8px) 11px no-repeat,
-    var(--node-bg) !important;
-  border-bottom: 2px solid var(--ink) !important;
-}
-[data-dock="macintosh"] .krnl-node-header > * {
-  position: relative;
-  background: var(--node-bg);
-  padding: 0 6px;
-}
-/* Transparent header buttons (gear, ×) would sit on the stripes: give them
-   the plate colour so the glyph never lands ink-on-ink. */
-[data-dock="macintosh"] .krnl-node-header > button {
+  padding-left: 28px !important;
   background: var(--node-bg) !important;
+  border-bottom: 1px solid var(--ink) !important;
 }
-[data-dock="macintosh"] .krnl-node-header > :empty:not(button):not(svg):not(img) {
-  background: transparent;
-  padding: 0;
+[data-dock="macintosh"] .krnl-node-header,
+[data-dock="macintosh"] .krnl-node-header * {
+  font-family: 'Pixelify Sans', var(--font-mono) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
 }
+[data-dock="macintosh"] .krnl-node-header > span:not(:empty) {
+  color: var(--ink) !important;
+}
+/* Close box */
 [data-dock="macintosh"] .krnl-node-header::before {
   content: '';
   position: absolute;
-  left: 10px;
+  left: 9px;
   top: 50%;
-  width: 11px;
-  height: 11px;
-  margin-top: -6px;
-  background: var(--node-bg);
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
   border: 1px solid var(--ink);
-  box-shadow: 0 0 0 2px var(--node-bg);
+  background: var(--node-bg);
+}
+[data-dock="macintosh"] .krnl-node-header > button:hover {
+  background: var(--ink) !important;
+  color: var(--node-bg) !important;
+}
+
+/* Menu bar = the app's top bar */
+[data-dock="macintosh"] [data-testid="topbar"] {
+  background: var(--node-bg) !important;
+  border-bottom: 1px solid var(--ink) !important;
+  box-shadow: none !important;
+}
+[data-dock="macintosh"] [data-testid="topbar"] * {
+  font-family: 'Pixelify Sans', var(--font-mono) !important;
+  letter-spacing: 0 !important;
+}
+[data-dock="macintosh"] [data-testid="topbar"] .krnl-topbar-btn {
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--ink) !important;
+  text-transform: none !important;
+  font-size: 12px !important;
+}
+[data-dock="macintosh"] [data-testid="topbar"] .krnl-topbar-btn:hover,
+[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle:hover {
+  background: var(--ink) !important;
+  color: var(--node-bg) !important;
+}
+[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  box-shadow: none !important;
+  font-weight: 700;
+}
+[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="false"] {
+  color: var(--ink-4) !important;
+}
+/* Finder footer = the status bar */
+[data-dock="macintosh"] [data-testid="statusbar"] {
+  border-top: 1px solid var(--ink) !important;
+}
+[data-dock="macintosh"] [data-testid="statusbar"],
+[data-dock="macintosh"] [data-testid="statusbar"] * {
+  font-family: 'Pixelify Sans', var(--font-mono) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
 }
 
 /* Submarine — brass module number tag on every header + corner rivets. */

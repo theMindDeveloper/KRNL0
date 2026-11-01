@@ -195,7 +195,9 @@ const MAC_LIGHT: TokenMap = k({
   '--ink-on-bright': '#fffbe8', '--acid': '#050505', '--acid-ink': '#050505', '--accent-on-dark': '#fffbe8',
   /* acid is black here, so text on it is paper and the primary button inverts. */
   '--btn-primary-bg': '#050505', '--btn-primary-bg-hover': '#2a2a2a', '--btn-primary-fg': '#fffbe8',
-  '--k-status-ok': '#c9f158', '--k-status-warn': '#ff7a4a', '--acid-glow': '#2a2a2a', '--acid-faint': 'rgba(5, 5, 5, 0.10)',
+  // Finder footer: light bar, ink text.
+  '--k-status-bg': '#fffbe8', '--k-status-line': '#050505', '--k-status-label': 'rgba(5, 5, 5, 0.66)',
+  '--k-status-value': '#050505', '--k-status-ok': '#050505', '--k-status-warn': '#8a2a10', '--acid-glow': '#2a2a2a', '--acid-faint': 'rgba(5, 5, 5, 0.10)',
   '--spine': '#1f1f1f', '--spine-hot': '#050505', '--rust': '#2a1a14', '--rust-deep': '#050505', '--cyan': '#050505', '--plum': '#1f1f1f',
   '--frame-bg': 'rgba(5, 5, 5, 0.04)', '--frame-edge': 'rgba(5, 5, 5, 0.55)',
   '--k-now': '#050505', '--k-cal-grid': 'rgba(5, 5, 5, 0.25)', '--k-cal-today': 'rgba(5, 5, 5, 0.06)', '--k-pointer-core': '#fffbe8',
