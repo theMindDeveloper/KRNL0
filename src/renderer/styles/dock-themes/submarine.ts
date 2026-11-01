@@ -14,47 +14,15 @@ export const SUBMARINE_THEME = defineDockTheme(
   { id: 'submarine', label: 'Submarine' },
   {
     canvas: `
-      /* Dark-only — TopBar suppresses the light/dark toggle for this dock */
+      /* Calm hull. Wood grain, hatching and caustic ripples made nodes hard
+       * to see; the canvas keeps one warm gradient and the brass dot grid. */
       html[data-dock="submarine"] .react-flow,
       html[data-theme="dark"][data-dock="submarine"] .react-flow {
         background:
-          /* vertical wood-grain striping */
-          repeating-linear-gradient(90deg,
-            rgba(0,0,0,0.10) 0 3px,
-            rgba(255, 200, 130, 0.02) 3px 6px),
-          /* emergency red wash from top */
-          radial-gradient(ellipse 80% 60% at 50% -10%, rgba(180, 30, 20, 0.20) 0%, transparent 70%),
-          /* main hull body */
-          linear-gradient(180deg, #1a130d 0%, #261b12 50%, #110a06 100%) !important;
-        --grid:        rgba(184, 138, 58, 0.18);
-        --grid-strong: rgba(232, 200, 118, 0.35);
-      }
-
-      /* Caustic light ripple — slow swimmer-pattern wash behind nodes */
-      html[data-dock="submarine"] .react-flow::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-          radial-gradient(ellipse 50% 30% at 20% 30%, rgba(232, 200, 118, 0.06) 0%, transparent 60%),
-          radial-gradient(ellipse 40% 25% at 75% 60%, rgba(232, 200, 118, 0.05) 0%, transparent 60%),
-          radial-gradient(ellipse 35% 22% at 55% 85%, rgba(232, 200, 118, 0.04) 0%, transparent 60%);
-        z-index: 0;
-        mix-blend-mode: screen;
-      }
-
-      /* Rivet-line hatching at the four edges — steel plating */
-      html[data-dock="submarine"] .react-flow::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-          repeating-linear-gradient(135deg,
-            transparent 0 22px,
-            rgba(232, 200, 118, 0.05) 22px 23px);
-        z-index: 0;
+          radial-gradient(ellipse 80% 50% at 50% -10%, rgba(180, 60, 20, 0.08) 0%, transparent 70%),
+          linear-gradient(180deg, #17110c 0%, #120d09 100%) !important;
+        --grid:        rgba(184, 138, 58, 0.16);
+        --grid-strong: rgba(232, 200, 118, 0.30);
       }
     `,
 

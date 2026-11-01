@@ -53,16 +53,11 @@ export function ClockBezel({ kind, outerR }: { kind: ClockSkin['bezel']; outerR:
     );
   }
 
-  // pixel — 1-bit square frame with a 50% dither, like a 1984 desk accessory.
+  // pixel — 1-bit desk-accessory frame: a plain square window with a
+  // 2px rule and a round face. (The old 50% dither was too busy.)
   return (
     <g data-testid="clock-bezel">
-      <defs>
-        <pattern id="clock-bezel-dither" width="2" height="2" patternUnits="userSpaceOnUse">
-          <rect width="1" height="1" fill="var(--k-clock-hand, #000)" />
-          <rect x="1" y="1" width="1" height="1" fill="var(--k-clock-hand, #000)" />
-        </pattern>
-      </defs>
-      <rect x={CX - r} y={CY - r} width={r * 2} height={r * 2} fill="url(#clock-bezel-dither)" stroke="var(--k-clock-hand, #000)" strokeWidth={2} />
+      <rect x={CX - r} y={CY - r} width={r * 2} height={r * 2} fill="none" stroke="var(--k-clock-hand, #000)" strokeWidth={2} />
       <circle cx={CX} cy={CY} r={r - 4} fill="var(--k-clock-bezel, #fff)" stroke="var(--k-clock-hand, #000)" strokeWidth={2} />
     </g>
   );

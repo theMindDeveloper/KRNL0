@@ -243,10 +243,9 @@ export const DOCK_REGISTRY = defineRegistry({
     sublabel: '1984 hardware',
     glyph: MACINTOSH_GLYPH,
     Chrome: MacintoshChrome,
-    // Top: case top + venting + brand row (~108). Bottom: floppy slot + model
-    // plate + power section (~116). Mother row sits inside the CRT bezel.
-    canvasBounds: { kind: 'static', rect: { left: -1410, top: -110, width: 3360, height: 766 } },
-    stationPadding: { top: 110, bottom: 116 },
+    // Finder desktop: 26px menu bar on top, 24px info bar at the bottom.
+    canvasBounds: { kind: 'static', rect: { left: -1410, top: -26, width: 3360, height: 590 } },
+    stationPadding: { top: 26, bottom: 24 },
   },
   submarine: {
     id: 'submarine',
