@@ -622,3 +622,22 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Why documented retroactively:** Hard rule requires a HISTORY.md entry before any merge to `main`, but this batch reached `origin/main` without one. Local `main` had fallen 26 commits behind while a different local commit (`9ebb796`) sat on top of the old tip; completing the already-staged merge brought both histories together. This entry closes that gap so the log matches what's actually running.
 
 **Tests:** Post-merge, full suite green — 110 test files / 1407 tests passed, 0 typecheck errors.
+
+---
+
+## [2026-11-01] — Frame-style theme engine (ADR 0009)
+
+**Type:** Feature
+**PRs / Commits:** branch `TMD/krnl0-design-system-reimagined-31f897` (`6f57865` … HEAD)
+**Files changed:** `src/renderer/themes/*` (new: manifests, applyFrameTheme, useFrameTheme, transition), `src/shared/frameStyles.ts`, `src/renderer/components/ChassisLayer/*`, `src/renderer/components/{TopBar,StatusBar,Station}/*`, Clock/Pomo/Terminal/Calendar/Analytics/MotherFrame nodes, `src/renderer/styles/{tokens,chassis,reactflow-theme}.css`, `src/sys/{parser,SysFacade,commands/theme}.ts`, `docs/03-adr/0009-frame-style-theme-engine.md`, `docs/06-requirements/theme-engine.md`, tests
+**Summary:**
+- **Theme engine:** each frame style carries a typed `ThemeManifest` (tokens per mode, fonts, component skins, slots). Tokens are applied to `<html>`; components read `var(--k-*, <classic literal>)`, so Classic stays pixel-identical.
+- **New "Pro" style:** matte graphite, Logic-Pro-inspired, dark only.
+- **Every style skins the components:** clock bezels and hands (same features everywhere: task arcs, pomo, numerals, readout), Pomo default faces plus the new `vu` and `outline` faces and an `auto` face, xterm colours, Analytics palette, mother-frame decoration (Mac title bars, Submarine rivets, Telemetry brackets…). Fonts bundled locally via Fontsource.
+- **Panel toggles** moved from the Station row into the top bar for every style.
+- **CLI:** `sys theme frames`, `sys theme frame <id>`, `sys theme show` reports the frame.
+- **Readability pass:** live WCAG audit across all 13 style/mode pairs; darker secondary inks, `--acid-ink`, tokenised status bar, fixed same-colour pills and buttons. Failures went from 40–170 per pair to a handful of near-misses and disabled controls.
+- **Look switching:** light/dark and style changes reveal as a circle from the pointer (View Transition, reduced-motion fallback); dark-only styles no longer overwrite the saved light preference.
+
+**Tests:** 0 typecheck errors; full suite green.
+

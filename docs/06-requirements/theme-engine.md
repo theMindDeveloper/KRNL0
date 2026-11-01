@@ -34,6 +34,8 @@ Today a frame style (Classic, Synthesizer, Telemetry, KRNL Dock, Blueprint, Maci
 | NF3 | The manifest contract is strictly typed (`ThemeManifest`, `ThemeTokens`); adding a style is one registry entry plus one manifest file. |
 | NF4 | Works offline; no runtime network request for fonts or assets. |
 | NF5 | `npm run typecheck` reports 0 errors and `npm test` is green at the end of every phase. |
+| NF6 | Text meets WCAG AA (4.5:1, 3:1 at 18px+) against its real surface in every style and mode, measured on the live renderer. Exempt: disabled controls, decorative glyphs. Acid used as text goes through `--acid-ink`; text on the accent through `--ink-on-bright`. |
+| NF7 | Light/dark and frame-style switches reveal the new look in one View Transition frame (circle from the pointer), with an instant fallback under `prefers-reduced-motion`. A dark-only style shows dark without overwriting the saved light/dark preference. |
 
 ---
 
@@ -135,5 +137,6 @@ Feature: Frame-style theme engine
 | 2 | Clock parity (F6), Pomo face defaults + new faces (F7), xterm theme (F8) |
 | 3 | Panel-toggle slot (F9), local fonts (F10), component backgrounds (F11) |
 | 4 | Per-style component skins for the six legacy styles, one style per commit (F12) |
+| 5 | Readability pass (NF6), look-switch transition and preference fix (NF7), tactile top-bar buttons |
 
-*Last updated: 2026-11-01 — initial version*
+*Last updated: 2026-11-01 — phase 5 readability and transitions*
