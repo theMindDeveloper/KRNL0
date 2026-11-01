@@ -49,6 +49,7 @@ const AN_THEMED: TokenMap = {
   '--k-an-line': 'var(--paper-3)', '--k-an-line-2': 'var(--paper-3)', '--k-an-line-3': 'var(--paper-3)',
   '--k-an-ink': 'var(--ink)', '--k-an-ink-1': 'var(--ink)', '--k-an-ink-2': 'var(--ink-2)', '--k-an-ink-2b': 'var(--ink-3)',
   '--k-an-ink-3': 'var(--ink-3)', '--k-an-ink-4': 'var(--ink-4)', '--k-an-warm': 'var(--rust)',
+  '--k-an-tile': 'var(--paper-2)',
 };
 
 /** Pro — matte graphite, one lit acid accent (design drafts "Pro screens"). */

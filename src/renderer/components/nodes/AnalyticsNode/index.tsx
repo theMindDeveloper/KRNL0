@@ -123,7 +123,7 @@ const CARDS_BY_VIEW: Record<AnalyticsView, readonly AnalyticsCardId[]> = {
 const rootStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
-  background: 'linear-gradient(180deg, #16181a 0%, #0e1012 100%)',
+  background: 'linear-gradient(180deg, var(--k-an-bg-2, #16181a) 0%, var(--k-an-bg, #0e1012) 100%)',
   border: '1px solid var(--k-an-line-2, #2a2e33)',
   borderRadius: 10,
   boxShadow:
@@ -140,7 +140,7 @@ const titlebarStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 10,
   padding: '10px 14px',
-  background: 'linear-gradient(180deg, #1f2226 0%, #16181a 100%)',
+  background: 'linear-gradient(180deg, var(--k-an-bg-3, #1f2226) 0%, var(--k-an-bg-2, #16181a) 100%)',
   borderBottom: '1px solid #0a0c0e',
   boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
   fontFamily: 'var(--font-mono)',
@@ -166,7 +166,7 @@ const summaryChipStyle: React.CSSProperties = {
   padding: '2px 8px',
   border: '1px solid var(--k-an-line-2, #2a2e33)',
   borderRadius: 999,
-  background: 'rgba(20,22,24,0.6)',
+  background: 'var(--k-an-bg-3, rgba(20,22,24,0.6))',
   color: 'var(--k-an-ink-1, #eef1f4)',
 };
 
@@ -203,7 +203,7 @@ const tabPill = (active: boolean): React.CSSProperties => ({
   border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),
   borderRadius: 999,
   background: active
-    ? 'linear-gradient(180deg, #2a2e33 0%, #1c1f23 100%)'
+    ? 'linear-gradient(180deg, var(--k-an-line-2, #2a2e33) 0%, #1c1f23 100%)'
     : 'transparent',
   color: active ? 'var(--acid, #c9f158)' : 'var(--k-an-ink-2b, #aab0b7)',
   cursor: 'pointer',
@@ -278,7 +278,7 @@ function ChartCard({
   if (hidden) return null;
 
   const cardStyle: React.CSSProperties = {
-    background: 'linear-gradient(180deg, #1a1d20 0%, #131517 100%)',
+    background: 'linear-gradient(180deg, var(--k-an-bg-2b, #1a1d20) 0%, var(--k-an-bg, #131517) 100%)',
     border: `1px solid ${pinned ? 'rgba(201,241,88,0.45)' : 'var(--k-an-line, #23262a)'}`,
     boxShadow: pinned
       ? '0 0 0 1px rgba(201,241,88,0.18) inset, 0 6px 20px rgba(0,0,0,0.35)'
@@ -673,7 +673,7 @@ function SettingsSidebar({
       style={{
         width: 196,
         flexShrink: 0,
-        background: 'linear-gradient(180deg, #16191c 0%, #101214 100%)',
+        background: 'linear-gradient(180deg, var(--k-an-bg-2, #16191c) 0%, var(--k-an-bg, #101214) 100%)',
         border: '1px solid var(--k-an-line, #23262a)',
         borderRadius: 8,
         padding: '12px 12px 12px',
