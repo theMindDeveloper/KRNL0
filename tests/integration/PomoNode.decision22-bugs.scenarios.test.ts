@@ -408,7 +408,7 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(ps.history).toHaveLength(0);
     });
 
-    it('C2: Given a paused pomo with 10s elapsed, when pomo.resume dispatched, then status=running and startedAt is offset so elapsed stays ~10s', () => {
+    it('C2: Given a paused pomo with 10s elapsed, when pomo.resume dispatched, then status=running, the 10s span is recorded and carried in sessionWorkSec', () => {
       // Build a paused state directly
       const nowMs = Date.now();
       const startedAt = new Date(nowMs - 10_000).toISOString();
@@ -432,10 +432,13 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(ps.status).toBe('running');
       expect(ps.pausedAt).toBeNull();
       expect(ps.pausedElapsedMs).toBe(0);
-      // The offset startedAt means: Date.now() - Date.parse(startedAt) ≈ 10_000ms
-      const effectiveElapsed = Date.now() - Date.parse(ps.startedAt!);
-      expect(effectiveElapsed).toBeGreaterThanOrEqual(9_000);
-      expect(effectiveElapsed).toBeLessThanOrEqual(11_000);
+      // The pause gap is not work: a fresh span opens at resume, and the
+      // pre-pause 10s lives on as a history record + sessionWorkSec.
+      const sinceResume = Date.now() - Date.parse(ps.startedAt!);
+      expect(sinceResume).toBeLessThanOrEqual(1_000);
+      expect(ps.sessionWorkSec).toBe(10);
+      expect(ps.history.at(-1)!.startedAt).toBe(startedAt);
+      expect(ps.history.at(-1)!.endedAt).toBe(pausedAt);
     });
 
     it('C3: Given a paused pomo, when pomo.cancel dispatched, then status=idle, one cancelled history record with completed=false, and endedAt equals pausedAt', () => {

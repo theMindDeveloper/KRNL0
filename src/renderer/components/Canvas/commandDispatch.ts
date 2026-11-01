@@ -631,7 +631,10 @@ function checkpointActiveTaskElapsed(): number {
   const ps = pomoNode.state as PomoState;
   if (ps.status !== 'running' || ps.startedAt === null) return 0;
   if (ps.activeTaskId === null) return 0;
-  const elapsedSec = Math.max(0, Math.floor((Date.now() - Date.parse(ps.startedAt)) / 1000));
+  const elapsedSec = Math.max(
+    0,
+    Math.floor((ps.sessionWorkSec ?? 0) + (Date.now() - Date.parse(ps.startedAt)) / 1000),
+  );
   if (elapsedSec === 0) return 0;
   const taskNode = board.nodes.find((n) => n.id === ps.activeTaskId);
   if (!taskNode || taskNode.kind !== 'todo.task') return elapsedSec;
@@ -705,7 +708,7 @@ function loadTaskIntoPomo(
         .getState()
         .board?.nodes.find((n) => n.id === ps.activeTaskId);
       if (priorTaskNode && priorTaskNode.kind === 'todo.task') {
-        const elapsedSec = Math.floor(ps.pausedElapsedMs / 1000);
+        const elapsedSec = Math.floor((ps.sessionWorkSec ?? 0) + ps.pausedElapsedMs / 1000);
         if (elapsedSec > 0) {
           const priorTs = priorTaskNode.state as TaskState;
           updateNode(
@@ -914,7 +917,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         const ts = taskNode.state as TaskState;
         updateNode(nodeId, {
           state: taskSetCurrentSessionElapsedSec(ts, {
-            seconds: Math.floor(pausedState.pausedElapsedMs / 1000),
+            seconds: Math.floor((pausedState.sessionWorkSec ?? 0) + pausedState.pausedElapsedMs / 1000),
           }),
         });
       }

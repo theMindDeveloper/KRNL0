@@ -147,7 +147,7 @@ export function TelemetryChrome() {
   let aosLabel = 'aos · los';
   let aosBig = fmtMinSec(now.getTime() - APP_BOOT_TS);
   if (runningPomo && runningPomo.startedAt) {
-    const elapsed = now.getTime() - Date.parse(runningPomo.startedAt) - (runningPomo.pausedElapsedMs ?? 0);
+    const elapsed = (runningPomo.sessionWorkSec ?? 0) * 1000 + now.getTime() - Date.parse(runningPomo.startedAt);
     const remaining = runningPomo.durationMin * 60_000 - elapsed;
     aosLabel = 'pomo · t-minus';
     aosBig = fmtMinSec(remaining);
