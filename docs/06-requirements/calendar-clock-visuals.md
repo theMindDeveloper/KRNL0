@@ -7,11 +7,11 @@
 | # | Requirement |
 |---|---|
 | F1 | Calendar and Clock use one lane packer (`store/laneLayout.ts`). Overlapping blocks form a cluster, every block in a cluster reports the same lane count, and a block widens over lanes that stay free for its whole interval. |
-| F2 | Calendar: each day column has a **reality rail** on its left edge, 7 px wide in week view and 40 px in day view. The day-view rail also shows minutes. Planned task and habit blocks sit to the right of it. |
+| F2 | Calendar time grid: each day column has a thin, unlabelled **reality rail** on its left edge (`min(6px, 10%)` of the column). Minutes appear in the popup. Planned task and habit blocks sit to the right of it. |
 | F3 | Reality colours: work = solid, in the colour of the task it is tagged with (acid when untagged). Break = hatched. A pause is a gap. The live span glows. |
 | F4 | Clicking a reality span (rail or clock ring) opens its popup with start, end and duration, a **Counts toward** selector (retag), and Delete. |
-| F5 | Planned blocks show title + time range, or "HH:MM title" on one line when short. They are at least 14 px tall. The time range is the task's real start and end even when the block crosses midnight. |
-| F6 | Block states: done = grey, struck through, ✓. Missed = planned time passed while still open (dashed border, dimmed, "missed"). Overrun = tracked > planned ("+Xm" in rust). |
+| F5 | Planned blocks show their real time range even when they cross midnight, and are at least 14 px tall. How much text they show is set by F13. |
+| F6 | Block states: done = faded (✓ when there is room). Missed = planned time passed while still open (lighter tint, "missed" in the agenda). Overrun = tracked > planned: a rust strip on the right edge at any size, plus "+Xm over" in the time line when it fits. |
 | F7 | Habit blocks are tinted with a coloured edge, like tasks, not a solid bright bar. |
 | F8 | Reality spans that cross midnight are split onto both days. |
 | F9 | When a dropped task lands later than the drop slot (chain push, Decision 30), a notice says where it went and why. |
