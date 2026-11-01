@@ -49,7 +49,10 @@ const AN_THEMED: TokenMap = {
   '--k-an-line': 'var(--paper-3)', '--k-an-line-2': 'var(--paper-3)', '--k-an-line-3': 'var(--paper-3)',
   '--k-an-ink': 'var(--ink)', '--k-an-ink-1': 'var(--ink)', '--k-an-ink-2': 'var(--ink-2)', '--k-an-ink-2b': 'var(--ink-3)',
   '--k-an-ink-3': 'var(--ink-3)', '--k-an-ink-4': 'var(--ink-4)', '--k-an-warm': 'var(--rust)',
-  '--k-an-tile': 'var(--paper-2)',
+  '--k-an-tile': 'var(--paper-2)', '--k-an-tab-end': 'var(--paper-2)',
+  // Text that sits on the accent / accent used as text: follow the style's
+  // own readable pair instead of the slate defaults.
+  '--k-an-on-accent': 'var(--ink-on-bright)', '--k-an-accent-ink': 'var(--acid-ink, var(--acid))',
 };
 
 /** Pro — matte graphite, one lit acid accent (design drafts "Pro screens"). */
@@ -61,8 +64,8 @@ const PRO_DARK: TokenMap = {
   '--node-bg': '#181818',
   '--ink': '#f2f2f2',
   '--ink-2': '#e6e6e6',
-  '--ink-3': '#8c8c8c',
-  '--ink-4': '#808080',
+  '--ink-3': '#a8a8a8',
+  '--ink-4': '#949494',
   '--acid': '#c9f158',
   '--acid-glow': '#d8ff6e',
   '--spine': '#7ea22b',
@@ -123,7 +126,7 @@ const k = (extra: Record<`--${string}`, string>): TokenMap => ({ ...CLASSIC_K, .
 
 const SYNTH_DARK: TokenMap = k({
   '--paper': '#1c1812', '--paper-2': '#221e18', '--paper-3': '#3a352c', '--node-bg': '#221e18',
-  '--ink': '#ece4d0', '--ink-2': '#d8d0bc', '--ink-3': '#a39a86', '--ink-4': '#8a826f',
+  '--ink': '#ece4d0', '--ink-2': '#d8d0bc', '--ink-3': '#b3aa94', '--ink-4': '#9a917d',
   '--rust': '#ff8a4c', '--cyan': '#4fd6e0', '--purple': '#b9a0ff',
   '--grid': 'rgba(236, 228, 208, 0.07)', '--grid-strong': 'rgba(236, 228, 208, 0.14)',
   '--k-cal-grid': '#2a261f', '--k-term-border': '#0e0c09',
@@ -151,7 +154,7 @@ const TELEMETRY_DARK: TokenMap = k({
 const KRNL_DOCK_DARK: TokenMap = k({
   '--k-clock-font': "'VT323', monospace", '--k-lcd-font': "'VT323', monospace",
   '--paper': '#14130f', '--paper-2': '#1f1d18', '--paper-3': '#2f2b24', '--node-bg': '#1c1a13',
-  '--ink': '#f4efe2', '--ink-2': '#ddd6c6', '--ink-3': '#968d7a', '--ink-4': '#7d7564',
+  '--ink': '#f4efe2', '--ink-2': '#ddd6c6', '--ink-3': '#b3aa94', '--ink-4': '#9a917d',
   '--acid': '#b8d957', '--rust': '#ff5a3c', '--cyan': '#7ec8e3',
   '--k-clock-bezel': '#0f100d', '--k-clock-bezel-hi': '#9a9d94', '--k-clock-bezel-lo': '#252823',
   '--k-clock-face': '#141512', '--k-clock-face-edge': '#3a3d36', '--k-clock-track': '#1f211b',
@@ -161,8 +164,10 @@ const KRNL_DOCK_DARK: TokenMap = k({
 
 const BLUEPRINT_LIGHT: TokenMap = k({
   '--paper': '#f0e6cc', '--paper-2': '#e2d6b6', '--paper-3': '#c8bb99', '--node-bg': '#f8eed4',
-  '--ink': '#1f2a3a', '--ink-2': 'rgba(31, 42, 58, 0.82)', '--ink-3': 'rgba(31, 42, 58, 0.55)', '--ink-4': 'rgba(31, 42, 58, 0.42)',
-  '--ink-on-bright': '#0a1525', '--acid': '#5e7d1d', '--acid-glow': '#7ea22b', '--acid-faint': 'rgba(94, 125, 29, 0.10)',
+  '--ink': '#1f2a3a', '--ink-2': 'rgba(31, 42, 58, 0.82)', '--ink-3': 'rgba(31, 42, 58, 0.78)', '--ink-4': 'rgba(31, 42, 58, 0.66)',
+  '--ink-on-bright': '#f8eed4', '--acid': '#5e7d1d', '--acid-ink': '#3f5612',
+  '--btn-primary-bg': '#1f2a3a', '--btn-primary-bg-hover': '#2c3b52', '--btn-primary-fg': '#f8eed4',
+  '--k-status-ok': '#a8d05a', '--acid-glow': '#7ea22b', '--acid-faint': 'rgba(94, 125, 29, 0.10)',
   '--spine': '#5e7d1d', '--spine-hot': '#7ea22b', '--rust': '#c8553d', '--rust-deep': '#a83e2a', '--cyan': '#2f4012',
   '--frame-bg': 'rgba(94, 125, 29, 0.05)', '--frame-edge': 'rgba(94, 125, 29, 0.42)',
   '--k-cal-grid': 'rgba(94, 125, 29, 0.22)', '--k-cal-today': 'rgba(94, 125, 29, 0.07)',
@@ -173,7 +178,7 @@ const BLUEPRINT_LIGHT: TokenMap = k({
 
 const BLUEPRINT_DARK: TokenMap = k({
   '--paper': '#0c1a2e', '--paper-2': '#142441', '--paper-3': '#1e3358', '--node-bg': '#0e1c34',
-  '--ink': '#d8eaff', '--ink-2': 'rgba(216, 234, 255, 0.78)', '--ink-3': 'rgba(216, 234, 255, 0.55)', '--ink-4': 'rgba(216, 234, 255, 0.42)',
+  '--ink': '#d8eaff', '--ink-2': 'rgba(216, 234, 255, 0.78)', '--ink-3': 'rgba(216, 234, 255, 0.74)', '--ink-4': 'rgba(216, 234, 255, 0.62)',
   '--ink-on-bright': '#0a1525', '--acid': '#7ec8e3', '--acid-glow': '#a8e0ff', '--acid-faint': 'rgba(126, 200, 227, 0.12)',
   '--spine': '#7ec8e3', '--spine-hot': '#a8e0ff', '--rust': '#e87a5f', '--rust-deep': '#c8553d', '--cyan': '#7ec8e3',
   '--frame-bg': 'rgba(126, 200, 227, 0.05)', '--frame-edge': 'rgba(126, 200, 227, 0.40)',
@@ -186,8 +191,11 @@ const BLUEPRINT_DARK: TokenMap = k({
 const MAC_LIGHT: TokenMap = k({
   '--font-mono': "'Pixelify Sans', 'JetBrains Mono', monospace", '--font-sans': "'Pixelify Sans', 'JetBrains Mono', monospace", '--k-clock-font': "'Pixelify Sans', monospace",
   '--paper': '#faf3df', '--paper-2': '#f0e6c8', '--paper-3': '#d8cdaa', '--node-bg': '#fffbe8',
-  '--ink': '#050505', '--ink-2': '#1a1a1a', '--ink-3': 'rgba(5, 5, 5, 0.62)', '--ink-4': 'rgba(5, 5, 5, 0.45)',
-  '--ink-on-bright': '#050505', '--acid': '#050505', '--acid-glow': '#2a2a2a', '--acid-faint': 'rgba(5, 5, 5, 0.10)',
+  '--ink': '#050505', '--ink-2': '#1a1a1a', '--ink-3': 'rgba(5, 5, 5, 0.76)', '--ink-4': 'rgba(5, 5, 5, 0.64)',
+  '--ink-on-bright': '#fffbe8', '--acid': '#050505', '--acid-ink': '#050505',
+  /* acid is black here, so text on it is paper and the primary button inverts. */
+  '--btn-primary-bg': '#050505', '--btn-primary-bg-hover': '#2a2a2a', '--btn-primary-fg': '#fffbe8',
+  '--k-status-ok': '#c9f158', '--k-status-warn': '#ff7a4a', '--acid-glow': '#2a2a2a', '--acid-faint': 'rgba(5, 5, 5, 0.10)',
   '--spine': '#1f1f1f', '--spine-hot': '#050505', '--rust': '#2a1a14', '--rust-deep': '#050505', '--cyan': '#050505', '--plum': '#1f1f1f',
   '--frame-bg': 'rgba(5, 5, 5, 0.04)', '--frame-edge': 'rgba(5, 5, 5, 0.55)',
   '--k-now': '#050505', '--k-cal-grid': 'rgba(5, 5, 5, 0.25)', '--k-cal-today': 'rgba(5, 5, 5, 0.06)', '--k-pointer-core': '#fffbe8',
@@ -200,7 +208,7 @@ const MAC_LIGHT: TokenMap = k({
 const MAC_DARK: TokenMap = k({
   '--font-mono': "'Pixelify Sans', 'JetBrains Mono', monospace", '--font-sans': "'Pixelify Sans', 'JetBrains Mono', monospace", '--k-clock-font': "'Pixelify Sans', monospace",
   '--paper': '#14110c', '--paper-2': '#1f1b14', '--paper-3': '#2c261c', '--node-bg': '#0a0807',
-  '--ink': '#f5efde', '--ink-2': '#d4cdb8', '--ink-3': 'rgba(245, 239, 222, 0.62)', '--ink-4': 'rgba(245, 239, 222, 0.45)',
+  '--ink': '#f5efde', '--ink-2': '#d4cdb8', '--ink-3': 'rgba(245, 239, 222, 0.76)', '--ink-4': 'rgba(245, 239, 222, 0.62)',
   '--ink-on-bright': '#0a0807', '--acid': '#f5efde', '--acid-glow': '#ffffff', '--acid-faint': 'rgba(245, 239, 222, 0.10)',
   '--spine': '#d4cdb8', '--spine-hot': '#f5efde', '--rust': '#e8d8b0', '--rust-deep': '#f5efde', '--cyan': '#f5efde', '--plum': '#d4cdb8',
   '--frame-bg': 'rgba(245, 239, 222, 0.04)', '--frame-edge': 'rgba(245, 239, 222, 0.40)',
@@ -214,7 +222,7 @@ const MAC_DARK: TokenMap = k({
 const SUBMARINE_DARK: TokenMap = k({
   '--k-lcd-font': "'VT323', monospace",
   '--paper': '#1a1410', '--paper-2': '#261c14', '--paper-3': '#38291c', '--node-bg': '#110a06',
-  '--ink': '#d4c69e', '--ink-2': 'rgba(212, 198, 158, 0.82)', '--ink-3': 'rgba(212, 198, 158, 0.62)', '--ink-4': 'rgba(212, 198, 158, 0.45)',
+  '--ink': '#d4c69e', '--ink-2': 'rgba(212, 198, 158, 0.82)', '--ink-3': 'rgba(212, 198, 158, 0.80)', '--ink-4': 'rgba(212, 198, 158, 0.66)',
   '--ink-on-bright': '#1a1408', '--acid': '#f0b850', '--acid-glow': '#f0d090', '--acid-faint': 'rgba(240, 184, 80, 0.12)',
   '--spine': '#b88a3a', '--spine-hot': '#f0b850', '--rust': '#ff6450', '--rust-deep': '#c8553d', '--cyan': '#8aff5a', '--plum': '#e8d8a8',
   '--frame-bg': 'rgba(184, 138, 58, 0.08)', '--frame-edge': 'rgba(232, 200, 118, 0.40)',

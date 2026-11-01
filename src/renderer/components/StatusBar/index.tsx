@@ -73,8 +73,8 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
         height: 28,
         /* Hardcoded dark — --ink flips to light in dark mode, which would
            wash out the bar. The statusbar is always-black by design. */
-        background: '#0c0a08',
-        borderTop: '1px solid var(--paper-3)',
+        background: 'var(--k-status-bg, #0c0a08)',
+        borderTop: '1px solid var(--k-status-line, var(--paper-3))',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -94,10 +94,10 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
         <StatusItem label="workspace" testId="statusbar-workspace">
           ~/krnl0/{boardName}
         </StatusItem>
-        <StatusItem label="claude" testId="statusbar-claude" valueColor="var(--acid)">
+        <StatusItem label="claude" testId="statusbar-claude" valueColor="var(--k-status-ok, var(--acid))">
           ● connected
         </StatusItem>
-        <StatusItem label="pomo" testId="statusbar-pomo" valueColor="var(--rust)">
+        <StatusItem label="pomo" testId="statusbar-pomo" valueColor="var(--k-status-warn, var(--rust))">
           {pomoText}
         </StatusItem>
         <StatusItem label="day" testId="statusbar-day">
@@ -109,7 +109,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 10.5,
-              color: 'var(--ink-4)',
+              color: 'var(--k-status-label, #8a8270)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase' as const,
               whiteSpace: 'nowrap' as const,
@@ -164,9 +164,9 @@ function StatusItem({ label, children, valueColor, testId }: StatusItemProps) {
       }}
     >
       {label !== undefined && (
-        <span style={{ color: 'var(--ink-4)' }}>{label}</span>
+        <span style={{ color: 'var(--k-status-label, #8a8270)' }}>{label}</span>
       )}
-      <span style={{ color: valueColor ?? 'var(--paper-3)' }}>{children}</span>
+      <span style={{ color: valueColor ?? 'var(--k-status-value, #d9d1b8)' }}>{children}</span>
     </span>
   );
 }

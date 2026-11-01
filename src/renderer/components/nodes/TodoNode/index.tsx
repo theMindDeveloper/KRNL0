@@ -519,7 +519,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   aria-label={item.done ? 'Mark undone' : 'Mark done'}
                 >
                   {item.done && (
-                    <span style={{ fontSize: 9, color: 'var(--acid)', fontWeight: 700, lineHeight: 1 }}>
+                    <span style={{ fontSize: 9, color: 'var(--acid-ink, var(--acid))', fontWeight: 700, lineHeight: 1 }}>
                       ✓
                     </span>
                   )}
@@ -631,7 +631,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                         <span style={{ opacity: 0.5 }}>·</span>
                         <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
                         <span style={{ opacity: 0.5 }}>·</span>
-                        <span style={{ color: 'var(--acid)' }}>{bd.effectiveMin}m</span>
+                        <span style={{ color: 'var(--acid-ink, var(--acid))' }}>{bd.effectiveMin}m</span>
                       </span>
                     );
                   })()

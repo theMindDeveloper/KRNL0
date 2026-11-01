@@ -485,7 +485,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             fontFamily: 'var(--font-mono)',
             fontVariantNumeric: 'tabular-nums',
             fontSize: 9.5,
-            color: isActiveRunning ? 'var(--acid)' : 'var(--ink-3)',
+            color: isActiveRunning ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
             letterSpacing: '0.04em',
             pointerEvents: 'none',
             boxShadow: isActiveRunning

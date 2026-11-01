@@ -111,7 +111,7 @@ export function CalendarNode({
               background: config.view === view ? 'var(--paper-2)' : 'transparent',
               border: 'none',
               borderRight: view !== 'year' ? '1px solid var(--paper-3)' : 'none',
-              color: config.view === view ? 'var(--acid)' : 'var(--ink-3)',
+              color: config.view === view ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
               fontFamily: 'inherit',
               fontSize: 'inherit',
               letterSpacing: '0.08em',

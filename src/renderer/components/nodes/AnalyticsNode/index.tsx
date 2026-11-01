@@ -177,7 +177,7 @@ const gearBtnStyle = (active: boolean): React.CSSProperties => ({
   placeItems: 'center',
   borderRadius: 6,
   background: active ? 'var(--acid)' : 'transparent',
-  color: active ? 'var(--k-an-bg, #0e1012)' : 'var(--k-an-ink-2b, #aab0b7)',
+  color: active ? 'var(--k-an-on-accent, #0e1012)' : 'var(--k-an-ink-2b, #aab0b7)',
   border: '1px solid ' + (active ? 'var(--acid)' : 'var(--k-an-line-2, #2a2e33)'),
   cursor: 'pointer',
   padding: 0,
@@ -203,9 +203,9 @@ const tabPill = (active: boolean): React.CSSProperties => ({
   border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),
   borderRadius: 999,
   background: active
-    ? 'linear-gradient(180deg, var(--k-an-line-2, #2a2e33) 0%, #1c1f23 100%)'
+    ? 'linear-gradient(180deg, var(--k-an-line-2, #2a2e33) 0%, var(--k-an-tab-end, #1c1f23) 100%)'
     : 'transparent',
-  color: active ? 'var(--acid, #c9f158)' : 'var(--k-an-ink-2b, #aab0b7)',
+  color: active ? 'var(--k-an-accent-ink, var(--acid, #c9f158))' : 'var(--k-an-ink-2b, #aab0b7)',
   cursor: 'pointer',
   boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.04)' : 'none',
   transition: 'all 120ms',
@@ -219,7 +219,7 @@ const chipBtn = (active: boolean): React.CSSProperties => ({
   border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),
   borderRadius: 4,
   background: active ? 'var(--acid, #c9f158)' : 'transparent',
-  color: active ? 'var(--k-an-bg, #0e1012)' : 'var(--k-an-ink-2, #c8cdd3)',
+  color: active ? 'var(--k-an-on-accent, #0e1012)' : 'var(--k-an-ink-2, #c8cdd3)',
   cursor: 'pointer',
   fontWeight: active ? 700 : 500,
 });
@@ -366,7 +366,7 @@ function cardActionBtn(active: boolean, accent: string): React.CSSProperties {
     display: 'grid',
     placeItems: 'center',
     background: active ? accent : 'transparent',
-    color: active ? 'var(--k-an-bg, #0e1012)' : accent,
+    color: active ? 'var(--k-an-on-accent, #0e1012)' : accent,
     border: `1px solid ${accent}`,
     borderRadius: 4,
     cursor: 'pointer',

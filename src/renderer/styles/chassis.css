@@ -201,7 +201,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.22em;
-  color: rgba(212,207,192,0.55);
+  color: rgba(212,207,192, 0.79);
   text-transform: uppercase;
 }
 .md-synth-top .pwr {
@@ -234,7 +234,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 .md-synth-top .hp {
   font-family: var(--font-mono);
   font-size: 9.5px;
-  color: rgba(212,207,192,0.45);
+  color: rgba(212,207,192, 0.69);
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -288,7 +288,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 7.5px;
   letter-spacing: 0.22em;
-  color: rgba(212,207,192,0.5);
+  color: rgba(212,207,192, 0.74);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -335,7 +335,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 7px;
   letter-spacing: 0.16em;
-  color: rgba(212,207,192,0.45);
+  color: rgba(212,207,192, 0.69);
   width: 14px;
   text-align: right;
   margin-right: 4px;
@@ -400,12 +400,12 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 7px;
   letter-spacing: 0.18em;
-  color: rgba(212,207,192,0.55);
+  color: rgba(212,207,192, 0.79);
   text-transform: uppercase;
 }
 .md-synth-jacks .arrow {
   font-family: var(--font-mono);
-  color: rgba(201,241,88,0.6);
+  color: rgba(201,241,88, 0.84);
   font-size: 14px;
 }
 
@@ -443,7 +443,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   font-family: var(--font-mono);
   font-size: 7.5px;
   letter-spacing: 0.18em;
-  color: rgba(212,207,192,0.45);
+  color: rgba(212,207,192, 0.69);
   text-align: right;
   text-transform: uppercase;
 }
@@ -452,7 +452,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   text-shadow: 0 0 4px rgba(201,241,88,0.4);
 }
 .md-synth-serial-link {
-  color: rgba(212,207,192,0.55);
+  color: rgba(212,207,192, 0.79);
   text-decoration: none;
   pointer-events: auto;
   transition: color 160ms;
@@ -598,7 +598,7 @@ html:not([data-theme="dark"]) .md-tel-gauge .track::before {
   background: linear-gradient(90deg, var(--rust) 0%, var(--spine) 60%, var(--spine) 100%);
   box-shadow: 0 0 4px rgba(94,125,29,0.4);
 }
-html:not([data-theme="dark"]) .md-tel-gauge .ticks { color: rgba(60,50,30,0.55); }
+html:not([data-theme="dark"]) .md-tel-gauge .ticks { color: rgba(60,50,30, 0.79); }
 html:not([data-theme="dark"]) .md-tel-bot {
   background: rgba(255, 250, 230, 0.92);
   border-color: rgba(94,125,29,0.25);
@@ -677,7 +677,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-cell .k {
   font-size: 7.5px;
   letter-spacing: 0.22em;
-  color: rgba(212,207,192,0.5);
+  color: rgba(212,207,192, 0.74);
   text-transform: uppercase;
   display: flex; gap: 6px;
 }
@@ -705,7 +705,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-cell .sub {
   font-size: 7.5px;
   letter-spacing: 0.2em;
-  color: rgba(212,207,192,0.42);
+  color: rgba(212,207,192, 0.66);
   margin-top: 4px;
   text-transform: uppercase;
 }
@@ -760,7 +760,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   display: flex;
   justify-content: space-between;
   font-size: 6.5px;
-  color: rgba(212,207,192,0.4);
+  color: rgba(212,207,192, 0.64);
   letter-spacing: 0.1em;
   margin-top: 2px;
   font-family: var(--font-mono);
@@ -814,7 +814,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-bay .id {
   font-size: 7px;
   letter-spacing: 0.18em;
-  color: rgba(212,207,192,0.5);
+  color: rgba(212,207,192, 0.74);
   text-transform: uppercase;
   padding-right: 12px;       /* keep pip from overlapping text */
   white-space: nowrap;
@@ -866,7 +866,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   text-overflow: ellipsis;
 }
 .md-tel-bay .bay-metric .bay-sub {
-  color: rgba(212,207,192,0.45);
+  color: rgba(212,207,192, 0.69);
   font-size: 7.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -918,7 +918,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-size: 9px;
   line-height: 1.25;
   letter-spacing: 0.04em;
-  color: rgba(212,207,192,0.5);
+  color: rgba(212,207,192, 0.74);
   gap: 1px;
 }
 .md-tel-log .row { line-height: 1.25; }
@@ -930,7 +930,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   margin-bottom: 2px;
 }
 .md-tel-log .row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.md-tel-log .row .ts { color: rgba(201,241,88,0.65); margin-right: 6px; }
+.md-tel-log .row .ts { color: rgba(201,241,88, 0.84); margin-right: 6px; }
 .md-tel-log .row .rust { color: var(--rust); }
 
 /* Side panel — horizontal layout. Wider, shallower so content sits in one
@@ -969,7 +969,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   align-items: center;
   gap: 6px;
   font-size: 7.5px;
-  color: rgba(212,207,192,0.55);
+  color: rgba(212,207,192, 0.79);
   letter-spacing: 0.06em;
   white-space: nowrap;
   min-width: 0;
@@ -1249,7 +1249,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   text-transform: uppercase;
   line-height: 1;
 }
-.dsp-tile.is-active .dsp-tile__sub { color: rgba(201,241,88,0.55); }
+.dsp-tile.is-active .dsp-tile__sub { color: rgba(201,241,88, 0.79); }
 
 .dsp-tile__check {
   position: absolute;
@@ -1297,7 +1297,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --dk-ch-2: #3a3d36;
   --dk-ch-3: #2f322c;
   --dk-phos: #b8d957;
-  --dk-phos-dim: #5a6b3a;
+  --dk-phos-dim: #7d9450; /* lifted for AA text contrast */
   --dk-phos-glow: #b8d95740;
   --dk-amber: #d9a23a;
   --dk-amber-dim: #6b4f1c;
@@ -1441,7 +1441,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-size: 8px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #8a8e82;
+  color: #a6aa9c;
   padding: 3px 8px 1px;
   background: linear-gradient(180deg, #2a2d27 0%, #1a1c18 100%);
   border-bottom: 1px solid #0a0c08;
@@ -1723,7 +1723,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 6px;
   letter-spacing: 0.16em;
-  color: rgba(138,142,130,0.55);
+  color: rgba(166,170,156,0.9);
   font-weight: 500;
 }
 
@@ -1816,7 +1816,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 6.5px;
   letter-spacing: 0.14em;
-  color: rgba(138,142,130,0.7);
+  color: rgba(166,170,156,0.88);
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -2069,7 +2069,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 5.5px;
   letter-spacing: 0.06em;
-  color: rgba(138,142,130,0.7);
+  color: rgba(166,170,156,0.88);
   font-weight: 600;
   text-transform: uppercase;
   max-width: 44px;
@@ -2134,7 +2134,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .dk-traffic span:nth-child(2) { background: #d9a23a; }
 .dk-traffic span:nth-child(3) { background: #5a9a3a; }
 .dk-term-title {
-  font-size: 9px; letter-spacing: 0.16em; color: #8a8e82;
+  font-size: 9px; letter-spacing: 0.16em; color: #a6aa9c;
   margin-left: 4px;
 }
 .dk-term-title .dk-dot { color: #3a3d36; margin: 0 4px; }
@@ -2282,12 +2282,12 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --bp-paper:   #f3ecda;
   --bp-paper-2: #e8ddc1;
   --bp-ink:     #1f2a3a;
-  --bp-ink-2:   rgba(31, 42, 58, 0.62);
-  --bp-ink-3:   rgba(31, 42, 58, 0.32);
-  --bp-line:    #5e7d1d;          /* spine — dimension callouts */
+  --bp-ink-2:   rgba(31, 42, 58, 0.80);
+  --bp-ink-3:   rgba(31, 42, 58, 0.62);
+  --bp-line:    #4d6918;          /* spine — dimension callouts */
   --bp-line-2:  rgba(94, 125, 29, 0.45);
   --bp-accent:  #c8553d;          /* rust — REV numbers, section marker */
-  --bp-warm:    #b8771e;          /* drafting-pencil amber — credit, clock val */
+  --bp-warm:    #8a5410;          /* drafting-pencil amber — credit, clock val */
   --bp-olive:   #3a5414;          /* deeper olive for dimension numerals */
   --bp-graphite:#5a6677;          /* graphite — secondary text */
   --bp-grid:    rgba(31, 42, 58, 0.08);
@@ -2342,8 +2342,8 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --bp-paper:   #0a1525;
   --bp-paper-2: #112038;
   --bp-ink:     #cfe7ff;
-  --bp-ink-2:   rgba(207, 231, 255, 0.62);
-  --bp-ink-3:   rgba(207, 231, 255, 0.30);
+  --bp-ink-2:   rgba(207, 231, 255, 0.78);
+  --bp-ink-3:   rgba(207, 231, 255, 0.58);
   --bp-line:    #7ec8e3;
   --bp-line-2:  rgba(126, 200, 227, 0.40);
   --bp-accent:  #e87a5f;   /* terracotta — REV column, section cut letters */
@@ -2885,13 +2885,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   text-transform: uppercase;
   margin-top: 2px;
 }
-[data-theme="dark"] .md-mac-brand-meta .v { color: rgba(220, 210, 188, 0.65); }
+[data-theme="dark"] .md-mac-brand-meta .v { color: rgba(220, 210, 188, 0.84); }
 
 /* Smiling-Mac glyph on the CRT bezel — Susan Kare's classic ROM icon */
 .md-mac-smiley {
   position: absolute;
   left: 12px; bottom: 10px;
-  color: rgba(245, 220, 160, 0.62);
+  color: rgba(245, 220, 160, 0.84);
   opacity: 0.78;
   pointer-events: none;
   filter: drop-shadow(0 0 4px rgba(255, 220, 140, 0.25));
@@ -2940,13 +2940,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.18em;
-  color: rgba(220, 200, 160, 0.65);
+  color: rgba(220, 200, 160, 0.84);
   text-transform: lowercase;
 }
 .md-mac-floppy-eject {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: rgba(220, 200, 160, 0.4);
+  color: rgba(220, 200, 160, 0.64);
 }
 .md-mac-floppy-sub {
   font-family: var(--font-mono);
@@ -3207,7 +3207,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   --sub-phos:     #8aff5a;
   --sub-red:      #ff6450;
   --sub-ink:      #d4c69e;
-  --sub-ink-dim:  rgba(212, 198, 158, 0.55);
+  --sub-ink-dim:  rgba(212, 198, 158, 0.74);
 
   background:
     repeating-linear-gradient(90deg,
@@ -3658,7 +3658,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   border-bottom: 1px solid rgba(138, 255, 90, 0.25);
   font-size: 6.5px;
   letter-spacing: 0.18em;
-  color: rgba(138, 255, 90, 0.55);
+  color: rgba(138, 255, 90, 0.79);
   text-transform: uppercase;
 }
 .md-sub-radar-row {
@@ -3684,7 +3684,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 .md-sub-radar-row.sev-err  .brg, .md-sub-radar-row.sev-err  .desc { color: var(--sub-red); text-shadow: 0 0 4px rgba(255,100,80,0.45); }
 .md-sub-radar-row.sev-warn .brg { color: var(--sub-needle); }
-.md-sub-radar-row.empty .desc { color: rgba(138, 255, 90, 0.4); font-style: italic; }
+.md-sub-radar-row.empty .desc { color: rgba(138, 255, 90, 0.64); font-style: italic; }
 
 /* ── 07 — Small/mini instruments (oxygen, pressure) ────────────────── */
 .md-sub-small-mod { justify-content: center; gap: 3px; }
@@ -4139,6 +4139,17 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   color: #c9f158 !important;
   text-shadow: 0 0 6px rgba(201, 241, 88, 0.6);
 }
+/* Light paper: phosphor green is unreadable, so the toggles go deep olive. */
+html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  border-color: rgba(63, 92, 10, 0.3) !important;
+  color: #4a5e22 !important;
+}
+html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  border-color: rgba(63, 92, 10, 0.7) !important;
+  background: rgba(63, 92, 10, 0.12) !important;
+  color: #2f4012 !important;
+  text-shadow: none;
+}
 
 /* KRNL Dock — stencil labels, red rocker lamp when on */
 [data-dock="krnl-dock"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
@@ -4219,6 +4230,11 @@ body { counter-reset: krnl-mother; }
   position: relative;
   background: var(--node-bg);
   padding: 0 6px;
+}
+/* Transparent header buttons (gear, ×) would sit on the stripes: give them
+   the plate colour so the glyph never lands ink-on-ink. */
+[data-dock="macintosh"] .krnl-node-header > button {
+  background: var(--node-bg) !important;
 }
 [data-dock="macintosh"] .krnl-node-header > :empty:not(button):not(svg):not(img) {
   background: transparent;

@@ -1229,7 +1229,7 @@ export function ClockNode({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: realityPopup.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)' }} />
               <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}</span>
-              {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid)' }}>◆ LIVE</span>}
+              {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>◆ LIVE</span>}
             </div>
             <div style={{ color: 'var(--ink-3)', fontSize: 10, marginBottom: 10, letterSpacing: '0.04em' }}>
               {fmtClockHM(realityPopup.seg.startMs)} {realityPopup.seg.live ? '→ now' : `– ${fmtClockHM(realityPopup.seg.endMs)}`}

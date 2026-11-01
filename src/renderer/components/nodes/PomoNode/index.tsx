@@ -375,7 +375,7 @@ export function PomoNode({
         <span
           data-testid="pomo-header-label"
           style={{
-            color: isTaskMode ? 'var(--acid)' : 'var(--ink-2)',
+            color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-2)',
             fontWeight: 500,
           }}
         >
@@ -656,7 +656,7 @@ export function PomoNode({
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
                 fontWeight: 700,
-                color: 'var(--acid)',
+                color: 'var(--acid-ink, var(--acid))',
                 textTransform: 'uppercase',
                 letterSpacing: '0.06em',
                 textAlign: 'center',
@@ -879,7 +879,7 @@ function CycleCounter({
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 8.5,
-              color: 'var(--acid)',
+              color: 'var(--acid-ink, var(--acid))',
               letterSpacing: '0.06em',
               marginLeft: 1,
             }}

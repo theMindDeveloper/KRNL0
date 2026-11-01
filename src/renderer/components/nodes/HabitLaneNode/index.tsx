@@ -323,7 +323,7 @@ export function HabitLaneNode({
           fontSize: 9,
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
-          color: 'var(--acid)',
+          color: 'var(--acid-ink, var(--acid))',
           opacity: 0,
           transition: 'opacity 0.15s ease',
           pointerEvents: 'none',

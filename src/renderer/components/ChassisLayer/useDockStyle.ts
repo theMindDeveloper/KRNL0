@@ -16,8 +16,10 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { DOCK_STYLES, DEFAULT_DOCK_STYLE, type DockStyle } from './dockRegistry';
 import { applyFrameTheme, currentMode } from '../../themes/applyFrameTheme';
+import { runLookTransition } from '../../themes/transition';
 
 export type { DockStyle } from './dockRegistry';
 export { DOCK_STYLES } from './dockRegistry';
@@ -42,9 +44,13 @@ const subscribers = new Set<(s: DockStyle) => void>();
 function setCurrent(next: DockStyle) {
   if (next === current) return;
   current = next;
-  apply(next);
   try { localStorage.setItem(STORAGE_KEY, next); } catch { /* ignore */ }
-  subscribers.forEach((fn) => fn(next));
+  // Tokens and every subscriber's re-render land inside one View Transition
+  // frame, so the new style is revealed whole instead of half-repainted.
+  runLookTransition(() => {
+    apply(next);
+    flushSync(() => subscribers.forEach((fn) => fn(next)));
+  });
 }
 
 apply(current);
