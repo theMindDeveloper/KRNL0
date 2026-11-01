@@ -138,11 +138,9 @@ function getBreakArcs(): Element[] {
   return Array.from(document.querySelectorAll('[data-testid="clock-task-break-arc"]'));
 }
 
-/** Get all SVG path arcs (fill=none + var(-- stroke). */
+/** Plan segments on the day dial. */
 function getAllArcPaths(): Element[] {
-  return Array.from(document.querySelectorAll('svg path')).filter(
-    (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
-  );
+  return Array.from(document.querySelectorAll('[data-testid="clock-plan-arc"]'));
 }
 
 beforeEach(() => {
@@ -176,7 +174,7 @@ describe('ClockNode — focus vs event tasks pre-drawing (Issue #166)', () => {
     expect(getBreakArcs()).toHaveLength(0);
   });
 
-  it('renders an event task as thin hollow/outlined arcs (3 paths) and no break arcs', () => {
+  it('renders an event task as one plan segment and no break arcs', () => {
     const todoId = 'todo-arcs-2';
     const t1 = makeTaskNode('t1', todoId, {
       plannedMin: 75,

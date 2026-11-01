@@ -15,8 +15,11 @@
 | F7 | Habit blocks are tinted with a coloured edge, like tasks, not a solid bright bar. |
 | F8 | Reality spans that cross midnight are split onto both days. |
 | F9 | When a dropped task lands later than the drop slot (chain push, Decision 30), a notice says where it went and why. |
-| F10 | Clock: plan arcs are solid lane-width strokes. Reality is its own ring between the dial and the plan lanes, so the dial face stays clear. |
-| F11 | Clock: the "now" pointer and the active task are shown only when the selected 12-hour half contains the current time. |
+| F10 | Clock = **day dial** (`ClockNode/DayDial.tsx`). There are no hands, 60 ticks or numerals. One fixed-thickness **plan band**: parallel tasks share it as sub-bands, so the shape never grows. A thin **reality band** inside it, one "now" needle, quarter-hour labels, and 12 hour ticks. |
+| F11 | The dial centre answers "what now / what next": **NOW** · task · time left (+N parallel), or **NEXT** · task · in N min, or FREE, plus tracked today. On another half or day it shows a summary (N planned · done/open). The needle only appears in the half that contains now. Tasks that already ended are dimmed by absolute time. |
+| F12 | Calendar day view narrower than 360 px switches to an **agenda**: a day strip (plan line + reality line) and one full-width row per task or habit (start/end, title, planned/tracked, +over, missed, "overlaps N"). It has a NOW divider, opens at now, and accepts drops (placed after the row dropped on). "▦ time grid" / "≡ list" toggle the layout. |
+| F13 | Calendar time grid: blocks show only what fits their measured size (bar / title / title + time). Lanes are packed by drawn height. At most ⌊width / 80px⌋ lanes are drawn per cluster, and the rest collapse into a "+N" chip that lists them. The default scale is 56 px per hour, and the grid opens scrolled to now. |
+| F14 | Clock list: only done tasks are struck through. Past open tasks are dimmed. |
 
 ## Gherkin Scenarios (ATDD)
 
