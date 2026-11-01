@@ -33,7 +33,7 @@ const DEFAULT_PALETTE = [
   'var(--acid)',
   'var(--rust)',
   '#8a7bff',
-  '#ff8e64',
+  'var(--k-an-warm, #ff8e64)',
   '#5dd3c5',
   '#d18bff',
   '#f4d35e',
@@ -97,9 +97,9 @@ export function DonutChart({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
         <svg width={W} height={chartH} viewBox={`0 0 ${W} ${chartH}`} role="img" aria-label="No data">
-          <circle cx={cx} cy={cy} r={rOuter} fill="none" stroke="#2a2e33" strokeWidth={2} />
-          <circle cx={cx} cy={cy} r={rOuter - 4} fill="none" stroke="#1a1d20" strokeWidth={1} strokeDasharray="3 5" />
-          <text x={cx} y={cy + 4} fontSize={10} textAnchor="middle" fill="#7d848b" fontFamily="var(--font-mono)">
+          <circle cx={cx} cy={cy} r={rOuter} fill="none" stroke="var(--k-an-line-2, #2a2e33)" strokeWidth={2} />
+          <circle cx={cx} cy={cy} r={rOuter - 4} fill="none" stroke="var(--k-an-bg-2b, #1a1d20)" strokeWidth={1} strokeDasharray="3 5" />
+          <text x={cx} y={cy + 4} fontSize={10} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
             no data
           </text>
         </svg>
@@ -156,7 +156,7 @@ export function DonutChart({
             key={sl.id}
             d={sl.path}
             fill={`url(#${uid}-grad-${sl.id})`}
-            stroke="#0e1012"
+            stroke="var(--k-an-bg, #0e1012)"
             strokeWidth={1.5}
             strokeLinejoin="round"
             style={{ transition: 'opacity 120ms' }}
@@ -191,7 +191,7 @@ export function DonutChart({
                 y={cy + (centerSecondary ? -2 : 5)}
                 fontSize={Math.max(14, Math.round(rInner * 0.4))}
                 textAnchor="middle"
-                fill="#f4f6f8"
+                fill="var(--k-an-ink, #f4f6f8)"
                 fontFamily="var(--font-mono)"
                 fontWeight={600}
                 style={{ letterSpacing: '-0.02em' }}
@@ -205,7 +205,7 @@ export function DonutChart({
                 y={cy + 14}
                 fontSize={9}
                 textAnchor="middle"
-                fill="#9aa1a8"
+                fill="var(--k-an-ink-3, #9aa1a8)"
                 fontFamily="var(--font-mono)"
                 style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}
               >
@@ -225,7 +225,7 @@ export function DonutChart({
             justifyContent: 'center',
             fontFamily: 'var(--font-mono)',
             fontSize: 9.5,
-            color: '#c8cdd3',
+            color: 'var(--k-an-ink-2, #c8cdd3)',
           }}
         >
           {slices.map((sl) => (
@@ -241,8 +241,8 @@ export function DonutChart({
                   display: 'inline-block',
                 }}
               />
-              <span style={{ color: '#c8cdd3' }}>{sl.label}</span>
-              <span style={{ color: '#7d848b' }}>
+              <span style={{ color: 'var(--k-an-ink-2, #c8cdd3)' }}>{sl.label}</span>
+              <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>
                 · {formatValue ? formatValue(sl.value) : sl.value}
               </span>
             </span>

@@ -54,7 +54,7 @@ const tileStyle = (accent: string): React.CSSProperties => ({
   flex: '1 1 140px',
   minWidth: 130,
   background: 'linear-gradient(180deg, rgba(20,22,24,0.55) 0%, rgba(12,14,16,0.55) 100%)',
-  border: '1px solid #23262a',
+  border: '1px solid var(--k-an-line, #23262a)',
   borderLeft: `3px solid ${accent}`,
   borderRadius: 6,
   padding: '10px 12px 8px',
@@ -68,7 +68,7 @@ const tileStyle = (accent: string): React.CSSProperties => ({
 const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 9,
-  color: '#9aa1a8',
+  color: 'var(--k-an-ink-3, #9aa1a8)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
 };
@@ -83,7 +83,7 @@ const valueRowStyle: React.CSSProperties = {
 const valueStyle: React.CSSProperties = {
   fontSize: 26,
   fontVariantNumeric: 'tabular-nums',
-  color: '#f4f6f8',
+  color: 'var(--k-an-ink, #f4f6f8)',
   lineHeight: 1,
   fontWeight: 600,
   letterSpacing: '-0.02em',
@@ -91,7 +91,7 @@ const valueStyle: React.CSSProperties = {
 
 const unitStyle: React.CSSProperties = {
   fontSize: 10,
-  color: '#7d848b',
+  color: 'var(--k-an-ink-4, #7d848b)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
 };
@@ -99,13 +99,13 @@ const unitStyle: React.CSSProperties = {
 const hintStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 9,
-  color: '#7d848b',
+  color: 'var(--k-an-ink-4, #7d848b)',
 };
 
 function DeltaBadge({ pct }: { pct: number | undefined }) {
   if (pct === undefined) return null;
   const up = pct >= 0;
-  const color = up ? 'var(--acid)' : '#ff8e64';
+  const color = up ? 'var(--acid)' : 'var(--k-an-warm, #ff8e64)';
   const sign = up ? '▲' : '▼';
   return (
     <span

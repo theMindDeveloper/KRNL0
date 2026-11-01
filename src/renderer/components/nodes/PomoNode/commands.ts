@@ -443,12 +443,18 @@ const VALID_FACES: ReadonlyArray<TimerFace> = TIMER_FACES;
 /**
  * PR4 — set the timer face variant on the PomoConfig.
  * No-op if the requested face is unknown or unchanged.
+ * ADR 0009 — 'auto' clears the saved face so the frame style's default applies.
  */
 export const pomoSetFace = (
   config: PomoConfig | null,
-  args: { face: TimerFace },
+  args: { face: TimerFace | 'auto' },
 ): PomoConfig => {
   const current = config ?? defaultPomoConfig();
+  if (args.face === 'auto') {
+    const { face: _drop, ...rest } = current;
+    void _drop;
+    return rest;
+  }
   if (!VALID_FACES.includes(args.face)) return current;
   return { ...current, face: args.face };
 };

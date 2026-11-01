@@ -459,8 +459,9 @@ export function PomoNode({
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {TIMER_FACES.map((face) => {
-              const isActive = (config.face ?? defaultFace) === face;
+            {(['auto', ...TIMER_FACES] as const).map((face) => {
+              // 'auto' = no saved face: the frame style picks (ADR 0009 F7).
+              const isActive = face === 'auto' ? config.face === undefined : config.face === face;
               return (
                 <button
                   key={face}

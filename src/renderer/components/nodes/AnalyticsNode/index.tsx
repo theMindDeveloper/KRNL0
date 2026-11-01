@@ -86,7 +86,7 @@ const SOURCE_PALETTE: Record<string, string> = {
   pomo: 'var(--rust)',
 };
 
-const FALLBACK_PALETTE = ['#8a7bff', '#5dd3c5', '#d18bff', '#f4d35e', '#ff8e64'];
+const FALLBACK_PALETTE = ['#8a7bff', '#5dd3c5', '#d18bff', '#f4d35e', 'var(--k-an-warm, #ff8e64)'];
 
 // Each view lists the cards it owns, in their default order. The settings
 // sidebar groups by view so the picker mirrors the user's mental model.
@@ -124,7 +124,7 @@ const rootStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
   background: 'linear-gradient(180deg, #16181a 0%, #0e1012 100%)',
-  border: '1px solid #2a2e33',
+  border: '1px solid var(--k-an-line-2, #2a2e33)',
   borderRadius: 10,
   boxShadow:
     '0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)',
@@ -132,7 +132,7 @@ const rootStyle: React.CSSProperties = {
   flexDirection: 'column',
   boxSizing: 'border-box',
   overflow: 'hidden',
-  color: '#eef1f4',
+  color: 'var(--k-an-ink-1, #eef1f4)',
 };
 
 const titlebarStyle: React.CSSProperties = {
@@ -147,7 +147,7 @@ const titlebarStyle: React.CSSProperties = {
   fontSize: 10,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  color: '#c8cdd3',
+  color: 'var(--k-an-ink-2, #c8cdd3)',
   flexShrink: 0,
 };
 
@@ -164,10 +164,10 @@ const summaryChipStyle: React.CSSProperties = {
   fontSize: 9.5,
   letterSpacing: '0.06em',
   padding: '2px 8px',
-  border: '1px solid #2a2e33',
+  border: '1px solid var(--k-an-line-2, #2a2e33)',
   borderRadius: 999,
   background: 'rgba(20,22,24,0.6)',
-  color: '#eef1f4',
+  color: 'var(--k-an-ink-1, #eef1f4)',
 };
 
 const gearBtnStyle = (active: boolean): React.CSSProperties => ({
@@ -177,8 +177,8 @@ const gearBtnStyle = (active: boolean): React.CSSProperties => ({
   placeItems: 'center',
   borderRadius: 6,
   background: active ? 'var(--acid)' : 'transparent',
-  color: active ? '#0e1012' : '#aab0b7',
-  border: '1px solid ' + (active ? 'var(--acid)' : '#2a2e33'),
+  color: active ? 'var(--k-an-bg, #0e1012)' : 'var(--k-an-ink-2b, #aab0b7)',
+  border: '1px solid ' + (active ? 'var(--acid)' : 'var(--k-an-line-2, #2a2e33)'),
   cursor: 'pointer',
   padding: 0,
   fontSize: 13,
@@ -200,12 +200,12 @@ const tabPill = (active: boolean): React.CSSProperties => ({
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   padding: '5px 11px',
-  border: '1px solid ' + (active ? '#3a4048' : '#23262a'),
+  border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),
   borderRadius: 999,
   background: active
     ? 'linear-gradient(180deg, #2a2e33 0%, #1c1f23 100%)'
     : 'transparent',
-  color: active ? 'var(--acid, #c9f158)' : '#aab0b7',
+  color: active ? 'var(--acid, #c9f158)' : 'var(--k-an-ink-2b, #aab0b7)',
   cursor: 'pointer',
   boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.04)' : 'none',
   transition: 'all 120ms',
@@ -216,10 +216,10 @@ const chipBtn = (active: boolean): React.CSSProperties => ({
   fontSize: 9,
   letterSpacing: '0.04em',
   padding: '3px 8px',
-  border: '1px solid ' + (active ? '#3a4048' : '#23262a'),
+  border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),
   borderRadius: 4,
   background: active ? 'var(--acid, #c9f158)' : 'transparent',
-  color: active ? '#0e1012' : '#c8cdd3',
+  color: active ? 'var(--k-an-bg, #0e1012)' : 'var(--k-an-ink-2, #c8cdd3)',
   cursor: 'pointer',
   fontWeight: active ? 700 : 500,
 });
@@ -279,7 +279,7 @@ function ChartCard({
 
   const cardStyle: React.CSSProperties = {
     background: 'linear-gradient(180deg, #1a1d20 0%, #131517 100%)',
-    border: `1px solid ${pinned ? 'rgba(201,241,88,0.45)' : '#23262a'}`,
+    border: `1px solid ${pinned ? 'rgba(201,241,88,0.45)' : 'var(--k-an-line, #23262a)'}`,
     boxShadow: pinned
       ? '0 0 0 1px rgba(201,241,88,0.18) inset, 0 6px 20px rgba(0,0,0,0.35)'
       : 'inset 0 1px 0 rgba(255,255,255,0.02), 0 4px 14px rgba(0,0,0,0.25)',
@@ -301,7 +301,7 @@ function ChartCard({
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 9.5,
-            color: pinned ? 'var(--acid)' : '#9aa1a8',
+            color: pinned ? 'var(--acid)' : 'var(--k-an-ink-3, #9aa1a8)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             fontWeight: pinned ? 700 : 500,
@@ -334,7 +334,7 @@ function ChartCard({
               onClick={(e) => { e.stopPropagation(); onToggleHidden(); }}
               onMouseDown={(e) => e.stopPropagation()}
               title="Hide card"
-              style={cardActionBtn(false, '#ff8e64')}
+              style={cardActionBtn(false, 'var(--k-an-warm, #ff8e64)')}
             >
               −
             </button>
@@ -366,7 +366,7 @@ function cardActionBtn(active: boolean, accent: string): React.CSSProperties {
     display: 'grid',
     placeItems: 'center',
     background: active ? accent : 'transparent',
-    color: active ? '#0e1012' : accent,
+    color: active ? 'var(--k-an-bg, #0e1012)' : accent,
     border: `1px solid ${accent}`,
     borderRadius: 4,
     cursor: 'pointer',
@@ -529,20 +529,20 @@ export function AnalyticsNode({
       {/* Titlebar */}
       <div style={titlebarStyle}>
         <span style={dotStyle} aria-hidden />
-        <span style={{ color: '#f4f6f8', fontWeight: 600 }}>Analytics</span>
-        <span style={{ color: '#7d848b' }}>·</span>
-        <span style={{ color: '#aab0b7' }}>{sources.length} sources</span>
+        <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
+        <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
+        <span style={{ color: 'var(--k-an-ink-2b, #aab0b7)' }}>{sources.length} sources</span>
         <div style={{ flex: 1 }} />
         <span style={summaryChipStyle}>
-          <span style={{ color: '#9aa1a8' }}>done </span>
-          <span style={{ color: '#f4f6f8' }}>{tot.tasksDone}</span>
+          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>done </span>
+          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.tasksDone}</span>
         </span>
         <span style={summaryChipStyle}>
-          <span style={{ color: '#9aa1a8' }}>focus </span>
-          <span style={{ color: '#f4f6f8' }}>{tot.focusMin}m</span>
+          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>focus </span>
+          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin}m</span>
         </span>
         <span style={summaryChipStyle}>
-          <span style={{ color: '#9aa1a8' }}>streak </span>
+          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>streak </span>
           <span style={{ color: 'var(--acid, #c9f158)' }}>{streaks.longestHabitStreak}d</span>
         </span>
         <button
@@ -674,7 +674,7 @@ function SettingsSidebar({
         width: 196,
         flexShrink: 0,
         background: 'linear-gradient(180deg, #16191c 0%, #101214 100%)',
-        border: '1px solid #23262a',
+        border: '1px solid var(--k-an-line, #23262a)',
         borderRadius: 8,
         padding: '12px 12px 12px',
         display: 'flex',
@@ -705,8 +705,8 @@ function SettingsSidebar({
           onMouseDown={(e) => e.stopPropagation()}
           style={{
             ...chipBtn(false),
-            borderColor: '#ff8e64',
-            color: '#ff8e64',
+            borderColor: 'var(--k-an-warm, #ff8e64)',
+            color: 'var(--k-an-warm, #ff8e64)',
             fontSize: 8,
           }}
           title="Show every card, clear pins"
@@ -720,12 +720,12 @@ function SettingsSidebar({
           margin: 0,
           fontFamily: 'var(--font-mono)',
           fontSize: 9,
-          color: '#9aa1a8',
+          color: 'var(--k-an-ink-3, #9aa1a8)',
           letterSpacing: '0.04em',
           lineHeight: 1.45,
         }}
       >
-        <span style={{ color: 'var(--acid)' }}>★</span> pin to top  ·  <span style={{ color: '#ff8e64' }}>✕</span> hide
+        <span style={{ color: 'var(--acid)' }}>★</span> pin to top  ·  <span style={{ color: 'var(--k-an-warm, #ff8e64)' }}>✕</span> hide
       </p>
 
       {ANALYTICS_VIEWS.map((v) => (
@@ -734,11 +734,11 @@ function SettingsSidebar({
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 9,
-              color: v === currentView ? '#eef1f4' : '#7d848b',
+              color: v === currentView ? 'var(--k-an-ink-1, #eef1f4)' : 'var(--k-an-ink-4, #7d848b)',
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
               fontWeight: v === currentView ? 700 : 500,
-              borderBottom: '1px dashed #23262a',
+              borderBottom: '1px dashed var(--k-an-line, #23262a)',
               paddingBottom: 3,
             }}
           >
@@ -763,7 +763,7 @@ function SettingsSidebar({
                     flex: 1,
                     fontFamily: 'var(--font-mono)',
                     fontSize: 9.5,
-                    color: hidden ? '#7d848b' : '#c8cdd3',
+                    color: hidden ? 'var(--k-an-ink-4, #7d848b)' : 'var(--k-an-ink-2, #c8cdd3)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -789,7 +789,7 @@ function SettingsSidebar({
                   onClick={(e) => { e.stopPropagation(); onToggleHidden(id); }}
                   onMouseDown={(e) => e.stopPropagation()}
                   title={hidden ? 'Show' : 'Hide'}
-                  style={cardActionBtn(hidden, '#ff8e64')}
+                  style={cardActionBtn(hidden, 'var(--k-an-warm, #ff8e64)')}
                 >
                   {hidden ? '+' : '✕'}
                 </button>
@@ -817,7 +817,7 @@ function SettingsSidebar({
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 9,
-            color: '#ff8e64',
+            color: 'var(--k-an-warm, #ff8e64)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             fontWeight: 700,
@@ -836,7 +836,7 @@ function SettingsSidebar({
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 8.5,
-            color: '#7d848b',
+            color: 'var(--k-an-ink-4, #7d848b)',
             lineHeight: 1.4,
           }}
         >
@@ -1427,12 +1427,12 @@ function ViewBody(props: ViewBodyProps) {
                 width: '100%',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 10,
-                color: '#eef1f4',
+                color: 'var(--k-an-ink-1, #eef1f4)',
                 borderCollapse: 'collapse',
               }}
             >
               <thead>
-                <tr style={{ color: '#9aa1a8', textAlign: 'left' }}>
+                <tr style={{ color: 'var(--k-an-ink-3, #9aa1a8)', textAlign: 'left' }}>
                   <th style={{ padding: '4px 6px' }}>id</th>
                   <th style={{ padding: '4px 6px' }}>label</th>
                   <th style={{ padding: '4px 6px', textAlign: 'right' }}>events</th>
@@ -1442,7 +1442,7 @@ function ViewBody(props: ViewBodyProps) {
                 {sources.map((s) => {
                   const count = events.filter((e) => e.source === s.id).length;
                   return (
-                    <tr key={s.id} style={{ borderTop: '1px solid #23262a' }}>
+                    <tr key={s.id} style={{ borderTop: '1px solid var(--k-an-line, #23262a)' }}>
                       <td style={{ padding: '4px 6px' }}>{s.id}</td>
                       <td style={{ padding: '4px 6px' }}>{s.label}</td>
                       <td style={{ padding: '4px 6px', textAlign: 'right' }}>{count}</td>
@@ -1472,13 +1472,13 @@ function ViewBody(props: ViewBodyProps) {
                   width: '100%',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 10,
-                  color: '#eef1f4',
+                  color: 'var(--k-an-ink-1, #eef1f4)',
                   borderCollapse: 'collapse',
                 }}
               >
                 <tbody>
                   {streaks.perHabit.map((h) => (
-                    <tr key={h.habitId} style={{ borderTop: '1px solid #23262a' }}>
+                    <tr key={h.habitId} style={{ borderTop: '1px solid var(--k-an-line, #23262a)' }}>
                       <td style={{ padding: '4px 6px' }}>{h.label}</td>
                       <td style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--acid, #c9f158)' }}>
                         {h.streak}d

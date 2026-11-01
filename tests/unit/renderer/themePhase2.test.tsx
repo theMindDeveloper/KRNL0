@@ -112,3 +112,12 @@ describe('F7 — new Pomo faces', () => {
     expect(getByText(/min 13 \/ 25/i)).toBeTruthy();
   });
 });
+
+describe('F7 — "auto" hands the face back to the frame style', () => {
+  it('pomoSetFace({face:"auto"}) clears the saved face', async () => {
+    const { pomoSetFace } = await import('../../../src/renderer/components/nodes/PomoNode/commands');
+    const next = pomoSetFace({ sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, face: 'blocks' }, { face: 'auto' });
+    expect(next.face).toBeUndefined();
+    expect(next.sessionMin).toBe(25);
+  });
+});

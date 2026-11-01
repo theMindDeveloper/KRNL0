@@ -220,10 +220,10 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
     return { ok: true, message: JSON.stringify(info), data: info };
   }
 
-  if (opts.face !== undefined && !isTimerFace(opts.face)) {
+  if (opts.face !== undefined && opts.face !== 'auto' && !isTimerFace(opts.face)) {
     return {
       ok: false,
-      message: `pomo config: invalid --face "${opts.face}". Allowed: ${VALID_FACES.join(', ')}`,
+      message: `pomo config: invalid --face "${opts.face}". Allowed: auto, ${VALID_FACES.join(', ')}`,
     };
   }
 
@@ -237,7 +237,8 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
     if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.round(opts.short);
     if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.round(opts.long);
     if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.round(opts.every);
-    if (opts.face !== undefined) next.face = opts.face as TimerFace;
+    if (opts.face === 'auto') delete next.face;
+    else if (opts.face !== undefined) next.face = opts.face as TimerFace;
     node['config'] = next;
     found = true;
   });
@@ -267,10 +268,10 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
     return { ok: true, message: JSON.stringify(info), data: info };
   }
 
-  if (opts.face !== undefined && !isTimerFace(opts.face)) {
+  if (opts.face !== undefined && opts.face !== 'auto' && !isTimerFace(opts.face)) {
     return {
       ok: false,
-      message: `pomo config: invalid --face "${opts.face}". Allowed: ${VALID_FACES.join(', ')}`,
+      message: `pomo config: invalid --face "${opts.face}". Allowed: auto, ${VALID_FACES.join(', ')}`,
     };
   }
 
@@ -290,7 +291,8 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
   if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.round(opts.short);
   if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.round(opts.long);
   if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.round(opts.every);
-  if (opts.face !== undefined) next.face = opts.face as TimerFace;
+  if (opts.face === 'auto') delete next.face;
+  else if (opts.face !== undefined) next.face = opts.face as TimerFace;
   node['config'] = next;
 
   saveBoardTo(boardPath, { ...(board as unknown as Record<string, unknown>), savedAt: new Date().toISOString() });

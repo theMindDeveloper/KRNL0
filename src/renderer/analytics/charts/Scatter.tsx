@@ -165,9 +165,9 @@ export function Scatter({
       {/* Correlation badge — top-right */}
       <g transform={`translate(${pad.left + innerW - 70}, ${pad.top - 2})`}>
         <rect x={0} y={0} width={70} height={14} rx={3} fill="rgba(20,22,24,0.7)" stroke={COLOR_GRID} />
-        <text x={4} y={10} fontSize={8} fill="#9aa1a8" fontFamily="var(--font-mono)">r =</text>
+        <text x={4} y={10} fontSize={8} fill="var(--k-an-ink-3, #9aa1a8)" fontFamily="var(--font-mono)">r =</text>
         <text x={66} y={10} fontSize={8.5} textAnchor="end" fontFamily="var(--font-mono)" fontWeight={700}
-          fill={Math.abs(correlation) > 0.5 ? 'var(--acid)' : '#c8cdd3'}>
+          fill={Math.abs(correlation) > 0.5 ? 'var(--acid)' : 'var(--k-an-ink-2, #c8cdd3)'}>
           {correlation.toFixed(2)}
         </text>
       </g>

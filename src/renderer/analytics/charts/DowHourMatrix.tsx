@@ -123,11 +123,11 @@ export function DowHourMatrix({
 
       {/* Peak legend */}
       <g transform={`translate(${pad.left + innerW - 72}, ${pad.top - 4})`}>
-        <text x={0} y={4} fontSize={8} fill="#9aa1a8" fontFamily="var(--font-mono)">peak</text>
+        <text x={0} y={4} fontSize={8} fill="var(--k-an-ink-3, #9aa1a8)" fontFamily="var(--font-mono)">peak</text>
         <rect x={24} y={-2} width={10} height={8} fill={colorMax} opacity={0.18} rx={1} />
         <rect x={36} y={-2} width={10} height={8} fill={colorMax} opacity={0.55} rx={1} />
         <rect x={48} y={-2} width={10} height={8} fill={colorMax} opacity={1} rx={1} />
-        <text x={62} y={4} fontSize={8} fill="#c8cdd3" fontFamily="var(--font-mono)">
+        <text x={62} y={4} fontSize={8} fill="var(--k-an-ink-2, #c8cdd3)" fontFamily="var(--font-mono)">
           {peak}
         </text>
       </g>

@@ -40,8 +40,20 @@ const legacy = (): ThemeManifest => ({
   slots: { panelToggles: 'topbar' },
 });
 
+/**
+ * Analytics node palette for non-Classic styles: follow the style's own
+ * surfaces and ink instead of the fixed dark slate Classic keeps.
+ */
+const AN_THEMED: TokenMap = {
+  '--k-an-bg': 'var(--node-bg)', '--k-an-bg-2': 'var(--node-bg)', '--k-an-bg-2b': 'var(--paper-2)', '--k-an-bg-3': 'var(--paper-2)',
+  '--k-an-line': 'var(--paper-3)', '--k-an-line-2': 'var(--paper-3)', '--k-an-line-3': 'var(--paper-3)',
+  '--k-an-ink': 'var(--ink)', '--k-an-ink-1': 'var(--ink)', '--k-an-ink-2': 'var(--ink-2)', '--k-an-ink-2b': 'var(--ink-3)',
+  '--k-an-ink-3': 'var(--ink-3)', '--k-an-ink-4': 'var(--ink-4)', '--k-an-warm': 'var(--rust)',
+};
+
 /** Pro — matte graphite, one lit acid accent (design drafts "Pro screens"). */
 const PRO_DARK: TokenMap = {
+  ...AN_THEMED,
   '--paper': '#0b0b0b',
   '--paper-2': '#141414',
   '--paper-3': '#262626',
@@ -106,7 +118,7 @@ const PRO: ThemeManifest = {
 // Palettes moved here from the `[data-dock] .mother-frame` blocks in
 // chassis.css so they apply on <html> and reach every node, not only mothers.
 
-const k = (extra: Record<`--${string}`, string>): TokenMap => ({ ...CLASSIC_K, ...extra });
+const k = (extra: Record<`--${string}`, string>): TokenMap => ({ ...CLASSIC_K, ...AN_THEMED, ...extra });
 
 const SYNTH_DARK: TokenMap = k({
   '--paper': '#1c1812', '--paper-2': '#221e18', '--paper-3': '#3a352c', '--node-bg': '#221e18',
