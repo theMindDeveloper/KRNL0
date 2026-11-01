@@ -622,3 +622,30 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Why documented retroactively:** Hard rule requires a HISTORY.md entry before any merge to `main`, but this batch reached `origin/main` without one. Local `main` had fallen 26 commits behind while a different local commit (`9ebb796`) sat on top of the old tip; completing the already-staged merge brought both histories together. This entry closes that gap so the log matches what's actually running.
 
 **Tests:** Post-merge, full suite green — 110 test files / 1407 tests passed, 0 typecheck errors.
+
+---
+
+## [2026-11-01] — Logic audit fixes: persistence safety, undo, #168 chain push, CLI parity and validation
+
+**Type:** Bug Fix (batch)
+**Commits:** `04a5b72` (persistence), `0903056` (pomo spans), `9edc7dd` (CLI input + pomo/habit/marquee), `616d43c` (undo), `7fe10b3` (#168 schedule), `6c157db` (habit/analytics midnight + streaks), `f210c7e` (todo/task/ledger sync), `e93321e` (mother guards, stubs, reset script)
+**Files changed:** `src/main/{boardIo.ts,persistence/board.ts,ipc/handlers.ts}`, `src/sys/{parser.ts,SysFacade.ts,commands/*}`, `src/shared/{cli/commandRegistry.ts,dispatch/task.ts}`, `src/renderer/{store/*,hooks/useLocalDay.ts,analytics/useAnalytics.ts,components/{Canvas,nodes/*,ChassisLayer/TelemetryChrome.tsx}}`, `scripts/reset-board.mjs`, `docs/03-architecture/decisions.md` (Decision 30), tests.
+
+**Summary:** Fixes from a read-only logic audit of the whole app.
+- **Persistence:** saves are atomic (temp file plus rename, with retry on Windows locks). An unreadable `board.json` is backed up as `.corrupt-<ts>` before the seed is used. CLI writes on a missing board start from the seed, not an empty board, which used to drop the mother nodes for good.
+- **Undo (#170):** undoing a task delete now also restores the todo item and the Pomo state. The cascade had been changing the undo snapshot in place. CLI changes no longer wipe undo history (new `reloadBoard`).
+- **#168:** chains stay sequential (Decision 30). Duration edits resize the block, loops are refused, and `task schedule --at` is validated and stored in local time.
+- **Pomo:** resuming after a pause records a separate work span, so the pause gap is not drawn as work.
+- **CLI:**
+  - New: `pomo pause|resume|discard`, `habit undo`.
+  - `habit done` no longer toggles.
+  - `marquee` needs `--delete` before it deletes anything.
+  - Numbers are strict (no NaN, zero or negatives), and flags may come before positional arguments.
+  - Unimplemented commands report failure instead of success.
+  - `pomo config` refreshes the UI.
+  - `todo check` and `task toggle` keep the todo item, the task and the completion ledger (#169) in sync.
+- **Habits and analytics:** habit grids and "today" counters roll over at midnight. Streaks respect the habit's schedule everywhere.
+- **Guards:** mother nodes can't be captured by `frame add --near` or moved by `node set-position`. `npm run reset` targets the worktree's own board (rule 10).
+- **Deliberately not changed:** Pomo→task time crediting (removed by #180), a revision check for renderer/CLI concurrent saves, and the CLI dispatch timeout.
+
+**Tests:** 115 files / 1456 passed, 0 typecheck errors, build OK. Some full-suite runs on this Windows machine show one random 5 s render-test timeout. The same tests pass when rerun.

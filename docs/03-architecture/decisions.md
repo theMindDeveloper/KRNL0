@@ -2339,3 +2339,21 @@ Documenting unbuilt commands is how AI agents learn to hallucinate them. The gat
 - Modified: `src/renderer/components/Canvas/commandDispatch.ts` (new `cli:dispatch` cases for `task.setNote`, `habit.unpinLane`).
 
 ---
+
+---
+
+## Decision 30 — Chains stay sequential: anchors are earliest-start constraints (#168) (2026-11-01)
+
+**Status:** Accepted (maintainer choice, 2026-11-01). Amends Decision 27 / ADR 0005 and ADR 0003 §3.7.
+
+**Problem (#168):** Lengthening task 1 in a chain made blocks overlap and render side by side. Two rules caused it:
+1. The cursor for the next task advanced by `plannedMin`, while the block was drawn with the `scheduledDurationMin` override. A resized block therefore overlapped its successor.
+2. Every task dropped on the calendar became an absolute fixpoint. Making task 1 longer never moved an anchored task 2.
+
+**Decision:**
+- An event task's cursor advance equals its drawn block length (`scheduledDurationMin` on an anchor, otherwise `plannedMin`). The successor starts where the block ends.
+- Within a chain, an anchor (`scheduledFor`) is an **earliest-start constraint**. If the previous task ends after the anchor's time, the anchor and everything after it are pushed to that end. An anchor placed later than the predecessor's end keeps its own time, so gaps are allowed. This applies to anchored parallel branches too.
+- `task duration` (UI and CLI) also writes `plannedMin` (and `scheduledDurationMin` when anchored), so editing the duration resizes the block.
+- `task.next` edges that would close a loop are refused (canvas connect, `task chain`, `edge add`). A looped chain has no start task and disappeared from Calendar and Clock.
+
+**Consequences:** A "backwards-in-time" anchor (Decision 27 test 15) no longer renders before its predecessor. It is pushed after it. The stored `scheduledFor` is not rewritten, so removing the predecessor restores the original time.
