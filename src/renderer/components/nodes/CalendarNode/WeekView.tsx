@@ -754,7 +754,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           itemId?: string;
           durationMin: number;
         };
-        if (!payload.taskId) return;
+        if (!payload.taskId && !payload.itemId) return;
         // #11 — snap to the zoom-driven granularity (60/30/15/5), not a fixed 15.
         // Guard against jsdom (clientY undefined, rect.height = 0) so the
         // computed minute is always a finite integer in [0, 60-gran].
@@ -767,7 +767,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         const safeMinute = Number.isFinite(minuteRaw) ? minuteRaw : 0;
         const snappedMinute = Math.max(0, Math.min(60 - gran, Math.floor(safeMinute / gran) * gran));
         const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:${String(snappedMinute).padStart(2, '0')}`;
-        scheduleTask(payload.taskId, scheduledFor, payload.durationMin);
+        if (payload.taskId) scheduleTask(payload.taskId, scheduledFor, payload.durationMin);
+        // A Todo row with no task node yet: the dispatcher creates and links
+        // one, then schedules it (so both Todo rows and canvas tasks drop here).
+        else onCommand('calendar.schedule', { itemId: payload.itemId, scheduledFor, scheduledDurationMin: payload.durationMin });
         // 240ms acid flash.
         e.currentTarget.classList.add('calendar-cell--just-dropped');
         const el = e.currentTarget;

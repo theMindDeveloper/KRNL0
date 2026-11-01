@@ -154,11 +154,11 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
 
   const activeToolBtn: React.CSSProperties = {
     ...btnBase,
-    // Hardcode — --ink flips to light in dark mode, which made the active
-    // button render as acid-green on cream (poor contrast). The active
-    // state should always be acid-on-black.
+    // Fixed dark key in every mode. Its glyph uses --accent-on-dark, never
+    // --acid: light styles (Mac, Blueprint) turn --acid dark, which made
+    // this black-on-black. See tokens.css "accent pairs".
     background: '#1a1814',
-    color: 'var(--acid)',
+    color: 'var(--accent-on-dark)',
   };
 
   const divider: React.CSSProperties = {

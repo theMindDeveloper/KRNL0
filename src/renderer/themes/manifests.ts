@@ -165,7 +165,7 @@ const KRNL_DOCK_DARK: TokenMap = k({
 const BLUEPRINT_LIGHT: TokenMap = k({
   '--paper': '#f0e6cc', '--paper-2': '#e2d6b6', '--paper-3': '#c8bb99', '--node-bg': '#f8eed4',
   '--ink': '#1f2a3a', '--ink-2': 'rgba(31, 42, 58, 0.82)', '--ink-3': 'rgba(31, 42, 58, 0.78)', '--ink-4': 'rgba(31, 42, 58, 0.66)',
-  '--ink-on-bright': '#f8eed4', '--acid': '#5e7d1d', '--acid-ink': '#3f5612',
+  '--ink-on-bright': '#f8eed4', '--acid': '#52701a', '--acid-ink': '#3f5612', '--accent-on-dark': '#a8d05a',
   '--btn-primary-bg': '#1f2a3a', '--btn-primary-bg-hover': '#2c3b52', '--btn-primary-fg': '#f8eed4',
   '--k-status-ok': '#a8d05a', '--acid-glow': '#7ea22b', '--acid-faint': 'rgba(94, 125, 29, 0.10)',
   '--spine': '#5e7d1d', '--spine-hot': '#7ea22b', '--rust': '#c8553d', '--rust-deep': '#a83e2a', '--cyan': '#2f4012',
@@ -179,7 +179,7 @@ const BLUEPRINT_LIGHT: TokenMap = k({
 const BLUEPRINT_DARK: TokenMap = k({
   '--paper': '#0c1a2e', '--paper-2': '#142441', '--paper-3': '#1e3358', '--node-bg': '#0e1c34',
   '--ink': '#d8eaff', '--ink-2': 'rgba(216, 234, 255, 0.78)', '--ink-3': 'rgba(216, 234, 255, 0.74)', '--ink-4': 'rgba(216, 234, 255, 0.62)',
-  '--ink-on-bright': '#0a1525', '--acid': '#7ec8e3', '--acid-glow': '#a8e0ff', '--acid-faint': 'rgba(126, 200, 227, 0.12)',
+  '--ink-on-bright': '#0a1525', '--acid': '#7ec8e3', '--accent-on-dark': '#7ec8e3', '--acid-glow': '#a8e0ff', '--acid-faint': 'rgba(126, 200, 227, 0.12)',
   '--spine': '#7ec8e3', '--spine-hot': '#a8e0ff', '--rust': '#e87a5f', '--rust-deep': '#c8553d', '--cyan': '#7ec8e3',
   '--frame-bg': 'rgba(126, 200, 227, 0.05)', '--frame-edge': 'rgba(126, 200, 227, 0.40)',
   '--k-cal-grid': 'rgba(126, 200, 227, 0.16)', '--k-cal-today': 'rgba(241, 196, 99, 0.06)', '--k-term-border': 'rgba(126, 200, 227, 0.4)',
@@ -190,12 +190,15 @@ const BLUEPRINT_DARK: TokenMap = k({
 
 const MAC_LIGHT: TokenMap = k({
   '--font-mono': "'Pixelify Sans', 'JetBrains Mono', monospace", '--font-sans': "'Pixelify Sans', 'JetBrains Mono', monospace", '--k-clock-font': "'Pixelify Sans', monospace",
-  '--paper': '#faf3df', '--paper-2': '#f0e6c8', '--paper-3': '#d8cdaa', '--node-bg': '#fffbe8',
-  '--ink': '#050505', '--ink-2': '#1a1a1a', '--ink-3': 'rgba(5, 5, 5, 0.76)', '--ink-4': 'rgba(5, 5, 5, 0.64)',
-  '--ink-on-bright': '#fffbe8', '--acid': '#050505', '--acid-ink': '#050505',
+  // Modern-retro: off-white windows and charcoal ink instead of 1-bit black.
+  '--paper': '#f4f3ef', '--paper-2': '#ecebe6', '--paper-3': '#d6d4cd', '--node-bg': '#fbfbf8',
+  '--ink': '#1d1d1f', '--ink-2': '#2c2c2e', '--ink-3': 'rgba(29, 29, 31, 0.78)', '--ink-4': 'rgba(29, 29, 31, 0.66)',
+  '--ink-on-bright': '#fbfbf8', '--acid': '#1d1d1f', '--acid-ink': '#1d1d1f', '--accent-on-dark': '#fbfbf8',
   /* acid is black here, so text on it is paper and the primary button inverts. */
-  '--btn-primary-bg': '#050505', '--btn-primary-bg-hover': '#2a2a2a', '--btn-primary-fg': '#fffbe8',
-  '--k-status-ok': '#c9f158', '--k-status-warn': '#ff7a4a', '--acid-glow': '#2a2a2a', '--acid-faint': 'rgba(5, 5, 5, 0.10)',
+  '--btn-primary-bg': '#1d1d1f', '--btn-primary-bg-hover': '#3a3a3c', '--btn-primary-fg': '#fbfbf8',
+  // Finder footer: light bar, ink text.
+  '--k-status-bg': '#fbfbf8', '--k-status-line': 'rgba(29, 29, 31, 0.35)', '--k-status-label': 'rgba(29, 29, 31, 0.66)',
+  '--k-status-value': '#1d1d1f', '--k-status-ok': '#1d1d1f', '--k-status-warn': '#8a2a10', '--acid-glow': '#2a2a2a', '--acid-faint': 'rgba(5, 5, 5, 0.10)',
   '--spine': '#1f1f1f', '--spine-hot': '#050505', '--rust': '#2a1a14', '--rust-deep': '#050505', '--cyan': '#050505', '--plum': '#1f1f1f',
   '--frame-bg': 'rgba(5, 5, 5, 0.04)', '--frame-edge': 'rgba(5, 5, 5, 0.55)',
   '--k-now': '#050505', '--k-cal-grid': 'rgba(5, 5, 5, 0.25)', '--k-cal-today': 'rgba(5, 5, 5, 0.06)', '--k-pointer-core': '#fffbe8',
@@ -209,7 +212,7 @@ const MAC_DARK: TokenMap = k({
   '--font-mono': "'Pixelify Sans', 'JetBrains Mono', monospace", '--font-sans': "'Pixelify Sans', 'JetBrains Mono', monospace", '--k-clock-font': "'Pixelify Sans', monospace",
   '--paper': '#14110c', '--paper-2': '#1f1b14', '--paper-3': '#2c261c', '--node-bg': '#0a0807',
   '--ink': '#f5efde', '--ink-2': '#d4cdb8', '--ink-3': 'rgba(245, 239, 222, 0.76)', '--ink-4': 'rgba(245, 239, 222, 0.62)',
-  '--ink-on-bright': '#0a0807', '--acid': '#f5efde', '--acid-glow': '#ffffff', '--acid-faint': 'rgba(245, 239, 222, 0.10)',
+  '--ink-on-bright': '#0a0807', '--acid': '#f5efde', '--accent-on-dark': '#f5efde', '--acid-glow': '#ffffff', '--acid-faint': 'rgba(245, 239, 222, 0.10)',
   '--spine': '#d4cdb8', '--spine-hot': '#f5efde', '--rust': '#e8d8b0', '--rust-deep': '#f5efde', '--cyan': '#f5efde', '--plum': '#d4cdb8',
   '--frame-bg': 'rgba(245, 239, 222, 0.04)', '--frame-edge': 'rgba(245, 239, 222, 0.40)',
   '--k-now': '#f5efde', '--k-cal-grid': 'rgba(245, 239, 222, 0.2)', '--k-cal-today': 'rgba(245, 239, 222, 0.06)', '--k-pointer-core': '#0a0807',
@@ -223,7 +226,7 @@ const SUBMARINE_DARK: TokenMap = k({
   '--k-lcd-font': "'VT323', monospace",
   '--paper': '#1a1410', '--paper-2': '#261c14', '--paper-3': '#38291c', '--node-bg': '#110a06',
   '--ink': '#d4c69e', '--ink-2': 'rgba(212, 198, 158, 0.82)', '--ink-3': 'rgba(212, 198, 158, 0.80)', '--ink-4': 'rgba(212, 198, 158, 0.66)',
-  '--ink-on-bright': '#1a1408', '--acid': '#f0b850', '--acid-glow': '#f0d090', '--acid-faint': 'rgba(240, 184, 80, 0.12)',
+  '--ink-on-bright': '#1a1408', '--acid': '#f0b850', '--accent-on-dark': '#f0b850', '--acid-glow': '#f0d090', '--acid-faint': 'rgba(240, 184, 80, 0.12)',
   '--spine': '#b88a3a', '--spine-hot': '#f0b850', '--rust': '#ff6450', '--rust-deep': '#c8553d', '--cyan': '#8aff5a', '--plum': '#e8d8a8',
   '--frame-bg': 'rgba(184, 138, 58, 0.08)', '--frame-edge': 'rgba(232, 200, 118, 0.40)',
   '--k-now': '#ff6450', '--k-cal-grid': 'rgba(184, 138, 58, 0.16)', '--k-cal-today': 'rgba(240, 184, 80, 0.06)', '--k-term-border': '#3a2a0e',
@@ -286,7 +289,7 @@ export const MANIFESTS: Record<FrameStyleId, ThemeManifest> = {
     tokens: { light: MAC_LIGHT, dark: MAC_DARK },
     loadFonts: fonts.pixel,
     components: {
-      pomo: { face: 'ascii' },
+      pomo: { face: 'mac' },
       clock: { bezel: 'pixel', hand: 'block', readoutWindow: true },
       terminal: { xterm: { light: xt('#fffbe8', '#050505', '#050505'), dark: xt('#0a0807', '#f5efde', '#f5efde') } },
     },

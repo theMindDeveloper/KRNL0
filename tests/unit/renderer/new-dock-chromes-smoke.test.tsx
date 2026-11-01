@@ -49,7 +49,7 @@ function makeBoard(): Board {
 }
 
 describe('new dock chromes — smoke', () => {
-  for (const dockStyle of ['blueprint', 'macintosh', 'submarine'] as const) {
+  for (const dockStyle of ['blueprint', 'submarine'] as const) {
     it(`${dockStyle} chrome mounts and renders without error`, async () => {
       useBoardStore.setState({ board: makeBoard() });
       const { CanvasChassis } = await import('../../../src/renderer/components/ChassisLayer/CanvasChassis');
@@ -59,4 +59,11 @@ describe('new dock chromes — smoke', () => {
       expect(chassis?.className).toContain(`dock-${dockStyle}`);
     });
   }
+  // Macintosh was rebuilt chromeless: the top bar is its menu bar and the
+  // status bar its footer, so it must not add a chassis of its own.
+  it('macintosh has no chassis chrome', async () => {
+    const { DOCK_REGISTRY } = await import('../../../src/renderer/components/ChassisLayer/dockRegistry');
+    expect(DOCK_REGISTRY.macintosh.Chrome).toBeUndefined();
+    expect(DOCK_REGISTRY.macintosh.stationPadding).toEqual({ top: 0, bottom: 0 });
+  });
 });

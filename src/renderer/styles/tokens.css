@@ -30,6 +30,12 @@
   /* Acid used as TEXT: bright acid is unreadable on paper, so light mode
      gets a deep green. Dark mode maps straight back to --acid. */
   --acid-ink:   #3f5c0a;
+  /* Accent pairs (ADR 0009 NF6). --acid is the style's accent and may be
+     dark (Mac light = black). Anything drawn ON a fixed dark surface (the
+     active dock key, LCD, status bar, command bar) uses --accent-on-dark,
+     which every style keeps light. Text on paper uses --acid-ink; text on
+     an --acid fill uses --ink-on-bright. themeContrast.test.ts enforces it. */
+  --accent-on-dark: #c9f158;
   --spine:     #5e7d1d;
   --spine-hot: #7ea22b;
   --rust:      #c8553d;

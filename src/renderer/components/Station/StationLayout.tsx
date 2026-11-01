@@ -61,16 +61,25 @@ const PANEL_IDS = {
 // chassis.css under `.station-splitter` so we can use :hover / :active /
 // :focus pseudo-classes (inline styles can't). The focus rule resets the
 // outline so clicked-and-released splitters don't keep glowing.
+// The handles take no layout space: a 9px grab zone pulled over the seam
+// with negative margins, so frames sit flush with no line between them
+// (the line only shows on hover/drag, see .station-splitter).
 const verticalHandleStyle: React.CSSProperties = {
-  width: 4,
+  width: 9,
+  margin: '0 -4px',
   cursor: 'col-resize',
   flexShrink: 0,
+  position: 'relative',
+  zIndex: 3,
 };
 
 const horizontalHandleStyle: React.CSSProperties = {
-  height: 4,
+  height: 9,
+  margin: '-4px 0',
   cursor: 'row-resize',
   flexShrink: 0,
+  position: 'relative',
+  zIndex: 3,
 };
 
 // Top-row slot → (panel id, default size, station-cell slot prop)
@@ -304,7 +313,7 @@ function CellWrapper({ children }: { children: React.ReactNode }) {
         height: '100%',
         overflow: 'hidden',
         background: 'transparent',
-        padding: 6,
+        padding: 'var(--k-cell-gap, 3px)',
         boxSizing: 'border-box',
       }}
     >

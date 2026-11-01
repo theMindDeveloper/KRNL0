@@ -13,39 +13,18 @@ export const MACINTOSH_THEME = defineDockTheme(
   { id: 'macintosh', label: 'Macintosh' },
   {
     canvas: `
-      /* Light — the Mac Finder "50% grey" stipple. Constructed via two
-       * offset radial-gradients on a Mac-white base to get the 1-bit
-       * pixel-dither look at 2px cell size. */
+      /* Flat desktop. The old 1-bit dither fought every node and edge on
+       * the canvas, so the desktop is one calm tone and only the dot grid
+       * remains. */
       html[data-dock="macintosh"]:not([data-theme="dark"]) .react-flow {
-        background:
-          /* dither dots */
-          radial-gradient(circle at 0 0,   #050505 0.6px, transparent 0.8px) 0 0   / 4px 4px,
-          radial-gradient(circle at 2px 2px, #050505 0.6px, transparent 0.8px) 0 0 / 4px 4px,
-          linear-gradient(180deg, #d8d2bc 0%, #c4bea8 100%) !important;
-        --grid:        rgba(5, 5, 5, 0.18);
-        --grid-strong: rgba(5, 5, 5, 0.38);
+        background: #f7f7f5 !important;
+        --grid:        rgba(5, 5, 5, 0.16);
+        --grid-strong: rgba(5, 5, 5, 0.30);
       }
-
-      /* Dark — inverted Mac stipple, cream dots on near-black */
       html[data-theme="dark"][data-dock="macintosh"] .react-flow {
-        background:
-          radial-gradient(circle at 0 0,   rgba(245,239,222,0.18) 0.6px, transparent 0.8px) 0 0   / 4px 4px,
-          radial-gradient(circle at 2px 2px, rgba(245,239,222,0.18) 0.6px, transparent 0.8px) 0 0 / 4px 4px,
-          linear-gradient(180deg, #1a1610 0%, #0e0b08 100%) !important;
+        background: #14110c !important;
         --grid:        rgba(245, 239, 222, 0.10);
-        --grid-strong: rgba(245, 239, 222, 0.25);
-      }
-
-      /* Subtle CRT vignette on the canvas root — the user is staring
-       * through the Mac's 9-inch tube. */
-      html[data-dock="macintosh"] .react-flow::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-          radial-gradient(ellipse 110% 90% at 50% 50%, transparent 60%, rgba(0,0,0,0.20) 100%);
-        z-index: 0;
+        --grid-strong: rgba(245, 239, 222, 0.22);
       }
     `,
 

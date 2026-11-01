@@ -733,4 +733,13 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Readability pass:** live WCAG audit across all 13 style/mode pairs; darker secondary inks, `--acid-ink`, tokenised status bar, fixed same-colour pills and buttons. Failures went from 40–170 per pair to a handful of near-misses and disabled controls.
 - **Look switching:** light/dark and style changes reveal as a circle from the pointer (View Transition, reduced-motion fallback); dark-only styles no longer overwrite the saved light preference.
 
-**Tests:** 0 typecheck errors; full suite green.
+- **Follow-up round:**
+  - **Pro is the default frame style.**
+  - **Root fix for black-on-black:** a new `--accent-on-dark` token covers anything drawn on fixed dark surfaces, and `themeContrast.test.ts` enforces WCAG pairs for every style and mode.
+  - **Panel toggles:** one minimal treatment for every style.
+  - **Station panels:** 6px gap, no divider line.
+  - **Calm canvases:** Mac and Submarine canvases are flat.
+  - **Macintosh rebuilt:** chromeless retro-Mac windows on the app's own top bar and status bar, plus a new `mac` Pomo face.
+- **Drag to Calendar:** canvas Task nodes get a drag grip, and Todo rows with no task node yet are promoted to a linked task when dropped on the Calendar (`calendar.schedule {itemId}`).
+
+**Tests:** 0 typecheck errors; 125 files / 1495 tests green.

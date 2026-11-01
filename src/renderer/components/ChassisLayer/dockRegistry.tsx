@@ -51,7 +51,6 @@ import { SynthesizerChrome } from './SynthesizerChrome';
 import { TelemetryChrome } from './TelemetryChrome';
 import { KrnlDockChrome } from './KrnlDockChrome';
 import { BlueprintChrome } from './BlueprintChrome';
-import { MacintoshChrome } from './MacintoshChrome';
 import { SubmarineChrome } from './SubmarineChrome';
 import { MANIFESTS } from '../../themes/manifests';
 import type { ThemeManifest } from '../../themes/types';
@@ -242,11 +241,8 @@ export const DOCK_REGISTRY = defineRegistry({
     label: 'Macintosh',
     sublabel: '1984 hardware',
     glyph: MACINTOSH_GLYPH,
-    Chrome: MacintoshChrome,
-    // Top: case top + venting + brand row (~108). Bottom: floppy slot + model
-    // plate + power section (~116). Mother row sits inside the CRT bezel.
-    canvasBounds: { kind: 'static', rect: { left: -1410, top: -110, width: 3360, height: 766 } },
-    stationPadding: { top: 110, bottom: 116 },
+    // Chromeless: the top bar is the menu bar, the status bar the footer.
+    stationPadding: { top: 0, bottom: 0 },
   },
   submarine: {
     id: 'submarine',
@@ -265,7 +261,7 @@ export const DOCK_REGISTRY = defineRegistry({
 
 export type DockStyle = keyof typeof DOCK_REGISTRY;
 export const DOCK_STYLES = Object.keys(DOCK_REGISTRY) as DockStyle[];
-export const DEFAULT_DOCK_STYLE: DockStyle = 'classic';
+export const DEFAULT_DOCK_STYLE: DockStyle = 'pro';
 
 /** Convenience: read theme constraint for a given style (TopBar dark-only). */
 export function isDarkOnly(style: DockStyle): boolean {

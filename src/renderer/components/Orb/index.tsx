@@ -537,7 +537,7 @@ export function Orb() {
             animation: 'ai-panel-in 0.25s cubic-bezier(0.34,1.56,0.64,1)',
           }}
         >
-          <span style={{ color: isRunning ? '#c9f158' : 'var(--acid)', marginRight: 6, opacity: 0.8 }}>
+          <span style={{ color: isRunning ? '#c9f158' : 'var(--accent-on-dark)', marginRight: 6, opacity: 0.8 }}>
             {isRunning ? '▶' : '◆'}
           </span>
           {caption}
@@ -584,7 +584,7 @@ export function Orb() {
             }}
           >
             <span data-testid="orb-chat-title">
-              <span style={{ color: 'var(--acid)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
+              <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
                 ◆
               </span>
               krnl0 · assistant

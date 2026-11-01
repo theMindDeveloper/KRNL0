@@ -94,7 +94,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
         <StatusItem label="workspace" testId="statusbar-workspace">
           ~/krnl0/{boardName}
         </StatusItem>
-        <StatusItem label="claude" testId="statusbar-claude" valueColor="var(--k-status-ok, var(--acid))">
+        <StatusItem label="claude" testId="statusbar-claude" valueColor="var(--k-status-ok, var(--accent-on-dark))">
           ● connected
         </StatusItem>
         <StatusItem label="pomo" testId="statusbar-pomo" valueColor="var(--k-status-warn, var(--rust))">

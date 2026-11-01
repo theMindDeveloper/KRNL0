@@ -12,6 +12,7 @@ import { ClockNode } from '../../../src/renderer/components/nodes/ClockNode';
 import { ClockBezel } from '../../../src/renderer/components/nodes/ClockNode/ClockBezel';
 import { Vu } from '../../../src/renderer/components/nodes/PomoNode/variants/Vu';
 import { Outline } from '../../../src/renderer/components/nodes/PomoNode/variants/Outline';
+import { Mac } from '../../../src/renderer/components/nodes/PomoNode/variants/Mac';
 import { TIMER_FACES } from '../../../src/renderer/components/nodes/PomoNode/types';
 import { setDockStyle } from '../../../src/renderer/components/ChassisLayer/useDockStyle';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
@@ -99,7 +100,7 @@ describe('F6 — Clock features are identical in every frame style', () => {
 
 describe('F7 — new Pomo faces', () => {
   it('TIMER_FACES lists the new faces next to the original four', () => {
-    expect(TIMER_FACES).toEqual(['ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline']);
+    expect(TIMER_FACES).toEqual(['ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline', 'mac']);
   });
 
   it.each([['vu', Vu], ['outline', Outline]] as const)('%s renders 25 minute bars and the readout', (name, Face) => {
@@ -110,6 +111,21 @@ describe('F7 — new Pomo faces', () => {
     const grid = name === 'vu' ? bars : bars.firstElementChild!;
     expect(grid.children).toHaveLength(25);
     expect(getByText(/min 13 \/ 25/i)).toBeTruthy();
+  });
+});
+
+describe('F7 — Mac face (Macintosh default)', () => {
+  it('shows the time, the 0–25 scale and minutes progress', () => {
+    const { getByText, getByTestId } = render(
+      React.createElement(Mac, { m: '13', s: '48', elapsedPct: 48, remainingPct: 52, running: true }),
+    );
+    expect(getByTestId('pomo-face-mac')).toBeTruthy();
+    expect(getByText('13:48')).toBeTruthy();
+    expect(getByText('25 min')).toBeTruthy();
+    expect(getByText(/13 of 25 minutes/)).toBeTruthy();
+  });
+  it('is the Macintosh default face', () => {
+    expect(MANIFESTS.macintosh.components.pomo.face).toBe('mac');
   });
 });
 

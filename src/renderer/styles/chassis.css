@@ -2729,466 +2729,23 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 
 /* ============================================================
-   MACINTOSH 128K chassis — the 1984 hardware as the frame
+   MACINTOSH — System 1 Finder desktop (rebuilt, ADR 0009 phase 5)
    ============================================================
-   Mother row IS the CRT screen. The chrome above and below is the beige
-   plastic case: top vent slots + rainbow Apple + "Macintosh" wordmark, then
-   the CRT bezel insetting the mothers, then the bottom skirt with floppy
-   slot, model plate, brightness/contrast knobs, and a power LED. */
-
+   Flat desktop only. The menu bar is the app's top bar and the footer is
+   the status bar (styled in the Macintosh component skins below). */
 .dock-chassis.dock-macintosh {
-  /* True 1984 Snow-White palette — lighter, less yellow than before, so
-     dark labels reads cleanly against the case. Old palette tested as too
-     muddy / olive; this hits the recognizable warm-grey beige. */
-  --mac-beige:    #e3dcc6;
-  --mac-beige-2:  #d2c9af;
-  --mac-beige-3:  #b9af92;
-  --mac-shadow:   #3a3325;   /* labels on the case — bumped darker for contrast */
-  --mac-deep:     #1c1814;
-  --mac-ink:      #161208;
-  --mac-stroke:   rgba(20, 16, 10, 0.55);
-  --mac-led-on:   #92ff5e;
-  --mac-led-dim:  rgba(146, 255, 94, 0.18);
-  --mac-bezel-2:  #948b6f;
-
-  background: linear-gradient(180deg,
-    var(--mac-beige) 0%,
-    var(--mac-beige-2) 70%,
-    var(--mac-beige-3) 100%);
-  /* Squarer corners — rectangular station panels need a rectangular case,
-     and the mother row reads more like a flush CRT than a TV. */
-  border-radius: 6px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.18),
-    inset 0 0 0 1px var(--mac-stroke),
-    0 8px 18px rgba(0, 0, 0, 0.25),
-    0 28px 60px rgba(0, 0, 0, 0.25);
+  --mac-desk:  #cfcdc6;
+  --mac-bar:   #fbf8ee;
+  --mac-ink:   #050505;
+  --mac-dim:   rgba(5, 5, 5, 0.66);
+  background: var(--mac-desk);
 }
-
 [data-theme="dark"] .dock-chassis.dock-macintosh {
-  --mac-beige:    #38322a;
-  --mac-beige-2:  #2a251f;
-  --mac-beige-3:  #1f1b16;
-  /* Was #0a0907 — near-black, completely unreadable on the dark beige case.
-     Bumped to a warm-cream tone so knob/floppy/plate labels stay legible. */
-  --mac-shadow:   #b8ad8a;
-  --mac-deep:     #0a0805;
-  --mac-ink:      #ddd6c6;
-  --mac-stroke:   rgba(220, 210, 188, 0.22);
-  --mac-bezel-2:  #5a523e;
+  --mac-desk:  #14110c;
+  --mac-bar:   #0a0807;
+  --mac-ink:   #f5efde;
+  --mac-dim:   rgba(245, 239, 222, 0.7);
 }
-
-/* ── CRT bezel — recessed window around the mother row ─────────────────
-   Tight left/right inset so the mother row fits flush inside the bezel,
-   not spilling past it. Squarer radius matches the squarer case. */
-.md-mac-crt-bezel {
-  position: absolute;
-  top: 102px; bottom: 110px; left: 6px; right: 6px;
-  background: var(--mac-deep);
-  border-radius: 4px;
-  box-shadow:
-    inset 0 0 0 4px var(--mac-bezel-2),
-    inset 0 0 0 5px rgba(0, 0, 0, 0.5),
-    inset 0 6px 18px rgba(0, 0, 0, 0.85),
-    inset 0 -4px 12px rgba(0, 0, 0, 0.6),
-    0 1px 0 rgba(255, 255, 255, 0.25);
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.md-mac-crt-scanlines {
-  position: absolute; inset: 6px;
-  border-radius: 10px;
-  background: repeating-linear-gradient(
-    180deg,
-    transparent 0 2px,
-    rgba(0, 0, 0, 0.18) 2px 3px);
-  opacity: 0.5;
-}
-.md-mac-crt-glare {
-  position: absolute; inset: 6px;
-  background:
-    radial-gradient(ellipse 60% 50% at 26% 24%, rgba(255, 255, 240, 0.10) 0%, transparent 50%),
-    radial-gradient(ellipse 100% 70% at 50% 110%, rgba(0, 0, 0, 0.35) 0%, transparent 70%);
-  border-radius: 10px;
-  pointer-events: none;
-}
-
-/* ── Top case ─────────────────────────────────────────────────────────── */
-.md-mac-case-top {
-  position: absolute;
-  top: 6px; left: 12px; right: 12px;
-  height: 92px;
-  display: grid;
-  grid-template-rows: 32px 1fr;
-  padding: 0 16px;
-  background: transparent;
-}
-
-.md-mac-vents {
-  display: grid;
-  grid-template-columns: repeat(16, 1fr);
-  align-items: center;
-  gap: 2px;
-  padding: 8px 14px;
-  border-radius: 6px;
-}
-.md-mac-vents span {
-  height: 2px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(255,255,255,0.18));
-  border-radius: 1px;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.18);
-}
-.md-mac-vents[data-running='true'] span {
-  animation: mac-vent-warm 2.4s ease-in-out infinite;
-}
-@keyframes mac-vent-warm {
-  0%, 100% { box-shadow: 0 1px 0 rgba(255,255,255,0.18); }
-  50%      { box-shadow: 0 1px 0 rgba(255,255,255,0.18), 0 0 6px rgba(255, 180, 80, 0.35); }
-}
-
-.md-mac-brand {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  padding: 0 4px;
-}
-.md-mac-wordmark {
-  font-family: 'Chicago', 'Lucida Grande', Georgia, serif;
-  font-style: italic;
-  font-weight: 700;
-  font-size: 26px;
-  letter-spacing: 0.01em;
-  color: var(--mac-ink);
-  text-shadow: 1px 1px 0 rgba(255,255,255,0.45);
-  user-select: none;
-}
-/* Brand row: serial badge on the right where the apple used to sit. */
-.md-mac-brand-meta {
-  display: flex; flex-direction: column;
-  align-items: flex-end;
-  font-family: var(--font-mono);
-  line-height: 1.1;
-}
-.md-mac-brand-meta .k {
-  font-size: 9px;
-  letter-spacing: 0.24em;
-  font-weight: 600;
-  color: var(--mac-ink);
-  text-transform: uppercase;
-}
-.md-mac-brand-meta .v {
-  font-size: 7px;
-  letter-spacing: 0.18em;
-  color: var(--mac-shadow);
-  text-transform: uppercase;
-  margin-top: 2px;
-}
-[data-theme="dark"] .md-mac-brand-meta .v { color: rgba(220, 210, 188, 0.84); }
-
-/* Smiling-Mac glyph on the CRT bezel — Susan Kare's classic ROM icon */
-.md-mac-smiley {
-  position: absolute;
-  left: 12px; bottom: 10px;
-  color: rgba(245, 220, 160, 0.84);
-  opacity: 0.78;
-  pointer-events: none;
-  filter: drop-shadow(0 0 4px rgba(255, 220, 140, 0.25));
-}
-.md-mac-smiley.is-running { color: rgba(170, 255, 130, 0.85); }
-.md-mac-smiley.is-blink .eye { opacity: 0.05; }
-
-/* ── Bottom case ──────────────────────────────────────────────────────── */
-.md-mac-case-bot {
-  position: absolute;
-  bottom: 8px; left: 14px; right: 14px;
-  height: 100px;
-  display: grid;
-  grid-template-columns: 1.1fr 1.7fr 1fr;
-  gap: 14px;
-  align-items: stretch;
-  padding: 6px 10px;
-}
-
-.md-mac-floppy {
-  display: flex; flex-direction: column;
-  justify-content: center; gap: 6px;
-  padding: 4px 8px;
-}
-.md-mac-floppy-slot {
-  display: grid;
-  grid-template-columns: 8px 1fr auto;
-  align-items: center;
-  gap: 8px;
-  height: 22px;
-  padding: 0 10px 0 6px;
-  background: linear-gradient(180deg, #0a0805 0%, #2a241d 100%);
-  border-radius: 2px;
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.85),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
-    0 1px 0 rgba(255, 255, 255, 0.4);
-}
-.md-mac-floppy-led {
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--mac-led-on);
-  box-shadow: 0 0 4px var(--mac-led-on);
-}
-.md-mac-floppy-label {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.18em;
-  color: rgba(220, 200, 160, 0.84);
-  text-transform: lowercase;
-}
-.md-mac-floppy-eject {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: rgba(220, 200, 160, 0.64);
-}
-.md-mac-floppy-sub {
-  font-family: var(--font-mono);
-  font-size: 7.5px;
-  letter-spacing: 0.28em;
-  color: var(--mac-shadow);
-  text-transform: uppercase;
-  padding-left: 6px;
-}
-
-.md-mac-plate {
-  display: flex; flex-direction: column;
-  justify-content: center; gap: 3px;
-  padding: 8px 12px;
-  /* Cream-paper inset — solid background so ink-on-paper labels read with
-     high contrast (the previous translucent gradient blended with the case
-     and made labels look washed out). */
-  background: linear-gradient(180deg, #f5edd2 0%, #ece2c0 100%);
-  border-radius: 3px;
-  border: 1px solid var(--mac-stroke);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.85),
-    inset 0 -1px 0 rgba(0,0,0,0.22),
-    0 1px 0 rgba(255,255,255,0.5);
-}
-[data-theme="dark"] .md-mac-plate {
-  background: linear-gradient(180deg, #211c14 0%, #15110a 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(220,210,188,0.20),
-    inset 0 -1px 0 rgba(0,0,0,0.55);
-}
-.md-mac-plate-row {
-  display: grid;
-  grid-template-columns: 100px 1fr;
-  gap: 8px;
-  align-items: baseline;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  min-width: 0;
-}
-.md-mac-plate-row .k {
-  font-size: 7px;
-  letter-spacing: 0.24em;
-  color: var(--mac-shadow);
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.md-mac-plate-row .v {
-  font-size: 10px;
-  color: var(--mac-ink);
-  letter-spacing: 0.04em;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.md-mac-plate-row-thin .v { font-size: 9px; }
-.md-mac-plate-row-thin .k { font-size: 6.5px; }
-.md-mac-plate-row-split {
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.md-mac-plate-row-split > div {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px;
-  align-items: baseline;
-  min-width: 0;
-}
-.md-mac-plate-row-split .k { font-size: 6.5px; }
-.md-mac-plate-row-split .v { font-size: 9px; }
-.md-mac-plate-row-hero {
-  border-bottom: 1px solid var(--mac-stroke);
-  padding-bottom: 2px;
-  margin-bottom: 2px;
-}
-.md-mac-plate-row-hero .k {
-  font-family: 'Chicago', Georgia, serif;
-  font-style: italic;
-  font-weight: 600;
-  font-size: 12px;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--mac-ink);
-}
-.md-mac-plate-row-hero .v {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--mac-ink);
-  text-align: right;
-}
-.dock-chassis .md-mac-credit { pointer-events: auto; }
-.md-mac-credit {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--mac-ink);
-  text-decoration: none;
-  border-bottom: 1px dotted var(--mac-shadow);
-}
-.md-mac-credit:hover { color: #4d6fd8; }
-
-.md-mac-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  align-items: center;
-  padding: 4px 4px;
-}
-.md-mac-knob {
-  display: flex; flex-direction: column;
-  align-items: center; gap: 4px;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: default;
-  font-family: var(--font-mono);
-}
-.dock-chassis button.md-mac-knob { pointer-events: auto; cursor: pointer; }
-.md-mac-knob-cap {
-  position: relative;
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.55), transparent 50%),
-    radial-gradient(circle at 50% 50%, var(--mac-beige) 0%, var(--mac-beige-3) 70%, var(--mac-shadow) 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,0.3),
-    inset 0 -2px 4px rgba(0,0,0,0.45),
-    inset 0 2px 2px rgba(255,255,255,0.4),
-    0 2px 4px rgba(0,0,0,0.35);
-}
-[data-theme="dark"] .md-mac-knob-cap {
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), transparent 50%),
-    radial-gradient(circle at 50% 50%, #6e6757 0%, #2a251f 70%, #0a0907 100%);
-}
-.md-mac-knob-indicator {
-  position: absolute;
-  top: 4px; left: 50%;
-  width: 2px; height: 12px;
-  margin-left: -1px;
-  background: var(--mac-ink);
-  box-shadow: 0 0 2px rgba(0,0,0,0.6);
-  transform-origin: 1px 13px;
-  transition: transform 320ms cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-[data-theme="dark"] .md-mac-knob-indicator {
-  background: var(--mac-led-on);
-  box-shadow: 0 0 4px var(--mac-led-on);
-}
-.md-mac-knob-lbl {
-  font-size: 7px;
-  letter-spacing: 0.22em;
-  color: var(--mac-shadow);
-  text-transform: uppercase;
-}
-
-.md-mac-power {
-  display: flex; flex-direction: column;
-  align-items: center; gap: 4px;
-  padding: 2px 4px;
-}
-.md-mac-power-led {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--mac-led-dim);
-  box-shadow: inset 0 -1px 2px rgba(0,0,0,0.4);
-}
-.md-mac-power-led.led-on {
-  background: var(--mac-led-on);
-  box-shadow:
-    0 0 6px var(--mac-led-on),
-    0 0 12px rgba(146, 255, 94, 0.5),
-    inset 0 -1px 2px rgba(0,0,0,0.4);
-}
-.md-mac-power-led.led-pulse {
-  background: var(--mac-led-on);
-  animation: mac-led-pulse 2.4s ease-in-out infinite;
-}
-@keyframes mac-led-pulse {
-  0%, 100% { box-shadow: 0 0 2px var(--mac-led-on), inset 0 -1px 2px rgba(0,0,0,0.4); opacity: 0.5; }
-  50%      { box-shadow: 0 0 6px var(--mac-led-on), 0 0 12px rgba(146, 255, 94, 0.5); opacity: 1; }
-}
-.md-mac-power-lbl {
-  font-family: var(--font-mono);
-  font-size: 7px;
-  letter-spacing: 0.24em;
-  color: var(--mac-shadow);
-  text-transform: uppercase;
-}
-.md-mac-power-sub {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--mac-ink);
-  font-variant-numeric: tabular-nums;
-  margin-top: 2px;
-}
-
-.md-mac-rivet {
-  position: absolute;
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.6), transparent 50%),
-    radial-gradient(circle at 50% 50%, var(--mac-beige-3) 0%, var(--mac-shadow) 100%);
-  box-shadow:
-    inset 0 -1px 1px rgba(0,0,0,0.45),
-    0 1px 1px rgba(0,0,0,0.3);
-  pointer-events: none;
-}
-.md-mac-rivet.rv-tl { top: 9px; left: 16px; }
-.md-mac-rivet.rv-tr { top: 9px; right: 16px; }
-.md-mac-rivet.rv-bl { bottom: 9px; left: 16px; }
-.md-mac-rivet.rv-br { bottom: 9px; right: 16px; }
-
-/* Macintosh nodes — the mother row IS the CRT, so contents read as a
- * crisp 1-bit Mac document: warm Mac-white paper, true-black ink, no
- * colour accents. The original 128K display literally couldn't show
- * colour. Dark theme inverts: night-mode Mac with cream-on-black. */
-[data-dock="macintosh"] .mother-frame {
-  /* Palette tokens live in the theme manifest (src/renderer/themes/manifests.ts). */
-  /* Monochrome — every accent collapses to greyscale, true 1-bit feel.
-   * Pomo "rust" stays distinguishable via a slightly warmer charcoal. */
-  border-radius: 3px !important;
-  border: 0 !important;
-  background: var(--paper) !important;
-  box-shadow:
-    inset 0 0 0 1px rgba(5, 5, 5, 0.85),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.45),
-    0 0 0 3px rgba(0, 0, 0, 0.15),
-    0 2px 0 rgba(0, 0, 0, 0.35) !important;
-}
-[data-theme="dark"][data-dock="macintosh"] .mother-frame {
-  /* Palette tokens live in the theme manifest (src/renderer/themes/manifests.ts). */
-  box-shadow:
-    inset 0 0 0 1px rgba(245, 239, 222, 0.55),
-    inset 0 0 0 2px rgba(0, 0, 0, 0.65),
-    0 0 0 3px rgba(0, 0, 0, 0.55),
-    0 2px 0 rgba(0, 0, 0, 0.7) !important;
-}
-
 
 /* ============================================================
    SUBMARINE chassis — brass periscope console (dark-only)
@@ -4066,16 +3623,22 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
    :hover / :active to give a clear "I am draggable / I am being
    dragged" cue without lingering after release.
    ============================================================ */
+/* Invisible at rest: frames sit flush, no divider line between panels.
+   A 1px seam line appears only while hovering or dragging the handle. */
 .station-splitter {
-  background: var(--paper-3);
-  transition: background 120ms ease;
+  background: transparent;
+  --seam: transparent;
+  background-image: linear-gradient(var(--seam), var(--seam));
+  background-repeat: no-repeat;
+  background-position: center;
+  transition: --seam 120ms ease;
 }
-.station-splitter:hover {
-  background: var(--ink-4, #6e6655);
-}
-.station-splitter:active {
-  background: var(--ink-3, #b3aa97);
-}
+.station-splitter[aria-orientation="vertical"],
+.station-splitter[data-panel-group-direction="horizontal"] { background-size: 1px 100%; }
+.station-splitter[aria-orientation="horizontal"],
+.station-splitter[data-panel-group-direction="vertical"] { background-size: 100% 1px; }
+.station-splitter:hover { --seam: var(--ink-4, #6e6655); }
+.station-splitter:active { --seam: var(--ink-3, #b3aa97); }
 .station-splitter:focus,
 .station-splitter:focus-visible {
   outline: none;
@@ -4101,107 +3664,33 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 
 /* ============================================================
-   PANEL TOGGLES IN THE TOP BAR — per frame style (ADR 0009 F9).
-   The Station panel toggles render inside the TopBar for every
-   style; each style dresses them in its own hardware language.
+   PANEL TOGGLES IN THE TOP BAR (ADR 0009 F9).
+   One quiet treatment for every style: plain text, no bevel, no
+   border. The open panel gets a 2px accent underline. Each style
+   tints it only through its tokens (--ink*, --acid-ink).
    ============================================================ */
-[data-testid="topbar-panel-toggles"] .krnl-panel-toggle { height: 26px; }
-
-/* Pro — segmented group of matte keys */
-[data-dock="pro"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  background: linear-gradient(180deg, #2e2e2e, #262626) !important;
-  border-color: #0a0a0a !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
-}
-
-/* Synthesizer — rubber keys with a lit LED bar */
-[data-dock="synthesizer"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  border-radius: 5px !important;
-  background: linear-gradient(180deg, #4a443a, #2a261e) !important;
-  border-color: #0e0c09 !important;
-  color: #d8d0bc !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #0e0c09;
-}
-[data-dock="synthesizer"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  box-shadow: inset 0 -3px 0 #c9f158, inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #0e0c09, 0 0 10px rgba(201, 241, 88, 0.25);
-}
-
-/* Telemetry — numbered bay switches in phosphor */
-[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  border-radius: 0 !important;
-  border: 1px solid rgba(201, 241, 88, 0.18) !important;
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  height: 26px;
   background: transparent !important;
-  color: #7f9452 !important;
-}
-[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  border-color: rgba(201, 241, 88, 0.55) !important;
-  background: rgba(201, 241, 88, 0.08) !important;
-  color: #c9f158 !important;
-  text-shadow: 0 0 6px rgba(201, 241, 88, 0.6);
-}
-/* Light paper: phosphor green is unreadable, so the toggles go deep olive. */
-html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  border-color: rgba(63, 92, 10, 0.3) !important;
-  color: #4a5e22 !important;
-}
-html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  border-color: rgba(63, 92, 10, 0.7) !important;
-  background: rgba(63, 92, 10, 0.12) !important;
-  color: #2f4012 !important;
-  text-shadow: none;
-}
-
-/* KRNL Dock — stencil labels, red rocker lamp when on */
-[data-dock="krnl-dock"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  font-family: 'Stardos Stencil', var(--font-mono) !important;
-  letter-spacing: 0.08em !important;
-  border-radius: 2px !important;
-  background: #141513 !important;
-  border: 1px solid #000 !important;
-  box-shadow: inset 0 0 0 1px #2a2d27;
-}
-[data-dock="krnl-dock"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  color: #f0ecdc !important;
-  box-shadow: inset 0 0 0 1px #2a2d27, inset 3px 0 0 #ff5a3c, 0 0 8px rgba(255, 90, 60, 0.35);
-}
-
-/* Blueprint — drawing checkboxes */
-[data-dock="blueprint"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  border: 0 !important;
   border-radius: 0 !important;
-  background: transparent !important;
-  border: 1px dashed var(--frame-edge) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  color: var(--ink-3) !important;
 }
-[data-dock="blueprint"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  border-style: solid !important;
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle:hover {
   color: var(--ink) !important;
 }
-
-/* Macintosh — menu-style items, inverted when on */
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  color: var(--ink) !important;
+  box-shadow: inset 0 -2px 0 var(--acid-ink, var(--acid)) !important;
+}
+/* Mac keeps its Chicago-style face; everything else stays mono. */
 [data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
   font-family: 'Pixelify Sans', var(--font-mono) !important;
   text-transform: none !important;
   letter-spacing: 0 !important;
   font-size: 12px !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  border: 0 !important;
-}
-[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  background: var(--ink) !important;
-  color: var(--node-bg) !important;
-}
-
-/* Submarine — brass toggles */
-[data-dock="submarine"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
-  border-radius: 12px !important;
-  border: 1px solid #6e521c !important;
-  background: radial-gradient(circle at 50% 30%, #3a2a18, #1a130d) !important;
-  color: #a8956a !important;
-}
-[data-dock="submarine"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  color: #1a1004 !important;
-  background: radial-gradient(circle at 50% 30%, #ffe2a0, #f0b850 60%, #a8701c) !important;
-  box-shadow: 0 0 10px rgba(240, 184, 80, 0.4);
 }
 
 /* ============================================================
@@ -4212,45 +3701,100 @@ html:not([data-theme="dark"])[data-dock="telemetry"] [data-testid="topbar-panel-
 body { counter-reset: krnl-mother; }
 .mother-frame { counter-increment: krnl-mother; }
 
-/* Macintosh — every mother is a System 1 window: 2px black frame, hard
-   shadow, striped title bar with a close box, titles knocked out in white. */
+/* ── Macintosh — retro Mac windows (rebuilt) ─────────────────────────
+   No extra bars: the app's own top bar is the menu bar and the status bar
+   is the Finder footer. Every panel is a classic window: 1px black frame,
+   hard 2px drop shadow, a plain title bar with a close box, Chicago-style
+   sentence-case titles. Hover inverts, like a Mac menu item. */
 [data-dock="macintosh"] .mother-frame {
-  border-radius: 0 !important;
-  box-shadow: inset 0 0 0 2px var(--ink), 4px 4px 0 var(--ink) !important;
+  border-radius: 4px !important;
+  border: 0 !important;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.55), 0 2px 0 rgba(29, 29, 31, 0.18), 0 6px 14px -8px rgba(29, 29, 31, 0.35) !important;
 }
+[data-theme="dark"][data-dock="macintosh"] .mother-frame {
+  box-shadow: inset 0 0 0 1px rgba(245, 239, 222, 0.35), 0 6px 14px -8px rgba(0, 0, 0, 0.8) !important;
+}
+/* Title bar, modern-retro: one calm tinted bar, close box at the left,
+   the title right after it (centred titles collided with the station drag
+   grip), controls pinned right. No pinstripes: they read as noise. */
 [data-dock="macintosh"] .krnl-node-header {
   position: relative;
-  padding-left: 30px !important;
-  background:
-    repeating-linear-gradient(180deg, var(--ink) 0 1px, transparent 1px 3px) 4px 50% / calc(100% - 8px) 11px no-repeat,
-    var(--node-bg) !important;
-  border-bottom: 2px solid var(--ink) !important;
+  padding-left: 28px !important;
+  background: var(--paper-2) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 30%, transparent) !important;
 }
-[data-dock="macintosh"] .krnl-node-header > * {
-  position: relative;
-  background: var(--node-bg);
-  padding: 0 6px;
+[data-dock="macintosh"] .krnl-node-header,
+[data-dock="macintosh"] .krnl-node-header * {
+  font-family: 'Pixelify Sans', var(--font-mono) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
 }
-/* Transparent header buttons (gear, ×) would sit on the stripes: give them
-   the plate colour so the glyph never lands ink-on-ink. */
+[data-dock="macintosh"] .krnl-node-header > span:not(:empty) {
+  color: var(--ink) !important;
+}
 [data-dock="macintosh"] .krnl-node-header > button {
-  background: var(--node-bg) !important;
+  background: transparent !important;
+  color: var(--ink-3) !important;
+  border-radius: 3px !important;
 }
-[data-dock="macintosh"] .krnl-node-header > :empty:not(button):not(svg):not(img) {
-  background: transparent;
-  padding: 0;
-}
+/* Close box */
 [data-dock="macintosh"] .krnl-node-header::before {
   content: '';
   position: absolute;
-  left: 10px;
+  left: 8px;
   top: 50%;
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   margin-top: -6px;
+  border: 1px solid color-mix(in srgb, var(--ink) 60%, transparent);
+  border-radius: 2px;
   background: var(--node-bg);
-  border: 1px solid var(--ink);
-  box-shadow: 0 0 0 2px var(--node-bg);
+}
+[data-dock="macintosh"] .krnl-node-header > button:hover {
+  background: var(--ink) !important;
+  color: var(--node-bg) !important;
+}
+
+/* Menu bar = the app's top bar */
+[data-dock="macintosh"] [data-testid="topbar"] {
+  background: var(--node-bg) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 35%, transparent) !important;
+  box-shadow: none !important;
+}
+[data-dock="macintosh"] [data-testid="topbar"] * {
+  font-family: 'Pixelify Sans', var(--font-mono) !important;
+  letter-spacing: 0 !important;
+}
+[data-dock="macintosh"] [data-testid="topbar"] .krnl-topbar-btn {
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--ink) !important;
+  text-transform: none !important;
+  font-size: 12px !important;
+}
+[data-dock="macintosh"] [data-testid="topbar"] .krnl-topbar-btn:hover,
+[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle:hover {
+  background: var(--ink) !important;
+  color: var(--node-bg) !important;
+}
+[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
+  box-shadow: none !important;
+  font-weight: 700;
+}
+[data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="false"] {
+  color: var(--ink-4) !important;
+}
+/* Finder footer = the status bar */
+[data-dock="macintosh"] [data-testid="statusbar"] {
+  border-top: 1px solid color-mix(in srgb, var(--ink) 35%, transparent) !important;
+}
+[data-dock="macintosh"] [data-testid="statusbar"],
+[data-dock="macintosh"] [data-testid="statusbar"] * {
+  font-family: 'Pixelify Sans', var(--font-mono) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
 }
 
 /* Submarine — brass module number tag on every header + corner rivets. */

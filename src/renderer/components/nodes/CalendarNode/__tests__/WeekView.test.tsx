@@ -319,6 +319,30 @@ describe('WeekView — drop to schedule', () => {
     });
   });
 
+  it('drop of a Todo row with no task yet fires calendar.schedule with its itemId', () => {
+    const onCommand = vi.fn();
+    render(
+      <WeekView
+        state={makeState({ anchorDate: '2026-05-11' })}
+        config={makeConfig()}
+        onCommand={onCommand}
+      />,
+    );
+    const cell = document.querySelector('[data-testid="week-cell-2026-05-12-09"]');
+    const payload = JSON.stringify({ itemId: 'item-1', durationMin: 25 });
+    fireEvent.drop(cell!, {
+      dataTransfer: {
+        getData: (type: string) => (type === 'application/krnl-task' ? payload : ''),
+        types: ['application/krnl-task'],
+      },
+    });
+    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', {
+      itemId: 'item-1',
+      scheduledFor: '2026-05-12T09:00',
+      scheduledDurationMin: 25,
+    });
+  });
+
   it('drop with non-matching MIME type does nothing', () => {
     const onCommand = vi.fn();
     render(
@@ -343,30 +367,6 @@ describe('WeekView — drop to schedule', () => {
     expect(onCommand).not.toHaveBeenCalled();
   });
 
-  it('drop with only itemId (no taskId) does nothing in v1', () => {
-    const onCommand = vi.fn();
-    render(
-      <WeekView
-        state={makeState({ anchorDate: '2026-05-11' })}
-        config={makeConfig()}
-        onCommand={onCommand}
-      />,
-    );
-    const cell = document.querySelector(
-      '[data-testid="week-cell-2026-05-12-14"]',
-    );
-    expect(cell).toBeTruthy();
-
-    const payload = JSON.stringify({ itemId: 'item-xyz', durationMin: 25 });
-    fireEvent.drop(cell!, {
-      dataTransfer: {
-        getData: (type: string) => (type === 'application/krnl-task' ? payload : ''),
-        types: ['application/krnl-task'],
-      },
-    });
-
-    expect(onCommand).not.toHaveBeenCalled();
-  });
 });
 
 describe('WeekView — empty state hint', () => {
