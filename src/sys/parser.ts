@@ -6,7 +6,7 @@ export type SysCommand =
   | { kind: 'node'; sub: 'remove'; id: string | undefined; force: boolean }
   | { kind: 'node'; sub: 'set-position'; id: string | undefined; x: number | undefined; y: number | undefined }
   | { kind: 'node'; sub: 'add'; nodeKind: string | undefined; at: { x: number; y: number } | undefined }
-  | { kind: 'pomo'; sub: 'stop' | 'status' | 'break' | 'extend' }
+  | { kind: 'pomo'; sub: 'stop' | 'status' | 'break' | 'extend' | 'pause' | 'resume' | 'discard' }
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
   | { kind: 'todo'; sub: 'list'; json: boolean }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
@@ -30,7 +30,7 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'day'; arg: string | undefined }
   | { kind: 'clock'; sub: 'show'; json: boolean }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
-  | { kind: 'habit'; sub: 'done'; name: string | undefined; date: string | undefined }
+  | { kind: 'habit'; sub: 'done' | 'undo'; name: string | undefined; date: string | undefined }
   | { kind: 'habit'; sub: 'color'; name: string | undefined; color: string | undefined }
   | { kind: 'habit'; sub: 'view'; view: string | undefined }
   | { kind: 'habit'; sub: 'list'; json: boolean }
@@ -112,6 +112,7 @@ export type SysCommand =
   | { kind: 'log'; sub: 'tail'; limit: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'stats'; json: boolean }
   | { kind: 'theme'; sub: 'show'; json: boolean }
+  | { kind: 'invalid'; message: string }
 ;
 
 function flag(args: string[], name: string): string | undefined {
@@ -131,9 +132,65 @@ function hasFlag(args: string[], name: string): boolean {
   return args.includes(`--${name}`);
 }
 
+/** Thrown by strict value parsers; surfaced to the user as an `invalid` command. */
+class SysParseError extends Error {}
+
+/**
+ * Strictly parse a positive number (minutes, ranges). `undefined` stays
+ * undefined; anything else that is not a finite number > 0 is rejected
+ * instead of being persisted as NaN / 0 / negative.
+ */
+function positiveNum(raw: string | undefined, what: string): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = Number(raw);
+  if (raw.trim() === '' || !Number.isFinite(n) || n <= 0) {
+    throw new SysParseError(`${what} must be a positive number, got "${raw}"`);
+  }
+  return n;
+}
+
+/** Flags that never take a value — everything else consumes the next token. */
+const BOOLEAN_FLAGS = new Set([
+  'json', 'child', 'clear', 'daily', 'force', 'mother', 'weekdays', 'weekly', 'delete',
+]);
+
+/**
+ * Move positional arguments in front of flags, preserving their order, so
+ * `todo add --tag work "milk"` reads `rest[0] === "milk"` exactly like
+ * `todo add "milk" --tag work`. Flag/value pairs keep their relative order.
+ */
+function hoistPositionals(args: string[]): string[] {
+  const positionals: string[] = [];
+  const flags: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a.startsWith('--') && a.length > 2) {
+      flags.push(a);
+      const next = args[i + 1];
+      if (!BOOLEAN_FLAGS.has(a.slice(2)) && next !== undefined && !next.startsWith('--')) {
+        flags.push(next);
+        i++;
+      }
+    } else {
+      positionals.push(a);
+    }
+  }
+  return [...positionals, ...flags];
+}
+
 export class SysParser {
   static parse(argv: string[]): SysCommand | null {
-    const [cmd, sub, ...rest] = argv;
+    try {
+      return SysParser.parseStrict(argv);
+    } catch (err) {
+      if (err instanceof SysParseError) return { kind: 'invalid', message: err.message };
+      throw err;
+    }
+  }
+
+  private static parseStrict(argv: string[]): SysCommand | null {
+    const [cmd, sub, ...rawRest] = argv;
+    const rest = hoistPositionals(rawRest);
 
     if (!cmd || cmd === 'help') return { kind: 'help', group: sub, sub: rest[0] };
     if (cmd === 'version') return { kind: 'version' };
@@ -197,14 +254,15 @@ export class SysParser {
     }
 
     if (cmd === 'pomo') {
-      if (sub === 'stop' || sub === 'status' || sub === 'break' || sub === 'extend')
+      if (sub === 'stop' || sub === 'status' || sub === 'break' || sub === 'extend'
+        || sub === 'pause' || sub === 'resume' || sub === 'discard')
         return { kind: 'pomo', sub };
       if (sub === 'start') {
         const minutesRaw = flag(rest, 'minutes');
         return {
           kind: 'pomo', sub: 'start',
           label: flag(rest, 'label'),
-          minutes: minutesRaw !== undefined ? Number(minutesRaw) : undefined,
+          minutes: positiveNum(minutesRaw, '--minutes'),
         };
       }
       // Decision 29 — pomo config
@@ -212,10 +270,10 @@ export class SysParser {
         const allArgs = rest;
         return {
           kind: 'pomo', sub: 'config',
-          session: numFlag(allArgs, 'session'),
-          short: numFlag(allArgs, 'short'),
-          long: numFlag(allArgs, 'long'),
-          every: numFlag(allArgs, 'every'),
+          session: positiveNum(flag(allArgs, 'session'), '--session'),
+          short: positiveNum(flag(allArgs, 'short'), '--short'),
+          long: positiveNum(flag(allArgs, 'long'), '--long'),
+          every: positiveNum(flag(allArgs, 'every'), '--every'),
           face: flag(allArgs, 'face'),
         };
       }
@@ -251,7 +309,7 @@ export class SysParser {
           sub: 'add',
           todoId: flag(rest, 'todo'),
           text: rest[0],
-          durationMin: durRaw !== undefined ? Number(durRaw) : undefined,
+          durationMin: positiveNum(durRaw, '--duration'),
         };
       }
       if (sub === 'edit') {
@@ -270,12 +328,11 @@ export class SysParser {
         return { kind: 'task', sub: 'subtask', parentId: rest[0], text: rest[1] };
       }
       if (sub === 'duration') {
-        const mins = rest[1] !== undefined ? Number(rest[1]) : undefined;
         return {
           kind: 'task',
           sub: 'duration',
           id: rest[0],
-          minutes: mins !== undefined && !isNaN(mins) ? mins : undefined,
+          minutes: positiveNum(rest[1], 'minutes'),
         };
       }
       if (sub === 'sibling') {
@@ -294,7 +351,7 @@ export class SysParser {
           sub: 'schedule',
           id: rest[0],
           at: flag(rest, 'at'),
-          durationMin: durRaw !== undefined ? Number(durRaw) : undefined,
+          durationMin: positiveNum(durRaw, '--duration'),
         };
       }
       if (sub === 'unschedule') {
@@ -307,7 +364,7 @@ export class SysParser {
           sub: 'addNext',
           sourceRef: rest[0],
           text: rest[1],
-          durationMin: durRaw !== undefined ? Number(durRaw) : undefined,
+          durationMin: positiveNum(durRaw, '--duration'),
         };
       }
       if (sub === 'kind') {
@@ -349,8 +406,8 @@ export class SysParser {
       if (sub === 'streak') return { kind: 'habit', sub: 'streak', name: rest[0] };
       if (sub === 'remove') return { kind: 'habit', sub: 'remove', name: rest[0] };
       if (sub === 'list')   return { kind: 'habit', sub: 'list', json: hasFlag(rest, 'json') };
-      if (sub === 'done') {
-        return { kind: 'habit', sub: 'done', name: rest[0], date: flag(rest, 'date') };
+      if (sub === 'done' || sub === 'undo') {
+        return { kind: 'habit', sub, name: rest[0], date: flag(rest, 'date') };
       }
       if (sub === 'color') {
         return { kind: 'habit', sub: 'color', name: rest[0], color: rest[1] };
@@ -371,7 +428,7 @@ export class SysParser {
       if (sub === 'schedule') {
         const ref = rest[0];
         const durRaw = flag(rest, 'duration');
-        const durationMin = durRaw !== undefined ? Number(durRaw) : undefined;
+        const durationMin = positiveNum(durRaw, '--duration');
         const atVal = flag(rest, 'at');
         if (hasFlag(rest, 'daily')) {
           return { kind: 'habit', sub: 'schedule', ref, scheduleKind: 'daily', days: undefined, invalidDays: undefined, at: atVal, durationMin };
@@ -574,7 +631,7 @@ export class SysParser {
         return {
           kind: 'analytics', sub: 'show',
           view: flag(rest, 'view'),
-          range: rangeRaw !== undefined ? Number(rangeRaw) : undefined,
+          range: positiveNum(rangeRaw, '--range'),
           metric: flag(rest, 'metric'),
           json: hasFlag(rest, 'json'),
         };
@@ -583,7 +640,7 @@ export class SysParser {
         const rangeRaw = flag(rest, 'range');
         return {
           kind: 'analytics', sub: 'totals',
-          range: rangeRaw !== undefined ? Number(rangeRaw) : undefined,
+          range: positiveNum(rangeRaw, '--range'),
           json: hasFlag(rest, 'json'),
         };
       }

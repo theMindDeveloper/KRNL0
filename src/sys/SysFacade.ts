@@ -9,7 +9,7 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
-import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig } from './commands/pomo';
+import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
@@ -105,6 +105,10 @@ export class SysFacade {
         ok: false,
         message: `Unknown command: '${argv.join(' ')}'. Run 'krnl help' for usage.`,
       };
+    }
+
+    if (command.kind === 'invalid') {
+      return { ok: false, message: command.message };
     }
 
     if (command.kind === 'help') {
@@ -272,6 +276,10 @@ export class SysFacade {
         return { ok: false, message: 'marquee requires an open renderer window', data: { exitCode: 2 } };
       }
       if (!command.rect) return { ok: false, message: 'marquee requires --rect x1,y1,x2,y2' };
+      // Destructive: only delete when the caller explicitly asked for it.
+      if (!command.delete) {
+        return { ok: false, message: 'marquee deletes everything in the rect — pass --delete to confirm' };
+      }
       return this.deps.cliDispatch('marquee.delete', command.rect as unknown as Record<string, unknown>);
     }
 
@@ -373,6 +381,9 @@ export class SysFacade {
         case 'stop':   return pomoStop();
         case 'break':  return pomoBreak();
         case 'extend': return pomoExtend();
+        case 'pause':  return pomoPause();
+        case 'resume': return pomoResume();
+        case 'discard': return pomoDiscard();
         case 'status': return pomoStatus();
         case 'config': {
           const cfgOpts: Parameters<typeof pomoConfig>[0] = {};
@@ -381,7 +392,11 @@ export class SysFacade {
           if (command.long !== undefined) cfgOpts.long = command.long;
           if (command.every !== undefined) cfgOpts.every = command.every;
           if (command.face !== undefined) cfgOpts.face = command.face;
-          return pomoConfig(cfgOpts);
+          const res = pomoConfig(cfgOpts);
+          // The file-path variant writes board.json directly; tell the
+          // renderer to reload or its next save would revert the change.
+          if (res.ok && Object.keys(cfgOpts).length > 0) this.deps.onBoardChanged?.();
+          return res;
         }
       }
     }
@@ -395,6 +410,7 @@ export class SysFacade {
       switch (command.sub) {
         case 'add':    return habit.cliAdd(ctx, command.name);
         case 'done':   return habit.cliDone(ctx, command.name, command.date);
+        case 'undo':   return habit.cliUndo(ctx, command.name, command.date);
         case 'streak': return habit.cliStreak(ctx, command.name);
         case 'color':  return habit.cliColor(ctx, command.name, command.color);
         case 'remove': return habit.cliRemove(ctx, command.name);

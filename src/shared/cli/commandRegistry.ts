@@ -51,7 +51,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Manage habits on the mother HabitNode',
     subcommands: [
       { name: 'add', usage: 'habit add "<name>"', summary: 'Add a new habit' },
-      { name: 'done', usage: 'habit done <id|name> [--date YYYY-MM-DD]', summary: 'Mark a habit done for a date' },
+      { name: 'done', usage: 'habit done <id|name> [--date YYYY-MM-DD]', summary: 'Mark a habit done for a date (idempotent)' },
+      { name: 'undo', usage: 'habit undo <id|name> [--date YYYY-MM-DD]', summary: 'Un-mark a habit for a date' },
       { name: 'streak', usage: 'habit streak <id|name>', summary: 'Show current streak' },
       { name: 'color', usage: 'habit color <id|name> <acid|rust|cyan|plum|spine|ink>', summary: 'Set habit color' },
       { name: 'remove', usage: 'habit remove <id|name>', summary: 'Remove a habit' },
@@ -73,7 +74,12 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Control the Pomodoro timer',
     subcommands: [
       { name: 'start', usage: 'pomo start [--label "..."] [--minutes 25]', summary: 'Start a pomo session' },
-      { name: 'stop', usage: 'pomo stop', summary: 'Stop/cancel the current session' },
+      { name: 'stop', usage: 'pomo stop', summary: 'Stop the timer and record the in-flight span' },
+      { name: 'pause', usage: 'pomo pause', summary: 'Pause a running session' },
+      { name: 'resume', usage: 'pomo resume', summary: 'Resume a paused session (the pause gap is not counted as work)' },
+      { name: 'break', usage: 'pomo break', summary: 'Switch from work to an open-ended break' },
+      { name: 'extend', usage: 'pomo extend', summary: 'Count the session as complete and keep working' },
+      { name: 'discard', usage: 'pomo discard', summary: 'Abandon the in-flight span without recording it' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
       { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor]', summary: 'Update board-scoped PomoConfig on the mother PomoNode' },
     ],

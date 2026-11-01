@@ -5,6 +5,9 @@ import {
   pomoStop as fsmStop,
   pomoBreak as fsmBreak,
   pomoExtend as fsmExtend,
+  pomoPause as fsmPause,
+  pomoResume as fsmResume,
+  pomoDiscard as fsmDiscard,
   type PomoEnv,
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
@@ -42,21 +45,59 @@ const cliEnv = (): PomoEnv => ({
 });
 
 export function pomoStart(label?: string, minutes?: number): SysResult {
-  let found = false;
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);
     if (!node) return;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    if (prev.status === 'running' || prev.status === 'paused') {
+      // fsmStart is a no-op here — say so instead of claiming a fresh start.
+      result = { ok: false, message: `pomo is already ${prev.status}` };
+      return;
+    }
     const cfg = node['config'] ?? {};
     const sessionMin = minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
-    const prev = (node['state'] ?? {}) as Partial<PomoState>;
     const startArgs: { label?: string; durationMin?: number } = { durationMin: sessionMin };
     if (label !== undefined) startArgs.label = label;
-    const next = fsmStart({ ...defaultState(prev) }, startArgs, cliEnv());
-    node['state'] = next;
-    found = true;
+    node['state'] = fsmStart(prev, startArgs, cliEnv());
+    result = { ok: true, message: 'Pomodoro started' };
   });
-  if (!found) return { ok: false, message: 'No Pomodoro node found on the board' };
-  return { ok: true, message: 'Pomodoro started' };
+  return result;
+}
+
+/** Shared shape for the simple state-transition verbs below. */
+function pomoTransition(
+  allowed: readonly PomoState['status'][],
+  verb: string,
+  apply: (prev: PomoState) => PomoState,
+  okMsg: string,
+): SysResult {
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  getBoardIo().mutateBoard((board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    if (!allowed.includes(prev.status)) {
+      result = { ok: false, message: `pomo is ${prev.status} — can only ${verb} while ${allowed.join(' or ')}` };
+      return;
+    }
+    node['state'] = apply(prev);
+    result = { ok: true, message: okMsg };
+  });
+  return result;
+}
+
+export function pomoPause(): SysResult {
+  return pomoTransition(['running'], 'pause', (s) => fsmPause(s, {}, cliEnv()), 'Pomodoro paused');
+}
+
+export function pomoResume(): SysResult {
+  return pomoTransition(['paused'], 'resume', (s) => fsmResume(s, {}, cliEnv()), 'Pomodoro resumed');
+}
+
+/** Abandon the in-flight span without recording it (the UI's RESET). */
+export function pomoDiscard(): SysResult {
+  return pomoTransition(['running', 'paused', 'break'], 'discard', (s) => fsmDiscard(s), 'Pomodoro discarded');
 }
 
 /** Issue #166 — record the in-flight segment before going idle. */
