@@ -133,8 +133,9 @@ export function HabitLaneNode({
   const color = habitColor(habit.color);
   const logSet = new Set(habit.log);
   const doneToday = logSet.has(today);
-  const streak = calcStreak(habit.log, today);
   const cadence = (habit as { schedule?: HabitSchedule | null }).schedule ?? null;
+  // Pass the schedule like HabitNode does, or a weekdays habit reads 0 on weekends.
+  const streak = calcStreak(habit.log, today, cadence ?? undefined);
   const cadHeader = cadenceTag(cadence);
   const cadFoot = cadenceFootText(cadence);
 

@@ -8,6 +8,7 @@
 
 import { useMemo } from 'react';
 import { useBoardStore } from '../store/boardStore';
+import { useLocalDay } from '../hooks/useLocalDay';
 import { buildAnalytics } from './engine';
 import { registerBuiltinSources } from './sources';
 import type { AnalyticsResult, BoardLike } from './types';
@@ -25,6 +26,9 @@ export function useAnalytics(): AnalyticsResult {
   // #169 — completion ledger feeds taskSource; subscribe so a record/clear
   // re-buckets analytics even when no node changed in the same tick.
   const completions = useBoardStore((s) => s.board?.completions);
+  // "Today" counters and streaks are computed inside the memo; recompute when
+  // the local day changes even if the board did not.
+  const day = useLocalDay();
 
   return useMemo<AnalyticsResult>(() => {
     const board: BoardLike = { nodes: nodes ?? [], completions: completions ?? [] };
@@ -33,7 +37,7 @@ export function useAnalytics(): AnalyticsResult {
     // structure changes — even though no current source reads edges, future
     // sources (e.g. task-chain progress) will.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, completions]);
+  }, [nodes, edges, completions, day]);
 }
 
 export type { AnalyticsResult } from './types';

@@ -32,9 +32,9 @@ import {
   getWeekDays,
   getYearGridCells,
   isDayScheduled,
-  todayLocal,
 } from './types';
 import { calcStreak } from './commands';
+import { useLocalDay } from '../../../hooks/useLocalDay';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HabitPopover } from './HabitPopover';
 import { HabitContextMenu } from './HabitContextMenu';
@@ -88,10 +88,12 @@ export function HabitNode({
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const view: HabitView = config.view ?? 'week';
-  const today = todayLocal();
-  // now is intentionally derived once per render — the grid is rebuilt only
-  // when state/config changes; views don't tick at sub-day cadence.
-  const now = useMemo(() => new Date(), []);
+  // useLocalDay re-renders at midnight so `today` and the grids roll over.
+  const today = useLocalDay();
+  // Re-derive the grid anchor when the local day changes. Memoizing on [] froze
+  // the week/month/year grids at the day the node mounted, so an app left open
+  // overnight showed last week and hid today's cell.
+  const now = useMemo(() => new Date(), [today]);
   const weekDays = useMemo(() => getWeekDays(now), [now]);
   const monthDays = useMemo(() => getMonthDays(now), [now]);
   const yearGrid = useMemo(() => getYearGridCells(now), [now]);

@@ -221,7 +221,7 @@ export async function cliStreak(
   if (!mother) return notFound();
   const resolved = resolveHabit(mother.state, idOrName);
   if ('error' in resolved) return { ok: false, message: resolved.error };
-  const n = calcStreak(resolved.habit.log, todayLocal());
+  const n = calcStreak(resolved.habit.log, todayLocal(), resolved.habit.schedule ?? undefined);
   return {
     ok: true,
     message: `streak for "${resolved.habit.name}": ${n} day${n === 1 ? '' : 's'}`,
@@ -320,7 +320,7 @@ export async function cliList(ctx: HabitCtx, json = false): Promise<SysResult> {
     name: h.name,
     color: h.color,
     archived: h.archived,
-    streak: calcStreak(h.log, today),
+    streak: calcStreak(h.log, today, h.schedule ?? undefined),
     logCount: h.log.length,
   }));
   if (json) {
@@ -548,7 +548,7 @@ export async function cliShow(
   if ('error' in resolved) return { ok: false, message: resolved.error };
   const h = resolved.habit;
   const today = todayLocal();
-  const streak = calcStreak(h.log, today);
+  const streak = calcStreak(h.log, today, h.schedule ?? undefined);
 
   const data: {
     id: string;
