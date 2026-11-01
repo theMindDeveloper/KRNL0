@@ -13,6 +13,8 @@ import {
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import { resolveNodeRef, resolutionError } from '../../shared/dispatch/resolveRef';
 import type { BoardShape } from '../../shared/dispatch/types';
+import { selectSchedule } from '../../renderer/store/scheduleSelector';
+import type { Board } from '../../shared/types';
 
 const VALID_FACES: readonly TimerFace[] = ['ascii', 'lcd', 'blocks', 'vapor'];
 function isTimerFace(v: unknown): v is TimerFace {
@@ -59,12 +61,34 @@ export function pomoStart(label?: string, minutes?: number): SysResult {
     }
     const cfg = node['config'] ?? {};
     const sessionMin = minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
-    const startArgs: { label?: string; durationMin?: number } = { durationMin: sessionMin };
+    const startArgs: { label?: string; durationMin?: number; activeTaskId?: string | null } = { durationMin: sessionMin };
     if (label !== undefined) startArgs.label = label;
+    // Same as the UI: an untagged start is tagged with the open task whose
+    // planned block contains "now" (time-model F5).
+    const suggested = label === undefined && prev.activeTaskId === null ? plannedTaskNow(board) : null;
+    if (suggested) {
+      startArgs.activeTaskId = suggested.id;
+      startArgs.label = suggested.text;
+    }
     node['state'] = fsmStart(prev, startArgs, cliEnv());
-    result = { ok: true, message: 'Pomodoro started' };
+    result = { ok: true, message: suggested ? `Pomodoro started on "${suggested.text}"` : 'Pomodoro started' };
   });
   return result;
+}
+
+/** The open task whose planned calendar block contains now, if any. */
+function plannedTaskNow(board: { nodes: Array<Record<string, unknown>>; edges?: unknown }): { id: string; text: string } | null {
+  const b = { ...board, edges: Array.isArray(board.edges) ? board.edges : [] } as unknown as Board;
+  const now = Date.now();
+  for (const p of selectSchedule(b).placements.values()) {
+    const s = new Date(p.startISO).getTime();
+    const e = new Date(p.endISO).getTime();
+    if (!(s <= now && now < e)) continue;
+    const node = board.nodes.find((n) => n['id'] === p.taskId);
+    const st = (node?.['state'] ?? {}) as { done?: boolean; text?: string };
+    if (node && !st.done) return { id: p.taskId, text: st.text ?? '' };
+  }
+  return null;
 }
 
 /** Shared shape for the simple state-transition verbs below. */
