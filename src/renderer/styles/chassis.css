@@ -18,8 +18,8 @@
    ============================================================ */
 
 /* Classic MotherFrame badge + corners hidden under all dock variants. */
-[data-dock] .mother-frame__corners,
-[data-dock] .mother-frame__badge { display: none !important; }
+[data-dock]:not([data-dock="pro"]) .mother-frame__corners,
+[data-dock]:not([data-dock="pro"]) .mother-frame__badge { display: none !important; }
 
 /* Synth GRID knob toggle — hides both background dot layers when off. */
 html[data-grid="off"] .react-flow__background { display: none !important; }
@@ -4183,4 +4183,23 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .station-splitter:focus,
 .station-splitter:focus-visible {
   outline: none;
+}
+
+
+/* ============================================================
+   PRO — matte graphite (ADR 0009). Chromeless like Classic: the
+   colours come from the Pro manifest tokens on <html>; this block
+   only adjusts the per-node bezel and the slot badge/corners.
+   ============================================================ */
+[data-dock="pro"] .mother-frame {
+  border-color: #070707 !important;
+}
+[data-dock="pro"] .mother-frame__badge {
+  background: #181818 !important;
+  border-color: #070707 !important;
+  border-radius: 3px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+[data-dock="pro"] .mother-frame__corners {
+  opacity: 0.45;
 }

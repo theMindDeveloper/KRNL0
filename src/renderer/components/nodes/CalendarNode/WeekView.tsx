@@ -1476,7 +1476,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 key={i}
                 style={{
                   flex: 1,
-                  borderLeft: i > 0 ? '1px solid rgba(154, 145, 128, 0.25)' : undefined,
+                  borderLeft: i > 0 ? '1px solid var(--k-cal-grid, rgba(154, 145, 128, 0.25))' : undefined,
                 }}
               />
             ))}
@@ -1491,7 +1491,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 style={{
                   flex: 1,
                   position: 'relative',
-                  background: isToday ? 'rgba(201, 241, 88, 0.08)' : 'transparent',
+                  background: isToday ? 'var(--k-cal-today, rgba(201, 241, 88, 0.08))' : 'transparent',
                   // borderLeft moved to the absolute overlay above so lines
                   // span the full scroll content, not just clientHeight.
                 }}
@@ -1513,7 +1513,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                       style={{
                         height: rowHeight,
                         boxSizing: 'border-box',
-                        borderBottom: '1px solid rgba(154, 145, 128, 0.25)',
+                        borderBottom: '1px solid var(--k-cal-grid, rgba(154, 145, 128, 0.25))',
                         // #4 — faint half-hour gridline once the grid is zoomed
                         // enough to warrant it, so blocks read against a ruler.
                         backgroundImage:

@@ -175,12 +175,12 @@ export function MotherFrame({
         display: 'flex',
         flexDirection: 'column',
         background: background === 'var(--node-bg)'
-          ? 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 30%), var(--node-bg)'
+          ? 'var(--k-mother-wash, linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 30%)), var(--node-bg)'
           : background,
         border: `1px solid ${borderColor}`,
-        borderRadius: 8,
+        borderRadius: 'var(--k-mother-radius, 8px)',
         boxShadow:
-          '0 2px 8px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
+          'var(--k-mother-shadow, 0 2px 8px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04))',
         // Station-mode panels must clip overflow so the inner mother content
         // never bleeds past the resizable panel boundary.
         overflow: isStation ? 'hidden' : 'visible',

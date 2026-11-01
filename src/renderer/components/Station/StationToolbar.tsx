@@ -16,7 +16,7 @@ import { useBoardStore } from '../../store/boardStore';
 import type { NodeKind, Node } from '../../../shared/types/node';
 import type { MotherNodeConfig, StationGeometry } from '../../../shared/types';
 import { SLOT_DEFAULTS } from './SlotResolver';
-import { isStationHidden } from './StationLayout';
+import { isStationHidden } from './stationVisibility';
 
 interface MotherEntry {
   kind: NodeKind;
@@ -148,7 +148,11 @@ function ToolbarBtn({
   );
 }
 
-export function StationToolbar() {
+/**
+ * `variant="inline"` renders the toggles without the row chrome so a frame
+ * style can place them inside its own bar (ADR 0009 F9, slots.panelToggles).
+ */
+export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline' } = {}) {
   const board = useBoardStore((s) => s.board);
   const updateNode = useBoardStore((s) => s.updateNode);
   const setLayoutGeometry = useBoardStore((s) => s.setLayoutGeometry);
@@ -189,30 +193,32 @@ export function StationToolbar() {
         display: 'flex',
         alignItems: 'center',
         gap: 4,
-        padding: '6px 10px',
         // Outer margin lets per-dock themes inset the toolbar so its
         // rectangular box doesn't kiss the chassis edge (chrome corner
         // radii, brass rails, etc.). Default = no inset.
-        margin: 'var(--station-toolbar-margin, 0)',
-        background: 'var(--paper-2, rgba(0,0,0,0.2))',
-        borderBottom: '1px solid var(--paper-3)',
+        margin: variant === 'inline' ? 0 : 'var(--station-toolbar-margin, 0)',
+        background: variant === 'inline' ? 'transparent' : 'var(--paper-2, rgba(0,0,0,0.2))',
+        borderBottom: variant === 'inline' ? 'none' : '1px solid var(--paper-3)',
+        padding: variant === 'inline' ? 0 : '6px 10px',
         flexShrink: 0,
-        height: 32,
+        height: variant === 'inline' ? 28 : 32,
         boxSizing: 'border-box',
       }}
     >
-      <span
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 9,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-3)',
-          marginRight: 6,
-        }}
-      >
-        panels
-      </span>
+      {variant === 'row' && (
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-3)',
+            marginRight: 6,
+          }}
+        >
+          panels
+        </span>
+      )}
       {MOTHER_ORDER.map((m) => {
         const node = motherByKind.get(m.kind);
         const active = !!node && !isStationHidden(node);

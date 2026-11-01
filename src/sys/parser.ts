@@ -112,6 +112,9 @@ export type SysCommand =
   | { kind: 'log'; sub: 'tail'; limit: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'stats'; json: boolean }
   | { kind: 'theme'; sub: 'show'; json: boolean }
+  // ADR 0009 — frame styles
+  | { kind: 'theme'; sub: 'frames'; json: boolean }
+  | { kind: 'theme'; sub: 'frame'; value: string | undefined }
 ;
 
 function flag(args: string[], name: string): string | undefined {
@@ -526,6 +529,13 @@ export class SysParser {
     if (cmd === 'theme') {
       if (sub === 'set') {
         return { kind: 'theme', sub: 'set', value: rest[0] };
+      }
+      // ADR 0009 — frame-style list / switch
+      if (sub === 'frames') {
+        return { kind: 'theme', sub: 'frames', json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'frame') {
+        return { kind: 'theme', sub: 'frame', value: rest[0] };
       }
       // Decision 29 — theme show (headless-capable read)
       if (sub === 'show' || sub === undefined) {

@@ -12,6 +12,8 @@ import { useReactFlow } from '@xyflow/react';
 import { LayoutModeToggle } from '../ui/LayoutModeToggle';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { isDarkOnly } from '../ChassisLayer/dockRegistry';
+import { StationToolbar } from '../Station/StationToolbar';
+import { MANIFESTS } from '../../themes/manifests';
 import { HoldButton } from '../ui/HoldButton';
 import { useBoardStore } from '../../store/boardStore';
 
@@ -55,6 +57,7 @@ export function TopBar() {
   // Hide the theme toggle while one is selected and force the global theme
   // to dark for visual consistency.
   const darkOnly = isDarkOnly(dockStyle);
+  const isStationLayout = useBoardStore((s) => s.board?.layoutMode === 'station');
   useEffect(() => {
     if (darkOnly && theme !== 'dark') setTheme('dark');
   }, [darkOnly, theme]);
@@ -188,6 +191,13 @@ export function TopBar() {
           ◆ live
         </span>
       </div>
+
+      {/* Centre: Station panel toggles when the frame style slots them here (ADR 0009 F9). */}
+      {isStationLayout && MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
+        <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <StationToolbar variant="inline" />
+        </div>
+      )}
 
       {/* Right: action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>

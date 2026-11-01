@@ -17,6 +17,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { DOCK_STYLES, DEFAULT_DOCK_STYLE, type DockStyle } from './dockRegistry';
+import { applyFrameTheme, currentMode } from '../../themes/applyFrameTheme';
 
 export type { DockStyle } from './dockRegistry';
 export { DOCK_STYLES } from './dockRegistry';
@@ -31,11 +32,8 @@ function readStored(): DockStyle {
 
 function apply(style: DockStyle) {
   if (typeof document === 'undefined') return;
-  if (style === 'classic') {
-    document.documentElement.removeAttribute('data-dock');
-  } else {
-    document.documentElement.setAttribute('data-dock', style);
-  }
+  // Writes data-dock and the style's tokens on <html> (ADR 0009).
+  applyFrameTheme(style, currentMode());
 }
 
 let current: DockStyle = readStored();
@@ -50,6 +48,24 @@ function setCurrent(next: DockStyle) {
 }
 
 apply(current);
+
+// Light/dark is a separate axis owned by TopBar; re-apply the style's tokens
+// for the new mode whenever data-theme changes.
+if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+  new MutationObserver(() => apply(current)).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+}
+
+/** Imperative access for the sys CLI bridge (useCliDispatch). */
+export function getDockStyle(): DockStyle {
+  return current;
+}
+
+export function setDockStyle(next: DockStyle): void {
+  setCurrent(next);
+}
 
 export function useDockStyle(): [DockStyle, (s: DockStyle) => void] {
   const [style, setLocal] = useState<DockStyle>(current);

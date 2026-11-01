@@ -19,6 +19,8 @@ import type { Board } from '../../shared/types';
 import type { Node } from '../../shared/types';
 import type { HabitLaneState } from '../components/nodes/HabitLaneNode/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
+import { getDockStyle, setDockStyle } from '../components/ChassisLayer/useDockStyle';
+import { isFrameStyleId } from '../../shared/frameStyles';
 
 export function useCliDispatch(): void {
   const store = useBoardStore;
@@ -78,6 +80,25 @@ export function useCliDispatch(): void {
             } else {
               message = `Invalid theme: ${value}`;
             }
+            break;
+          }
+
+          // ADR 0009 — frame styles
+          case 'theme.frame': {
+            const { value } = args as { value: string };
+            if (isFrameStyleId(value)) {
+              setDockStyle(value);
+              ok = true;
+              message = `Frame style set to ${value}`;
+            } else {
+              message = `Unknown frame style: ${value}`;
+            }
+            break;
+          }
+
+          case 'theme.frame.get': {
+            ok = true;
+            message = getDockStyle();
             break;
           }
 

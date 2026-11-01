@@ -53,6 +53,8 @@ import { KrnlDockChrome } from './KrnlDockChrome';
 import { BlueprintChrome } from './BlueprintChrome';
 import { MacintoshChrome } from './MacintoshChrome';
 import { SubmarineChrome } from './SubmarineChrome';
+import { MANIFESTS } from '../../themes/manifests';
+import type { ThemeManifest } from '../../themes/types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,6 +79,8 @@ export interface DockStyleDef {
   stationPadding: { top: number; bottom: number };
   /** If set, TopBar hides the light/dark toggle and forces dark. */
   theme?: 'dark-only';
+  /** Theme manifest: tokens, component variants, slots (ADR 0009). */
+  manifest: ThemeManifest;
 }
 
 // ── Glyphs (24x24 viewBox, shared grid) ──────────────────────────────────────
@@ -85,6 +89,15 @@ const CLASSIC_GLYPH = (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="6" width="18" height="12" rx="2" />
     <path d="M7 10h10M7 14h6" opacity="0.7" />
+  </svg>
+);
+
+const PRO_GLYPH = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <path d="M3 9h18" opacity="0.6" />
+    <rect x="6" y="12" width="5" height="4" rx="1" />
+    <path d="M14 13h4M14 15.5h3" opacity="0.7" />
   </svg>
 );
 
@@ -167,13 +180,24 @@ function defineRegistry<K extends string>(r: Record<K, DockStyleDef>): Record<K,
 export const DOCK_REGISTRY = defineRegistry({
   classic: {
     id: 'classic',
+    manifest: MANIFESTS.classic,
     label: 'Classic',
     sublabel: 'Default frame',
     glyph: CLASSIC_GLYPH,
     stationPadding: { top: 0, bottom: 0 },
   },
+  pro: {
+    id: 'pro',
+    manifest: MANIFESTS.pro,
+    label: 'Pro',
+    sublabel: 'Matte graphite',
+    glyph: PRO_GLYPH,
+    stationPadding: { top: 0, bottom: 0 },
+    theme: 'dark-only',
+  },
   synthesizer: {
     id: 'synthesizer',
+    manifest: MANIFESTS.synthesizer,
     label: 'Synthesizer',
     sublabel: 'Eurorack panel',
     glyph: SYNTH_GLYPH,
@@ -183,6 +207,7 @@ export const DOCK_REGISTRY = defineRegistry({
   },
   telemetry: {
     id: 'telemetry',
+    manifest: MANIFESTS.telemetry,
     label: 'Telemetry',
     sublabel: 'Mission control',
     glyph: TELEMETRY_GLYPH,
@@ -192,6 +217,7 @@ export const DOCK_REGISTRY = defineRegistry({
   },
   'krnl-dock': {
     id: 'krnl-dock',
+    manifest: MANIFESTS['krnl-dock'],
     label: 'KRNL Dock',
     sublabel: 'Rack chassis',
     glyph: KRNL_DOCK_GLYPH,
@@ -202,6 +228,7 @@ export const DOCK_REGISTRY = defineRegistry({
   },
   blueprint: {
     id: 'blueprint',
+    manifest: MANIFESTS.blueprint,
     label: 'Blueprint',
     sublabel: 'Drafting table',
     glyph: BLUEPRINT_GLYPH,
@@ -211,6 +238,7 @@ export const DOCK_REGISTRY = defineRegistry({
   },
   macintosh: {
     id: 'macintosh',
+    manifest: MANIFESTS.macintosh,
     label: 'Macintosh',
     sublabel: '1984 hardware',
     glyph: MACINTOSH_GLYPH,
@@ -222,6 +250,7 @@ export const DOCK_REGISTRY = defineRegistry({
   },
   submarine: {
     id: 'submarine',
+    manifest: MANIFESTS.submarine,
     label: 'Submarine',
     sublabel: 'Periscope console',
     glyph: SUBMARINE_GLYPH,

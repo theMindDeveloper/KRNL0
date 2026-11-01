@@ -823,7 +823,7 @@ export function ClockNode({
                   <line
                     x1={pIn.x} y1={pIn.y}
                     x2={pOut.x} y2={pOut.y}
-                    stroke="#fff5ec"
+                    stroke="var(--k-pointer-core, #fff5ec)"
                     strokeWidth={0.8}
                     strokeLinecap="round"
                     opacity={0.9}
@@ -831,7 +831,7 @@ export function ClockNode({
                   <circle
                     cx={pDot.x} cy={pDot.y} r={3}
                     fill="var(--rust)"
-                    stroke="#fff5ec"
+                    stroke="var(--k-pointer-core, #fff5ec)"
                     strokeWidth={0.8}
                     style={{
                       animation: 'clock-now-pulse 2s ease-in-out infinite',

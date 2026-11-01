@@ -11,6 +11,7 @@ import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
 import { Vapor } from './variants/Vapor';
+import { useFrameTheme } from '../../../themes/useFrameTheme';
 
 const TICK_MS = 500;
 
@@ -266,10 +267,11 @@ export function PomoNode({
   // pick a default per theme: 'blocks' on light, 'vapor' on dark. The
   // user's explicit choice is preserved across theme toggles since we
   // only fall back when config.face is undefined.
-  const themeIsDark =
-    typeof document !== 'undefined' &&
-    document.documentElement.getAttribute('data-theme') === 'dark';
-  const defaultFace: TimerFace = themeIsDark ? 'vapor' : 'blocks';
+  // ADR 0009 F7 — a frame style may name its own default face; the user's
+  // explicit config.face still always wins.
+  const { mode: frameMode, manifest: frameManifest } = useFrameTheme();
+  const themeIsDark = frameMode === 'dark';
+  const defaultFace: TimerFace = frameManifest.components.pomo.face ?? (themeIsDark ? 'vapor' : 'blocks');
   const activeFace: TimerFace = config.face ?? defaultFace;
 
   const headerLeft = isTaskMode
