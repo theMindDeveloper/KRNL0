@@ -656,7 +656,12 @@ export function ClockNode({
           }
         >
           <svg
-            viewBox="0 0 240 240"
+            viewBox={(() => {
+              // Grow the drawing area with the plan lanes so many parallel
+              // tasks are never clipped by the panel (240 = the base dial).
+              const half = Math.max(120, Math.ceil(trackOuterEdge + 4));
+              return `${CX - half} ${CY - half} ${half * 2} ${half * 2}`;
+            })()}
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
           >
             {/* Train-track concentric lanes.

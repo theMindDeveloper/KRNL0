@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
@@ -38,11 +38,24 @@ function fmtMin(totalMin: number): string {
  * (store/trackedTime.ts); the bar fills tracked / planned and turns rust when
  * more time was spent than planned. Hidden until something was tracked.
  */
-function PlanTrackedBar({ taskId, plannedMin, live }: { taskId: string; plannedMin: number; live: boolean }) {
-  const _tick = useTick();
-  void _tick;
+function PlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean }) {
+  // Only the card the pomo is running on ticks; every other card re-renders
+  // just when the pomo node changes.
+  return props.live ? <LivePlanTrackedBar {...props} /> : <PlanTrackedBarView {...props} nowMs={null} />;
+}
+
+function LivePlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean }) {
+  const tick = useTick();
+  return <PlanTrackedBarView {...props} nowMs={tick} />;
+}
+
+function PlanTrackedBarView({ taskId, plannedMin, live, nowMs }: { taskId: string; plannedMin: number; live: boolean; nowMs: number | null }) {
   const pomoNode = useBoardStore(selectPomoNode);
-  const trackedSec = trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now());
+  const trackedSec = useMemo(
+    () => trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now()),
+    // nowMs only changes for the live card (tick), forcing a fresh total.
+    [pomoNode, taskId, nowMs],
+  );
   const status = planStatus(trackedSec, plannedMin);
   if (status === 'untracked' && !live) return null;
   const ratio = plannedMin > 0 ? trackedSec / (plannedMin * 60) : 0;
@@ -146,7 +159,13 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   // Corner timer: tracked time on this task, derived from the pomo spans
   // tagged with it (live while the pomo is running on it).
   const pomoNode = useBoardStore(selectPomoNode);
-  const elapsedSec = trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now());
+  // Recomputed when the pomo changes, or every render of the live card (its
+  // local 500 ms tick); idle cards don't rescan the history on each render.
+  const liveKey = isActiveRunning ? Date.now() : 0;
+  const elapsedSec = useMemo(
+    () => trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now()),
+    [pomoNode, taskId, liveKey],
+  );
   const showTimer = elapsedSec > 0 || isActive;
 
   // ── Task chain prev/next display ───────────────────────────────────────────

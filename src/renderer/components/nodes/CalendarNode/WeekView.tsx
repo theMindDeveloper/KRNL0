@@ -170,9 +170,11 @@ type HabitScheduleKind = 'weekly' | 'daily';
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function WeekView({ state, config, onCommand, singleDay = false }: WeekViewProps) {
-  // Width of the per-day reality rail (left edge of each column). Wider in
-  // the day view, where it also carries a minutes label.
-  const railPx = singleDay ? 40 : 7;
+  // Width of the per-day reality rail (left edge of each column), as a CSS
+  // length so it scales with the column: wide in the day view (carries a
+  // minutes label), at most 12% of a narrow week column (station panels can
+  // be ~25px per day).
+  const rail = singleDay ? '40px' : 'min(7px, 12%)';
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows
   // the same 24-hour grid.
@@ -920,8 +922,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={{
             position: 'absolute',
             top: topPx,
-            left: `calc(${railPx}px + (100% - ${railPx}px) * ${leftFrac} + 1px)`,
-            right: `calc((100% - ${railPx}px) * ${rightFrac} + 2px)`,
+            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 1px)`,
+            right: `calc((100% - ${rail}) * ${rightFrac} + 2px)`,
             height: heightPx,
             background: isGrayed
               ? 'var(--paper-3)'
@@ -1154,7 +1156,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             position: 'absolute',
             top: topPx,
             left: 1,
-            width: railPx - 2,
+            width: `calc(${rail} - 2px)`,
             height: heightPx,
             background: isWork ? `color-mix(in srgb, ${tone} ${seg.live ? 95 : 80}%, transparent)` : 'transparent',
             backgroundImage: isWork
@@ -1220,7 +1222,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             // Plan layer, right of the reality rail. A tinted block with a
             // coloured edge (like tasks) instead of a solid bright bar, so a
             // habit no longer shouts over tasks and tracked time.
-            left: railPx + 1,
+            left: `calc(${rail} + 1px)`,
             right: 2,
             height: blockHeight,
             background: `color-mix(in srgb, var(--${habit.color}) 22%, var(--paper))`,
