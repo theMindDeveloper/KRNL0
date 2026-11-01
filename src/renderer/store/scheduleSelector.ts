@@ -150,15 +150,16 @@ function clampPlanned(plannedMin: number | undefined): number {
  * for consistency with the writer's pattern in WeekView.
  */
 function addMinutesISO(isoLocal: string, min: number): string {
-  // Parse the ISO local string via Date (which interprets without 'Z' as local).
-  const d = new Date(isoLocal);
-  if (Number.isNaN(d.getTime())) return isoLocal;
-  d.setMinutes(d.getMinutes() + min);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const da = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
+  // Wall-clock arithmetic: read the local fields as if they were UTC so a
+  // daylight-saving change can't stretch or shrink a block by an hour.
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(isoLocal);
+  if (!m) return isoLocal;
+  const d = new Date(Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]! + min));
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const da = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
   return `${y}-${mo}-${da}T${hh}:${mm}`;
 }
 

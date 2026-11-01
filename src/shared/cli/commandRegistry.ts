@@ -33,7 +33,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'unschedule', usage: 'task unschedule <ref>', summary: 'Clear the scheduled time from a task' },
       { name: 'addNext', usage: 'task addNext <sourceRef> "<text>" [--duration <min>]', summary: 'Add a sequential successor task after source' },
       { name: 'list', usage: 'task list [<todoId>] [--json]', summary: 'List tasks, optionally filtered by TodoNode. IDs/refs accept ≥4-char prefix or unique text.' },
-      { name: 'kind', usage: 'task kind <ref> <focus|event>', summary: 'Set task kind discriminator (Decision 28). Refuses on active pomo task in headless mode.' },
+      { name: 'kind', usage: 'task kind <ref> <focus|event>', summary: 'Task kind (event only since #180 — focus is refused). Kept for script compatibility.' },
       { name: 'note', usage: 'task note <ref> "<text>" | --clear', summary: 'Set or clear a free-form note on a task' },
     ],
   },

@@ -137,6 +137,13 @@ function computeColumnLayout(
   return result;
 }
 
+/** "YYYY-MM-DDTHH:MM" read as wall-clock time (no DST shifts). */
+function wallClockMs(iso: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
+  if (!m) return new Date(iso).getTime();
+  return Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]!);
+}
+
 function fmtDur(min: number): string {
   const m = Math.max(0, Math.round(min));
   const h = Math.floor(m / 60);
@@ -495,8 +502,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // rendering, only the resulting placements.
   const weekRangeFromISO = `${baseYMD}T00:00`;
   const weekRangeToISO = `${addDays(baseYMD, dayCount)}T00:00`;
-  const scheduledTasks = useBoardStore(
-    useShallow((s): ScheduledTask[] => {
+  // Perf: subscribe to the board only (not hover / viewport) and derive in a
+  // memo. The previous useShallow selectors built new objects on every store
+  // change, so the whole calendar re-rendered on every hover and pan.
+  const boardForCal = useBoardStore((s) => s.board);
+  const scheduledTasks = useMemo((): ScheduledTask[] => {
+      const s = { board: boardForCal };
       if (!s.board) return [];
       const placements = selectScheduledTasksForRange(
         s.board,
@@ -513,8 +524,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         // Decision 28: block duration comes from placement endISO - startISO
         // (effectiveMin for focus tasks, which already includes breaks).
         // For event tasks and legacy cases, fall back to plannedMin.
-        const startMs = new Date(p.startISO).getTime();
-        const endMs = new Date(p.endISO).getTime();
+        // Wall-clock difference (local fields read as UTC), so a block that
+        // crosses a DST change keeps its planned length on the grid.
+        const startMs = wallClockMs(p.startISO);
+        const endMs = wallClockMs(p.endISO);
         const blockDurationMin =
           Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
             ? Math.round((endMs - startMs) / 60_000)
@@ -532,12 +545,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         });
       }
       return out;
-    }),
-  );
+  }, [boardForCal, weekRangeFromISO, weekRangeToISO]);
 
   // Read scheduled habits from the board store (ADR 0002 §6).
-  const scheduledHabits = useBoardStore(
-    useShallow((s): ScheduledHabit[] => {
+  const scheduledHabits = useMemo((): ScheduledHabit[] => {
+      const s = { board: boardForCal };
       if (!s.board) return [];
       const result: ScheduledHabit[] = [];
       for (const n of s.board.nodes) {
@@ -556,8 +568,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         }
       }
       return result;
-    }),
-  );
+  }, [boardForCal]);
 
   // Build a map from YYYY-MM-DD → TaskSlice[], splitting any task whose
   // duration crosses midnight into one slice per affected day.

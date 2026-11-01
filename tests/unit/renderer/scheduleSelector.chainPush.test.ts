@@ -99,3 +99,17 @@ describe('#168 — chain stays sequential when task 1 changes', () => {
     expect(placements.get('y')?.startISO).toBe('2026-11-02T10:00');
   });
 });
+
+describe('DST — blocks keep their wall-clock length', () => {
+  it('a 60-minute block across the spring-forward night ends 60 wall-clock minutes later', () => {
+    seq = 0;
+    const b = board(
+      [task('t1', 60, { scheduledFor: '2026-03-29T01:30', scheduledDurationMin: 60 }), task('t2', 30)],
+      [edge('t1', 't2')],
+    );
+    const { placements } = selectSchedule(b);
+    expect(placements.get('t1')?.endISO).toBe('2026-03-29T02:30');
+    expect(placements.get('t2')?.startISO).toBe('2026-03-29T02:30');
+  });
+});
+
