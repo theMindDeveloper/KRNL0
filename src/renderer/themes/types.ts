@@ -23,12 +23,26 @@ export interface XtermColors {
   cursorAccent: string;
 }
 
+/**
+ * How a style draws the Clock dial. Only appearance: the feature set (task
+ * lanes, pomo reality wash, ticks, numerals, now-pointer, hands, readout) is
+ * fixed in every style (F6). Colours come from `--k-clock-*` tokens.
+ */
+export interface ClockSkin {
+  bezel: 'none' | 'ring' | 'metal' | 'brass' | 'line' | 'pixel';
+  hand: 'line' | 'sword' | 'block';
+  /** Backing window behind the HH:MM readout. */
+  readoutWindow: boolean;
+}
+
 export interface ThemeManifest {
   /** Tokens per supported mode. A missing mode falls back to the other one. */
   tokens: Partial<Record<FrameMode, TokenMap>>;
   components: {
     /** Default Timer face; only used when the node has no face of its own (F7). */
     pomo: { face?: PomoFace };
+    /** Clock dial appearance (F6). */
+    clock: ClockSkin;
     /** xterm colours, applied live (F8). */
     terminal: { xterm: Partial<Record<FrameMode, XtermColors>> };
   };

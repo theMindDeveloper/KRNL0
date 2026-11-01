@@ -11,7 +11,10 @@
  */
 
 import type { FrameStyleId } from '../../shared/frameStyles';
-import type { ThemeManifest, TokenMap, XtermColors } from './types';
+import type { ClockSkin, ThemeManifest, TokenMap, XtermColors } from './types';
+
+/** Classic dial: no bezel, line hands, bare readout — exactly today's clock. */
+export const CLASSIC_CLOCK: ClockSkin = { bezel: 'none', hand: 'line', readoutWindow: false };
 
 export const CLASSIC_K: TokenMap = {
   '--k-now': '#ef4444',
@@ -33,7 +36,7 @@ const CLASSIC_XTERM: XtermColors = {
 
 const legacy = (): ThemeManifest => ({
   tokens: { light: CLASSIC_K, dark: CLASSIC_K },
-  components: { pomo: {}, terminal: { xterm: { light: CLASSIC_XTERM, dark: CLASSIC_XTERM } } },
+  components: { pomo: {}, clock: CLASSIC_CLOCK, terminal: { xterm: { light: CLASSIC_XTERM, dark: CLASSIC_XTERM } } },
   slots: { panelToggles: 'row' },
 });
 
@@ -77,12 +80,23 @@ const PRO_DARK: TokenMap = {
   '--k-mother-wash': 'linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0) 18%)',
   '--k-mother-shadow': 'inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px #070707, 0 24px 48px rgba(0,0,0,0.5)',
   '--k-term-border': '#070707',
+  '--k-clock-bezel': '#0d0d0d',
+  '--k-clock-bezel-edge': '#050505',
+  '--k-clock-face': '#161616',
+  '--k-clock-face-edge': '#262626',
+  '--k-clock-track': '#1e1e1e',
+  '--k-clock-tick-major': '#bdbdbd',
+  '--k-clock-tick-minor': '#3a3a3a',
+  '--k-clock-num': '#8c8c8c',
+  '--k-clock-hand': '#ededed',
+  '--k-clock-readout': '#9a9a9a',
 };
 
 const PRO: ThemeManifest = {
   tokens: { dark: PRO_DARK },
   components: {
     pomo: { face: 'blocks' },
+    clock: { bezel: 'ring', hand: 'line', readoutWindow: true },
     terminal: { xterm: { dark: { background: '#0b0b10', foreground: '#c9cfc6', cursor: '#c9f158', cursorAccent: '#0b0b10' } } },
   },
   slots: { panelToggles: 'topbar' },

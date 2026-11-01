@@ -2,7 +2,7 @@
 // Time and id sources are injected so tests can pin them.
 
 import type { PomoConfig, PomoSegmentKind, PomoSessionRecord, PomoState, TimerFace } from './types';
-import { defaultPomoConfig } from './types';
+import { defaultPomoConfig, TIMER_FACES } from './types';
 import { isLongBreakAfter } from './pomoRules';
 
 export interface PomoEnv {
@@ -438,7 +438,7 @@ export const pomoClearActiveTask = (
   };
 };
 
-const VALID_FACES: ReadonlyArray<TimerFace> = ['ascii', 'lcd', 'blocks', 'vapor'];
+const VALID_FACES: ReadonlyArray<TimerFace> = TIMER_FACES;
 
 /**
  * PR4 — set the timer face variant on the PomoConfig.

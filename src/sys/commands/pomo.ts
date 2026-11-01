@@ -1,5 +1,6 @@
 import type { SysResult } from '../SysFacade';
 import type { PomoConfig, PomoState, TimerFace } from '../../renderer/components/nodes/PomoNode/types';
+import { TIMER_FACES } from '../../renderer/components/nodes/PomoNode/types';
 import {
   pomoStart as fsmStart,
   pomoStop as fsmStop,
@@ -9,7 +10,7 @@ import {
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 
-const VALID_FACES: readonly TimerFace[] = ['ascii', 'lcd', 'blocks', 'vapor'];
+const VALID_FACES: readonly TimerFace[] = TIMER_FACES;
 function isTimerFace(v: unknown): v is TimerFace {
   return typeof v === 'string' && (VALID_FACES as readonly string[]).includes(v);
 }

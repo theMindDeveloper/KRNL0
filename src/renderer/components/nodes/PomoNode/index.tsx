@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
+import { TIMER_FACES } from './types';
 import { defaultPomoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL, MotherFrameStationContext } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
@@ -11,6 +12,8 @@ import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
 import { Vapor } from './variants/Vapor';
+import { Vu } from './variants/Vu';
+import { Outline } from './variants/Outline';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 
 const TICK_MS = 500;
@@ -456,7 +459,7 @@ export function PomoNode({
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {(['ascii', 'lcd', 'blocks', 'vapor'] as const).map((face) => {
+            {TIMER_FACES.map((face) => {
               const isActive = (config.face ?? defaultFace) === face;
               return (
                 <button
@@ -551,6 +554,12 @@ export function PomoNode({
           )}
           {activeFace === 'vapor' && (
             <Vapor m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'vu' && (
+            <Vu m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'outline' && (
+            <Outline m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
           )}
 
           {/* Today's full-cycle counter — distinct visual from the session pips
