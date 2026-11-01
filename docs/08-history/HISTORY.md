@@ -649,3 +649,42 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Deliberately not changed:** Pomo→task time crediting (removed by #180), a revision check for renderer/CLI concurrent saves, and the CLI dispatch timeout.
 
 **Tests:** 115 files / 1456 passed, 0 typecheck errors, build OK. Some full-suite runs on this Windows machine show one random 5 s render-test timeout. The same tests pass when rerun.
+
+---
+
+## [2026-11-01] — Plan vs reality: pomo as observer, readable Calendar/Clock, Plan-vs-actual analytics
+
+**Type:** Feature + Bug Fix (four stacked slices on top of the logic-audit batch)
+**Commits:** `fd128cd` (dev preview), `e74dc4e` (audit leftovers), `630477d` (time model, #180), `21e70f6` (calendar/clock visuals), `b016cb5` (analytics)
+**Files changed:** `src/main/{ipc/handlers.ts,persistence/board.ts}`, `src/renderer/{store/{trackedTime,laneLayout,pomoReality,boardStore}.ts,analytics/{estimates.ts,charts/PlanVsActual.tsx},components/{Canvas/commandDispatch.ts,nodes/{PomoNode,TaskNode,TodoNode,CalendarNode/WeekView.tsx,ClockNode,AnalyticsNode}},dev/*,index.tsx}`, `src/sys/{parser.ts,SysFacade.ts,commands/{pomo,task,analytics}.ts}`, `src/shared/cli/commandRegistry.ts`, `vitest.config.ts`, `docs/06-requirements/{time-model,calendar-clock-visuals,analytics-plan-vs-actual}.md`, tests.
+
+**Summary:**
+- **Audit leftovers:**
+  - A renderer save over a newer CLI write is refused, and the app reloads (revision guard on `board:save`).
+  - `cli:dispatch` targets one window. A timeout now says the command may have run.
+  - Bulk deletes share the store's coalescing undo slot.
+  - `marquee` is in the help registry.
+  - The test timeout is 15 s.
+- **Time model (#180 follow-up, docs/06-requirements/time-model.md):**
+  - The Pomodoro only observes. Tasks tag it (`activeTaskId` on the live span, `taskId` on recorded spans).
+  - Tracked time per task is derived from tagged spans, and nothing is written onto tasks any more.
+  - "Start pomo" no longer cancels a running session. Before this fix, event tasks silently stopped it.
+  - START suggests the task planned for now.
+  - New: a tag selector on the Pomo node, retagging of recorded spans, and CLI `pomo tag` / `pomo retag`.
+  - Task cards show PLAN vs TRACKED with an overrun state.
+  - `plannedMin` is the single estimate, and the mirrors are re-synced on load.
+- **Calendar & Clock (calendar-clock-visuals.md):**
+  - One shared lane packer for parallel tasks.
+  - Reality gets its own rail (calendar) and ring (clock), coloured by its tag; a pause is a gap.
+  - Blocks show title and real time range, with done, missed and overrun states.
+  - Habits are tinted, not solid bars.
+  - Reality spans that cross midnight are split.
+  - A notice appears when a drop is pushed by its chain.
+  - The clock's now-pointer only shows in its own 12 h half.
+- **Analytics (analytics-plan-vs-actual.md):**
+  - New "Plan vs actual" tab: accuracy (median tracked ÷ planned), estimate vs actual per task (deleted tasks included via the ledger), planned vs worked per day, and where the time went.
+  - CLI `analytics show --view estimates`.
+- **Dev:** `npx vite --config vite.preview.config.ts` serves the renderer with a fixture board (`?solo=calendar|clock|analytics`). It is DEV-only and stripped from builds.
+- **Tests removed:** tests that encoded the retired planner model (per-task checkpoints, session quotas from estimates, loading a task into the pomo, the focus/event toggle) were removed and replaced by plan-vs-reality tests.
+
+**Tests:** 120 files / 1442 passed, 0 typecheck errors, build OK. Not yet exercised in the Electron window.
