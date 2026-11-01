@@ -8,6 +8,7 @@ import {
   taskToggle as fsmTaskToggle,
   taskEdit as fsmTaskEdit,
   taskSetSchedule as fsmTaskSetSchedule,
+  taskSetDuration as fsmTaskSetDuration,
 } from '../../renderer/components/nodes/TaskNode/commands';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import {
@@ -34,6 +35,7 @@ import {
 } from '../../shared/dispatch/resolveRef';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
 import { TASK_STEP_X, TASK_STEP_Y, MOTHER_OFFSET_Y } from '../layout';
+import { wouldCreateChainCycle } from '../../renderer/store/chainWalker';
 
 export interface TaskCtx {
   boardPath: string;
@@ -451,18 +453,15 @@ export async function taskDuration(
     }
   }
 
-  const ts = taskNode.state as TaskState;
-  const nextState: TaskState = {
-    ...ts,
-    durationMin: minutes,
-    eta: `~${minutes} min`,
-  };
+  // Same FSM as the UI: also updates plannedMin/scheduledDurationMin so the
+  // calendar block actually resizes.
+  const nextState = fsmTaskSetDuration(taskNode.state as TaskState, { durationMin: minutes });
   updateNode(board, taskId, { ...taskNode, state: nextState });
   saveBoard(ctx, board);
   return {
     ok: true,
-    message: `Task "${taskId.slice(0, 8)}" duration set to ${minutes} min.`,
-    data: { id: taskId, durationMin: minutes },
+    message: `Task "${taskId.slice(0, 8)}" duration set to ${nextState.durationMin} min.`,
+    data: { id: taskId, durationMin: nextState.durationMin },
   };
 }
 
@@ -636,6 +635,9 @@ export async function taskChain(ctx: TaskCtx, refs: string[]): Promise<SysResult
         e.to.command === 'task.activate',
     );
     if (exists) continue;
+    if (wouldCreateChainCycle(board.edges, fromId, toId)) {
+      return { ok: false, message: `task chain: linking ${fromId.slice(0, 8)} → ${toId.slice(0, 8)} would create a loop.` };
+    }
     board.edges = [
       ...board.edges,
       {
@@ -658,6 +660,26 @@ export async function taskChain(ctx: TaskCtx, refs: string[]): Promise<SysResult
 // ── ADR 0003/0005 — taskSchedule / taskUnschedule ────────────────────────────
 
 /**
+ * Normalize a `--at` value to the local "YYYY-MM-DDTHH:MM" shape the calendar
+ * writes and the schedule selector compares lexicographically. Values with a
+ * `Z` or offset are converted to local time; free text ("tomorrow") and
+ * impossible dates return null.
+ */
+export function normalizeScheduleAt(at: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/.exec(at.trim());
+  if (!m) return null;
+  const d = new Date(m[7] ? at.trim() : `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? '00'}`);
+  if (Number.isNaN(d.getTime())) return null;
+  if (!m[7]) {
+    // Local input: reject rollovers such as 2026-02-30 or 25:00.
+    if (d.getFullYear() !== Number(m[1]) || d.getMonth() + 1 !== Number(m[2]) || d.getDate() !== Number(m[3])
+      || d.getHours() !== Number(m[4]) || d.getMinutes() !== Number(m[5])) return null;
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
  * `krnl task schedule <ref> --at <ISO> [--duration <min>]`
  * Sets scheduledFor (and optional scheduledDurationMin) on a TaskNode, then
  * mirrors to the linked TodoItem via todoSetItemSchedule.
@@ -670,6 +692,11 @@ export async function taskSchedule(
 ): Promise<SysResult> {
   if (!taskId) return { ok: false, message: 'task schedule requires a <ref>' };
   if (!at) return { ok: false, message: 'task schedule requires --at <ISO>' };
+  const normalized = normalizeScheduleAt(at);
+  if (normalized === null) {
+    return { ok: false, message: `task schedule: --at must be an ISO datetime like 2026-11-02T09:30, got "${at}"` };
+  }
+  at = normalized;
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
   if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };

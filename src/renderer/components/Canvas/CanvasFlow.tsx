@@ -34,6 +34,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
 import { saveBoard, emit } from '../../store/eventLog';
+import { wouldCreateChainCycle } from '../../store/chainWalker';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
 import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapters';
@@ -1042,6 +1043,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         e.from.event === event,
     );
     if (duplicate) return;
+    // A task.next loop leaves the chain with no start task, which makes every
+    // task in it disappear from Calendar and Clock — refuse to close one.
+    if (event === 'task.next' && wouldCreateChainCycle(existingEdges, conn.source, conn.target)) {
+      emit('sys.error', 'link refused: it would make the task chain loop back on itself', { severity: 'warn' });
+      return;
+    }
 
     const targetCommand = tgtIsHabitLane ? 'habit.markDone' : 'task.activate';
     const edge: KrnlEdge = isTaskFlow

@@ -433,6 +433,8 @@ describe('sys task duration', () => {
     const task = findTasks().find((t) => t.id === taskId)!;
     expect((task.state as TaskState).durationMin).toBe(45);
     expect((task.state as TaskState).eta).toBe('~45 min');
+    // The calendar reads plannedMin — it must follow the duration (#168).
+    expect((task.state as TaskState).plannedMin).toBe(45);
   });
 
   it('returns error when task id is missing', async () => {

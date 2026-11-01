@@ -15,8 +15,14 @@
 //   so the next task starts after breaks complete.
 //   scheduledDurationMin on a focus task is a WORK-TIME override; the total
 //   block height = work-time + breaks derived from that work time.
-// - For kind === 'event': cursor advance = plannedMin (no breaks).
-//   scheduledDurationMin on an event task is a TOTAL-TIME override (no breaks).
+// - For kind === 'event': cursor advance = the block length (plannedMin, or
+//   the anchor's scheduledDurationMin override), so successors start where the
+//   block visually ends (#168). scheduledDurationMin is a TOTAL-TIME override.
+//
+// #168 chain push: within a chain, an anchor is an earliest-start constraint,
+// not an absolute fixpoint. If the previous task ends after the anchor's
+// scheduledFor, the anchor (and everything after it) is pushed to that end so
+// the chain never overlaps itself. Anchors placed later keep their own time.
 //
 // Memoized at module level on (board.nodes, board.edges, pomoConfig) by
 // reference identity. Config edits create a new node array (immutable updates)
@@ -156,6 +162,14 @@ function addMinutesISO(isoLocal: string, min: number): string {
   return `${y}-${mo}-${da}T${hh}:${mm}`;
 }
 
+/** The later of two local ISO datetimes; `a` wins ties and unparseable input. */
+function laterISO(a: string, b: string): string {
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return a;
+  return tb > ta ? b : a;
+}
+
 /**
  * Build the set of task IDs reachable from `seed` via task.next edges
  * (treated as undirected for connectivity). Restricted to ids in `scope`.
@@ -190,8 +204,9 @@ interface TaskInfo {
  *
  * For kind==='event':
  *   - effectiveMin (endISO) = scheduledDurationMin override (if set on anchor) or plannedMin.
- *   - cursorAdvanceMin = plannedMin (cursor always advances by work time, not visual override).
- *     This preserves the ADR 0003 §3.7 rule: successor start uses plannedMin, not override.
+ *   - cursorAdvanceMin = effectiveMin — the successor starts where this block
+ *     ends (#168; supersedes ADR 0003 §3.7's plannedMin-only advance, which made
+ *     a resized block overlap its successor).
  *   - breakdown = null.
  *
  * For kind==='focus':
@@ -209,12 +224,10 @@ function computeEffective(
   const plannedMin = clampPlanned(ts.plannedMin);
 
   if (kind === 'event') {
-    // effectiveMin is used for endISO (visual block height).
-    // cursorAdvanceMin is always plannedMin — successor starts after work time, not visual override.
     const effectiveMin = isAnchor
       ? clampPlanned(ts.scheduledDurationMin ?? plannedMin)
       : plannedMin;
-    return { effectiveMin, cursorAdvanceMin: plannedMin, breakdown: null };
+    return { effectiveMin, cursorAdvanceMin: effectiveMin, breakdown: null };
   }
 
   // kind === 'focus'
@@ -317,8 +330,10 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
           const taskKind: TaskKind = ts.kind ?? 'focus';
 
           if (isAnchor) {
-            // Explicit anchor: reset cursor to scheduledFor.
-            cursor = ts.scheduledFor as string;
+            // Explicit anchor: reset cursor to scheduledFor — unless the
+            // previous task in the chain ends later, then push (#168).
+            const sf = ts.scheduledFor as string;
+            cursor = cursor !== null ? laterISO(sf, cursor) : sf;
             cursorAnchorId = unit.taskId;
 
             const { effectiveMin, cursorAdvanceMin, breakdown } = computeEffective(ts, true, cfg);
@@ -383,6 +398,9 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
             if (cursor === null) continue; // skip entire group (pre-first-anchor)
             groupStart = cursor;
             groupAnchorId = cursorAnchorId; // carries over from last sequential anchor
+          } else if (cursor !== null) {
+            // #168 — the group can't start before the preceding task ends.
+            groupStart = laterISO(groupStart, cursor);
           }
 
           // Emit each branch.
@@ -393,7 +411,11 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
               ts !== undefined &&
               typeof ts.scheduledFor === 'string' &&
               ts.scheduledFor.length > 0;
-            const branchStart = isBranchAnchor ? (ts!.scheduledFor as string) : groupStart!;
+            const branchStart = isBranchAnchor
+              ? cursor !== null
+                ? laterISO(ts!.scheduledFor as string, cursor)
+                : (ts!.scheduledFor as string)
+              : groupStart!;
             const branchAnchorId = isBranchAnchor
               ? branch.taskId
               : (groupAnchorId ?? cursorAnchorId ?? branch.taskId);
