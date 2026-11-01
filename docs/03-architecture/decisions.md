@@ -130,7 +130,7 @@ Cut before week 1 to keep the scope honest:
 | MCP server | Deferred to v1.1. |
 | ElevenLabs TTS | Deferred to v1.1. Piper is free and local. |
 | OpenAI Realtime | Cost + complexity. |
-| Custom themes | Token system supports them; we don't ship more than light + dark. |
+| Custom themes | ~~Token system supports them; we don't ship more than light + dark.~~ **Superseded by ADR 0009 (2026-11-01):** frame styles carry full theme manifests. |
 
 **Status: Locked. Do not re-open.**
 
