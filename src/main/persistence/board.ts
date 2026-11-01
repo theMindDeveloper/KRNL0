@@ -2,7 +2,7 @@
 // Both the Electron main process (handlers.ts) and the sys CLI
 // (sys/commands/*.ts) read/write through this module.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { copyFileSync, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
 // ADR 0001 — local helper; mirrors HabitNode/types.ts toYMD but kept here to
@@ -644,18 +644,62 @@ export function loadBoardFrom(boardPath: string): unknown {
         ),
       );
     }
-  } catch {
-    // fall through to seed
+  } catch (err) {
+    // The file exists but cannot be parsed/migrated. Keep a copy before we
+    // hand back the seed — the next save would otherwise overwrite the user's
+    // only copy of their board.
+    backupCorruptBoard(boardPath, err);
   }
   return seedBoard();
 }
 
+/** Copy an unreadable board.json aside as `board.json.corrupt-<timestamp>`. */
+export function backupCorruptBoard(boardPath: string, err: unknown): void {
+  try {
+    if (!existsSync(boardPath)) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    copyFileSync(boardPath, `${boardPath}.corrupt-${stamp}`);
+    console.error(`[board] could not read ${boardPath}; backed up as .corrupt-${stamp}`, err);
+  } catch (backupErr) {
+    console.error('[board] failed to back up corrupt board', backupErr);
+  }
+}
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Write `text` to `path` atomically: write a sibling temp file, then rename it
+ * over the target. A crash mid-write leaves the old file intact instead of a
+ * truncated one. On Windows, rename can fail transiently (EPERM/EBUSY) while
+ * antivirus or another reader holds the file, so it is retried briefly.
+ */
+export function writeFileAtomic(path: string, text: string): void {
+  const dir = dirname(path);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, text, 'utf-8');
+  for (let attempt = 0; ; attempt++) {
+    try {
+      renameSync(tmp, path);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if ((code === 'EPERM' || code === 'EBUSY' || code === 'EACCES') && attempt < 5) {
+        sleepSync(20 * (attempt + 1));
+        continue;
+      }
+      try { unlinkSync(tmp); } catch { /* ignore */ }
+      throw err;
+    }
+  }
+}
+
 export function saveBoardTo(boardPath: string, data: unknown): void {
   try {
-    const dir = dirname(boardPath);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(boardPath, JSON.stringify(data, null, 2), 'utf-8');
-  } catch {
-    // best-effort
+    writeFileAtomic(boardPath, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error(`[board] failed to save ${boardPath}`, err);
   }
 }

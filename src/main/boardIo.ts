@@ -7,9 +7,10 @@
  */
 
 import { app, BrowserWindow } from 'electron';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { backupCorruptBoard, seedBoard, writeFileAtomic } from './persistence/board';
 
 export const BOARD_DIR =
   process.env.KRNL0_BOARD_DIR ?? join(homedir(), 'Documents', app.getName());
@@ -33,15 +34,15 @@ export function readBoardFile(): RawBoard | null {
     if (!Array.isArray(parsed.nodes)) parsed.nodes = [];
     if (!Array.isArray(parsed.edges)) parsed.edges = [];
     return parsed;
-  } catch {
+  } catch (err) {
+    backupCorruptBoard(BOARD_PATH, err);
     return null;
   }
 }
 
 export function writeBoardFile(board: RawBoard): void {
-  if (!existsSync(BOARD_DIR)) mkdirSync(BOARD_DIR, { recursive: true });
   board.savedAt = new Date().toISOString();
-  writeFileSync(BOARD_PATH, JSON.stringify(board, null, 2), 'utf-8');
+  writeFileAtomic(BOARD_PATH, JSON.stringify(board, null, 2));
 }
 
 export function notifyBoardChanged(): void {
@@ -57,15 +58,10 @@ export function notifyBoardChanged(): void {
 export function mutateBoard(
   mutator: (board: RawBoard) => RawBoard | void,
 ): RawBoard {
-  const current =
-    readBoardFile() ?? {
-      version: 1,
-      schemaVersion: 1,
-      savedAt: new Date().toISOString(),
-      viewport: { x: 0, y: 220, zoom: 1 },
-      nodes: [],
-      edges: [],
-    };
+  // A missing (or unreadable — already backed up by readBoardFile) board
+  // starts from the canonical seed, never an empty board: writing an empty
+  // board would permanently drop the mother nodes.
+  const current = readBoardFile() ?? (seedBoard() as RawBoard);
   const next = mutator(current) ?? current;
   writeBoardFile(next);
   notifyBoardChanged();
