@@ -5,7 +5,7 @@ import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
-import { loadBoardFrom, saveBoardTo, seedBoard } from '../persistence/board';
+import { loadBoardFrom, saveBoardTo, seedBoard, RendererRevGuard } from '../persistence/board';
 import { notifyBoardChanged } from '../boardIo';
 import { renderMotd } from '../rpc/motd';
 import type { RpcServer } from '../rpc/server';
@@ -54,6 +54,11 @@ function loadBoard() {
   return loadBoardFrom(BOARD_PATH);
 }
 
+// Lost-update guard: the renderer saves the whole board, so a save made from a
+// board loaded before a CLI write would revert that write. Track the revision
+// the renderer last saw; a stale save is refused and the renderer reloads.
+const rendererRev = new RendererRevGuard(BOARD_PATH);
+
 function saveBoard(data: unknown) {
   saveBoardTo(BOARD_PATH, data);
 }
@@ -64,11 +69,20 @@ function hasOpenRenderer(): boolean {
 
 export function registerHandlers(rpcServer?: RpcServer): void {
   ipcMain.handle('board:load', async () => {
-    return loadBoard();
+    const board = loadBoard();
+    rendererRev.sync();
+    return board;
   });
 
   ipcMain.handle('board:save', async (_event, data: unknown) => {
+    if (rendererRev.isStale()) {
+      // A newer write landed (sys CLI / Codex). Keep it and make the renderer
+      // reload; it re-reads through board:load, which re-syncs the revision.
+      notifyBoardChanged();
+      return;
+    }
     saveBoard(data);
+    rendererRev.sync();
   });
 
   // Factory reset — overwrite board.json with a fresh canonical seed and return
@@ -76,7 +90,9 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   // Destructive and intentional: the renderer gates this behind a hold-to-confirm.
   ipcMain.handle('board:reset', async () => {
     saveBoard(seedBoard());
-    return loadBoard();
+    const board = loadBoard();
+    rendererRev.sync();
+    return board;
   });
 
   ipcMain.handle('board:saveViewport', async (_event, viewport: unknown) => {
@@ -84,7 +100,11 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     const merged = typeof board === 'object' && board !== null
       ? { ...(board as Record<string, unknown>), viewport, savedAt: new Date().toISOString() }
       : { viewport, savedAt: new Date().toISOString() };
+    // Merges onto the current file, so it never loses a write itself — but it
+    // bumps the revision, which must not make the renderer's next save stale.
+    const wasInSync = !rendererRev.isStale();
     saveBoard(merged);
+    if (wasInSync) rendererRev.sync();
   });
 
   ipcMain.handle('sys:run', async (_event, argv: string[]) => {
@@ -100,7 +120,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
 
   // cli:dispatch — main→renderer command dispatch for renderer-coupled commands.
   // Used by Phase 2 CLI commands (viewport/undo/redo/theme/marquee/node.move).
-  // Main sends cli:dispatch:request to all windows, waits up to 5s for reply.
+  // Main sends cli:dispatch:request to one window and waits up to 15s for a reply.
   const pendingCliDispatches = new Map<string, {
     resolve: (result: { ok: boolean; message: string }) => void;
     timer: ReturnType<typeof setTimeout>;
@@ -131,15 +151,20 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       };
     }
     const id = randomUUID();
+    // One window only: broadcasting ran the command once per window.
+    const target = BrowserWindow.getFocusedWindow() ?? windows[0]!;
     const result = await new Promise<{ ok: boolean; message: string }>((resolve) => {
       const timer = setTimeout(() => {
         pendingCliDispatches.delete(id);
-        resolve({ ok: false, message: `cli:dispatch timeout for ${command}` });
-      }, 5000);
+        // The request was delivered; only the confirmation is missing, so the
+        // command may well have run. Say so — a blind retry could run it twice.
+        resolve({
+          ok: false,
+          message: `${command}: the app did not confirm within 15s — it may still have run. Check the board before retrying.`,
+        });
+      }, 15_000);
       pendingCliDispatches.set(id, { resolve, timer });
-      for (const win of windows) {
-        win.webContents.send('cli:dispatch:request', id, command, args);
-      }
+      target.webContents.send('cli:dispatch:request', id, command, args);
     });
     return result;
   }

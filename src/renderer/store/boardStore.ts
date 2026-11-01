@@ -112,7 +112,10 @@ const HISTORY_CAP = 50;
 // the microtask queue drains.
 let _coalescing = false;
 
-function pushHistory(s: BoardStore): { history: Board[]; future: Board[] } {
+/** Exported so bulk paths that call setState directly (cascade delete) take
+ *  part in the same per-task coalescing — otherwise a delete followed by an
+ *  updateNode in the same tick cost two Ctrl+Z presses. */
+export function pushHistory(s: BoardStore): { history: Board[]; future: Board[] } {
   if (!s.board) return { history: s.history, future: s.future };
   if (_coalescing) return { history: s.history, future: s.future };
   _coalescing = true;

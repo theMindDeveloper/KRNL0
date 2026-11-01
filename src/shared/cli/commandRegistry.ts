@@ -205,6 +205,13 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'marquee',
+    summary: 'Select by rectangle (requires open renderer)',
+    subcommands: [
+      { name: '--rect', usage: 'marquee --rect x1,y1,x2,y2 --delete', summary: 'Delete every node inside the rectangle. --delete is required; undoable with undo.' },
+    ],
+  },
+  {
     group: 'viewport',
     summary: 'Canvas viewport control (requires open renderer)',
     subcommands: [

@@ -25,7 +25,7 @@
  * per-task session checkpoint, extended task.toggle and task.delete cascades.
  */
 
-import { useBoardStore } from '../../store/boardStore';
+import { useBoardStore, pushHistory } from '../../store/boardStore';
 import { emit, saveBoard } from '../../store/eventLog';
 
 /** Dispatch `krnl:ensure-visible` so CanvasFlow can pan the camera if the
@@ -470,7 +470,7 @@ function removeNodeSet(ids: string[], opts?: { skipHistory?: boolean }): void {
     if (!s.board) return s;
     const historyPatch = opts?.skipHistory
       ? {}
-      : { history: [...s.history, s.board].slice(-DELETE_HISTORY_CAP), future: [] };
+      : pushHistory(s);
     return {
       ...historyPatch,
       board: {
@@ -484,8 +484,6 @@ function removeNodeSet(ids: string[], opts?: { skipHistory?: boolean }): void {
   });
 }
 
-// Mirrors boardStore's HISTORY_CAP (not exported). Bulk-delete pushes one slot.
-const DELETE_HISTORY_CAP = 50;
 
 /** Renumber sibling tasks (1-based by createdAt) after add/delete. */
 function renumberSiblings(parentTodoId: string, parentTaskId: string | null): void {
@@ -557,7 +555,7 @@ export function deleteTaskNodesCascade(taskIds: string[], opts?: { skipHistory?:
     if (!s.board) return s;
     const historyPatch = opts?.skipHistory
       ? {}
-      : { history: [...s.history, s.board].slice(-DELETE_HISTORY_CAP), future: [] };
+      : pushHistory(s);
     return {
       ...historyPatch,
       board: {

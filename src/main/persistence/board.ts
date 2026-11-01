@@ -2,7 +2,7 @@
 // Both the Electron main process (handlers.ts) and the sys CLI
 // (sys/commands/*.ts) read/write through this module.
 
-import { copyFileSync, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync, mkdirSync } from 'fs';
+import { copyFileSync, existsSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
 // ADR 0001 — local helper; mirrors HabitNode/types.ts toYMD but kept here to
@@ -693,6 +693,37 @@ export function writeFileAtomic(path: string, text: string): void {
       try { unlinkSync(tmp); } catch { /* ignore */ }
       throw err;
     }
+  }
+}
+
+/** Revision of board.json on disk (mtime in ms), or null when it doesn't exist. */
+export function boardFileRev(boardPath: string): number | null {
+  try {
+    return statSync(boardPath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tracks the board.json revision the renderer last loaded or wrote, so a
+ * renderer save that would overwrite a newer write (sys CLI, Codex) is
+ * refused instead of silently reverting it.
+ */
+export class RendererRevGuard {
+  private rev: number | null = null;
+
+  constructor(private readonly boardPath: string) {}
+
+  /** Call after the renderer loaded the board or after it saved successfully. */
+  sync(): void {
+    this.rev = boardFileRev(this.boardPath);
+  }
+
+  /** True iff someone else wrote board.json since the renderer last synced. */
+  isStale(): boolean {
+    const current = boardFileRev(this.boardPath);
+    return this.rev !== null && current !== null && current !== this.rev;
   }
 }
 

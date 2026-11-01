@@ -4,10 +4,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadBoardFrom, saveBoardTo } from '../../../src/main/persistence/board';
+import { loadBoardFrom, saveBoardTo, RendererRevGuard } from '../../../src/main/persistence/board';
 
 let tmpDir = '';
 let boardPath = '';
@@ -47,5 +47,30 @@ describe('board persistence safety', () => {
     saveBoardTo(boardPath, { nodes: [{ id: 'b' }], edges: [] });
     expect(JSON.parse(readFileSync(boardPath, 'utf-8')).nodes[0].id).toBe('b');
     expect(existsSync(`${boardPath}.tmp`)).toBe(false);
+  });
+});
+
+describe('RendererRevGuard — lost-update protection', () => {
+  it('is not stale right after the renderer synced', () => {
+    saveBoardTo(boardPath, { nodes: [], edges: [] });
+    const guard = new RendererRevGuard(boardPath);
+    guard.sync();
+    expect(guard.isStale()).toBe(false);
+  });
+
+  it('becomes stale when another writer changes board.json', () => {
+    saveBoardTo(boardPath, { nodes: [], edges: [] });
+    const guard = new RendererRevGuard(boardPath);
+    guard.sync();
+    saveBoardTo(boardPath, { nodes: [{ id: 'from-cli' }], edges: [] });
+    const later = new Date(Date.now() + 5_000);
+    utimesSync(boardPath, later, later); // guarantee a distinct mtime
+    expect(guard.isStale()).toBe(true);
+    guard.sync();
+    expect(guard.isStale()).toBe(false);
+  });
+
+  it('is never stale before the first sync (fresh app, no board yet)', () => {
+    expect(new RendererRevGuard(boardPath).isStale()).toBe(false);
   });
 });
