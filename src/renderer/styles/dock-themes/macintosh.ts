@@ -17,7 +17,7 @@ export const MACINTOSH_THEME = defineDockTheme(
        * the canvas, so the desktop is one calm tone and only the dot grid
        * remains. */
       html[data-dock="macintosh"]:not([data-theme="dark"]) .react-flow {
-        background: #e4dfcd !important;
+        background: #f7f7f5 !important;
         --grid:        rgba(5, 5, 5, 0.16);
         --grid-strong: rgba(5, 5, 5, 0.30);
       }

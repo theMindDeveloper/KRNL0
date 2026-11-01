@@ -14,6 +14,7 @@ import { Blocks } from './variants/Blocks';
 import { Vapor } from './variants/Vapor';
 import { Vu } from './variants/Vu';
 import { Outline } from './variants/Outline';
+import { Mac } from './variants/Mac';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 
 const TICK_MS = 500;
@@ -548,6 +549,9 @@ export function PomoNode({
           )}
           {activeFace === 'outline' && (
             <Outline m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+          )}
+          {activeFace === 'mac' && (
+            <Mac m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
           )}
 
           {/* Today's full-cycle counter — distinct visual from the session pips

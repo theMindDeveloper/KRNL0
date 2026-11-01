@@ -190,14 +190,15 @@ const BLUEPRINT_DARK: TokenMap = k({
 
 const MAC_LIGHT: TokenMap = k({
   '--font-mono': "'Pixelify Sans', 'JetBrains Mono', monospace", '--font-sans': "'Pixelify Sans', 'JetBrains Mono', monospace", '--k-clock-font': "'Pixelify Sans', monospace",
-  '--paper': '#faf3df', '--paper-2': '#f0e6c8', '--paper-3': '#d8cdaa', '--node-bg': '#fffbe8',
-  '--ink': '#050505', '--ink-2': '#1a1a1a', '--ink-3': 'rgba(5, 5, 5, 0.76)', '--ink-4': 'rgba(5, 5, 5, 0.64)',
-  '--ink-on-bright': '#fffbe8', '--acid': '#050505', '--acid-ink': '#050505', '--accent-on-dark': '#fffbe8',
+  // Modern-retro: off-white windows and charcoal ink instead of 1-bit black.
+  '--paper': '#f4f3ef', '--paper-2': '#ecebe6', '--paper-3': '#d6d4cd', '--node-bg': '#fbfbf8',
+  '--ink': '#1d1d1f', '--ink-2': '#2c2c2e', '--ink-3': 'rgba(29, 29, 31, 0.78)', '--ink-4': 'rgba(29, 29, 31, 0.66)',
+  '--ink-on-bright': '#fbfbf8', '--acid': '#1d1d1f', '--acid-ink': '#1d1d1f', '--accent-on-dark': '#fbfbf8',
   /* acid is black here, so text on it is paper and the primary button inverts. */
-  '--btn-primary-bg': '#050505', '--btn-primary-bg-hover': '#2a2a2a', '--btn-primary-fg': '#fffbe8',
+  '--btn-primary-bg': '#1d1d1f', '--btn-primary-bg-hover': '#3a3a3c', '--btn-primary-fg': '#fbfbf8',
   // Finder footer: light bar, ink text.
-  '--k-status-bg': '#fffbe8', '--k-status-line': '#050505', '--k-status-label': 'rgba(5, 5, 5, 0.66)',
-  '--k-status-value': '#050505', '--k-status-ok': '#050505', '--k-status-warn': '#8a2a10', '--acid-glow': '#2a2a2a', '--acid-faint': 'rgba(5, 5, 5, 0.10)',
+  '--k-status-bg': '#fbfbf8', '--k-status-line': 'rgba(29, 29, 31, 0.35)', '--k-status-label': 'rgba(29, 29, 31, 0.66)',
+  '--k-status-value': '#1d1d1f', '--k-status-ok': '#1d1d1f', '--k-status-warn': '#8a2a10', '--acid-glow': '#2a2a2a', '--acid-faint': 'rgba(5, 5, 5, 0.10)',
   '--spine': '#1f1f1f', '--spine-hot': '#050505', '--rust': '#2a1a14', '--rust-deep': '#050505', '--cyan': '#050505', '--plum': '#1f1f1f',
   '--frame-bg': 'rgba(5, 5, 5, 0.04)', '--frame-edge': 'rgba(5, 5, 5, 0.55)',
   '--k-now': '#050505', '--k-cal-grid': 'rgba(5, 5, 5, 0.25)', '--k-cal-today': 'rgba(5, 5, 5, 0.06)', '--k-pointer-core': '#fffbe8',
@@ -288,7 +289,7 @@ export const MANIFESTS: Record<FrameStyleId, ThemeManifest> = {
     tokens: { light: MAC_LIGHT, dark: MAC_DARK },
     loadFonts: fonts.pixel,
     components: {
-      pomo: { face: 'ascii' },
+      pomo: { face: 'mac' },
       clock: { bezel: 'pixel', hand: 'block', readoutWindow: true },
       terminal: { xterm: { light: xt('#fffbe8', '#050505', '#050505'), dark: xt('#0a0807', '#f5efde', '#f5efde') } },
     },

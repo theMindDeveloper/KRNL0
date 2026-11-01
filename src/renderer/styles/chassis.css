@@ -2734,7 +2734,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
    Flat desktop only. The menu bar is the app's top bar and the footer is
    the status bar (styled in the Macintosh component skins below). */
 .dock-chassis.dock-macintosh {
-  --mac-desk:  #e4dfcd;
+  --mac-desk:  #cfcdc6;
   --mac-bar:   #fbf8ee;
   --mac-ink:   #050505;
   --mac-dim:   rgba(5, 5, 5, 0.66);
@@ -3707,15 +3707,22 @@ body { counter-reset: krnl-mother; }
    hard 2px drop shadow, a plain title bar with a close box, Chicago-style
    sentence-case titles. Hover inverts, like a Mac menu item. */
 [data-dock="macintosh"] .mother-frame {
-  border-radius: 0 !important;
+  border-radius: 4px !important;
   border: 0 !important;
-  box-shadow: inset 0 0 0 1px var(--ink), 2px 2px 0 var(--ink) !important;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.55), 0 2px 0 rgba(29, 29, 31, 0.18), 0 6px 14px -8px rgba(29, 29, 31, 0.35) !important;
 }
+[data-theme="dark"][data-dock="macintosh"] .mother-frame {
+  box-shadow: inset 0 0 0 1px rgba(245, 239, 222, 0.35), 0 6px 14px -8px rgba(0, 0, 0, 0.8) !important;
+}
+/* Title bar, modern-retro: one calm tinted bar, close box at the left,
+   the title right after it (centred titles collided with the station drag
+   grip), controls pinned right. No pinstripes: they read as noise. */
 [data-dock="macintosh"] .krnl-node-header {
   position: relative;
   padding-left: 28px !important;
-  background: var(--node-bg) !important;
-  border-bottom: 1px solid var(--ink) !important;
+  background: var(--paper-2) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 30%, transparent) !important;
 }
 [data-dock="macintosh"] .krnl-node-header,
 [data-dock="macintosh"] .krnl-node-header * {
@@ -3726,16 +3733,22 @@ body { counter-reset: krnl-mother; }
 [data-dock="macintosh"] .krnl-node-header > span:not(:empty) {
   color: var(--ink) !important;
 }
+[data-dock="macintosh"] .krnl-node-header > button {
+  background: transparent !important;
+  color: var(--ink-3) !important;
+  border-radius: 3px !important;
+}
 /* Close box */
 [data-dock="macintosh"] .krnl-node-header::before {
   content: '';
   position: absolute;
-  left: 9px;
+  left: 8px;
   top: 50%;
   width: 10px;
   height: 10px;
-  margin-top: -5px;
-  border: 1px solid var(--ink);
+  margin-top: -6px;
+  border: 1px solid color-mix(in srgb, var(--ink) 60%, transparent);
+  border-radius: 2px;
   background: var(--node-bg);
 }
 [data-dock="macintosh"] .krnl-node-header > button:hover {
@@ -3746,7 +3759,7 @@ body { counter-reset: krnl-mother; }
 /* Menu bar = the app's top bar */
 [data-dock="macintosh"] [data-testid="topbar"] {
   background: var(--node-bg) !important;
-  border-bottom: 1px solid var(--ink) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 35%, transparent) !important;
   box-shadow: none !important;
 }
 [data-dock="macintosh"] [data-testid="topbar"] * {
@@ -3774,7 +3787,7 @@ body { counter-reset: krnl-mother; }
 }
 /* Finder footer = the status bar */
 [data-dock="macintosh"] [data-testid="statusbar"] {
-  border-top: 1px solid var(--ink) !important;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 35%, transparent) !important;
 }
 [data-dock="macintosh"] [data-testid="statusbar"],
 [data-dock="macintosh"] [data-testid="statusbar"] * {

@@ -58,7 +58,7 @@ export interface PomoState {
 }
 
 /** Every Timer face. 'vu' and 'outline' added with the theme engine (ADR 0009). */
-export const TIMER_FACES = ['ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline'] as const;
+export const TIMER_FACES = ['ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline', 'mac'] as const;
 export type TimerFace = (typeof TIMER_FACES)[number];
 
 export interface PomoConfig {
