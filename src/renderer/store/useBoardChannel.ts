@@ -9,7 +9,7 @@ import { emit } from './eventLog';
 import type { Board } from '../../shared/types';
 
 export function useBoardChannel(): void {
-  const setBoard = useBoardStore((s) => s.setBoard);
+  const reloadBoard = useBoardStore((s) => s.reloadBoard);
 
   useEffect(() => {
     const bridge = window.krnl;
@@ -18,7 +18,7 @@ export function useBoardChannel(): void {
       void bridge.boardLoad()
         .then((data) => {
           if (data) {
-            setBoard(data as Board);
+            reloadBoard(data as Board);
             emit('board.loaded', 'board reloaded from disk', { severity: 'info' });
           }
         })
@@ -28,5 +28,5 @@ export function useBoardChannel(): void {
         });
     });
     return unsubscribe;
-  }, [setBoard]);
+  }, [reloadBoard]);
 }

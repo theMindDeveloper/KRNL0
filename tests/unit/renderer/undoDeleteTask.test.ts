@@ -85,4 +85,27 @@ describe('#170 — undo task delete', () => {
     const item = (useBoardStore.getState().board!.nodes.find((n) => n.id === 'todo-mother')!.state as TodoState).items.find((i) => i.id === 'item-1');
     expect(item).toBeDefined();
   });
+
+  it('undoing task.delete also restores the linked todo item (snapshot not mutated in place)', () => {
+    useBoardStore.getState().setBoard(makeBoard());
+    makeCommandHandler('task-1')('task.delete', {});
+    const items = () =>
+      (useBoardStore.getState().board!.nodes.find((n) => n.id === 'todo-mother')!.state as TodoState).items;
+    expect(items()).toHaveLength(0);
+
+    useBoardStore.getState().undo();
+    expect(hasTask()).toBe(true);
+    expect(items().map((i) => i.id)).toEqual(['item-1']);
+  });
+
+  it('a board reload from disk (CLI change) keeps the undo history', () => {
+    useBoardStore.getState().setBoard(makeBoard());
+    makeCommandHandler('task-1')('task.delete', {});
+    const afterDelete = useBoardStore.getState().board!;
+    useBoardStore.getState().reloadBoard({ ...afterDelete, savedAt: '2026-05-10T11:00:00.000Z' });
+    expect(useBoardStore.getState().history.length).toBeGreaterThan(0);
+    useBoardStore.getState().undo();
+    expect(hasTask()).toBe(true);
+  });
 });
+

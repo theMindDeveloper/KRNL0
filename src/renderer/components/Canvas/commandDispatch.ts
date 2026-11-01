@@ -522,11 +522,13 @@ export function deleteTaskNodesCascade(taskIds: string[]): void {
   if (!storeState.board) return;
 
   // Shallow-clone nodes/edges so deleteTaskCascade can mutate them safely.
+  // The copy matters: the cascade writes `board.nodes[idx] = …` for the pomo
+  // and todo nodes, and the live array is the snapshot pushed to undo history.
   // Cast to AnyNode[] — Node<unknown,unknown> is structurally AnyNode-compatible but
   // lacks the index signature; we widen here at the boundary.
   const workingBoard: BoardShape = {
     ...storeState.board,
-    nodes: storeState.board.nodes as unknown as BoardShape['nodes'],
+    nodes: [...storeState.board.nodes] as unknown as BoardShape['nodes'],
     edges: [...storeState.board.edges],
   };
 
