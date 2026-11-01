@@ -4,12 +4,17 @@
 // board via seedBoard() in src/main/ipc/handlers.ts.
 //
 // Usage:
-//   node scripts/reset-board.mjs            # delete board.json only
-//   node scripts/reset-board.mjs --hard     # also wipe Electron userData
+//   node scripts/reset-board.mjs            # this worktree's board (.krnl0-data/)
+//   node scripts/reset-board.mjs --hard     # also wipe this worktree's Electron userData
+//   node scripts/reset-board.mjs --shared   # the shared ~/Documents board used by
+//                                           # `npm run dev:shared` and packaged builds
 //
-// Resolves the same paths handlers.ts uses:
-//   BOARD_DIR  = $KRNL0_BOARD_DIR ?? ~/Documents/<package.json#name>/
-//   userData   = OS-default Electron userData folder for <package.json#name>
+// Resolves the same paths scripts/dev.mjs gives `npm run dev` (per-worktree
+// isolation, AGENTS.md rule 10), so a reset in one worktree never touches
+// another worktree's board:
+//   BOARD_DIR  = $KRNL0_BOARD_DIR ?? <worktree>/.krnl0-data/
+//   userData   = $KRNL0_USER_DATA ?? <worktree>/.krnl0-data/electron/
+// With --shared: ~/Documents/<package.json#name>/ and the OS userData folder.
 
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,10 +26,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(readFileSync(join(HERE, '..', 'package.json'), 'utf8'));
 const APP_NAME = PKG.name;
 
-const boardDir = process.env.KRNL0_BOARD_DIR ?? join(homedir(), 'Documents', APP_NAME);
-const boardFile = join(boardDir, 'board.json');
-
+const shared = process.argv.includes('--shared');
 const hard = process.argv.includes('--hard');
+const worktreeData = join(process.cwd(), '.krnl0-data');
+
+const boardDir = process.env.KRNL0_BOARD_DIR
+  ?? (shared ? join(homedir(), 'Documents', APP_NAME) : worktreeData);
+const boardFile = join(boardDir, 'board.json');
 
 let removed = 0;
 
@@ -37,12 +45,13 @@ if (existsSync(boardFile)) {
 }
 
 if (hard) {
-  const userDataDir =
-    process.platform === 'win32'
+  const userDataDir = process.env.KRNL0_USER_DATA ?? (!shared
+    ? join(worktreeData, 'electron')
+    : process.platform === 'win32'
       ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), APP_NAME)
       : process.platform === 'darwin'
         ? join(homedir(), 'Library', 'Application Support', APP_NAME)
-        : join(homedir(), '.config', APP_NAME);
+        : join(homedir(), '.config', APP_NAME));
 
   if (existsSync(userDataDir)) {
     rmSync(userDataDir, { recursive: true, force: true });

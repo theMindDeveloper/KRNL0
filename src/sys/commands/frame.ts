@@ -269,7 +269,9 @@ export async function frameAdd(
         x: Math.round(srcCenterX - width / 2),
         y: Math.round(srcCenterY - height / 2),
       };
-      if (srcNode) childIds = [srcNode.id];
+      // Never capture a mother node: frame children move with the frame, and
+      // mothers are fixed-position (frameFit filters them the same way).
+      if (srcNode && srcNode['isMother'] !== true) childIds = [srcNode.id];
     }
   } else if (opts.at) {
     position = opts.at;

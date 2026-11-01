@@ -506,9 +506,11 @@ export class SysFacade {
       }
     }
 
+    // Parsed but not wired to an implementation yet (e.g. node add, say,
+    // hear). Report failure so scripts and Codex don't assume it ran.
     return {
-      ok: true,
-      message: `[stub] parsed: ${JSON.stringify(command)}`,
+      ok: false,
+      message: `'${argv.slice(0, 2).join(' ')}' is not implemented yet.`,
       data: command,
     };
   }

@@ -22,9 +22,10 @@ const APP_VERSION: string = (() => {
   }
 })();
 
-// Board location — isolated per Electron app name so multiple worktrees
-// (e.g. main vs feat/new-features) don't share the same board.json.
-// Override with KRNL0_BOARD_DIR for explicit per-instance dev paths.
+// Board location. `npm run dev` (scripts/dev.mjs) sets KRNL0_BOARD_DIR to the
+// worktree's own .krnl0-data/, which is what isolates worktrees from each
+// other. Without it (packaged builds, `npm run dev:shared`) every instance
+// shares ~/Documents/<app name>/ — the app name is the same in all worktrees.
 const BOARD_DIR = process.env.KRNL0_BOARD_DIR
   ?? join(homedir(), 'Documents', app.getName());
 const BOARD_PATH = join(BOARD_DIR, 'board.json');
