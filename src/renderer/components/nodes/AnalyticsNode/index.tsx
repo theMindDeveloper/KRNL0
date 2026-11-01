@@ -21,6 +21,8 @@ import { useCallback, useMemo } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
+import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
+import { EstimateBars, DailyPlanActual, FocusMix, Legend, COLOR_PLANNED, COLOR_TRACKED, fmtMinutes } from '../../../analytics/charts/PlanVsActual';
 import {
   ActivityStrip,
   CalendarHeatmap,
@@ -65,6 +67,7 @@ const VIEW_LABELS: Record<AnalyticsView, string> = {
   calendar: 'Calendar',
   patterns: 'Patterns',
   insights: 'Insights',
+  estimates: 'Plan vs actual',
   sources: 'Sources',
 };
 
@@ -115,6 +118,7 @@ const CARDS_BY_VIEW: Record<AnalyticsView, readonly AnalyticsCardId[]> = {
     'insights.histogramFocus',
     'insights.histogramTasks',
   ],
+  estimates: ['estimates.kpis', 'estimates.perTask', 'estimates.daily', 'estimates.mix'],
   sources: ['sources.list', 'sources.streaks'],
 };
 
@@ -879,6 +883,84 @@ interface ViewBodyProps {
   clamp: (requested: number) => number;
 }
 
+// ── Plan vs actual ────────────────────────────────────────────────────────────
+// Estimate (task plannedMin) vs actual (pomo work tagged with the task), per
+// task and per day, plus where the observed time went. See analytics/estimates.ts.
+function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperties }) {
+  const { range, settingsOpen, isHidden, isPinned, toggleHidden, togglePin, clamp, cardGridStyle, state } = props;
+  const board = useBoardStore((s) => s.board);
+  const est = useMemo(
+    () => (board ? computeEstimates(board, range, Date.now()) : null),
+    [board, range],
+  );
+  if (!est) return null;
+  const k = est.kpis;
+  const tile = (label: string, value: string, sub: string, testId: string) => (
+    <div data-testid={testId} style={{ flex: '1 1 140px', minWidth: 130, padding: '10px 12px', border: '1px solid #2a2e33', borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#aab0b7' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 22, fontWeight: 700, color: '#eef0f2', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: '#aab0b7', marginTop: 2 }}>{sub}</div>
+    </div>
+  );
+  const card = (id: AnalyticsCardId, title: string, span: number, contentHeight: number, body: (size: { width: number; height: number }) => React.ReactNode) => (
+    <ChartCard
+      key={id}
+      cardId={id}
+      title={title}
+      span={clamp(span)}
+      contentHeight={contentHeight}
+      hidden={isHidden(id)}
+      pinned={isPinned(id)}
+      settingsOpen={settingsOpen}
+      onToggleHidden={() => toggleHidden(id)}
+      onTogglePin={() => togglePin(id)}
+    >
+      {body}
+    </ChartCard>
+  );
+  const cards = orderCards(
+    [
+      {
+        cardId: 'estimates.kpis' as const,
+        render: () => card('estimates.kpis', `Plan vs actual · last ${state.rangeDays}d`, 3, 96, () => (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%' }}>
+            {tile('Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy')}
+            {tile('Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned')}
+            {tile('Tracked', fmtMinutes(k.trackedMin), `${k.overCount} over · ${k.underCount} within plan`, 'estimates-kpi-tracked')}
+            {tile('Tagged focus', k.taggedShare === null ? '—' : `${Math.round(k.taggedShare * 100)}%`, 'of pomo work linked to a task', 'estimates-kpi-tagged')}
+          </div>
+        )),
+      },
+      {
+        cardId: 'estimates.perTask' as const,
+        render: () => card('estimates.perTask', 'Estimate vs actual · per task', 2, 250, (size) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Legend items={[{ label: 'Planned (estimate)', color: COLOR_PLANNED }, { label: 'Tracked (pomo, tagged)', color: COLOR_TRACKED }]} />
+            <EstimateBars tasks={est.tasks} width={chartWidth(size.width, 480)} />
+          </div>
+        )),
+      },
+      {
+        cardId: 'estimates.mix' as const,
+        render: () => card('estimates.mix', 'Where the time went', 1, 120, (size) => (
+          <FocusMix mix={est.mix} width={chartWidth(size.width, 260)} />
+        )),
+      },
+      {
+        cardId: 'estimates.daily' as const,
+        render: () => card('estimates.daily', 'Planned vs worked · per day', 3, 200, (size) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Legend items={[{ label: 'Planned on calendar', color: COLOR_PLANNED }, { label: 'Worked (pomo)', color: COLOR_TRACKED }]} />
+            <DailyPlanActual days={est.days} width={chartWidth(size.width, 640)} height={chartHeight(size.height - 20, 170)} />
+          </div>
+        )),
+      },
+    ],
+    state.pinnedCards ?? [],
+  );
+  return <div style={cardGridStyle}>{cards.map((c) => <CardSlot key={c.cardId}>{c.render()}</CardSlot>)}</div>;
+}
+
 function orderCards<T extends { cardId: AnalyticsCardId }>(
   cards: T[],
   pinnedOrder: readonly AnalyticsCardId[],
@@ -1061,6 +1143,10 @@ function ViewBody(props: ViewBodyProps) {
       state.pinnedCards ?? [],
     );
     return <div style={cardGridStyle}>{cards.map((c) => <CardSlot key={c.cardId}>{c.render()}</CardSlot>)}</div>;
+  }
+
+  if (view === 'estimates') {
+    return <EstimatesView {...props} cardGridStyle={cardGridStyle} />;
   }
 
   if (view === 'calendar') {

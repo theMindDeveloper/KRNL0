@@ -10,6 +10,7 @@ export type AnalyticsView =
   | 'calendar'   // year heatmap
   | 'patterns'   // dow + hour + month
   | 'insights'   // multivariate (scatter, donut, correlations) — added 2026-05-18
+  | 'estimates'  // plan vs actual: estimate vs tracked per task / day
   | 'sources';   // raw event stream by source
 
 export const ANALYTICS_VIEWS: readonly AnalyticsView[] = [
@@ -17,6 +18,7 @@ export const ANALYTICS_VIEWS: readonly AnalyticsView[] = [
   'calendar',
   'patterns',
   'insights',
+  'estimates',
   'sources',
 ] as const;
 
@@ -50,6 +52,11 @@ export type AnalyticsCardId =
   | 'insights.stacked'
   | 'insights.histogramFocus'
   | 'insights.histogramTasks'
+  // estimates (plan vs actual)
+  | 'estimates.kpis'
+  | 'estimates.perTask'
+  | 'estimates.daily'
+  | 'estimates.mix'
   // sources
   | 'sources.list'
   | 'sources.streaks';
@@ -74,6 +81,10 @@ export const ANALYTICS_CARD_LABELS: Record<AnalyticsCardId, string> = {
   'insights.stacked':             'Daily mix (stacked)',
   'insights.histogramFocus':      'Focus distribution',
   'insights.histogramTasks':      'Tasks distribution',
+  'estimates.kpis':               'Plan vs actual — headline',
+  'estimates.perTask':            'Estimate vs actual per task',
+  'estimates.daily':              'Planned vs worked per day',
+  'estimates.mix':                'Where the time went',
   'sources.list':                 'Registered sources',
   'sources.streaks':              'Habit streaks',
 };

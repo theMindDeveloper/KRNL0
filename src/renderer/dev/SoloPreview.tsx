@@ -10,7 +10,9 @@ import type { Board } from '../../shared/types';
 
 export function SoloPreview({ kind }: { kind: string }) {
   const setBoard = useBoardStore((s) => s.setBoard);
-  const node = useBoardStore((s) => s.board?.nodes.find((n) => n.isMother && n.kind === kind) ?? null);
+  const node = useBoardStore(
+    (s) => s.board?.nodes.find((n) => n.isMother && n.kind === kind) ?? s.board?.nodes.find((n) => n.kind === kind) ?? null,
+  );
 
   useEffect(() => {
     void window.krnl?.boardLoad().then((b) => setBoard(b as Board));

@@ -147,6 +147,25 @@ function stressBoard(): Json {
     span('r5', at(14, 0), at(14, 25), 'work', null, ''),
   ];
 
+  // Finished tasks + a deleted one in the completion ledger, so the analytics
+  // "Plan vs actual" view has something to compare.
+  for (const id of ['t-study', 't-read-a', 't-read-b']) {
+    const st = nodes.find((n) => n.id === id)!['state'] as Json;
+    st['done'] = true;
+    st['completedAt'] = at(12, 0).toISOString();
+  }
+  (pomo['state'] as Json)['history'] = [
+    ...((pomo['state'] as Json)['history'] as Json[]),
+    span('r6', at(16, 0, -2), at(17, 40, -2), 'work', 'gone-essay', 'Essay draft'),
+    span('r7', at(10, 0, -3), at(10, 50, -3), 'work', 't-read-b', 'Read chapter B'),
+    span('r8', at(15, 0, -4), at(16, 10, -4), 'work', null, ''),
+  ];
+  nodes.push({
+    id: 'analytics-1', kind: 'analytics', position: { x: -840, y: 1500 }, isMother: false,
+    state: { view: 'estimates', rangeDays: 7, metric: 'taskCount', width: 540, height: 540, hiddenCards: [], pinnedCards: [], settingsOpen: false },
+    config: {},
+  });
+
   const habit = nodes.find((n) => n.id === 'mother-habit')!;
   habit['state'] = {
     habits: [
@@ -157,6 +176,13 @@ function stressBoard(): Json {
   return {
     version: 1, schemaVersion: 2, savedAt: new Date().toISOString(),
     viewport: { x: 0, y: 220, zoom: 1 }, layoutMode: 'station', nodes, edges,
+    completions: [
+      { taskId: 'gone-essay', text: 'Essay draft', plannedMin: 60, completedAt: at(18, 0, -2).toISOString() },
+      ...['t-study', 't-read-a', 't-read-b'].map((id) => {
+        const st = nodes.find((n) => n.id === id)!['state'] as Json;
+        return { taskId: id, text: st['text'], plannedMin: st['plannedMin'], completedAt: st['completedAt'] };
+      }),
+    ],
   };
 }
 

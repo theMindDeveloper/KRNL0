@@ -7,6 +7,8 @@ import { buildAnalytics } from '../../renderer/analytics/engine';
 import { registerBuiltinSources } from '../../renderer/analytics/sources';
 import { lastNDays, todayLocal } from '../../renderer/analytics/dateRange';
 import type { BoardLike } from '../../renderer/analytics/types';
+import { computeEstimates, describeAccuracy } from '../../renderer/analytics/estimates';
+import type { Board } from '../../shared/types';
 
 // Register sources once — idempotent guard inside registerBuiltinSources.
 registerBuiltinSources();
@@ -32,12 +34,13 @@ export async function analyticsShow(
     json?: boolean;
   },
 ): Promise<SysResult> {
-  const board = loadBoard(ctx);
-  const engine = buildAnalytics(board);
   const rangeDays = (typeof opts.range === 'number' && opts.range > 0) ? opts.range : 30;
   const today = todayLocal();
   const range = lastNDays(rangeDays, today);
+  if (opts.view === 'estimates') return analyticsEstimates(ctx, rangeDays, range, opts.json === true);
 
+  const board = loadBoard(ctx);
+  const engine = buildAnalytics(board);
   const totals = engine.totals(range);
   const open = engine.open();
   const byDay = engine.byDay(range);
@@ -58,6 +61,41 @@ export async function analyticsShow(
   ];
 
   return { ok: true, message: lines.join('\n'), data: { rangeDays, totals, open } };
+}
+
+/** Plan vs actual — estimate vs tracked per task, planned vs worked per day. */
+function analyticsEstimates(
+  ctx: AnalyticsCtx,
+  rangeDays: number,
+  range: { start: string; end: string },
+  json: boolean,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as Record<string, unknown> | null;
+  const board = {
+    nodes: Array.isArray(raw?.['nodes']) ? raw!['nodes'] : [],
+    edges: Array.isArray(raw?.['edges']) ? raw!['edges'] : [],
+    completions: Array.isArray(raw?.['completions']) ? raw!['completions'] : [],
+  } as unknown as Board;
+  const est = computeEstimates(board, range, Date.now());
+  if (json) {
+    const payload = { range: { days: rangeDays, ...range }, ...est };
+    return { ok: true, message: JSON.stringify(payload), data: payload };
+  }
+  const m = (n: number) => (n >= 60 ? `${Math.floor(n / 60)}h${String(Math.round(n % 60)).padStart(2, '0')}` : `${Math.round(n)}m`);
+  const k = est.kpis;
+  const lines = [
+    `plan vs actual — last ${rangeDays} days (${range.start} → ${range.end})`,
+    '',
+    `  accuracy      : ${k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`} — ${describeAccuracy(k.medianRatio)}`,
+    `  planned/tracked: ${m(k.plannedMin)} / ${m(k.trackedMin)}  (${k.overCount} over, ${k.underCount} within plan)`,
+    `  tagged focus  : ${k.taggedShare === null ? '—' : `${Math.round(k.taggedShare * 100)}%`} of pomo work linked to a task`,
+    `  time went to  : work on tasks ${m(est.mix.taggedWorkMin)} · untagged ${m(est.mix.untaggedWorkMin)} · breaks ${m(est.mix.breakMin)}`,
+    '',
+    ...est.tasks.slice(0, 15).map((t) =>
+      `  ${t.done ? '✓' : ' '} ${t.text.slice(0, 28).padEnd(28)} plan ${m(t.plannedMin).padStart(5)}  tracked ${m(t.trackedMin).padStart(5)}${t.trackedMin > t.plannedMin ? '  OVER' : ''}${t.deleted ? '  (deleted)' : ''}`,
+    ),
+  ];
+  return { ok: true, message: lines.join('\n'), data: est };
 }
 
 export async function analyticsTotals(

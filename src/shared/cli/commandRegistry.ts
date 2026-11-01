@@ -122,7 +122,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'analytics',
     summary: 'Analytics reads from board state (headless-capable)',
     subcommands: [
-      { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
+      { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources|estimates] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
       { name: 'totals', usage: 'analytics totals [--range N] [--json]', summary: 'Show task/habit/focus totals over N days (default 30)' },
       { name: 'streaks', usage: 'analytics streaks [--json]', summary: 'Show habit streak data' },
     ],
