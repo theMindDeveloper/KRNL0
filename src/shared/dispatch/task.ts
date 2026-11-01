@@ -10,6 +10,11 @@
 //   sys/commands/task.ts                            (delegates here)
 
 import type { BoardShape, AnyNode, DispatchCtx } from './types';
+import type { CompletionRecord } from '../types/board';
+import {
+  recordCompletion as ledgerRecord,
+  clearCompletion as ledgerClear,
+} from '../../renderer/store/completionLedger';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
 import type { PomoConfig, PomoState } from '../../renderer/components/nodes/PomoNode/types';
@@ -194,6 +199,25 @@ export function stampCompletedAt(
   return next;
 }
 
+// ── syncCompletion ────────────────────────────────────────────────────────
+// #169 — keep board.completions in step with a task's done state. Mirrors the
+// renderer's syncCompletionLedger so CLI toggles count in analytics too.
+
+export function syncCompletion(board: BoardShape, taskId: string): void {
+  const node = board.nodes.find((n) => n.id === taskId && n.kind === 'todo.task');
+  if (!node) return;
+  const ts = node.state as TaskState;
+  const ledger = board['completions'] as CompletionRecord[] | undefined;
+  board['completions'] = ts.done && ts.completedAt
+    ? ledgerRecord(ledger, {
+        taskId,
+        text: ts.text,
+        plannedMin: ts.plannedMin ?? ts.durationMin ?? 25,
+        completedAt: ts.completedAt,
+      })
+    : ledgerClear(ledger, taskId);
+}
+
 // ── taskToggleMirror ──────────────────────────────────────────────────────
 
 export interface ToggleTaskResult {
@@ -202,7 +226,8 @@ export interface ToggleTaskResult {
 }
 
 /**
- * Pure: toggle a task's done flag and mirror to its linked TodoItem.
+ * Pure: toggle a task's done flag, mirror to its linked TodoItem, and update
+ * the completion ledger.
  */
 export function taskToggleMirror(
   board: BoardShape,
@@ -234,5 +259,6 @@ export function taskToggleMirror(
     }
   }
 
+  syncCompletion(board, taskId);
   return { board, done: nextState.done };
 }

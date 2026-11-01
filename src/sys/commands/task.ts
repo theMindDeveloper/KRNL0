@@ -26,7 +26,7 @@ import {
 import {
   deleteTaskCascade,
   renumberSiblings as sharedRenumberSiblings,
-  stampCompletedAt,
+  taskToggleMirror,
 } from '../../shared/dispatch/task';
 import {
   resolveNodeRef,
@@ -282,23 +282,12 @@ export async function taskToggle(
   if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
   taskId = taskNode.id;
 
-  const prevState = taskNode.state as TaskState;
+  // Shared with the renderer: toggles, stamps completedAt, mirrors to the
+  // TodoItem and records/clears the completion ledger (#169).
   const env = { uuid: () => randomUUID(), now: () => new Date().toISOString() };
-  const nextState = stampCompletedAt(prevState, fsmTaskToggle(prevState), env);
-  updateNode(board, taskId, { ...taskNode, state: nextState });
-
-  // Mirror to linked TodoItem
-  if (prevState.todoItemId !== null) {
-    const todoMother = findNode(board, prevState.parentTodoId);
-    if (todoMother && todoMother.kind === 'todo') {
-      const todoState = todoMother.state as TodoState;
-      const item = todoState.items.find((i) => i.id === prevState.todoItemId);
-      if (item && item.done !== nextState.done) {
-        const newTodo = fsmTodoToggle(todoState, { id: prevState.todoItemId }, env);
-        updateNode(board, todoMother.id, { ...todoMother, state: newTodo });
-      }
-    }
-  }
+  const result = taskToggleMirror(board, taskId, env);
+  if (!result) return { ok: false, message: `No task node matching "${taskId}"` };
+  const nextState = { done: result.done };
 
   saveBoard(ctx, board);
   return {

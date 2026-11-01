@@ -517,7 +517,7 @@ function renumberSiblings(parentTodoId: string, parentTaskId: string | null): vo
  * and applies the result to the Zustand store in one atomic setState call.
  * Handles pomo cancel, TodoItem removal, and sibling renumber via the shared module.
  */
-export function deleteTaskNodesCascade(taskIds: string[]): void {
+export function deleteTaskNodesCascade(taskIds: string[], opts?: { skipHistory?: boolean }): void {
   const storeState = useBoardStore.getState();
   if (!storeState.board) return;
 
@@ -551,11 +551,15 @@ export function deleteTaskNodesCascade(taskIds: string[]): void {
   // #170 — push ONE history slot (pre-mutation board) so the cascade is
   // undoable. Previously this pushed nothing, so undo could not restore a
   // deleted task (the comment claimed "one undo step" but recorded zero).
+  // skipHistory: the caller already pushed a slot for this action (e.g.
+  // todo.remove updated the list first), so one undo reverts everything.
   useBoardStore.setState((s) => {
     if (!s.board) return s;
+    const historyPatch = opts?.skipHistory
+      ? {}
+      : { history: [...s.history, s.board].slice(-DELETE_HISTORY_CAP), future: [] };
     return {
-      history: [...s.history, s.board].slice(-DELETE_HISTORY_CAP),
-      future: [],
+      ...historyPatch,
       board: {
         ...s.board,
         nodes: workingBoard.nodes as Node[],
@@ -1692,21 +1696,10 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       if (itemId) {
         const removedItem = prevState.items.find((i) => i.id === itemId);
         if (removedItem?.taskNodeId) {
-          const currentBoard = useBoardStore.getState().board;
-          if (currentBoard) {
-            const descendants = collectDescendants(
-              removedItem.taskNodeId,
-              currentBoard.nodes as unknown as BoardShape['nodes'],
-            );
-            // updateNode above already pushed a history slot for this action.
-            removeNodeSet(descendants, { skipHistory: true });
-            const ts = currentBoard.nodes.find(
-              (n) => n.id === removedItem.taskNodeId,
-            )?.state as TaskState | undefined;
-            if (ts) {
-              renumberSiblings(ts.parentTodoId, ts.parentTaskId);
-            }
-          }
+          // Same cascade as task.delete: removes subtasks and their todo rows,
+          // cancels the pomo if it was on this task, renumbers siblings.
+          // updateNode above already pushed a history slot for this action.
+          deleteTaskNodesCascade([removedItem.taskNodeId], { skipHistory: true });
         }
       }
 
@@ -1720,21 +1713,13 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const prevState = node.state as TodoState;
       updateNode(nodeId, { state: result.state });
 
-      const currentBoard = useBoardStore.getState().board;
-      if (currentBoard) {
-        const taskIds: string[] = [];
-        for (const item of prevState.items) {
-          if (item.done && item.taskNodeId) {
-            taskIds.push(...collectDescendants(
-              item.taskNodeId,
-              currentBoard.nodes as unknown as BoardShape['nodes'],
-            ));
-          }
-        }
-        if (taskIds.length > 0) {
-          // updateNode above already pushed a history slot for this action.
-          removeNodeSet(taskIds, { skipHistory: true });
-        }
+      const taskIds = prevState.items
+        .filter((item) => item.done && item.taskNodeId)
+        .map((item) => item.taskNodeId as string);
+      if (taskIds.length > 0) {
+        // Full task cascade (subtasks, their todo rows, pomo cancel, renumber).
+        // updateNode above already pushed a history slot for this action.
+        deleteTaskNodesCascade(taskIds, { skipHistory: true });
       }
 
       const final = useBoardStore.getState().board;

@@ -107,5 +107,30 @@ describe('#170 — undo task delete', () => {
     useBoardStore.getState().undo();
     expect(hasTask()).toBe(true);
   });
+
+  it('removing a todo item clears a pomo that was running on its task (no phantom session)', () => {
+    const b = makeBoard();
+    b.nodes.push({
+      id: 'mother-pomo', kind: 'pomo', position: { x: 0, y: 0 }, isMother: true,
+      state: {
+        status: 'running', startedAt: new Date().toISOString(), durationMin: 25, breakMin: 5,
+        label: 'Write report', sessionsCompleted: 0, activeTaskId: 'task-1', history: [],
+        pausedAt: null, pausedElapsedMs: 0, sessionWorkSec: 0,
+      },
+      config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4 },
+    });
+    useBoardStore.getState().setBoard(b);
+    makeCommandHandler('todo-mother')('todo.remove', { id: 'item-1' });
+
+    const pomo = useBoardStore.getState().board!.nodes.find((n) => n.id === 'mother-pomo')!;
+    expect((pomo.state as { activeTaskId: string | null }).activeTaskId).toBeNull();
+    expect(hasTask()).toBe(false);
+
+    // Still a single undo step.
+    useBoardStore.getState().undo();
+    expect(hasTask()).toBe(true);
+    const restored = useBoardStore.getState().board!.nodes.find((n) => n.id === 'mother-pomo')!;
+    expect((restored.state as { activeTaskId: string | null }).activeTaskId).toBe('task-1');
+  });
 });
 
