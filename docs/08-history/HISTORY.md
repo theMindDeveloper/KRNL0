@@ -707,3 +707,12 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Dev:** design drafts lived in a Claude Design canvas (not part of the app).
 
 **Tests:** 120 files / 1443 passed, 0 typecheck errors, build OK. Not yet exercised in the Electron window.
+
+---
+
+## [2026-11-01] — Remove startup sound; land PR #182 on main
+
+**Type:** Chore
+**PRs / Commits:** [#182](https://github.com/theMindDeveloper/KRNL0/pull/182) (pushed to `main` directly as a fast-forward, at the maintainer's request)
+**Files changed:** `src/renderer/App.tsx`
+**Summary:** The `krnl0startup` sound no longer plays when the app opens. The clip stays in the SFX library and still plays via `sys sfx play krnl0startup`.
