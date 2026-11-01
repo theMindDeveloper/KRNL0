@@ -162,7 +162,9 @@ function renderClockNode(
 
 /** Task arcs are <path> elements with fill="none" and a stroke that is a var(--...) token. */
 function getTaskArcPaths(): Element[] {
-  return Array.from(document.querySelectorAll('[data-testid="clock-plan-arc"]'));
+  return Array.from(document.querySelectorAll('svg path')).filter(
+    (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
+  );
 }
 
 beforeEach(() => {
@@ -171,7 +173,7 @@ beforeEach(() => {
 
 // ── Clock face structure ───────────────────────────────────────────────────────
 
-describe('ClockNode renders the day dial', () => {
+describe('ClockNode renders the analog face', () => {
   it('renders an SVG element', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
@@ -179,22 +181,23 @@ describe('ClockNode renders the day dial', () => {
     expect(svgs.length).toBeGreaterThan(0);
   });
 
-  it('renders 12 hour ticks (no 60-tick analog face)', () => {
+  it('renders 60 tick marks', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
-    const lines = document.querySelectorAll('[data-testid="clock-day-dial"] line');
-    expect(lines.length).toBeGreaterThanOrEqual(12);
-    expect(lines.length).toBeLessThan(20);
+    const lines = document.querySelectorAll('svg line');
+    // 60 tick lines + 3 hand lines + 1 now-notch line = 64; confirm ≥ 60.
+    expect(lines.length).toBeGreaterThanOrEqual(60);
   });
 
-  it('labels the quarter hours and shows a now/next readout in the centre', () => {
+  it('renders 12 numerals (1–12)', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
     const texts = Array.from(document.querySelectorAll('svg text'))
       .map((t) => t.textContent?.trim())
       .filter(Boolean);
-    for (const n of ['12', '3', '6', '9']) expect(texts).toContain(n);
-    expect(document.querySelector('[data-testid="clock-dial-centre"]')).toBeTruthy();
+    for (let n = 1; n <= 12; n++) {
+      expect(texts).toContain(String(n));
+    }
   });
 
   // (Removed) "shows link UI when linkedTodoId is null" — the manual
@@ -232,15 +235,21 @@ describe('Anchored chain renders task arcs', () => {
     expect(getTaskArcPaths()).toHaveLength(3);
   });
 
-  it('parallel tasks share the plan band instead of adding rings', () => {
-    const todoId = 'todo-par';
-    const a = makeTaskNode('par-a', makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T02:00`, kind: 'event' }));
-    const b = makeTaskNode('par-b', makeTaskState({ parentTodoId: todoId, plannedMin: 60, scheduledFor: `${ANCHOR_DATE}T02:00`, kind: 'event' }));
-    seedBoard([makeTodoNode(todoId), a, b]);
+  it('plan arcs are solid lane-width strokes, not hairline outlines', () => {
+    const todoId = 'todo-sw';
+    const t1 = makeTaskNode(
+      't-sw-1',
+      makeTaskState({ parentTodoId: todoId, plannedMin: 30, scheduledFor: `${ANCHOR_DATE}T02:00`, kind: 'event' }),
+    );
+    const t2 = makeTaskNode('t-sw-2', makeTaskState({ parentTodoId: todoId, plannedMin: 30, kind: 'event' }));
+    seedBoard([makeTodoNode(todoId), t1, t2], [makeEdge('t-sw-1', 't-sw-2')]);
+
     renderClockNode(makeClockState({ linkedTodoId: todoId }));
-    // Both drawn, and the dial keeps its fixed 240 viewBox (no outward growth).
-    expect(getTaskArcPaths()).toHaveLength(2);
-    expect(document.querySelector('[data-testid="clock-day-dial"]')?.getAttribute('viewBox')).toBe('0 0 240 240');
+
+    const arcs = getTaskArcPaths();
+    expect(arcs.length).toBeGreaterThanOrEqual(1);
+    
+    for (const a of arcs) expect(a.getAttribute('stroke-width')).toBe('7');
   });
 
   it('chain with no anchor renders no task arcs', () => {
@@ -278,9 +287,9 @@ describe('Task arcs reflect past / future state', () => {
       const arcs = getTaskArcPaths();
     expect(arcs.length).toBeGreaterThan(0);
     
-      // Ended plan segments are dimmed.
+      // Ended plan arcs fade to 40% of the normal 0.7.
       const opacities = arcs.map((a) => parseFloat(a.getAttribute('opacity') ?? '1'));
-      for (const o of opacities) expect(o).toBeLessThan(0.85);
+      for (const o of opacities) expect(o).toBeCloseTo(0.28, 5);
     } finally {
       vi.useRealTimers();
     }

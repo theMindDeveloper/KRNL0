@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
 import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
-import { DayDial } from './DayDial';
+import { packLanes } from '../../../store/laneLayout';
 import { toneVarForTask } from '../../../utils/taskColor';
 import type { PomoState } from '../PomoNode/types';
 import { saveBoard } from '../../../store/eventLog';
@@ -24,6 +24,60 @@ export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 // Shared palette across Clock, Calendar, Todo. See src/renderer/utils/taskColor.ts.
 import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
 
+// ── Geometry constants ─────────────────────────────────────────────────────────
+const CX = 120;
+const CY = 120;
+const R_ARC = 102;
+const R_FACE = 86;
+const R_TICK_OUT = 84;
+const R_TICK_IN = 76;
+const R_TICK_IN_MAJ = 72;
+const R_NUM = 60;
+
+// ── Geometry helpers ───────────────────────────────────────────────────────────
+
+/** Map an hour 0–24 onto its angle on a 12-hour face. 12 sits at top. */
+function hourToRad(h: number): number {
+  return ((h % 12) / 12) * Math.PI * 2 - Math.PI / 2;
+}
+
+function pt(h: number, r: number): { x: number; y: number } {
+  const a = hourToRad(h);
+  return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) };
+}
+
+/** SVG arc path from startH to endH on the 12-h face at radius r. */
+function arcPath(startH: number, endH: number, r: number): string {
+  const span = Math.max(0.05, endH - startH);
+  const a1 = hourToRad(startH);
+  const a2 = hourToRad(startH + span);
+  const x1 = CX + r * Math.cos(a1);
+  const y1 = CY + r * Math.sin(a1);
+  const x2 = CX + r * Math.cos(a2);
+  const y2 = CY + r * Math.sin(a2);
+  const large = span > 6 ? 1 : 0;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
+}
+
+/**
+ * #180 — filled pie sector from the dial centre out to radius r, spanning
+ * [startH, endH]. Used to draw tracked-reality as an ambient background WASH
+ * on the dial face (behind the ticks/numbers/event lanes), distinct from the
+ * thin outlined event arcs on the outer track lanes.
+ */
+function sectorPath(startH: number, endH: number, r: number): string {
+  const span = Math.max(0.05, endH - startH);
+  const a1 = hourToRad(startH);
+  const a2 = hourToRad(startH + span);
+  const x1 = CX + r * Math.cos(a1);
+  const y1 = CY + r * Math.sin(a1);
+  const x2 = CX + r * Math.cos(a2);
+  const y2 = CY + r * Math.sin(a2);
+  const large = span > 6 ? 1 : 0;
+  return `M ${CX} ${CY} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+}
+
+/** Format hour-float as "9:30am". */
 function fmtTime(h: number): string {
   const hr = Math.floor(h);
   const m = Math.round((h - hr) * 60);
@@ -69,6 +123,8 @@ function isoHoursFromDayStart(iso: string, referenceDate: string): number | null
   return dayOffset * 24 + hh + mm / 60;
 }
 
+// Numerals 1–12. 12 at index 0 so hourToRad(12)=top.
+const NUMERALS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
 
 // ── Flattened task type for display ───────────────────────────────────────────
 // Entries can come from two sources: scheduled tasks (from the schedule
@@ -187,8 +243,13 @@ export function ClockNode({
 
   const hours = now.getHours();
   const mins  = now.getMinutes();
-  // nowFloat uses minute granularity — enough for the now needle / NOW text.
+  // No `secs` here — second-hand position comes from CSS animation.
+  // nowFloat uses minute granularity which is fine for activeIdx / now notch.
   const nowFloat = hours + mins / 60;
+
+  // Hand angles (degrees from 12, CW)
+  const hourAng = ((hours % 12) + mins / 60) / 12 * 360;
+  const minAng  = mins / 60 * 360;
 
   // Board + selectors
   const board = useBoardStore((s) => s.board);
@@ -348,18 +409,6 @@ export function ClockNode({
     return out;
   }, [board0, liveMs, selectedDate, viewWindow]);
 
-  // Minutes of pomo work recorded on the selected day (both halves).
-  const trackedTodayMin = useMemo(() => {
-    const dayStart = new Date(selectedDate + 'T00:00:00').getTime();
-    const dayEnd = dayStart + 86_400_000;
-    let ms = 0;
-    for (const seg of selectPomoReality(board0, liveMs)) {
-      if (seg.kind !== 'work') continue;
-      ms += Math.max(0, Math.min(seg.endMs, dayEnd) - Math.max(seg.startMs, dayStart));
-    }
-    return ms / 60_000;
-  }, [board0, liveMs, selectedDate]);
-
   // Active-task / now-pointer concepts only apply when the user is viewing
   // today. On any other day, `now` has no meaning relative to the day being
   // shown — silently lighting up a task as "active" would be a lie.
@@ -369,6 +418,29 @@ export function ClockNode({
   const activeIdx = nowInWindow
     ? tasks.findIndex((t) => nowFloat >= t.start && nowFloat < t.end)
     : -1;
+
+  // Ring geometry (outward from the dial):
+  //   face (R_FACE) → reality ring (what the pomo observed) → plan lanes
+  //   (one concentric lane per parallel task, from the shared lane packer so
+  //   Clock and Calendar agree on which tasks run in parallel).
+  // Pomo is drawn as colour INSIDE the face (wedges); task arcs ("worms")
+  // ride lanes just outside it.
+  const REALITY_R = R_FACE;
+  const REALITY_SW = 0;
+  const trackBaseR = R_FACE + 9; // center radius of plan lane 0
+  const laneByTaskId = useMemo(() => {
+    const lanes = packLanes(tasks.map((t) => ({ id: t.id, start: t.start, end: t.end })));
+    const m = new Map<string, number>();
+    for (const [id, pl] of lanes) m.set(id, pl.lane);
+    return m;
+  }, [tasks]);
+  const trackTotalLanes = Math.max(1, ...[...laneByTaskId.values()].map((l) => l + 1));
+  // Thinner lanes when many run in parallel, so the dial doesn't shrink to
+  // make room for them (the viewBox grows with the outermost lane).
+  const TRACK_STROKE = trackTotalLanes <= 2 ? 7 : trackTotalLanes <= 4 ? 5 : 4;
+  const TRACK_LANE_GAP = trackTotalLanes <= 2 ? 2 : 1.5;
+  const trackInnerEdge = REALITY_R - REALITY_SW / 2;
+  const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
 
   const activeProgress = activeIdx >= 0
     ? (nowFloat - tasks[activeIdx]!.start) / (tasks[activeIdx]!.end - tasks[activeIdx]!.start)
@@ -587,35 +659,339 @@ export function ClockNode({
               : { position: 'relative', width: 220, height: 220, margin: '0 auto', overflow: 'visible' }
           }
         >
-          <DayDial
-            tasks={tasks.map((t) => ({
-              id: t.id,
-              start: t.start,
-              end: t.end,
-              name: t.name,
-              colorVar: t.colorVar,
-              source: t.source,
-              done: taskInfo.get(t.id)?.done === true,
-            }))}
-            reality={realitySegments.map((seg) => ({
-              id: seg.id,
-              startH: seg.startH,
-              endH: seg.endH,
-              kind: seg.kind,
-              colorVar: seg.kind === 'work' ? (seg.taskId ? toneVarForTask(seg.taskId) : 'var(--acid)') : 'var(--ink-3)',
-              live: seg.live,
-            }))}
-            winLo={viewWindow === 1 ? 12 : 0}
-            nowH={nowInWindow ? nowFloat : null}
-            isToday={isToday}
-            todayNowH={isToday ? nowFloat : null}
-            trackedTodayMin={trackedTodayMin}
-            dateLabel={selectedDateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-            onRealityClick={(id, e) => {
-              const seg = realitySegments.find((r) => r.id === id);
-              if (seg) setRealityPopup({ seg, x: e.clientX, y: e.clientY });
-            }}
-          />
+          <svg
+            viewBox={(() => {
+              // Grow the drawing area with the plan lanes so many parallel
+              // tasks are never clipped by the panel (240 = the base dial).
+              const half = Math.max(120, Math.ceil(trackOuterEdge + 4));
+              return `${CX - half} ${CY - half} ${half * 2} ${half * 2}`;
+            })()}
+            style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
+          >
+            <defs>
+              <pattern id="clock-break-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="1.2" height="4" fill="var(--ink-3)" />
+              </pattern>
+            </defs>
+            {/* Train-track concentric lanes.
+                One gray "track" circle per overlapping-task lane.
+                Tasks ride their assigned lane's track.
+                Stroke width auto-shrinks as lanes are added so all rings
+                fit within the outer band without crossing the numerals. */}
+            {(() => {
+              const totalLanes = trackTotalLanes;
+
+              // ── Geometry: tracks grow OUTWARD from the clock edge ──
+              // Lane 0 = innermost, sits just outside the clock face.
+              // Each new lane stacks further outward (larger radius).
+              // Thin uniform stroke — no shrinking; the clock has free space
+              // around it for many tracks before overflowing the node bounds.
+              // Track geometry comes from the hoisted constants so the
+              // now-pointer (rendered after this IIFE) can use the same span.
+              const STROKE = TRACK_STROKE;
+              const LANE_GAP = TRACK_LANE_GAP;
+              const radiusForLane = (lane: number): number =>
+                trackBaseR + lane * (STROKE + LANE_GAP);
+              const radiusFor = (t: TaskEntry): number =>
+                radiusForLane(laneByTaskId.get(t.id) ?? 0);
+              const stroke = STROKE;
+
+              // ── Gray train tracks, one per lane in use ──
+              const tracks: React.ReactElement[] = [];
+              for (let lane = 0; lane < totalLanes; lane++) {
+                tracks.push(
+                  <circle
+                    key={`track-${lane}`}
+                    cx={CX} cy={CY} r={radiusForLane(lane)}
+                    fill="none"
+                    stroke="var(--paper-3)"
+                    strokeWidth={stroke}
+                    // Faint guide only — empty lanes were heavy grey rings.
+                    opacity={0.18}
+                  />,
+                );
+              }
+
+              // ── Task arcs riding their lane's track ──
+              const arcs = tasks.flatMap((t, i) => {
+                // `ended` (faded arc) only makes sense for today — a 9am task
+                // on tomorrow is not "ended" at 3pm today.
+                const ended = isToday && nowFloat >= t.end;
+                const active = i === activeIdx;
+                const opacity = ended ? 0.4 : 1;
+                const sw = stroke;
+                const r = radiusFor(t);
+                const activeStyle: React.CSSProperties = active
+                  ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: t.colorVar }
+                  : {};
+                const breakdown = t.breakdown;
+
+                // Single-stroke ring — same visual language as calendar.
+                // Calendar uses task-tone background + tone-color border;
+                // we render the analog equivalent as one solid arc in tone.
+                const baseArc = (
+                  key: string,
+                  s: number,
+                  e: number,
+                  cap: 'round' | 'butt',
+                ): React.ReactElement => (
+                  <g key={`${key}-base`}>
+                    <path
+                      data-testid="clock-plan-arc"
+                      d={arcPath(s, e, r)}
+                      fill="none"
+                      stroke={t.colorVar}
+                      strokeWidth={sw}
+                      strokeLinecap={cap}
+                      opacity={opacity * (active ? 0.95 : 0.7)}
+                      style={activeStyle}
+                    >
+                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)}`}</title>
+                    </path>
+                  </g>
+                );
+
+                if (breakdown === null || breakdown.segments.length <= 1) {
+                  return [baseArc(t.id, t.start, t.end, 'round')];
+                }
+
+                const out: React.ReactElement[] = [];
+                out.push(baseArc(t.id, t.start, t.end, 'round'));
+
+                // Break overlays — track-color stroke cuts through the task
+                // arc cleanly (matches the calendar's dashed-border + stripe
+                // language — neutral panel break in the timeline).
+                //
+                // Break overlay stroke matches the task arc exactly.
+                // (Earlier polish bumped this to +2 and then +1 to kill an
+                // AA halo, but the user judged both visibly too thick — a
+                // faint edge of tone is the acceptable trade.)
+                const breakStroke = sw;
+                let segCursor = t.start;
+                for (let sIdx = 0; sIdx < breakdown.segments.length; sIdx++) {
+                  const seg = breakdown.segments[sIdx]!;
+                  const segEnd = Math.min(segCursor + seg.min / 60, t.end);
+                  if (seg.kind !== 'work' && segEnd > segCursor) {
+                    out.push(
+                      <path
+                        key={`${t.id}-seg-${sIdx}`}
+                        data-testid="clock-task-break-arc"
+                        data-break-kind={seg.kind}
+                        d={arcPath(segCursor, segEnd, r)}
+                        fill="none"
+                        stroke="var(--paper-3)"
+                        strokeWidth={breakStroke}
+                        strokeLinecap="butt"
+                        opacity={opacity}
+                      />,
+                    );
+                  }
+                  segCursor = segEnd;
+                }
+                return out;
+              });
+
+              return [...tracks, ...arcs];
+            })()}
+
+            {/* #180 — tracked reality moved to a dial-face wash (drawn above,
+                under the ticks). The old lane-ring stroke is gone so reality
+                and event arcs no longer share the track lanes. */}
+
+            {/* Now-pointer — spans exactly the train-track band.
+                Only rendered when viewing today.
+
+                Contrast trick — the pointer paints in --rust, the same
+                family as user's rust-toned task arcs, so without help
+                it vanishes over them. We use a thin near-white core
+                running through a slightly wider rust stroke (double-
+                stroke, no extra DOM cost) and a tiny dot with a small
+                pulse. No SVG filter halos: previous version's glow
+                overflowed the node's clip box. */}
+            {nowInWindow && (() => {
+              const pIn  = pt(nowFloat, trackInnerEdge);
+              const pOut = pt(nowFloat, trackOuterEdge);
+              const pDot = pt(nowFloat, trackBaseR);
+              return (
+                <>
+                  <line
+                    x1={pIn.x} y1={pIn.y}
+                    x2={pOut.x} y2={pOut.y}
+                    stroke="var(--rust)"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    opacity={0.95}
+                  />
+                  <line
+                    x1={pIn.x} y1={pIn.y}
+                    x2={pOut.x} y2={pOut.y}
+                    stroke="#fff5ec"
+                    strokeWidth={0.8}
+                    strokeLinecap="round"
+                    opacity={0.9}
+                  />
+                  <circle
+                    cx={pDot.x} cy={pDot.y} r={3}
+                    fill="var(--rust)"
+                    stroke="#fff5ec"
+                    strokeWidth={0.8}
+                    style={{
+                      animation: 'clock-now-pulse 2s ease-in-out infinite',
+                      transformBox: 'fill-box',
+                      transformOrigin: 'center',
+                    }}
+                  />
+                </>
+              );
+            })()}
+
+            {/* Inner face */}
+            <circle
+              cx={CX} cy={CY} r={R_FACE}
+              fill="var(--node-bg)"
+              stroke="var(--paper-3)"
+              strokeWidth={1}
+            />
+
+            {/* Pomo = colour inside the clock: each recorded span fills its
+                wedge of the face, in the colour of the task it is tagged with
+                (acid when untagged); breaks are a faint hatched wedge; a pause
+                is empty face. Drawn under the ticks, numerals and hands.
+                Click a wedge for times, retag and delete. */}
+            {realitySegments.map((seg) => {
+              const isWork = seg.kind === 'work';
+              const tone = isWork ? (seg.taskId ? toneVarForTask(seg.taskId) : 'var(--acid)') : 'var(--ink-3)';
+              const open = (e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setRealityPopup({ seg, x: e.clientX, y: e.clientY });
+              };
+              return (
+                <path
+                  key={`reality-${seg.id}`}
+                  data-testid="clock-reality-arc"
+                  data-reality-kind={seg.kind}
+                  data-reality-live={seg.live ? 'true' : undefined}
+                  onClick={open}
+                  onContextMenu={open}
+                  d={sectorPath(seg.startH, seg.endH, R_FACE - 1)}
+                  fill={isWork ? tone : 'url(#clock-break-hatch)'}
+                  stroke="none"
+                  opacity={isWork ? (seg.live ? 0.42 : 0.3) : 0.5}
+                  style={
+                    seg.live
+                      ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone, cursor: 'pointer' }
+                      : { cursor: 'pointer' }
+                  }
+                >
+                  <title>{`${isWork ? 'Focus' : 'Break'} · ${fmtClockHM(seg.startMs)}${seg.live ? ' → now' : `–${fmtClockHM(seg.endMs)}`}`}</title>
+                </path>
+              );
+            })}
+
+            {/* 60 tick marks */}
+            {Array.from({ length: 60 }).map((_, i) => {
+              const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
+              const isHour = i % 5 === 0;
+              const r1 = isHour ? R_TICK_IN_MAJ : R_TICK_IN;
+              return (
+                <line
+                  key={i}
+                  x1={CX + r1 * Math.cos(a)}
+                  y1={CY + r1 * Math.sin(a)}
+                  x2={CX + R_TICK_OUT * Math.cos(a)}
+                  y2={CY + R_TICK_OUT * Math.sin(a)}
+                  stroke={isHour ? 'var(--ink-2)' : 'var(--ink-3)'}
+                  strokeWidth={isHour ? 1.5 : 0.8}
+                />
+              );
+            })}
+
+            {/* Numerals 1–12 */}
+            {NUMERALS.map((n) => {
+              const p = pt(n, R_NUM);
+              return (
+                <text
+                  key={n}
+                  x={p.x}
+                  y={p.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontFamily="var(--font-mono)"
+                  fontSize={11}
+                  fontWeight={n === 12 ? 700 : 600}
+                  fill={n === 12 ? 'var(--rust)' : 'var(--ink-2)'}
+                  letterSpacing="0.02em"
+                >
+                  {n}
+                </text>
+              );
+            })}
+
+            {/* Digital HH:MM readout — drawn here (between numerals and
+                hands) so SVG paint order places it BEHIND the hour /
+                minute / second hands. Previously rendered as an HTML
+                overlay sibling of the SVG, which floated above
+                everything and crossed the minute hand. */}
+            <text
+              x={CX}
+              y={CY - 28}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontFamily="var(--font-mono)"
+              fontSize={8}
+              letterSpacing="1.4"
+              fill="var(--ink-4)"
+              style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
+            >
+              {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}
+            </text>
+
+            {/* Hour hand */}
+            <g transform={`rotate(${hourAng - 90} ${CX} ${CY})`}>
+              <line
+                x1={CX - 8} y1={CY} x2={CX + 38} y2={CY}
+                stroke="var(--ink)"
+                strokeWidth={3.2}
+                strokeLinecap="round"
+              />
+            </g>
+
+            {/* Minute hand */}
+            <g transform={`rotate(${minAng - 90} ${CX} ${CY})`}>
+              <line
+                x1={CX - 10} y1={CY} x2={CX + 56} y2={CY}
+                stroke="var(--ink)"
+                strokeWidth={2}
+                strokeLinecap="round"
+              />
+            </g>
+
+            {/* Second hand — CSS keyframe sweep (60s linear infinite).
+                Continuous, GPU-composited, zero React work per frame.
+                animation-delay aligns the starting angle to the current
+                seconds at mount. */}
+            <g
+              style={{
+                transformOrigin: `${CX}px ${CY}px`,
+                animation: 'clock-sec-sweep 60s linear infinite',
+                animationDelay: `-${initialSecOffsetRef.current}s`,
+              }}
+            >
+              <line
+                x1={CX - 14} y1={CY} x2={CX + 62} y2={CY}
+                stroke="var(--rust)"
+                strokeWidth={1}
+                strokeLinecap="round"
+                opacity={0.9}
+              />
+              <circle cx={CX + 60} cy={CY} r={2} fill="var(--rust)" />
+            </g>
+
+            {/* Hub */}
+            <circle cx={CX} cy={CY} r={5} fill="var(--ink)" />
+            <circle cx={CX} cy={CY} r={1.6} fill="var(--acid)" />
+          </svg>
 
           {/* HH:MM digital readout moved into the SVG (above) so it
               paints behind the hour/minute/second hands. */}

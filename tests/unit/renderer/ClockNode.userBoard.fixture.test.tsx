@@ -199,11 +199,13 @@ describe('User-board fixture — focus vs event tasks pre-drawing (Issue #166)',
       }),
     );
 
-    const taskArcPaths = Array.from(document.querySelectorAll('[data-testid="clock-plan-arc"]'));
+    const taskArcPaths = Array.from(document.querySelectorAll('svg path')).filter(
+      (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
+    );
     expect(taskArcPaths).toHaveLength(0);
   });
 
-  it('renders one plan segment per event task', () => {
+  it('renders event tasks as thin hollow arcs (3 paths per event task)', () => {
     const board = buildUserBoard();
     // Set all tasks to events
     for (const n of board.nodes) {
@@ -224,15 +226,17 @@ describe('User-board fixture — focus vs event tasks pre-drawing (Issue #166)',
       }),
     );
 
-    const taskArcPaths = Array.from(document.querySelectorAll('[data-testid="clock-plan-arc"]'));
+    const taskArcPaths = Array.from(document.querySelectorAll('svg path')).filter(
+      (p) => p.getAttribute('fill') === 'none' && (p.getAttribute('stroke') ?? '').startsWith('var(--'),
+    );
 
     // One solid plan arc per task
     expect(taskArcPaths).toHaveLength(3);
 
-    // Each plan segment is filled with a var(--token) CSS variable
+    // Each arc stroke is a var(--token) CSS variable
     for (const arc of taskArcPaths) {
-      const fill = arc.getAttribute('fill') ?? '';
-      expect(fill).toMatch(/^var\(--[a-z][\w-]*\)/);
+      const stroke = arc.getAttribute('stroke') ?? '';
+      expect(stroke).toMatch(/^var\(--[a-z][\w-]*\)/);
     }
   });
 });
