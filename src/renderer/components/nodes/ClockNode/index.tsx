@@ -425,8 +425,6 @@ export function ClockNode({
   //   Clock and Calendar agree on which tasks run in parallel).
   const REALITY_R = R_FACE + 4;
   const REALITY_SW = 5;
-  const TRACK_STROKE = 7;
-  const TRACK_LANE_GAP = 2;
   const trackBaseR = R_FACE + 15; // center radius of plan lane 0
   const laneByTaskId = useMemo(() => {
     const lanes = packLanes(tasks.map((t) => ({ id: t.id, start: t.start, end: t.end })));
@@ -435,6 +433,10 @@ export function ClockNode({
     return m;
   }, [tasks]);
   const trackTotalLanes = Math.max(1, ...[...laneByTaskId.values()].map((l) => l + 1));
+  // Thinner lanes when many run in parallel, so the dial doesn't shrink to
+  // make room for them (the viewBox grows with the outermost lane).
+  const TRACK_STROKE = trackTotalLanes <= 2 ? 7 : trackTotalLanes <= 4 ? 5 : 4;
+  const TRACK_LANE_GAP = trackTotalLanes <= 2 ? 2 : 1.5;
   const trackInnerEdge = REALITY_R - REALITY_SW / 2;
   const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
 
@@ -697,7 +699,8 @@ export function ClockNode({
                     fill="none"
                     stroke="var(--paper-3)"
                     strokeWidth={stroke}
-                    opacity={0.55}
+                    // Faint guide only — empty lanes were heavy grey rings.
+                    opacity={0.18}
                   />,
                 );
               }
@@ -1107,6 +1110,9 @@ export function ClockNode({
           {tasks.map((t, i) => {
             const ended = isToday && nowFloat >= t.end;
             const on    = i === activeIdx;
+            // Strike through only what is actually done; a past task that is
+            // still open is just dimmed (striking it read as "finished").
+            const isDone = taskInfo.get(t.id)?.done === true;
             return (
               <div
                 key={t.id}
@@ -1152,7 +1158,7 @@ export function ClockNode({
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    textDecoration: ended ? 'line-through' : 'none',
+                    textDecoration: isDone ? 'line-through' : 'none',
                     textDecorationColor: 'var(--ink-4)',
                   }}
                 >

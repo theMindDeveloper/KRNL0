@@ -181,7 +181,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // length so it scales with the column: wide in the day view (carries a
   // minutes label), at most 12% of a narrow week column (station panels can
   // be ~25px per day).
-  const rail = singleDay ? 'min(30px, 12%)' : 'min(7px, 12%)';
+  // A thin strip in every view: a wide labelled rail read as extra task
+  // blocks next to the plan. Minutes live in the hover / click popup.
+  const rail = 'min(6px, 10%)';
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows
   // the same 24-hour grid.
@@ -807,9 +809,76 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const slices = slicesByDay.get(dayYMD);
     if (!slices || slices.length === 0) return null;
 
-    const colLayout = computeColumnLayout(slices, (MIN_BLOCK_PX / rowHeight) * 60);
+    const rawLayout = computeColumnLayout(slices, (MIN_BLOCK_PX / rowHeight) * 60);
 
-    return slices.map((slice) => {
+    // Only as many parallel lanes as fit at a readable width (~80px); the
+    // rest of a busy cluster collapses into a "+N" chip in the last lane
+    // that lists them. Narrow week columns (<2 readable lanes) keep slivers.
+    const colPxAll = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
+    const maxLanes = Math.floor((colPxAll - Math.min(6, colPxAll * 0.1)) / 80);
+    const colLayout = new Map<string, { colIndex: number; colCount: number; span: number }>();
+    const hiddenSlices: TaskSlice[] = [];
+    for (const sl of slices) {
+      const pl = rawLayout.get(sl.task.id) ?? { colIndex: 0, colCount: 1, span: 1 };
+      if (maxLanes >= 2 && pl.colCount > maxLanes) {
+        if (pl.colIndex >= maxLanes - 1) hiddenSlices.push(sl);
+        else colLayout.set(sl.task.id, { colIndex: pl.colIndex, colCount: maxLanes, span: Math.min(pl.span, maxLanes - 1 - pl.colIndex) });
+      } else {
+        colLayout.set(sl.task.id, pl);
+      }
+    }
+    const hiddenIds = new Set(hiddenSlices.map((sl) => sl.task.id));
+
+    // Group hidden slices that overlap in time → one chip per group.
+    const groups: TaskSlice[][] = [];
+    for (const sl of [...hiddenSlices].sort((a, b) => a.sliceStartMin - b.sliceStartMin)) {
+      const last = groups[groups.length - 1];
+      const lastEnd = last ? Math.max(...last.map((x) => x.sliceEndMin)) : -1;
+      if (last && sl.sliceStartMin < lastEnd) last.push(sl);
+      else groups.push([sl]);
+    }
+    const overflowChips = groups.map((g) => {
+      const start = g[0]!.sliceStartMin;
+      return (
+        <button
+          key={`overflow-${g[0]!.task.id}`}
+          type="button"
+          data-testid="calendar-overflow-chip"
+          title={g.map((x) => x.task.text).join(', ')}
+          onClick={(e) => {
+            e.stopPropagation();
+            setLayerMenu({ x: e.clientX, y: e.clientY, items: g.map((x) => ({ kind: 'task' as const, task: x.task })) });
+          }}
+          style={{
+            position: 'absolute',
+            top: (start / 60) * rowHeight,
+            left: `calc(${rail} + (100% - ${rail}) * ${(maxLanes - 1) / maxLanes} + 4px)`,
+            right: 3,
+            height: Math.max(20, Math.min(28, rowHeight / 2)),
+            zIndex: 3,
+            border: '1px solid var(--paper-3)',
+            borderRadius: 4,
+            background: 'var(--paper-2)',
+            color: 'var(--ink)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 3,
+          }}
+        >
+          {g.slice(0, 3).map((x) => (
+            <span key={x.task.id} aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: toneVarForTask(x.task.id) }} />
+          ))}
+          +{g.length}
+        </button>
+      );
+    });
+
+    const blocks = slices.filter((sl) => !hiddenIds.has(sl.task.id)).map((slice) => {
       const { task, sliceStartMin, sliceEndMin, isContinuation, hasContinuation } = slice;
 
       // #7 — apply a live resize draft (if this block is being dragged) so it
@@ -952,7 +1021,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // How much text fits: measured column width × this block's lanes.
       // Unmeasured (tests / first paint) counts as roomy.
       const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-      const railNum = Math.min(singleDay ? 30 : 7, colPx * 0.12);
+      const railNum = Math.min(6, colPx * 0.1);
       const widthPx = ((colPx - railNum) * span) / colCount - 3;
       const detail: 'none' | 'title' | 'full' =
         widthPx < 34 || heightPx < 14 ? 'none' : widthPx < 110 || heightPx < 32 ? 'title' : 'full';
@@ -976,8 +1045,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={{
             position: 'absolute',
             top: topPx,
-            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 1px)`,
-            right: `calc((100% - ${rail}) * ${rightFrac} + 2px)`,
+            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 4px)`,
+            right: `calc((100% - ${rail}) * ${rightFrac} + 3px)`,
             height: heightPx,
             // Calm by default: a tinted card with a solid colour edge. Done
             // fades; missed is a lighter tint; overrun is a rust strip on the
@@ -1166,6 +1235,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         </div>
       );
     });
+    return [...blocks, ...overflowChips];
   }
 
   // ── Tracked-reality rail (plan vs reality) ─────────────────────────────────
@@ -1183,7 +1253,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const isWork = seg.kind === 'work';
       const tone = isWork ? (seg.taskId ? toneVarForTask(seg.taskId) : 'var(--acid)') : 'var(--ink-3)';
       const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
-      const showLabel = singleDay && heightPx >= 14;
+      const showLabel = false;
       return (
         <div
           key={`reality-${seg.id}-${i}`}
