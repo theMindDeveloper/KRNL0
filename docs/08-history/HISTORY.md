@@ -688,3 +688,22 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Tests removed:** tests that encoded the retired planner model (per-task checkpoints, session quotas from estimates, loading a task into the pomo, the focus/event toggle) were removed and replaced by plan-vs-reality tests.
 
 **Tests:** 120 files / 1442 passed, 0 typecheck errors, build OK. Not yet exercised in the Electron window.
+
+---
+
+## [2026-11-01] — Calendar/Clock follow-up: readable narrow panels, clock decision, perf + DST
+
+**Type:** Bug Fix + UI
+**Commits:** `c75e364`, `4666b11`, `c942fb0`, `362cb95`, `cd0de37` (reverted by `5a990eb`), `c972ecf`, `5a990eb`, `ff267d7`
+**Summary:**
+- **Calendar:**
+  - Blocks show only what fits their measured size, and lanes are packed by drawn height.
+  - A "+N" chip collapses lanes that don't fit; it lists the hidden tasks.
+  - 56 px per hour by default, and the grid opens scrolled to now.
+  - A narrow day view (< 360 px) becomes an agenda list, with a list/grid toggle.
+  - Selectors are memoized on the board, so the calendar no longer re-renders on hover or pan.
+- **Clock (maintainer decision after the design rounds):** stays the analog dial, with tasks as rounded arcs on lanes around it and Pomo as colour inside the face (wedges per span; breaks hatched). The "day dial" experiment was reverted. The now-pointer only shows in its own 12-hour half, and only done tasks are struck through in the list.
+- **DST:** schedule end times and block heights use wall-clock arithmetic.
+- **Dev:** design drafts lived in a Claude Design canvas (not part of the app).
+
+**Tests:** 120 files / 1443 passed, 0 typecheck errors, build OK. Not yet exercised in the Electron window.
