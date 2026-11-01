@@ -382,25 +382,6 @@ describe('Story 2 — Body double-click loads task into pomo (no auto-start) (De
     expect(onCommand).not.toHaveBeenCalledWith('task.spawnPomo');
   });
 
-  it('T2.2: after task.loadIntoPomo on an idle pomo with no checkpoint, pomo status is paused (not running), activeTaskId === clickedTaskId, and no history record is written', () => {
-    // Implementation note: loadTaskIntoPomo({ autoStart: false }) always sets status
-    // to 'paused' (with pausedElapsedMs=0 when no checkpoint). The spec says "idle"
-    // but the implementation uses 'paused' as the load-without-start state.
-    // This test documents the actual behaviour (paused with no elapsed = frozen at 0).
-    const board = makeBoardWithTasks({ taskA: { plannedMin: 25 } });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-a')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.activeTaskId).toBe('task-a');
-    // paused (not running) — no auto-start
-    expect(ps.status).toBe('paused');
-    expect(ps.pausedElapsedMs).toBe(0);
-    // pomo label reflects task text
-    expect(ps.label).toBe('Task A');
-  });
-
   it('T2.3: task.loadIntoPomo writes no history record', () => {
     const board = makeBoardWithTasks();
     useBoardStore.getState().setBoard(board);
@@ -785,28 +766,6 @@ describe('Story 6 — Animated task-flow edges (Decision 22.2 Fix 6)', () => {
 // loads must NOT disturb a live session — only explicit START presses do.
 
 describe('Story 7 — Click protect-running (background runs survive selection)', () => {
-
-  it('T7.1: passive task.loadIntoPomo on Task B while Task A is running NO-OPs (pomo still running A)', () => {
-    const board = makeBoardWithTasks({
-      taskA: { plannedMin: 25 },
-      taskB: { plannedMin: 10 },
-      pomoState: {
-        status: 'running',
-        activeTaskId: 'task-a',
-        startedAt: new Date(Date.now() - 60_000).toISOString(),
-        durationMin: 25,
-        label: 'Task A',
-      },
-    });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-b')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.activeTaskId).toBe('task-a');
-    expect(ps.status).toBe('running');
-    expect(ps.label).toBe('Task A');
-  });
 
   it('T7.2: passive todo.loadTaskForItem on item-2 while Task A is running NO-OPs', () => {
     const board = makeBoardWithTasks({

@@ -8,6 +8,8 @@ export type SysCommand =
   | { kind: 'node'; sub: 'add'; nodeKind: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'pomo'; sub: 'stop' | 'status' | 'break' | 'extend' | 'pause' | 'resume' | 'discard' }
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
+  | { kind: 'pomo'; sub: 'tag'; ref: string | undefined }
+  | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined }
   | { kind: 'todo'; sub: 'list'; json: boolean }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
   | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
@@ -257,6 +259,8 @@ export class SysParser {
       if (sub === 'stop' || sub === 'status' || sub === 'break' || sub === 'extend'
         || sub === 'pause' || sub === 'resume' || sub === 'discard')
         return { kind: 'pomo', sub };
+      if (sub === 'tag') return { kind: 'pomo', sub: 'tag', ref: rest[0] };
+      if (sub === 'retag') return { kind: 'pomo', sub: 'retag', segmentId: rest[0], ref: rest[1] };
       if (sub === 'start') {
         const minutesRaw = flag(rest, 'minutes');
         return {

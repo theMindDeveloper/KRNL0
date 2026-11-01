@@ -331,16 +331,24 @@ export async function taskStartPomo(
   const pomoMother = findPomoMother(board);
   if (!pomoMother) return { ok: false, message: 'No pomo mother node found in board.' };
 
+  // Plan vs reality: tag the pomo with this task and start it if idle. The
+  // session length is the pomo's own setting — the task estimate is a plan,
+  // not a timer. A running session keeps running; only its tag changes.
   const ts = taskNode.state as TaskState;
-  const nextPomoState = fsmPomoStart(pomoMother.state as PomoState, {
-    label: ts.text,
-    durationMin: ts.durationMin,
-  });
+  const ps = pomoMother.state as PomoState;
+  const cfg = (pomoMother['config'] ?? {}) as { sessionMin?: number };
+  const tagged: PomoState = { ...ps, activeTaskId: taskId, label: ts.text };
+  const started = ps.status === 'idle' || ps.status === 'done';
+  const nextPomoState = started
+    ? fsmPomoStart(tagged, { durationMin: cfg.sessionMin ?? 25 })
+    : tagged;
   updateNode(board, pomoMother.id, { ...pomoMother, state: nextPomoState });
   saveBoard(ctx, board);
   return {
     ok: true,
-    message: `Pomo started for "${ts.text}" (${ts.durationMin} min).`,
+    message: started
+      ? `Pomo started on "${ts.text}".`
+      : `Pomo (already ${ps.status}) is now tagged "${ts.text}".`,
   };
 }
 

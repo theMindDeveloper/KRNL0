@@ -9,6 +9,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTick } from '../../../hooks/useTick';
 import type { PomoState } from '../PomoNode/types';
+import { trackedSecondsForTask, planStatus, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 
 /**
  * Decision 22 F16 — format seconds as `H:MM:SS` (≥1h) or `MM:SS` (<1h).
@@ -23,62 +24,51 @@ export function formatElapsed(totalSec: number): string {
   return `${pad(m)}:${pad(s)}`;
 }
 
-/**
- * TaskPomoBar — progress bar at the bottom of a task card.
- *
- * Shown when the task has at least one completed pomo session.
- * Only this subcomponent subscribes to useTick(), so inactive tasks never
- * mount a tick subscription.
- *
- * Progress = pomoSessionsCompleted / plannedSessions where
- * plannedSessions is derived from durationMin / 25 (default session length).
- * When no PomoState is available we fall back to a single-session denominator.
- */
-function TaskPomoBar({ state, taskId }: { state: TaskState; taskId: string }) {
-  // Subscribe to the pomo node's runtime so we can detect the active task.
-  const pomoRuntime = useBoardStore(
-    useShallow((s) => {
-      const pomo = s.board?.nodes.find((n) => n.kind === 'pomo');
-      if (!pomo) return { status: null as PomoState['status'] | null, startedAt: null };
-      const ps = pomo.state as PomoState;
-      return { status: ps.status, startedAt: ps.startedAt };
-    }),
-  );
+function fmtMin(totalMin: number): string {
+  const m = Math.max(0, Math.round(totalMin));
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h === 0) return `${r}m`;
+  return r === 0 ? `${h}h` : `${h}h${String(r).padStart(2, '0')}`;
+}
 
-  // Tick drives live re-renders while the pomo is running.
+/**
+ * Plan vs reality — "PLAN 1h · TRACKED 52m" strip at the bottom of a task
+ * card. Tracked time is the sum of pomo work spans tagged with this task
+ * (store/trackedTime.ts); the bar fills tracked / planned and turns rust when
+ * more time was spent than planned. Hidden until something was tracked.
+ */
+function PlanTrackedBar({ taskId, plannedMin, live }: { taskId: string; plannedMin: number; live: boolean }) {
   const _tick = useTick();
   void _tick;
-
-  const completedSessions = state.pomoSessionsCompleted;
-
-  // Estimate planned sessions from durationMin rounded up to 25-min blocks.
-  const sessionMin = 25;
-  const plannedSessions = Math.max(1, Math.ceil((state.durationMin ?? sessionMin) / sessionMin));
-  const progress = Math.min(1, completedSessions / plannedSessions);
-
-  if (completedSessions === 0) return null;
-
-  void taskId;
-  const isRunning = pomoRuntime.status === 'running';
-
+  const pomoNode = useBoardStore(selectPomoNode);
+  const trackedSec = trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now());
+  const status = planStatus(trackedSec, plannedMin);
+  if (status === 'untracked' && !live) return null;
+  const ratio = plannedMin > 0 ? trackedSec / (plannedMin * 60) : 0;
+  const color = status === 'overrun' ? 'var(--rust)' : live ? 'var(--acid)' : 'var(--ink-3)';
   return (
-    <div
-      data-testid="task-pomo-bar"
-      style={{
-        height: 4,
-        background: 'var(--paper-3)',
-        borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
-        overflow: 'hidden',
-      }}
-    >
+    <div data-testid="task-plan-tracked" style={{ padding: '4px 10px 6px' }}>
       <div
         style={{
-          height: '100%',
-          width: `${progress * 100}%`,
-          background: isRunning ? 'var(--acid)' : 'var(--ink-4)',
-          transition: isRunning ? 'none' : undefined,
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 9,
+          letterSpacing: '0.06em',
+          color: 'var(--ink-3)',
+          marginBottom: 3,
         }}
-      />
+      >
+        <span>PLAN {fmtMin(plannedMin)}</span>
+        <span style={{ color }}>
+          {status === 'overrun' ? '+' + fmtMin(trackedSec / 60 - plannedMin) + ' OVER · ' : ''}
+          TRACKED {fmtMin(trackedSec / 60)}
+        </span>
+      </div>
+      <div style={{ height: 3, background: 'var(--paper-3)', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.min(1, ratio) * 100}%`, background: color }} />
+      </div>
     </div>
   );
 }
@@ -153,21 +143,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const isPastScheduled = scheduledEndMs !== null && scheduledEndMs <= nowMs;
   const isGrayed = state.done || isPastScheduled;
 
-  // B.3 — corner timer formula: include currentSessionElapsedSec checkpoint
-  const checkpointSec = state.currentSessionElapsedSec ?? 0;
-  let elapsedSec: number;
-  if (isActiveRunning && pomoRuntime?.startedAt) {
-    // Running: liveDelta already includes the checkpoint via offset startedAt
-    // (loadTaskIntoPomo sets startedAt = now - checkpointMs when autoStart=true).
-    const liveDelta = Math.max(0, (Date.now() - Date.parse(pomoRuntime.startedAt)) / 1000);
-    elapsedSec = (state.secondsAccumulated ?? 0) + liveDelta;
-  } else if (isActive) {
-    // Paused/loaded: show secondsAccumulated + checkpoint (frozen).
-    elapsedSec = (state.secondsAccumulated ?? 0) + checkpointSec;
-  } else {
-    // Inactive: show secondsAccumulated + checkpoint (if any, from a prior session).
-    elapsedSec = (state.secondsAccumulated ?? 0) + checkpointSec;
-  }
+  // Corner timer: tracked time on this task, derived from the pomo spans
+  // tagged with it (live while the pomo is running on it).
+  const pomoNode = useBoardStore(selectPomoNode);
+  const elapsedSec = trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now());
   const showTimer = elapsedSec > 0 || isActive;
 
   // ── Task chain prev/next display ───────────────────────────────────────────
@@ -797,11 +776,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         />
       )}
 
-      {/* Pomo progress bar — only visible while this task is actively running.
-          Idle cards (even those with completed sessions) stay clean. */}
-      {isActiveRunning && state.pomoSessionsCompleted > 0 && (
-        <TaskPomoBar state={state} taskId={node.id} />
-      )}
+      <PlanTrackedBar
+        taskId={node.id}
+        plannedMin={state.plannedMin ?? state.durationMin ?? 25}
+        live={isActiveRunning}
+      />
     </div>
   );
 }

@@ -425,9 +425,15 @@ function migrateTaskPlannedMin(board: Record<string, unknown>): Record<string, u
     const node = n as { kind?: string; state?: Record<string, unknown> | null };
     if (node.kind !== 'todo.task') return n;
     const s = (node.state ?? {}) as Record<string, unknown>;
-    if (typeof s['plannedMin'] === 'number') return n;
-    const fallback = typeof s['durationMin'] === 'number' ? s['durationMin'] : 25;
-    return { ...node, state: { ...s, plannedMin: fallback } };
+    // plannedMin is the one estimate the calendar, clock and analytics read;
+    // durationMin/eta are display mirrors that drifted apart on older boards
+    // (#168). Backfill plannedMin if missing, then re-sync the mirrors to it.
+    const planned = typeof s['plannedMin'] === 'number'
+      ? s['plannedMin']
+      : typeof s['durationMin'] === 'number' ? s['durationMin'] : 25;
+    const eta = `~${planned} min`;
+    if (s['plannedMin'] === planned && s['durationMin'] === planned && s['eta'] === eta) return n;
+    return { ...node, state: { ...s, plannedMin: planned, durationMin: planned, eta } };
   });
   return board;
 }

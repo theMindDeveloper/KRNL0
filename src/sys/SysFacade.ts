@@ -9,7 +9,7 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
-import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard } from './commands/pomo';
+import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
@@ -384,6 +384,16 @@ export class SysFacade {
         case 'pause':  return pomoPause();
         case 'resume': return pomoResume();
         case 'discard': return pomoDiscard();
+        case 'tag':
+        case 'retag': {
+          const tagCtx = {
+            boardPath: this.deps.boardPath,
+            ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+          };
+          return command.sub === 'tag'
+            ? pomoTag(tagCtx, command.ref)
+            : pomoRetag(tagCtx, command.segmentId, command.ref);
+        }
         case 'status': return pomoStatus();
         case 'config': {
           const cfgOpts: Parameters<typeof pomoConfig>[0] = {};

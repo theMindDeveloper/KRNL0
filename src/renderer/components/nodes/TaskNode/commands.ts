@@ -69,10 +69,12 @@ export const taskSetPlannedMin = (
   // would cascade but the edited block itself would stay frozen at its old
   // size — the reported "edit time only pushes the next task" bug. Since for
   // event tasks scheduledDurationMin IS the total duration, re-sync it.
+  // durationMin/eta mirror the estimate so every view shows the same number.
+  const mirrors = { plannedMin, durationMin: plannedMin, eta: `~${plannedMin} min` };
   if (typeof state.scheduledDurationMin === 'number') {
-    return { ...state, plannedMin, scheduledDurationMin: plannedMin };
+    return { ...state, ...mirrors, scheduledDurationMin: plannedMin };
   }
-  return { ...state, plannedMin };
+  return { ...state, ...mirrors };
 };
 
 // task.setCurrentSessionElapsedSec — Decision 22.1: write the in-flight session

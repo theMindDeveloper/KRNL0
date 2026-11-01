@@ -11,6 +11,8 @@ import {
   type PomoEnv,
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
+import { resolveNodeRef, resolutionError } from '../../shared/dispatch/resolveRef';
+import type { BoardShape } from '../../shared/dispatch/types';
 
 const VALID_FACES: readonly TimerFace[] = ['ascii', 'lcd', 'blocks', 'vapor'];
 function isTimerFace(v: unknown): v is TimerFace {
@@ -150,6 +152,76 @@ export function pomoExtend(): SysResult {
   });
   if (!found) return { ok: false, message: msg };
   return { ok: true, message: msg };
+}
+
+/** Resolve a task ref for tagging; 'none' clears the tag. */
+function resolveTag(board: BoardShape, ref: string): { taskId: string | null; label: string } | { error: string } {
+  if (ref === 'none') return { taskId: null, label: '' };
+  const r = resolveNodeRef(board, ref);
+  if (!r.ok) return { error: resolutionError('task', ref, r) };
+  const node = board.nodes.find((n) => n.id === r.id);
+  if (!node || node.kind !== 'todo.task') return { error: `"${ref}" is not a task` };
+  return { taskId: node.id, label: String((node.state as { text?: string }).text ?? '') };
+}
+
+export interface PomoTagCtx {
+  boardPath: string;
+  onBoardChanged?: () => void;
+}
+
+/** Load → mutate → save for the tag verbs (path-based, so it's testable). */
+function mutatePomoBoard(ctx: PomoTagCtx, fn: (board: BoardLike) => void): void {
+  const raw = loadBoardFrom(ctx.boardPath) as BoardLike | null;
+  if (!raw) return;
+  const board: BoardLike = {
+    ...((raw as unknown) as Record<string, unknown>),
+    nodes: Array.isArray(raw.nodes) ? raw.nodes : [],
+    edges: Array.isArray(raw.edges) ? raw.edges : [],
+  };
+  fn(board);
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+}
+
+/** `krnl pomo tag <taskRef|none>` — label what the pomo is observing. */
+export function pomoTag(ctx: PomoTagCtx, ref: string | undefined): SysResult {
+  if (!ref) return { ok: false, message: 'pomo tag requires <taskRef|none>' };
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  mutatePomoBoard(ctx, (board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const tag = resolveTag(board as unknown as BoardShape, ref);
+    if ('error' in tag) { result = { ok: false, message: tag.error }; return; }
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    node['state'] = { ...prev, activeTaskId: tag.taskId, label: tag.label };
+    result = { ok: true, message: tag.taskId ? `pomo tagged "${tag.label}"` : 'pomo untagged' };
+  });
+  return result;
+}
+
+/** `krnl pomo retag <segmentId> <taskRef|none>` — fix what recorded time was spent on. */
+export function pomoRetag(ctx: PomoTagCtx, segmentId: string | undefined, ref: string | undefined): SysResult {
+  if (!segmentId || !ref) return { ok: false, message: 'pomo retag requires <segmentId> <taskRef|none>' };
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  mutatePomoBoard(ctx, (board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const tag = resolveTag(board as unknown as BoardShape, ref);
+    if ('error' in tag) { result = { ok: false, message: tag.error }; return; }
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    const matches = prev.history.filter((r) => r.id.startsWith(segmentId));
+    if (matches.length !== 1) {
+      result = { ok: false, message: matches.length === 0 ? `no segment "${segmentId}"` : `segment "${segmentId}" is ambiguous` };
+      return;
+    }
+    const id = matches[0]!.id;
+    node['state'] = {
+      ...prev,
+      history: prev.history.map((r) => (r.id === id ? { ...r, taskId: tag.taskId, label: tag.label } : r)),
+    };
+    result = { ok: true, message: `segment ${id.slice(0, 8)} → ${tag.taskId ? `"${tag.label}"` : 'untagged'}` };
+  });
+  return result;
 }
 
 /** Issue #166 — segment-aware status: shows what is currently happening. */

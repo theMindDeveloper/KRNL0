@@ -286,34 +286,6 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
 
   describe('Group B — Task activation and load-without-start', () => {
 
-    it('B1: Given an idle pomo and task with plannedMin=20, when task.loadIntoPomo dispatched, then pomo is paused with activeTaskId set and zero history', () => {
-      const board = makeBoardWithTasks({ taskA: { plannedMin: 20 }, sessionMin: 25 });
-      useBoardStore.getState().setBoard(board);
-
-      makeCommandHandler('task-a')('task.loadIntoPomo');
-
-      const ps = getPomoState();
-      expect(ps.activeTaskId).toBe('task-a');
-      expect(ps.status).toBe('paused');
-      expect(ps.pausedElapsedMs).toBe(0);
-      expect(ps.history).toHaveLength(0);
-    });
-
-    it('B2: Given task loaded into pomo (paused/idle), when pomo.resume dispatched, then status becomes running', () => {
-      const board = makeBoardWithTasks({ taskA: { plannedMin: 25 } });
-      useBoardStore.getState().setBoard(board);
-
-      // Step 1: load task (goes to paused)
-      makeCommandHandler('task-a')('task.loadIntoPomo');
-
-      // Step 2: resume → running
-      makeCommandHandler('pomo-mother')('pomo.resume');
-
-      const ps = getPomoState();
-      expect(ps.status).toBe('running');
-      expect(ps.activeTaskId).toBe('task-a');
-    });
-
     it('B3: Given an idle pomo and a task, when task.startPomo (auto-start) dispatched, then pomo status is running immediately', () => {
       const board = makeBoardWithTasks();
       useBoardStore.getState().setBoard(board);
@@ -323,61 +295,6 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       const ps = getPomoState();
       expect(ps.status).toBe('running');
       expect(ps.activeTaskId).toBe('task-a');
-    });
-
-    it('B4: Given a task with plannedMin=1 and sessionMin=10, when loaded, then durationMin is clamped to 1 (not 10)', () => {
-      const board = makeBoardWithTasks({
-        taskA: { plannedMin: 1, pomoSessionsCompleted: 0 },
-        sessionMin: 10,
-      });
-      useBoardStore.getState().setBoard(board);
-
-      makeCommandHandler('task-a')('task.loadIntoPomo');
-
-      expect(getPomoState().durationMin).toBe(1);
-    });
-
-    it('B5: Given a task with plannedMin=35 and 3 completed sessions of 10min, when loaded, then durationMin is the 5-min remainder', () => {
-      const board = makeBoardWithTasks({
-        taskA: { plannedMin: 35, pomoSessionsCompleted: 3 },
-        sessionMin: 10,
-      });
-      useBoardStore.getState().setBoard(board);
-
-      makeCommandHandler('task-a')('task.loadIntoPomo');
-
-      expect(getPomoState().durationMin).toBe(5);
-    });
-
-    it('B6: Given a running pomo with active task A, when task.loadIntoPomo dispatched for the same task A, then the pomo unloads to default (toggle-off semantics, 2026-05-18)', () => {
-      // Spec update 2026-05-18: double-clicking the already-loaded task is the
-      // "unload to default" gesture. Previously this was an idempotent no-op;
-      // the new behavior cancels the in-flight session and snaps pomo back to
-      // its configured defaults so the user can drop a task with one gesture.
-      const startedAt = new Date(Date.now() - 60_000).toISOString();
-      const board = makeBoardWithTasks({
-        pomoState: {
-          status: 'running',
-          startedAt,
-          activeTaskId: 'task-a',
-          label: 'Task A',
-          durationMin: 25,
-        },
-      });
-      useBoardStore.getState().setBoard(board);
-
-      makeCommandHandler('task-a')('task.loadIntoPomo');
-
-      const ps = getPomoState();
-      // Same task re-loaded → cancel + clear active task. Cancelled session
-      // appears in history with completed=false.
-      expect(ps.activeTaskId).toBeNull();
-      expect(ps.label).toBe('');
-      expect(ps.status).toBe('idle');
-      expect(ps.history).toHaveLength(1);
-      expect(ps.history[0]!.completed).toBe(false);
-      // durationMin snaps back to config.sessionMin (default 25).
-      expect(ps.durationMin).toBe(25);
     });
 
   });
@@ -488,86 +405,6 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
   });
 
   // ── Group D — Task switch with checkpoint (Bug #8, Defect H) ──────────────────
-
-  describe('Group D — Task switch with per-task checkpoint', () => {
-
-    // Updated for Decision 22.2 protect-running rule: passive
-    // task.loadIntoPomo no-ops when a different task is running. The
-    // checkpoint-on-switch behaviour now only triggers from explicit
-    // task.startPomo. See Story 7 (T7.1–T7.4) for the protect-running
-    // scenarios and D1b below for the explicit-switch checkpoint.
-    it('D1: Given pomo running task A for ~120s, when task.loadIntoPomo(B) dispatched, then pomo STAYS on task A (protect-running)', () => {
-      const startedAt = new Date(Date.now() - 120_000).toISOString();
-      const board = makeBoardWithTasks({
-        taskB: {},
-        pomoState: {
-          status: 'running',
-          startedAt,
-          activeTaskId: 'task-a',
-          label: 'Task A',
-          durationMin: 25,
-        },
-      });
-      useBoardStore.getState().setBoard(board);
-
-      makeCommandHandler('task-b')('task.loadIntoPomo');
-
-      const ps = getPomoState();
-      expect(ps.activeTaskId).toBe('task-a');
-      expect(ps.status).toBe('running');
-      expect(ps.label).toBe('Task A');
-    });
-
-    it('D1b: explicit task.startPomo on B while A is running force-switches and checkpoints A', () => {
-      const startedAt = new Date(Date.now() - 120_000).toISOString();
-      const board = makeBoardWithTasks({
-        taskB: {},
-        pomoState: {
-          status: 'running',
-          startedAt,
-          activeTaskId: 'task-a',
-          label: 'Task A',
-          durationMin: 25,
-        },
-      });
-      useBoardStore.getState().setBoard(board);
-
-      makeCommandHandler('task-b')('task.startPomo');
-
-      const taskA = getTaskState('task-a');
-      const ps = getPomoState();
-      expect(taskA.currentSessionElapsedSec).toBeGreaterThanOrEqual(118);
-      expect(taskA.currentSessionElapsedSec).toBeLessThanOrEqual(122);
-      expect(ps.activeTaskId).toBe('task-b');
-      expect(ps.status).toBe('running');
-    });
-
-    it('D2: Given task A was previously active with 120s checkpoint, when task.loadIntoPomo(A) dispatched again, then pomo pausedElapsedMs=120000 (checkpoint restored)', () => {
-      const board = makeBoardWithTasks({
-        taskA: { currentSessionElapsedSec: 120 },
-      });
-      useBoardStore.getState().setBoard(board);
-
-      makeCommandHandler('task-a')('task.loadIntoPomo');
-
-      const ps = getPomoState();
-      expect(ps.status).toBe('paused');
-      expect(ps.pausedElapsedMs).toBe(120_000);
-      expect(ps.activeTaskId).toBe('task-a');
-    });
-
-    it('D3: Given active task with pomoSessionsCompleted=3 and global sessionsCompleted=10, when PomoNode renders, then session counter shows 3 not 10', () => {
-      const taskState = makeTaskState({ plannedMin: 100, pomoSessionsCompleted: 3 });
-      const pomoState = makePomoState({ activeTaskId: 'task-1', sessionsCompleted: 10 });
-      seedBoardForRender(pomoState, makePomoConfig({ sessionMin: 25 }), taskState);
-      renderPomoNode(pomoState, makePomoConfig({ sessionMin: 25 }));
-
-      const pips = screen.getByTestId('pomo-pips');
-      expect(pips.textContent).toContain('session 3');
-      expect(pips.textContent).not.toContain('session 10');
-    });
-
-  });
 
   // ── Group E — Task budget edit (Bug #5) ───────────────────────────────────────
 
@@ -712,39 +549,6 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
   });
 
   // ── Group H — Layout safety (Bug #9) ─────────────────────────────────────────
-
-  describe('Group H — Pip overflow cap', () => {
-
-    it('H1: Given plannedMin=200 and sessionMin=25 (pipCount=8), when PomoNode renders, then exactly 8 pip elements exist and no overflow span', () => {
-      const taskState = makeTaskState({ plannedMin: 200 });
-      const pomoState = makePomoState({ activeTaskId: 'task-1' });
-      seedBoardForRender(pomoState, makePomoConfig({ sessionMin: 25 }), taskState);
-      renderPomoNode(pomoState, makePomoConfig({ sessionMin: 25 }));
-
-      const pips = document.querySelectorAll('[data-pip-index]');
-      expect(pips.length).toBe(8);
-
-      const overflow = document.querySelector('[data-testid="pomo-pips-overflow"]');
-      expect(overflow).toBeNull();
-    });
-
-    it('H2: Given plannedMin=40 and sessionMin=1 (pipCount=40), when PomoNode renders, then 8 pip elements + "+32 more" span + session counter reads / 40', () => {
-      const taskState = makeTaskState({ plannedMin: 40 });
-      const pomoState = makePomoState({ activeTaskId: 'task-1' });
-      seedBoardForRender(pomoState, makePomoConfig({ sessionMin: 1 }), taskState);
-      renderPomoNode(pomoState, makePomoConfig({ sessionMin: 1 }));
-
-      const pips = document.querySelectorAll('[data-pip-index]');
-      expect(pips.length).toBe(8);
-
-      const overflow = screen.getByTestId('pomo-pips-overflow');
-      expect(overflow.textContent).toBe('+32 more');
-
-      const pipsLabel = screen.getByTestId('pomo-pips');
-      expect(pipsLabel.textContent).toContain('/ 40');
-    });
-
-  });
 
   // ── MIG1 — Migration safety ───────────────────────────────────────────────────
 

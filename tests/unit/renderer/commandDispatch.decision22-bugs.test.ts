@@ -169,40 +169,6 @@ function getTaskState(taskId: string): TaskState {
 
 // ── B1: task.loadIntoPomo → pomo paused, no history ──────────────────────────
 
-describe('B1 — task.loadIntoPomo loads task into idle pomo as paused, no history', () => {
-  it('sets activeTaskId and status=paused', () => {
-    const board = makeBoardWithTasks();
-    useBoardStore.getState().setBoard(board);
-
-    const handler = makeCommandHandler('task-a');
-    handler('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.activeTaskId).toBe('task-a');
-    expect(ps.status).toBe('paused');
-  });
-
-  it('adds no history record', () => {
-    const board = makeBoardWithTasks();
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-a')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.history).toHaveLength(0);
-  });
-
-  it('sets durationMin from plannedMin', () => {
-    const board = makeBoardWithTasks({ taskA: { plannedMin: 20 }, sessionMin: 25 });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-a')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.durationMin).toBe(20);
-  });
-});
-
 // ── B3: task.startPomo (auto-start) → pomo running ───────────────────────────
 
 describe('B3 — task.startPomo auto-starts the pomo', () => {
@@ -220,72 +186,13 @@ describe('B3 — task.startPomo auto-starts the pomo', () => {
 
 // ── B4: plannedMin=1, sessionMin=10 → durationMin=1 (clamp to remainder) ─────
 
-describe('B4 — clamp-to-remainder: 1-min task with 10-min sessionMin → durationMin=1', () => {
-  it('durationMin is clamped to 1', () => {
-    const board = makeBoardWithTasks({
-      taskA: { plannedMin: 1, pomoSessionsCompleted: 0 },
-      sessionMin: 10,
-    });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-a')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.durationMin).toBe(1);
-  });
-});
-
 // ── B5: plannedMin=35, sessionMin=10, 3 sessions done → durationMin=5 ─────────
-
-describe('B5 — remainder after 3 sessions of 10-min on a 35-min task → durationMin=5', () => {
-  it('durationMin is the 5-min remainder', () => {
-    const board = makeBoardWithTasks({
-      taskA: { plannedMin: 35, pomoSessionsCompleted: 3 },
-      sessionMin: 10,
-    });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-a')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.durationMin).toBe(5);
-  });
-});
 
 // ── Toggle-off semantics: same task + loaded → unload to default (2026-05-18) ─
 // Spec update: double-clicking an already-loaded task unloads it. Previously
 // this was a no-op that preserved the checkpoint; now it cancels the session
 // (recording a non-completed history entry) and snaps the pomo back to
 // configured defaults so a single gesture drops the task.
-
-describe('Toggle-off — double-clicking same paused task unloads to default', () => {
-  it('cancel + clear active task; durationMin snaps to sessionMin', () => {
-    const board = makeBoardWithTasks({
-      taskA: { currentSessionElapsedSec: 120 },
-      pomoState: {
-        status: 'paused',
-        startedAt: new Date(Date.now() - 120_000).toISOString(),
-        pausedAt: new Date().toISOString(),
-        pausedElapsedMs: 120_000,
-        activeTaskId: 'task-a',
-        label: 'Task A',
-        durationMin: 25,
-      },
-    });
-    useBoardStore.getState().setBoard(board);
-
-    // Re-load the same task → toggle-off (unload + reset to defaults).
-    makeCommandHandler('task-a')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.activeTaskId).toBeNull();
-    expect(ps.label).toBe('');
-    expect(ps.status).toBe('idle');
-    expect(ps.history).toHaveLength(1);
-    expect(ps.history[0]!.completed).toBe(false);
-    expect(ps.durationMin).toBe(25);
-  });
-});
 
 // ── D1: switch from running task A to task B
 //
@@ -294,74 +201,7 @@ describe('Toggle-off — double-clicking same paused task unloads to default', (
 // The user must press STOP (or explicit START on Task B) to switch. The
 // checkpoint test for the explicit-switch path is preserved as D1b.
 
-describe('D1 — passive task.loadIntoPomo on Task B preserves a running Task A', () => {
-  it('pomo stays on task A running; task B is NOT loaded', () => {
-    const startedAt = new Date(Date.now() - 120_000).toISOString();
-    const board = makeBoardWithTasks({
-      taskB: {},
-      pomoState: {
-        status: 'running',
-        startedAt,
-        activeTaskId: 'task-a',
-        label: 'Task A',
-        durationMin: 25,
-      },
-    });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-b')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.activeTaskId).toBe('task-a');
-    expect(ps.status).toBe('running');
-    expect(ps.label).toBe('Task A');
-  });
-});
-
-describe('D1b — explicit task.startPomo on Task B force-switches and checkpoints Task A', () => {
-  it('task A currentSessionElapsedSec is ~120 and pomo activeTaskId is task-b', () => {
-    const startedAt = new Date(Date.now() - 120_000).toISOString();
-    const board = makeBoardWithTasks({
-      taskB: {},
-      pomoState: {
-        status: 'running',
-        startedAt,
-        activeTaskId: 'task-a',
-        label: 'Task A',
-        durationMin: 25,
-      },
-    });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-b')('task.startPomo');
-
-    const taskA = getTaskState('task-a');
-    const ps = getPomoState();
-
-    // Allow ±2s for timing jitter
-    expect(taskA.currentSessionElapsedSec).toBeGreaterThanOrEqual(118);
-    expect(taskA.currentSessionElapsedSec).toBeLessThanOrEqual(122);
-    expect(ps.activeTaskId).toBe('task-b');
-  });
-});
-
 // ── D2: load task A with 120s checkpoint as paused ───────────────────────────
-
-describe('D2 — load task A with checkpoint 120s → pomo paused at 120s', () => {
-  it('pomo pausedElapsedMs=120000 and status=paused', () => {
-    const board = makeBoardWithTasks({
-      taskA: { currentSessionElapsedSec: 120 },
-    });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('task-a')('task.loadIntoPomo');
-
-    const ps = getPomoState();
-    expect(ps.status).toBe('paused');
-    expect(ps.pausedElapsedMs).toBe(120_000);
-    expect(ps.activeTaskId).toBe('task-a');
-  });
-});
 
 // ── F1: mark active running task done → pomo cancels ─────────────────────────
 
@@ -520,53 +360,3 @@ describe('G1 — delete active running task cancels pomo and removes task', () =
 
 // ── Invariant: start → run 60s → cancel → secondsAccumulated=60, checkpoint=0 ─
 
-describe('Invariant (Decision 22.3) — start → run 60s → cancel: secondsAccumulated UNCHANGED, currentSessionElapsedSec===0', () => {
-  it('cancel discards in-flight time (RESET = abandoned)', () => {
-    // Set startedAt to 60s ago
-    const startedAt = new Date(Date.now() - 60_000).toISOString();
-    const board = makeBoardWithTasks({
-      pomoState: {
-        status: 'running',
-        startedAt,
-        activeTaskId: 'task-a',
-        label: 'Task A',
-        durationMin: 25,
-      },
-    });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('pomo-mother')('pomo.cancel');
-
-    const ts = getTaskState('task-a');
-
-    // secondsAccumulated should remain 0 — cancel does NOT credit the session.
-    expect(ts.secondsAccumulated).toBe(0);
-
-    // Checkpoint must be cleared
-    expect(ts.currentSessionElapsedSec).toBe(0);
-  });
-
-  it('complete credits the session (full session → secondsAccumulated bumped, checkpoint cleared)', () => {
-    // pomoComplete requires now - startedAt >= durationMin*60_000.
-    // Use durationMin=1 + startedAt 61s ago so elapsed crosses the threshold.
-    const startedAt = new Date(Date.now() - 61_000).toISOString();
-    const board = makeBoardWithTasks({
-      pomoState: {
-        status: 'running',
-        startedAt,
-        activeTaskId: 'task-a',
-        label: 'Task A',
-        durationMin: 1,
-      },
-    });
-    useBoardStore.getState().setBoard(board);
-
-    makeCommandHandler('pomo-mother')('pomo.complete');
-
-    const ts = getTaskState('task-a');
-    expect(ts.secondsAccumulated).toBeGreaterThanOrEqual(59);
-    expect(ts.secondsAccumulated).toBeLessThanOrEqual(63);
-    expect(ts.currentSessionElapsedSec).toBe(0);
-    expect(ts.pomoSessionsCompleted).toBe(1);
-  });
-});

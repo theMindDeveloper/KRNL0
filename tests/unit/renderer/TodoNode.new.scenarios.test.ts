@@ -5,7 +5,7 @@
  *
  * F# mapping (plan F-prime → todo-node F#):
  *   F9  — row right-click context menu (Edit text, Start pomo, Delete)
- *   F10 — row click fires todo.startPomoForItem (when taskNodeId linked)
+ *   F10 — row click does not touch the pomo
  *   F11 — todo.remove cascades TaskNode (dispatcher test in cascade file; UI: delete button dispatches todo.remove)
  *   F12 — todo.clearDone (existing F6; cascade in cascade test file)
  *   F13 — todo.toggle mirrors done to linked TaskNode (cascade file)
@@ -226,20 +226,9 @@ describe('F9 — TodoNode row right-click context menu', () => {
   });
 });
 
-// ── F10 — Row click fires todo.loadTaskForItem (load-only, Decision 22.3) ─────
+// ── F10 — a row click never touches the pomo (plan vs reality) ─────────────
 
-describe('F10 — Row text click fires todo.loadTaskForItem when linked', () => {
-  it('clicking linked undone item text fires todo.loadTaskForItem (load only, no auto-start)', () => {
-    const onCommand = vi.fn();
-    let s = defaultTodoState();
-    s = todoAdd(s, { text: 'linked task' }, envAt(T1, 'item-1'));
-    s = todoLinkTask(s, { itemId: 'item-1', taskNodeId: 'task-abc' });
-    renderTodoNode(s, onCommand);
-    const textEl = document.querySelector('.todo-text') as HTMLElement;
-    fireEvent.click(textEl);
-    expect(onCommand).toHaveBeenCalledWith('todo.loadTaskForItem', { itemId: 'item-1' });
-  });
-
+describe('F10 — Row text click does not load or retag the pomo', () => {
   it('clicking unlinked item text does NOT fire todo.loadTaskForItem', () => {
     const onCommand = vi.fn();
     let s = defaultTodoState();

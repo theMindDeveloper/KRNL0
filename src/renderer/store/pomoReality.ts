@@ -54,8 +54,27 @@ export function selectPomoReality(board: Board | null, nowMs: number): RealitySe
     });
   }
 
+  // While paused, the work done since the last (re)start is not in history
+  // yet — it is recorded on resume/stop. Show it as a closed span so the
+  // calendar/clock don't drop it during the pause.
+  if (s.status === 'paused' && s.startedAt !== null && s.pausedAt !== null) {
+    const startMs = Date.parse(s.startedAt);
+    const endMs = Date.parse(s.pausedAt);
+    if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+      out.push({
+        id: 'pomo-paused',
+        startMs,
+        endMs,
+        kind: 'work',
+        taskId: s.activeTaskId,
+        label: s.label,
+        live: false,
+      });
+    }
+  }
+
   // In-flight segment: running draws a live work span, break draws a live break
-  // span. Paused logs nothing (gap) — no live span.
+  // span. The pause itself is a gap.
   if ((s.status === 'running' || s.status === 'break') && s.startedAt !== null) {
     const startMs = Date.parse(s.startedAt);
     if (Number.isFinite(startMs) && nowMs > startMs) {

@@ -443,6 +443,34 @@ export const pomoSetConfig = (
  * Passing the live PomoConfig is required for the snap-to-default behavior;
  * omitting it preserves the current durations (legacy call sites).
  */
+/**
+ * Plan vs reality — tag what the pomo is observing. Sets the task id stamped
+ * onto spans recorded from now on (and onto the in-flight span when it
+ * closes). Never touches the timer itself: no cancel, no duration change.
+ */
+export const pomoSetTag = (
+  state: PomoState,
+  args: { taskId: string | null; label?: string },
+): PomoState => {
+  const label = args.taskId === null ? '' : (args.label ?? state.label);
+  if (state.activeTaskId === args.taskId && state.label === label) return state;
+  return { ...state, activeTaskId: args.taskId, label };
+};
+
+/** Retag an already-recorded span (fix "what was this time spent on" later). */
+export const pomoRetagSegment = (
+  state: PomoState,
+  args: { id: string; taskId: string | null; label?: string },
+): PomoState => {
+  let changed = false;
+  const history = state.history.map((r) => {
+    if (r.id !== args.id) return r;
+    changed = true;
+    return { ...r, taskId: args.taskId, label: args.taskId === null ? '' : (args.label ?? r.label) };
+  });
+  return changed ? { ...state, history } : state;
+};
+
 export const pomoClearActiveTask = (
   state: PomoState,
   config?: PomoConfig,
