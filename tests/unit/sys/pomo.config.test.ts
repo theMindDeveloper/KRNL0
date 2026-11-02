@@ -105,6 +105,13 @@ describe('pomo config', () => {
     expect(res.message).toMatch(/invalid.*face/i);
   });
 
+  it('never saves a zero length from a fraction below 0.5', () => {
+    pomoConfig({ session: 0.4, short: 0.2 });
+    const cfg = getPomoConfig();
+    expect(cfg.sessionMin).toBe(1);
+    expect(cfg.shortBreakMin).toBe(1);
+  });
+
   it('persists to board.json', () => {
     pomoConfig({ session: 45 });
     const cfg = getPomoConfig();

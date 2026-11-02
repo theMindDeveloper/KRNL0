@@ -194,6 +194,7 @@ import {
   analyticsSetSettingsOpen,
   analyticsResetCardLayout,
 } from '../nodes/AnalyticsNode/commands';
+import { isValidYMD } from '../../../shared/ymd';
 
 // ── dispatch ──────────────────────────────────────────────────────────
 
@@ -1159,7 +1160,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         updateNode(nodeId, { state: sel.state });
       }
       const date = (args as { date?: unknown }).date;
-      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (isValidYMD(date)) {
         const fresh = useBoardStore.getState().board;
         if (fresh) {
           for (const cn of fresh.nodes) {

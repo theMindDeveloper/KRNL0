@@ -37,6 +37,7 @@ import {
   isValidTimeOfDay,
   todayLocal,
 } from '../../renderer/components/nodes/HabitNode/types';
+import { isValidYMD } from '../../shared/ymd';
 
 export interface HabitCtx {
   boardPath: string;
@@ -149,13 +150,6 @@ export async function cliAdd(ctx: HabitCtx, name: string | undefined): Promise<S
   };
 }
 
-/** True iff `s` is a real calendar date in strict `YYYY-MM-DD` form. */
-function isValidYMD(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const [y, m, d] = s.split('-').map(Number) as [number, number, number];
-  const dt = new Date(y, m - 1, d);
-  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
-}
 
 /**
  * `habit done` / `habit undo` — set (not toggle) a day's mark, so retrying a

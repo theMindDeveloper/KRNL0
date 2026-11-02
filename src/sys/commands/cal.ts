@@ -9,6 +9,7 @@ import type { ScheduledTaskPlacement } from '../../renderer/store/scheduleSelect
 import type { Board } from '../../shared/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode } from '../../shared/dispatch/types';
+import { isValidYMD } from '../../shared/ymd';
 
 export interface CalCtx {
   boardPath: string;
@@ -111,7 +112,7 @@ export function calView(
 ): SysResult {
   const views = ['day', 'week', 'month', 'year'];
   if (!view || !views.includes(view)) return { ok: false, message: 'cal view requires <day|week|month|year>' };
-  if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, message: `bad --date "${date}"` };
+  if (date !== undefined && !isValidYMD(date)) return { ok: false, message: `bad --date "${date}" (want a real YYYY-MM-DD date)` };
   const board = loadBoard(ctx);
   if (!board) return { ok: false, message: 'No board found' };
   const cal = board.nodes.find((n) => n.kind === 'calendar' && n.isMother);

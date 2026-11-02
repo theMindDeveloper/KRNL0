@@ -14,6 +14,7 @@ import type { ScheduledTaskPlacement } from '../../renderer/store/scheduleSelect
 import type { Board } from '../../shared/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
+import { isValidYMD, localYMD } from '../../shared/ymd';
 
 export interface ClockCtx {
   boardPath: string;
@@ -135,7 +136,10 @@ export async function clockShow(
   if (!clockNode) return { ok: false, message: 'No clock mother node found in board.' };
 
   const clockState = clockNode.state as ClockState;
-  const { selectedDate, viewWindow } = clockState;
+  const { viewWindow } = clockState;
+  // A bad stored day (written before dates were validated) must not make
+  // every later `clock show` throw — show today instead.
+  const selectedDate = isValidYMD(clockState.selectedDate) ? clockState.selectedDate : localYMD(new Date());
 
   // Window boundaries (minutes-of-day).
   const windowStartMin = viewWindow === 1 ? 720 : 0;

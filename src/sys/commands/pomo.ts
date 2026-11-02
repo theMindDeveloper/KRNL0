@@ -20,6 +20,7 @@ import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
 import { selectPomoReality } from '../../renderer/store/pomoReality';
 import { spanTagFor } from '../../renderer/store/spanTags';
+import { isValidYMD } from '../../shared/ymd';
 
 const VALID_FACES: readonly TimerFace[] = TIMER_FACES;
 function isTimerFace(v: unknown): v is TimerFace {
@@ -62,6 +63,11 @@ export function pomoStart(label?: string, minutes?: number): SysResult {
     if (prev.status === 'running' || prev.status === 'paused') {
       // fsmStart is a no-op here — say so instead of claiming a fresh start.
       result = { ok: false, message: `pomo is already ${prev.status}` };
+      return;
+    }
+    if (prev.status !== 'idle' && prev.status !== 'done') {
+      // fsmStart only starts from idle/done; during a break it is a no-op too.
+      result = { ok: false, message: `pomo is on a ${prev.status} — run 'krnl pomo resume' to get back to work` };
       return;
     }
     const cfg = node['config'] ?? {};
@@ -151,7 +157,7 @@ export function pomoStop(): SysResult {
 /** Issue #166 — transition running/paused → break, recording the work span. */
 export function pomoBreak(): SysResult {
   let found = false;
-  let msg = 'Switched to break';
+  let msg = 'No Pomodoro node found on the board';
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);
     if (!node) return;
@@ -161,6 +167,7 @@ export function pomoBreak(): SysResult {
       return;
     }
     node['state'] = fsmBreak(prev, {}, cliEnv());
+    msg = 'Switched to break';
     found = true;
   });
   if (!found) return { ok: false, message: msg };
@@ -305,7 +312,7 @@ export function pomoSegments(ctx: { boardPath: string }, opts: { date?: string; 
   const d = new Date();
   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const date = opts.date ?? today;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, message: `bad --date "${date}" (want YYYY-MM-DD)` };
+  if (!isValidYMD(date)) return { ok: false, message: `bad --date "${date}" (want YYYY-MM-DD)` };
   const dayStart = new Date(`${date}T00:00:00`).getTime();
   const dayEnd = dayStart + 86_400_000;
   const hm = (ms: number) => { const t = new Date(ms); return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; };
@@ -450,10 +457,10 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
     if (!node) return;
     const prev = (node['config'] ?? {}) as Partial<PomoConfig>;
     const next: Partial<PomoConfig> = { ...prev };
-    if (opts.session !== undefined && opts.session > 0) next.sessionMin = Math.round(opts.session);
-    if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.round(opts.short);
-    if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.round(opts.long);
-    if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.round(opts.every);
+    if (opts.session !== undefined && opts.session > 0) next.sessionMin = Math.max(1, Math.round(opts.session));
+    if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.max(1, Math.round(opts.short));
+    if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.max(1, Math.round(opts.long));
+    if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.max(1, Math.round(opts.every));
     if (opts.face === 'auto') delete next.face;
     else if (opts.face !== undefined) next.face = opts.face as TimerFace;
   if (opts.countStopped !== undefined) next.countStopped = opts.countStopped;
@@ -511,10 +518,10 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
 
   const prev = (node['config'] ?? {}) as Partial<PomoConfig>;
   const next: Partial<PomoConfig> = { ...prev };
-  if (opts.session !== undefined && opts.session > 0) next.sessionMin = Math.round(opts.session);
-  if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.round(opts.short);
-  if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.round(opts.long);
-  if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.round(opts.every);
+  if (opts.session !== undefined && opts.session > 0) next.sessionMin = Math.max(1, Math.round(opts.session));
+  if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.max(1, Math.round(opts.short));
+  if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.max(1, Math.round(opts.long));
+  if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.max(1, Math.round(opts.every));
   if (opts.face === 'auto') delete next.face;
   else if (opts.face !== undefined) next.face = opts.face as TimerFace;
   if (opts.countStopped !== undefined) next.countStopped = opts.countStopped;
