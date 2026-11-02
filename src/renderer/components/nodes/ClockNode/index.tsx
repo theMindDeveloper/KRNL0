@@ -88,9 +88,13 @@ function sectorPath(startH: number, endH: number, r: number): string {
 
 /** Format hour-float as "9:30am". */
 function fmtTime(h: number): string {
-  const hr = Math.floor(h);
-  const m = Math.round((h - hr) * 60);
-  const ampm = hr >= 12 && hr < 24 ? 'pm' : 'am';
+  // Whole minutes, wrapped into one day: a task that began yesterday
+  // (h < 0) or ends tomorrow (h > 24) shows its wall-clock time, and
+  // 9.9999 h reads 10:00, not 9:60.
+  const total = ((Math.round(h * 60) % 1440) + 1440) % 1440;
+  const hr = Math.floor(total / 60);
+  const m = total % 60;
+  const ampm = hr >= 12 ? 'pm' : 'am';
   const hr12 = ((hr + 11) % 12) + 1;
   return `${hr12}:${String(m).padStart(2, '0')}${ampm}`;
 }
@@ -141,8 +145,12 @@ const NUMERALS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
 // render as arcs in the clock; habits behave like events (no breakdown).
 interface TaskEntry {
   id: string;
-  start: number;   // hour-float, e.g. 9.5 = 9:30 AM
+  start: number;   // hour-float, e.g. 9.5 = 9:30 AM — clipped to the 12-hour window (drawing)
   end: number;
+  /** The real start / end (hours from the day start), unclipped — for the
+   *  times the list, menus and popups show and for "ended" (F5). */
+  realStart: number;
+  realEnd: number;
   name: string;
   /** Resolved CSS color (a `var(--token)` string). Tasks use their tone,
    *  habits use their habit color. Single source of truth — render code
@@ -292,13 +300,17 @@ export function ClockNode({
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
-      items: taskMenuItems({
-        id: taskId,
-        text: ts.text,
-        done: ts.done,
-        startMs: dayStart + startH * 3_600_000,
-        endMs: dayStart + endH * 3_600_000,
-      }),
+      items: taskMenuItems(
+        {
+          id: taskId,
+          text: ts.text,
+          done: ts.done,
+          startMs: dayStart + startH * 3_600_000,
+          endMs: dayStart + endH * 3_600_000,
+        },
+        // Same menu as the Calendar: Easy mode has no focus linking.
+        { easy, onDetails: () => setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: dayStart + startH * 3_600_000, endMs: dayStart + endH * 3_600_000 }) },
+      ),
     });
   };
   // Left-click a task (arc or list row) → what it is: name, plan, tracked time.
@@ -434,6 +446,8 @@ export function ClockNode({
         id: p.taskId,
         start: Math.max(startH, winLo),
         end: Math.min(endH, winHi),
+        realStart: startH,
+        realEnd: endH,
         name: info.text,
         colorVar: TONE_VAR[colorFor(p.taskId)],
         plannedMin: info.plannedMin,
@@ -460,6 +474,8 @@ export function ClockNode({
         id: `habit-${h.id}`,
         start: Math.max(startH, winLo),
         end: Math.min(endH, winHi),
+        realStart: startH,
+        realEnd: endH,
         name: h.name,
         colorVar: `var(--${h.color})`,
         plannedMin: durMin,
@@ -831,7 +847,7 @@ export function ClockNode({
               const arcs = tasks.flatMap((t, i) => {
                 // `ended` (faded arc) only makes sense for today — a 9am task
                 // on tomorrow is not "ended" at 3pm today.
-                const ended = isToday && nowFloat >= t.end;
+                const ended = isToday && nowFloat >= t.realEnd;
                 const active = i === activeIdx;
                 const opacity = ended ? 0.4 : 1;
                 const sw = stroke;
@@ -865,16 +881,16 @@ export function ClockNode({
                       strokeLinecap={cap}
                       pointerEvents="stroke"
                       style={{ cursor: 'pointer' }}
-                      onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
-                      onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                      onClick={(ev) => openTaskInfo(t.id, t.realStart, t.realEnd, ev)}
+                      onContextMenu={(ev) => openTaskMenu(t.id, t.realStart, t.realEnd, ev)}
                     >
-                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)} · click for details, right-click for actions`}</title>
+                      <title>{`${t.name} · ${fmtTime(t.realStart)}–${fmtTime(t.realEnd)} · click for details, right-click for actions`}</title>
                     </path>
                     <path
                       data-testid="clock-plan-arc"
                       data-task-id={t.id}
-                      onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
-                      onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                      onClick={(ev) => openTaskInfo(t.id, t.realStart, t.realEnd, ev)}
+                      onContextMenu={(ev) => openTaskMenu(t.id, t.realStart, t.realEnd, ev)}
                       d={arcPath(s, e, r)}
                       fill="none"
                       stroke={t.colorVar}
@@ -884,7 +900,7 @@ export function ClockNode({
                       data-hovered={hovered ? 'true' : undefined}
                       style={{ ...activeStyle, cursor: 'context-menu', transition: 'opacity 120ms, filter 120ms', filter: hovered ? 'brightness(1.35)' : undefined }}
                     >
-                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)}`}</title>
+                      <title>{`${t.name} · ${fmtTime(t.realStart)}–${fmtTime(t.realEnd)}`}</title>
                     </path>
                   </g>
                 );
@@ -1277,7 +1293,7 @@ export function ClockNode({
           revealIndex={activeIdx}
         >
           {tasks.map((t, i) => {
-            const ended = isToday && nowFloat >= t.end;
+            const ended = isToday && nowFloat >= t.realEnd;
             const on    = i === activeIdx;
             // Strike through only what is actually done; a past task that is
             // still open is just dimmed (striking it read as "finished").
@@ -1286,8 +1302,8 @@ export function ClockNode({
               <div
                 key={t.id}
                 data-testid="clock-task-row"
-                onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
-                onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                onClick={(ev) => openTaskInfo(t.id, t.realStart, t.realEnd, ev)}
+                onContextMenu={(ev) => openTaskMenu(t.id, t.realStart, t.realEnd, ev)}
                 onPointerEnter={() => setHoverTaskId(t.id)}
                 onPointerLeave={() => setHoverTaskId((h) => (h === t.id ? null : h))}
                 style={{
@@ -1323,7 +1339,7 @@ export function ClockNode({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {fmtTime(t.start)}
+                  {fmtTime(t.realStart)}
                 </span>
                 {/* Name */}
                 <span
