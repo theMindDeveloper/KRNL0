@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/krnl0-social-preview.png" alt="krnl0 — One canvas. Every productivity app. Single source of truth." width="100%" />
+<img src="docs/assets/krnl0-banner.png" alt="KRNL0 — open source, terminal-wired Life OS" width="100%" />
 <img src="docs/assets/stationMODEUpdate.jpg" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges"/>
 <img src="docs/assets/dockupdate.png" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges"/>
 
