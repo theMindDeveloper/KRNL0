@@ -198,8 +198,10 @@ export function PagedView({
         <div
           ref={contentRef}
           style={{
-            transform: `translateY(${-start}px)`,
-            transition: 'transform 180ms ease',
+            // margin, not transform: a transformed layer inside the zoomed
+            // canvas is rasterised then scaled (blurry text). Whole pixels only.
+            marginTop: -Math.round(start),
+            transition: 'margin-top 180ms ease',
             ...(fillItems ? { ['--page-h' as string]: `${Math.max(0, boxH - (itemCount > 1 && showPager ? PAGER_H : 0))}px` } : {}),
             ...contentStyle,
           }}
