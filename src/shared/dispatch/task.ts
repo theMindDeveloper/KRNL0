@@ -28,9 +28,8 @@ import {
   taskToggle as fsmTaskToggle,
 } from '../../renderer/components/nodes/TaskNode/commands';
 import {
-  pomoCancel as fsmPomoCancel,
   pomoClearActiveTask as fsmPomoClearActiveTask,
-  pomoSkipBreak as fsmPomoSkipBreak,
+  pomoStop as fsmPomoStop,
 } from '../../renderer/components/nodes/PomoNode/commands';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -124,15 +123,10 @@ export function deleteTaskCascade(
   if (pomoNode) {
     const ps = pomoNode.state as PomoState;
     if (ps.activeTaskId !== null && allDescendants.has(ps.activeTaskId)) {
-      let cancelledState = ps;
-      // pomoCancel only covers running/paused; pomoSkipBreak transitions a
-      // 'break' status back to idle. Without that branch, deleting a task
-      // mid-break would leave the break timer ticking on a phantom session.
-      if (ps.status === 'running' || ps.status === 'paused') {
-        cancelledState = fsmPomoCancel(ps);
-      } else if (ps.status === 'break') {
-        cancelledState = fsmPomoSkipBreak(ps);
-      }
+      // pomoStop records the in-flight span with its real length (a break as
+      // a break) and goes idle from running, paused or break — so deleting a
+      // task mid-session neither loses the time nor books the session cap.
+      const cancelledState = ps.status === 'idle' ? ps : fsmPomoStop(ps);
       // Pass the pomo mother's live config so durationMin/breakMin snap back
       // to user-configured defaults — without this, a deleted task left the
       // pomo stuck on the task's per-session minutes (user report 2026-05-18).

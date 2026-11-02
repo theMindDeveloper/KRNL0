@@ -278,6 +278,26 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       const pomoNode = finalBoard.nodes.find((n) => n.kind === 'pomo')!;
       const cfg = pomoNode.config as { sessionMin: number };
       expect(cfg.sessionMin).toBe(15);
+      // The idle timer shows the new length, and the next START runs at it.
+      expect(getPomoState().durationMin).toBe(15);
+      makeCommandHandler('pomo-mother')('pomo.start');
+      expect(getPomoState().status).toBe('running');
+      expect(getPomoState().durationMin).toBe(15);
+    });
+
+    it('A4: ticking the active task done in the Todo list stops the pomo too', () => {
+      const board = makeBoardWithTasks({
+        pomoState: { status: 'running', startedAt: new Date(Date.now() - 120_000).toISOString(), activeTaskId: 'task-a', label: 'Task A', durationMin: 25 },
+      });
+      useBoardStore.getState().setBoard(board);
+
+      makeCommandHandler('todo-mother')('todo.toggle', { id: 'item-1' });
+
+      const ps = getPomoState();
+      expect(ps.status).toBe('idle');
+      expect(ps.activeTaskId).toBeNull();
+      expect(ps.history).toHaveLength(1);
+      expect(ps.history[0]!.durationMin).toBe(2);
     });
 
   });
@@ -451,9 +471,11 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
 
   // ── Group F — Done while active (Bug #3) ──────────────────────────────────────
 
-  describe('Group F — Marking active task done cancels pomo and commits elapsed', () => {
+  // Updated for time-model F2: tracked time lives in the pomo history, so the
+  // stop records the real span and writes nothing onto the task.
+  describe('Group F — Marking active task done stops the pomo and records the real span', () => {
 
-    it('F1: Given pomo running task A for ~60s, when task.toggle marks A done, then pomo=idle, activeTaskId=null, one cancelled record, secondsAccumulated≈60', () => {
+    it('F1: Given pomo running task A for ~60s, when task.toggle marks A done, then pomo=idle, activeTaskId=null, one 1-minute record tagged A', () => {
       const startedAt = new Date(Date.now() - 60_000).toISOString();
       const board = makeBoardWithTasks({
         pomoState: {
@@ -474,14 +496,35 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(ps.history).toHaveLength(1);
       expect(ps.history[0]!.completed).toBe(false);
 
+      expect(ps.history[0]!.durationMin).toBe(1);
+      expect(ps.history[0]!.taskId).toBe('task-a');
+
       const ts = getTaskState('task-a');
       expect(ts.done).toBe(true);
-      expect(ts.secondsAccumulated).toBeGreaterThanOrEqual(58);
-      expect(ts.secondsAccumulated).toBeLessThanOrEqual(62);
-      expect(ts.currentSessionElapsedSec).toBe(0);
+      expect(ts.secondsAccumulated ?? 0).toBe(0);
     });
 
-    it('F2: Given pomo paused on task A with pausedElapsedMs=30000, when task.toggle marks A done, then pomo=idle and secondsAccumulated≈30', () => {
+    it('F1b: in Observe mode the record is the time worked, not the 24 h span cap', () => {
+      const board = makeBoardWithTasks({
+        pomoState: {
+          status: 'running',
+          startedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+          activeTaskId: 'task-a',
+          label: 'Task A',
+          durationMin: 24 * 60,
+        },
+      });
+      useBoardStore.getState().setBoard(board);
+
+      makeCommandHandler('task-a')('task.toggle');
+
+      const ps = getPomoState();
+      expect(ps.history).toHaveLength(1);
+      expect(ps.history[0]!.durationMin).toBe(5);
+      expect(ps.history[0]!.completed).toBe(false);
+    });
+
+    it('F2: Given pomo paused on task A with pausedElapsedMs=30000, when task.toggle marks A done, then pomo=idle and the pre-pause span is recorded', () => {
       const nowMs = Date.now();
       const board = makeBoardWithTasks({
         taskA: { currentSessionElapsedSec: 30 },
@@ -503,10 +546,11 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(ps.status).toBe('idle');
       expect(ps.activeTaskId).toBeNull();
 
+      expect(ps.history).toHaveLength(1);
+      expect(ps.history[0]!.endedAt).toBe(new Date(nowMs).toISOString());
+
       const ts = getTaskState('task-a');
       expect(ts.done).toBe(true);
-      expect(ts.secondsAccumulated).toBeGreaterThanOrEqual(28);
-      expect(ts.secondsAccumulated).toBeLessThanOrEqual(32);
     });
 
   });

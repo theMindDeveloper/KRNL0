@@ -36,6 +36,8 @@ export const pomoStart = (
     ...state,
     status: 'running',
     startedAt: toIso(env.now()),
+    // A start from idle/done is a fresh pomodoro: no worked time carries over.
+    sessionWorkSec: 0,
     label: args.label ?? state.label,
     durationMin: args.durationMin ?? state.durationMin,
     activeTaskId:
@@ -124,11 +126,17 @@ export const pomoCancel = (
     state.status === 'paused' && state.pausedAt !== null
       ? state.pausedAt
       : toIso(env.now());
+  // The minutes actually spanned, never the configured session length (in
+  // Observe mode that is the 24 h cap, which analytics would sum as work).
+  const durationMin =
+    state.status === 'paused'
+      ? Math.max(0, Math.round(state.pausedElapsedMs / 60_000))
+      : Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(state.startedAt)) / 60_000));
   const record: PomoSessionRecord = {
     id: env.uuid(),
     startedAt: state.startedAt,
     endedAt,
-    durationMin: state.durationMin,
+    durationMin,
     label: state.label,
     completed: false,
     taskId: state.activeTaskId,
@@ -141,6 +149,7 @@ export const pomoCancel = (
     startedAt: null,
     pausedAt: null,
     pausedElapsedMs: 0,
+    sessionWorkSec: 0,
     history: [...state.history, record],
   };
 };
@@ -166,7 +175,9 @@ export const pomoComplete = (
     id: env.uuid(),
     startedAt: state.startedAt,
     endedAt: toIso(now),
-    durationMin: state.durationMin,
+    // This span only: work before a pause was already recorded on resume, so
+    // the session length here would count those minutes twice.
+    durationMin: spanMin(state.startedAt, now),
     label: state.label,
     completed: true,
     taskId: state.activeTaskId,
@@ -181,6 +192,7 @@ export const pomoComplete = (
       ...state,
       status: 'done',
       startedAt: null,
+      sessionWorkSec: 0,
       sessionsCompleted: nextSessions,
       history: [...state.history, record],
     };
@@ -191,6 +203,7 @@ export const pomoComplete = (
     ...state,
     status: 'break',
     startedAt: toIso(now),
+    sessionWorkSec: 0,
     sessionsCompleted: nextSessions,
     breakMin,
     history: [...state.history, record],

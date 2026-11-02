@@ -248,12 +248,11 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         observeMode ? pomoDropBlips(s as unknown as PomoState, next) : next;
       switch (command) {
         case 'pomo.start': {
-          // Observe mode has no session length; leaving it restores the configured one.
-          const cur = s as unknown as PomoState;
-          const durationMin = observeMode
-            ? OBSERVE_SPAN_MIN
-            : cur.durationMin === OBSERVE_SPAN_MIN ? pomoCfg.sessionMin : undefined;
-          return { state: pomoStart(s as never, { ...(args as object), ...(durationMin !== undefined && args['durationMin'] === undefined ? { durationMin } : {}) }) };
+          // A fresh start runs at the pomo's own session length (time-model
+          // F3/F12), so a Session change in the gear takes effect on the next
+          // START. Observe mode has no session length.
+          const durationMin = startDurationMin(pomoCfg, observeMode);
+          return { state: pomoStart(s as never, { ...(args as object), ...(args['durationMin'] === undefined ? { durationMin } : {}) }) };
         }
         case 'pomo.pause':    return { state: pomoPause(s as never) };
         case 'pomo.resume':   return { state: observeBlips(pomoResume(s as never)) };
@@ -278,7 +277,17 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.break':    return { state: observeBlips(pomoBreak(s as never)) };
         case 'pomo.extend':   return { state: pomoExtend(s as never) };
         case 'pomo.stop':     return { state: observeBlips(pomoStop(s as never)) };
-        case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
+        case 'pomo.setConfig': {
+          const config = pomoSetConfig(pomoCfg, args as never);
+          // An idle timer shows its next session length; keep it in step.
+          const cur = s as unknown as PomoState;
+          const nextObserve = config.mode === 'observe' || isEasyBoard(useBoardStore.getState().board);
+          const idleMin = startDurationMin(config, nextObserve);
+          if ((cur.status === 'idle' || cur.status === 'done') && cur.durationMin !== idleMin) {
+            return { config, state: { ...cur, durationMin: idleMin } as unknown as Node['state'] };
+          }
+          return { config };
+        }
         case 'pomo.setFace':   return { config: pomoSetFace(pomoCfg, args as { face: TimerFace }) };
         case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never, pomoCfg) };
         case 'pomo.deleteSegment': return { state: pomoDeleteSegment(s as never, args as never) };
@@ -658,7 +667,9 @@ function tagPomo(taskNodeId: string | null, opts: { start: boolean }): void {
   });
   if (opts.start && (next.status === 'idle' || next.status === 'done')) {
     const cfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
-    next = pomoStart(next, { durationMin: cfg.sessionMin });
+    // Observe / Easy mode has no session length: a 25-min threshold would
+    // flag an ordinary span as a completed pomodoro.
+    next = pomoStart(next, { durationMin: startDurationMin(cfg, cfg.mode === 'observe' || isEasyBoard(board)) });
     emit('pomo.start', `pomo started${taskNodeId ? ` on ${shortId(taskNodeId)}` : ''}`, taskNodeId ? { refId: taskNodeId } : {});
   }
   updateNode(pomoNode.id, { state: next });
@@ -689,6 +700,30 @@ function plannedTaskAt(board: Board, nowMs: number): string | null {
 /** Short id for log lines — keeps text under the 120-char cap. */
 function shortId(id: string): string {
   return id.startsWith('mother-') ? id : id.slice(0, 10);
+}
+
+/** Session length a fresh pomo START runs at. */
+function startDurationMin(cfg: PomoConfig, observe: boolean): number {
+  return observe ? OBSERVE_SPAN_MIN : cfg.sessionMin;
+}
+
+/**
+ * A task was ticked done (on its card, its Todo row or a Calendar/Clock popup)
+ * while the pomo is on it: stop the pomo and untag it. pomoStop records the
+ * span with its real length (a break is recorded as a break), so analytics
+ * get the minutes actually worked, never the session cap. No task fields are
+ * written: tracked time is derived from the pomo history (time-model F2).
+ */
+function stopPomoOnFinishedTask(taskId: string): void {
+  const { board, updateNode } = useBoardStore.getState();
+  const pomoNode = board?.nodes.find((n) => n.kind === 'pomo');
+  if (!pomoNode) return;
+  const ps = pomoNode.state as PomoState;
+  if (ps.activeTaskId !== taskId || ps.status === 'idle') return;
+  const pomoCfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
+  // Pass config so durationMin/breakMin snap back to user defaults
+  // (matches task-delete and task.loadIntoPomo toggle-off paths).
+  updateNode(pomoNode.id, { state: pomoClearActiveTask(pomoStop(ps), pomoCfg) });
 }
 
 export function makeCommandHandler(nodeId: string) {
@@ -1465,6 +1500,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
               updateNode(prevItem.taskNodeId, { state: mirrored });
               // #169 — keep the completion ledger in sync with the mirrored node.
               syncCompletionLedger(prevItem.taskNodeId);
+              // Same as ticking the card: a finished task stops the pomo on it.
+              if (nextItem.done) stopPomoOnFinishedTask(prevItem.taskNodeId);
             }
           }
         }
@@ -1580,54 +1617,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         }
       }
 
-      // Bug #3: if task is now done AND it's the active pomo task, cancel the session.
-      // We bypass the pomo.cancel dispatcher branch (which writes secondsAccumulated),
-      // so do the same commit inline so the in-flight elapsed time is not lost.
-      if (nextTask.done === true) {
-        const freshBoard = useBoardStore.getState().board;
-        const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
-        if (pomoNode) {
-          const ps = pomoNode.state as PomoState;
-          if (ps.activeTaskId === nodeId && ps.status !== 'idle') {
-            const pomoCfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
-            // pomoCancel covers running/paused; pomoSkipBreak covers break.
-            // Without skipBreak, marking a task done mid-break would orphan
-            // the break timer (status stays 'break' with no active task).
-            let cancelledState = ps;
-            if (ps.status === 'running' || ps.status === 'paused') {
-              cancelledState = pomoCancel(cancelledState);
-            } else if (ps.status === 'break') {
-              cancelledState = pomoSkipBreak(cancelledState);
-            }
-            // Pass config so durationMin/breakMin snap back to user defaults
-            // (matches task-delete and task.loadIntoPomo toggle-off paths).
-            cancelledState = pomoClearActiveTask(cancelledState, pomoCfg);
-            updateNode(pomoNode.id, { state: cancelledState });
-
-            // Commit the just-cancelled session's elapsed time into the task.
-            const newest = cancelledState.history[cancelledState.history.length - 1];
-            if (newest) {
-              const elapsedSec = Math.max(
-                0,
-                Math.floor((Date.parse(newest.endedAt) - Date.parse(newest.startedAt)) / 1000),
-              );
-              const freshTask = useBoardStore
-                .getState()
-                .board?.nodes.find((n) => n.id === nodeId);
-              if (freshTask && freshTask.kind === 'todo.task') {
-                const ts = freshTask.state as TaskState;
-                updateNode(nodeId, {
-                  state: {
-                    ...ts,
-                    secondsAccumulated: (ts.secondsAccumulated ?? 0) + elapsedSec,
-                    currentSessionElapsedSec: 0,
-                  },
-                });
-              }
-            }
-          }
-        }
-      }
+      // Bug #3: a task ticked done while the pomo is on it stops the pomo.
+      if (nextTask.done === true) stopPomoOnFinishedTask(nodeId);
 
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
