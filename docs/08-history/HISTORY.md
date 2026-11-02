@@ -934,3 +934,19 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Canvas / UI:** text-note Escape restores the pre-edit text after autosave; refused image drops say why; double-click renames a canvas; light-theme contrast fixes (primary buttons, Orb/Commander, analytics tiles, danger red, pomo toggle) and no left-edge accent bars in the radio.
 
 **Tests:** see the batch report; new tests in `tests/unit/{main,sys,renderer}` and `tests/integration`.
+
+---
+
+## [2026-11-03] — Autonomous bug-fix pass (batch 2)
+
+**Type:** Bug Fix
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `753b7dc` … `84e1184`
+**Files changed:** `shared/boardMerge.ts` (new), `main/ipc/handlers.ts`, `shared/dispatch/task.ts`, `Canvas/commandDispatch.ts`, `PomoNode/index.tsx`, `TodoNode/commands.ts`, `HabitLaneNode/index.tsx`, `store/useCliDispatch.ts`, `sys/{parser,SysFacade}.ts`, `sys/commands/{task,pomo,info,theme}.ts`, tests
+**Summary:**
+- **Edits survive a CLI write:** a renderer save that arrives after the CLI / AI terminal changed `board.json` is three-way merged (per node, edge, stroke, canvas and completion; the user's changed items win) instead of being refused and thrown away on reload.
+- **One name everywhere:** renaming a Todo row renames its task card, calendar block, pomo label and ledger entry, and the other way round (`renameTask`, shared with `krnl task edit`).
+- **Easy mode:** START never links a span to a task left over from Advanced, and the header doesn't show one. Observe / Easy no longer shows a gear that opened an empty panel.
+- **Terminal:** a page reload, renderer crash or closed window kills that page's shells instead of leaking one per reload.
+- **CLI parity:** `task subtask` creates and links its Todo row; `task subtask` / `task addNext` without a duration are open-ended like the canvas; `krnl cal --from …`, `clock --json` etc. run the default subcommand; `theme show`, `info` and `settings show` report the window's real light/dark theme.
+- **Todo:** open items are never hidden by the 50-row cap. **Habit lane:** rolls over at midnight.
