@@ -7,6 +7,7 @@
 // so the legend has room.
 
 import { useId } from 'react';
+import { fitArcLabel, fitCircleLabel } from './common';
 
 export interface DonutSlice {
   id: string;
@@ -118,12 +119,21 @@ export function DonutChart({
       acc = end;
       const color = d.color || DEFAULT_PALETTE[i % DEFAULT_PALETTE.length]!;
       const path = arcPath(cx, cy, rOuter, rInner, start, end);
-      const mid = start + sweep / 2;
-      const labelR = (rOuter + rInner) / 2;
-      const labelPos = polar(cx, cy, labelR, mid);
       const pct = (d.value / total) * 100;
-      return { ...d, color, path, pct, labelPos, start, end };
+      // Text containment rule (charts/common.ts): the % label is shrunk until
+      // it sits wholly inside its slice, or dropped (the legend still has it).
+      const fit = fitArcLabel({ text: `${Math.round(pct)}%`, rOuter, rInner, start, end, maxFont: 10 });
+      const pctLabel = fit ? { x: cx + fit.x, y: cy + fit.y, fontSize: fit.fontSize } : null;
+      return { ...d, color, path, pct, pctLabel, start, end };
     });
+
+  // Centre text obeys the same containment rule against the donut hole.
+  const primaryFont = centerPrimary && rInner > 0
+    ? fitCircleLabel(centerPrimary, rInner, Math.max(14, Math.round(rInner * 0.4)), centerSecondary ? 6 : 0, -0.02)
+    : null;
+  const secondaryFont = centerSecondary && rInner > 0
+    ? fitCircleLabel(centerSecondary.toUpperCase(), rInner, 9, 14, 0.1)
+    : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -164,14 +174,16 @@ export function DonutChart({
             <title>{`${sl.label} · ${formatValue ? formatValue(sl.value) : sl.value} (${sl.pct.toFixed(1)}%)`}</title>
           </path>
         ))}
-        {/* Slice percentage labels — only when slice is wide enough to fit */}
+        {/* Slice percentage labels — only where they fit inside the slice */}
         {slices.map((sl) =>
-          sl.pct >= 8 ? (
+          sl.pctLabel ? (
             <text
               key={`${sl.id}-label`}
-              x={sl.labelPos.x}
-              y={sl.labelPos.y + 3}
-              fontSize={10}
+              data-testid="donut-slice-label"
+              x={sl.pctLabel.x}
+              y={sl.pctLabel.y}
+              fontSize={sl.pctLabel.fontSize}
+              dominantBaseline="central"
               textAnchor="middle"
               fill="#ffffff"
               fontFamily="var(--font-mono)"
@@ -185,11 +197,13 @@ export function DonutChart({
         {/* Center label (donut only) */}
         {rInner > 0 && (
           <>
-            {centerPrimary && (
+            {centerPrimary && primaryFont !== null && (
               <text
+                data-testid="donut-center-primary"
                 x={cx}
-                y={cy + (centerSecondary ? -2 : 5)}
-                fontSize={Math.max(14, Math.round(rInner * 0.4))}
+                y={cy + (centerSecondary ? -6 : 0)}
+                dominantBaseline="central"
+                fontSize={primaryFont}
                 textAnchor="middle"
                 fill="var(--k-an-ink, #f4f6f8)"
                 fontFamily="var(--font-mono)"
@@ -199,11 +213,12 @@ export function DonutChart({
                 {centerPrimary}
               </text>
             )}
-            {centerSecondary && (
+            {centerSecondary && secondaryFont !== null && (
               <text
                 x={cx}
                 y={cy + 14}
-                fontSize={9}
+                dominantBaseline="central"
+                fontSize={secondaryFont}
                 textAnchor="middle"
                 fill="var(--k-an-ink-3, #9aa1a8)"
                 fontFamily="var(--font-mono)"

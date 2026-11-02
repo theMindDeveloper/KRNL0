@@ -10,6 +10,7 @@ import type { BoardLike } from '../../renderer/analytics/types';
 import { computeEstimates, describeAccuracy } from '../../renderer/analytics/estimates';
 import { summarizeAnalytics } from '../../renderer/analytics/summary';
 import { addDays } from '../../renderer/analytics/dateRange';
+import { computeTagBreakdown } from '../../renderer/analytics/tags';
 import type { Board } from '../../shared/types';
 
 // Register sources once — idempotent guard inside registerBuiltinSources.
@@ -40,6 +41,7 @@ export async function analyticsShow(
   const today = todayLocal();
   const range = lastNDays(rangeDays, today);
   if (opts.view === 'estimates') return analyticsEstimates(ctx, rangeDays, range, opts.json === true);
+  if (opts.view === 'tags') return analyticsTags(ctx, rangeDays, range, opts.json === true);
 
   const board = loadBoard(ctx);
   const engine = buildAnalytics(board);
@@ -66,6 +68,36 @@ export async function analyticsShow(
 }
 
 /** Plan vs actual — estimate vs tracked per task, planned vs worked per day. */
+// ADR 0016 — where the time went, by tag (same numbers as the AnalyticsNode "Time" view).
+function analyticsTags(
+  ctx: AnalyticsCtx,
+  rangeDays: number,
+  range: { start: string; end: string },
+  json: boolean,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as Record<string, unknown> | null;
+  const board = {
+    nodes: Array.isArray(raw?.['nodes']) ? raw!['nodes'] : [],
+    edges: Array.isArray(raw?.['edges']) ? raw!['edges'] : [],
+    completions: Array.isArray(raw?.['completions']) ? raw!['completions'] : [],
+  } as unknown as Board;
+  const res = computeTagBreakdown(board, range, Date.now());
+  if (json) {
+    const payload = { range: { days: rangeDays, start: range.start, end: range.end }, ...res };
+    return { ok: true, message: JSON.stringify(payload), data: payload };
+  }
+  const lines = [
+    `time by tag — last ${rangeDays} days (${range.start} → ${range.end})`,
+    `  ${res.totalCount} tasks done · ${res.totalMin} min`,
+    '',
+    ...res.tags.map((t) =>
+      `  ${t.label.padEnd(14)} ${String(t.minutes).padStart(5)} min  ${String(Math.round(t.share * 100)).padStart(3)}%  (${t.count} task${t.count === 1 ? '' : 's'})`,
+    ),
+  ];
+  if (res.tags.length === 0) lines.push('  no completed tasks in range');
+  return { ok: true, message: lines.join('\n'), data: res };
+}
+
 function analyticsEstimates(
   ctx: AnalyticsCtx,
   rangeDays: number,

@@ -12,7 +12,10 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined }
   | { kind: 'pomo'; sub: 'delete-segment'; segmentId: string | undefined }
   | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
-  | { kind: 'todo'; sub: 'list'; json: boolean }
+  | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
+  | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
+  | { kind: 'todo'; sub: 'tags'; action: string | undefined; label: string | undefined; keywords: string | undefined; color: string | undefined; json: boolean }
+  | { kind: 'todo'; sub: 'archive' | 'clear-archive' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
   | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
   | { kind: 'task'; sub: 'list'; todoId: string | undefined; json: boolean }
@@ -168,6 +171,7 @@ function positiveNum(raw: string | undefined, what: string): number | undefined 
 /** Flags that never take a value — everything else consumes the next token. */
 const BOOLEAN_FLAGS = new Set([
   'json', 'child', 'clear', 'daily', 'force', 'mother', 'weekdays', 'weekly', 'delete',
+  'all', 'archived', 'done',
 ]);
 
 /**
@@ -302,7 +306,27 @@ export class SysParser {
     }
 
     if (cmd === 'todo') {
-      if (sub === 'list')  return { kind: 'todo', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'list') {
+        const scope = hasFlag(rest, 'all') ? 'all'
+          : hasFlag(rest, 'archived') ? 'archived'
+            : hasFlag(rest, 'done') ? 'done'
+              : 'today';
+        return { kind: 'todo', sub: 'list', json: hasFlag(rest, 'json'), scope };
+      }
+      // ADR 0016 — tags + archive.
+      if (sub === 'tag') return { kind: 'todo', sub: 'tag', ref: rest[0], tag: rest[1] };
+      if (sub === 'tags') {
+        return {
+          kind: 'todo', sub: 'tags',
+          action: rest[0] !== undefined && !rest[0].startsWith('--') ? rest[0] : undefined,
+          label: rest[1] !== undefined && !rest[1].startsWith('--') ? rest[1] : undefined,
+          keywords: flag(rest, 'keywords'),
+          color: flag(rest, 'color'),
+          json: hasFlag(rest, 'json'),
+        };
+      }
+      if (sub === 'archive') return { kind: 'todo', sub: 'archive' };
+      if (sub === 'clear-archive') return { kind: 'todo', sub: 'clear-archive' };
       if (sub === 'check') return { kind: 'todo', sub: 'check', id: rest[0] };
       if (sub === 'add') {
         return { kind: 'todo', sub: 'add', text: rest[0], tag: flag(rest, 'tag') };

@@ -206,9 +206,14 @@ krnl task chain <ref1> <ref2> [...]    # wire task.next → task.activate betwee
 
 ### Todos — items on the mother TodoNode
 ```
-krnl todo add "<text>" [--tag <label>]
-krnl todo check <ref>
-krnl todo list [--json]
+krnl todo add "<text>" [--tag <label>]   # untagged adds are auto-tagged
+krnl todo check <ref>                      # done -> "Done" today, "Archive" from tomorrow
+krnl todo list [--done|--archived|--all] [--json]   # default: open + done today
+krnl todo tag <ref> <tag|auto>             # hand-tag (unknown label = new custom tag); auto = classifier
+krnl todo tags [list|add "<label>" [--keywords a,b]|remove <id>] [--json]
+krnl todo archive                          # archive done items now
+krnl todo clear-archive                    # delete archived rows + task nodes (analytics kept)
+krnl analytics show --view tags [--range N] [--json]   # time by tag
 ```
 
 ### Habits — see "Habits" model above

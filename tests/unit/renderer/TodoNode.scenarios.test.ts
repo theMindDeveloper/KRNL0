@@ -10,11 +10,18 @@
  * to honour the constraint "DO NOT add Handle imports to the component body."
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 // Clean up jsdom between each test so elements don't bleed across scenarios.
 afterEach(() => cleanup());
+// ADR 0016 — done items only stay in "Done" on their completion day, so pin
+// "today" to the fixtures' day; otherwise they'd render under Archive.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-05-10T13:00:00.000Z'));
+});
+afterEach(() => vi.useRealTimers());
 import React from 'react';
 
 import { TodoNode } from '../../../src/renderer/components/nodes/TodoNode';
@@ -66,6 +73,10 @@ function renderTodoNode(
       onSelect: vi.fn(),
     })
   );
+  // ADR 0016 — done items live in a collapsed "Done" dropdown; open it so
+  // the row-level scenarios below can see them.
+  const doneToggle = screen.queryByTestId('todo-done-toggle');
+  if (doneToggle) fireEvent.click(doneToggle);
 }
 
 // ── Background state builders ─────────────────────────────────────────────────
@@ -138,17 +149,19 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
       s = todoAdd(s, { text: 'tagged', tag: 'WORK' }, envAt(T1, 'id-t'));
       s = todoAdd(s, { text: 'untagged' }, envAt(T2, 'id-u'));
       renderTodoNode(s);
+      // ADR 0016 — every row gets a tag button; untagged rows show "+".
       const tags = document.querySelectorAll('.todo-tag');
-      expect(tags.length).toBe(1);
+      expect(tags.length).toBe(2);
       expect(tags[0]?.textContent).toBe('WORK');
+      expect(tags[1]?.textContent).toBe('+');
     });
 
-    it('truncates tag to at most 4 characters', () => {
+    it('shows a built-in tag by its label, not its id', () => {
       let s = defaultTodoState();
-      s = todoAdd(s, { text: 'long-tag', tag: 'TOOLONG' }, envAt(T1, 'id-x'));
+      s = todoAdd(s, { text: 'fix the login bug' }, envAt(T1, 'id-x'));
       renderTodoNode(s);
       const tag = document.querySelector('.todo-tag');
-      expect(tag?.textContent?.length).toBeLessThanOrEqual(4);
+      expect(tag?.textContent).toBe('Code');
     });
   });
 
@@ -261,8 +274,9 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
     });
   });
 
-  // ── F6 — Clear done dispatches todo.clearDone ─────────────────────────────
-  describe('F6 — Clear done dispatches todo.clearDone', () => {
+  // ── F6 — Archive done (was "clear done") ─────────────────────────────────
+  // ADR 0016: the header button now archives instead of deleting.
+  describe('F6 — Archive done dispatches todo.archiveDone', () => {
     it('shows the clear done button when at least one item is done', () => {
       const state = makeBackground();
       renderTodoNode(state);
@@ -270,13 +284,13 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
       expect(btn).not.toBeNull();
     });
 
-    it('dispatches todo.clearDone when clear done is activated', () => {
+    it('dispatches todo.archiveDone when the button is activated', () => {
       const onCommand = vi.fn();
       const state = makeBackground();
       renderTodoNode(state, onCommand);
       const btn = screen.getByTestId('clear-done-btn');
       fireEvent.click(btn);
-      expect(onCommand).toHaveBeenCalledWith('todo.clearDone');
+      expect(onCommand).toHaveBeenCalledWith('todo.archiveDone');
     });
 
     it('does not show the clear done button when no items are done', () => {

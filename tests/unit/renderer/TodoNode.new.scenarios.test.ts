@@ -72,6 +72,9 @@ function renderTodoNode(
       onSelect: vi.fn(),
     }),
   );
+  // ADR 0016 — open the Done dropdown so done rows are in the DOM.
+  const doneToggle = screen.queryByTestId('todo-done-toggle');
+  if (doneToggle) fireEvent.click(doneToggle);
 }
 
 // ── F14 — todoLinkTask FSM sets taskNodeId on item ───────────────────────────
@@ -245,7 +248,8 @@ describe('F10 — Row text click does not load or retag the pomo', () => {
     let s = defaultTodoState();
     s = todoAdd(s, { text: 'linked task' }, envAt(T1, 'item-1'));
     s = todoLinkTask(s, { itemId: 'item-1', taskNodeId: 'task-abc' });
-    s = todoToggle(s, { id: 'item-1' }, envAt(T2));
+    // Completed "now" so it sits in today's Done, not the Archive.
+    s = todoToggle(s, { id: 'item-1' }, envAt(new Date().toISOString()));
     renderTodoNode(s, onCommand);
     const textEl = document.querySelector('.todo-text') as HTMLElement;
     fireEvent.click(textEl);

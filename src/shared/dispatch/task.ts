@@ -21,7 +21,9 @@ import type { PomoConfig, PomoState } from '../../renderer/components/nodes/Pomo
 import {
   todoRemove as fsmTodoRemove,
   todoToggle as fsmTodoToggle,
+  tagExamples,
 } from '../../renderer/components/nodes/TodoNode/commands';
+import { classifyTask, mergeTagLibrary } from '../tags/classify';
 import {
   taskToggle as fsmTaskToggle,
 } from '../../renderer/components/nodes/TaskNode/commands';
@@ -208,14 +210,34 @@ export function syncCompletion(board: BoardShape, taskId: string): void {
   if (!node) return;
   const ts = node.state as TaskState;
   const ledger = board['completions'] as CompletionRecord[] | undefined;
+  const tag = ts.done && ts.completedAt ? completionTagFor(board, ts) : undefined;
   board['completions'] = ts.done && ts.completedAt
     ? ledgerRecord(ledger, {
         taskId,
         text: ts.text,
         plannedMin: ts.plannedMin ?? ts.durationMin ?? 25,
         completedAt: ts.completedAt,
+        ...(tag !== undefined ? { tag } : {}),
       })
     : ledgerClear(ledger, taskId);
+}
+
+/**
+ * ADR 0016 — the tag a completion is filed under: the linked TodoItem's tag,
+ * else the task's own legacy tag, else a fresh classification of its text (so
+ * subtasks without a Todo row still land in a category).
+ */
+export function completionTagFor(
+  board: { nodes: ReadonlyArray<{ id: string; kind: string; state: unknown }> },
+  ts: Pick<TaskState, 'text' | 'parentTodoId' | 'todoItemId' | 'tag'>,
+): string | undefined {
+  const todo = board.nodes.find((n) => n.id === ts.parentTodoId && n.kind === 'todo');
+  const todoState = todo?.state as TodoState | undefined;
+  const item = ts.todoItemId ? todoState?.items.find((i) => i.id === ts.todoItemId) : undefined;
+  if (item?.tag) return item.tag;
+  if (ts.tag) return ts.tag;
+  const library = mergeTagLibrary(todoState?.tagLibrary);
+  return classifyTask(ts.text, library, todoState ? tagExamples(todoState) : []) ?? undefined;
 }
 
 // ── taskToggleMirror ──────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ export const taskSource: AnalyticsDataSource = {
         type: 'task.completed',
         date: isoToYMD(c.completedAt),
         isoTimestamp: c.completedAt,
-        metadata: { taskId: c.taskId, text: c.text, plannedMin: c.plannedMin },
+        metadata: { taskId: c.taskId, text: c.text, plannedMin: c.plannedMin, tag: c.tag ?? null },
       });
     }
     return out;

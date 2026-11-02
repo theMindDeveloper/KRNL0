@@ -9,6 +9,7 @@ const ICONS: Record<PageId, React.ReactNode> = {
   activity: (<path d="M3 12h4l3-8 4 16 3-8h4" />),
   year: (<><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2" /></>),
   hours: (<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>),
+  tags: (<><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" /></>),
   estimates: (<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" /></>),
   insights: (<><path d="M12 3v9h9" /><path d="M20.5 15.5A9 9 0 1 1 8.5 3.7" /></>),
   habits: (<path d="M12 21c-4 0-7-2.8-7-6.8 0-3.3 2.4-5.2 3.6-8.2.4 2 1.6 3.2 2.9 3.6C11 6.5 12.8 4.2 15 3c-.4 3 1.4 4.8 2.6 6.6.9 1.4 1.4 2.8 1.4 4.6 0 4-3 6.8-7 6.8z" />),

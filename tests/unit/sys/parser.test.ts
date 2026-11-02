@@ -52,10 +52,10 @@ describe('SysParser', () => {
       });
     });
     it('parses todo list', () => {
-      expect(SysParser.parse(['todo', 'list'])).toEqual({ kind: 'todo', sub: 'list', json: false });
+      expect(SysParser.parse(['todo', 'list'])).toEqual({ kind: 'todo', sub: 'list', json: false, scope: 'today' });
     });
     it('parses todo list --json', () => {
-      expect(SysParser.parse(['todo', 'list', '--json'])).toEqual({ kind: 'todo', sub: 'list', json: true });
+      expect(SysParser.parse(['todo', 'list', '--json'])).toEqual({ kind: 'todo', sub: 'list', json: true, scope: 'today' });
     });
     it('parses todo check', () => {
       expect(SysParser.parse(['todo', 'check', 'abc123'])).toMatchObject({

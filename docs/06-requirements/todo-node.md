@@ -9,11 +9,11 @@
 | # | Requirement |
 |---|---|
 | F1 | Items are sorted at render time: undone items ascending by `createdAt`, done items below undone items |
-| F2 | Each item renders a checkbox (`.todo-check`), text (`.todo-text`), and an optional tag pill (`.todo-tag`, mono uppercase, max 4 characters) |
+| F2 | Each item renders a checkbox (`.todo-check`), text (`.todo-text`), and a tag button (`.todo-tag`) showing the tag's label and colour dot, or a faint `+` when untagged (ADR 0016 — was a 4-char pill) |
 | F3 | Clicking a checkbox dispatches `todo.toggle` with the item id; done items display strikethrough text and `color: var(--ink-4)` |
 | F4 | The "add task" row at the bottom dispatches `todo.add` with the typed text on `Enter`; the `↵` keyboard hint is always visible |
 | F5 | Double-clicking an item's text enters inline edit mode; blur or `Enter` dispatches `todo.edit` with the updated text |
-| F6 | A "clear done" action dispatches `todo.clearDone`, removing all items where `done === true` |
+| F6 | The header's "ARCHIVE DONE" action dispatches `todo.archiveDone` (ADR 0016 — it used to delete via `todo.clearDone`, which stays available as a command for scripts) |
 | F7 | The node header shows the count of undone items as `"Todos (N)"` updating reactively |
 | F8 | An RF `<Handle type="target" position="left">` is rendered for receiving edge signals |
 | F9 | Right-clicking a todo row opens a context menu with three actions: "Edit text", "Delete", "Start pomo" |
@@ -23,6 +23,16 @@
 | F13 | `todo.toggle` mirrors done state to the linked TaskNode (if `taskNodeId !== null`); `task.toggle` mirrors done state back to the linked TodoItem (if `todoItemId !== null`) |
 | F14 | Each `TodoItem` stores `taskNodeId: string \| null`; `todo.add` initialises it as `null`; `todoLinkTask` sets it atomically when the TaskNode is spawned |
 | F15 | The add-task row renders a **minutes input** (3 chars wide, mono) next to the text input. It defaults to the current `pomoConfig.sessionMin` value. On `Enter` the dispatched `todo.add` carries `{ text, plannedMin }`; the spawned TaskNode is created with that `plannedMin` (and `durationMin = pomoConfig.sessionMin`). Free-form text matching `/,\s*time:\s*(\d+)/i` also extracts a `plannedMin` if the dedicated input is empty. |
+| F16 | Completing an item moves it out of the open list into a collapsible **Done (N)** dropdown (collapsed by default). The header count `Todos (N)` counts open items only |
+| F17 | A done item stays in Done for the rest of its completion day, then shows in a collapsible **Archive (N)** dropdown (newest first, grouped under day labels). The buckets are derived from `completedAt` and the clock, so the rollover needs no midnight job and works even if the app was closed |
+| F18 | "ARCHIVE DONE" (`todo.archiveDone`) moves every done item to the Archive immediately by stamping `archivedAt` |
+| F19 | Ticking an archived (or done) row's checkbox reopens it: `done = false`, `archivedAt` cleared, back in the open list |
+| F20 | The Archive header's CLEAR (`todo.clearArchived`) deletes archived rows and their TaskNodes. The completion ledger is untouched, so analytics keeps the history |
+| F21 | Every new item is auto-tagged by an offline classifier (`src/shared/tags/classify.ts`) into one of 11 built-in tags — Code, Study, Writing, Reading, Meetings, Admin, Planning, Health, Chores, Social, Creative — or left untagged ("Other") when nothing scores high enough. Editing the text re-classifies auto tags. Hand tags (`tagSource: 'user'`) are never overwritten. Auto tags render with a dashed border |
+| F22 | Clicking a tag opens a picker (best guesses first, then all tags, then "Auto"). Picking dispatches `todo.setItemTag`. Hand-tagged items train the classifier: their words vote for their tag, and a near-duplicate follows its example. Other open auto-tagged items are re-classified immediately |
+| F23 | Users can create custom tags by typing a new name in the picker (or `todo.addTag`), optionally with keywords. Custom tags can be removed (`todo.removeTag`). Built-ins cannot |
+| F24 | Every completion-ledger entry records the tag the task was completed under (`CompletionRecord.tag`). Re-tagging a done item updates its entry. The Analytics node's **Time** view shows minutes by tag (pomo-tracked minutes, else planned): a donut, a ranked list and a stacked bar per day |
+| F25 | CLI parity: `todo list [--done\|--archived\|--all]`, `todo tag <ref> <tag\|auto>`, `todo tags [list\|add\|remove]`, `todo archive`, `todo clear-archive`, `analytics show --view tags` |
 
 ---
 
@@ -31,9 +41,10 @@
 | # | Requirement |
 |---|---|
 | NF1 | Node width is 320 px; item list scrolls vertically inside the node when items exceed visible area |
-| NF2 | Tag pills display at most 4 characters; longer values are truncated with no tooltip required |
+| NF2 | Tag buttons are at most 84 px wide; longer labels ellipsize and the full label is in the tooltip |
 | NF3 | The add-task input clears after dispatch and re-focuses so successive entries require no click |
 | NF4 | All state mutations go through `onCommand`; the component holds no local item state |
+| NF5 | Classification is deterministic, local and dependency-free (no model call). It runs on add, edit and re-tag, never on render |
 
 ---
 
@@ -63,6 +74,15 @@ Actor right-clicks a todo row and selects "Delete". The todo item is removed fro
 **UC-T8 — Bidirectional done mirroring**
 Actor toggles a todo row checkbox to done. The linked TaskNode opacity drops to 0.4 and its text gains strikethrough (done state mirrored). Conversely, toggling the TaskNode's checkbox marks the todo row done.
 
+**UC-T9 — Done, then archived (ADR 0016)**
+Actor ticks a task. It leaves the open list and the "Done (N)" count goes up. The next day the item appears under "Archive", labelled with the day it was finished. Ticking it there reopens it.
+
+**UC-T10 — Correct a tag (ADR 0016)**
+Actor sees "Krnl0 sprint review" auto-tagged Meetings, clicks the pill and picks Study. The pill turns solid, and other open "Krnl0 sprint …" items switch to Study.
+
+**UC-T11 — See where the time went (ADR 0016)**
+Actor opens Analytics → Time and sees completed minutes split by tag for the selected range.
+
 ---
 
 ## User Stories
@@ -72,6 +92,9 @@ Actor toggles a todo row checkbox to done. The linked TaskNode opacity drops to 
 - As a user, I want to add tasks without switching context so I can capture ideas quickly.
 - As a user, I want short tags so I can categorize tasks at a glance.
 - As a user, I want a "clear done" action so the list stays manageable over time.
+- As a user, I want finished tasks to wait in a Done dropdown for the rest of the day, then move to an archive, so I see today's wins without the list filling up.
+- As a user, I want my tasks tagged automatically, and I want to fix a wrong tag in one click so it learns, so I can see where my time goes without filling in forms.
+- As a user, I want my own tags next to the built-in ones, so the categories fit my life.
 
 ---
 
@@ -183,8 +206,65 @@ Feature: TodoNode task list
     When todoLinkTask is called with { itemId, taskNodeId: "task-abc" }
     Then the matching item has taskNodeId = "task-abc"
     And all other items are unchanged
+
+  Scenario: F16 — Completing moves an item into the Done dropdown
+    Given an open item "Email"
+    When the user ticks it
+    Then it is no longer in the open list
+    And the "Done (1)" toggle is shown collapsed
+    When the user expands Done
+    Then "Email" is listed there with strikethrough
+
+  Scenario: F17 — Done rolls into Archive after the day ends
+    Given an item completed today
+    When the clock passes midnight
+    Then the item is listed under "Archive" with yesterday's day label
+
+  Scenario: F18 — Archive now
+    Given two done items
+    When the user clicks "ARCHIVE DONE"
+    Then onCommand is called with "todo.archiveDone"
+    And both items have archivedAt set
+
+  Scenario: F19 — Restore from archive
+    Given an archived item
+    When the user ticks its checkbox
+    Then the item is open again and archivedAt is cleared
+
+  Scenario: F20 — Clear archive keeps analytics
+    Given an archived, completed task
+    When todo.clearArchived is dispatched
+    Then the row and its TaskNode are removed
+    And its completion-ledger entry remains
+
+  Scenario: F21 — Auto tag
+    When todoAdd is called with text "Fix login bug"
+    Then the item has tag "code" and tagSource "auto"
+    When todoAdd is called with text "zxqv"
+    Then the item has no tag
+
+  Scenario: F22 — A correction teaches the classifier
+    Given open auto-tagged items "krnl0 sprint review" and "krnl0 sprint planning poker"
+    When the user tags "krnl0 sprint review" as Study
+    Then "krnl0 sprint planning poker" is re-tagged Study automatically
+
+  Scenario: F23 — Custom tag from the picker
+    When the user types "Gaming" in the tag picker and chooses Create
+    Then onCommand is called with "todo.setItemTag" { tag: "Gaming" }
+    And the list's tagLibrary contains { id: "gaming", label: "Gaming" }
+
+  Scenario: F24 — Time by tag
+    Given "Fix login bug" and "Gym" were completed today
+    When analytics show --view tags runs
+    Then the result has one Code slice and one Health slice
+
+  Scenario: F25 — CLI parity
+    When the user runs "todo tag <ref> Planning"
+    Then the item has tag "planning" and tagSource "user"
+    When the user runs "todo tag <ref> auto"
+    Then the item is auto-classified again
 ```
 
 ---
 
-*Last updated: 2026-05-13 — Decision 22 (minutes input on add-task row)*
+*Last updated: 2026-11-02 — ADR 0016 (Done/Archive lifecycle, task tags, time by tag)*

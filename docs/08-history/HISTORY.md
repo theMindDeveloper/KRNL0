@@ -828,3 +828,37 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Follow-up 16:** mother windows take clicks again (React Flow turned off mouse input on nodes that are neither selectable nor draggable). Drags end when released over a YouTube / website card. Drawings are canvas nodes: click or box-select, drag, Delete. Redesigned calendar task popup and habit cadence dialog (shared `RepeatEditor`: every day, weekdays or picked days, time, length); the Habit window's add row has an optional Repeat. Task right-click has "Show on calendar" (opens the week, pulses the block; the camera stays put in Station mode). YouTube Mix links (`list=RD…`) play (the playlist part is dropped). The highlighted habit cell's ring is no longer covered by the next cell. The embed counter-scale was reverted (it changed page layout with zoom).
 - **Follow-up 17:** the Habit window is "Habits & Routines": the add row reads "+ add habit or recurring event", and scheduled habits show a ↻ repeat mark on the calendar.
 - **Follow-up 18:** Pomo controls are icons: Stop, Break, and Pause / Resume / End break as the main button (ending a break records it). Reset is gone: Pomo settings has "Count stopped sessions" (on = Stop records the work so far, off = Stop discards), with a CLI twin `pomo config --count-stopped on|off`. Native dropdown lists are readable in dark themes. Dropping a task anywhere on another task's calendar block runs it in parallel (same start).
+## [2026-11-02] — Todo Done/Archive, smart task tags, time by tag (ADR 0016)
+
+**Type:** Feature
+**PRs / Commits:** branch `TMD/task-completion-tagging-c87ea6`
+**Files changed:**
+- **New:** `src/shared/tags/{taxonomy,classify}.ts`, `src/renderer/components/nodes/TodoNode/TagPicker.tsx`, `src/renderer/analytics/{tags.ts,charts/TagCharts.tsx}`
+- **Todo node:** `TodoNode/{types,commands,index}.tsx`
+- **Wiring:** `Canvas/commandDispatch.ts`, `shared/dispatch/task.ts`, `shared/types/board.ts`, `analytics/{types,sources/taskSource}.ts`, `AnalyticsNode/{types,index}.tsx`, `analytics/charts/{common,DonutChart}.ts(x)`
+- **CLI:** `sys/{parser,SysFacade,commands/todo,commands/analytics}.ts`, `shared/cli/commandRegistry.ts`
+- **Docs:** `claude/CLAUDE.md`, ADR 0016, `docs/06-requirements/todo-node.md` (F16–F25), `docs/04-visual-system/design-tokens.md`
+- **Tests:** 6 new files
+
+**Summary:**
+- **Done → Archive:**
+  - A ticked task now leaves the open list and waits in a collapsed **Done (N)** dropdown.
+  - After its completion day it shows under **Archive (N)**, grouped by day. The buckets are derived from the clock, so no midnight job is needed.
+  - "ARCHIVE DONE" replaces "CLEAR DONE" and archives early. Nothing is deleted.
+  - Ticking an archived row restores it. The Archive's CLEAR deletes rows and task nodes but keeps the analytics ledger.
+- **Smart tags:**
+  - An offline, deterministic classifier sorts every task into 11 built-in categories, or leaves it as "Other" rather than guessing.
+  - Click a tag to open a picker with best guesses first; you can create custom tags there.
+  - Hand tags teach the classifier and re-file similar open tasks at once.
+  - Auto tags are dashed and hand tags are solid. Existing items are backfilled on first load.
+- **Time by tag:**
+  - Completions record their tag on the ledger, and re-tagging a done task updates it.
+  - The new Analytics **Time** view shows a donut, a ranked list and daily stacked bars, built on pomo-tracked minutes, else planned minutes.
+- **CLI:** `todo list --done|--archived|--all`, `todo tag`, `todo tags list|add|remove`, `todo archive`, `todo clear-archive`, `analytics show --view tags`.
+- **Text containment rule:**
+  - Donut % labels used to sit on the ring and cross slice edges. Chart labels are now fitted with `fitArcLabel` / `fitCircleLabel`: shrink to 8 px, else hide, always 3 px clear of every edge.
+  - The rule is in the visual-system docs and enforced by a randomized geometry test.
+
+**Tests:** 131 files / 1589 passed, 0 typecheck errors. Exercised in the browser preview (`vite.preview.config.ts`), not yet in the Electron window. One unrelated Station test timed out once under full-suite load and passes on its own.
+
+- **Follow-up 19:** merged `TMD/task-completion-tagging-c87ea6` (ADR 0016: Todo Done/Archive, smart task tags with picker and custom tags, time by tag). Its Analytics **Time** view is a new **Time by tag** page in the paged Analytics (donut, ranked list, daily bars), with a tag icon in the page nav. Conflicts in `sys/parser.ts`, `sys/commands/analytics.ts` and this file were resolved by keeping both sides. Tests: 141 files / 1657 green.

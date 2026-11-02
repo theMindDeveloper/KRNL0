@@ -5,7 +5,7 @@
 import type { CSSProperties } from 'react';
 import type { AnalyticsCardId } from './types';
 
-export type PageId = 'summary' | 'activity' | 'year' | 'hours' | 'estimates' | 'insights' | 'habits';
+export type PageId = 'summary' | 'activity' | 'year' | 'hours' | 'estimates' | 'tags' | 'insights' | 'habits';
 
 export interface AnalyticsPage {
   id: PageId;
@@ -18,6 +18,7 @@ export const PAGES: readonly AnalyticsPage[] = [
   { id: 'year',      label: 'Year' },
   { id: 'hours',     label: 'Hours' },
   { id: 'estimates', label: 'Plan vs actual' },
+  { id: 'tags',      label: 'Time by tag' },
   { id: 'insights',  label: 'Insights' },
   { id: 'habits',    label: 'Habits' },
 ];
@@ -39,6 +40,10 @@ const LAYOUT: Partial<Record<AnalyticsCardId | 'summary', Slot>> = {
   'estimates.mix':               { page: 'estimates', row: 0, rows: 1, col: 4, cols: 3 },
   'estimates.perTask':           { page: 'estimates', row: 1, rows: 1, col: 1, cols: 3 },
   'estimates.daily':             { page: 'estimates', row: 1, rows: 1, col: 4, cols: 3 },
+  // ADR 0016 — time by tag
+  'time.donut':                  { page: 'tags',      row: 0, rows: 1, col: 1, cols: 2 },
+  'time.list':                   { page: 'tags',      row: 0, rows: 1, col: 3, cols: 4 },
+  'time.daily':                  { page: 'tags',      row: 1, rows: 1, col: 1, cols: 6 },
   'insights.radar':              { page: 'insights',  row: 0, rows: 1, col: 1, cols: 2 },
   'insights.donutSessionsByDay': { page: 'insights',  row: 0, rows: 1, col: 3, cols: 2 },
   'insights.donutSources':       { page: 'insights',  row: 0, rows: 1, col: 5, cols: 2 },

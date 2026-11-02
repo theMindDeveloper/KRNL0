@@ -2,7 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TodoConfig, TodoItem, TodoState } from './types';
-import { visibleItems } from './commands';
+import { todoBuckets, todoReclassify, todoTagLibrary, visibleItems } from './commands';
+import { tagDisplay } from '../../../../shared/tags/classify';
+import { TagPicker } from './TagPicker';
+import { isoToYMD, todayLocal, addDays } from '../../../analytics/dateRange';
 import { defaultTodoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { ContextMenu } from '../../ContextMenu';
@@ -44,14 +47,31 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     hasTaskNode: boolean;
   } | null>(null);
 
-  const rawItems = visibleItems(state, config);
+  // ADR 0016 — Done / Archive dropdowns (collapsed by default) + tag picker.
+  const [doneOpen, setDoneOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [tagPicker, setTagPicker] = useState<{ x: number; y: number; itemId: string } | null>(null);
 
-  // 60-second tick for past-item graying.
+  // 60-second tick for past-item graying — also rolls yesterday's Done into
+  // the Archive at midnight, since the buckets are derived from the clock.
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  // Backfill: items created before tagging existed (or while a tag was
+  // missing from the library) get classified once on mount. Pure check first,
+  // so a list that's already settled dispatches nothing.
+  useEffect(() => {
+    if (todoReclassify(state) !== state) onCommand('todo.reclassify');
+    // Mount-only by design: later adds/edits classify themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const buckets = todoBuckets(state, nowMs);
+  const tagLibrary = todoTagLibrary(state);
+  const rawItems = visibleItems({ ...state, items: [...buckets.active, ...buckets.done] }, config);
 
   // Build a map from taskNodeId → plannedMin so drag payloads can include duration.
   const taskPlannedMin = useBoardStore(
@@ -168,7 +188,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   const undoneBucket = rawItems.filter((i) => !i.done);
   const doneBucket = rawItems.filter((i) => i.done);
-  const items = [...sortByChain(undoneBucket), ...sortByChain(doneBucket)];
+  const items = sortByChain(undoneBucket);
+  const doneItems = sortByChain(doneBucket);
 
   // PR8 — count items whose scheduled-end has passed and are still undone.
   // Same isPast rule as the per-row graying below, lifted into a reduce so
@@ -186,8 +207,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     return isPast ? acc + 1 : acc;
   }, 0);
 
-  const undoneCount = state.items.filter((i) => !i.done).length;
-  const hasDone = state.items.some((i) => i.done);
+  const undoneCount = buckets.active.length;
+  const hasDone = buckets.done.length > 0;
 
   const submitTask = (name: string, durationMin: number | null) => {
     // Time is optional — no duration → an open-ended task.
@@ -333,6 +354,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         },
       },
       {
+        label: 'Set tag…',
+        onSelect: () => {
+          if (ctxMenu) setTagPicker({ x: ctxMenu.x, y: ctxMenu.y, itemId });
+        },
+      },
+      {
         label: 'Start pomo',
         disabled: !hasTaskNode,
         onSelect: () => {
@@ -347,6 +374,306 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         },
       },
     ];
+  };
+
+  // One Todo row — shared by the open list, the Done dropdown and the Archive.
+  const renderRow = (item: TodoItem, archived = false) => {
+    // Gray out if done OR if the scheduled end has passed.
+    const sched = item.taskNodeId !== null
+      ? taskScheduledInfo.get(item.taskNodeId)
+      : item.scheduledFor
+        ? { scheduledFor: item.scheduledFor, durationMin: 25 }
+        : undefined;
+    const isPast = sched !== undefined &&
+      new Date(sched.scheduledFor).getTime() + sched.durationMin * 60_000 <= nowMs;
+    const isGrayed = item.done || isPast;
+    return (
+    <div
+      key={item.id}
+      className={`todo-item${item.done ? ' done' : ''}`}
+      draggable={true}
+      onDragStart={(e: DragEvent<HTMLDivElement>) => {
+        if (item.done) { e.preventDefault(); return; }
+        const durationMin = item.taskNodeId !== null
+          ? (taskPlannedMin.get(item.taskNodeId) ?? 25)
+          : 25;
+        const payload = item.taskNodeId !== null
+          ? { taskId: item.taskNodeId, durationMin }
+          : { itemId: item.id, durationMin };
+        e.dataTransfer.setData('application/krnl-task', JSON.stringify(payload));
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
+      }}
+      onContextMenu={(e) =>
+        handleRowContextMenu(e, item.id, item.taskNodeId !== null)
+      }
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '4px 14px',
+        opacity: isGrayed ? 0.5 : 1,
+        cursor: 'grab',
+      }}
+    >
+      {/* PR8 — rust overdue dot. Only on items whose scheduled end
+          has passed and that are still undone. Sits at the start
+          of the row so the eye catches it before content. */}
+      {isPast && !item.done && (
+        <span
+          aria-label="overdue"
+          data-testid={`todo-overdue-dot-${item.id}`}
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: 'var(--rust)',
+            flexShrink: 0,
+            boxShadow: '0 0 6px rgba(200, 85, 61, 0.45)',
+          }}
+        />
+      )}
+      {/* Shared per-task color dot — links this todo row to its
+          Calendar block and Clock arc. Only shown when the item
+          is bound to an actual task node. */}
+      {item.taskNodeId !== null && (
+        <span
+          data-testid={`todo-color-dot-${item.id}`}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: toneVarForTask(item.taskNodeId),
+            flexShrink: 0,
+            opacity: item.done ? 0.4 : 0.95,
+          }}
+        />
+      )}
+      {/* F3: checkbox — dispatches todo.toggle.
+          Uses a theme-locked dark hex for the done bg + acid border
+          + acid checkmark, so the "checked" state reads as a small
+          dark chip with a green tick in BOTH light and dark themes.
+          Previously `background: var(--ink)` flipped to light/cream
+          in dark mode, producing "green-on-white" mis-contrast. */}
+      <button
+        type="button"
+        className={`todo-check${item.done ? ' todo-check--done' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onCommand('todo.toggle', { id: item.id });
+        }}
+        style={{
+          flexShrink: 0,
+          width: 14,
+          height: 14,
+          border: `1px solid ${item.done ? 'var(--acid)' : 'var(--ink-4)'}`,
+          borderRadius: 3,
+          background: item.done ? '#0a0908' : 'transparent',
+          cursor: 'pointer',
+          display: 'grid',
+          placeItems: 'center',
+          padding: 0,
+          transition: 'all 0.12s',
+        }}
+        aria-label={archived ? 'Restore to list' : item.done ? 'Mark undone' : 'Mark done'}
+        title={archived ? 'Restore to list' : undefined}
+      >
+        {item.done && (
+          <span style={{ fontSize: 9, color: 'var(--acid-ink, var(--acid))', fontWeight: 700, lineHeight: 1 }}>
+            ✓
+          </span>
+        )}
+      </button>
+
+      {/* F3/F5: text — strikethrough when done, double-click enters edit mode */}
+      {editingId === item.id ? (
+        <input
+          type="text"
+          value={editValue}
+          autoFocus
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleEditKeyDown}
+          onBlur={commitEdit}
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid var(--ink-3)',
+            outline: 'none',
+            fontFamily: 'var(--font-sans)',
+            fontSize: 12.5,
+            color: 'var(--ink)',
+            caretColor: 'var(--acid)',
+            padding: '1px 0',
+          }}
+        />
+      ) : (
+        <span
+          className="todo-text"
+          onDoubleClick={() => !item.done && startEdit(item.id, item.text)}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            flex: 1,
+            fontFamily: 'var(--font-sans)',
+            fontSize: 12.5,
+            color: item.done ? 'var(--ink-4)' : 'var(--ink)',
+            textDecorationLine: item.done ? 'line-through' : 'none',
+            textDecorationColor: 'var(--ink-4)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            cursor: item.done ? 'default' : item.taskNodeId !== null ? 'pointer' : 'text',
+          }}
+        >
+          {item.text}
+        </span>
+      )}
+
+      {/* Three-numbers display: work / break / total (mono, right-aligned).
+          Only shown when item is wired to a task node (has taskNodeId).
+          Replaced by a numeric input when this row's time is being edited. */}
+      {item.taskNodeId !== null && (
+        editingTimeId === item.id ? (
+          <input
+            type="number"
+            min={1}
+            max={480}
+            value={timeValue}
+            autoFocus
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => {
+              setTimeValue(e.target.value);
+              setTimeInvalid(false);
+            }}
+            onKeyDown={handleTimeKeyDown}
+            onBlur={commitTimeEdit}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              flexShrink: 0,
+              width: 56,
+              background: 'var(--paper-2)',
+              border: `1px solid ${timeInvalid ? 'var(--rust)' : 'var(--ink-3)'}`,
+              borderRadius: 3,
+              outline: 'none',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9.5,
+              color: 'var(--ink-3)',
+              textAlign: 'right',
+              padding: '1px 4px',
+            }}
+          />
+        ) : (() => {
+          const planned = taskPlannedMin.get(item.taskNodeId) ?? 25;
+          const kind = taskKindMap.get(item.taskNodeId) ?? 'focus';
+          const bd = kind === 'event'
+            ? { workMin: planned, breakMin: 0, effectiveMin: planned }
+            : breakdownPomoTime(planned, 0, pomoConfig);
+          return (
+            <span
+              data-testid="todo-item-breakdown"
+              title={`work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m`}
+              style={{
+                flexShrink: 0,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                color: 'var(--ink-4)',
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ color: 'var(--ink-3)' }}>{bd.workMin}</span>
+              <span style={{ opacity: 0.5 }}>·</span>
+              <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
+              <span style={{ opacity: 0.5 }}>·</span>
+              <span style={{ color: 'var(--acid-ink, var(--acid))' }}>{bd.effectiveMin}m</span>
+            </span>
+          );
+        })()
+      )}
+
+      {/* F2 / ADR 0016: tag pill — click to re-tag. A dashed border marks
+          a tag the classifier guessed; solid means the user chose it.
+          Untagged rows get a faint "+" so there's always a way in. */}
+      {(() => {
+        const disp = item.tag !== undefined ? tagDisplay(tagLibrary, item.tag) : null;
+        const isAuto = item.tagSource === 'auto';
+        return (
+          <button
+            type="button"
+            className="todo-tag"
+            data-testid={`todo-tag-${item.id}`}
+            title={disp ? `${disp.label}${isAuto ? ' (auto — click to change)' : ''}` : 'Add a tag'}
+            onClick={(e) => {
+              e.stopPropagation();
+              setTagPicker({ x: e.clientX, y: e.clientY, itemId: item.id });
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              color: disp ? 'var(--ink-3)' : 'var(--ink-4)',
+              background: disp ? 'var(--paper-2)' : 'transparent',
+              border: `1px ${isAuto ? 'dashed' : 'solid'} ${disp ? 'var(--paper-3)' : 'transparent'}`,
+              padding: '0 5px',
+              borderRadius: 3,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              maxWidth: 84,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+              opacity: disp ? 1 : 0.6,
+              lineHeight: '14px',
+            }}
+          >
+            {disp ? (
+              <>
+                <span aria-hidden style={{ width: 5, height: 5, borderRadius: '50%', background: disp.color, flexShrink: 0 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{disp.label}</span>
+              </>
+            ) : '+'}
+          </button>
+        );
+      })()}
+
+      {/* Delete — hover-revealed */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onCommand('todo.remove', { id: item.id });
+        }}
+        style={{
+          flexShrink: 0,
+          background: 'transparent',
+          border: 'none',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          color: 'var(--ink-4)',
+          cursor: 'pointer',
+          padding: '0 2px',
+          lineHeight: 1,
+          opacity: 0,
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.opacity = '1';
+          (e.currentTarget as HTMLButtonElement).style.color = 'var(--rust)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.opacity = '0';
+          (e.currentTarget as HTMLButtonElement).style.color = 'var(--ink-4)';
+        }}
+        aria-label={`Delete: ${item.text}`}
+      >
+        ✕
+      </button>
+    </div>
+    );
   };
 
   return (
@@ -387,12 +714,15 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               </span>
             )}
           </span>
-          {/* F6: clear done button — visible when ≥1 done item */}
+          {/* F6 / ADR 0016: archive-now button — visible when ≥1 item is in
+              Done. Done items archive on their own when the day ends; this
+              just does it early. Nothing is deleted. */}
           {hasDone && (
             <button
               type="button"
               data-testid="clear-done-btn"
-              onClick={() => onCommand('todo.clearDone')}
+              title="Move today's done items to the archive"
+              onClick={() => onCommand('todo.archiveDone')}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -405,7 +735,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 padding: '0 2px',
               }}
             >
-              CLEAR DONE
+              ARCHIVE DONE
             </button>
           )}
         </div>
@@ -423,280 +753,62 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 fontFamily: 'var(--font-sans)',
               }}
             >
-              No todos yet
+              {doneItems.length > 0 || buckets.archived.length > 0 ? 'All clear' : 'No todos yet'}
             </div>
           ) : (
-            items.map((item) => {
-              // Gray out if done OR if the scheduled end has passed.
-              const sched = item.taskNodeId !== null
-                ? taskScheduledInfo.get(item.taskNodeId)
-                : item.scheduledFor
-                  ? { scheduledFor: item.scheduledFor, durationMin: 25 }
-                  : undefined;
-              const isPast = sched !== undefined &&
-                new Date(sched.scheduledFor).getTime() + sched.durationMin * 60_000 <= nowMs;
-              const isGrayed = item.done || isPast;
-              return (
-              <div
-                key={item.id}
-                className={`todo-item${item.done ? ' done' : ''}`}
-                draggable={true}
-                onDragStart={(e: DragEvent<HTMLDivElement>) => {
-                  if (item.done) { e.preventDefault(); return; }
-                  const durationMin = item.taskNodeId !== null
-                    ? (taskPlannedMin.get(item.taskNodeId) ?? 25)
-                    : 25;
-                  const payload = item.taskNodeId !== null
-                    ? { taskId: item.taskNodeId, durationMin }
-                    : { itemId: item.id, durationMin };
-                  e.dataTransfer.setData('application/krnl-task', JSON.stringify(payload));
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
-                }}
-                onContextMenu={(e) =>
-                  handleRowContextMenu(e, item.id, item.taskNodeId !== null)
-                }
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '4px 14px',
-                  opacity: isGrayed ? 0.5 : 1,
-                  cursor: 'grab',
-                }}
-              >
-                {/* PR8 — rust overdue dot. Only on items whose scheduled end
-                    has passed and that are still undone. Sits at the start
-                    of the row so the eye catches it before content. */}
-                {isPast && !item.done && (
-                  <span
-                    aria-label="overdue"
-                    data-testid={`todo-overdue-dot-${item.id}`}
-                    style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: '50%',
-                      background: 'var(--rust)',
-                      flexShrink: 0,
-                      boxShadow: '0 0 6px rgba(200, 85, 61, 0.45)',
-                    }}
-                  />
-                )}
-                {/* Shared per-task color dot — links this todo row to its
-                    Calendar block and Clock arc. Only shown when the item
-                    is bound to an actual task node. */}
-                {item.taskNodeId !== null && (
-                  <span
-                    data-testid={`todo-color-dot-${item.id}`}
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background: toneVarForTask(item.taskNodeId),
-                      flexShrink: 0,
-                      opacity: item.done ? 0.4 : 0.95,
-                    }}
-                  />
-                )}
-                {/* F3: checkbox — dispatches todo.toggle.
-                    Uses a theme-locked dark hex for the done bg + acid border
-                    + acid checkmark, so the "checked" state reads as a small
-                    dark chip with a green tick in BOTH light and dark themes.
-                    Previously `background: var(--ink)` flipped to light/cream
-                    in dark mode, producing "green-on-white" mis-contrast. */}
-                <button
-                  type="button"
-                  className={`todo-check${item.done ? ' todo-check--done' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCommand('todo.toggle', { id: item.id });
-                  }}
-                  style={{
-                    flexShrink: 0,
-                    width: 14,
-                    height: 14,
-                    border: `1px solid ${item.done ? 'var(--acid)' : 'var(--ink-4)'}`,
-                    borderRadius: 3,
-                    background: item.done ? '#0a0908' : 'transparent',
-                    cursor: 'pointer',
-                    display: 'grid',
-                    placeItems: 'center',
-                    padding: 0,
-                    transition: 'all 0.12s',
-                  }}
-                  aria-label={item.done ? 'Mark undone' : 'Mark done'}
-                >
-                  {item.done && (
-                    <span style={{ fontSize: 9, color: 'var(--acid-ink, var(--acid))', fontWeight: 700, lineHeight: 1 }}>
-                      ✓
-                    </span>
-                  )}
-                </button>
+            items.map((item) => renderRow(item))
+          )}
 
-                {/* F3/F5: text — strikethrough when done, double-click enters edit mode */}
-                {editingId === item.id ? (
-                  <input
-                    type="text"
-                    value={editValue}
-                    autoFocus
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onKeyDown={handleEditKeyDown}
-                    onBlur={commitEdit}
-                    style={{
-                      flex: 1,
-                      background: 'transparent',
-                      border: 'none',
-                      borderBottom: '1px solid var(--ink-3)',
-                      outline: 'none',
-                      fontFamily: 'var(--font-sans)',
-                      fontSize: 12.5,
-                      color: 'var(--ink)',
-                      caretColor: 'var(--acid)',
-                      padding: '1px 0',
-                    }}
-                  />
-                ) : (
-                  <span
-                    className="todo-text"
-                    onDoubleClick={() => !item.done && startEdit(item.id, item.text)}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      flex: 1,
-                      fontFamily: 'var(--font-sans)',
-                      fontSize: 12.5,
-                      color: item.done ? 'var(--ink-4)' : 'var(--ink)',
-                      textDecorationLine: item.done ? 'line-through' : 'none',
-                      textDecorationColor: 'var(--ink-4)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      cursor: item.done ? 'default' : item.taskNodeId !== null ? 'pointer' : 'text',
-                    }}
-                  >
-                    {item.text}
-                  </span>
-                )}
+          {/* ADR 0016 — Done dropdown: today's completed items. */}
+          {doneItems.length > 0 && (
+            <>
+              <SectionToggle
+                testId="todo-done-toggle"
+                label="Done"
+                count={doneItems.length}
+                open={doneOpen}
+                onToggle={() => setDoneOpen((o) => !o)}
+              />
+              {doneOpen && doneItems.map((item) => renderRow(item))}
+            </>
+          )}
 
-                {/* Three-numbers display: work / break / total (mono, right-aligned).
-                    Only shown when item is wired to a task node (has taskNodeId).
-                    Replaced by a numeric input when this row's time is being edited. */}
-                {item.taskNodeId !== null && (
-                  editingTimeId === item.id ? (
-                    <input
-                      type="number"
-                      min={1}
-                      max={480}
-                      value={timeValue}
-                      autoFocus
-                      onFocus={(e) => e.currentTarget.select()}
-                      onChange={(e) => {
-                        setTimeValue(e.target.value);
-                        setTimeInvalid(false);
-                      }}
-                      onKeyDown={handleTimeKeyDown}
-                      onBlur={commitTimeEdit}
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      style={{
-                        flexShrink: 0,
-                        width: 56,
-                        background: 'var(--paper-2)',
-                        border: `1px solid ${timeInvalid ? 'var(--rust)' : 'var(--ink-3)'}`,
-                        borderRadius: 3,
-                        outline: 'none',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 9.5,
-                        color: 'var(--ink-3)',
-                        textAlign: 'right',
-                        padding: '1px 4px',
-                      }}
-                    />
-                  ) : (() => {
-                    const planned = taskPlannedMin.get(item.taskNodeId) ?? 25;
-                    const kind = taskKindMap.get(item.taskNodeId) ?? 'focus';
-                    const bd = kind === 'event'
-                      ? { workMin: planned, breakMin: 0, effectiveMin: planned }
-                      : breakdownPomoTime(planned, 0, pomoConfig);
-                    return (
-                      <span
-                        data-testid="todo-item-breakdown"
-                        title={`work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m`}
+          {/* ADR 0016 — Archive dropdown: done items from earlier days,
+              newest first, with a day label whenever the day changes. */}
+          {buckets.archived.length > 0 && (
+            <>
+              <SectionToggle
+                testId="todo-archive-toggle"
+                label="Archive"
+                count={buckets.archived.length}
+                open={archiveOpen}
+                onToggle={() => setArchiveOpen((o) => !o)}
+                action={archiveOpen ? { label: 'CLEAR', testId: 'todo-clear-archive-btn', onSelect: () => onCommand('todo.clearArchived') } : undefined}
+              />
+              {archiveOpen && buckets.archived.map((item, idx) => {
+                const day = item.completedAt ? isoToYMD(item.completedAt) : '';
+                const prevDay = idx > 0 ? isoToYMD(buckets.archived[idx - 1]!.completedAt ?? '') : null;
+                return (
+                  <div key={item.id}>
+                    {day !== prevDay && (
+                      <div
                         style={{
-                          flexShrink: 0,
+                          padding: '4px 14px 2px',
                           fontFamily: 'var(--font-mono)',
                           fontSize: 9,
                           color: 'var(--ink-4)',
-                          letterSpacing: '0.04em',
-                          whiteSpace: 'nowrap',
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
                         }}
                       >
-                        <span style={{ color: 'var(--ink-3)' }}>{bd.workMin}</span>
-                        <span style={{ opacity: 0.5 }}>·</span>
-                        <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
-                        <span style={{ opacity: 0.5 }}>·</span>
-                        <span style={{ color: 'var(--acid-ink, var(--acid))' }}>{bd.effectiveMin}m</span>
-                      </span>
-                    );
-                  })()
-                )}
-
-                {/* F2: tag pill — 4-char max, mono uppercase */}
-                {item.tag !== undefined && (
-                  <span
-                    className="todo-tag"
-                    style={{
-                      flexShrink: 0,
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 9,
-                      color: 'var(--ink-3)',
-                      background: 'var(--paper-2)',
-                      padding: '1px 5px',
-                      borderRadius: 3,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      overflow: 'hidden',
-                      maxWidth: '4ch',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {item.tag.slice(0, 4)}
-                  </span>
-                )}
-
-                {/* Delete — hover-revealed */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCommand('todo.remove', { id: item.id });
-                  }}
-                  style={{
-                    flexShrink: 0,
-                    background: 'transparent',
-                    border: 'none',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
-                    color: 'var(--ink-4)',
-                    cursor: 'pointer',
-                    padding: '0 2px',
-                    lineHeight: 1,
-                    opacity: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.opacity = '1';
-                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--rust)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.opacity = '0';
-                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--ink-4)';
-                  }}
-                  aria-label={`Delete: ${item.text}`}
-                >
-                  ✕
-                </button>
-              </div>
-            );
-            })
+                        {dayLabel(day)}
+                      </div>
+                    )}
+                    {renderRow(item, true)}
+                  </div>
+                );
+              })}
+            </>
           )}
           </div>
         </PagedView>
@@ -795,6 +907,112 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           onDismiss={() => setCtxMenu(null)}
         />
       )}
+
+      {/* ADR 0016 — tag picker (portal, like the context menu). */}
+      {tagPicker !== null && (() => {
+        const item = state.items.find((i) => i.id === tagPicker.itemId);
+        if (!item) return null;
+        return (
+          <TagPicker
+            x={tagPicker.x}
+            y={tagPicker.y}
+            item={item}
+            state={state}
+            onPick={(tag) => onCommand('todo.setItemTag', { id: item.id, tag })}
+            onDismiss={() => setTagPicker(null)}
+          />
+        );
+      })()}
     </MotherFrame>
+  );
+}
+
+/** "Today" / "Yesterday" / "Mon 3 Nov" for an archive day header. */
+function dayLabel(ymd: string): string {
+  if (!ymd) return '';
+  const today = todayLocal();
+  if (ymd === today) return 'Today';
+  if (ymd === addDays(today, -1)) return 'Yesterday';
+  return new Date(`${ymd}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+/** Collapsible section header for the Done / Archive dropdowns. */
+function SectionToggle({
+  label,
+  count,
+  open,
+  onToggle,
+  testId,
+  action,
+}: {
+  label: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  testId: string;
+  action?: { label: string; testId: string; onSelect: () => void } | undefined;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '6px 14px 3px',
+        marginTop: 4,
+        borderTop: '1px solid var(--paper-3)',
+      }}
+    >
+      <button
+        type="button"
+        data-testid={testId}
+        aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 9.5,
+          color: 'var(--ink-3)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          textAlign: 'left',
+        }}
+      >
+        <span style={{ display: 'inline-block', width: 8, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.12s' }}>▸</span>
+        {label} ({count})
+      </button>
+      {action && (
+        <button
+          type="button"
+          data-testid={action.testId}
+          onClick={(e) => { e.stopPropagation(); action.onSelect(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Delete archived items for good (analytics keeps their history)"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9,
+            color: 'var(--ink-4)',
+            cursor: 'pointer',
+            letterSpacing: '0.04em',
+            padding: '0 2px',
+          }}
+        >
+          {action.label}
+        </button>
+      )}
+    </div>
   );
 }
