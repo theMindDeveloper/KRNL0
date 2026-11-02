@@ -15,6 +15,10 @@ interface DrawStore {
   tool: PenTool;
   color: string;
   sizeScale: number; // 0.5 / 1 / 2 — S / M / L
+  /** Where the pen wheel is open (screen px), or null. */
+  wheel: { x: number; y: number } | null;
+  openWheel: (x: number, y: number) => void;
+  closeWheel: () => void;
   setActive: (on: boolean) => void;
   toggle: () => void;
   setTool: (t: PenTool) => void;
@@ -27,7 +31,10 @@ export const useDrawStore = create<DrawStore>((set) => ({
   tool: 'pen',
   color: PEN_COLORS[1],
   sizeScale: 1,
-  setActive: (on) => set({ active: on }),
+  wheel: null,
+  openWheel: (x, y) => set({ active: true, wheel: { x, y } }),
+  closeWheel: () => set({ wheel: null }),
+  setActive: (on) => set(on ? { active: true } : { active: false, wheel: null }),
   toggle: () => set((s) => ({ active: !s.active })),
   setTool: (tool) => set({ tool, active: true }),
   setColor: (color) => set((s) => ({ color, tool: s.tool === 'eraser' ? 'pen' : s.tool })),

@@ -44,6 +44,7 @@ import { DrawLayer } from './DrawLayer';
 import { targetNodeIdAt } from './connectTarget';
 import { PieMenu } from '../ui/PieMenu';
 import { canvasWheelItems } from './canvasWheel';
+import { useDrawStore } from '../../store/drawStore';
 import type { TextLook } from '../nodes/TextNode/types';
 import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
@@ -1835,6 +1836,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
               mediaFileInputRef.current?.click();
             },
             frame: () => handleAddNode({ kind: 'frame', at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+            pen: () => useDrawStore.getState().openWheel(paneCtxMenu.x, paneCtxMenu.y),
           })}
         />
       )}

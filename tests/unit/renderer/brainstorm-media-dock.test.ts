@@ -2,7 +2,7 @@
  * Sticky notes / shapes, drop-anything classification, dock snapping,
  * analytics page layout, and the CLI verbs for them.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { textSetLook } from '../../../src/renderer/components/nodes/TextNode/commands';
 import { classifyFile, classifyUrl } from '../../../src/renderer/components/Canvas/dropMedia';
 import { anchorFor } from '../../../src/renderer/components/Dock';
@@ -91,10 +91,13 @@ import { canvasWheelItems } from '../../../src/renderer/components/Canvas/canvas
 describe('canvas wheel', () => {
   it('first ring is a few categories; sub-panels hold the rest; shortcuts shown', () => {
     const noop = () => {};
-    const items = canvasWheelItems({ task: noop, habit: noop, note: noop, look: noop, image: noop, mediaFile: noop, frame: noop });
+    const pen = vi.fn();
+    const items = canvasWheelItems({ task: noop, habit: noop, note: noop, look: noop, image: noop, mediaFile: noop, frame: noop, pen });
     expect(items.map((i) => i.key)).toEqual(['task', 'habit', 'note', 'sticky', 'shapes', 'media', 'frame', 'pen']);
     expect(items.find((i) => i.key === 'shapes')!.children!.map((c) => c.key)).toEqual(['rect', 'ellipse', 'diamond']);
-    expect(items.find((i) => i.key === 'pen')!.children!.length).toBeGreaterThanOrEqual(5);
+    // Pen opens the one pen wheel (no separate sub-panel design).
+    items.find((i) => i.key === 'pen')!.onSelect!();
+    expect(pen).toHaveBeenCalled();
     expect(items.find((i) => i.key === 'note')!.shortcut).toBe('N');
   });
 });

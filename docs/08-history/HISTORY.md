@@ -819,3 +819,7 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Follow-up 12:**
   - **Faster media:** dropped files are imported by path (main copies the file; no bytes over IPC). `krnl-asset://` streams with HTTP Range support, so video and audio start at once and can seek. `.mov` is served as `video/mp4`, so H.264 movs play.
   - **Sticky notes:** the paper colour could vanish on re-render (shorthand/longhand background mix), leaving lines on black; fixed with a single `background`. Stickies now use handwritten Caveat (Fontsource), softer ruled lines, a red margin and a folded corner.
+- **Follow-up 13:**
+  - **Sticky notes:** the "cursed" (black) note is fixed. The paper-grain SVG's filter reference was double-encoded (`%2523n`), so the SVG painted a solid black square over the note.
+  - **Light / dark:** always available. The top-bar toggle shows for every style (choosing Light on a dark-only style switches to Classic), and Settings has an Appearance section above Factory reset. Before, the dark-only default hid the toggle, so the ⚙ in its place, which opens the reset, looked like the theme button.
+  - **Pen wheel:** the older two-ring design is back as the only pen wheel; the canvas wheel's Pen item opens it.

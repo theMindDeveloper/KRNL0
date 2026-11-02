@@ -15,8 +15,7 @@ import { ViewportPortal, useReactFlow } from '@xyflow/react';
 import { getStroke } from 'perfect-freehand';
 import { useBoardStore } from '../../store/boardStore';
 import { useDrawStore, TOOL_SIZE, type PenTool } from '../../store/drawStore';
-import { PieMenu } from '../ui/PieMenu';
-import { penWheelItems } from './canvasWheel';
+import { PenWheel } from './PenWheel';
 import type { DrawStroke, DrawTool } from '../../../shared/types/board';
 
 /** SVG path for a stroke: perfect-freehand outline, or a straight arrow. Exported for tests. */
@@ -110,7 +109,10 @@ export function DrawLayer() {
   const { active, tool, color, sizeScale, setActive } = useDrawStore();
   const { screenToFlowPosition, getZoom, getViewport, setViewport } = useReactFlow();
   const [live, setLive] = useState<DrawStroke['points'] | null>(null);
-  const [wheel, setWheel] = useState<{ x: number; y: number } | null>(null);
+  const wheel = useDrawStore((st) => st.wheel);
+  const openWheel = useDrawStore((st) => st.openWheel);
+  const closeWheel = useDrawStore((st) => st.closeWheel);
+  const setWheel = (w: { x: number; y: number } | null) => (w ? openWheel(w.x, w.y) : closeWheel());
   const drawing = useRef(false);
   const panning = useRef<{ x: number; y: number } | null>(null);
 
@@ -221,16 +223,7 @@ export function DrawLayer() {
         />
       )}
 
-      {active && wheel && (
-        <PieMenu
-          testId="draw-wheel"
-          x={wheel.x}
-          y={wheel.y}
-          items={penWheelItems({ withClear: () => useBoardStore.getState().clearDrawings() })}
-          center={{ label: 'Done drawing', icon: <path d="M5 12.5l4.5 4.5L19 7.5" />, onSelect: () => setActive(false) }}
-          onClose={() => setWheel(null)}
-        />
-      )}
+      {active && wheel && <PenWheel x={wheel.x} y={wheel.y} onClose={closeWheel} />}
     </>
   );
 }
