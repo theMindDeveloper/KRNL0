@@ -17,6 +17,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { useDrawStore, TOOL_SIZE, type PenTool } from '../../store/drawStore';
 import { PenWheel } from './PenWheel';
 import type { DrawStroke, DrawTool } from '../../../shared/types/board';
+import { activeCanvasOf, isStrokeOnCanvas } from '../../../shared/canvas';
 
 /** SVG path for a stroke: perfect-freehand outline, or a straight arrow. Exported for tests. */
 export function strokePath(points: DrawStroke['points'], size: number, tool: DrawTool): string {
@@ -132,7 +133,11 @@ export function DrawLayer() {
 
   const erase = (e: ReactPointerEvent) => {
     const [x, y] = toFlow(e);
-    const hit = strokesHit(useBoardStore.getState().board?.drawings ?? [], x, y, 10 / getZoom());
+    // Only strokes on the active canvas are erasable (Decision 33).
+    const b = useBoardStore.getState().board;
+    const canvasId = b ? activeCanvasOf(b) : '';
+    const strokes = (b?.drawings ?? []).filter((d) => isStrokeOnCanvas(d, canvasId));
+    const hit = strokesHit(strokes, x, y, 10 / getZoom());
     if (hit.length) removeStrokes(hit);
   };
 

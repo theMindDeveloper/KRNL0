@@ -36,6 +36,7 @@ interface PomoSessionLike {
   endedAt: string;
   durationMin: number;
   completed: boolean;
+  kind?: string;
 }
 
 interface PomoStateLike {
@@ -135,10 +136,10 @@ export function buildAnalytics(board: BoardLike): AnalyticsResult {
           const s = n.state as PomoStateLike;
           const history = s.history ?? [];
           for (const rec of history) {
-            if (!rec.completed) continue;
-            if (!rec.endedAt) continue;
+            if (!rec.endedAt || rec.kind === 'break') continue;
             if (isoToYMD(rec.endedAt) === today) {
-              sessionsToday += 1;
+              // Focus counts every work span; sessions only full pomodoros.
+              if (rec.completed) sessionsToday += 1;
               focusMinToday += rec.durationMin ?? 0;
             }
           }

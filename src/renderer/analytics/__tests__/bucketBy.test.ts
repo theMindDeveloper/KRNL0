@@ -31,12 +31,15 @@ describe('bucketBy', () => {
         evt({ type: 'task.completed', date: '2026-05-10' }),
         evt({ type: 'task.completed', date: '2026-05-10' }),
         evt({ type: 'habit.checkin', date: '2026-05-10' }),
+        // A full pomodoro emits pomo.work + pomo.session; a partial span only pomo.work.
+        evt({ type: 'pomo.work', date: '2026-05-11', durationMin: 25 }),
         evt({ type: 'pomo.session', date: '2026-05-11', durationMin: 25 }),
-        evt({ type: 'pomo.session', date: '2026-05-11', durationMin: 30 }),
+        evt({ type: 'pomo.work', date: '2026-05-11', durationMin: 12 }),
       ];
       const out = byDay(events, { start: '2026-05-10', end: '2026-05-11' });
       expect(out[0]).toMatchObject({ taskCount: 2, habitCount: 1, sessions: 0, focusMin: 0 });
-      expect(out[1]).toMatchObject({ taskCount: 0, habitCount: 0, sessions: 2, focusMin: 55 });
+      // Focus counts every work span, not only full pomodoros.
+      expect(out[1]).toMatchObject({ taskCount: 0, habitCount: 0, sessions: 1, focusMin: 37 });
     });
 
     it('drops events outside the range', () => {
@@ -54,12 +57,14 @@ describe('bucketBy', () => {
       const events: AnalyticsEvent[] = [
         evt({ type: 'task.completed', date: '2026-05-10' }),
         evt({ type: 'habit.checkin', date: '2026-05-11' }),
+        evt({ type: 'pomo.work', date: '2026-05-12', durationMin: 25 }),
         evt({ type: 'pomo.session', date: '2026-05-12', durationMin: 25 }),
-        evt({ type: 'pomo.session', date: '2026-05-12', durationMin: 25 }),
+        evt({ type: 'pomo.work', date: '2026-05-12', durationMin: 10 }),
+        evt({ type: 'pomo.break', date: '2026-05-12', durationMin: 5 }),
       ];
       const out = totals(events, { start: '2026-05-10', end: '2026-05-12' });
       expect(out).toEqual({
-        tasksDone: 1, habitCheckins: 1, focusMin: 50, sessions: 2,
+        tasksDone: 1, habitCheckins: 1, focusMin: 35, sessions: 1, breakMin: 5,
       });
     });
   });
@@ -78,9 +83,9 @@ describe('bucketBy', () => {
 
     it('counts focus minutes per dow', () => {
       const events: AnalyticsEvent[] = [
-        evt({ type: 'pomo.session', date: '2026-05-12', durationMin: 25 }), // Tue
-        evt({ type: 'pomo.session', date: '2026-05-12', durationMin: 25 }),
-        evt({ type: 'pomo.session', date: '2026-05-15', durationMin: 50 }), // Fri
+        evt({ type: 'pomo.work', date: '2026-05-12', durationMin: 25 }), // Tue
+        evt({ type: 'pomo.work', date: '2026-05-12', durationMin: 25 }),
+        evt({ type: 'pomo.work', date: '2026-05-15', durationMin: 50 }), // Fri
       ];
       const out = byDayOfWeek(events, { start: '2026-05-11', end: '2026-05-17' });
       expect(out[1]?.focusMin).toBe(50);
@@ -105,7 +110,7 @@ describe('bucketBy', () => {
           isoTimestamp: new Date(2026, 4, 10, 9, 30).toISOString(),
         }),
         evt({
-          type: 'pomo.session',
+          type: 'pomo.work',
           date: '2026-05-10',
           durationMin: 25,
           isoTimestamp: new Date(2026, 4, 10, 14, 0).toISOString(),
@@ -123,7 +128,7 @@ describe('bucketBy', () => {
         evt({ type: 'task.completed', date: '2026-01-15' }),
         evt({ type: 'task.completed', date: '2026-12-31' }),
         evt({ type: 'habit.checkin', date: '2026-06-01' }),
-        evt({ type: 'pomo.session', date: '2026-06-01', durationMin: 25 }),
+        evt({ type: 'pomo.work', date: '2026-06-01', durationMin: 25 }),
       ];
       const out = byMonth(events, 2026);
       expect(out).toHaveLength(12);

@@ -17,6 +17,8 @@ export interface RealitySegment {
   kind: PomoSegmentKind;
   taskId: string | null;
   label: string;
+  /** Observe mode — tag id of a free-text span (null for task / untagged). */
+  tag: string | null;
   /** True for the in-flight segment (endMs === nowMs, still growing). */
   live: boolean;
 }
@@ -50,6 +52,7 @@ export function selectPomoReality(board: Board | null, nowMs: number): RealitySe
       kind: recordKind(rec),
       taskId: rec.taskId ?? null,
       label: rec.label,
+      tag: rec.tag ?? null,
       live: false,
     });
   }
@@ -68,6 +71,7 @@ export function selectPomoReality(board: Board | null, nowMs: number): RealitySe
         kind: 'work',
         taskId: s.activeTaskId,
         label: s.label,
+        tag: s.activeTaskId ? null : s.tag ?? null,
         live: false,
       });
     }
@@ -85,6 +89,7 @@ export function selectPomoReality(board: Board | null, nowMs: number): RealitySe
         kind: s.status === 'break' ? 'break' : 'work',
         taskId: s.activeTaskId,
         label: s.label,
+        tag: s.activeTaskId ? null : s.tag ?? null,
         live: true,
       });
     }

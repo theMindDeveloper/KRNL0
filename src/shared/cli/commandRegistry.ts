@@ -80,7 +80,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'start', usage: 'pomo start [--label "..."] [--minutes 25]', summary: 'Start a pomo session' },
       { name: 'stop', usage: 'pomo stop', summary: 'Stop the timer and record the in-flight span' },
       { name: 'pause', usage: 'pomo pause', summary: 'Pause a running session' },
-      { name: 'resume', usage: 'pomo resume', summary: 'Resume a paused session (the pause gap is not counted as work)' },
+      { name: 'resume', usage: 'pomo resume', summary: 'Resume a paused session, or go back to work from a break (records the break)' },
       { name: 'break', usage: 'pomo break', summary: 'Switch from work to an open-ended break' },
       { name: 'extend', usage: 'pomo extend', summary: 'Count the session as complete and keep working' },
       { name: 'discard', usage: 'pomo discard', summary: 'Abandon the in-flight span without recording it' },
@@ -193,6 +193,17 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'list', usage: 'draw list [--json]', summary: 'List strokes (id, tool, colour, points)' },
       { name: 'delete', usage: 'draw delete <strokeId>', summary: 'Delete one stroke' },
       { name: 'clear', usage: 'draw clear', summary: 'Delete every stroke' },
+    ],
+  },
+  {
+    group: 'canvas',
+    summary: 'Free-content canvases (mothers, tasks and analytics are shared across all of them)',
+    subcommands: [
+      { name: 'list', usage: 'canvas list [--json]', summary: 'List canvases (* = active) with free-node counts' },
+      { name: 'add', usage: 'canvas add <name>', summary: 'Create a canvas and switch to it' },
+      { name: 'switch', usage: 'canvas switch <id|name>', summary: 'Make a canvas active' },
+      { name: 'rename', usage: 'canvas rename <id|name> <new name>', summary: 'Rename a canvas' },
+      { name: 'delete', usage: 'canvas delete <id|name>', summary: 'Delete a canvas and its free content (never mother data; not the last one)' },
     ],
   },
   {

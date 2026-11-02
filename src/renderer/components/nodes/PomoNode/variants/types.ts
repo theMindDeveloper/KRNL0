@@ -11,6 +11,8 @@ export interface TimerFaceProps {
   elapsedPct: number;
   /** Percentage of time remaining (0–100) */
   remainingPct: number;
+  /** Minutes the scale spans: the session length, or 60 (one hour) in Observe mode. Default 25. */
+  total?: number;
   /** True only when FSM status is "running" */
   running: boolean;
 }

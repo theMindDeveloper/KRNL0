@@ -3,7 +3,7 @@ import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
 import { TIMER_FACES } from './types';
-import { defaultPomoConfig } from './types';
+import { defaultPomoConfig, OBSERVE_SPAN_MIN } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL, MotherFrameStationContext } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -17,6 +17,11 @@ import { Outline } from './variants/Outline';
 import { Mac } from './variants/Mac';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { AppSelect } from '../../ui/AppSelect';
+import { boardTagLibrary, spanTagFor } from '../../../store/spanTags';
+import { SpanLabeler } from './SpanLabeler';
+import { DoingPicker, type DoingChoice } from './DoingPicker';
+import { SpanLog } from './SpanLog';
+import { ObserveDash } from './ObserveDash';
 
 const TICK_MS = 500;
 
@@ -109,7 +114,10 @@ export function PomoNode({
   // Issue #166 — observer model. Running counts DOWN toward the session
   // threshold (durationMin); break counts UP, open-ended. `sessionWorkSec`
   // carries accumulated work across pause gaps so the threshold is correct.
-  const thresholdMs = state.durationMin * 60_000;
+  // An Observe span leaves the day-long OBSERVE_SPAN_MIN in state until the
+  // next Start; Pomodoro mode shows the configured session length meanwhile.
+  const sessionMin = state.durationMin === OBSERVE_SPAN_MIN ? config.sessionMin : state.durationMin;
+  const thresholdMs = sessionMin * 60_000;
   const liveWorkMs =
     state.status === 'running' && state.startedAt !== null
       ? state.sessionWorkSec * 1000 + (Date.now() - Date.parse(state.startedAt))
@@ -123,7 +131,9 @@ export function PomoNode({
       : 0;
   // The "Are you done?" prompt fires once the work threshold is reached. The
   // timer keeps running (arc keeps growing) — NO auto-break, NO auto-stop.
-  const promptDone = state.status === 'running' && liveWorkMs >= thresholdMs;
+  // Observe mode: no threshold, so no prompt — the timer just counts up.
+  const observe = config.mode === 'observe';
+  const promptDone = !observe && state.status === 'running' && liveWorkMs >= thresholdMs;
 
   // Issue #166 slice 5 — OS notification when threshold is first reached.
   // Fires once per transition false→true; uses Web Notification API (works
@@ -203,7 +213,49 @@ export function PomoNode({
   const handleBreak = () => onCommand('pomo.break');
   // One Stop button: records the session so far, or discards it when
   // "Count stopped sessions" is off in the Pomo settings.
-  const handleStop = () => onCommand(config.countStopped === false ? 'pomo.discard' : 'pomo.stop');
+  const handleStop = () => onCommand(!observe && config.countStopped === false ? 'pomo.discard' : 'pomo.stop');
+
+  // Observe mode — "what was this?" whenever a work span closes (Stop or
+  // Break) untagged: free text + a tag (ADR 0016). A span already tagged with
+  // a task needs no question. The row sits above the controls, so the timer
+  // stays usable while it is open.
+  const lastRec = state.history[state.history.length - 1];
+  const prevHistoryLen = useRef(state.history.length);
+  const [askId, setAskId] = useState<string | null>(null);
+  useEffect(() => {
+    const grew = state.history.length > prevHistoryLen.current;
+    prevHistoryLen.current = state.history.length;
+    // Only unnamed spans are asked about; a continued name/task carries over.
+    if (observe && grew && lastRec && lastRec.kind === 'work' && !lastRec.taskId && !lastRec.label) setAskId(lastRec.id);
+  }, [observe, state.history.length, lastRec]);
+  const askRec = askId ? state.history.find((r) => r.id === askId) : undefined;
+  const tagLibrary = useBoardStore((s) => boardTagLibrary(s.board));
+  // Observe mode — what is being recorded (carried across breaks and stops),
+  // what Continue resumes, and recent names to pick from instead.
+  const doing: DoingChoice | null = !observe ? null
+    : state.activeTaskId ? { label: state.label || 'task', tag: null, taskId: state.activeTaskId }
+    : state.label ? { label: state.label, tag: state.tag ?? null, taskId: null } : null;
+  const continueName = doing?.label ?? '';
+  const recents: DoingChoice[] = [];
+  if (observe) {
+    const seen = new Set<string>();
+    for (let i = state.history.length - 1; i >= 0 && recents.length < 8; i--) {
+      const r = state.history[i]!;
+      if (r.kind === 'break' || (!r.taskId && !r.label)) continue;
+      const key = r.taskId ?? `${r.label}|${r.tag ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      recents.push({ label: r.label || 'task', tag: r.taskId ? null : r.tag ?? null, taskId: r.taskId ?? null });
+    }
+  }
+  const guessCategory = (text: string) => spanTagFor(useBoardStore.getState().board, text);
+  const taskName = (id: string) => {
+    const n = useBoardStore.getState().board?.nodes.find((x) => x.id === id);
+    return n ? (n.state as TaskState).text : undefined;
+  };
+  // Span log view (every recorded span of a day, with delete).
+  const [logOpen, setLogOpen] = useState(false);
+
   const handleExtend = () => onCommand('pomo.extend');
 
   const buttonLabel = primaryButtonLabel(state.status);
@@ -258,12 +310,16 @@ export function PomoNode({
     : 'Stop — end and record this session';
 
   // F1 — liquid fill height tracks remaining time
+  // Faces only render in Pomodoro mode; their scale is the session length.
+  // Observe mode shows a plain count-up of the current span instead.
+  const observedMs = state.status === 'break' ? breakElapsedMs : liveWorkMs;
+  const faceTotalMin = sessionMin;
   const remainingPct = calcRemainingPct(state.status, remainingMs, totalMs);
   // Elapsed pct — used by Ring/Blocks/Ascii variants
   const elapsedPct = 100 - remainingPct;
 
   const clockText = state.status === 'idle' || state.status === 'done'
-    ? formatRemaining(state.durationMin * 60_000)
+    ? formatRemaining(sessionMin * 60_000)
     : state.status === 'break'
       ? formatRemaining(breakElapsedMs) // break counts UP, open-ended
       : formatRemaining(remainingMs);
@@ -285,8 +341,10 @@ export function PomoNode({
 
   const headerLeft = isTaskMode
     ? `ON · ${truncate(state.label || 'task', 18)}`
-    : 'DEEP WORK';
-  const headerRight = isTaskMode ? '· TAGGED' : '· POMO.025';
+    : observe ? 'TIME LOG' : 'DEEP WORK';
+  const headerRight = observe
+    ? (state.status === 'break' ? '· BREAK' : '')
+    : isTaskMode ? '· TAGGED' : `· POMO.${String(sessionMin).padStart(3, '0')}`;
 
   // A.2 — gear disabled while session is in-flight (running, paused, break)
   const gearDisabled = state.status !== 'idle' && state.status !== 'done';
@@ -304,7 +362,10 @@ export function PomoNode({
   };
 
   const saveGear = () => {
-    onCommand('pomo.setConfig', { config: draftConfig });
+    // Mode is set live by its own toggle — don't let a stale draft revert it.
+    const { mode: _mode, ...rest } = draftConfig;
+    void _mode;
+    onCommand('pomo.setConfig', { config: rest });
     setGearOpen(false);
   };
 
@@ -390,6 +451,59 @@ export function PomoNode({
         <span style={{ color: 'var(--ink-3)' }}>{headerRight}</span>
         {/* A.1 — spacer pushes gear to the right */}
         <span style={{ flex: 1 }} />
+        {/* Span log — every recorded span, to find and delete misclicks. */}
+        <button
+          type="button"
+          className="pomo-gear-btn"
+          data-testid="pomo-log-toggle"
+          aria-pressed={logOpen}
+          title={logOpen ? 'Back to the timer' : 'Recorded spans — see and delete them'}
+          onClick={(e) => { e.stopPropagation(); setGearOpen(false); setLogOpen((o) => !o); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid)', borderColor: 'var(--acid)' } : {}) }}
+        >
+          {logOpen ? '✕' : '☰'}
+        </button>
+        {/* Mode switch — Pomodoro rhythm, or just observe where the time goes.
+            Locked while a span is in flight, like the gear. */}
+        <div
+          role="group"
+          aria-label="Pomo mode"
+          style={{ display: 'flex', border: '1px solid var(--paper-3)', borderRadius: 4, overflow: 'hidden' }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {(['pomodoro', 'observe'] as const).map((m) => {
+            const active = (config.mode ?? 'pomodoro') === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                data-testid={`pomo-mode-${m}`}
+                aria-pressed={active}
+                disabled={gearDisabled && !active}
+                title={gearDisabled
+                  ? 'Stop the current span to switch mode'
+                  : m === 'observe'
+                    ? 'Observe — Start, Break, Stop. No session length or pips; tag what you did when a span ends.'
+                    : 'Pomodoro — sessions, breaks, pips'}
+                onClick={(e) => { e.stopPropagation(); if (!active) onCommand('pomo.setConfig', { config: { mode: m } }); }}
+                style={{
+                  padding: '2px 7px',
+                  background: active ? 'var(--rust)' : 'transparent',
+                  color: active ? 'var(--paper)' : 'var(--ink-3)',
+                  border: 'none',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  letterSpacing: '0.06em',
+                  cursor: gearDisabled ? 'not-allowed' : 'pointer',
+                  opacity: gearDisabled && !active ? 0.4 : 1,
+                }}
+              >
+                {m === 'pomodoro' ? 'POMO' : 'OBSERVE'}
+              </button>
+            );
+          })}
+        </div>
         {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight */}
         <button
           type="button"
@@ -434,7 +548,7 @@ export function PomoNode({
             settings
           </div>
 
-          {([
+          {!observe && ([
             ['sessionMin', 'Session (min)'],
             ['shortBreakMin', 'Short break (min)'],
             ['longBreakMin', 'Long break (min)'],
@@ -453,7 +567,7 @@ export function PomoNode({
           ))}
 
           {/* Does Stop record the session so far? (one Stop button either way) */}
-          <div className="pomo-settings-row">
+          {!observe && <div className="pomo-settings-row">
             <span className="pomo-settings-label" title="On: Stop records the work so far. Off: Stop discards the session.">Count stopped sessions</span>
             <button
               type="button"
@@ -471,8 +585,9 @@ export function PomoNode({
             >
               <span style={{ width: 16, height: 16, borderRadius: 999, background: config.countStopped !== false ? '#0a0908' : 'var(--ink-3)' }} />
             </button>
-          </div>
+          </div>}
 
+          {!observe && (<>
           {/* PR4 — face picker: 5 segmented buttons, one per variant */}
           <div
             className="pomo-settings-row"
@@ -521,6 +636,7 @@ export function PomoNode({
             })}
           </div>
 
+          </>)}
           <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
             <button
               type="button"
@@ -568,35 +684,63 @@ export function PomoNode({
             </button>
           </div>
         </div>
+      ) : logOpen ? (
+        <div style={{ padding: bodyPadding }}>
+          <SpanLog
+            history={state.history}
+            library={tagLibrary}
+            taskName={taskName}
+            onDelete={(id) => onCommand('pomo.deleteSegment', { id })}
+            onName={(id) => { setAskId(id); setLogOpen(false); }}
+          />
+          {/* DEV-only (#180) — record a finished 30-min span ending now, to try
+              the "log this span" flow without waiting. Not in production builds. */}
+          {import.meta.env.DEV && (
+            <button
+              type="button"
+              data-testid="pomo-dev-demo"
+              onClick={() => { onCommand('pomo.devSeedSegment', { kind: 'work', minutes: 30, agoMin: 0, label: '' }); setLogOpen(false); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{ marginTop: 8, width: '100%', padding: '5px', background: 'transparent', border: '1px dashed var(--ink-4)', borderRadius: 4, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 9, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+            >
+              dev · + 30 min demo span
+            </button>
+          )}
+        </div>
       ) : (
         <div style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap }}>
           {/* PR4 — timer face switch: swap inner face without touching outer chrome */}
+          {observe ? (
+            <ObserveDash state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} />
+          ) : (<>
           {activeFace === 'ascii' && (
-            <Ascii m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+            <Ascii m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           {activeFace === 'lcd' && (
-            <Lcd m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+            <Lcd m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           {activeFace === 'blocks' && (
-            <Blocks m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+            <Blocks m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           {activeFace === 'vapor' && (
-            <Vapor m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+            <Vapor m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           {activeFace === 'vu' && (
-            <Vu m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+            <Vu m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           {activeFace === 'outline' && (
-            <Outline m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+            <Outline m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           {activeFace === 'mac' && (
-            <Mac m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} running={running} />
+            <Mac m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
+          </>)}
 
           {/* Today's full-cycle counter — distinct visual from the session pips
               (squares + numeric badge + acid glow) so it reads as "achievement"
               not "in-progress session". Always rendered so the user gets a
               live count even at 0 cycles. Tooltip carries the breakdown. */}
+          {observe ? null : (<>
           <CycleCounter
             cyclesToday={cyclesToday}
             sessionsToday={sessionsToday}
@@ -657,6 +801,7 @@ export function PomoNode({
               session {sessionsForDisplay} / {pipCount}
             </span>
           </div>
+          </>)}
 
           {/* Issue #166 — observer-model controls. Every control carries a
               hover tooltip (#6) explaining exactly what it does:
@@ -672,9 +817,25 @@ export function PomoNode({
               only a label on the recorded spans; changing it never resets
               the timer, and recorded spans can be retagged later from the
               Calendar/Clock. Starting untagged suggests the task planned now. */}
+          {/* Observe mode — pick what you're doing (recent, a task, or new);
+              Start / Continue / Back to work record it. */}
+          {observe && !askRec && (
+            <DoingPicker
+              caption={state.status === 'running' ? 'doing' : 'next'}
+              current={doing}
+              recents={recents}
+              tasks={tagOptions}
+              library={tagLibrary}
+              onPick={(c) => c.taskId
+                ? onCommand('pomo.tag', { taskId: c.taskId })
+                : onCommand('pomo.setLiveLabel', { label: c.label, ...(c.tag ? { tag: c.tag } : {}) })}
+              onClear={() => onCommand('pomo.tag', { taskId: null })}
+            />
+          )}
+          {!observe && (
           <label
             data-testid="pomo-tag"
-            title="What is this session spent on? Only labels the recorded time — it never controls the timer."
+            title="Link a task: time recorded from now counts toward that task (and its category). It never controls the timer."
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -688,15 +849,15 @@ export function PomoNode({
               color: 'var(--ink-3)',
             }}
           >
-            <span style={{ color: isTaskMode ? 'var(--acid)' : 'var(--ink-4)' }}>●</span>
-            <span>ON</span>
+            <span aria-hidden style={{ color: isTaskMode ? 'var(--acid)' : 'var(--ink-4)' }}>{isTaskMode ? '☑' : '☐'}</span>
+            <span>TASK</span>
             <AppSelect
-              ariaLabel="Tag this session with a task"
+              ariaLabel="Link this session to a task"
               testId="pomo-tag-select"
               value={state.activeTaskId ?? ''}
               onChange={(v) => onCommand('pomo.tag', { taskId: v === '' ? null : v })}
               options={[
-                { value: '', label: 'untagged' },
+                { value: '', label: 'no task (optional)' },
                 ...(state.activeTaskId !== null && !tagOptions.some((o) => o.id === state.activeTaskId)
                   ? [{ value: state.activeTaskId, label: state.label || 'task' }]
                   : []),
@@ -705,8 +866,100 @@ export function PomoNode({
               style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 10.5, padding: '2px 0' }}
             />
           </label>
+          )}
 
-          {promptDone ? (
+          {askRec && (
+            <SpanLabeler
+              key={askRec.id}
+              minutes={Math.round((Date.parse(askRec.endedAt) - Date.parse(askRec.startedAt)) / 60_000)}
+              initialText={askRec.label}
+              tasks={tagOptions}
+              library={tagLibrary}
+              guess={guessCategory}
+              onSave={(l) => {
+                onCommand('pomo.retagSegment', 'taskId' in l
+                  ? { id: askRec.id, taskId: l.taskId }
+                  : { id: askRec.id, taskId: null, label: l.text, ...(l.tag ? { tag: l.tag } : {}) });
+                // The latest span's label becomes what's being done now, so
+                // continuing doesn't ask again. Renaming an older span from the log doesn't.
+                const latestWork = [...state.history].reverse().find((r) => r.kind === 'work');
+                if (latestWork?.id === askRec.id) {
+                  if ('taskId' in l) onCommand('pomo.tag', { taskId: l.taskId });
+                  else onCommand('pomo.setLiveLabel', { label: l.text, ...(l.tag ? { tag: l.tag } : {}) });
+                }
+                setAskId(null);
+              }}
+              onSkip={() => setAskId(null)}
+              onAddCategory={(label) => onCommand('pomo.addCategory', { label })}
+            />
+          )}
+
+          {/* Observe mode: Start → (Break ⇄ Back to work) → Stop. Work and
+              breaks are both recorded spans; there is no pause. */}
+          {observe && state.status !== 'paused' ? (
+            <div className="pomo-controls" style={{ display: 'flex', gap: 6 }}>
+              {state.status === 'running' && (
+                <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={{ ...ghostBtnStyle, height: 38 }} title="Break — records the work so far, then times your break">
+                  BREAK
+                </button>
+              )}
+              {/* After a break or a stop: carry on with what you were doing, or
+                  start something new (asked about when it ends). */}
+              {state.status === 'break' && continueName && (
+                <button
+                  type="button"
+                  data-testid="pomo-new"
+                  onClick={() => { onCommand('pomo.tag', { taskId: null }); onCommand('pomo.resume'); }}
+                  className="pomo-btn ghost"
+                  style={{ ...ghostBtnStyle, flex: '0 0 auto', height: 38, padding: '0 12px' }}
+                  title="Start something new — you'll be asked what it was when it ends"
+                >
+                  NEW
+                </button>
+              )}
+              {state.status === 'break' && (
+                <button
+                  type="button"
+                  data-testid="pomo-resume"
+                  onClick={() => onCommand('pomo.resume')}
+                  className="pomo-btn ghost"
+                  style={{ ...ghostBtnStyle, height: 38, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={continueName ? `Back to "${continueName}" — records the break` : 'Back to work — records the break, starts a new work span'}
+                >
+                  {continueName ? `BACK TO ${truncate(continueName, 14)}` : 'BACK TO WORK'}
+                </button>
+              )}
+              {(state.status === 'idle' || state.status === 'done') && continueName && (
+                <button
+                  type="button"
+                  data-testid="pomo-new"
+                  onClick={() => { onCommand('pomo.tag', { taskId: null }); onCommand('pomo.start'); }}
+                  className="pomo-btn ghost"
+                  style={{ ...ghostBtnStyle, flex: '0 0 auto', height: 38, padding: '0 14px' }}
+                  title="Start something new — you'll be asked what it was when it ends"
+                >
+                  NEW
+                </button>
+              )}
+              <button
+                type="button"
+                data-testid="pomo-primary"
+                onClick={state.status === 'running' || state.status === 'break' ? handleStop : handlePrimary}
+                className="pomo-btn"
+                style={{ ...primaryIconBtnStyle, flex: 1, minWidth: 0 }}
+                title={state.status === 'idle' || state.status === 'done'
+                  ? continueName ? `Continue "${continueName}"` : 'Start observing'
+                  : 'Stop — record this span and end'}
+              >
+                <PomoIcon kind={state.status === 'idle' || state.status === 'done' ? 'play' : 'stop'} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {state.status === 'idle' || state.status === 'done'
+                    ? continueName ? `CONTINUE ${truncate(continueName, 18)}` : 'START'
+                    : 'STOP'}
+                </span>
+              </button>
+            </div>
+          ) : promptDone ? (
             <div
               data-testid="pomo-prompt"
               className="pomo-controls"
@@ -760,69 +1013,6 @@ export function PomoNode({
                 <PomoIcon kind={state.status === 'running' ? 'pause' : state.status === 'break' ? 'skip' : 'play'} />
                 {buttonLabel}
               </button>
-            </div>
-          )}
-
-          {/* DEV-only (#180) — seed synthetic tracked-reality segments so the
-              Clock dial wash + Calendar background wash can be inspected without
-              running a real session. Stripped from production builds. */}
-          {import.meta.env.DEV && (
-            <div
-              data-testid="pomo-dev-viz"
-              style={{
-                marginTop: 4,
-                padding: '6px 8px',
-                border: '1px dashed var(--ink-4)',
-                borderRadius: 5,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 5,
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <span style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 8.5,
-                color: 'var(--ink-4)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-              }}>
-                dev · seed reality
-              </span>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <button
-                  type="button"
-                  data-testid="pomo-dev-seed-work"
-                  onClick={() => onCommand('pomo.devSeedSegment', { kind: 'work', minutes: 30, agoMin: 0 })}
-                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
-                >
-                  +30m WORK
-                </button>
-                <button
-                  type="button"
-                  data-testid="pomo-dev-seed-break"
-                  onClick={() => onCommand('pomo.devSeedSegment', { kind: 'break', minutes: 10, agoMin: 0 })}
-                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
-                >
-                  +10m BREAK
-                </button>
-                <button
-                  type="button"
-                  data-testid="pomo-dev-clear"
-                  onClick={() => onCommand('pomo.devClearSeeded')}
-                  style={{ ...ghostBtnStyle, fontSize: 9, padding: '5px 4px' }}
-                >
-                  CLEAR
-                </button>
-              </div>
-              <span style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 8,
-                color: 'var(--ink-4)',
-                lineHeight: 1.3,
-              }}>
-                seeds segments ending now → see Clock dial + Calendar today
-              </span>
             </div>
           )}
 

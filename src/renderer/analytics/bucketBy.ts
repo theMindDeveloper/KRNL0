@@ -34,10 +34,9 @@ export function byDay(events: readonly AnalyticsEvent[], range: RangeArg): DayBu
     if (!b) continue;
     if (e.type === 'task.completed') b.taskCount += 1;
     else if (e.type === 'habit.checkin') b.habitCount += 1;
-    else if (e.type === 'pomo.session') {
-      b.sessions += 1;
-      b.focusMin += e.durationMin ?? 0;
-    }
+    else if (e.type === 'pomo.session') b.sessions += 1;
+    // Focus is all work actually tracked, not only spans that hit the session length.
+    else if (e.type === 'pomo.work') b.focusMin += e.durationMin ?? 0;
   }
   return Array.from(map.values());
 }
@@ -47,16 +46,16 @@ export function totals(events: readonly AnalyticsEvent[], range: RangeArg): Tota
   let habitCheckins = 0;
   let focusMin = 0;
   let sessions = 0;
+  let breakMin = 0;
   for (const e of events) {
     if (!inRange(e.date, range)) continue;
     if (e.type === 'task.completed') tasksDone += 1;
     else if (e.type === 'habit.checkin') habitCheckins += 1;
-    else if (e.type === 'pomo.session') {
-      sessions += 1;
-      focusMin += e.durationMin ?? 0;
-    }
+    else if (e.type === 'pomo.session') sessions += 1;
+    else if (e.type === 'pomo.work') focusMin += e.durationMin ?? 0;
+    else if (e.type === 'pomo.break') breakMin += e.durationMin ?? 0;
   }
-  return { tasksDone, habitCheckins, focusMin, sessions };
+  return { tasksDone, habitCheckins, focusMin, sessions, breakMin };
 }
 
 export function byDayOfWeek(events: readonly AnalyticsEvent[], range: RangeArg): DowBucket[] {
@@ -69,7 +68,7 @@ export function byDayOfWeek(events: readonly AnalyticsEvent[], range: RangeArg):
     const b = out[dowOf(e.date)]!;
     if (e.type === 'task.completed') b.tasks += 1;
     else if (e.type === 'habit.checkin') b.habits += 1;
-    else if (e.type === 'pomo.session') b.focusMin += e.durationMin ?? 0;
+    else if (e.type === 'pomo.work') b.focusMin += e.durationMin ?? 0;
   }
   return out;
 }
@@ -84,7 +83,7 @@ export function byHourOfDay(events: readonly AnalyticsEvent[], range: RangeArg):
     if (h < 0 || h > 23) continue;
     const b = out[h]!;
     if (e.type === 'task.completed') b.tasks += 1;
-    else if (e.type === 'pomo.session') b.focusMin += e.durationMin ?? 0;
+    else if (e.type === 'pomo.work') b.focusMin += e.durationMin ?? 0;
   }
   return out;
 }
@@ -97,7 +96,7 @@ export function byMonth(events: readonly AnalyticsEvent[], year: number): MonthB
     const b = out[monthOf(e.date) - 1]!;
     if (e.type === 'task.completed') b.tasks += 1;
     else if (e.type === 'habit.checkin') b.habits += 1;
-    else if (e.type === 'pomo.session') b.focusMin += e.durationMin ?? 0;
+    else if (e.type === 'pomo.work') b.focusMin += e.durationMin ?? 0;
   }
   return out;
 }

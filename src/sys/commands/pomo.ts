@@ -1,6 +1,6 @@
 import type { SysResult } from '../SysFacade';
 import type { PomoConfig, PomoState, TimerFace } from '../../renderer/components/nodes/PomoNode/types';
-import { TIMER_FACES } from '../../renderer/components/nodes/PomoNode/types';
+import { OBSERVE_SPAN_MIN, TIMER_FACES } from '../../renderer/components/nodes/PomoNode/types';
 import {
   pomoStart as fsmStart,
   pomoStop as fsmStop,
@@ -10,6 +10,7 @@ import {
   pomoResume as fsmResume,
   pomoDiscard as fsmDiscard,
   pomoDeleteSegment as fsmDeleteSegment,
+  pomoRetagSegment as fsmRetag,
   type PomoEnv,
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
@@ -18,6 +19,7 @@ import type { BoardShape } from '../../shared/dispatch/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
 import { selectPomoReality } from '../../renderer/store/pomoReality';
+import { spanTagFor } from '../../renderer/store/spanTags';
 
 const VALID_FACES: readonly TimerFace[] = TIMER_FACES;
 function isTimerFace(v: unknown): v is TimerFace {
@@ -63,7 +65,9 @@ export function pomoStart(label?: string, minutes?: number): SysResult {
       return;
     }
     const cfg = node['config'] ?? {};
-    const sessionMin = minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
+    const sessionMin = cfg['mode'] === 'observe'
+      ? OBSERVE_SPAN_MIN
+      : minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
     const startArgs: { label?: string; durationMin?: number; activeTaskId?: string | null } = { durationMin: sessionMin };
     if (label !== undefined) startArgs.label = label;
     // Same as the UI: an untagged start is tagged with the open task whose
@@ -121,7 +125,7 @@ export function pomoPause(): SysResult {
 }
 
 export function pomoResume(): SysResult {
-  return pomoTransition(['paused'], 'resume', (s) => fsmResume(s, {}, cliEnv()), 'Pomodoro resumed');
+  return pomoTransition(['paused', 'break'], 'resume', (s) => fsmResume(s, {}, cliEnv()), 'Pomodoro resumed');
 }
 
 /** Abandon the in-flight span without recording it (the UI's RESET). */
@@ -227,14 +231,25 @@ export function pomoTag(ctx: PomoTagCtx, ref: string | undefined): SysResult {
 }
 
 /** `krnl pomo retag <segmentId> <taskRef|none>` — fix what recorded time was spent on. */
-export function pomoRetag(ctx: PomoTagCtx, segmentId: string | undefined, ref: string | undefined): SysResult {
-  if (!segmentId || !ref) return { ok: false, message: 'pomo retag requires <segmentId> <taskRef|none>' };
+export function pomoRetag(
+  ctx: PomoTagCtx,
+  segmentId: string | undefined,
+  ref: string | undefined,
+  free: { text?: string | undefined; tag?: string | undefined } = {},
+): SysResult {
+  const text = free.text?.trim() ?? '';
+  if (!segmentId || (!ref && !text)) return { ok: false, message: 'pomo retag requires <segmentId> <taskRef|none> or --text "what" [--tag <tag>]' };
   let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
   mutatePomoBoard(ctx, (board) => {
     const node = findPomoNode(board);
     if (!node) return;
-    const tag = resolveTag(board as unknown as BoardShape, ref);
+    const tag = text
+      ? { taskId: null, label: text }
+      : resolveTag(board as unknown as BoardShape, ref as string);
     if ('error' in tag) { result = { ok: false, message: tag.error }; return; }
+    // Observe mode — a free-text span gets a tag id (explicit, else classified).
+    const spanTag = text ? spanTagFor(board as unknown as Board, text, free.tag ?? null) : null;
+    if (text && free.tag && !spanTag) { result = { ok: false, message: `unknown tag "${free.tag}"` }; return; }
     const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
     const matches = prev.history.filter((r) => r.id.startsWith(segmentId));
     if (matches.length !== 1) {
@@ -244,9 +259,10 @@ export function pomoRetag(ctx: PomoTagCtx, segmentId: string | undefined, ref: s
     const id = matches[0]!.id;
     node['state'] = {
       ...prev,
-      history: prev.history.map((r) => (r.id === id ? { ...r, taskId: tag.taskId, label: tag.label } : r)),
+      history: fsmRetag(prev, { id, taskId: tag.taskId, label: tag.label, tag: spanTag }).history,
     };
-    result = { ok: true, message: `segment ${id.slice(0, 8)} → ${tag.taskId ? `"${tag.label}"` : 'untagged'}` };
+    const shown = tag.taskId || text ? `"${tag.label}"${spanTag ? ` [${spanTag}]` : ''}` : 'untagged';
+    result = { ok: true, message: `segment ${id.slice(0, 8)} → ${shown}` };
   });
   return result;
 }
@@ -364,6 +380,7 @@ export function pomoConfig(opts: {
   every?: number;
   face?: string;
   countStopped?: boolean;
+  mode?: string;
 }): SysResult {
   // Resolve path: env override (test) or Electron default.
   const boardPath: string | undefined = process.env['KRNL0_BOARD_PATH'];
@@ -398,7 +415,7 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
   const { readBoardFile: rfb, mutateBoard: mb } = getBoardIo();
 
   if (opts.session === undefined && opts.short === undefined && opts.long === undefined
-    && opts.every === undefined && opts.face === undefined && opts.countStopped === undefined) {
+    && opts.every === undefined && opts.face === undefined && opts.countStopped === undefined && opts.mode === undefined) {
     const board = rfb();
     if (!board) return { ok: false, message: 'No board found' };
     const node = findPomoNode(board);
@@ -411,10 +428,14 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
       longBreakEvery: cfg.longBreakEvery ?? 4,
       face: cfg.face ?? 'vapor',
       countStopped: cfg.countStopped ?? true,
+      mode: cfg.mode ?? 'pomodoro',
     };
     return { ok: true, message: JSON.stringify(info), data: info };
   }
 
+  if (opts.mode !== undefined && opts.mode !== 'pomodoro' && opts.mode !== 'observe') {
+    return { ok: false, message: `pomo config: invalid --mode "${opts.mode}". Allowed: pomodoro, observe` };
+  }
   if (opts.face !== undefined && opts.face !== 'auto' && !isTimerFace(opts.face)) {
     return {
       ok: false,
@@ -435,6 +456,7 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
     if (opts.face === 'auto') delete next.face;
     else if (opts.face !== undefined) next.face = opts.face as TimerFace;
   if (opts.countStopped !== undefined) next.countStopped = opts.countStopped;
+  if (opts.mode === 'pomodoro' || opts.mode === 'observe') next.mode = opts.mode;
     node['config'] = next;
     found = true;
   });
@@ -444,7 +466,7 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
 
 function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: string): SysResult {
   if (opts.session === undefined && opts.short === undefined && opts.long === undefined
-    && opts.every === undefined && opts.face === undefined && opts.countStopped === undefined) {
+    && opts.every === undefined && opts.face === undefined && opts.countStopped === undefined && opts.mode === undefined) {
     const raw = loadBoardFrom(boardPath) as BoardLike | null;
     if (!raw) return { ok: false, message: 'No board found' };
     const board: BoardLike = {
@@ -461,10 +483,14 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
       longBreakEvery: cfg.longBreakEvery ?? 4,
       face: cfg.face ?? 'vapor',
       countStopped: cfg.countStopped ?? true,
+      mode: cfg.mode ?? 'pomodoro',
     };
     return { ok: true, message: JSON.stringify(info), data: info };
   }
 
+  if (opts.mode !== undefined && opts.mode !== 'pomodoro' && opts.mode !== 'observe') {
+    return { ok: false, message: `pomo config: invalid --mode "${opts.mode}". Allowed: pomodoro, observe` };
+  }
   if (opts.face !== undefined && opts.face !== 'auto' && !isTimerFace(opts.face)) {
     return {
       ok: false,
@@ -491,6 +517,7 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
   if (opts.face === 'auto') delete next.face;
   else if (opts.face !== undefined) next.face = opts.face as TimerFace;
   if (opts.countStopped !== undefined) next.countStopped = opts.countStopped;
+  if (opts.mode === 'pomodoro' || opts.mode === 'observe') next.mode = opts.mode;
   node['config'] = next;
 
   saveBoardTo(boardPath, { ...(board as unknown as Record<string, unknown>), savedAt: new Date().toISOString() });

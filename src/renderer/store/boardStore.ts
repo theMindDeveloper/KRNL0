@@ -5,6 +5,24 @@ import type { DrawStroke } from '../../shared/types/board';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
 import { recordCompletion as recordCompletionLedger, clearCompletion as clearCompletionLedger } from './completionLedger';
+import {
+  activeCanvasOf,
+  isSharedNode,
+  isStrokeOnCanvas,
+  newCanvasId,
+  addCanvas as addCanvasTo,
+  renameCanvas as renameCanvasIn,
+  switchCanvas as switchCanvasIn,
+  deleteCanvas as deleteCanvasFrom,
+} from '../../shared/canvas';
+
+/** Undo/redo restore content, not where the user is looking: keep the current
+ *  canvas when the restored snapshot still has it. */
+function keepActiveCanvas(snapshot: Board, current: Board): Board {
+  const id = current.activeCanvasId;
+  if (!id || snapshot.activeCanvasId === id || !(snapshot.canvases ?? []).some((c) => c.id === id)) return snapshot;
+  return { ...snapshot, activeCanvasId: id };
+}
 
 const INITIAL_VIEWPORT: BoardViewport = { x: 0, y: 160, zoom: 1 };
 const ZOOM_MIN = 0.25;
@@ -109,6 +127,12 @@ interface BoardStore {
   // Both persist through the same saveBoard IPC path as all other mutations.
   setLayoutMode: (mode: LayoutMode) => void;
   setLayoutGeometry: (geom: Board['layoutGeometry']) => void;
+  // Decision 33 — free-content canvases. add/rename/delete are undoable;
+  // switching is navigation (no history). All persist via saveBoard.
+  addCanvas: (name: string) => string | null;
+  renameCanvas: (id: string, name: string) => void;
+  deleteCanvas: (id: string) => boolean;
+  switchCanvas: (id: string) => void;
 }
 
 const HISTORY_CAP = 50;
@@ -188,12 +212,15 @@ export const useBoardStore = create<BoardStore>((set) => ({
       };
     }),
 
+  // Free nodes always land on the active canvas — overwriting any canvasId a
+  // pasted / duplicated node carried over from its source (Decision 33).
   addNode: (node) =>
     set((s) => {
       if (!s.board) return s;
+      const placed = isSharedNode(node) ? node : { ...node, canvasId: activeCanvasOf(s.board) };
       return {
         ...pushHistory(s),
-        board: { ...s.board, nodes: [...s.board.nodes, node] },
+        board: { ...s.board, nodes: [...s.board.nodes, placed] },
       };
     }),
 
@@ -309,7 +336,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
       if (!s.board || s.history.length === 0) return s;
       const prev = s.history[s.history.length - 1]!;
       return {
-        board: prev,
+        board: keepActiveCanvas(prev, s.board),
         history: s.history.slice(0, -1),
         future: [s.board, ...s.future].slice(0, HISTORY_CAP),
       };
@@ -320,7 +347,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
       if (!s.board || s.future.length === 0) return s;
       const next = s.future[0]!;
       return {
-        board: next,
+        board: keepActiveCanvas(next, s.board),
         history: [...s.history, s.board].slice(-HISTORY_CAP),
         future: s.future.slice(1),
       };
@@ -339,7 +366,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
   addStroke: (stroke) =>
     set((s) => {
       if (!s.board) return s;
-      const board = { ...s.board, drawings: [...(s.board.drawings ?? []), stroke] };
+      const board = { ...s.board, drawings: [...(s.board.drawings ?? []), { ...stroke, canvasId: activeCanvasOf(s.board) }] };
       void saveBoard(board);
       return { ...pushHistory(s), board };
     }),
@@ -369,10 +396,15 @@ export const useBoardStore = create<BoardStore>((set) => ({
       return { ...pushHistory(s), board };
     }),
 
+  // Clears the active canvas's strokes only (Decision 33).
   clearDrawings: () =>
     set((s) => {
-      if (!s.board || !(s.board.drawings ?? []).length) return s;
-      const board = { ...s.board, drawings: [] };
+      if (!s.board) return s;
+      const active = activeCanvasOf(s.board);
+      const all = s.board.drawings ?? [];
+      const kept = all.filter((d) => !isStrokeOnCanvas(d, active));
+      if (kept.length === all.length) return s;
+      const board = { ...s.board, drawings: kept };
       void saveBoard(board);
       return { ...pushHistory(s), board };
     }),
@@ -441,6 +473,45 @@ export const useBoardStore = create<BoardStore>((set) => ({
       void saveBoard(updated);
       return { board: updated };
     });
+  },
+
+  addCanvas: (name) => {
+    const s = useBoardStore.getState();
+    if (!s.board) return null;
+    const id = newCanvasId();
+    // A new canvas opens immediately.
+    const board = switchCanvasIn(addCanvasTo(s.board, name.trim() || 'Untitled', id), id);
+    useBoardStore.setState({ ...pushHistory(s), board, selectedNodeId: null });
+    void saveBoard(board);
+    return id;
+  },
+
+  renameCanvas: (id, name) => {
+    const s = useBoardStore.getState();
+    const trimmed = name.trim();
+    if (!s.board || !trimmed) return;
+    const board = renameCanvasIn(s.board, id, trimmed);
+    useBoardStore.setState({ ...pushHistory(s), board });
+    void saveBoard(board);
+  },
+
+  deleteCanvas: (id) => {
+    const s = useBoardStore.getState();
+    if (!s.board) return false;
+    const board = deleteCanvasFrom(s.board, id);
+    if (!board) return false;
+    useBoardStore.setState({ ...pushHistory(s), board, selectedNodeId: null });
+    void saveBoard(board);
+    return true;
+  },
+
+  switchCanvas: (id) => {
+    const s = useBoardStore.getState();
+    if (!s.board || activeCanvasOf(s.board) === id) return;
+    const board = switchCanvasIn(s.board, id);
+    if (board.activeCanvasId !== id) return;
+    useBoardStore.setState({ board, selectedNodeId: null });
+    void saveBoard(board);
   },
 
   // NOTE: `theme` in the store is no longer the authoritative source of truth for

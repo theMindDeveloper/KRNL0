@@ -49,15 +49,33 @@ export function computeTagBreakdown(board: Board, range: RangeArg, nowMs: number
   const examples = todoState ? tagExamples(todoState) : [];
 
   const tracked = new Map<string, number>();
+  const freeSpans: Array<{ date: string; tag: string; minutes: number }> = [];
   for (const seg of selectPomoReality(board, nowMs)) {
-    if (seg.kind === 'break' || !seg.taskId) continue;
-    tracked.set(seg.taskId, (tracked.get(seg.taskId) ?? 0) + (seg.endMs - seg.startMs) / 60_000);
+    if (seg.kind === 'break') continue;
+    const minutes = (seg.endMs - seg.startMs) / 60_000;
+    if (seg.taskId) tracked.set(seg.taskId, (tracked.get(seg.taskId) ?? 0) + minutes);
+    // Observe mode — free-text spans ("emails") count by their own tag.
+    else if (seg.label) freeSpans.push({ date: isoToYMD(new Date(seg.startMs).toISOString()), tag: seg.tag ?? UNTAGGED_ID, minutes });
   }
 
   const days = new Map<string, Record<string, number>>(eachDay(range).map((d) => [d, {}]));
   const slices = new Map<string, TagSlice>();
   let totalMin = 0;
   let totalCount = 0;
+
+  for (const f of freeSpans) {
+    const day = days.get(f.date);
+    if (!day) continue;
+    const disp = f.tag === UNTAGGED_ID
+      ? { id: UNTAGGED_ID, label: 'Other', color: 'var(--ink-4)' }
+      : tagDisplay(library, f.tag);
+    const minutes = Math.round(f.minutes);
+    const slice = slices.get(disp.id) ?? { ...disp, count: 0, minutes: 0, share: 0 };
+    slice.minutes += minutes;
+    slices.set(disp.id, slice);
+    day[disp.id] = (day[disp.id] ?? 0) + minutes;
+    totalMin += minutes;
+  }
 
   for (const c of ledger) {
     if (!c.completedAt) continue;

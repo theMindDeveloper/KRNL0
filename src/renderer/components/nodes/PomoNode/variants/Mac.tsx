@@ -1,14 +1,16 @@
 // Mac — the timer as a retro Mac desk accessory (ADR 0009, Macintosh
 // default): big digits in a framed display, a filled progress bar with a
-// hatched "now" cell and a 0–25 minute scale, then "N of 25 minutes".
+// hatched "now" cell and a 0–total minute scale, then "N of total minutes".
 // Same information as Blocks; session pips and cycles render below it.
 
 import type { TimerFaceProps } from './types';
 
-const TOTAL = 25;
-const SCALE = [0, 5, 10, 15, 20, 25];
+/** Six evenly spaced scale ticks from 0 to the total. */
+const scaleFor = (total: number) => [0, 1, 2, 3, 4, 5].map((i) => Math.round((total * i) / 5));
 
-export function Mac({ m, s, elapsedPct }: TimerFaceProps) {
+export function Mac({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
+  const TOTAL = Math.max(1, Math.round(total));
+  const SCALE = scaleFor(TOTAL);
   const minsElapsed = Math.min(TOTAL, Math.floor((elapsedPct / 100) * TOTAL));
   const donePct = (minsElapsed / TOTAL) * 100;
   const nowPct = 100 / TOTAL;

@@ -10,6 +10,7 @@ import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
 import { drawList, drawClear, drawDelete } from './commands/draw';
+import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
 import { mediaAdd, mediaList } from './commands/media';
 import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
 import {
@@ -427,7 +428,7 @@ export class SysFacade {
           };
           return command.sub === 'tag'
             ? pomoTag(tagCtx, command.ref)
-            : pomoRetag(tagCtx, command.segmentId, command.ref);
+            : pomoRetag(tagCtx, command.segmentId, command.ref, { text: command.text, tag: command.tag });
         }
         case 'delete-segment': {
           const segCtx = {
@@ -450,6 +451,7 @@ export class SysFacade {
           if (command.every !== undefined) cfgOpts.every = command.every;
           if (command.face !== undefined) cfgOpts.face = command.face;
           if (command.countStopped !== undefined) cfgOpts.countStopped = command.countStopped;
+          if (command.mode !== undefined) cfgOpts.mode = command.mode;
           const res = pomoConfig(cfgOpts);
           // The file-path variant writes board.json directly; tell the
           // renderer to reload or its next save would revert the change.
@@ -568,6 +570,20 @@ export class SysFacade {
         case 'list':   return drawList(dCtx, command.json);
         case 'clear':  return drawClear(dCtx);
         case 'delete': return drawDelete(dCtx, command.id);
+      }
+    }
+
+    if (command.kind === 'canvas') {
+      const cCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'list':   return canvasList(cCtx, command.json);
+        case 'add':    return canvasAdd(cCtx, command.name);
+        case 'switch': return canvasSwitch(cCtx, command.ref);
+        case 'rename': return canvasRename(cCtx, command.ref, command.name);
+        case 'delete': return canvasDelete(cCtx, command.ref);
       }
     }
 

@@ -17,6 +17,11 @@ const defaultEnv: PomoEnv = {
 
 const toIso = (ms: number): string => new Date(ms).toISOString();
 
+/** Observe mode — a free-text span carries the live category tag (a task span
+ *  takes its colour from the task). */
+const liveTag = (state: PomoState): { tag?: string } =>
+  state.activeTaskId === null && state.tag ? { tag: state.tag } : {};
+
 export const pomoStart = (
   state: PomoState,
   args: {
@@ -58,6 +63,21 @@ export const pomoResume = (
   _args: object = {},
   env: PomoEnv = defaultEnv,
 ): PomoState => {
+  // Back to work from a break: record the break span, open a fresh work span.
+  if (state.status === 'break' && state.startedAt !== null) {
+    const now = env.now();
+    const rec: PomoSessionRecord = {
+      id: env.uuid(),
+      startedAt: state.startedAt,
+      endedAt: toIso(now),
+      durationMin: Math.max(0, Math.round((now - Date.parse(state.startedAt)) / 60_000)),
+      label: state.label,
+      completed: false,
+      taskId: state.activeTaskId,
+      kind: 'break',
+    };
+    return { ...state, status: 'running', startedAt: toIso(now), sessionWorkSec: 0, history: [...state.history, rec] };
+  }
   if (state.status !== 'paused') return state;
   // Close the pre-pause work as its own span and open a fresh one at `now`, so
   // the Clock/Calendar draw the pause gap as a gap (not as work) and a pause
@@ -77,6 +97,7 @@ export const pomoResume = (
             completed: false,
             taskId: state.activeTaskId,
             kind: 'work' as const,
+            ...liveTag(state),
           },
         ]
       : state.history;
@@ -112,6 +133,7 @@ export const pomoCancel = (
     completed: false,
     taskId: state.activeTaskId,
     kind: 'work',
+    ...liveTag(state),
   };
   return {
     ...state,
@@ -149,6 +171,7 @@ export const pomoComplete = (
     completed: true,
     taskId: state.activeTaskId,
     kind: 'work',
+    ...liveTag(state),
   };
   // Event-task path (Decision 28 + follow-up): single big session, no break.
   // Caller signals via skipBreak=true. FSM transitions to 'done' (idle-like)
@@ -221,6 +244,7 @@ function recordWorkSpan(
     completed,
     taskId: state.activeTaskId,
     kind: 'work',
+    ...liveTag(state),
   };
 }
 
@@ -267,6 +291,7 @@ export const pomoBreak = (
       completed: reached,
       taskId: state.activeTaskId,
       kind: 'work',
+      ...liveTag(state),
     };
     return {
       ...state,
@@ -358,6 +383,7 @@ export const pomoStop = (
       completed: reached,
       taskId: state.activeTaskId,
       kind: 'work',
+      ...liveTag(state),
     };
     return {
       ...state,
@@ -400,7 +426,22 @@ export const pomoDiscard = (state: PomoState): PomoState => {
   };
 };
 
-export const pomoSetLabel = (state: PomoState, args: { label: string }): PomoState => {
+/** Spans shorter than this are misclicks (Start then Stop right away). */
+export const BLIP_MS = 10_000;
+
+/**
+ * Observe mode — drop spans `next` added that are shorter than BLIP_MS, so a
+ * misclicked Start/Stop doesn't leave an unclickable sliver on the Calendar.
+ */
+export const pomoDropBlips = (prev: PomoState, next: PomoState): PomoState => {
+  const before = new Set(prev.history.map((r) => r.id));
+  const history = next.history.filter(
+    (r) => before.has(r.id) || Date.parse(r.endedAt) - Date.parse(r.startedAt) >= BLIP_MS,
+  );
+  return history.length === next.history.length ? next : { ...next, history };
+};
+
+export const pomoSetLabel =(state: PomoState, args: { label: string }): PomoState => {
   return { ...state, label: args.label };
 };
 
@@ -433,6 +474,7 @@ export const pomoSetConfig = (
     longBreakMin: clampPositive(args.config.longBreakMin, current.longBreakMin),
     longBreakEvery: clampPositive(args.config.longBreakEvery, current.longBreakEvery),
     ...(typeof args.config.countStopped === 'boolean' ? { countStopped: args.config.countStopped } : {}),
+    ...(args.config.mode === 'pomodoro' || args.config.mode === 'observe' ? { mode: args.config.mode } : {}),
   };
 };
 
@@ -454,20 +496,38 @@ export const pomoSetTag = (
   args: { taskId: string | null; label?: string },
 ): PomoState => {
   const label = args.taskId === null ? '' : (args.label ?? state.label);
-  if (state.activeTaskId === args.taskId && state.label === label) return state;
-  return { ...state, activeTaskId: args.taskId, label };
+  if (state.activeTaskId === args.taskId && state.label === label && !state.tag) return state;
+  return { ...state, activeTaskId: args.taskId, label, tag: null };
 };
 
-/** Retag an already-recorded span (fix "what was this time spent on" later). */
+/**
+ * Observe mode — name what is being recorded now (free text + category).
+ * Spans recorded from now on carry it, so continuing after a break or a
+ * stop doesn't ask "what was this?" again.
+ */
+export const pomoSetLiveLabel = (state: PomoState, args: { label: string; tag?: string | null }): PomoState => {
+  const label = args.label.trim();
+  return { ...state, activeTaskId: null, label, tag: label ? (args.tag ?? null) : null };
+};
+
+/**
+ * Retag an already-recorded span (fix "what was this time spent on" later).
+ * A task wins; with no task, `label` is free text ("emails") and `tag` its
+ * tag id. Untagging (no task, no label) clears both.
+ */
 export const pomoRetagSegment = (
   state: PomoState,
-  args: { id: string; taskId: string | null; label?: string },
+  args: { id: string; taskId: string | null; label?: string; tag?: string | null },
 ): PomoState => {
   let changed = false;
   const history = state.history.map((r) => {
     if (r.id !== args.id) return r;
     changed = true;
-    return { ...r, taskId: args.taskId, label: args.taskId === null ? '' : (args.label ?? r.label) };
+    const { tag: _old, ...rest } = r;
+    void _old;
+    if (args.taskId !== null) return { ...rest, taskId: args.taskId, label: args.label ?? r.label };
+    const label = (args.label ?? '').trim();
+    return { ...rest, taskId: null, label, ...(label && args.tag ? { tag: args.tag } : {}) };
   });
   return changed ? { ...state, history } : state;
 };
@@ -531,7 +591,7 @@ function clampPositive(value: unknown, fallback: number): number {
  */
 export const pomoDevSeedSegment = (
   state: PomoState,
-  args: { kind?: PomoSegmentKind; minutes?: number; agoMin?: number } = {},
+  args: { kind?: PomoSegmentKind; minutes?: number; agoMin?: number; label?: string } = {},
   env: PomoEnv = defaultEnv,
 ): PomoState => {
   const kind: PomoSegmentKind = args.kind === 'break' ? 'break' : 'work';
@@ -544,7 +604,7 @@ export const pomoDevSeedSegment = (
     startedAt: toIso(startMs),
     endedAt: toIso(endMs),
     durationMin: minutes,
-    label: 'DEV',
+    label: args.label ?? 'DEV',
     completed: kind === 'work',
     taskId: null,
     kind,

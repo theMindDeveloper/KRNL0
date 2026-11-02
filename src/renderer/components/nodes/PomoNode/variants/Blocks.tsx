@@ -11,9 +11,11 @@
 
 import type { TimerFaceProps } from './types';
 
-const TOTAL_BARS = 25;
+/** Bars per scale: one per minute, kept between 5 and 60. */
+const barsFor = (total: number) => Math.max(5, Math.min(60, Math.round(total)));
 
-export function Blocks({ m, s, elapsedPct }: TimerFaceProps) {
+export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
+  const TOTAL_BARS = barsFor(total);
   const minsElapsed = Math.floor((elapsedPct / 100) * TOTAL_BARS);
 
   return (
@@ -38,7 +40,7 @@ export function Blocks({ m, s, elapsedPct }: TimerFaceProps) {
         className="stack"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(25, 1fr)',
+          gridTemplateColumns: `repeat(${TOTAL_BARS}, 1fr)`,
           gap: 2,
           height: 110,
           alignItems: 'end',

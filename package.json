@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:shared": "electron-vite dev",
+    "seed:preview": "vite-node scripts/seed-observe-preview.ts",
     "build": "electron-vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",

@@ -18,6 +18,7 @@ import { runLookTransition } from '../../themes/transition';
 import { HoldButton } from '../ui/HoldButton';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
+import { CanvasSwitcher } from './CanvasSwitcher';
 
 type Theme = 'light' | 'dark';
 
@@ -179,8 +180,10 @@ export function TopBar() {
             userSelect: 'none',
           }}
         >
-          ∷ ~/krnl0 / boards / deep-work
+          ∷ ~/krnl0 / canvas /
         </span>
+        {/* Decision 33 — canvas switcher (the breadcrumb's last segment). */}
+        <CanvasSwitcher />
 
         {/* Live badge */}
         <span

@@ -78,7 +78,9 @@ export function summarizeAnalytics(
     sentences.push('Finish a task, run a pomo or check off a habit and this fills in.');
   } else {
     if (tot.focusMin > 0) {
-      sentences.push(`Focus: ${fmtMinutes(tot.focusMin)} over ${tot.sessions} session${tot.sessions === 1 ? '' : 's'}${trendWord(focusDelta)}.`);
+      const over = tot.sessions > 0 ? ` over ${tot.sessions} pomodoro${tot.sessions === 1 ? '' : 's'}` : '';
+      const breaks = tot.breakMin ? `, plus ${fmtMinutes(tot.breakMin)} of breaks` : '';
+      sentences.push(`Focus: ${fmtMinutes(tot.focusMin)}${over}${breaks}${trendWord(focusDelta)}.`);
     }
     if (tot.tasksDone > 0) sentences.push(`Tasks: ${tot.tasksDone} done${trendWord(tasksDelta)}.`);
     sentences.push(`You were active on ${activeDays} of ${rangeDays} days.`);

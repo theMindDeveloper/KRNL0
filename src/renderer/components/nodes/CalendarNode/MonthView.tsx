@@ -6,6 +6,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
+import { toneVarForTask } from '../../../utils/taskColor';
+import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
@@ -141,6 +143,8 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
   // One cell's height (6 equal rows) — decides how many chips fit.
   const gridRef = useRef<HTMLDivElement>(null);
   const [cellH, setCellH] = useState(0);
+  // Left-click a task chip → what it is (the cell click still opens the day).
+  const [taskPopup, setTaskPopup] = useState<{ taskId: string; x: number; y: number } | null>(null);
   useEffect(() => {
     const el = gridRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -519,7 +523,9 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
                   {visible.map((task) => (
                     <div
                       key={task.id}
-                      title={task.text}
+                      data-testid="month-task-chip"
+                      title={`${task.text} · click for details`}
+                      onClick={(e) => { e.stopPropagation(); setTaskPopup({ taskId: task.id, x: e.clientX, y: e.clientY }); }}
                       style={{
                         fontFamily: 'var(--font-mono)',
                         fontSize: 10,
@@ -535,6 +541,7 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
                         cursor: 'pointer',
                       }}
                     >
+                      <span aria-hidden style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 999, background: toneVarForTask(task.id), marginRight: 4, verticalAlign: '1px' }} />
                       {truncateLabel(task.text)}
                     </div>
                   ))}
@@ -602,6 +609,7 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
           );
         })}
       </div>
+      {taskPopup && <TaskInfoPopup {...taskPopup} onClose={() => setTaskPopup(null)} />}
     </div>
   );
 }
