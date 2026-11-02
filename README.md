@@ -1,8 +1,8 @@
 <div align="center">
 
 <img src="docs/assets/krnl0-banner.png" alt="KRNL0 — open source, terminal-wired Life OS" width="100%" />
-<img src="docs/assets/stationMODEUpdate.jpg" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges"/>
-<img src="docs/assets/dockupdate.png" alt="The KRNL0 canvas — Pomodoro, Todos, Habits, Terminal, Calendar wired with task chains and animated edges"/>
+<img src="docs/assets/v0.10-station.webp" alt="KRNL0 v0.10 Station mode — Pomo, Todos, Habits, Calendar, the Analytics window and the Clock around a canvas with a website, a YouTube embed, a sticky note and pen drawings"/>
+<img src="docs/assets/v0.10-canvas.webp" alt="KRNL0 v0.10 Canvas mode — the window row above task chains, shapes, YouTube and Wikipedia embeds, sticky notes, the ambient radio and the pen wheel"/>
 
 <br /><br />
 
