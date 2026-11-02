@@ -41,6 +41,7 @@ import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapte
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { DrawLayer } from './DrawLayer';
+import { targetNodeIdAt } from './connectTarget';
 import { PieMenu } from '../ui/PieMenu';
 import { canvasWheelItems } from './canvasWheel';
 import type { TextLook } from '../nodes/TextNode/types';
@@ -55,7 +56,7 @@ import { MEDIA_SIZE, type MediaState } from '../nodes/MediaNode/types';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
-import type { Connection } from '@xyflow/react';
+import type { Connection, FinalConnectionState } from '@xyflow/react';
 import type { TaskState } from '../nodes/TaskNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
 import type { HabitState } from '../nodes/HabitNode/types';
@@ -1133,7 +1134,25 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     return () => window.removeEventListener('paste', onPaste);
   }, [screenToFlowPosition, spawnFiles, spawnMediaNode, addNode]);
 
+  // Dropped a connection on a node's body instead of its dot → connect anyway,
+  // keeping the direction of the handle the drag started from.
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+    if (state.isValid || !state.fromNode) return;
+    const pt = 'changedTouches' in event ? event.changedTouches[0] : event;
+    if (!pt) return;
+    const id = targetNodeIdAt(pt.clientX, pt.clientY);
+    if (!id || id === state.fromNode.id) return;
+    const fromSource = state.fromHandle?.type !== 'target';
+    onConnectRef.current({
+      source: fromSource ? state.fromNode.id : id,
+      target: fromSource ? id : state.fromNode.id,
+      sourceHandle: null,
+      targetHandle: null,
+    });
+  }, []);
+
   // ── onConnect — wire a visual link edge between two non-mother nodes ──────
+  const onConnectRef = useRef<(c: Connection) => void>(() => {});
   const onConnect = useCallback((conn: Connection) => {
     if (!conn.source || !conn.target) return;
     if (conn.source === conn.target) return;
@@ -1188,6 +1207,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
   }, [addEdge]);
+  useEffect(() => { onConnectRef.current = onConnect; }, [onConnect]);
 
   // In station mode the mothers are rendered as station cells in
   // StationLayout — the embedded canvas must hide them (and their edges) so
@@ -1617,6 +1637,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      // Easier wiring: snap to a handle from further away, and dropping
+      // anywhere on a node (not just on its dot) still connects.
+      connectionRadius={48}
+      onConnectEnd={onConnectEnd}
       onNodeContextMenu={onNodeContextMenu}
       onEdgeContextMenu={handleEdgeContextMenu}
       onPaneClick={() => { closeCtxMenu(); closePaneCtxMenu(); setEdgeCtxMenu(null); }}
