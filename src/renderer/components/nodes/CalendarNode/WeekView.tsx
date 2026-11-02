@@ -261,8 +261,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // The band must never outlive the drag: a drop on a task block stops
   // propagation before the cell can clear it, and a cancelled drag (Esc, drop
   // outside the grid) never reaches a cell at all.
+  // Task block being dragged (dragover can't read the payload), so the band
+  // over a block can show the real landing slot.
+  const draggingTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const clear = () => setSnapPreview(null);
+    const clear = () => { setSnapPreview(null); draggingTaskIdRef.current = null; };
     window.addEventListener('dragend', clear, true);
     window.addEventListener('drop', clear, true);
     return () => {
@@ -1010,6 +1013,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         setTaskPopup(null);
+        draggingTaskIdRef.current = task.id;
         // BUGFIX: drag payload must carry WORK-time (plannedMin), not block
         // height. scheduledDurationMin on focus tasks is treated as work-time
         // override by the selector, which then adds breaks on top. Using the
@@ -1035,8 +1039,16 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         if (!isTask) return; // fall through to cell
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        // Over a block the drop takes the block's start, not the slot band.
-        setSnapPreview(null);
+        // Band = where the drop lands: another task takes this block's start;
+        // the block itself nudges to the slot under the cursor.
+        let minute = sliceStartMin;
+        if (draggingTaskIdRef.current === task.id) {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const relY = Math.max(0, (Number.isFinite(e.clientY) ? e.clientY : 0) - (Number.isFinite(rect.top) ? rect.top : 0));
+          const abs = sliceStartMin + (relY / rowHeight) * 60;
+          minute = Math.max(0, Math.min(1440 - gran, Math.floor(abs / gran) * gran));
+        }
+        setSnapPreview((p) => (p && p.dayYMD === dayYMD && p.minute === minute ? p : { dayYMD, minute }));
       };
 
       const handleDropOnBlock = (e: DragEvent<HTMLDivElement>) => {
