@@ -443,8 +443,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const id = setTimeout(() => setPushNotice(null), 4500);
     return () => clearTimeout(id);
   }, [pushNotice]);
-  const scheduleTask = (taskId: string, scheduledFor: string, scheduledDurationMin: number) => {
-    onCommand('calendar.schedule', { taskId, scheduledFor, scheduledDurationMin });
+  const scheduleTask = (taskId: string, scheduledFor: string, scheduledDurationMin: number, parallelWith?: string) => {
+    onCommand('calendar.schedule', { taskId, scheduledFor, scheduledDurationMin, ...(parallelWith ? { parallelWith } : {}) });
     const board = useBoardStore.getState().board;
     const placed = board ? selectSchedule(board).placements.get(taskId) : undefined;
     if (placed && placed.startISO.slice(0, 16) !== scheduledFor.slice(0, 16)) {
@@ -1063,6 +1063,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           payload.taskId,
           `${dayYMD}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
           payload.durationMin,
+          payload.taskId !== task.id ? task.id : undefined,
         );
       };
 

@@ -26,7 +26,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'subtask', usage: 'task subtask <parentId> "<text>"', summary: 'Add a child task' },
       { name: 'duration', usage: 'task duration <id> <minutes>', summary: 'Set task duration in minutes' },
       { name: 'sibling', usage: 'task sibling <id>', summary: 'Fork a sibling task in parallel (same as task parallel)' },
-      { name: 'parallel', usage: 'task parallel <id>', summary: 'Fork a parallel task (canonical alias for task sibling)' },
+      { name: 'parallel', usage: 'task parallel <id> [--with <id2>]', summary: 'Fork a parallel task, or with --with run an existing task in parallel with <id2>' },
       { name: 'reset-pomo', usage: 'task reset-pomo <id>', summary: 'Reset pomo session count for task' },
       { name: 'chain', usage: 'task chain <ref1> <ref2> [<ref3>...]', summary: 'Wire task.next → task.activate between consecutive tasks' },
       { name: 'schedule', usage: 'task schedule <ref> --at <YYYY-MM-DDTHH:MM> [--duration <min>]', summary: 'Schedule a task at a wall-clock time (cascade anchor)' },

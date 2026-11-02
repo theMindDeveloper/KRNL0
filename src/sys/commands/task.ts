@@ -35,7 +35,9 @@ import {
 } from '../../shared/dispatch/resolveRef';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
 import { TASK_STEP_X, TASK_STEP_Y, MOTHER_OFFSET_Y } from '../layout';
-import { wouldCreateChainCycle } from '../../renderer/store/chainWalker';
+import { wouldCreateChainCycle, parallelizeChainEdges } from '../../renderer/store/chainWalker';
+import { selectSchedule } from '../../renderer/store/scheduleSelector';
+import type { Board } from '../../shared/types';
 
 export interface TaskCtx {
   boardPath: string;
@@ -884,6 +886,43 @@ export async function taskAddNext(
  * Kept as a one-liner alias so both names route to the same implementation.
  */
 export const taskParallel = taskSibling;
+
+/**
+ * `krnl task parallel <ref> --with <ref2>` — run an existing task in parallel
+ * with another (the calendar's drop-a-task-onto-a-task). Unlinks <ref> from
+ * the chain that would push it behind <ref2>, forks it alongside <ref2>, and
+ * schedules it at <ref2>'s start.
+ */
+export async function taskParallelWith(
+  ctx: TaskCtx,
+  ref: string | undefined,
+  withRef: string,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'task parallel requires a <ref>' };
+  const board = loadBoard(ctx);
+  const moved = findTaskNode(board, ref);
+  const target = findTaskNode(board, withRef);
+  if (!moved) return { ok: false, message: `No task node matching "${ref}"` };
+  if (!target) return { ok: false, message: `No task node matching "${withRef}"` };
+  if (moved.id === target.id) return { ok: false, message: 'task parallel: a task cannot run in parallel with itself.' };
+  const start = selectSchedule(board as unknown as Board).placements.get(target.id)?.startISO.slice(0, 16);
+  if (!start) return { ok: false, message: `task parallel: "${target.id.slice(0, 8)}" is not on the calendar.` };
+  const sameTodo = (moved.state as TaskState).parentTodoId === (target.state as TaskState).parentTodoId;
+  board.edges = parallelizeChainEdges(board.edges, moved.id, target.id, sameTodo, (from, to) => ({
+    id: `edge-${randomUUID()}`,
+    from: { nodeId: from, event: 'task.next' },
+    to: { nodeId: to, command: 'task.activate' },
+    enabled: true,
+  }));
+  saveBoard(ctx, board);
+  const res = await taskSchedule(ctx, moved.id, start);
+  if (!res.ok) return res;
+  return {
+    ok: true,
+    message: `Task "${moved.id.slice(0, 8)}" now runs in parallel with "${target.id.slice(0, 8)}" at ${start}.`,
+    data: { id: moved.id, with: target.id, scheduledFor: start },
+  };
+}
 
 // ── Decision 29 — task kind + task note ──────────────────────────────────────
 
