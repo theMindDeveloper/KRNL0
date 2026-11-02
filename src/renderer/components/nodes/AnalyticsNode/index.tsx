@@ -25,6 +25,7 @@ import { PagedView } from '../../ui/PagedView';
 import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
 import { GUIDE, cardOrder, isGuideCard } from './guide';
+import { GuideNav, RAIL_MIN_PANEL } from './GuideNav';
 import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
 import { EstimateBars, DailyPlanActual, FocusMix, Legend, COLOR_PLANNED, COLOR_TRACKED, fmtMinutes } from '../../../analytics/charts/PlanVsActual';
 import {
@@ -430,20 +431,12 @@ export function AnalyticsNode({
   // screen; "All charts" jumps straight to any card.
   const [currentCard, setCurrentCard] = useState<string | null>(null);
   const [jumpTo, setJumpTo] = useState<string | null>(null);
-  const [indexOpen, setIndexOpen] = useState(false);
-  // Extra charts beyond the guide pages — off by default.
-  const [showAll, setShowAll] = useState(false);
+
   const onPageChange = useCallback((item: HTMLElement | null) => {
     setCurrentCard(item?.getAttribute('data-card-id') ?? (item ? 'summary' : null));
     setJumpTo(null);
   }, []);
-  const guidePos = GUIDE.findIndex((g) => g.id === (currentCard ?? 'summary'));
-  const currentLabel = guidePos >= 0
-    ? { section: `${guidePos + 1} / ${GUIDE.length}`, title: GUIDE[guidePos]!.title }
-    : {
-        section: 'More',
-        title: ANALYTICS_CARD_LABELS[currentCard as AnalyticsCardId] ?? currentCard ?? '',
-      };
+
   // Plain-language summary on top of Overview (same text as `analytics summary`).
   const summary = summarizeAnalytics(analytics, range, prevRange, state.rangeDays);
   const tot = analytics.totals(range);
@@ -461,8 +454,8 @@ export function AnalyticsNode({
   const settingsOpen = state.settingsOpen ?? false;
 
   const isHidden = useCallback(
-    (id: AnalyticsCardId) => hiddenCards.includes(id) || (!showAll && !isGuideCard(id)),
-    [hiddenCards, showAll],
+    (id: AnalyticsCardId) => hiddenCards.includes(id) || !isGuideCard(id),
+    [hiddenCards],
   );
   const isPinned = useCallback(
     (id: AnalyticsCardId) => pinnedCards.includes(id),
@@ -480,7 +473,8 @@ export function AnalyticsNode({
   // 2026-05-18 (rev 3): node is fixed-size now — no resize handler.
 
   // Container size — drives the grid column count.
-  const [bodyRef] = useElementSize<HTMLDivElement>();
+  const [bodyRef, bodySize] = useElementSize<HTMLDivElement>();
+  const navAsRow = bodySize.width > 0 && bodySize.width < RAIL_MIN_PANEL;
   // One card per page (PagedView fillItems) — a single column.
   void colCountFor;
   const colCount = 1;
@@ -598,84 +592,9 @@ export function AnalyticsNode({
         </button>
       </div>
 
-      {/* Where am I + All charts index + range chips (no tabs). */}
-      <div style={{ ...toolbarStyle, position: 'relative' }}>
-        <button
-          type="button"
-          data-testid="analytics-index-btn"
-          aria-expanded={indexOpen}
-          onClick={(e) => { e.stopPropagation(); setIndexOpen((o) => !o); }}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={tabPill(indexOpen)}
-          title="Jump to any chart"
-        >
-          ☰ All charts
-        </button>
-        <span
-          data-testid="analytics-current"
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--k-an-ink-3, #9aa1a8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}
-        >
-          {currentLabel.section} · <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{currentLabel.title}</span>
-        </span>
+      {/* Range chips (pages are listed beside the chart). */}
+      <div style={toolbarStyle}>
         <div style={{ flex: 1 }} />
-        {indexOpen && (
-          <div
-            data-testid="analytics-index"
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              position: 'absolute', top: '100%', left: 0, zIndex: 20, marginTop: 6,
-              width: 'min(520px, 100%)', padding: 12, borderRadius: 12,
-              background: 'var(--k-an-bg-2, #16191c)', border: '1px solid var(--k-an-line-2, #2a2e33)',
-              boxShadow: '0 16px 40px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', gap: 10,
-            }}
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
-              {GUIDE.map((g, i) => {
-                const on = (currentCard ?? 'summary') === g.id;
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    data-testid={`analytics-index-${g.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setJumpTo(g.id === 'summary' ? '[data-testid="analytics-summary"]' : `[data-card-id="${g.id}"]`);
-                      setIndexOpen(false);
-                    }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', cursor: 'pointer',
-                      padding: '9px 10px', borderRadius: 9, minWidth: 0,
-                      background: on ? 'rgba(201,241,88,0.10)' : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${on ? 'rgba(201,241,88,0.55)' : 'var(--k-an-line, #23262a)'}`,
-                    }}
-                  >
-                    <span aria-hidden style={{
-                      width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'grid', placeItems: 'center',
-                      background: 'rgba(201,241,88,0.12)', color: 'var(--acid, #c9f158)', fontSize: 13, fontFamily: 'var(--font-mono)',
-                    }}>{g.icon}</span>
-                    <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--k-an-ink, #f4f6f8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        <span style={{ color: 'var(--k-an-ink-4, #7d848b)', fontFamily: 'var(--font-mono)', fontSize: 10, marginRight: 5 }}>{i + 1}</span>{g.title}
-                      </span>
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10.5, color: 'var(--k-an-ink-3, #9aa1a8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.hint}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              data-testid="analytics-more-charts"
-              onClick={(e) => { e.stopPropagation(); setShowAll((v) => !v); }}
-              style={{
-                alignSelf: 'flex-start', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 4px',
-                fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', color: 'var(--k-an-ink-3, #9aa1a8)',
-              }}
-            >
-              {showAll ? '− Hide extra charts' : '+ More charts (radar, scatter, distributions…)'}
-            </button>
-          </div>
-        )}
         <div style={{ display: 'flex', gap: 4 }}>
           {RANGE_PRESETS.map((days) => (
             <button
@@ -701,16 +620,23 @@ export function AnalyticsNode({
           overflow: 'hidden',
           padding: '12px 14px 16px',
           display: 'flex',
+          flexDirection: navAsRow ? 'column' : 'row',
           gap: 12,
           minHeight: 0,
         }}
       >
+        <GuideNav
+          asRow={navAsRow}
+          current={currentCard ?? 'summary'}
+          onPick={(id) => setJumpTo(id === 'summary' ? '[data-testid="analytics-summary"]' : `[data-card-id="${id}"]`)}
+        />
         <PagedView
           testId="analytics-pages"
           itemSelector="[data-page-item], [data-card-id]"
           fillItems
           revealSelector={jumpTo}
           onPageChange={onPageChange}
+          showPager={false}
           style={{ flex: 1, minWidth: 0 }}
           contentStyle={{ display: 'flex', flexDirection: 'column', gap: 12 }}
         >
@@ -1013,10 +939,10 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
   if (!est) return null;
   const k = est.kpis;
   const tile = (label: string, value: string, sub: string, testId: string) => (
-    <div data-testid={testId} style={{ flex: '1 1 140px', minWidth: 130, padding: '10px 12px', border: '1px solid #2a2e33', borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#aab0b7' }}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 22, fontWeight: 700, color: '#eef0f2', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: '#aab0b7', marginTop: 2 }}>{sub}</div>
+    <div data-testid={testId} style={{ minWidth: 0, padding: '12px 14px', border: '1px solid #2a2e33', borderRadius: 10, background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#aab0b7' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(20px, 4vh, 30px)', fontWeight: 700, color: '#eef0f2', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: '#aab0b7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
     </div>
   );
   const card = (id: AnalyticsCardId, title: string, span: number, contentHeight: number, body: (size: { width: number; height: number }) => React.ReactNode) => (
@@ -1040,7 +966,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
       {
         cardId: 'estimates.kpis' as const,
         render: () => card('estimates.kpis', `Plan vs actual · last ${state.rangeDays}d`, 3, 96, () => (
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: 'minmax(0, 1fr)', gap: 10, width: '100%', height: '100%' }}>
             {tile('Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy')}
             {tile('Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned')}
             {tile('Tracked', fmtMinutes(k.trackedMin), `${k.overCount} over · ${k.underCount} within plan`, 'estimates-kpi-tracked')}

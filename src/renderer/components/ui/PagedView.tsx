@@ -46,6 +46,8 @@ export interface PagedViewProps {
   revealSelector?: string | null;
   /** Called with the item at the top of the current page whenever it changes. */
   onPageChange?: (item: HTMLElement | null, page: number, pages: number) => void;
+  /** Show the ‹ ● › pager (default). Off when the host has its own navigation. */
+  showPager?: boolean;
 }
 
 /**
@@ -76,6 +78,7 @@ export function PagedView({
   fillItems = false,
   revealSelector,
   onPageChange,
+  showPager = true,
 }: PagedViewProps) {
   const outerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -109,11 +112,11 @@ export function PagedView({
     itemTops.current = items.map((i) => i.top);
     setItemCount((c) => (c === items.length ? c : items.length));
     let next = computePageStarts(items, full);
-    if (next.length > 1) next = computePageStarts(items, full - PAGER_H);
+    if (next.length > 1 && showPager) next = computePageStarts(items, full - PAGER_H);
     setBoxH((h) => (h === full ? h : full));
     setContentH((h) => (h === content.scrollHeight ? h : content.scrollHeight));
     setStarts((prev) => (prev.length === next.length && prev.every((v, i) => Math.abs(v - next[i]!) < 0.5) ? prev : next));
-  }, [itemSelector]);
+  }, [itemSelector, showPager]);
 
   useLayoutEffect(() => { measure(); });
 
@@ -174,7 +177,8 @@ export function PagedView({
 
   const start = starts[current] ?? 0;
   const end = current + 1 < pages ? starts[current + 1]! : contentH;
-  const visibleH = pages > 1 ? Math.min(boxH - PAGER_H, end - start) : boxH;
+  const pagerH = showPager ? PAGER_H : 0;
+  const visibleH = pages > 1 ? Math.min(boxH - pagerH, end - start) : boxH;
 
   return (
     <div
@@ -192,14 +196,14 @@ export function PagedView({
           style={{
             transform: `translateY(${-start}px)`,
             transition: 'transform 180ms ease',
-            ...(fillItems ? { ['--page-h' as string]: `${Math.max(0, boxH - (itemCount > 1 ? PAGER_H : 0))}px` } : {}),
+            ...(fillItems ? { ['--page-h' as string]: `${Math.max(0, boxH - (itemCount > 1 && showPager ? PAGER_H : 0))}px` } : {}),
             ...contentStyle,
           }}
         >
           {children}
         </div>
       </div>
-      {pages > 1 && (
+      {pages > 1 && showPager && (
         <div
           data-testid={testId ? `${testId}-pager` : 'paged-pager'}
           style={{
