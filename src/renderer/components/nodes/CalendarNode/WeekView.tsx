@@ -509,9 +509,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // #7 — apply the typed exact time + duration to the task (bypasses the grid
   // snap entirely → solves the "only 15-min grid" complaint). #4 — unschedule
   // pulls the task off the calendar. Both dispatch to the TASK node.
-  const applyExactTime = (task: ScheduledTask) => {
+  const applyExactTime = (task: ScheduledTask, time: string = exactTime) => {
     const day = task.startISO.slice(0, 10);
-    const m = /^(\d{1,2}):(\d{2})$/.exec(exactTime.trim());
+    const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
     const h = m ? Math.min(23, Math.max(0, parseInt(m[1]!, 10))) : new Date(task.startISO).getHours();
     const min = m ? Math.min(59, Math.max(0, parseInt(m[2]!, 10))) : 0;
     const durN = Math.max(1, Math.round(Number(exactDur) || task.scheduledDurationMin));
@@ -2234,7 +2234,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           duration={exactDur}
           onTime={setExactTime}
           onDuration={setExactDur}
-          onApply={() => { applyExactTime(taskPopup.task); setTaskPopup(null); }}
+          onApply={(t) => { applyExactTime(taskPopup.task, t); setTaskPopup(null); }}
           onActivate={() => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); setTaskPopup(null); }}
           onJump={() => { jumpToTaskNode(taskPopup.task.id); setTaskPopup(null); }}
           onUnschedule={() => { unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}

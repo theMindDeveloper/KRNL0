@@ -11,32 +11,47 @@ interface Props {
   testId?: string;
   minuteStep?: number;
   style?: CSSProperties;
+  /** Enter in the field, with the parsed time. The field stops key events
+   *  from reaching window listeners, so a host form submits through this. */
+  onEnter?: (value: string) => void;
+  /** Escape in the field (when its picker is closed). */
+  onEscape?: () => void;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** Accepts "9", "930", "9:3", "09:30" → "09:30"; null when it isn't a time. */
+/** Accepts "9", "930", "1430", "9:05", "09:30" → "HH:MM"; null when it isn't a time. */
 export function parseTime(raw: string): string | null {
   const t = raw.trim();
-  const m = /^(\d{1,2})(?::?(\d{1,2}))?$/.exec(t);
-  if (!m) return null;
-  let h = Number(m[1]);
-  let min = m[2] !== undefined ? Number(m[2]) : 0;
-  if (m[2] === undefined && t.length >= 3) { h = Number(t.slice(0, t.length - 2)); min = Number(t.slice(-2)); }
+  let h: number;
+  let min: number;
+  const colon = /^(\d{1,2}):(\d{1,2})$/.exec(t);
+  if (colon) {
+    h = Number(colon[1]);
+    min = Number(colon[2]);
+  } else if (/^\d{1,4}$/.test(t)) {
+    // Digits only: the last two are minutes once there are more than two.
+    h = Number(t.length <= 2 ? t : t.slice(0, -2));
+    min = t.length <= 2 ? 0 : Number(t.slice(-2));
+  } else {
+    return null;
+  }
   if (h > 23 || min > 59) return null;
   return `${pad(h)}:${pad(min)}`;
 }
 
-export function TimeField({ value, onChange, testId, minuteStep = 5, style }: Props) {
+export function TimeField({ value, onChange, testId, minuteStep = 5, style, onEnter, onEscape }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
 
   const [hh, mm] = value.split(':').map(Number) as [number, number];
-  const commit = (raw: string) => {
+  const commit = (raw: string): string => {
     const t = parseTime(raw);
-    if (t) { onChange(t); setDraft(t); } else setDraft(value);
+    if (t) { onChange(t); setDraft(t); return t; }
+    setDraft(value);
+    return value;
   };
   const minutes = Array.from({ length: Math.ceil(60 / minuteStep) }, (_, i) => i * minuteStep);
   if (Number.isFinite(mm) && !minutes.includes(mm)) minutes.push(mm), minutes.sort((a, b) => a - b);
@@ -61,7 +76,11 @@ export function TimeField({ value, onChange, testId, minuteStep = 5, style }: Pr
           if (t) onChange(t);
         }}
         onBlur={(e) => commit(e.target.value)}
-        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') commit(draft); }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') onEnter?.(commit(draft));
+          else if (e.key === 'Escape') { if (open) setOpen(false); else onEscape?.(); }
+        }}
         onPointerDown={(e) => e.stopPropagation()}
         style={{
           flex: 1, minWidth: 0, width: '100%', border: 'none', outline: 'none', background: 'transparent',

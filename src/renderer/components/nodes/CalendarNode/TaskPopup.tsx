@@ -25,7 +25,9 @@ interface Props {
   duration: string;
   onTime: (v: string) => void;
   onDuration: (v: string) => void;
-  onApply: () => void;
+  /** Save the edited time; `time` overrides the draft when the caller has a
+   *  fresher value than the last render (Enter in the time field). */
+  onApply: (time?: string) => void;
   onActivate: () => void;
   onJump: () => void;
   onUnschedule: () => void;
@@ -111,7 +113,14 @@ export function TaskPopup(p: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'end', gap: 8 }}>
             <div style={field}>
               <span style={fieldLabel}>Start</span>
-              <TimeField testId="task-popup-time" value={p.time} onChange={p.onTime} />
+              <TimeField
+                testId="task-popup-time"
+                value={p.time}
+                onChange={p.onTime}
+                // "Esc closes, Enter saves" also while typing in the field.
+                onEnter={(t) => { if ((t !== hm(startMs) || durChanged) && dur > 0) p.onApply(t); else p.onClose(); }}
+                onEscape={p.onClose}
+              />
             </div>
             <span aria-hidden style={{ color: 'var(--ink-4)', paddingBottom: 9, fontSize: 13 }}>→</span>
             <div style={field}>
@@ -142,7 +151,7 @@ export function TaskPopup(p: Props) {
             type="button"
             data-testid="task-popup-apply-time"
             disabled={!dirty}
-            onClick={p.onApply}
+            onClick={() => p.onApply()}
             style={{ ...primaryBtn, opacity: dirty ? 1 : 0.35, cursor: dirty ? 'pointer' : 'default' }}
           >
             {dirty ? 'Save time' : 'No changes'}
