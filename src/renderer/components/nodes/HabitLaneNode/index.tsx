@@ -12,8 +12,9 @@ import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
 import type { Habit, HabitColor, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { calcStreak } from '../HabitNode/commands';
-import { HABIT_COLORS, todayLocal, toYMD } from '../HabitNode/types';
+import { HABIT_COLORS, toYMD } from '../HabitNode/types';
 import { useBoardStore } from '../../../store/boardStore';
+import { useLocalDay } from '../../../hooks/useLocalDay';
 import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
 import { HabitIcon } from '../HabitNode/HabitIcon';
 
@@ -104,7 +105,8 @@ export function HabitLaneNode({
     return null;
   }, [board, node.state.habitId]);
 
-  const today = todayLocal();
+  // Re-renders at local midnight, so a lane left open overnight moves on.
+  const today = useLocalDay();
   const week = useMemo(() => lastSevenDays(today), [today]);
 
   const { getNodes } = useReactFlow();
