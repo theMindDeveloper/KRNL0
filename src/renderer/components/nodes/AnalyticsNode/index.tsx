@@ -70,6 +70,7 @@ import {
   ANALYTICS_VIEWS,
   defaultAnalyticsState,
 } from './types';
+import { useLocalDay } from '../../../hooks/useLocalDay';
 
 const VIEW_LABELS: Record<AnalyticsView, string> = {
   overview: 'Overview',
@@ -417,7 +418,10 @@ export function AnalyticsNode({
   const view = state.view;
   const analytics = useAnalytics();
 
-  const range = useMemo(() => lastNDays(state.rangeDays), [state.rangeDays]);
+  // Re-derive the ranges at local midnight; otherwise a window left open
+  // overnight keeps charting a range that ends yesterday.
+  const today = useLocalDay();
+  const range = useMemo(() => lastNDays(state.rangeDays), [state.rangeDays, today]); // eslint-disable-line react-hooks/exhaustive-deps
   const prevRange = useMemo(
     () => ({
       start: addDays(range.start, -state.rangeDays),
@@ -429,7 +433,7 @@ export function AnalyticsNode({
 
   const byDay = analytics.byDay(range);
   // The year heatmap always shows the last 365 days, whatever the range.
-  const yearRange = useMemo(() => lastNDays(365), []);
+  const yearRange = useMemo(() => lastNDays(365), [today]); // eslint-disable-line react-hooks/exhaustive-deps
   const yearByDay = analytics.byDay(yearRange);
 
   // One sequence of full-page cards (no tabs). The header names the card on
