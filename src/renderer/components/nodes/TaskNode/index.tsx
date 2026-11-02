@@ -6,6 +6,7 @@ import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
 import { useBoardStore } from '../../../store/boardStore';
+import { selectSchedule } from '../../../store/scheduleSelector';
 import { useShallow } from 'zustand/react/shallow';
 import { useTick } from '../../../hooks/useTick';
 import type { PomoState } from '../PomoNode/types';
@@ -384,6 +385,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     setCtxMenu({ x: e.clientX, y: e.clientY });
   };
 
+  // Read when the menu is open only (a chain successor has no scheduledFor of
+  // its own but is on the calendar too).
+  const onCalendar = ctxMenu !== null
+    && (!!state.scheduledFor || selectSchedule(useBoardStore.getState().board).placements.has(taskId));
+
   const ctxItems = [
     {
       label: 'Edit text',
@@ -423,8 +429,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
       onSelect: startNoteEdit,
     },
-    // Only for tasks that are on the calendar.
-    ...(state.scheduledFor
+    // Only for tasks that are on the calendar (anchors and chain successors).
+    ...(onCalendar
       ? [{ label: 'Show on calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTaskOnCalendar(taskId)); } }]
       : []),
     {

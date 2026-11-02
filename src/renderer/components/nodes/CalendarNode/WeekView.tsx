@@ -4,7 +4,7 @@
 // rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
 // HabitSwapModal. NowLine is rendered as an overlay.
 
-import { CALENDAR_REVEAL_EVENT } from '../../../store/scheduleActions';
+import { CALENDAR_REVEAL_EVENT, unscheduleTask } from '../../../store/scheduleActions';
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -519,9 +519,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     applyTaskState(task.id, (s) =>
       taskSetSchedule(taskSetPlannedMin(s, { minutes: durN }), { scheduledFor, scheduledDurationMin: durN }),
     );
-  };
-  const unscheduleTask = (taskId: string) => {
-    applyTaskState(taskId, (s) => taskSetSchedule(s, { scheduledFor: null }));
   };
 
   // #6 — info popup for a clicked tracked-reality (pomo) segment.
@@ -2237,7 +2234,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           onApply={(t) => { applyExactTime(taskPopup.task, t); setTaskPopup(null); }}
           onActivate={() => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); setTaskPopup(null); }}
           onJump={() => { jumpToTaskNode(taskPopup.task.id); setTaskPopup(null); }}
-          onUnschedule={() => { unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
+          onUnschedule={() => { void unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
           onClose={() => setTaskPopup(null)}
         />
       )}

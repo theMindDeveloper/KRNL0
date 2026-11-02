@@ -9,7 +9,7 @@
  * events (so drops still reach the hour cells).
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { WeekView } from '../../../src/renderer/components/nodes/CalendarNode/WeekView';
 import { ClockNode } from '../../../src/renderer/components/nodes/ClockNode';
@@ -98,8 +98,8 @@ describe('Calendar ↔ Clock right-click parity', () => {
     const cal = calendarMenuAt(8.5);
     const clock = clockMenu('[data-testid="clock-plan-arc"][data-task-id="t-math"]');
     expect(cal).toEqual(['Details…', 'Start focus', 'Mark done', 'Show on canvas', 'Unschedule']);
-    // The Clock has no task details popup; every action is otherwise identical.
-    expect(clock).toEqual(cal.filter((l) => l !== 'Details…'));
+    // Identical on both surfaces, Details… included.
+    expect(clock).toEqual(cal);
   });
 
   it('a tracked focus segment offers the same actions on both surfaces', () => {
@@ -110,7 +110,7 @@ describe('Calendar ↔ Clock right-click parity', () => {
     expect(clock).toEqual(cal);
   });
 
-  it('menu actions change the board (retag, delete, unschedule)', () => {
+  it('menu actions change the board (retag, delete, unschedule)', async () => {
     seed();
     render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
     const col = document.querySelector(`[data-testid="week-col-${TODAY}"]`) as HTMLElement;
@@ -126,8 +126,11 @@ describe('Calendar ↔ Clock right-click parity', () => {
 
     fireEvent.contextMenu(col, { clientY: 8.5 * 28, clientX: 60 });
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Unschedule' })); });
-    const math = useBoardStore.getState().board!.nodes.find((n) => n.id === 't-math')!.state as { scheduledFor: string | null };
-    expect(math.scheduledFor ?? null).toBeNull();
+    // Unschedule goes through the dispatcher (lazy-loaded), so it lands a tick later.
+    await waitFor(() => {
+      const math = useBoardStore.getState().board!.nodes.find((n) => n.id === 't-math')!.state as { scheduledFor: string | null };
+      expect(math.scheduledFor ?? null).toBeNull();
+    });
   });
 });
 
