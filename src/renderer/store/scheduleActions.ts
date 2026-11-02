@@ -67,6 +67,14 @@ export function startFocusOnTask(taskId: string): Promise<void> {
   return dispatchToTask(taskId, 'task.startPomo');
 }
 
+/** Tick / untick a habit for today (CLI: habit done|undo <id>). */
+export async function toggleHabitToday(habitId: string): Promise<void> {
+  const habitNode = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'habit' && n.isMother);
+  if (!habitNode) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  makeCommandHandler(habitNode.id)('habit.toggleDay', { id: habitId });
+}
+
 /** Window event the canvas listens for to centre a node (works from any surface). */
 export const FOCUS_NODE_EVENT = 'krnl:focus-node';
 

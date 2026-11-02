@@ -427,7 +427,7 @@ export class SysFacade {
           };
           return command.sub === 'tag'
             ? pomoTag(tagCtx, command.ref)
-            : pomoRetag(tagCtx, command.segmentId, command.ref);
+            : pomoRetag(tagCtx, command.segmentId, command.ref, { text: command.text, tag: command.tag });
         }
         case 'delete-segment': {
           const segCtx = {
@@ -450,6 +450,7 @@ export class SysFacade {
           if (command.every !== undefined) cfgOpts.every = command.every;
           if (command.face !== undefined) cfgOpts.face = command.face;
           if (command.countStopped !== undefined) cfgOpts.countStopped = command.countStopped;
+          if (command.mode !== undefined) cfgOpts.mode = command.mode;
           const res = pomoConfig(cfgOpts);
           // The file-path variant writes board.json directly; tell the
           // renderer to reload or its next save would revert the change.

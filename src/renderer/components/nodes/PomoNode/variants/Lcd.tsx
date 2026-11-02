@@ -10,7 +10,7 @@
 
 import type { TimerFaceProps } from './types';
 
-export function Lcd({ m, s, running }: TimerFaceProps) {
+export function Lcd({ m, s, running, total = 25 }: TimerFaceProps) {
   const colonAnimation = running ? 'pomo-blink 1s steps(2) infinite' : 'none';
   const ledAnimation = running ? 'pomo-blink 1.4s ease infinite' : 'none';
 
@@ -139,7 +139,7 @@ export function Lcd({ m, s, running }: TimerFaceProps) {
           />
           {running ? 'recording focus' : 'standby'}
         </span>
-        <span>25 min cycle</span>
+        <span>{total} min cycle</span>
       </div>
     </div>
   );

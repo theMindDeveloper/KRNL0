@@ -880,3 +880,12 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
   - Wrong auto tags already on a board re-classify on load.
 - **Follow-up 27 (Bug Fix):** choosing Light with the dark-only Pro frame still switches to Classic, but going back to Dark now restores Pro (remembered in `krnl0-dock-style-before-light`, unless another frame was picked meanwhile).
 - **Follow-up 28 (UI):** hovering a task arc on the clock, its list row, or a pomo wedge brightens it, so you see what a click acts on. Arc and row highlight together.
+
+---
+
+## [2026-11-02] — Pomo Observe mode
+
+**Type:** Feature  
+**Branch:** `TMD/pomodoro-observer-mode-f9cfd3`  
+**Files changed:** `PomoNode/{types,commands,index}.tsx?`, `store/pomoReality.ts`, `store/spanTags.ts` (new), `analytics/tags.ts`, `ClockNode/index.tsx`, `CalendarNode/WeekView.tsx`, `Canvas/commandDispatch.ts`, `sys/{parser,SysFacade,commands/pomo}.ts`, `tests/unit/sys/pomo.observe.test.ts`, `docs/06-requirements/pomo-node.md`  
+**Summary:** A POMO/OBSERVE toggle sits in the Pomo header. Observe mode shows a plain count-up and has Start → Break ⇄ Back to work → Stop, so work and breaks are both recorded. Spans under 10 s are dropped as misclicks. When a work span ends, a "Log this span" panel asks for a name and a category (with icons, guessed from the name, "+ new" adds one), or a task to link. A ☰ span log lists each day's spans with delete. Named spans are coloured by category on the Clock and Calendar and counted in Time-by-tag. Analytics fix: Focus now counts all tracked work, not only full 25-minute pomodoros, and breaks are totalled. The timer faces scale to the session length instead of a fixed 25. The dev seed panel is gone; a dev-only "+30 min demo span" lives in the log. A named span carries over: after Back to work, or after Stop via **Continue**, new spans keep the name and category, so you are only asked again after **New** or after clearing the "doing" chip. CLI: `pomo config --mode`, `pomo retag <seg> --text … --tag …`, `pomo resume` ends a break (F19–F22).

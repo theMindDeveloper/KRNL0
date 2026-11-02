@@ -9,7 +9,7 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'stop' | 'status' | 'break' | 'extend' | 'pause' | 'resume' | 'discard' }
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
   | { kind: 'pomo'; sub: 'tag'; ref: string | undefined }
-  | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined }
+  | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined; text?: string | undefined; tag?: string | undefined }
   | { kind: 'pomo'; sub: 'delete-segment'; segmentId: string | undefined }
   | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
@@ -103,7 +103,7 @@ export type SysCommand =
   | { kind: 'habit'; sub: 'show'; ref: string | undefined; json: boolean }
   | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
-  | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined }
+  | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined; mode?: string | undefined }
   | {
       kind: 'frame';
       sub: 'add';
@@ -278,7 +278,8 @@ export class SysParser {
         || sub === 'pause' || sub === 'resume' || sub === 'discard')
         return { kind: 'pomo', sub };
       if (sub === 'tag') return { kind: 'pomo', sub: 'tag', ref: rest[0] };
-      if (sub === 'retag') return { kind: 'pomo', sub: 'retag', segmentId: rest[0], ref: rest[1] };
+      // retag <seg> <taskRef|none> | retag <seg> --text "emails" [--tag admin]
+      if (sub === 'retag') return { kind: 'pomo', sub: 'retag', segmentId: rest[0], ref: rest[1]?.startsWith('--') ? undefined : rest[1], text: flag(rest, 'text'), tag: flag(rest, 'tag') };
       if (sub === 'delete-segment') return { kind: 'pomo', sub: 'delete-segment', segmentId: rest[0] };
       if (sub === 'segments') return { kind: 'pomo', sub: 'segments', date: flag(rest, 'date'), json: hasFlag(rest, 'json') };
       if (sub === 'start') {
@@ -301,6 +302,7 @@ export class SysParser {
           face: flag(allArgs, 'face'),
           // --count-stopped on|off: does Stop record the session so far?
           countStopped: ((v) => (v === undefined ? undefined : !/^(off|no|false|0)$/i.test(v)))(flag(allArgs, 'count-stopped')),
+          mode: flag(allArgs, 'mode'),
         };
       }
     }

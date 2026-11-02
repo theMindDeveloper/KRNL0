@@ -10,7 +10,7 @@ interface BubbleConfig {
   animationDelay: string;
 }
 
-export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
+export function Vapor({ m, s, remainingPct, total = 25 }: TimerFaceProps) {
   const bubbles: BubbleConfig[] = useMemo(
     () =>
       [0, 1, 2, 3].map((i) => ({
@@ -201,12 +201,7 @@ export function Vapor({ m, s, remainingPct }: TimerFaceProps) {
             pointerEvents: 'none',
           }}
         >
-          <span>25</span>
-          <span>20</span>
-          <span>15</span>
-          <span>10</span>
-          <span>05</span>
-          <span>00</span>
+          {[5, 4, 3, 2, 1, 0].map((i) => <span key={i}>{String(Math.round((total * i) / 5)).padStart(2, '0')}</span>)}
         </div>
       </div>
 

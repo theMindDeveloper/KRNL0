@@ -42,6 +42,7 @@ const TASK_RECT = { width: 220, height: 120 } as const;
 import type { Node } from '@shared/types/node';
 import type { Board } from '@shared/types';
 import { selectSchedule } from '../../store/scheduleSelector';
+import { spanTagFor } from '../../store/spanTags';
 import { parallelizeChainEdges } from '../../store/chainWalker';
 import type { Edge } from '@shared/types/edge';
 import {
@@ -72,10 +73,12 @@ import {
   pomoDeleteSegment,
   pomoSetTag,
   pomoRetagSegment,
+  pomoDropBlips,
+  pomoSetLiveLabel,
   pomoDiscard,
 } from '../nodes/PomoNode/commands';
 import type { PomoConfig, PomoState, TimerFace } from '../nodes/PomoNode/types';
-import { defaultPomoConfig } from '../nodes/PomoNode/types';
+import { defaultPomoConfig, OBSERVE_SPAN_MIN } from '../nodes/PomoNode/types';
 
 // ── Todo ──────────────────────────────────────────────────────────────
 import {
@@ -236,10 +239,20 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
   switch (node.kind) {
     case 'pomo': {
       const pomoCfg = (c as unknown as PomoConfig | null) ?? defaultPomoConfig();
+      // Observe mode — a start/stop misclick must not leave a sliver span.
+      const observeBlips = (next: PomoState): PomoState =>
+        pomoCfg.mode === 'observe' ? pomoDropBlips(s as unknown as PomoState, next) : next;
       switch (command) {
-        case 'pomo.start':    return { state: pomoStart(s as never, args as never) };
+        case 'pomo.start': {
+          // Observe mode has no session length; leaving it restores the configured one.
+          const cur = s as unknown as PomoState;
+          const durationMin = pomoCfg.mode === 'observe'
+            ? OBSERVE_SPAN_MIN
+            : cur.durationMin === OBSERVE_SPAN_MIN ? pomoCfg.sessionMin : undefined;
+          return { state: pomoStart(s as never, { ...(args as object), ...(durationMin !== undefined && args['durationMin'] === undefined ? { durationMin } : {}) }) };
+        }
         case 'pomo.pause':    return { state: pomoPause(s as never) };
-        case 'pomo.resume':   return { state: pomoResume(s as never) };
+        case 'pomo.resume':   return { state: observeBlips(pomoResume(s as never)) };
         case 'pomo.cancel':   return { state: pomoCancel(s as never) };
         case 'pomo.complete': {
           // Detect if the active task is an event-kind task; if so, signal
@@ -258,25 +271,36 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.skipBreak': return { state: pomoSkipBreak(s as never) };
         case 'pomo.endBreak': return { state: pomoEndBreak(s as never) };
         // Issue #166 — observer-model verbs.
-        case 'pomo.break':    return { state: pomoBreak(s as never) };
+        case 'pomo.break':    return { state: observeBlips(pomoBreak(s as never)) };
         case 'pomo.extend':   return { state: pomoExtend(s as never) };
-        case 'pomo.stop':     return { state: pomoStop(s as never) };
+        case 'pomo.stop':     return { state: observeBlips(pomoStop(s as never)) };
         case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
         case 'pomo.setFace':   return { config: pomoSetFace(pomoCfg, args as { face: TimerFace }) };
         case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never, pomoCfg) };
         case 'pomo.deleteSegment': return { state: pomoDeleteSegment(s as never, args as never) };
         case 'pomo.retagSegment': {
           const taskId = typeof args['taskId'] === 'string' ? args['taskId'] : null;
-          const t = taskId ? useBoardStore.getState().board?.nodes.find((n) => n.id === taskId) : undefined;
+          const b = useBoardStore.getState().board;
+          const t = taskId ? b?.nodes.find((n) => n.id === taskId) : undefined;
+          // Observe mode — no task: free text + a tag (explicit, else classified).
+          const text = !taskId && typeof args['label'] === 'string' ? args['label'].trim() : '';
+          const explicitTag = typeof args['tag'] === 'string' ? args['tag'] : null;
           return {
             state: pomoRetagSegment(s as never, {
               id: String(args['id'] ?? ''),
               taskId,
               ...(t ? { label: (t.state as TaskState).text } : {}),
+              ...(text ? { label: text, tag: spanTagFor(b ?? null, text, explicitTag) } : {}),
             }),
           };
         }
         case 'pomo.discard': return { state: pomoDiscard(s as never) };
+        case 'pomo.setLiveLabel': {
+          const label = String(args['label'] ?? '');
+          const explicit = typeof args['tag'] === 'string' ? args['tag'] : null;
+          const tag = label.trim() ? spanTagFor(useBoardStore.getState().board ?? null, label, explicit) : null;
+          return { state: pomoSetLiveLabel(s as never, { label, tag }) };
+        }
         // DEV-only (#180 viz testing) — seed/clear synthetic reality segments.
         case 'pomo.devSeedSegment': return { state: pomoDevSeedSegment(s as never, args as never) };
         case 'pomo.devClearSeeded': return { state: pomoDevClearSeeded(s as never) };
@@ -691,6 +715,14 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     if (node.kind === 'pomo' && command === 'pomo.tag') {
       const raw = args['taskId'];
       tagPomo(typeof raw === 'string' ? raw : null, { start: false });
+      return;
+    }
+
+    // ── pomo.addCategory: the Pomo's "+ new category" adds a tag to the
+    //    shared library, which lives on the Todo list (ADR 0016).
+    if (node.kind === 'pomo' && command === 'pomo.addCategory') {
+      const todo = board.nodes.find((n) => n.kind === 'todo' && n.isMother) ?? board.nodes.find((n) => n.kind === 'todo');
+      if (todo) _dispatch(todo.id, 'todo.addTag', { label: String(args['label'] ?? '') });
       return;
     }
 

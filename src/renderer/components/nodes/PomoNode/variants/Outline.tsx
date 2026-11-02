@@ -5,9 +5,11 @@
 import type { TimerFaceProps } from './types';
 import { Readout } from './Readout';
 
-const TOTAL = 25;
+/** One bar per minute of the scale, kept between 5 and 60. */
+const barsFor = (total: number) => Math.max(5, Math.min(60, Math.round(total)));
 
-export function Outline({ m, s, elapsedPct }: TimerFaceProps) {
+export function Outline({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
+  const TOTAL = barsFor(total);
   const minsElapsed = Math.floor((elapsedPct / 100) * TOTAL);
 
   return (

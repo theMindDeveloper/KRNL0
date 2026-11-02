@@ -34,6 +34,7 @@ import { HabitSwapModal } from '../../ui/HabitSwapModal';
 import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
 import { calcStreak } from '../HabitNode/commands';
 import { toneVarForTask } from '../../../utils/taskColor';
+import { boardTagLibrary, spanTone } from '../../../store/spanTags';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { PagedView } from '../../ui/PagedView';
@@ -408,7 +409,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     useShallow((s) => {
       const segs = selectPomoReality(s.board, liveMs);
       const map = new Map<string, Array<{
-        id: string; kind: 'work' | 'break'; taskId: string | null;
+        id: string; kind: 'work' | 'break'; taskId: string | null; tag: string | null; label: string;
         startMin: number; endMin: number; live: boolean;
         startMs: number; endMs: number;
       }>>();
@@ -423,7 +424,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           const startMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
           const endMin = Math.min(1440, startMin + Math.max(1, (pieceEnd - cursor) / 60_000));
           const arr = map.get(ymd) ?? [];
-          arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, startMin, endMin, live: seg.live, startMs: seg.startMs, endMs: seg.endMs });
+          arr.push({ id: seg.id, kind: seg.kind, taskId: seg.taskId, tag: seg.tag, label: seg.label, startMin, endMin, live: seg.live, startMs: seg.startMs, endMs: seg.endMs });
           map.set(ymd, arr);
           cursor = pieceEnd;
         }
@@ -478,7 +479,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // #6/#7 — a tracked-reality segment with the day it was clipped to, used by
   // the reality info popup (when it started / ended / duration).
   type RealitySeg = {
-    id: string; kind: 'work' | 'break'; taskId: string | null;
+    id: string; kind: 'work' | 'break'; taskId: string | null; tag: string | null; label: string;
     startMin: number; endMin: number; live: boolean; startMs: number; endMs: number;
   };
   // #7 — exact-time editor fields inside the task popup (seeded when it opens).
@@ -556,6 +557,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // memo. The previous useShallow selectors built new objects on every store
   // change, so the whole calendar re-rendered on every hover and pan.
   const boardForCal = useBoardStore((s) => s.board);
+  const tagLibrary = boardTagLibrary(boardForCal);
   const scheduledTasks = useMemo((): ScheduledTask[] => {
       const s = { board: boardForCal };
       if (!s.board) return [];
@@ -1514,7 +1516,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 key={`sr-${r.id}-${i}`}
                 style={{
                   position: 'absolute', top: 0, bottom: 0, left: pct(r.startMin), width: widthPct(r.startMin, r.endMin),
-                  background: r.kind === 'work' ? (r.taskId ? toneVarForTask(r.taskId) : 'var(--acid)') : 'transparent',
+                  background: r.kind === 'work' ? spanTone(tagLibrary, r) : 'transparent',
                   backgroundImage: r.kind === 'work' ? undefined : 'repeating-linear-gradient(135deg, var(--ink-3) 0 1px, transparent 1px 3px)',
                 }}
               />
@@ -1565,7 +1567,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const topPx = (seg.startMin / 60) * rowHeight;
       const heightPx = Math.max(2, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
-      const tone = isWork ? (seg.taskId ? toneVarForTask(seg.taskId) : 'var(--acid)') : 'var(--ink-3)';
+      const tone = spanTone(tagLibrary, seg);
       const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
       return (
         <div
@@ -1575,8 +1577,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           data-reality-live={seg.live ? 'true' : undefined}
           aria-label={
             seg.live
-              ? `${isWork ? 'Focus' : 'Break'} ${fmtHM(seg.startMs)} to now (recording)`
-              : `${isWork ? 'Focus' : 'Break'} ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)}, ${minutes} minutes`
+              ? `${isWork ? (!seg.taskId && seg.label) || 'Focus' : 'Break'} ${fmtHM(seg.startMs)} to now (recording)`
+              : `${isWork ? (!seg.taskId && seg.label) || 'Focus' : 'Break'} ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)}, ${minutes} minutes`
           }
           style={{
             position: 'absolute',
@@ -2258,7 +2260,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             </div>
             {layerMenu.items.map((item, i) => {
               const isTask = item.kind === 'task';
-              const tone = isTask ? toneVarForTask(item.task.id) : (item.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)');
+              const tone = isTask ? toneVarForTask(item.task.id) : spanTone(tagLibrary, item.seg);
               const label = isTask
                 ? item.task.text || 'Untitled task'
                 : `Tracked · ${item.seg.kind === 'work' ? 'focus' : 'break'} ${fmtHM(item.seg.startMs)}–${fmtHM(item.seg.endMs)}`;
@@ -2352,11 +2354,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 aria-hidden
                 style={{
                   width: 10, height: 10, borderRadius: 999, flexShrink: 0,
-                  background: realityPopup.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)',
+                  background: spanTone(tagLibrary, realityPopup.seg),
                 }}
               />
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>
-                {realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}
+                {realityPopup.seg.kind === 'work' ? (!realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}
               </span>
               {realityPopup.seg.live && (
                 <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em' }}>◆ LIVE</span>

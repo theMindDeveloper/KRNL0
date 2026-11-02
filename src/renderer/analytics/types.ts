@@ -67,6 +67,8 @@ export interface Totals {
   habitCheckins: number;
   focusMin: number;
   sessions: number;
+  /** Minutes of recorded breaks. */
+  breakMin?: number;
 }
 
 export interface StreakResult {

@@ -26,6 +26,10 @@
 | F16 | When `pipCount > 8`, exactly 8 pips render plus a `+N more` text element where N = `pipCount - 8`; the `session N / pipCount` counter label carries the full count. |
 | F17 | ~~Session counter shows the active task's `pomoSessionsCompleted` when `activeTaskId !== null`, else the global `state.sessionsCompleted`.~~ **Superseded by [time-model.md](time-model.md) (Decision 31):** the pomo observes and a task only tags it. Tracked time is derived from tagged spans, and nothing is written onto the task. |
 | F18 | Pressing PAUSE freezes the visible clock at the current elapsed and disables the tick interval. Auto-complete (`pomo.complete`) does not fire while `status === 'paused'`. |
+| F19 | Observe mode (`config.mode = 'observe'`, switched from the POMO/OBSERVE toggle in the Pomo header or `krnl pomo config --mode observe`): a plain h:mm:ss count-up (no timer face, no session length, no prompt, pause, pips or cycle counter). Controls: Start → Break ⇄ Back to work → Stop; breaks are recorded spans too (`krnl pomo resume` ends a break). A "today · work · breaks" line replaces the pips. Spans under 10 s (misclicks) are not recorded. |
+| F20 | When an Observe work span ends untagged, a "Log this span" panel asks for a name + category (ADR 0016 library, with icons, guessed from the name, "+ new" adds one), or a task to link instead. Clock, Calendar and Time-by-tag colour and count named spans by category. CLI: `krnl pomo retag <seg> --text "…" [--tag <tag>]`. |
+| F21 | The ☰ button in the Pomo header opens a span log: every recorded work/break span of a day (‹ › to page days) with a delete button, so tiny spans are easy to remove. |
+| F22 | Analytics: Focus counts every recorded work span (not only spans that reached the session length); breaks are totalled; "sessions" counts full pomodoros only. Timer faces scale to the configured session length instead of a fixed 25. |
 
 ---
 

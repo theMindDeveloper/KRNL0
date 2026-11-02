@@ -4,6 +4,8 @@ import type { NodeProps } from '../types';
 import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
 import { packLanes } from '../../../store/laneLayout';
 import { toneVarForTask } from '../../../utils/taskColor';
+import { boardTagLibrary, spanTone } from '../../../store/spanTags';
+import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import type { PomoState } from '../PomoNode/types';
 import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
@@ -229,6 +231,7 @@ export function ClockNode({
   // real time. The 30-second hand tick is too coarse; add a 1-second cursor
   // that only runs when there is an in-flight segment (zero idle cost).
   const board0 = useBoardStore((s) => s.board);
+  const tagLibrary = boardTagLibrary(board0);
   const isLive = pomoIsLive(board0);
   const [liveMs, setLiveMs] = useState(() => Date.now());
 
@@ -294,6 +297,16 @@ export function ClockNode({
         endMs: dayStart + endH * 3_600_000,
       }),
     });
+  };
+  // Left-click a task (arc or list row) → what it is: name, plan, tracked time.
+  const [taskPopup, setTaskPopup] = useState<{ taskId: string; x: number; y: number; startMs: number; endMs: number } | null>(null);
+  const openTaskInfo = (taskId: string, startH: number, endH: number, e: React.MouseEvent) => {
+    // Habits ride the dial as `habit-<id>`; the popup shows them too.
+    const node = useBoardStore.getState().board?.nodes.find((n) => n.id === taskId);
+    if (!taskId.startsWith('habit-') && (!node || node.kind !== 'todo.task')) return;
+    e.stopPropagation();
+    const dayStart = new Date(selectedDate + 'T00:00:00').getTime();
+    setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: dayStart + startH * 3_600_000, endMs: dayStart + endH * 3_600_000 });
   };
   const fmtClockHM = (ms: number) => {
     const d = new Date(ms);
@@ -848,14 +861,16 @@ export function ClockNode({
                       strokeWidth={Math.max(12, sw + 8)}
                       strokeLinecap={cap}
                       pointerEvents="stroke"
-                      style={{ cursor: 'context-menu' }}
+                      style={{ cursor: 'pointer' }}
+                      onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
                       onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
                     >
-                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)} · right-click for actions`}</title>
+                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)} · click for details, right-click for actions`}</title>
                     </path>
                     <path
                       data-testid="clock-plan-arc"
                       data-task-id={t.id}
+                      onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
                       onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
                       d={arcPath(s, e, r)}
                       fill="none"
@@ -1008,7 +1023,7 @@ export function ClockNode({
                 Click a wedge for times, retag and delete. */}
             {realitySegments.map((seg) => {
               const isWork = seg.kind === 'work';
-              const tone = isWork ? (seg.taskId ? toneVarForTask(seg.taskId) : 'var(--acid)') : 'var(--ink-3)';
+              const tone = spanTone(tagLibrary, seg);
               const open = (e: React.MouseEvent) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1268,6 +1283,7 @@ export function ClockNode({
               <div
                 key={t.id}
                 data-testid="clock-task-row"
+                onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
                 onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
                 onPointerEnter={() => setHoverTaskId(t.id)}
                 onPointerLeave={() => setHoverTaskId((h) => (h === t.id ? null : h))}
@@ -1342,6 +1358,9 @@ export function ClockNode({
       {ctxMenu && (
         <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onDismiss={() => setCtxMenu(null)} />
       )}
+      {taskPopup && (
+        <TaskInfoPopup {...taskPopup} onClose={() => setTaskPopup(null)} />
+      )}
       {realityPopup && createPortal(
         <>
           <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
@@ -1363,8 +1382,8 @@ export function ClockNode({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: realityPopup.seg.kind === 'work' ? 'var(--rust)' : 'var(--ink-3)' }} />
-              <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? 'Focus session' : 'Break'}</span>
+              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: spanTone(tagLibrary, realityPopup.seg) }} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? (!realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}</span>
               {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>◆ LIVE</span>}
             </div>
             <div style={{ color: 'var(--ink-3)', fontSize: 10, marginBottom: 10, letterSpacing: '0.04em' }}>

@@ -31,6 +31,9 @@ export interface PomoSessionRecord {
   /** Issue #166: which visual language this span draws in. Defaults to 'work'
    *  for legacy records written before the observer model (migration). */
   kind: PomoSegmentKind;
+  /** Observe mode — tag id (ADR 0016 library) on a free-text span. Task spans
+   *  take their colour from the task and leave this unset. */
+  tag?: string;
 }
 
 export interface PomoState {
@@ -43,6 +46,9 @@ export interface PomoState {
   /** Default break length (informational only — breaks are open-ended). */
   breakMin: number;
   label: string;
+  /** Observe mode — category tag of the free-text `label` being recorded
+   *  (null/absent when untagged or when a task is linked). */
+  tag?: string | null;
   /** Count of COMPLETED pomodoros (work spans that reached threshold). */
   sessionsCompleted: number;
   activeTaskId: string | null;
@@ -61,7 +67,17 @@ export interface PomoState {
 export const TIMER_FACES = ['ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline', 'mac'] as const;
 export type TimerFace = (typeof TIMER_FACES)[number];
 
+/** 'observe' drops the pomodoro rhythm: no threshold, breaks, pause or pips —
+ *  just Start/Stop and a "what was this?" tag on each recorded span. */
+export type PomoMode = 'pomodoro' | 'observe';
+
+/** Observe-mode session length: a day, so a span never "completes" a
+ *  pomodoro (no threshold prompt, no session/pip counts). */
+export const OBSERVE_SPAN_MIN = 24 * 60;
+
 export interface PomoConfig {
+  /** Defaults to 'pomodoro' when missing. */
+  mode?: PomoMode;
   sessionMin: number;
   shortBreakMin: number;
   longBreakMin: number;

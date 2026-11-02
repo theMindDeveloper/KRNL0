@@ -80,7 +80,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'start', usage: 'pomo start [--label "..."] [--minutes 25]', summary: 'Start a pomo session' },
       { name: 'stop', usage: 'pomo stop', summary: 'Stop the timer and record the in-flight span' },
       { name: 'pause', usage: 'pomo pause', summary: 'Pause a running session' },
-      { name: 'resume', usage: 'pomo resume', summary: 'Resume a paused session (the pause gap is not counted as work)' },
+      { name: 'resume', usage: 'pomo resume', summary: 'Resume a paused session, or go back to work from a break (records the break)' },
       { name: 'break', usage: 'pomo break', summary: 'Switch from work to an open-ended break' },
       { name: 'extend', usage: 'pomo extend', summary: 'Count the session as complete and keep working' },
       { name: 'discard', usage: 'pomo discard', summary: 'Abandon the in-flight span without recording it' },
