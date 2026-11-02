@@ -63,6 +63,9 @@ export interface CompletionRecord {
   text: string;         // task text at completion time (node may be gone later)
   plannedMin: number;   // budgeted minutes at completion time
   completedAt: string;  // ISO 8601
+  // ADR 0016 — tag id the task was filed under at completion time (refreshed
+  // if the user re-tags it later). Absent = untagged ("Other").
+  tag?: string;
 }
 
 export interface Board {

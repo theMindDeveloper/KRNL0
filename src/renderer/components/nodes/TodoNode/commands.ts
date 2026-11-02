@@ -3,6 +3,14 @@
 // real Date.now and crypto.randomUUID at runtime.
 
 import type { TodoConfig, TodoItem, TodoState } from './types';
+import {
+  classifyTask,
+  findTag,
+  mergeTagLibrary,
+  slugifyTag,
+} from '../../../../shared/tags/classify';
+import type { TagDef, TagExample } from '../../../../shared/tags/classify';
+import { isoToYMD, toYMD } from '../../../analytics/dateRange';
 
 export interface TodoEnv {
   uuid: () => string;
@@ -24,11 +32,14 @@ export const todoAdd = (
 ): TodoState => {
   const trimmed = args.text.trim();
   if (!trimmed) return state;
+  // ADR 0016 — an explicit tag is a hand tag; otherwise ask the classifier.
+  const autoTag = args.tag === undefined ? autoTagFor(state, trimmed) : null;
   const item: TodoItem = {
     id: env.uuid(),
     text: trimmed,
     done: false,
-    ...(args.tag !== undefined ? { tag: args.tag } : {}),
+    ...(args.tag !== undefined ? { tag: args.tag, tagSource: 'user' as const } : {}),
+    ...(autoTag !== null ? { tag: autoTag, tagSource: 'auto' as const } : {}),
     createdAt: env.now(),
     completedAt: null,
     taskNodeId: null,
@@ -46,19 +57,26 @@ export const todoToggle = (
   items: state.items.map((item) => {
     if (item.id !== args.id) return item;
     const done = !item.done;
-    return { ...item, done, completedAt: done ? env.now() : null };
+    // Reopening pulls the item out of Done/Archive, so a manual archive mark
+    // must not survive it.
+    const { archivedAt: _a, ...rest } = item;
+    void _a;
+    return { ...rest, done, completedAt: done ? env.now() : null };
   }),
 });
 
-// todo.edit — update text; no-op if id is missing.
+// todo.edit — update text; no-op if id is missing. Auto tags are re-derived
+// from the new text; hand tags are kept.
 export const todoEdit = (
   state: TodoState,
   args: { id: string; text: string },
 ): TodoState => ({
   ...state,
-  items: state.items.map((item) =>
-    item.id === args.id ? { ...item, text: args.text } : item,
-  ),
+  items: state.items.map((item) => {
+    if (item.id !== args.id) return item;
+    const edited = { ...item, text: args.text };
+    return isHandTagged(item) ? edited : withAutoTag(edited, autoTagFor(state, args.text, item.id));
+  }),
 });
 
 // todo.remove — filter out one item by id.
@@ -105,6 +123,160 @@ export const todoSetItemSchedule = (
     return { ...item, scheduledFor: args.scheduledFor };
   }),
 });
+
+// ── ADR 0016 — tags ─────────────────────────────────────────────────────────
+
+/** Built-in tags followed by this list's custom tags. */
+export const todoTagLibrary = (state: TodoState): readonly TagDef[] =>
+  mergeTagLibrary(state.tagLibrary);
+
+/** A tag the user chose (legacy tags without a source count as chosen). */
+const isHandTagged = (item: TodoItem): boolean =>
+  item.tag !== undefined && item.tagSource !== 'auto';
+
+/** Hand-tagged items are the classifier's training set. */
+export const tagExamples = (state: TodoState, excludeId?: string): TagExample[] =>
+  state.items
+    .filter((i) => i.id !== excludeId && isHandTagged(i))
+    .map((i) => ({ text: i.text, tag: i.tag as string }));
+
+function autoTagFor(state: TodoState, text: string, excludeId?: string): string | null {
+  return classifyTask(text, todoTagLibrary(state), tagExamples(state, excludeId));
+}
+
+function withAutoTag(item: TodoItem, tagId: string | null): TodoItem {
+  const { tag: _t, tagSource: _s, ...rest } = item;
+  void _t; void _s;
+  return tagId === null ? rest : { ...rest, tag: tagId, tagSource: 'auto' };
+}
+
+// todo.setItemTag — hand-tag an item. `tag` is an id or label; an unknown
+// label creates a custom tag on the fly. `null` hands the item back to the
+// classifier. Every other open, auto-tagged item is then re-classified so one
+// correction immediately improves the rest of the list.
+export const todoSetItemTag = (
+  state: TodoState,
+  args: { id: string; tag: string | null },
+): TodoState => {
+  if (!state.items.some((i) => i.id === args.id)) return state;
+  let next = state;
+  let tagId: string | null = null;
+  if (args.tag !== null) {
+    const label = args.tag.trim();
+    if (!label) return state;
+    if (!findTag(todoTagLibrary(next), label)) next = todoAddTag(next, { label });
+    tagId = findTag(todoTagLibrary(next), label)?.id ?? null;
+    if (tagId === null) return state;
+  }
+  const items = next.items.map((item) => {
+    if (item.id !== args.id) return item;
+    if (tagId !== null) return { ...item, tag: tagId, tagSource: 'user' as const };
+    return withAutoTag(item, autoTagFor(next, item.text, item.id));
+  });
+  return todoReclassify({ ...next, items });
+};
+
+// todo.reclassify — re-run the classifier over open, auto-tagged (or
+// untagged) items. Done/archived items keep the tag they were completed under
+// so history doesn't shift underneath the analytics.
+export const todoReclassify = (state: TodoState): TodoState => {
+  let changed = false;
+  const items = state.items.map((item) => {
+    if (item.done || isHandTagged(item)) return item;
+    const tagId = autoTagFor(state, item.text, item.id);
+    if ((item.tag ?? null) === tagId) return item;
+    changed = true;
+    return withAutoTag(item, tagId);
+  });
+  return changed ? { ...state, items } : state;
+};
+
+// todo.addTag — create a custom tag. No-op on an empty label or one that
+// already exists. Keywords are optional extra trigger words for the classifier.
+const CUSTOM_TAG_COLORS = ['#e8a33d', '#4fb3ff', '#c07bff', '#57d19a', '#ff7b7b', '#b8c46a'];
+export const todoAddTag = (
+  state: TodoState,
+  args: { label: string; color?: string; keywords?: string[] },
+): TodoState => {
+  const label = args.label.trim().slice(0, 24);
+  const id = slugifyTag(label);
+  if (!label || !id) return state;
+  const library = todoTagLibrary(state);
+  if (findTag(library, label) || library.some((t) => t.id === id)) return state;
+  const custom = state.tagLibrary ?? [];
+  const keywords = (args.keywords ?? []).map((k) => k.trim()).filter(Boolean);
+  const tag: TagDef = {
+    id,
+    label,
+    color: args.color ?? CUSTOM_TAG_COLORS[custom.length % CUSTOM_TAG_COLORS.length]!,
+    ...(keywords.length > 0 ? { keywords } : {}),
+  };
+  return todoReclassify({ ...state, tagLibrary: [...custom, tag] });
+};
+
+// todo.removeTag — delete a custom tag (built-ins can't be removed). Open
+// items that carried it go back to the classifier; done items keep the id so
+// their history still groups together (it then renders as a plain label).
+export const todoRemoveTag = (state: TodoState, args: { id: string }): TodoState => {
+  const custom = state.tagLibrary ?? [];
+  if (!custom.some((t) => t.id === args.id)) return state;
+  const next: TodoState = {
+    ...state,
+    tagLibrary: custom.filter((t) => t.id !== args.id),
+    items: state.items.map((i) => (i.tag === args.id && !i.done ? withAutoTag(i, null) : i)),
+  };
+  return todoReclassify(next);
+};
+
+// ── ADR 0016 — Done / Archive lifecycle ─────────────────────────────────────
+// Buckets are derived, not stored: a done item sits in "Done" while its
+// completion day is today and moves to "Archive" once that day is over, so the
+// rollover needs no midnight job and survives the app being closed overnight.
+// archivedAt only forces an early archive ("Archive now").
+
+export interface TodoBuckets {
+  active: TodoItem[];
+  done: TodoItem[];
+  archived: TodoItem[];
+}
+
+export const isArchived = (item: TodoItem, today: string): boolean =>
+  item.done &&
+  (item.archivedAt !== undefined ||
+    (item.completedAt !== null && isoToYMD(item.completedAt) < today));
+
+export const todoBuckets = (state: TodoState, nowMs: number = Date.now()): TodoBuckets => {
+  const today = toYMD(new Date(nowMs));
+  const out: TodoBuckets = { active: [], done: [], archived: [] };
+  for (const item of state.items) {
+    if (!item.done) out.active.push(item);
+    else if (isArchived(item, today)) out.archived.push(item);
+    else out.done.push(item);
+  }
+  // Archive reads newest-first; the other two keep insertion order.
+  out.archived.sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+  return out;
+};
+
+// todo.archiveDone — "Archive now": move every done-today item to the archive.
+export const todoArchiveDone = (state: TodoState, env: TodoEnv = defaultEnv): TodoState => {
+  const stamp = env.now();
+  let changed = false;
+  const items = state.items.map((item) => {
+    if (!item.done || item.archivedAt !== undefined) return item;
+    changed = true;
+    return { ...item, archivedAt: stamp };
+  });
+  return changed ? { ...state, items } : state;
+};
+
+// todo.clearArchived — permanently drop archived items. Analytics is
+// unaffected: completions live in the board ledger (#169), not on the list.
+export const todoClearArchived = (state: TodoState, nowMs: number = Date.now()): TodoState => {
+  const today = toYMD(new Date(nowMs));
+  const items = state.items.filter((i) => !isArchived(i, today));
+  return items.length === state.items.length ? state : { ...state, items };
+};
 
 // Render helper (pure, applied to a copy — Decision #10):
 //   1. Filter by showCompleted if false

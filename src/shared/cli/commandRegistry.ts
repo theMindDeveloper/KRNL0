@@ -43,7 +43,11 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'add', usage: 'todo add "<text>" [--tag <label>]', summary: 'Add a TodoItem + linked TaskNode (both created, bidirectional link)' },
       { name: 'check', usage: 'todo check <ref>', summary: 'Toggle a TodoItem done/undone — <ref> accepts id-prefix or text match' },
-      { name: 'list', usage: 'todo list [--json]', summary: 'List all TodoItems (--json prints bare JSON)' },
+      { name: 'list', usage: 'todo list [--done|--archived|--all] [--json]', summary: 'List TodoItems — default: open + done today; --done today only, --archived past days, --all everything. [Tag?] = auto tag' },
+      { name: 'tag', usage: 'todo tag <ref> <tag|auto>', summary: 'Hand-tag a TodoItem (id or label; unknown labels create a custom tag). "auto" hands it back to the classifier' },
+      { name: 'tags', usage: 'todo tags [list|add "<label>" [--keywords a,b] [--color c]|remove <id>] [--json]', summary: 'List, create or remove tags. Built-ins: code, study, writing, reading, meetings, admin, planning, health, chores, social, creative' },
+      { name: 'archive', usage: 'todo archive', summary: 'Move every done item to the archive now (otherwise they move when the day ends)' },
+      { name: 'clear-archive', usage: 'todo clear-archive', summary: 'Delete archived items and their task nodes. Analytics history is kept' },
     ],
   },
   {
@@ -122,7 +126,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'analytics',
     summary: 'Analytics reads from board state (headless-capable)',
     subcommands: [
-      { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources|estimates] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
+      { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources|estimates|tags] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
       { name: 'totals', usage: 'analytics totals [--range N] [--json]', summary: 'Show task/habit/focus totals over N days (default 30)' },
       { name: 'streaks', usage: 'analytics streaks [--json]', summary: 'Show habit streak data' },
     ],

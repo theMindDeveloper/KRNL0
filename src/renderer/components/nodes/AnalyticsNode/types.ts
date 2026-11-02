@@ -11,6 +11,7 @@ export type AnalyticsView =
   | 'patterns'   // dow + hour + month
   | 'insights'   // multivariate (scatter, donut, correlations) — added 2026-05-18
   | 'estimates'  // plan vs actual: estimate vs tracked per task / day
+  | 'time'       // ADR 0016 — where the time went, by tag
   | 'sources';   // raw event stream by source
 
 export const ANALYTICS_VIEWS: readonly AnalyticsView[] = [
@@ -19,6 +20,7 @@ export const ANALYTICS_VIEWS: readonly AnalyticsView[] = [
   'patterns',
   'insights',
   'estimates',
+  'time',
   'sources',
 ] as const;
 
@@ -57,6 +59,10 @@ export type AnalyticsCardId =
   | 'estimates.perTask'
   | 'estimates.daily'
   | 'estimates.mix'
+  // time (ADR 0016 — by tag)
+  | 'time.donut'
+  | 'time.list'
+  | 'time.daily'
   // sources
   | 'sources.list'
   | 'sources.streaks';
@@ -85,6 +91,9 @@ export const ANALYTICS_CARD_LABELS: Record<AnalyticsCardId, string> = {
   'estimates.perTask':            'Estimate vs actual per task',
   'estimates.daily':              'Planned vs worked per day',
   'estimates.mix':                'Where the time went',
+  'time.donut':                   'Time by tag (donut)',
+  'time.list':                    'Tags ranked',
+  'time.daily':                   'Daily mix by tag',
   'sources.list':                 'Registered sources',
   'sources.streaks':              'Habit streaks',
 };

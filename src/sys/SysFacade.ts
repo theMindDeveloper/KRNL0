@@ -466,7 +466,18 @@ export class SysFacade {
       switch (command.sub) {
         case 'add':   return todo.todoAdd(ctx, command.text, command.tag);
         case 'check': return todo.todoCheck(ctx, command.id);
-        case 'list':  return todo.todoList(ctx, command.json);
+        case 'list':  return todo.todoList(ctx, command.json, command.scope);
+        case 'tag':   return todo.todoTag(ctx, command.ref, command.tag);
+        case 'tags': {
+          const opts: Parameters<typeof todo.todoTags>[1] = { json: command.json };
+          if (command.action !== undefined) opts.action = command.action;
+          if (command.label !== undefined) opts.label = command.label;
+          if (command.keywords !== undefined) opts.keywords = command.keywords;
+          if (command.color !== undefined) opts.color = command.color;
+          return todo.todoTags(ctx, opts);
+        }
+        case 'archive':       return todo.todoArchive(ctx);
+        case 'clear-archive': return todo.todoClearArchive(ctx);
       }
     }
 

@@ -743,3 +743,38 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Drag to Calendar:** canvas Task nodes get a drag grip, and Todo rows with no task node yet are promoted to a linked task when dropped on the Calendar (`calendar.schedule {itemId}`).
 
 **Tests:** 0 typecheck errors; 125 files / 1495 tests green.
+
+---
+
+## [2026-11-02] — Todo Done/Archive, smart task tags, time by tag (ADR 0016)
+
+**Type:** Feature
+**PRs / Commits:** branch `TMD/task-completion-tagging-c87ea6`
+**Files changed:**
+- **New:** `src/shared/tags/{taxonomy,classify}.ts`, `src/renderer/components/nodes/TodoNode/TagPicker.tsx`, `src/renderer/analytics/{tags.ts,charts/TagCharts.tsx}`
+- **Todo node:** `TodoNode/{types,commands,index}.tsx`
+- **Wiring:** `Canvas/commandDispatch.ts`, `shared/dispatch/task.ts`, `shared/types/board.ts`, `analytics/{types,sources/taskSource}.ts`, `AnalyticsNode/{types,index}.tsx`, `analytics/charts/{common,DonutChart}.ts(x)`
+- **CLI:** `sys/{parser,SysFacade,commands/todo,commands/analytics}.ts`, `shared/cli/commandRegistry.ts`
+- **Docs:** `claude/CLAUDE.md`, ADR 0016, `docs/06-requirements/todo-node.md` (F16–F25), `docs/04-visual-system/design-tokens.md`
+- **Tests:** 6 new files
+
+**Summary:**
+- **Done → Archive:**
+  - A ticked task now leaves the open list and waits in a collapsed **Done (N)** dropdown.
+  - After its completion day it shows under **Archive (N)**, grouped by day. The buckets are derived from the clock, so no midnight job is needed.
+  - "ARCHIVE DONE" replaces "CLEAR DONE" and archives early. Nothing is deleted.
+  - Ticking an archived row restores it. The Archive's CLEAR deletes rows and task nodes but keeps the analytics ledger.
+- **Smart tags:**
+  - An offline, deterministic classifier sorts every task into 11 built-in categories, or leaves it as "Other" rather than guessing.
+  - Click a tag to open a picker with best guesses first; you can create custom tags there.
+  - Hand tags teach the classifier and re-file similar open tasks at once.
+  - Auto tags are dashed and hand tags are solid. Existing items are backfilled on first load.
+- **Time by tag:**
+  - Completions record their tag on the ledger, and re-tagging a done task updates it.
+  - The new Analytics **Time** view shows a donut, a ranked list and daily stacked bars, built on pomo-tracked minutes, else planned minutes.
+- **CLI:** `todo list --done|--archived|--all`, `todo tag`, `todo tags list|add|remove`, `todo archive`, `todo clear-archive`, `analytics show --view tags`.
+- **Text containment rule:**
+  - Donut % labels used to sit on the ring and cross slice edges. Chart labels are now fitted with `fitArcLabel` / `fitCircleLabel`: shrink to 8 px, else hide, always 3 px clear of every edge.
+  - The rule is in the visual-system docs and enforced by a randomized geometry test.
+
+**Tests:** 131 files / 1589 passed, 0 typecheck errors. Exercised in the browser preview (`vite.preview.config.ts`), not yet in the Electron window. One unrelated Station test timed out once under full-suite load and passes on its own.

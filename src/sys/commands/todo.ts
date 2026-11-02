@@ -7,11 +7,19 @@ import type { SysResult } from '../SysFacade';
 import {
   todoToggle as fsmTodoToggle,
   visibleItems,
+  todoBuckets,
+  todoTagLibrary,
+  todoSetItemTag,
+  todoAddTag,
+  todoRemoveTag,
+  todoArchiveDone,
+  todoClearArchived,
 } from '../../renderer/components/nodes/TodoNode/commands';
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
 import { defaultTodoConfig } from '../../renderer/components/nodes/TodoNode/types';
 import { createTodoTaskPair } from '../../shared/dispatch/todo';
-import { taskToggleMirror } from '../../shared/dispatch/task';
+import { taskToggleMirror, syncCompletion, deleteTaskCascade } from '../../shared/dispatch/task';
+import { findTag, tagDisplay } from '../../shared/tags/classify';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import { resolveTodoItemRef, resolutionError } from '../../shared/dispatch/resolveRef';
 import type { BoardShape } from '../../shared/dispatch/types';
@@ -106,7 +114,14 @@ export async function todoCheck(ctx: TodoCtx, id?: string): Promise<SysResult> {
   };
 }
 
-export async function todoList(ctx: TodoCtx, json = false): Promise<SysResult> {
+/** Which lifecycle buckets `todo list` shows (ADR 0016). */
+export type TodoListScope = 'today' | 'done' | 'archived' | 'all';
+
+export async function todoList(
+  ctx: TodoCtx,
+  json = false,
+  scope: TodoListScope = 'today',
+): Promise<SysResult> {
   const board = loadBoard(ctx);
   const mother = findTodoMother(board);
   if (!mother) {
@@ -114,7 +129,18 @@ export async function todoList(ctx: TodoCtx, json = false): Promise<SysResult> {
     return { ok: false, message: 'No todo mother node found in board.' };
   }
 
-  const items = visibleItems(mother.state, defaultTodoConfig());
+  // Default view mirrors the UI: open items + today's Done; the archive is opt-in.
+  const buckets = todoBuckets(mother.state);
+  const keep = new Set(
+    (scope === 'done' ? buckets.done
+      : scope === 'archived' ? buckets.archived
+        : scope === 'all' ? [...buckets.active, ...buckets.done, ...buckets.archived]
+          : [...buckets.active, ...buckets.done]).map((i) => i.id),
+  );
+  const archivedIds = new Set(buckets.archived.map((i) => i.id));
+  const items = visibleItems(mother.state, { ...defaultTodoConfig(), maxVisible: Number.MAX_SAFE_INTEGER })
+    .filter((i) => keep.has(i.id));
+  const library = todoTagLibrary(mother.state);
 
   if (json) {
     return {
@@ -125,8 +151,9 @@ export async function todoList(ctx: TodoCtx, json = false): Promise<SysResult> {
   }
 
   const lines = items.map((i) => {
-    const status = i.done ? '[x]' : '[ ]';
-    const tag = i.tag ? ` [${i.tag}]` : '';
+    const status = archivedIds.has(i.id) ? '[a]' : i.done ? '[x]' : '[ ]';
+    const label = i.tag ? tagDisplay(library, i.tag).label : '';
+    const tag = label ? ` [${label}${i.tagSource === 'auto' ? '?' : ''}]` : '';
     return `${status} ${i.id.slice(0, 8)}  ${i.text}${tag}`;
   });
 
@@ -135,4 +162,129 @@ export async function todoList(ctx: TodoCtx, json = false): Promise<SysResult> {
     message: lines.length > 0 ? lines.join('\n') : 'No todos.',
     data: items,
   };
+}
+
+// ── ADR 0016 — tags + archive ──────────────────────────────────────────────
+
+/** Apply a pure TodoState transform to the todo mother and persist. */
+function mutateTodo(
+  ctx: TodoCtx,
+  fn: (state: TodoState) => TodoState,
+): { ok: true; before: TodoState; after: TodoState; board: BoardShape } | { ok: false; message: string } {
+  const board = loadBoard(ctx);
+  const idx = board.nodes.findIndex((n) => n.kind === 'todo' && n.isMother === true);
+  if (idx === -1) return { ok: false, message: 'No todo mother node found in board.' };
+  const node = board.nodes[idx]!;
+  const before = node.state as TodoState;
+  const after = fn(before);
+  board.nodes[idx] = { ...node, state: after };
+  return { ok: true, before, after, board };
+}
+
+/** Re-file ledger entries of done items whose tag changed (analytics reads the ledger). */
+function syncDoneTags(board: BoardShape, before: TodoState, after: TodoState): void {
+  for (const item of after.items) {
+    if (!item.done || !item.taskNodeId) continue;
+    const prev = before.items.find((i) => i.id === item.id);
+    if (prev?.tag !== item.tag) syncCompletion(board, item.taskNodeId);
+  }
+}
+
+export async function todoTag(ctx: TodoCtx, ref?: string, tag?: string): Promise<SysResult> {
+  if (!ref || !tag) return { ok: false, message: 'todo tag requires <ref> and <tag|auto>' };
+  const board = loadBoard(ctx);
+  const r = resolveTodoItemRef(board, ref);
+  if (!r.ok) return { ok: false, message: resolutionError('todo item', ref, r) };
+  const auto = tag.toLowerCase() === 'auto';
+  const m = mutateTodo(ctx, (s) => todoSetItemTag(s, { id: r.id.itemId, tag: auto ? null : tag }));
+  if (!m.ok) return m;
+  syncDoneTags(m.board, m.before, m.after);
+  saveBoard(ctx, m.board);
+  const item = m.after.items.find((i) => i.id === r.id.itemId);
+  const label = item?.tag ? tagDisplay(todoTagLibrary(m.after), item.tag).label : 'Other';
+  return {
+    ok: true,
+    message: `Todo "${item?.text ?? ref}" tagged ${label}${auto ? ' (auto)' : ''}.`,
+    data: { id: r.id.itemId, tag: item?.tag ?? null, tagSource: item?.tagSource ?? null },
+  };
+}
+
+export async function todoTags(
+  ctx: TodoCtx,
+  opts: { action?: string; label?: string; keywords?: string; color?: string; json?: boolean },
+): Promise<SysResult> {
+  const action = opts.action ?? 'list';
+  if (action === 'add') {
+    if (!opts.label) return { ok: false, message: 'todo tags add requires a "<label>"' };
+    const keywords = opts.keywords ? opts.keywords.split(',') : undefined;
+    const m = mutateTodo(ctx, (s) => todoAddTag(s, {
+      label: opts.label!,
+      ...(keywords ? { keywords } : {}),
+      ...(opts.color ? { color: opts.color } : {}),
+    }));
+    if (!m.ok) return m;
+    if (m.after === m.before) return { ok: false, message: `Tag "${opts.label}" already exists.` };
+    saveBoard(ctx, m.board);
+    const added = m.after.tagLibrary?.[m.after.tagLibrary.length - 1];
+    return { ok: true, message: `Added tag "${added?.label}" (id: ${added?.id}).`, data: added };
+  }
+  if (action === 'remove') {
+    if (!opts.label) return { ok: false, message: 'todo tags remove requires a <tag id>' };
+    const m = mutateTodo(ctx, (s) => {
+      const t = findTag(todoTagLibrary(s), opts.label!);
+      return t ? todoRemoveTag(s, { id: t.id }) : s;
+    });
+    if (!m.ok) return m;
+    if (m.after === m.before) return { ok: false, message: `No custom tag "${opts.label}" (built-in tags can't be removed).` };
+    saveBoard(ctx, m.board);
+    return { ok: true, message: `Removed tag "${opts.label}".` };
+  }
+  if (action !== 'list') return { ok: false, message: `Unknown todo tags action "${action}" (list|add|remove)` };
+
+  const board = loadBoard(ctx);
+  const mother = findTodoMother(board);
+  const state = mother?.state ?? { items: [] };
+  const library = todoTagLibrary(state);
+  const counts = new Map<string, number>();
+  for (const i of state.items) if (i.tag) counts.set(i.tag, (counts.get(i.tag) ?? 0) + 1);
+  const rows = library.map((t) => ({
+    id: t.id,
+    label: t.label,
+    builtin: t.builtin === true,
+    items: counts.get(t.id) ?? 0,
+    keywords: [...(t.strong ?? []), ...(t.keywords ?? [])],
+  }));
+  if (opts.json) return { ok: true, message: JSON.stringify(rows), data: rows };
+  const lines = rows.map((r) =>
+    `${r.id.padEnd(14)} ${r.label.padEnd(14)} ${String(r.items).padStart(3)} items${r.builtin ? '' : '  (custom)'}`,
+  );
+  return { ok: true, message: lines.join('\n'), data: rows };
+}
+
+export async function todoArchive(ctx: TodoCtx): Promise<SysResult> {
+  const m = mutateTodo(ctx, (s) => todoArchiveDone(s));
+  if (!m.ok) return m;
+  const moved = m.after.items.filter((i, k) => i.archivedAt !== undefined && m.before.items[k]?.archivedAt === undefined).length;
+  if (moved > 0) saveBoard(ctx, m.board);
+  return { ok: true, message: moved > 0 ? `Archived ${moved} done item(s).` : 'Nothing to archive.', data: { archived: moved } };
+}
+
+export async function todoClearArchive(ctx: TodoCtx): Promise<SysResult> {
+  const board = loadBoard(ctx);
+  const mother = findTodoMother(board);
+  if (!mother) return { ok: false, message: 'No todo mother node found in board.' };
+  const archived = todoBuckets(mother.state).archived;
+  if (archived.length === 0) return { ok: true, message: 'Archive is already empty.', data: { removed: 0 } };
+  // Delete the archived rows' task nodes (the cascade also drops the rows).
+  // The completion ledger is left alone, so analytics keeps the history.
+  for (const item of archived) {
+    if (item.taskNodeId) deleteTaskCascade(board, item.taskNodeId);
+  }
+  const idx = board.nodes.findIndex((n) => n.id === mother.id);
+  if (idx !== -1) {
+    const node = board.nodes[idx]!;
+    board.nodes[idx] = { ...node, state: todoClearArchived(node.state as TodoState) };
+  }
+  saveBoard(ctx, board);
+  return { ok: true, message: `Cleared ${archived.length} archived item(s).`, data: { removed: archived.length } };
 }

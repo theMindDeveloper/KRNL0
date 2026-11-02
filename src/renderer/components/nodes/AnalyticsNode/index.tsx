@@ -22,6 +22,8 @@ import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
 import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
+import { computeTagBreakdown } from '../../../analytics/tags';
+import { TagDailyBars, TagList } from '../../../analytics/charts/TagCharts';
 import { EstimateBars, DailyPlanActual, FocusMix, Legend, COLOR_PLANNED, COLOR_TRACKED, fmtMinutes } from '../../../analytics/charts/PlanVsActual';
 import {
   ActivityStrip,
@@ -68,6 +70,7 @@ const VIEW_LABELS: Record<AnalyticsView, string> = {
   patterns: 'Patterns',
   insights: 'Insights',
   estimates: 'Plan vs actual',
+  time: 'Time',
   sources: 'Sources',
 };
 
@@ -119,6 +122,7 @@ const CARDS_BY_VIEW: Record<AnalyticsView, readonly AnalyticsCardId[]> = {
     'insights.histogramTasks',
   ],
   estimates: ['estimates.kpis', 'estimates.perTask', 'estimates.daily', 'estimates.mix'],
+  time: ['time.donut', 'time.list', 'time.daily'],
   sources: ['sources.list', 'sources.streaks'],
 };
 
@@ -961,6 +965,70 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
   return <div style={cardGridStyle}>{cards.map((c) => <CardSlot key={c.cardId}>{c.render()}</CardSlot>)}</div>;
 }
 
+// ── Time by tag (ADR 0016) ────────────────────────────────────────────────────
+// Completed tasks grouped by their tag: minutes are pomo time tracked against
+// the task, else its estimate. See analytics/tags.ts.
+function TimeView(props: ViewBodyProps & { cardGridStyle: React.CSSProperties }) {
+  const { range, settingsOpen, isHidden, isPinned, toggleHidden, togglePin, clamp, cardGridStyle, state } = props;
+  const board = useBoardStore((s) => s.board);
+  const res = useMemo(
+    () => (board ? computeTagBreakdown(board, range, Date.now()) : null),
+    [board, range],
+  );
+  if (!res) return null;
+  const slices: DonutSlice[] = res.tags.map((t) => ({ id: t.id, label: t.label, value: t.minutes, color: t.color }));
+  const card = (id: AnalyticsCardId, title: string, span: number, contentHeight: number, body: (size: { width: number; height: number }) => React.ReactNode) => (
+    <ChartCard
+      key={id}
+      cardId={id}
+      title={title}
+      span={clamp(span)}
+      contentHeight={contentHeight}
+      hidden={isHidden(id)}
+      pinned={isPinned(id)}
+      settingsOpen={settingsOpen}
+      onToggleHidden={() => toggleHidden(id)}
+      onTogglePin={() => togglePin(id)}
+    >
+      {body}
+    </ChartCard>
+  );
+  const cards = orderCards(
+    [
+      {
+        cardId: 'time.donut' as const,
+        render: () => card('time.donut', `Time by tag · last ${state.rangeDays}d`, 1, 260, (size) => (
+          <DonutChart
+            data={slices}
+            innerRatio={0.55}
+            size={Math.min(220, chartWidth(size.width, 220))}
+            centerPrimary={fmtMinutes(res.totalMin)}
+            centerSecondary={`${res.totalCount} tasks`}
+            formatValue={fmtMinutes}
+          />
+        )),
+      },
+      {
+        cardId: 'time.list' as const,
+        render: () => card('time.list', 'Tags ranked · time · share · tasks', 2, 260, (size) => (
+          <TagList tags={res.tags} width={chartWidth(size.width, 420)} />
+        )),
+      },
+      {
+        cardId: 'time.daily' as const,
+        render: () => card('time.daily', 'Daily mix by tag', 3, 190, (size) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Legend items={res.tags.map((t) => ({ label: t.label, color: t.color }))} />
+            <TagDailyBars days={res.days} tags={res.tags} width={chartWidth(size.width, 640)} height={chartHeight(size.height - 24, 150)} />
+          </div>
+        )),
+      },
+    ],
+    state.pinnedCards ?? [],
+  );
+  return <div style={cardGridStyle}>{cards.map((c) => <CardSlot key={c.cardId}>{c.render()}</CardSlot>)}</div>;
+}
+
 function orderCards<T extends { cardId: AnalyticsCardId }>(
   cards: T[],
   pinnedOrder: readonly AnalyticsCardId[],
@@ -1147,6 +1215,10 @@ function ViewBody(props: ViewBodyProps) {
 
   if (view === 'estimates') {
     return <EstimatesView {...props} cardGridStyle={cardGridStyle} />;
+  }
+
+  if (view === 'time') {
+    return <TimeView {...props} cardGridStyle={cardGridStyle} />;
   }
 
   if (view === 'calendar') {
