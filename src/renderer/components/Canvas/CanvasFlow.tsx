@@ -41,6 +41,7 @@ import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapte
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { DrawLayer } from './DrawLayer';
+import { motherRowY } from './motherRow';
 import { targetNodeIdAt } from './connectTarget';
 import { PieMenu } from '../ui/PieMenu';
 import { canvasWheelItems } from './canvasWheel';
@@ -421,6 +422,11 @@ function getMemoizedRfEdge(
 
 // ── Inner canvas (must be inside ReactFlowProvider) ───────────────────────────
 
+// Size of the canvas area the saved viewport was last framed for (see the
+// ResizeObserver in CanvasFlowInner). Module-level so it survives the
+// remount when switching Station ↔ Canvas.
+let lastCanvasSize: { w: number; h: number } | null = null;
+
 // CanvasFlowInner receives the initial viewport as a prop (already loaded).
 // This ensures defaultViewport captures the persisted value from board.json.
 interface CanvasFlowInnerProps {
@@ -488,6 +494,25 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const update = () => {
       const r = el.getBoundingClientRect();
       updateCanvasRect(r.left, r.top);
+      // Keep the camera centred on the same spot when the canvas area changes
+      // size: switching Station ↔ Canvas (a new canvas mounts in a different
+      // box) or resizing the window. Without this the view stays pinned to the
+      // top-left corner, so what was in the middle of one mode lands off to
+      // the side in the other.
+      if (r.width < 1 || r.height < 1) return;
+      const prev = lastCanvasSize;
+      lastCanvasSize = { w: r.width, h: r.height };
+      if (!prev || (prev.w === r.width && prev.h === r.height)) return;
+      const dx = (r.width - prev.w) / 2;
+      const dy = (r.height - prev.h) / 2;
+      // Next frame: on mount React Flow applies its starting viewport first.
+      requestAnimationFrame(() => {
+        const v = getViewport();
+        const next = { x: v.x + dx, y: v.y + dy, zoom: v.zoom };
+        void setRfViewport(next);
+        updateViewport(next.x, next.y, next.zoom);
+        setViewport(next);
+      });
     };
     update();
     const observer = new ResizeObserver(update);
@@ -838,7 +863,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       }
       const mother = findAnalyticsMother(current);
       if (mother) {
-        setCenter(mother.position.x + MOTHER_WIDTH / 2, mother.position.y + MOTHER_HEIGHT / 2, { zoom: 1, duration: 380 });
+        const y = motherRowY(current?.nodes ?? []);
+        const rf = getNodes().find((n) => n.id === mother.id);
+        setCenter((rf?.position.x ?? mother.position.x) + MOTHER_WIDTH / 2, y + MOTHER_HEIGHT / 2, { zoom: 1, duration: 380 });
       }
       return;
     }
@@ -1234,6 +1261,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const displayX = new Map<string, number>(
       motherNodes.map((n, i) => [n.id, rowStartX + i * MOTHER_ROW_STEP]),
     );
+    const rowY = motherRowY(board.nodes);
     const slotTotal = motherNodes.length;
     const slotIndexMap = new Map<string, number>(
       motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
@@ -1261,12 +1289,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         cached.src === node &&
         cached.slotIndex === slotIndex &&
         cached.slotTotal === slotTotal &&
-        cached.rf.position.x === x
+        cached.rf.position.x === x &&
+        cached.rf.position.y === rowY
       ) {
         return cached.rf;
       }
 
-      const shown = x === node.position.x ? node : { ...node, position: { ...node.position, x } };
+      const shown = x === node.position.x && rowY === node.position.y ? node : { ...node, position: { x, y: rowY } };
       const rf = toRfNode(shown, {
         onCommand,
         onSelect,

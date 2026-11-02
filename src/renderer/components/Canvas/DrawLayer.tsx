@@ -187,7 +187,7 @@ export function DrawLayer() {
       <ViewportPortal>
         <svg
           data-testid="draw-layer"
-          style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none', zIndex: 4 }}
+          style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none', zIndex: 100000 }}
         >
           {(drawings ?? []).map((s) => <StrokeSvg key={s.id} s={s} />)}
           {live && <StrokeSvg s={{ points: live, size: (TOOL_SIZE[liveTool] * sizeScale) / getZoom(), tool: liveTool, color }} />}
