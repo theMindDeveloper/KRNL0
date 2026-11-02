@@ -17,6 +17,7 @@ import { MANIFESTS } from '../../themes/manifests';
 import { runLookTransition } from '../../themes/transition';
 import { HoldButton } from '../ui/HoldButton';
 import { useBoardStore } from '../../store/boardStore';
+import { BrandMark } from './BrandMark';
 
 type Theme = 'light' | 'dark';
 
@@ -112,12 +113,10 @@ export function TopBar() {
     >
       {/* Left: brand + breadcrumb + live badge */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        {/* Brand mark — Wave C (LifeOS UI refresh).
-            Source: user's logo-snippet.html — dashed halo ring + rounded
-            block mark (ink in light theme / acid in dark theme) + ■ glyph +
-            KRNL0 wordmark with dimmed "0". The SVG renders one of two
-            variants depending on `theme` so both halo dim and mark fill
-            track the surface they sit on. */}
+        {/* Brand mark — the "Lit Core" app icon (build/icon.svg): a dark 3×3
+            voxel cube on a near-black tile, centre voxel lit acid on each
+            face. The tile is dark in every theme so the mark matches the
+            dock / taskbar icon. KRNL0 wordmark keeps its dimmed "0". */}
         <span
           data-testid="topbar-brand"
           style={{
@@ -127,36 +126,7 @@ export function TopBar() {
             userSelect: 'none',
           }}
         >
-          <svg
-            data-testid="topbar-brand-mark"
-            aria-hidden
-            width={26}
-            height={26}
-            viewBox="0 0 80 80"
-            style={{ display: 'block', flexShrink: 0, overflow: 'visible' }}
-          >
-            {theme === 'dark' ? (
-              <>
-                <rect x={2} y={4} width={72} height={72} rx={11}
-                      fill="none" stroke="#5a5244" strokeWidth={1.5}
-                      strokeDasharray="4 3" opacity={0.7} />
-                <rect x={10} y={12} width={56} height={56} rx={7} fill="#c9f158" />
-                <text x={38} y={40} textAnchor="middle" dominantBaseline="central"
-                      fontFamily="var(--font-mono)" fontWeight={700} fontSize={26}
-                      fill="#0e0d0b">■</text>
-              </>
-            ) : (
-              <>
-                <rect x={2} y={4} width={72} height={72} rx={11}
-                      fill="none" stroke="#9a9180" strokeWidth={1.5}
-                      strokeDasharray="4 3" opacity={0.6} />
-                <rect x={10} y={12} width={56} height={56} rx={7} fill="#1a1814" />
-                <text x={38} y={40} textAnchor="middle" dominantBaseline="central"
-                      fontFamily="var(--font-mono)" fontWeight={700} fontSize={26}
-                      fill="#c9f158">■</text>
-              </>
-            )}
-          </svg>
+          <BrandMark />
           <span
             style={{
               fontFamily: 'var(--font-mono)',
