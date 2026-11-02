@@ -114,6 +114,7 @@ export type SysCommand =
   | { kind: 'analytics'; sub: 'totals'; range: number | undefined; json: boolean }
   | { kind: 'analytics'; sub: 'streaks'; json: boolean }
   | { kind: 'analytics'; sub: 'open' | 'close' | 'toggle' }
+  | { kind: 'analytics'; sub: 'summary'; range: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'tail'; limit: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'stats'; json: boolean }
   | { kind: 'theme'; sub: 'show'; json: boolean }
@@ -666,9 +667,12 @@ export class SysParser {
       if (sub === 'streaks') {
         return { kind: 'analytics', sub: 'streaks', json: hasFlag(rest, 'json') };
       }
-      // Decision 32 — window visibility (Station mode: shown in place of the canvas).
+      // Decision 32 — window visibility (Station mode: its panel beside the terminal).
       if (sub === 'open' || sub === 'close' || sub === 'toggle') {
         return { kind: 'analytics', sub };
+      }
+      if (sub === 'summary') {
+        return { kind: 'analytics', sub: 'summary', range: positiveNum(flag(rest, 'range'), '--range'), json: hasFlag(rest, 'json') };
       }
     }
 

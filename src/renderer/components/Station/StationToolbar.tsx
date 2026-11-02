@@ -2,8 +2,8 @@
  * StationToolbar — top-of-shell strip with toggle icons for every panel.
  *
  * Replaces the per-cell right-click → Hide UX. One row of 8 buttons:
- * Pomo · Todo · Habit · Calendar · Terminal · Clock · Analytics · Canvas.
- * Analytics and Canvas share one panel (Decision 32). Each button
+ * Pomo · Todo · Habit · Calendar · Terminal · Analytics · Clock · Canvas.
+ * Analytics has its own panel beside the terminal (Decision 32). Each button
  * is a toggle:
  *   - Active state = panel visible
  *   - Inactive state = panel hidden (omitted from the layout; neighbours
@@ -31,9 +31,9 @@ const MOTHER_ORDER: MotherEntry[] = [
   { kind: 'habit',    label: 'Habit' },
   { kind: 'calendar', label: 'Cal' },
   { kind: 'term',     label: 'Term' },
-  { kind: 'clock',    label: 'Clock' },
-  // Decision 32 — shown in place of the canvas panel.
+  // Decision 32 — bottom row, beside the terminal.
   { kind: 'analytics', label: 'Analytics' },
+  { kind: 'clock',    label: 'Clock' },
 ];
 
 function Glyph({ kind, active }: { kind: NodeKind | 'canvas'; active: boolean }) {
@@ -187,24 +187,14 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
     updateNode(m.id, { config: { ...cfg, stationHidden: !currentlyHidden } });
   };
 
-  // Decision 32 — Analytics and the canvas share one panel. The canvas reads as
-  // visible only when Analytics isn't covering it; turning the canvas on
-  // while Analytics is shown hides Analytics instead of flipping the flag.
-  const analyticsMother = motherByKind.get('analytics');
-  const analyticsShown = !!analyticsMother && !isStationHidden(analyticsMother);
-  const canvasShown = !canvasHidden && !analyticsShown;
+  const canvasShown = !canvasHidden;
 
   const toggleCanvas = () => {
-    if (analyticsShown && analyticsMother) {
-      const cfg = (analyticsMother.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
-      updateNode(analyticsMother.id, { config: { ...cfg, stationHidden: true } });
-      if (!canvasHidden) return;
-    }
     const next: StationGeometry = {
       rowFraction: stationGeo?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
       columnFractions: stationGeo?.columnFractions ?? [],
       rightColumnSplit: stationGeo?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
-      canvasHidden: analyticsShown ? false : !canvasHidden,
+      canvasHidden: !canvasHidden,
     };
     setLayoutGeometry({ station: next });
   };

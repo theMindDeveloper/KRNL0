@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 /**
  * Decision 32 — Analytics as a fixed window (analytics-window F1..F5).
- *   - default hidden in Station mode (the canvas keeps its panel)
- *   - toolbar toggle shows it; the Canvas toggle reads off while it covers the panel
- *   - turning the canvas back on hides Analytics
- *   - the 'main' slot hosts the dashboard in a MotherFrame, without a swap handle
+ *   - its own Station panel beside the terminal, shown by default
+ *   - toolbar toggle hides/shows it; the Canvas toggle is independent
+ *   - its slot hosts the dashboard in a MotherFrame with the usual swap handle
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import React from 'react';
@@ -19,7 +18,7 @@ if (typeof global.ResizeObserver === 'undefined') {
   global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 }
 
-function board(analyticsCfg: Record<string, unknown> = { stationSlot: 'main' }): Board {
+function board(analyticsCfg: Record<string, unknown> = { stationSlot: 'bottom-right-pre' }): Board {
   return {
     version: 1, schemaVersion: 2, savedAt: '2026-11-02T00:00:00.000Z', layoutMode: 'station',
     viewport: { x: 0, y: 0, zoom: 1 }, edges: [],
@@ -37,43 +36,42 @@ beforeEach(() => useBoardStore.setState({ board: board() }));
 afterEach(() => { cleanup(); useBoardStore.setState({ board: null }); });
 
 describe('Analytics window — visibility', () => {
-  it('is hidden by default in Station mode', () => {
-    expect(isStationHidden(analytics())).toBe(true);
-    expect(isAnalyticsShown(useBoardStore.getState().board)).toBe(false);
+  it('is shown by default in Station mode', () => {
+    expect(isStationHidden(analytics())).toBe(false);
+    expect(isAnalyticsShown(useBoardStore.getState().board)).toBe(true);
   });
 
   it('setAnalyticsShown writes stationHidden on the mother', () => {
-    setAnalyticsShown(true);
-    expect(analytics().config).toMatchObject({ stationSlot: 'main', stationHidden: false });
     setAnalyticsShown(false);
-    expect(analytics().config).toMatchObject({ stationHidden: true });
+    expect(analytics().config).toMatchObject({ stationSlot: 'bottom-right-pre', stationHidden: true });
+    setAnalyticsShown(true);
+    expect(analytics().config).toMatchObject({ stationHidden: false });
   });
 });
 
 describe('Analytics window — toolbar toggles', () => {
-  it('shows Analytics in place of the canvas, and the Canvas toggle brings the canvas back', () => {
+  it('Analytics and Canvas toggle independently', () => {
     render(<StationToolbar />);
-    expect(pressed('Analytics')).toBe('false');
+    expect(pressed('Analytics')).toBe('true');
     expect(pressed('Canvas')).toBe('true');
 
     fireEvent.click(screen.getByRole('button', { name: /^Analytics$/i }));
-    expect(isAnalyticsShown(useBoardStore.getState().board)).toBe(true);
-    expect(pressed('Analytics')).toBe('true');
-    expect(pressed('Canvas')).toBe('false');
+    expect(isAnalyticsShown(useBoardStore.getState().board)).toBe(false);
+    expect(pressed('Analytics')).toBe('false');
+    expect(pressed('Canvas')).toBe('true');
 
     fireEvent.click(screen.getByRole('button', { name: /^Canvas$/i }));
+    expect(pressed('Canvas')).toBe('false');
     expect(isAnalyticsShown(useBoardStore.getState().board)).toBe(false);
-    expect(pressed('Canvas')).toBe('true');
-    expect(useBoardStore.getState().board!.layoutGeometry?.station?.canvasHidden ?? false).toBe(false);
   });
 });
 
 describe('Analytics window — station cell', () => {
-  it('the main slot hosts the dashboard in a mother frame with no swap handle', async () => {
-    useBoardStore.setState({ board: board({ stationSlot: 'main', stationHidden: false }) });
+  it('its slot hosts the dashboard in a mother frame', async () => {
+    useBoardStore.setState({ board: board({ stationSlot: 'bottom-right-pre', stationHidden: false }) });
     const { StationCell } = await import('../../../src/renderer/components/Station/StationCell');
-    render(React.createElement(StationCell, { slot: 'main' }));
+    render(React.createElement(StationCell, { slot: 'bottom-right-pre' }));
     expect(document.querySelector('.mother-frame [data-testid="analytics-mother"] [data-testid="analytics-node-root"]')).not.toBeNull();
-    expect(document.querySelector('.station-drag-handle')).toBeNull();
+    expect(document.querySelector('.station-drag-handle')).not.toBeNull();
   });
 });

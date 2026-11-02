@@ -120,8 +120,8 @@ export function seedBoard(): PartialBoard {
         config: { shell: 'default', fontSize: 13, stationSlot: 'bottom-strip' },
       },
       // Decision 32 — seventh mother: Analytics. Fixed window right of the
-      // terminal in canvas mode; in station mode it takes the canvas panel
-      // when shown (default hidden, see stationVisibility.ts).
+      // terminal in canvas mode; its own panel beside the terminal in station
+      // mode.
       analyticsMotherSeed(),
     ],
     edges: [],
@@ -163,7 +163,7 @@ function analyticsMotherSeed(state?: Record<string, unknown>): Record<string, un
       settingsOpen: false,
       ...(state ?? {}),
     },
-    config: { stationSlot: 'main' },
+    config: { stationSlot: 'bottom-right-pre' },
   };
 }
 
@@ -591,7 +591,7 @@ const MOTHER_STATION_SLOTS: Record<string, string> = {
   calendar: 'top-right-upper',
   clock:    'top-right-lower',
   term:     'bottom-strip',
-  analytics: 'main',
+  analytics: 'bottom-right-pre',
 };
 
 function migrateStationSlot(board: Record<string, unknown>): Record<string, unknown> {

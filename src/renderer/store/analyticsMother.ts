@@ -1,8 +1,8 @@
 // Decision 32 — Analytics is a fixed mother ('mother-analytics', slot 'main').
 //
-// Its visibility only matters in Station mode, where it takes the canvas panel
-// when shown. Like every mother it is stored as config.stationHidden (default
-// hidden — see stationVisibility.ts). Canvas mode always shows it in the
+// Its visibility only matters in Station mode, where it has its own panel
+// beside the terminal. Like every mother it is stored as config.stationHidden
+// (default shown — see stationVisibility.ts). Canvas mode always shows it in the
 // mother row. The Dock button, the 'A' shortcut and `sys analytics
 // open|close|toggle` all go through these helpers so they agree.
 

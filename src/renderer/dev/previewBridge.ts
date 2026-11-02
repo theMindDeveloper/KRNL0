@@ -164,7 +164,7 @@ function stressBoard(): Json {
     // Decision 32 — analytics is the seventh mother (slot 'main').
     id: 'mother-analytics', kind: 'analytics', position: { x: 1960, y: 0 }, isMother: true,
     state: { view: 'estimates', rangeDays: 7, metric: 'taskCount', width: 540, height: 540, hiddenCards: [], pinnedCards: [], settingsOpen: false },
-    config: { stationSlot: 'main' },
+    config: { stationSlot: 'bottom-right-pre' },
   });
 
   const habit = nodes.find((n) => n.id === 'mother-habit')!;

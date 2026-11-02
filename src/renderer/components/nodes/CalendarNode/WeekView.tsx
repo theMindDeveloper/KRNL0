@@ -33,6 +33,8 @@ import { calcStreak } from '../HabitNode/commands';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
+import { PagedView } from '../../ui/PagedView';
+import { hourWindow, stepHourWindow } from './hourWindow';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -664,8 +666,36 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // Today: start a little before now (what's next matters most).
       target = Math.max(0, now.getHours() * 60 + now.getMinutes() - 90);
     }
-    el.scrollTop = Math.max(0, ((target - 20) / 60) * rowHeight);
+    el.scrollTop = Math.max(0, Math.floor((target - 20) / 60) * rowHeight);
+    setGridTop(el.scrollTop);
   }, [baseYMD, dayCount, weekDays, slicesByDay, rowHeight]);
+
+  // ── No scrolling: the hour grid shows whole-hour windows ───────────────────
+  // The grid never shows a scrollbar. The wheel (and the ‹ › pager, and a
+  // drag held at the top/bottom edge) flips to the previous / next window of
+  // hours that fits the panel.
+  const [gridTop, setGridTop] = useState(0);
+  const [gridH, setGridH] = useState(0);
+  useEffect(() => {
+    const el = gridBodyRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setGridH(el.clientHeight));
+    ro.observe(el);
+    setGridH(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
+  const lastFlip = useRef(0);
+  const flipHours = (dir: 1 | -1) => {
+    const el = gridBodyRef.current;
+    if (!el) return;
+    const now = Date.now();
+    if (now - lastFlip.current < 320) return;
+    lastFlip.current = now;
+    const startHour = stepHourWindow(el.scrollTop, el.clientHeight, rowHeight, rowCount, dir);
+    el.scrollTop = startHour * rowHeight;
+    setGridTop(el.scrollTop);
+  };
+  const win = hourWindow(gridTop, gridH, rowHeight, rowCount);
 
   // Whether any task is scheduled this week (controls empty-state hint).
   const hasTasksThisWeek = slicesByDay.size > 0;
@@ -1413,7 +1443,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     if (!nowPlaced) rows.push(nowDivider);
 
     return (
-      <div data-testid="calendar-agenda" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px 16px', position: 'relative' }}>
+      <div data-testid="calendar-agenda" style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '8px 10px 4px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
         {/* Day strip: plan line + reality line across the day */}
         <div style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)', marginBottom: 4 }}>
@@ -1445,13 +1475,16 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           </div>
         </div>
 
-        <div onDragOver={allowDrop} onDrop={dropAfter(null)} style={{ minHeight: 40 }}>
+        <div onDragOver={allowDrop} onDrop={dropAfter(null)} style={{ minHeight: 40, flex: '1 1 0', display: 'flex', flexDirection: 'column' }}>
           {items.length === 0 && (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)', padding: '16px 4px' }}>
               Nothing planned. Drag a task here to plan it next.
             </div>
           )}
-          {rows}
+          {/* No scrolling: rows page (PagedView). */}
+          <PagedView testId="calendar-agenda-pages" style={{ flex: '1 1 0' }} resetKey={baseYMD}>
+            {rows}
+          </PagedView>
         </div>
 
         <button
@@ -1841,15 +1874,28 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         </button>
       )}
 
-      {/* Grid body: gutter + 7 columns — flex-fills the calendar card and scrolls */}
+      {/* Grid body: gutter + 7 columns — flex-fills the calendar card. Shows a
+          window of whole hours; wheel / pager / edge-drag flip windows. */}
       <div
         ref={gridBodyRef}
-        className="krnl-week-grid"
+        className="krnl-week-grid nowheel"
+        data-testid="calendar-grid-body"
+        onWheel={(e) => {
+          if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) < 4) return;
+          e.stopPropagation();
+          flipHours(e.deltaY > 0 ? 1 : -1);
+        }}
+        onDragOver={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          if (!Number.isFinite(e.clientY) || rect.height <= 0) return;
+          if (e.clientY > rect.bottom - 18) flipHours(1);
+          else if (e.clientY < rect.top + 18) flipHours(-1);
+        }}
         style={{
           display: useAgenda ? 'none' : 'flex',
           flex: 1,
           minHeight: 0,
-          overflowY: 'auto',
+          overflow: 'hidden',
           position: 'relative',
         }}
       >
@@ -2057,6 +2103,28 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           )}
         </div>
       </div>
+
+      {!useAgenda && win.pages > 1 && (
+        <div
+          data-testid="calendar-hour-pager"
+          style={{
+            position: 'absolute', right: 8, bottom: 6, zIndex: 6,
+            display: 'flex', alignItems: 'center', gap: 2,
+            background: 'color-mix(in srgb, var(--paper) 88%, transparent)',
+            border: '1px solid var(--paper-3)', borderRadius: 999, padding: '1px 4px',
+            fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-2)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+          }}
+        >
+          <button type="button" aria-label="Earlier hours" disabled={win.startHour === 0}
+            onClick={() => flipHours(-1)} style={hourPagerBtn(win.startHour === 0)}>‹</button>
+          <span style={{ fontVariantNumeric: 'tabular-nums', padding: '0 2px' }}>
+            {String(win.startHour).padStart(2, '0')}–{String(win.endHour).padStart(2, '0')}
+          </span>
+          <button type="button" aria-label="Later hours" disabled={win.endHour >= rowCount}
+            onClick={() => flipHours(1)} style={hourPagerBtn(win.endHour >= rowCount)}>›</button>
+        </div>
+      )}
 
       {/* Empty-state hint — shown when no tasks scheduled this week.
           Rendered outside the scroll container so it stays centered as the
@@ -2542,6 +2610,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 }
 
 // Compact zoom button (− / +). Disabled state dims and blocks the cursor.
+function hourPagerBtn(disabled: boolean): React.CSSProperties {
+  return {
+    background: 'transparent', border: 'none', padding: '0 4px', fontSize: 13, lineHeight: 1,
+    color: disabled ? 'var(--ink-4)' : 'var(--ink-2)', opacity: disabled ? 0.4 : 1,
+    cursor: disabled ? 'default' : 'pointer', fontFamily: 'var(--font-mono)',
+  };
+}
+
 function zoomBtnStyle(disabled: boolean): React.CSSProperties {
   return {
     width: 18,

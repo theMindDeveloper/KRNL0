@@ -21,6 +21,9 @@ import { useCallback, useMemo } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
+import { PagedView } from '../../ui/PagedView';
+import { summarizeAnalytics } from '../../../analytics/summary';
+import { SummaryHero } from './SummaryHero';
 import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
 import { EstimateBars, DailyPlanActual, FocusMix, Legend, COLOR_PLANNED, COLOR_TRACKED, fmtMinutes } from '../../../analytics/charts/PlanVsActual';
 import {
@@ -412,6 +415,8 @@ export function AnalyticsNode({
   const year = state.year ?? new Date(todayLocal() + 'T00:00:00').getFullYear();
 
   const byDay = analytics.byDay(range);
+  // Plain-language summary on top of Overview (same text as `analytics summary`).
+  const summary = summarizeAnalytics(analytics, range, prevRange, state.rangeDays);
   const tot = analytics.totals(range);
   const prevTot = analytics.totals(prevRange);
   const open = analytics.open();
@@ -593,19 +598,27 @@ export function AnalyticsNode({
         </div>
       </div>
 
-      {/* Body — split: cards on the left, settings sidebar on the right */}
+      {/* Body — split: cards on the left, settings sidebar on the right.
+          No scrolling: cards are split into pages (PagedView). */}
       <div
         ref={bodyRef}
         style={{
           flex: 1,
-          overflow: 'auto',
+          overflow: 'hidden',
           padding: '12px 14px 16px',
           display: 'flex',
           gap: 12,
           minHeight: 0,
         }}
       >
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+        <PagedView
+          testId="analytics-pages"
+          itemSelector="[data-page-item], [data-card-id]"
+          resetKey={view}
+          style={{ flex: 1, minWidth: 0 }}
+          contentStyle={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
+          {view === 'overview' && <SummaryHero summary={summary} byDay={byDay} />}
           <ViewBody
             view={view}
             state={state}
@@ -635,7 +648,7 @@ export function AnalyticsNode({
             colCount={colCount}
             clamp={clamp}
           />
-        </div>
+        </PagedView>
 
         {settingsOpen && (
           <SettingsSidebar
@@ -732,6 +745,7 @@ function SettingsSidebar({
         <span style={{ color: 'var(--acid)' }}>★</span> pin to top  ·  <span style={{ color: 'var(--k-an-warm, #ff8e64)' }}>✕</span> hide
       </p>
 
+      <PagedView testId="analytics-settings-pages" style={{ flex: '1 1 0' }} contentStyle={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {ANALYTICS_VIEWS.map((v) => (
         <div key={v} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <span
@@ -802,6 +816,7 @@ function SettingsSidebar({
           })}
         </div>
       ))}
+      </PagedView>
 
       {/* Danger zone — destructive history wipe (hold to confirm). Clears the
           completion ledger + pomo session history only; habit logs and the
@@ -1165,7 +1180,7 @@ function ViewBody(props: ViewBodyProps) {
           onTogglePin={() => togglePin('calendar.heatmap')}
         >
           {() => (
-            <div style={{ width: '100%', overflowX: 'auto' }}>
+            <div style={{ width: '100%', overflow: 'hidden' }}>
               <CalendarHeatmap data={byDay} metric={state.metric} />
             </div>
           )}
@@ -1507,7 +1522,7 @@ function ViewBody(props: ViewBodyProps) {
         onTogglePin={() => togglePin('sources.list')}
       >
         {() => (
-          <div style={{ width: '100%', overflow: 'auto' }}>
+          <PagedView style={{ width: '100%', height: '100%' }} itemSelector="tbody > tr">
             <table
               style={{
                 width: '100%',
@@ -1537,7 +1552,7 @@ function ViewBody(props: ViewBodyProps) {
                 })}
               </tbody>
             </table>
-          </div>
+          </PagedView>
         )}
       </ChartCard>
       {streaks.perHabit.length > 0 && (
@@ -1552,7 +1567,7 @@ function ViewBody(props: ViewBodyProps) {
           onTogglePin={() => togglePin('sources.streaks')}
         >
           {() => (
-            <div style={{ width: '100%', overflow: 'auto' }}>
+            <PagedView style={{ width: '100%', height: '100%' }} itemSelector="tbody > tr">
               <table
                 style={{
                   width: '100%',
@@ -1573,7 +1588,7 @@ function ViewBody(props: ViewBodyProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </PagedView>
           )}
         </ChartCard>
       )}

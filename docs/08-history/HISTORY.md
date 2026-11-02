@@ -743,3 +743,18 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Drag to Calendar:** canvas Task nodes get a drag grip, and Todo rows with no task node yet are promoted to a linked task when dropped on the Calendar (`calendar.schedule {itemId}`).
 
 **Tests:** 0 typecheck errors; 125 files / 1495 tests green.
+
+---
+
+## [2026-11-02] — Analytics window, readable calendar, pomo highlights, no-scroll windows
+
+**Type:** Feature
+**PRs / Commits:** branch `TMD/hopeful-moore-10c910`
+**Files changed:** `src/main/persistence/board.ts`, `src/shared/types/board.ts`, `src/renderer/components/Station/*`, `src/renderer/components/nodes/AnalyticsNode/{AnalyticsMother,SummaryHero,index}.tsx`, `src/renderer/components/nodes/CalendarNode/{WeekView,dayBlockLayout,hourWindow}.ts(x)`, `src/renderer/components/nodes/{ClockNode,TodoNode}/index.tsx`, `src/renderer/components/ContextMenu/{index,scheduleMenus}.ts(x)`, `src/renderer/components/ui/PagedView.tsx`, `src/renderer/store/{analyticsMother,scheduleActions}.ts`, `src/renderer/analytics/summary.ts`, `src/sys/{parser,SysFacade}.ts`, `src/sys/commands/{analytics,pomo}.ts`, `src/shared/cli/commandRegistry.ts`, docs (Decision 32, `analytics-window.md`, `calendar-clock-visuals.md` F15–F19), tests
+**Summary:**
+- **Analytics is the seventh fixed mother** (Decision 32, slot `bottom-right-pre`). Station mode: its own panel in the bottom row beside the terminal (Canvas | Term | Analytics | Clock), shown by default, with its own panel toggle. Canvas mode: a fixed window in the mother row. Migration adopts any free-floating analytics node. CLI: `analytics open | close | toggle`.
+- **Readable parallel tasks:** a day column caps lanes at 64 px; extra tasks collapse into a "+N" chip (a compact corner chip on single-lane week columns). Hidden tasks can be dragged out of the chip's list.
+- **Pomo spans are background highlights** behind tasks (focus = tinted wash, break = hatch), with no pointer events so drops still land.
+- **Right-click menus** shared by Calendar and Clock (task arcs, task rows, pomo wedges): Tag → task, Untag, Details…, Delete segment; Start focus, Mark done, Show on canvas, Unschedule. CLI twins plus new `pomo segments` and `pomo delete-segment`.
+- **Analytics overview:** a plain-language summary on top (headline, four figures with change vs the previous period, focus sparkline, sentences). CLI: `analytics summary`.
+- **No scrolling:** a shared `PagedView` splits content into pages of whole items, flipped with the wheel or ‹ ● ›. Used by Analytics (cards, settings, tables), Todo, the Clock task list, the Calendar agenda and the Ambient Radio lists. The Calendar hour grid shows windows of whole hours (wheel, pager, or drag to an edge), and the Clock dial flexes to the free space.

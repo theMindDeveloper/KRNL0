@@ -8,6 +8,8 @@ import { registerBuiltinSources } from '../../renderer/analytics/sources';
 import { lastNDays, todayLocal } from '../../renderer/analytics/dateRange';
 import type { BoardLike } from '../../renderer/analytics/types';
 import { computeEstimates, describeAccuracy } from '../../renderer/analytics/estimates';
+import { summarizeAnalytics } from '../../renderer/analytics/summary';
+import { addDays } from '../../renderer/analytics/dateRange';
 import type { Board } from '../../shared/types';
 
 // Register sources once — idempotent guard inside registerBuiltinSources.
@@ -150,10 +152,24 @@ export async function analyticsStreaks(
   return { ok: true, message: lines.join('\n'), data: streaks };
 }
 
+/**
+ * `analytics summary [--range N] [--json]` — the plain-language summary shown
+ * on top of the Overview tab (analytics/summary.ts).
+ */
+export async function analyticsSummary(ctx: AnalyticsCtx, opts: { range?: number; json?: boolean }): Promise<SysResult> {
+  const rangeDays = (typeof opts.range === 'number' && opts.range > 0) ? opts.range : 30;
+  const range = lastNDays(rangeDays, todayLocal());
+  const prevRange = { start: addDays(range.start, -rangeDays), end: addDays(range.start, -1) };
+  const summary = summarizeAnalytics(buildAnalytics(loadBoard(ctx)), range, prevRange, rangeDays);
+  if (opts.json) return { ok: true, message: JSON.stringify(summary), data: summary };
+  const stats = summary.stats.map((s) => `${s.label}: ${s.value}${s.deltaPct === null ? '' : ` (${s.deltaPct >= 0 ? '+' : ''}${s.deltaPct}%)`}`);
+  return { ok: true, message: [summary.headline, '', ...summary.sentences.map((t) => `  • ${t}`), '', `  ${stats.join(' · ')}`].join('\n'), data: summary };
+}
+
 // ── Decision 32 — analytics window visibility ──────────────────────────────────
-// Analytics is a fixed mother ('mother-analytics'). In Station mode it takes
-// the canvas panel when shown; visibility is config.stationHidden, default
-// hidden. Canvas mode always shows it in the mother row.
+// Analytics is a fixed mother ('mother-analytics'). In Station mode it has its
+// own panel beside the terminal; visibility is config.stationHidden, default
+// shown. Canvas mode always shows it in the mother row.
 
 export interface AnalyticsWindowCtx extends AnalyticsCtx {
   onBoardChanged?: () => void;
@@ -170,14 +186,14 @@ export function analyticsWindow(
   const mother = nodes.find((n) => n['kind'] === 'analytics' && n['isMother'] === true);
   if (!mother) return { ok: false, message: 'No analytics window on the board' };
   const cfg = (mother['config'] ?? {}) as Record<string, unknown>;
-  // Same default as the renderer: no flag means hidden.
-  const shown = cfg['stationHidden'] === false;
+  // Same default as the renderer: no flag means shown.
+  const shown = cfg['stationHidden'] !== true;
   const next = action === 'toggle' ? !shown : action === 'open';
   mother['config'] = { ...cfg, stationHidden: !next };
   saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
   ctx.onBoardChanged?.();
   const where = board['layoutMode'] === 'station'
-    ? (next ? ' (shown in place of the canvas)' : ' (canvas panel restored)')
+    ? (next ? ' (panel shown beside the terminal)' : ' (panel hidden)')
     : ' (canvas mode always shows it in the mother row; this applies in station mode)';
   return { ok: true, message: `analytics ${next ? 'opened' : 'closed'}${where}`, data: { shown: next } };
 }

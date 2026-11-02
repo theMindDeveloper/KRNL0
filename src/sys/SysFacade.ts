@@ -31,6 +31,7 @@ import {
   analyticsTotals,
   analyticsStreaks,
   analyticsWindow,
+  analyticsSummary,
 } from './commands/analytics';
 import type { AnalyticsCtx } from './commands/analytics';
 import { logTail, logStats, requiresRenderer as logRequiresRenderer } from './commands/log';
@@ -364,6 +365,11 @@ export class SysFacade {
           return analyticsTotals(aCtx, totalsOpts);
         }
         case 'streaks': return analyticsStreaks(aCtx, { json: command.json });
+        case 'summary': {
+          const sumOpts: Parameters<typeof analyticsSummary>[1] = { json: command.json };
+          if (command.range !== undefined) sumOpts.range = command.range;
+          return analyticsSummary(aCtx, sumOpts);
+        }
         case 'open':
         case 'close':
         case 'toggle':

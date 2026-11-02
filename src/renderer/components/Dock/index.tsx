@@ -69,7 +69,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
   }, [dockMenuOpen]);
 
   // Decision 32 — Analytics is a fixed mother. In Station mode the button
-  // toggles its window (in place of the canvas); in Canvas mode it brings
+  // toggles its panel (beside the terminal); in Canvas mode it brings
   // the mother into view, so it has no on/off state there.
   const analyticsOpen = useBoardStore((s) =>
     s.board?.layoutMode === 'station' && isAnalyticsShown(s.board),

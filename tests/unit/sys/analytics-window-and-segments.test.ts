@@ -29,7 +29,7 @@ function seed(layoutMode: 'station' | 'canvas' = 'station'): void {
             { id: 'seg-aaaa1', startedAt: '2026-11-01T09:00:00', endedAt: '2026-11-01T09:30:00', durationMin: 30, label: 'Math', completed: true, taskId: 't-math', kind: 'work' },
             { id: 'seg-bbbb2', startedAt: '2026-11-01T09:30:00', endedAt: '2026-11-01T09:35:00', durationMin: 5, label: '', completed: true, taskId: null, kind: 'break' },
           ] } },
-      { id: 'mother-analytics', kind: 'analytics', isMother: true, position: { x: 1960, y: 0 }, state: {}, config: { stationSlot: 'main' } },
+      { id: 'mother-analytics', kind: 'analytics', isMother: true, position: { x: 1960, y: 0 }, state: {}, config: { stationSlot: 'bottom-right-pre' } },
     ],
   }), 'utf-8');
 }
@@ -55,13 +55,13 @@ describe('sys analytics open | close | toggle', () => {
     expect(changed).toHaveBeenCalledTimes(1);
     an.analyticsWindow({ boardPath }, 'close');
     expect(node('mother-analytics').config.stationHidden).toBe(true);
-    expect(node('mother-analytics').config.stationSlot).toBe('main');
+    expect(node('mother-analytics').config.stationSlot).toBe('bottom-right-pre');
   });
 
-  it('toggle starts from the default (hidden) and flips', () => {
+  it('toggle starts from the default (shown) and flips', () => {
     seed();
-    expect(an.analyticsWindow({ boardPath }, 'toggle').data).toEqual({ shown: true });
     expect(an.analyticsWindow({ boardPath }, 'toggle').data).toEqual({ shown: false });
+    expect(an.analyticsWindow({ boardPath }, 'toggle').data).toEqual({ shown: true });
   });
 
   it('explains canvas mode, where the window is always in the mother row', () => {

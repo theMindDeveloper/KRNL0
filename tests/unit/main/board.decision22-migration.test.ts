@@ -306,8 +306,8 @@ describe('Decision 22 — board migration', () => {
   it('AC1: seedBoard() produces exactly 7 mothers including mother-clock at the canonical x', () => {
     const board = seedBoard();
 
-    // Exactly 6 nodes (the 6 permanent mothers)
-    expect(board.nodes).toHaveLength(6);
+    // Exactly 7 nodes (the 7 permanent mothers — Decision 32 added analytics)
+    expect(board.nodes).toHaveLength(7);
 
     // mother-clock seed x: 1252 (orig) → 1300 (PR2.1, 520px spacing for 440-wide)
     // → 1350 (Wave C, 540px spacing for 500-wide mothers).

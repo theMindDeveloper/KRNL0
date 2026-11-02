@@ -25,6 +25,7 @@
 | F17 | **Right-click menus.** Right-clicking a day column hit-tests every layer at that minute. One hit opens its menu; several open the picker, and picking a row opens that row's menu. Segment menu: header (kind · times · minutes), **Tag → <task>** for up to 6 root tasks, **Untag** (when tagged), **Details…**, **Delete segment** (disabled for the live span). Task menu: header (title · times), **Details…**, **Start focus**, **Mark done / Mark not done**, **Show on canvas**, **Unschedule**. Menus stay on screen. |
 | F18 | **Clock parity.** The Clock day view offers the same menus from the same builder (`ContextMenu/scheduleMenus.ts`): right-click a task arc or a task-list row for the task menu, and a pomo wedge for the segment menu. The Clock has no task details popup, so its task menu has no **Details…**. |
 | F19 | **CLI twins.** Tag / Untag → `pomo retag <seg> <task|none>`. Delete segment → `pomo delete-segment <seg>`. Start focus → `task pomo <ref>`. Mark done → `task toggle <ref>`. Unschedule → `task unschedule <ref>`. `pomo segments [--date] [--json]` lists segment ids. |
+| F20 | **No scrolling.** The Calendar hour grid shows a window of whole hours that fits the panel. The wheel, the ‹ HH–HH › pager, or a drag held at the top/bottom edge flips to the next window. The agenda list and the Clock task list page by whole rows (`ui/PagedView`). The Clock dial flexes to the free space, so the whole Clock always fits. |
 
 ## Gherkin Scenarios (ATDD)
 
@@ -82,4 +83,13 @@ Feature: Readable parallel tasks and pomo highlights
     When I run "pomo segments --date 2026-11-01"
     And I run "pomo delete-segment <id>"
     Then that span is gone from the calendar, clock and analytics
+```
+
+```gherkin
+Feature: No scrolling in Calendar and Clock
+
+  Scenario: F20 — hour windows
+    Given a Calendar panel that fits 6 hours
+    When I scroll down once over the grid
+    Then the grid shows the next 6 whole hours and the pager reads the new range
 ```

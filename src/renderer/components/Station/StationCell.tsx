@@ -54,19 +54,15 @@ export function StationCell({ slot }: Props) {
   const onCommand = makeCommandHandler(node.id);
   const slotIndex = SLOT_INDEX[slot] ?? 1;
 
-  // Decision 32 — the 'main' slot (Analytics) stands in for the canvas panel,
-  // not a mother column, so it neither swaps nor accepts a swap.
-  const swappable = slot !== 'main';
-
   const onDragOver = (e: React.DragEvent) => {
-    if (swappable && e.dataTransfer.types.includes(DRAG_MIME)) {
+    if (e.dataTransfer.types.includes(DRAG_MIME)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
     }
   };
   const onDrop = (e: React.DragEvent) => {
     const sourceId = e.dataTransfer.getData(DRAG_MIME);
-    if (!swappable || !sourceId || sourceId === node.id) return;
+    if (!sourceId || sourceId === node.id) return;
     e.preventDefault();
     swapMotherSlots(sourceId, node.id);
   };
@@ -78,7 +74,7 @@ export function StationCell({ slot }: Props) {
         onDragOver={onDragOver}
         onDrop={onDrop}
       >
-        {swappable && <DragHandle nodeId={node.id} />}
+        <DragHandle nodeId={node.id} />
         <Component
           node={node}
           selected={false}

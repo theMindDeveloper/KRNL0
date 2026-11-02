@@ -36,20 +36,20 @@ describe('Decision 32 — analytics mother', () => {
     return loadBoardFrom(boardPath) as B;
   };
 
-  it('F1: seed includes mother-analytics in the main slot, right of the terminal', () => {
+  it('F1: seed includes mother-analytics in the bottom-right-pre slot, right of the terminal', () => {
     const m = (seedBoard().nodes as N[]).find((n) => n.id === 'mother-analytics');
     expect(m).toBeDefined();
     expect(m!.kind).toBe('analytics');
     expect(m!.isMother).toBe(true);
     expect(m!.position).toEqual({ x: 1960, y: 0 });
-    expect(m!.config).toMatchObject({ stationSlot: 'main' });
+    expect(m!.config).toMatchObject({ stationSlot: 'bottom-right-pre' });
   });
 
   it('F2: injects mother-analytics into a board that predates it', () => {
     const b = load(legacy());
     const m = b.nodes.find((n) => n.id === 'mother-analytics');
     expect(m?.isMother).toBe(true);
-    expect(m?.config?.['stationSlot']).toBe('main');
+    expect(m?.config?.['stationSlot']).toBe('bottom-right-pre');
     // Default station visibility is "hidden" — no flag is written.
     expect(m?.config?.['stationHidden']).toBeUndefined();
   });
@@ -83,7 +83,7 @@ describe('Decision 32 — analytics mother', () => {
   });
 
   it('keeps a user-chosen station visibility', () => {
-    const b = load(legacy([{ id: 'mother-analytics', kind: 'analytics', isMother: true, position: { x: 1960, y: 0 }, state: {}, config: { stationSlot: 'main', stationHidden: false } }]));
+    const b = load(legacy([{ id: 'mother-analytics', kind: 'analytics', isMother: true, position: { x: 1960, y: 0 }, state: {}, config: { stationSlot: 'bottom-right-pre', stationHidden: false } }]));
     expect(b.nodes.find((n) => n.id === 'mother-analytics')?.config?.['stationHidden']).toBe(false);
   });
 });

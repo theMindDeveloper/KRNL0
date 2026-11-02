@@ -6,6 +6,7 @@ import { visibleItems } from './commands';
 import { defaultTodoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { ContextMenu } from '../../ContextMenu';
+import { PagedView } from '../../ui/PagedView';
 import type { ContextMenuItem } from '../../ContextMenu';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -345,7 +346,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   return (
     <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
-      <div style={{ overflow: 'hidden', borderRadius: 6 }}>
+      <div style={{ overflow: 'hidden', borderRadius: 6, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         <div className="krnl-node-header"
           style={{
@@ -405,7 +406,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         </div>
 
         {/* Item list */}
-        <div className="todo-body" style={{ padding: '6px 0', maxHeight: 320, overflowY: 'auto' }}>
+        {/* No scrolling: rows that don't fit go to the next page (PagedView). */}
+        <PagedView testId="todo-pages" itemSelector=".todo-body > *" style={{ flex: '1 1 0', minHeight: 0 }} contentStyle={{ padding: '6px 0' }}>
+          <div className="todo-body" style={{ display: 'contents' }}>
           {items.length === 0 ? (
             <div
               style={{
@@ -690,7 +693,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             );
             })
           )}
-        </div>
+          </div>
+        </PagedView>
 
         {/* F4: add-task row — "add task" placeholder swaps to input on click, ↵ always visible */}
         <div

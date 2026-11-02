@@ -25,6 +25,7 @@ export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { ClockBezel } from './ClockBezel';
+import { PagedView } from '../../ui/PagedView';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 
@@ -528,7 +529,9 @@ export function ClockNode({
           gap: 10,
           height: '100%',
           boxSizing: 'border-box',
-          overflowY: 'auto',
+          // No scrolling: the dial flexes to the free space and the task
+          // list pages (PagedView).
+          overflow: 'hidden',
         }}
       >
         {/* Header */}
@@ -713,11 +716,19 @@ export function ClockNode({
             Sizes shrunk ~10% from the prior 92%/460/244 so labels above
             and below stay visible on smaller screens. */}
         <div
-          style={
-            inStation
-              ? { position: 'relative', width: '83%', maxWidth: 414, aspectRatio: '1 / 1', margin: '0 auto', overflow: 'visible' }
-              : { position: 'relative', width: 220, height: 220, margin: '0 auto', overflow: 'visible' }
-          }
+          data-testid="clock-dial"
+          style={{
+            position: 'relative',
+            // Flexes with the window so the whole clock always fits: the
+            // dial's height comes from the free space, its width follows.
+            flex: '1 1 0',
+            minHeight: 120,
+            maxHeight: inStation ? 414 : 230,
+            aspectRatio: '1 / 1',
+            maxWidth: '100%',
+            margin: '0 auto',
+            overflow: 'visible',
+          }}
         >
           <svg
             viewBox={(() => {
@@ -1165,15 +1176,13 @@ export function ClockNode({
           )}
         </div>
 
-        {/* Task list */}
-        <div
-          style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1,
-            fontFamily: 'var(--font-mono)',
-          }}
+        {/* Task list — pages of whole rows, never a scrollbar. */}
+        <PagedView
+          testId="clock-task-pages"
+          resetKey={selectedDate}
+          style={{ width: '100%', flex: tasks.length > 0 ? '1 1 0' : '0 0 auto', minHeight: tasks.length > 0 ? 64 : 0 }}
+          contentStyle={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)' }}
+          revealIndex={activeIdx}
         >
           {tasks.map((t, i) => {
             const ended = isToday && nowFloat >= t.end;
@@ -1247,7 +1256,7 @@ export function ClockNode({
               </div>
             );
           })}
-        </div>
+        </PagedView>
       </div>
 
       {/* #6/#12 — tracked-reality info + delete popup (right-click an arc). */}
