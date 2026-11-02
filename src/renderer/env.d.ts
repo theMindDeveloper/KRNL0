@@ -55,3 +55,6 @@ declare module '*?url' {
   const src: string;
   export default src;
 }
+
+/** App version from package.json, injected by electron-vite `define`. */
+declare const __APP_VERSION__: string | undefined;

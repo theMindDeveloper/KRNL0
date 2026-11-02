@@ -119,12 +119,14 @@ const chipBtn: React.CSSProperties = {
 
 function VideoPlayer({ url, onAspect }: { url: string; onAspect: (a: number) => void }) {
   const [error, setError] = useState(false);
+  const isFile = url.startsWith('krnl-asset://');
   if (error) {
     return (
       <Centered>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: '#e8ebee', textAlign: 'center', padding: 16, lineHeight: 1.45 }}>
-          This video's format can't play here (common with .mov from phones).<br />
-          <a href={url} download style={{ color: 'var(--acid)' }}>Download it</a> or convert to MP4.
+          {isFile
+            ? <>This video's format can't play here (common with .mov from phones).<br /><a href={url} download style={{ color: 'var(--acid)' }}>Download it</a> or convert to MP4.</>
+            : <>This video can't be embedded here.<br /><a href={url} target="_blank" rel="noreferrer" style={{ color: 'var(--acid)' }}>Open it in the browser ↗</a></>}
         </span>
       </Centered>
     );

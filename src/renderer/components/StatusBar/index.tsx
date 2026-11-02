@@ -20,7 +20,8 @@ import { useStore } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
 
-const BOARD_VERSION = 'v0.2.0';
+// Injected from package.json at build time (electron.vite.config.ts).
+const BOARD_VERSION = `v${typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'}`;
 
 interface StatusBarProps {
   /** ADR 0008 § 9.5 — shown when station mode falls back to canvas due to narrow viewport. */
