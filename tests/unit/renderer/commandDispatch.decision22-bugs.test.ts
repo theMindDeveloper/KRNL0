@@ -229,10 +229,9 @@ describe('F1 — mark active running task done stops the pomo', () => {
     expect(ps.history[0]!.completed).toBe(false);
   });
 
-  it('secondsAccumulated IS updated on toggle-done (in-flight session time is committed inline)', () => {
-    // The task.toggle cascade calls pomoCancel directly, then commits the just-
-    // cancelled session's elapsed time into secondsAccumulated inline (so the
-    // bypass of the pomo.cancel branch does NOT lose the user's time).
+  it('toggle-done keeps the in-flight time in the pomo history, not on the task (time-model F2)', () => {
+    // Tracked time is derived from pomo spans tagged with the task, so the
+    // stop records the real span and writes no tracking fields onto the task.
     const startedAt = new Date(Date.now() - 60_000).toISOString();
     const board = makeBoardWithTasks({
       pomoState: {
@@ -247,11 +246,10 @@ describe('F1 — mark active running task done stops the pomo', () => {
 
     makeCommandHandler('task-a')('task.toggle');
 
-    const ts = getTaskState('task-a');
-    // ~60s elapsed (allow ±2 for timing jitter).
-    expect(ts.secondsAccumulated).toBeGreaterThanOrEqual(58);
-    expect(ts.secondsAccumulated).toBeLessThanOrEqual(62);
-    expect(ts.currentSessionElapsedSec).toBe(0);
+    const rec = getPomoState().history[0]!;
+    expect(rec.taskId).toBe('task-a');
+    expect(rec.durationMin).toBe(1);
+    expect(getTaskState('task-a').secondsAccumulated ?? 0).toBe(0);
   });
 
   it('does not cancel pomo when toggling a task that is not active', () => {

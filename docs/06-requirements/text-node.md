@@ -11,7 +11,7 @@
 | F1 | TextNode renders `state.text` inside a body element with class `.text-body`. When `state.text === ''`, the body shows a placeholder `"write..."` in `var(--ink-4)` |
 | F2 | Clicking the body switches the node into edit mode: a `<textarea>` replaces the body div, autofocuses, and places the caret at the end of the existing text |
 | F3 | While editing, typing updates a local `draft` value. After 400 ms of no keystrokes OR on `blur`, the component dispatches `text.setText` with `{ text: draft }` |
-| F4 | Pressing `Escape` while editing restores the pre-edit text and exits edit mode without dispatching |
+| F4 | Pressing `Escape` while editing restores the pre-edit text and exits edit mode. If the 400 ms autosave already wrote part of the edit, Escape dispatches one `text.setText` with the pre-edit text; otherwise it dispatches nothing |
 | F5 | A `<NodeResizer>` is rendered with `isVisible={selected}`, `minWidth=180`, `minHeight=80`, `maxWidth=800`, `maxHeight=2000`. On `onResizeEnd`, dispatch `text.setSize` with `{ width, height }` (rounded integers) |
 | F6 | When `state.width` / `state.height` are absent, the node renders with default width 260 px and min-height 120 px |
 | F7 | Visual style matches LifeOS `.node.text`: transparent background, 1px dashed `var(--paper-3)` border at rest, solid border + `--shadow-1` on hover, body uses `var(--font-serif)` at 18 px with `letter-spacing: -0.005em` and `line-height: 1.35` |

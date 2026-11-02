@@ -15,7 +15,7 @@
 | F5 | A `<NodeResizer>` is rendered with `isVisible={selected}`, `minWidth=120`, `minHeight=80`, `maxWidth=1200`, `maxHeight=1200`. When `Shift` is held during resize, aspect ratio is preserved using `naturalWidth/naturalHeight`. On `onResizeEnd`, dispatch `image.setSize` |
 | F6 | When the node is selected and the user clicks a replace control, a hidden `<input type="file" accept="image/*">` opens. Selecting a new file writes a new asset and dispatches `image.setAsset` with the new fields (old assetId is left on disk — no GC in v1) |
 | F7 | A caption row below the image shows `state.alt`; clicking it mounts an `<input>`; on blur or `Enter`, dispatches `image.setAlt` |
-| F8 | Files larger than 25 MB are rejected; files of disallowed MIME types are rejected. Rejection logs `console.warn` and does NOT create a node |
+| F8 | Files larger than 25 MB, empty files and files of disallowed MIME types are rejected. Rejection does NOT create an image node and shows the canvas notice with the reason ("images must be under 25 MB"). Image formats the store can't keep (BMP, TIFF, HEIC) become a file card instead of being dropped |
 | F9 | `sys image add <abs-path> [--at x,y]` reads the file, validates it, copies it into `assets/`, and creates an ImageNode. `sys image replace <id> <abs-path>` swaps the asset. `sys image resize <id> --w N --h N` resizes. `sys image clear <id>` nulls the assetId |
 | F10 | React Flow `<Handle>` (target Left, source Right) are rendered with `isConnectable={true}` so the node can connect to/from other non-mother nodes |
 | F11 | If `state.assetId` references a file that has been deleted from disk, the `<img>` `onError` swaps in the placeholder visual instead of crashing |

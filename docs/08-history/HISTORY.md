@@ -916,3 +916,21 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `TMD/pomodoro-observer-mode-f9cfd3`  
 **Files changed:** `store/uiMode.ts` (new), board type/schema/seed, `TopBar` settings, Pomo/Clock/Calendar/Todo/Analytics gates, `scheduleMenus`, `TaskInfoPopup`, `CanvasFlow`, `sys` (`settings mode`), `tests/unit/easyMode.test.ts`, `docs/06-requirements/easy-mode.md`  
 **Summary:** A global Easy / Advanced switch in Settings. Easy hides the links between features and keeps the data identical: the Pomo is a stopwatch with breaks that never asks or names anything, recorded time is one colour, there are no tags or Focus buttons, and Analytics drops the plan-vs-actual and time-by-tag pages. Plan and reality are compared by time on the Clock and Calendar. New boards start in Easy and existing boards stay Advanced. CLI: `krnl settings mode [easy|advanced]`. Also fixed: Start no longer re-suggests a planned task over a continued name.
+
+---
+
+## [2026-11-03] — Autonomous bug-fix and polish pass (batch 1)
+
+**Type:** Bug Fix
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `ec341e5` … `4f9439b`
+**Files changed:** `main/{persistence/board,boardIo,index,ipc/handlers,rpc/server}.ts`, `renderer/App.tsx`, `store/{boardStore,useCliDispatch,scheduleActions,eventLog/boardSaveLogging}.ts`, `Canvas/{CanvasFlow,commandDispatch,dropImage,dropMedia}.ts*`, `PomoNode/commands.ts`, `shared/{dispatch/task,ymd}.ts`, `sys/commands/{clock,cal,pomo,habit}.ts`, Calendar / Clock / Analytics / TerminalNode / TextNode / TopBar / ui components, theme colour fixes, 12 test files
+**Summary:**
+- **Data safety:** a locked or unreadable `board.json` no longer comes back as the seed (which the next save or CLI command wrote over the real board). Reads retry, then the app shows a "board not loaded — Try again" screen. Failed writes are reported, temp files are unique per writer, and one app instance runs per data folder.
+- **Persistence:** content saves keep the current camera position; swapped mother windows keep their order after a reload; the RPC server ignores non-request JSON instead of crashing main.
+- **Pomo:** the gear's Session length applies on the next START. Ticking a task done (card, Todo row or popup) or deleting it mid-session records the real span instead of the session length (an Observe span was booked as 24 h), and writes nothing onto the task (time-model F2).
+- **CLI:** `krnl undo/redo` persist; `node move` takes short refs and refuses mothers; `term setTitle/setFontSize/clear` work (the dispatch switch matched a kind no node has); impossible dates are rejected and `clock show` survives a bad stored day; `pomo start` during a break says to resume; `pomo config` never saves 0 minutes.
+- **Calendar / Clock / Analytics:** drop, resize and right-click land on the right time at any canvas zoom; Unschedule and Show on calendar work for chain successors ("Unschedule chain"); Enter/Esc work in the task popup's time field; the Clock shows a task's real times and respects Easy mode in its menu; analytics ranges roll over at midnight.
+- **Canvas / UI:** text-note Escape restores the pre-edit text after autosave; refused image drops say why; double-click renames a canvas; light-theme contrast fixes (primary buttons, Orb/Commander, analytics tiles, danger red, pomo toggle) and no left-edge accent bars in the radio.
+
+**Tests:** see the batch report; new tests in `tests/unit/{main,sys,renderer}` and `tests/integration`.
