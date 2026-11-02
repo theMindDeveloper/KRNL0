@@ -40,7 +40,11 @@ function sector(r0: number, r1: number, a0: number, a1: number): string {
 const BACK = <path d="M14 6l-6 6 6 6" />;
 const CLOSE = <path d="M6 6l12 12M18 6L6 18" />;
 
-export function PieMenu({ x, y, items, onClose, testId = 'pie-menu' }: { x: number; y: number; items: PieItem[]; onClose: () => void; testId?: string }) {
+export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
+  x: number; y: number; items: PieItem[]; onClose: () => void; testId?: string;
+  /** Root-level centre button (default: close). */
+  center?: { label: string; icon: ReactNode; onSelect: () => void };
+}) {
   const [stack, setStack] = useState<PieItem[][]>([items]);
   const [hover, setHover] = useState<string | null>(null);
   const level = stack[stack.length - 1]!;
@@ -126,17 +130,21 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu' }: { x: numb
           className="krnl-piemenu-slice"
           data-testid={`${testId}-center`}
           role="button"
-          aria-label={nested ? 'Back' : 'Close'}
+          aria-label={nested ? 'Back' : center?.label ?? 'Close'}
           r={R_C}
           fill="#24282d"
           stroke="rgba(255,255,255,0.12)"
-          onClick={() => (nested ? setStack((st) => st.slice(0, -1)) : onClose())}
+          onClick={() => {
+            if (nested) { setStack((st) => st.slice(0, -1)); return; }
+            center?.onSelect();
+            onClose();
+          }}
         >
-          <title>{nested ? 'Back' : 'Close (Esc)'}</title>
+          <title>{nested ? 'Back' : center ? center.label : 'Close (Esc)'}</title>
         </circle>
         {hover
           ? <text y={4} textAnchor="middle" fontSize={9} fontFamily="var(--font-sans)" fontWeight={600} fill="#e8ebee" pointerEvents="none">{hover.slice(0, 11)}</text>
-          : glyph(nested ? BACK : CLOSE, '#e8ebee', 0, 0)}
+          : glyph(nested ? BACK : center?.icon ?? CLOSE, '#e8ebee', 0, 0)}
       </svg>
     </div>,
     document.body,

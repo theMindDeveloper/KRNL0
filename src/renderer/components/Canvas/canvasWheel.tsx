@@ -1,6 +1,7 @@
 // Items for the canvas right-click wheel: a few categories on the first ring,
 // each opening its own ring (sticky colours, shape kinds, media, pen tools).
 
+import type { ReactNode } from 'react';
 import type { PieItem } from '../ui/PieMenu';
 import { STICKY_COLORS, type TextLook } from '../nodes/TextNode/types';
 import { PEN_COLORS, useDrawStore, type PenTool } from '../../store/drawStore';
@@ -35,8 +36,39 @@ const I = {
   eraser: <><path d="M7 20h13" /><path d="M5.5 14.5l8-8a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L11 19H8z" /></>,
 };
 
-export function canvasWheelItems(a: CanvasWheelActions): PieItem[] {
+/**
+ * The pen wheel — used on its own while drawing (right-click) and as the
+ * canvas wheel's Pen panel, so both look and act the same. Marks the current
+ * tool, colour and size.
+ */
+export function penWheelItems(opts: { withClear?: () => void } = {}): PieItem[] {
+  const st = useDrawStore.getState();
   const pen = (tool: PenTool) => () => { useDrawStore.getState().setTool(tool); };
+  const tools: Array<[PenTool, string, ReactNode]> = [
+    ['pen', 'Pen', I.pen], ['marker', 'Marker', I.marker], ['highlighter', 'Highlight', I.highlighter],
+    ['arrow', 'Arrow', I.arrow], ['eraser', 'Eraser', I.eraser],
+  ];
+  return [
+    ...tools.map(([id, label, icon]) => ({ key: `pen-${id}`, label, icon, active: st.active && st.tool === id, onSelect: pen(id) })),
+    {
+      key: 'pen-color', label: 'Colour', icon: <circle cx="12" cy="12" r="6" fill={st.color} />,
+      children: PEN_COLORS.map((col) => ({
+        key: `pc-${col}`, label: 'Colour', swatch: col, active: st.color === col,
+        onSelect: () => { useDrawStore.getState().setColor(col); useDrawStore.getState().setActive(true); },
+      })),
+    },
+    {
+      key: 'pen-size', label: 'Size', icon: <><circle cx="6" cy="12" r="1.5" /><circle cx="12" cy="12" r="2.5" /><circle cx="19" cy="12" r="3.5" /></>,
+      children: ([[0.5, 'Thin', 1.5], [1, 'Medium', 3], [2, 'Thick', 5]] as const).map(([v, label, r]) => ({
+        key: `ps-${v}`, label, icon: <circle cx="12" cy="12" r={r} fill="currentColor" />, active: st.sizeScale === v,
+        onSelect: () => { useDrawStore.getState().setSizeScale(v); useDrawStore.getState().setActive(true); },
+      })),
+    },
+    ...(opts.withClear ? [{ key: 'pen-clear', label: 'Clear all', icon: <><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13h10l1-13" /></>, onSelect: opts.withClear }] : []),
+  ];
+}
+
+export function canvasWheelItems(a: CanvasWheelActions): PieItem[] {
   return [
     { key: 'task', label: 'Task', icon: I.task, onSelect: a.task },
     { key: 'habit', label: 'Habit', icon: I.habit, onSelect: a.habit },
@@ -61,19 +93,6 @@ export function canvasWheelItems(a: CanvasWheelActions): PieItem[] {
       ],
     },
     { key: 'frame', label: 'Frame', shortcut: 'F', icon: I.frame, onSelect: a.frame },
-    {
-      key: 'pen', label: 'Pen', shortcut: 'P', icon: I.pen,
-      children: [
-        { key: 'pen-pen', label: 'Pen', icon: I.pen, onSelect: pen('pen') },
-        { key: 'pen-marker', label: 'Marker', icon: I.marker, onSelect: pen('marker') },
-        { key: 'pen-highlighter', label: 'Highlight', icon: I.highlighter, onSelect: pen('highlighter') },
-        { key: 'pen-arrow', label: 'Arrow', icon: I.arrow, onSelect: pen('arrow') },
-        { key: 'pen-eraser', label: 'Eraser', icon: I.eraser, onSelect: pen('eraser') },
-        {
-          key: 'pen-color', label: 'Colour', icon: <circle cx="12" cy="12" r="6" />,
-          children: PEN_COLORS.map((c) => ({ key: `pc-${c}`, label: 'Colour', swatch: c, onSelect: () => { useDrawStore.getState().setColor(c); useDrawStore.getState().setActive(true); } })),
-        },
-      ],
-    },
+    { key: 'pen', label: 'Pen', shortcut: 'P', icon: I.pen, children: penWheelItems() },
   ];
 }
