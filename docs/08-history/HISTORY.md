@@ -792,3 +792,4 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Month view fix:** cells show only whole chips plus "+N"; today is a soft tint with an acid day pill, so text stays readable.
 
 **Tests:** 0 typecheck errors; 132 files green.
+- **Follow-up:** Analytics drops the six tabs for an 8-page guide (Summary, Activity, Year, When you work, Plan vs actual, Per task, Where time went, Habit streaks), with an icon-tile index and the other charts behind "More charts". The year heatmap always shows 365 days and fills its card. Per-task bars grow to fill their card. The Calendar task popup is redesigned (header with colour and span, start/length editor with quick lengths, one action row). Clock open-ended arcs use a smooth gradient fade.

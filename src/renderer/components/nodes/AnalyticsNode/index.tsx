@@ -17,13 +17,14 @@
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
 import { PagedView } from '../../ui/PagedView';
 import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
+import { GUIDE, cardOrder, isGuideCard } from './guide';
 import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
 import { EstimateBars, DailyPlanActual, FocusMix, Legend, COLOR_PLANNED, COLOR_TRACKED, fmtMinutes } from '../../../analytics/charts/PlanVsActual';
 import {
@@ -297,8 +298,10 @@ function ChartCard({
     gap: 10,
     transition: 'border-color 140ms, box-shadow 140ms',
     gridColumn: span ? `span ${span}` : undefined,
-    // One card per page, filling it (PagedView fillItems sets --page-h).
+    // One card per page, filling it (PagedView fillItems sets --page-h),
+    // in guide order.
     height: 'var(--page-h, auto)',
+    order: cardOrder(cardId),
     boxSizing: 'border-box',
     overflow: 'hidden',
     minHeight: 0,
@@ -419,6 +422,28 @@ export function AnalyticsNode({
   const year = state.year ?? new Date(todayLocal() + 'T00:00:00').getFullYear();
 
   const byDay = analytics.byDay(range);
+  // The year heatmap always shows the last 365 days, whatever the range.
+  const yearRange = useMemo(() => lastNDays(365), []);
+  const yearByDay = analytics.byDay(yearRange);
+
+  // One sequence of full-page cards (no tabs). The header names the card on
+  // screen; "All charts" jumps straight to any card.
+  const [currentCard, setCurrentCard] = useState<string | null>(null);
+  const [jumpTo, setJumpTo] = useState<string | null>(null);
+  const [indexOpen, setIndexOpen] = useState(false);
+  // Extra charts beyond the guide pages — off by default.
+  const [showAll, setShowAll] = useState(false);
+  const onPageChange = useCallback((item: HTMLElement | null) => {
+    setCurrentCard(item?.getAttribute('data-card-id') ?? (item ? 'summary' : null));
+    setJumpTo(null);
+  }, []);
+  const guidePos = GUIDE.findIndex((g) => g.id === (currentCard ?? 'summary'));
+  const currentLabel = guidePos >= 0
+    ? { section: `${guidePos + 1} / ${GUIDE.length}`, title: GUIDE[guidePos]!.title }
+    : {
+        section: 'More',
+        title: ANALYTICS_CARD_LABELS[currentCard as AnalyticsCardId] ?? currentCard ?? '',
+      };
   // Plain-language summary on top of Overview (same text as `analytics summary`).
   const summary = summarizeAnalytics(analytics, range, prevRange, state.rangeDays);
   const tot = analytics.totals(range);
@@ -436,8 +461,8 @@ export function AnalyticsNode({
   const settingsOpen = state.settingsOpen ?? false;
 
   const isHidden = useCallback(
-    (id: AnalyticsCardId) => hiddenCards.includes(id),
-    [hiddenCards],
+    (id: AnalyticsCardId) => hiddenCards.includes(id) || (!showAll && !isGuideCard(id)),
+    [hiddenCards, showAll],
   );
   const isPinned = useCallback(
     (id: AnalyticsCardId) => pinnedCards.includes(id),
@@ -573,21 +598,84 @@ export function AnalyticsNode({
         </button>
       </div>
 
-      {/* Tabs + range chips */}
-      <div style={toolbarStyle}>
-        {ANALYTICS_VIEWS.map((v) => (
-          <button
-            key={v}
-            type="button"
-            data-testid={`analytics-tab-${v}`}
-            onClick={(e) => { e.stopPropagation(); onCommand('analytics.setView', { view: v }); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={tabPill(view === v)}
-          >
-            {VIEW_LABELS[v]}
-          </button>
-        ))}
+      {/* Where am I + All charts index + range chips (no tabs). */}
+      <div style={{ ...toolbarStyle, position: 'relative' }}>
+        <button
+          type="button"
+          data-testid="analytics-index-btn"
+          aria-expanded={indexOpen}
+          onClick={(e) => { e.stopPropagation(); setIndexOpen((o) => !o); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={tabPill(indexOpen)}
+          title="Jump to any chart"
+        >
+          ☰ All charts
+        </button>
+        <span
+          data-testid="analytics-current"
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--k-an-ink-3, #9aa1a8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}
+        >
+          {currentLabel.section} · <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{currentLabel.title}</span>
+        </span>
         <div style={{ flex: 1 }} />
+        {indexOpen && (
+          <div
+            data-testid="analytics-index"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute', top: '100%', left: 0, zIndex: 20, marginTop: 6,
+              width: 'min(520px, 100%)', padding: 12, borderRadius: 12,
+              background: 'var(--k-an-bg-2, #16191c)', border: '1px solid var(--k-an-line-2, #2a2e33)',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', gap: 10,
+            }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
+              {GUIDE.map((g, i) => {
+                const on = (currentCard ?? 'summary') === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    data-testid={`analytics-index-${g.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setJumpTo(g.id === 'summary' ? '[data-testid="analytics-summary"]' : `[data-card-id="${g.id}"]`);
+                      setIndexOpen(false);
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', cursor: 'pointer',
+                      padding: '9px 10px', borderRadius: 9, minWidth: 0,
+                      background: on ? 'rgba(201,241,88,0.10)' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${on ? 'rgba(201,241,88,0.55)' : 'var(--k-an-line, #23262a)'}`,
+                    }}
+                  >
+                    <span aria-hidden style={{
+                      width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'grid', placeItems: 'center',
+                      background: 'rgba(201,241,88,0.12)', color: 'var(--acid, #c9f158)', fontSize: 13, fontFamily: 'var(--font-mono)',
+                    }}>{g.icon}</span>
+                    <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--k-an-ink, #f4f6f8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span style={{ color: 'var(--k-an-ink-4, #7d848b)', fontFamily: 'var(--font-mono)', fontSize: 10, marginRight: 5 }}>{i + 1}</span>{g.title}
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 10.5, color: 'var(--k-an-ink-3, #9aa1a8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.hint}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              data-testid="analytics-more-charts"
+              onClick={(e) => { e.stopPropagation(); setShowAll((v) => !v); }}
+              style={{
+                alignSelf: 'flex-start', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 4px',
+                fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', color: 'var(--k-an-ink-3, #9aa1a8)',
+              }}
+            >
+              {showAll ? '− Hide extra charts' : '+ More charts (radar, scatter, distributions…)'}
+            </button>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 4 }}>
           {RANGE_PRESETS.map((days) => (
             <button
@@ -620,14 +708,17 @@ export function AnalyticsNode({
         <PagedView
           testId="analytics-pages"
           itemSelector="[data-page-item], [data-card-id]"
-          resetKey={view}
           fillItems
+          revealSelector={jumpTo}
+          onPageChange={onPageChange}
           style={{ flex: 1, minWidth: 0 }}
           contentStyle={{ display: 'flex', flexDirection: 'column', gap: 12 }}
         >
-          {view === 'overview' && <SummaryHero summary={summary} byDay={byDay} />}
+          <SummaryHero summary={summary} byDay={byDay} />
+          {ANALYTICS_VIEWS.map((v) => (
           <ViewBody
-            view={view}
+            key={v}
+            view={v}
             state={state}
             byDay={byDay}
             dow={dow}
@@ -654,7 +745,9 @@ export function AnalyticsNode({
             radarAxes={radarAxes}
             colCount={colCount}
             clamp={clamp}
+            yearByDay={yearByDay}
           />
+          ))}
         </PagedView>
 
         {settingsOpen && (
@@ -877,6 +970,8 @@ function SettingsSidebar({
 
 interface ViewBodyProps {
   view: AnalyticsView;
+  /** Last 365 days — the year heatmap ignores the range chips. */
+  yearByDay: ReturnType<ReturnType<typeof useAnalytics>['byDay']>;
   state: AnalyticsState;
   byDay: ReturnType<ReturnType<typeof useAnalytics>['byDay']>;
   dow: ReturnType<ReturnType<typeof useAnalytics>['byDayOfWeek']>;
@@ -958,7 +1053,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
         render: () => card('estimates.perTask', 'Estimate vs actual · per task', 2, 250, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Legend items={[{ label: 'Planned (estimate)', color: COLOR_PLANNED }, { label: 'Tracked (pomo, tagged)', color: COLOR_TRACKED }]} />
-            <EstimateBars tasks={est.tasks} width={chartWidth(size.width, 480)} />
+            <EstimateBars tasks={est.tasks} width={chartWidth(size.width, 480)} {...(size.height > 0 ? { height: size.height - 30 } : {})} />
           </div>
         )),
       },
@@ -1005,13 +1100,10 @@ function ViewBody(props: ViewBodyProps) {
 
   // Grid track count is driven by the measured node width so cards never
   // squeeze below 280px and never leave random whitespace on the right.
-  const cardGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
-    gap: 12,
-    alignItems: 'stretch',
-    gridAutoRows: 'min-content',
-  };
+  // Cards from every view join one ordered sequence (guide order, then the
+  // extras), so the per-view grid wrappers step out of the layout.
+  void colCount;
+  const cardGridStyle: React.CSSProperties = { display: 'contents' };
 
   const metricPicker = (currentMetric: AnalyticsMetric, onChange: (m: AnalyticsMetric) => void) => (
     <div style={{ display: 'flex', gap: 4 }}>
@@ -1186,10 +1278,8 @@ function ViewBody(props: ViewBodyProps) {
           onToggleHidden={() => toggleHidden('calendar.heatmap')}
           onTogglePin={() => togglePin('calendar.heatmap')}
         >
-          {() => (
-            <div style={{ width: '100%', overflow: 'hidden' }}>
-              <CalendarHeatmap data={byDay} metric={state.metric} />
-            </div>
+          {(size) => (
+            <CalendarHeatmap data={props.yearByDay} metric={state.metric} width={size.width} height={size.height} />
           )}
         </ChartCard>
       </div>

@@ -34,6 +34,7 @@ import { toneVarForTask } from '../../../utils/taskColor';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { PagedView } from '../../ui/PagedView';
+import { TaskPopup } from './TaskPopup';
 import { hourWindow, stepHourWindow } from './hourWindow';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -471,7 +472,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     if (!taskPopup) return;
     const d = new Date(taskPopup.task.startISO);
     setExactTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
-    setExactDur(String(taskPopup.task.scheduledDurationMin));
+    setExactDur(taskPopup.task.timeOpen ? '' : String(taskPopup.task.scheduledDurationMin));
   }, [taskPopup]);
 
   // #7 — apply the typed exact time + duration to the task (bypasses the grid
@@ -2159,217 +2160,22 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       )}
 
       {/* Task info popup — shown on left-click of a task block */}
-      {taskPopup && (() => {
-        const startMs = new Date(taskPopup.task.startISO).getTime();
-        const endMs = startMs + taskPopup.task.scheduledDurationMin * 60_000;
-        const fmt = (ms: number) => {
-          const d = new Date(ms);
-          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-        };
-        const startStr = fmt(startMs);
-        const endStr = fmt(endMs);
-        const POPUP_W = 280;
-        return createPortal(
-        <>
-          {/* Backdrop: click anywhere to dismiss */}
-          <div
-            onClick={() => setTaskPopup(null)}
-            style={{ position: 'fixed', inset: 0, zIndex: 1998 }}
-          />
-          <div
-            style={{
-              position: 'fixed',
-              left: Math.min(taskPopup.x + 4, window.innerWidth - POPUP_W - 8),
-              top: taskPopup.y + 6,
-              zIndex: 1999,
-              background: 'var(--paper)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 8,
-              padding: '12px 14px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              color: 'var(--ink)',
-              boxShadow: 'var(--shadow-1)',
-              minWidth: 240,
-              maxWidth: POPUP_W,
-              pointerEvents: 'auto',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 12,
-                color: 'var(--ink)',
-                marginBottom: 10,
-                wordBreak: 'break-word',
-                lineHeight: 1.3,
-              }}
-            >
-              {taskPopup.task.text}
-            </div>
-
-            {/* Start → End time row.
-                Previous version painted the digits directly in --acid /
-                --cyan with a glow — looked great on dark paper, but on
-                the cream light-mode background the bright colors washed
-                out against the paper and the popup became unreadable
-                (user report 2026-05-17). Switched to colored chips with
-                the theme-invariant --ink-on-bright text token — the chip
-                background carries the color identity, the digits stay
-                legible in every theme. */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 8,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: 'var(--ink-on-bright)',
-                  background: 'var(--acid)',
-                  padding: '3px 8px',
-                  borderRadius: 4,
-                  letterSpacing: '0.04em',
-                  lineHeight: 1,
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {startStr}
-              </span>
-              <div
-                style={{
-                  flex: 1,
-                  height: 2,
-                  borderRadius: 1,
-                  background:
-                    'linear-gradient(90deg, var(--acid) 0%, var(--cyan) 100%)',
-                  opacity: 0.85,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: 'var(--ink-on-bright)',
-                  background: 'var(--cyan)',
-                  padding: '3px 8px',
-                  borderRadius: 4,
-                  letterSpacing: '0.04em',
-                  lineHeight: 1,
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {endStr}
-              </span>
-            </div>
-
-            {/* #7 — exact-time editor. Type any start time + duration to place
-                the task precisely, independent of the calendar's snap grid. */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <input
-                data-testid="task-popup-time"
-                type="time"
-                value={exactTime}
-                onChange={(e) => setExactTime(e.target.value)}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 5px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)' }}
-              />
-              <input
-                data-testid="task-popup-duration"
-                type="number"
-                min={1}
-                value={exactDur}
-                onChange={(e) => setExactDur(e.target.value)}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{ width: 56, fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 5px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)' }}
-              />
-              <span style={{ fontSize: 9, color: 'var(--ink-3)' }}>min</span>
-              <button
-                type="button"
-                data-testid="task-popup-apply-time"
-                onClick={() => { applyExactTime(taskPopup.task); setTaskPopup(null); }}
-                style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: 'var(--ink-on-bright)', background: 'var(--cyan)', border: '1px solid var(--cyan)', borderRadius: 3, padding: '3px 8px', cursor: 'pointer', textTransform: 'uppercase' }}
-              >
-                Set
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  onCommand('calendar.activateTask', { taskId: taskPopup.task.id });
-                  setTaskPopup(null);
-                }}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
-                  fontWeight: 600,
-                  color: 'var(--ink-on-bright)',
-                  background: 'var(--acid)',
-                  border: '1px solid var(--acid)',
-                  borderRadius: 3,
-                  padding: '3px 8px',
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                }}
-              >
-                Activate
-              </button>
-              <button
-                type="button"
-                data-testid="calendar-task-jump"
-                onClick={() => {
-                  jumpToTaskNode(taskPopup.task.id);
-                  setTaskPopup(null);
-                }}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
-                  fontWeight: 600,
-                  color: 'var(--ink-2)',
-                  background: 'transparent',
-                  border: '1px solid var(--paper-3)',
-                  borderRadius: 3,
-                  padding: '3px 8px',
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                }}
-              >
-                Jump to node →
-              </button>
-              {/* #4 — unschedule: pull the task off the calendar. */}
-              <button
-                type="button"
-                data-testid="calendar-task-unschedule"
-                onClick={() => { unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
-                title="Remove this task from the calendar (keeps the task)"
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
-                  fontWeight: 600,
-                  color: '#ff8e64',
-                  background: 'transparent',
-                  border: '1px solid #ff8e64',
-                  borderRadius: 3,
-                  padding: '3px 8px',
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                }}
-              >
-                Unschedule
-              </button>
-            </div>
-          </div>
-        </>,
-        document.body,
-      );
-      })()}
+      {taskPopup && (
+        <TaskPopup
+          task={taskPopup.task}
+          x={taskPopup.x}
+          y={taskPopup.y}
+          time={exactTime}
+          duration={exactDur}
+          onTime={setExactTime}
+          onDuration={setExactDur}
+          onApply={() => { applyExactTime(taskPopup.task); setTaskPopup(null); }}
+          onActivate={() => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); setTaskPopup(null); }}
+          onJump={() => { jumpToTaskNode(taskPopup.task.id); setTaskPopup(null); }}
+          onUnschedule={() => { unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
+          onClose={() => setTaskPopup(null)}
+        />
+      )}
 
       {ctxMenu && (
         <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onDismiss={() => setCtxMenu(null)} />

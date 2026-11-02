@@ -862,25 +862,31 @@ export function ClockNode({
                   </g>
                 );
 
-                // No set time: draw the arc in fading steps (open-ended).
+                // No set time: one arc whose colour fades smoothly to nothing
+                // toward its end (a gradient laid along the arc's chord).
                 if (t.timeOpen) {
-                  const STEPS = 6;
-                  const span = t.end - t.start;
+                  const p0 = pt(t.start, r);
+                  const p1 = pt(t.end, r);
+                  const gid = `clock-open-${t.id}`;
                   const hit = baseArc(t.id, t.start, t.end, 'round');
                   return [
+                    <defs key={`${t.id}-open-defs`}>
+                      <linearGradient id={gid} gradientUnits="userSpaceOnUse" x1={p0.x} y1={p0.y} x2={p1.x} y2={p1.y}>
+                        <stop offset="0%" stopColor={t.colorVar} stopOpacity={opacity * (active ? 0.95 : 0.8)} />
+                        <stop offset="55%" stopColor={t.colorVar} stopOpacity={opacity * 0.35} />
+                        <stop offset="100%" stopColor={t.colorVar} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>,
                     <g key={`${t.id}-open`} data-time-open="true" opacity={0}>{hit}</g>,
-                    ...Array.from({ length: STEPS }, (_, k) => (
-                      <path
-                        key={`${t.id}-open-${k}`}
-                        d={arcPath(t.start + (span * k) / STEPS, t.start + (span * (k + 1)) / STEPS, r)}
-                        fill="none"
-                        stroke={t.colorVar}
-                        strokeWidth={sw}
-                        strokeLinecap={k === 0 ? 'round' : 'butt'}
-                        opacity={opacity * (active ? 0.95 : 0.75) * (1 - k / STEPS)}
-                        pointerEvents="none"
-                      />
-                    )),
+                    <path
+                      key={`${t.id}-open-arc`}
+                      d={arcPath(t.start, t.end, r)}
+                      fill="none"
+                      stroke={`url(#${gid})`}
+                      strokeWidth={sw}
+                      strokeLinecap="round"
+                      pointerEvents="none"
+                    />,
                   ];
                 }
                 if (breakdown === null || breakdown.segments.length <= 1) {

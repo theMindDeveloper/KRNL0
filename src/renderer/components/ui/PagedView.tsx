@@ -42,6 +42,10 @@ export interface PagedViewProps {
    * the previous or next one.
    */
   fillItems?: boolean;
+  /** Jump to the page holding the first item matching this selector (on change). */
+  revealSelector?: string | null;
+  /** Called with the item at the top of the current page whenever it changes. */
+  onPageChange?: (item: HTMLElement | null, page: number, pages: number) => void;
 }
 
 /**
@@ -70,6 +74,8 @@ export function PagedView({
   resetKey,
   revealIndex,
   fillItems = false,
+  revealSelector,
+  onPageChange,
 }: PagedViewProps) {
   const outerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -80,6 +86,7 @@ export function PagedView({
   const [itemCount, setItemCount] = useState(0);
   const lastWheel = useRef(0);
   const itemTops = useRef<number[]>([]);
+  const itemEls = useRef<HTMLElement[]>([]);
 
   const measure = useCallback(() => {
     const outer = outerRef.current;
@@ -89,10 +96,16 @@ export function PagedView({
     // Offsets relative to the content box — the page shift (transform) moves
     // the box and its items together, so it cancels out.
     const base = content.getBoundingClientRect().top;
-    const items = Array.from(content.querySelectorAll<HTMLElement>(itemSelector)).map((el) => {
-      const r = el.getBoundingClientRect();
-      return { top: r.top - base, bottom: r.bottom - base };
-    });
+    // Visual order (CSS `order` can differ from DOM order).
+    const measured = Array.from(content.querySelectorAll<HTMLElement>(itemSelector))
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return { el, top: r.top - base, bottom: r.bottom - base };
+      })
+      .filter((m) => m.bottom > m.top)
+      .sort((a, b) => a.top - b.top);
+    itemEls.current = measured.map((m) => m.el);
+    const items = measured.map(({ top, bottom }) => ({ top, bottom }));
     itemTops.current = items.map((i) => i.top);
     setItemCount((c) => (c === items.length ? c : items.length));
     let next = computePageStarts(items, full);
@@ -126,6 +139,25 @@ export function PagedView({
     for (let i = 0; i < starts.length; i++) if (starts[i]! <= top + 0.5) p = i;
     setPage(p);
   }, [revealIndex, starts]);
+
+  useEffect(() => {
+    if (!revealSelector) return;
+    const el = contentRef.current?.querySelector<HTMLElement>(revealSelector);
+    const i = el ? itemEls.current.indexOf(el) : -1;
+    const top = i >= 0 ? itemTops.current[i] : undefined;
+    if (top === undefined) return;
+    let p = 0;
+    for (let k = 0; k < starts.length; k++) if (starts[k]! <= top + 0.5) p = k;
+    setPage(p);
+  }, [revealSelector, starts]);
+
+  // Report the item at the top of the shown page.
+  useEffect(() => {
+    if (!onPageChange) return;
+    const top = starts[current] ?? 0;
+    const i = itemTops.current.findIndex((t) => Math.abs(t - top) < 0.5);
+    onPageChange(i >= 0 ? itemEls.current[i] ?? null : null, current, pages);
+  }, [current, starts, pages, onPageChange]);
 
   const go = useCallback((delta: number) => {
     setPage((p) => Math.max(0, Math.min(pages - 1, p + delta)));
