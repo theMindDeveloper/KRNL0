@@ -872,3 +872,9 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
     - New `ui/Popover.tsx`, `ui/AppSelect.tsx` and `ui/TimeField.tsx` (type a time, or pick from hour/minute columns).
     - Used in the calendar task popup (start time), the calendar and clock "Counts toward" retag, and the Pomo task tag.
 - **Follow-up 25 (UI):** habit icons are app SVGs (`HabitNode/HabitIcon.tsx`, 24 line icons in currentColor) instead of emoji, so they follow light and dark themes. Old glyph/emoji icons map to the matching SVG. Used in the Habit window, context menu, lanes, calendar blocks and the repeat dialog.
+- **Follow-up 26 (Bug Fix):** hand-tagging "task 1" as Meetings no longer re-tags "task 2"…"task 5".
+  - Cause: the classifier dropped numbers, so "task N" all became the token "task", a 100% near-duplicate of the example.
+  - Placeholder words (task, todo, item…) are now stopwords.
+  - Near-duplicate checks count numbers.
+  - A word seen in only one example votes below the tagging threshold on its own.
+  - Wrong auto tags already on a board re-classify on load.

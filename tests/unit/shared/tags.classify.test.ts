@@ -129,3 +129,14 @@ describe('findTag / tagDisplay / slugifyTag', () => {
     expect(slugifyTag('  Side Project! ')).toBe('side-project');
   });
 });
+
+describe('one hand tag does not spread by a placeholder word', () => {
+  it('tagging "task 1" as a meeting leaves "task 2".."task 5" alone', () => {
+    const examples = [{ text: 'task 1', tag: 'meetings' }];
+    for (const t of ['task 2', 'task 3', 'Task 4', 'task 5']) expect(classifyTask(t, LIB, examples)).toBeNull();
+  });
+  it('numbers keep "plan 1" and "plan 2" from being near-duplicates', () => {
+    const examples = [{ text: 'garden plan 1', tag: 'meetings' }];
+    expect(classifyTask('garden plan 2', LIB, examples)).not.toBe('meetings');
+  });
+});
