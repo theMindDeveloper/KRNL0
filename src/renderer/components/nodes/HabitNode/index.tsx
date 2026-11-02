@@ -165,9 +165,9 @@ export function HabitNode({
   );
 
   const titleByView: Record<HabitView, string> = {
-    week: `HABITS — WEEK ${weekNum} · HBT.WEEK`,
-    month: `HABITS — ${MONTH_LABELS[now.getMonth()]} · HBT.MONTH`,
-    year: `HABITS — ${now.getFullYear()} · HBT.YEAR`,
+    week: `HABITS & ROUTINES — WEEK ${weekNum} · HBT.WEEK`,
+    month: `HABITS & ROUTINES — ${MONTH_LABELS[now.getMonth()]} · HBT.MONTH`,
+    year: `HABITS & ROUTINES — ${now.getFullYear()} · HBT.YEAR`,
   };
 
   const menuHabit = menu ? visibleHabits.find((h) => h.id === menu.habitId) ?? null : null;
@@ -279,7 +279,7 @@ export function HabitNode({
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               type="text"
-              placeholder="+ add habit"
+              placeholder="+ add habit or recurring event"
               data-habit-add
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -309,7 +309,7 @@ export function HabitNode({
             <button
               type="button"
               data-testid="habit-add-repeat"
-              title={newRepeat ? describeRepeat(newRepeat) : 'Repeat (optional)'}
+              title={newRepeat ? describeRepeat(newRepeat) : 'Repeat: make it a recurring event on the calendar (optional)'}
               aria-pressed={!!newRepeat}
               onClick={(e) => {
                 e.stopPropagation();

@@ -1591,7 +1591,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         <div
           key={`habit-block-${habit.id}`}
           data-testid={`habit-block-${habit.id}-${dayYMD}`}
-          title={`${habit.name} — ${habit.schedule.timeOfDay}${titleSuffix}`}
+          title={`${habit.name} — repeats · ${habit.schedule.timeOfDay}${titleSuffix}`}
           style={{
             position: 'absolute',
             top: topPx,
@@ -1645,6 +1645,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           >
             {nameLabel}
           </span>
+          {/* Recurring marker: habits & routines repeat on the calendar. */}
+          <svg data-testid="habit-block-repeat" width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            aria-label="repeats" style={{ flexShrink: 0, marginLeft: 'auto', color: 'var(--ink-2)' }}>
+            <path d="M3 7a5 5 0 0 1 8.6-3.4L13 5" /><path d="M13 2v3h-3" /><path d="M13 9a5 5 0 0 1-8.6 3.4L3 11" /><path d="M3 14v-3h3" />
+          </svg>
         </div>,
       );
     }
