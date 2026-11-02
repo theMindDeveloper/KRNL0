@@ -167,7 +167,9 @@ export function PomoNode({
   // totalMs kept for the face fill pct (work threshold; break shows full).
   const totalMs = thresholdMs;
 
-  const isTaskMode = state.activeTaskId !== null;
+  // Easy mode has no task links (easy-mode D3): a link left over from
+  // Advanced is not shown, and the next START drops it.
+  const isTaskMode = !easy && state.activeTaskId !== null;
 
   // Plan vs reality — pips count the pomo's own completed sessions within the
   // long-break cycle. The tagged task's estimate no longer sets a session
@@ -507,8 +509,9 @@ export function PomoNode({
             );
           })}
         </div>}
-        {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight */}
-        <button
+        {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight.
+            Observe (and Easy) has no session settings, so no gear there. */}
+        {!observe && <button
           type="button"
           className="pomo-gear-btn"
           data-testid="pomo-gear"
@@ -524,11 +527,11 @@ export function PomoNode({
           style={{ fontSize: 11 }}
         >
           {gearOpen ? '✕' : '⚙'}
-        </button>
+        </button>}
       </div>
 
       {/* Body — either settings panel OR vapor tube */}
-      {gearOpen ? (
+      {gearOpen && !observe ? (
         <div
           data-testid="pomo-settings-panel"
           style={{

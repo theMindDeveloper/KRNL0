@@ -301,6 +301,18 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(getPomoState().label).toBe('Gym');
     });
 
+    it('A6: in Easy mode START drops a task link left over from Advanced (easy-mode D13)', () => {
+      const board = makeBoardWithTasks({
+        pomoState: { status: 'idle', startedAt: null, activeTaskId: 'task-a', label: 'Task A', durationMin: 25 },
+      });
+      useBoardStore.getState().setBoard({ ...board, uiMode: 'easy' } as Board);
+      makeCommandHandler('pomo-mother')('pomo.start');
+      const ps = getPomoState();
+      expect(ps.status).toBe('running');
+      expect(ps.activeTaskId).toBeNull();
+      expect(ps.label).toBe('');
+    });
+
     it('A4: ticking the active task done in the Todo list stops the pomo too', () => {
       const board = makeBoardWithTasks({
         pomoState: { status: 'running', startedAt: new Date(Date.now() - 120_000).toISOString(), activeTaskId: 'task-a', label: 'Task A', durationMin: 25 },

@@ -254,7 +254,20 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           // F3/F12), so a Session change in the gear takes effect on the next
           // START. Observe mode has no session length.
           const durationMin = startDurationMin(pomoCfg, observeMode);
-          return { state: pomoStart(s as never, { ...(args as object), ...(args['durationMin'] === undefined ? { durationMin } : {}) }) };
+          // Easy mode never links a span (easy-mode D3/D13): a task or name
+          // left over from Advanced must not tag the spans recorded here.
+          const easyStart = isEasyBoard(useBoardStore.getState().board);
+          const started = pomoStart(s as never, {
+            ...(easyStart ? { activeTaskId: null, label: '' } : {}),
+            ...(args as object),
+            ...(args['durationMin'] === undefined ? { durationMin } : {}),
+          });
+          if (easyStart && started.tag !== undefined) {
+            const { tag: _tag, ...untagged } = started;
+            void _tag;
+            return { state: untagged as Node['state'] };
+          }
+          return { state: started };
         }
         case 'pomo.pause':    return { state: pomoPause(s as never) };
         case 'pomo.resume':   return { state: observeBlips(pomoResume(s as never)) };

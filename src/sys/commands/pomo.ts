@@ -76,6 +76,8 @@ export function pomoStart(label?: string, minutes?: number): SysResult {
       ? OBSERVE_SPAN_MIN
       : minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
     const startArgs: { label?: string; durationMin?: number; activeTaskId?: string | null } = { durationMin: sessionMin };
+    // Easy mode never links a span (easy-mode D13), same as the UI's START.
+    if (easy) { startArgs.activeTaskId = null; startArgs.label = ''; }
     if (label !== undefined) startArgs.label = label;
     // Same as the UI: an untagged start is tagged with the open task whose
     // planned block contains "now" (time-model F5).
