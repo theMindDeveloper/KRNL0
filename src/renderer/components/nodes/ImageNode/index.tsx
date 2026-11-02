@@ -1,5 +1,5 @@
 /**
- * ImageNode â€” drag-drop image card with real file-backed persistence.
+ * ImageNode — drag-drop image card with real file-backed persistence.
  *
  * State references the image by `assetId` (a 26-char ULID-shaped string).
  * Bytes live at <BOARD_DIR>/assets/<assetId>.<ext> and are served via the
@@ -31,7 +31,7 @@ export function ImageNode({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Track Shift across the document so the NodeResizer's keepAspectRatio
-  // prop reflects the modifier in real time. Cheap â€” only two listeners.
+  // prop reflects the modifier in real time. Cheap — only two listeners.
   useEffect(() => {
     const onChange = (e: KeyboardEvent) => setShiftHeld(e.shiftKey);
     window.addEventListener('keydown', onChange);

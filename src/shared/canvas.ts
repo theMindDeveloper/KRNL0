@@ -1,4 +1,4 @@
-﻿// ADR Decision 33 â€” multiple canvases in one board.json.
+// ADR Decision 33 — multiple canvases in one board.json.
 //
 // Only free content is canvas-scoped (text, image, media, frame, drawings and
 // the edges between them). Mothers and their data kinds (tasks, habit lanes,
@@ -16,7 +16,7 @@ export interface CanvasMeta {
   name: string;
 }
 
-/** Child kinds that are mother-node data â€” never belong to a canvas. */
+/** Child kinds that are mother-node data — never belong to a canvas. */
 export const SHARED_KINDS: ReadonlySet<string> = new Set(['todo.task', 'habit.lane', 'habit.day', 'pomo.session']);
 
 interface NodeLike { id: string; kind: string; isMother?: boolean; canvasId?: string }
@@ -63,8 +63,8 @@ export function edgesOnCanvas<E extends EdgeLike>(edges: readonly E[], visible: 
 
 /**
  * Ensure a board has a canvas list and every free node / stroke a valid
- * canvasId. Missing or unknown ids land on the active canvas (legacy content â†’
- * the default canvas; CLI-created nodes â†’ wherever the user is). Shared nodes
+ * canvasId. Missing or unknown ids land on the active canvas (legacy content →
+ * the default canvas; CLI-created nodes → wherever the user is). Shared nodes
  * have any stray canvasId removed. Idempotent; returns a new board.
  */
 export function normalizeCanvases<B extends CanvasBoardLike>(board: B): B {
@@ -115,7 +115,7 @@ export function switchCanvas<B extends CanvasBoardLike>(board: B, id: string): B
  * Delete a canvas with its free nodes, its strokes and any edge touching a
  * removed node. Shared nodes (mothers, tasks, habit lanes) and board-level
  * data (completions, pomo history) are untouched. The last canvas cannot be
- * deleted â€” returns null.
+ * deleted — returns null.
  */
 export function deleteCanvas<B extends CanvasBoardLike>(board: B, id: string): B | null {
   const b = normalizeCanvases(board);
