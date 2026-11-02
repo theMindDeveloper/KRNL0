@@ -449,6 +449,7 @@ export class SysFacade {
           if (command.long !== undefined) cfgOpts.long = command.long;
           if (command.every !== undefined) cfgOpts.every = command.every;
           if (command.face !== undefined) cfgOpts.face = command.face;
+          if (command.countStopped !== undefined) cfgOpts.countStopped = command.countStopped;
           const res = pomoConfig(cfgOpts);
           // The file-path variant writes board.json directly; tell the
           // renderer to reload or its next save would revert the change.

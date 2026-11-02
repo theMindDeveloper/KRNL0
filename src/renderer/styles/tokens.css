@@ -762,3 +762,7 @@ input[type="number"]::-webkit-outer-spin-button {
 @media (prefers-reduced-motion: reduce) {
   .krnl-live-badge { animation: none; }
 }
+
+/* Native <select> lists inherit the OS colours (white on white in dark themes). */
+select option { background: var(--paper); color: var(--ink); }
+[data-theme="dark"] select { color-scheme: dark; }

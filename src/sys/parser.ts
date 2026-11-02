@@ -100,7 +100,7 @@ export type SysCommand =
   | { kind: 'habit'; sub: 'show'; ref: string | undefined; json: boolean }
   | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
-  | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined }
+  | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined }
   | {
       kind: 'frame';
       sub: 'add';
@@ -295,6 +295,8 @@ export class SysParser {
           long: positiveNum(flag(allArgs, 'long'), '--long'),
           every: positiveNum(flag(allArgs, 'every'), '--every'),
           face: flag(allArgs, 'face'),
+          // --count-stopped on|off: does Stop record the session so far?
+          countStopped: ((v) => (v === undefined ? undefined : !/^(off|no|false|0)$/i.test(v)))(flag(allArgs, 'count-stopped')),
         };
       }
     }

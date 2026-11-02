@@ -1051,10 +1051,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         const relY = Math.max(0, clientY - rectTop);
         const minutesIntoBlock = (relY / rowHeight) * 60;
         const absMinute = sliceStartMin + (Number.isFinite(minutesIntoBlock) ? minutesIntoBlock : 0);
-        const snappedMin = Math.max(
-          0,
-          Math.min(1440 - gran, Math.floor(absMinute / gran) * gran),
-        );
+        // Another task dropped onto this block runs in parallel with it: it
+        // takes the block's start (anywhere on the block, not just the top).
+        // Dropping a block onto itself still nudges it to the slot under the cursor.
+        const snappedMin = payload.taskId !== task.id
+          ? sliceStartMin
+          : Math.max(0, Math.min(1440 - gran, Math.floor(absMinute / gran) * gran));
         const hour = Math.floor(snappedMin / 60);
         const minute = snappedMin % 60;
         scheduleTask(

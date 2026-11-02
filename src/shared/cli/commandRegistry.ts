@@ -85,7 +85,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'segments', usage: 'pomo segments [--date YYYY-MM-DD] [--json]', summary: 'List tracked focus/break spans for a day (ids for retag / delete-segment)' },
       { name: 'delete-segment', usage: 'pomo delete-segment <segmentId>', summary: 'Delete a recorded focus/break span (Calendar/Clock right-click → Delete segment)' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
-      { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor]', summary: 'Update board-scoped PomoConfig on the mother PomoNode' },
+      { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor] [--count-stopped on|off]', summary: 'Update board-scoped PomoConfig on the mother PomoNode (count-stopped: does Stop record the session so far)' },
     ],
   },
   {

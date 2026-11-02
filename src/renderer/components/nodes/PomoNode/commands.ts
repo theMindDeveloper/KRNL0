@@ -432,6 +432,7 @@ export const pomoSetConfig = (
     shortBreakMin: clampPositive(args.config.shortBreakMin, current.shortBreakMin),
     longBreakMin: clampPositive(args.config.longBreakMin, current.longBreakMin),
     longBreakEvery: clampPositive(args.config.longBreakEvery, current.longBreakEvery),
+    ...(typeof args.config.countStopped === 'boolean' ? { countStopped: args.config.countStopped } : {}),
   };
 };
 

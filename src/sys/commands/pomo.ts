@@ -363,6 +363,7 @@ export function pomoConfig(opts: {
   long?: number;
   every?: number;
   face?: string;
+  countStopped?: boolean;
 }): SysResult {
   // Resolve path: env override (test) or Electron default.
   const boardPath: string | undefined = process.env['KRNL0_BOARD_PATH'];
@@ -397,7 +398,7 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
   const { readBoardFile: rfb, mutateBoard: mb } = getBoardIo();
 
   if (opts.session === undefined && opts.short === undefined && opts.long === undefined
-    && opts.every === undefined && opts.face === undefined) {
+    && opts.every === undefined && opts.face === undefined && opts.countStopped === undefined) {
     const board = rfb();
     if (!board) return { ok: false, message: 'No board found' };
     const node = findPomoNode(board);
@@ -409,6 +410,7 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
       longBreakMin: cfg.longBreakMin ?? 15,
       longBreakEvery: cfg.longBreakEvery ?? 4,
       face: cfg.face ?? 'vapor',
+      countStopped: cfg.countStopped ?? true,
     };
     return { ok: true, message: JSON.stringify(info), data: info };
   }
@@ -432,6 +434,7 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
     if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.round(opts.every);
     if (opts.face === 'auto') delete next.face;
     else if (opts.face !== undefined) next.face = opts.face as TimerFace;
+  if (opts.countStopped !== undefined) next.countStopped = opts.countStopped;
     node['config'] = next;
     found = true;
   });
@@ -441,7 +444,7 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
 
 function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: string): SysResult {
   if (opts.session === undefined && opts.short === undefined && opts.long === undefined
-    && opts.every === undefined && opts.face === undefined) {
+    && opts.every === undefined && opts.face === undefined && opts.countStopped === undefined) {
     const raw = loadBoardFrom(boardPath) as BoardLike | null;
     if (!raw) return { ok: false, message: 'No board found' };
     const board: BoardLike = {
@@ -457,6 +460,7 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
       longBreakMin: cfg.longBreakMin ?? 15,
       longBreakEvery: cfg.longBreakEvery ?? 4,
       face: cfg.face ?? 'vapor',
+      countStopped: cfg.countStopped ?? true,
     };
     return { ok: true, message: JSON.stringify(info), data: info };
   }
@@ -486,6 +490,7 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
   if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.round(opts.every);
   if (opts.face === 'auto') delete next.face;
   else if (opts.face !== undefined) next.face = opts.face as TimerFace;
+  if (opts.countStopped !== undefined) next.countStopped = opts.countStopped;
   node['config'] = next;
 
   saveBoardTo(boardPath, { ...(board as unknown as Record<string, unknown>), savedAt: new Date().toISOString() });

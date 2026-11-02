@@ -55,7 +55,7 @@ export function primaryTooltip(status: PomoState['status']): string {
   switch (status) {
     case 'running': return 'Pause — step away; away-time is excluded from the record';
     case 'paused':  return 'Resume the session';
-    case 'break':   return 'Skip break — record the break up to now, ready for the next session';
+    case 'break':   return 'End break — records the break up to now, ready for the next session';
     default:        return 'Start a session';
   }
 }
@@ -200,11 +200,10 @@ export function PomoNode({
     else if (state.status === 'break') onCommand('pomo.stop'); // end break → idle
   };
   const handleBreak = () => onCommand('pomo.break');
-  const handleStop = () => onCommand('pomo.stop');
+  // One Stop button: records the session so far, or discards it when
+  // "Count stopped sessions" is off in the Pomo settings.
+  const handleStop = () => onCommand(config.countStopped === false ? 'pomo.discard' : 'pomo.stop');
   const handleExtend = () => onCommand('pomo.extend');
-  // RESET discards the in-flight session WITHOUT recording it (#2/#6) — distinct
-  // from STOP, which records. Snaps back to idle.
-  const handleReset = () => onCommand('pomo.discard');
 
   const buttonLabel = primaryButtonLabel(state.status);
 
@@ -236,8 +235,26 @@ export function PomoNode({
     textTransform: 'uppercase',
     boxShadow: '0 0 0 1px var(--btn-primary-ring)',
   };
-  const isActiveSession =
-    state.status === 'running' || state.status === 'paused' || state.status === 'break';
+  const iconBtnStyle: React.CSSProperties = {
+    ...ghostBtnStyle,
+    flex: '0 0 42px',
+    padding: 0,
+    height: 38,
+    display: 'grid',
+    placeItems: 'center',
+  };
+  const primaryIconBtnStyle: React.CSSProperties = {
+    ...primaryBtnStyle,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 38,
+    padding: '0 12px',
+  };
+  const stopTitle = config.countStopped === false
+    ? 'Stop — end and discard this session (change in Pomo settings)'
+    : 'Stop — end and record this session';
 
   // F1 — liquid fill height tracks remaining time
   const remainingPct = calcRemainingPct(state.status, remainingMs, totalMs);
@@ -433,6 +450,27 @@ export function PomoNode({
               />
             </div>
           ))}
+
+          {/* Does Stop record the session so far? (one Stop button either way) */}
+          <div className="pomo-settings-row">
+            <span className="pomo-settings-label" title="On: Stop records the work so far. Off: Stop discards the session.">Count stopped sessions</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={config.countStopped !== false}
+              data-testid="pomo-settings-countStopped"
+              onClick={(e) => { e.stopPropagation(); onCommand('pomo.setConfig', { config: { countStopped: config.countStopped === false } }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                width: 34, height: 20, borderRadius: 999, border: 'none', cursor: 'pointer', padding: 2,
+                background: config.countStopped !== false ? 'var(--acid)' : 'var(--paper-3)',
+                display: 'flex', justifyContent: config.countStopped !== false ? 'flex-end' : 'flex-start',
+                transition: 'background 120ms',
+              }}
+            >
+              <span style={{ width: 16, height: 16, borderRadius: 999, background: config.countStopped !== false ? '#0a0908' : 'var(--ink-3)' }} />
+            </button>
+          </div>
 
           {/* PR4 — face picker: 5 segmented buttons, one per variant */}
           <div
@@ -655,6 +693,7 @@ export function PomoNode({
               aria-label="Tag this session with a task"
               value={state.activeTaskId ?? ''}
               onChange={(e) => onCommand('pomo.tag', { taskId: e.target.value === '' ? null : e.target.value })}
+              className="pomo-tag-select"
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -709,32 +748,14 @@ export function PomoNode({
             </div>
           ) : (
             <div className="pomo-controls" style={{ display: 'flex', gap: 6 }}>
-              {/* RESET — discard without recording. Mid-session only. */}
-              {isActiveSession && state.status !== 'break' && (
-                <button
-                  type="button"
-                  data-testid="pomo-reset"
-                  onClick={handleReset}
-                  className="pomo-btn ghost"
-                  style={ghostBtnStyle}
-                  title="Reset — discard this session, record nothing"
-                >
-                  RESET
+              {(state.status === 'running' || state.status === 'paused') && (
+                <button type="button" data-testid="pomo-stop" aria-label="Stop" onClick={handleStop} className="pomo-btn ghost" style={iconBtnStyle} title={stopTitle}>
+                  <PomoIcon kind="stop" />
                 </button>
               )}
               {state.status === 'running' && (
-                <>
-                  <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={ghostBtnStyle} title="Take a break — records the work so far, then times your break">
-                    BREAK
-                  </button>
-                  <button type="button" data-testid="pomo-stop" onClick={handleStop} className="pomo-btn ghost" style={ghostBtnStyle} title="Stop — record this session and end">
-                    STOP
-                  </button>
-                </>
-              )}
-              {state.status === 'paused' && (
-                <button type="button" data-testid="pomo-stop" onClick={handleStop} className="pomo-btn ghost" style={ghostBtnStyle} title="Stop — record this session and end">
-                  STOP
+                <button type="button" data-testid="pomo-break" aria-label="Break" onClick={handleBreak} className="pomo-btn ghost" style={iconBtnStyle} title="Break — records the work so far, then times your break">
+                  <PomoIcon kind="break" />
                 </button>
               )}
               <button
@@ -742,10 +763,11 @@ export function PomoNode({
                 data-testid="pomo-primary"
                 onClick={state.status === 'break' ? handleStop : handlePrimary}
                 className="pomo-btn"
-                style={primaryBtnStyle}
+                style={primaryIconBtnStyle}
                 title={primaryTooltip(state.status)}
               >
-                {state.status === 'break' ? 'SKIP BREAK' : buttonLabel}
+                <PomoIcon kind={state.status === 'running' ? 'pause' : state.status === 'break' ? 'skip' : 'play'} />
+                {buttonLabel}
               </button>
             </div>
           )}
@@ -974,3 +996,18 @@ function CycleCounter({
 }
 
 export default PomoNode;
+
+function PomoIcon({ kind }: { kind: 'play' | 'pause' | 'stop' | 'break' | 'skip' }) {
+  const p = { width: 15, height: 15, viewBox: '0 0 16 16', 'aria-hidden': true } as const;
+  switch (kind) {
+    case 'play':  return <svg {...p} fill="currentColor"><path d="M4.5 2.5v11l9-5.5z" /></svg>;
+    case 'pause': return <svg {...p} fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1" /><rect x="9.3" y="2.5" width="3.2" height="11" rx="1" /></svg>;
+    case 'stop':  return <svg {...p} fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="2" /></svg>;
+    case 'skip':  return <svg {...p} fill="currentColor"><path d="M3 2.5v11l7.5-5.5z" /><rect x="11" y="2.5" width="2.4" height="11" rx="0.8" /></svg>;
+    case 'break': return (
+      <svg {...p} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.5 6.5h9v3.5a3.5 3.5 0 0 1-3.5 3.5H6a3.5 3.5 0 0 1-3.5-3.5z" /><path d="M11.5 7.5h1a1.8 1.8 0 0 1 0 3.6h-1.2" /><path d="M5.5 1.5v2.5M8.5 1.5v2.5" />
+      </svg>
+    );
+  }
+}
