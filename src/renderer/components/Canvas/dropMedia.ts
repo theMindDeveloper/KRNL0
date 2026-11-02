@@ -13,6 +13,8 @@ const EXT_KIND: Record<string, Exclude<MediaKind, 'embed' | 'link' | 'file'>> = 
   pdf: 'pdf',
 };
 
+const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml']);
+
 export function fileExt(name: string): string {
   const dot = name.lastIndexOf('.');
   return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
@@ -23,7 +25,9 @@ export function classifyFile(file: { name: string; type: string }): 'image' | Ex
   const ext = fileExt(file.name);
   // Extension first: Windows often reports .mov / .wav with an empty or odd MIME.
   if (EXT_KIND[ext]) return EXT_KIND[ext]!;
-  if (file.type.startsWith('image/') && ext !== 'heic') return 'image';
+  // Only formats the image pipeline stores (dropImage.ts ALLOWED_MIME); a
+  // BMP / TIFF / HEIC still lands, as a file card, instead of vanishing.
+  if (IMAGE_MIME.has(file.type)) return 'image';
   if (file.type === 'application/pdf') return 'pdf';
   if (file.type.startsWith('video/')) return 'video';
   if (file.type.startsWith('audio/')) return 'audio';

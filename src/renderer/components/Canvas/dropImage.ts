@@ -10,7 +10,7 @@
  * No base64 anywhere. Renderer never touches `fs`.
  */
 
-const ALLOWED_MIME = new Set<string>([
+export const ALLOWED_MIME: ReadonlySet<string> = new Set<string>([
   'image/png',
   'image/jpeg',
   'image/webp',
@@ -60,18 +60,23 @@ function measureNatural(file: File): Promise<{ w: number; h: number }> {
   });
 }
 
+/** Why a file can't become an ImageNode, in words for the user; null if it can. */
+export function imageRejectReason(file: { type: string; size: number }): string | null {
+  if (!ALLOWED_MIME.has(file.type)) return 'images must be PNG, JPEG, WebP, GIF or SVG';
+  if (file.size === 0) return 'the file is empty';
+  if (file.size > MAX_BYTES) return 'images must be under 25 MB';
+  return null;
+}
+
 /**
  * Validate, measure, and persist the file. Returns null if validation fails
  * (caller should treat as "skip this file"). Throws only on unexpected IPC
  * failures.
  */
 export async function ingestImageFile(file: File): Promise<IngestedImage | null> {
-  if (!ALLOWED_MIME.has(file.type)) {
-    console.warn('[image] rejected: unsupported mime', file.type);
-    return null;
-  }
-  if (file.size === 0 || file.size > MAX_BYTES) {
-    console.warn('[image] rejected: bad size', file.size);
+  const reason = imageRejectReason(file);
+  if (reason) {
+    console.warn('[image] rejected:', reason, file.type, file.size);
     return null;
   }
 

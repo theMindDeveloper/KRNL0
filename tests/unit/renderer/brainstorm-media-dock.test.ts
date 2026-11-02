@@ -5,6 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { textSetLook } from '../../../src/renderer/components/nodes/TextNode/commands';
 import { classifyFile, classifyUrl } from '../../../src/renderer/components/Canvas/dropMedia';
+import { imageRejectReason } from '../../../src/renderer/components/Canvas/dropImage';
 import { anchorFor } from '../../../src/renderer/components/Dock';
 import { cardPlacement, cardsOfPage, pageOfCard, pageSelector, PAGES } from '../../../src/renderer/components/nodes/AnalyticsNode/guide';
 import { strokesHit, strokePath } from '../../../src/renderer/components/Canvas/DrawLayer';
@@ -40,6 +41,15 @@ describe('drop anything', () => {
     expect(classifyFile({ name: 'take.wav', type: 'audio/x-wav' })).toBe('audio');
     // Anything else becomes a file card.
     expect(classifyFile({ name: 'notes.docx', type: 'application/msword' })).toBe('file');
+    // Image formats the image store can't keep become file cards, not nothing.
+    expect(classifyFile({ name: 'scan.bmp', type: 'image/bmp' })).toBe('file');
+    expect(classifyFile({ name: 'photo.heic', type: 'image/heic' })).toBe('file');
+  });
+  it('explains why an image file is refused', () => {
+    expect(imageRejectReason({ type: 'image/png', size: 10 })).toBeNull();
+    expect(imageRejectReason({ type: 'image/png', size: 0 })).toMatch(/empty/);
+    expect(imageRejectReason({ type: 'image/png', size: 26 * 1024 * 1024 })).toMatch(/25 MB/);
+    expect(imageRejectReason({ type: 'image/tiff', size: 10 })).toMatch(/PNG/);
   });
   it('classifies links: players embed, the rest become link cards', () => {
     expect(classifyUrl('https://www.youtube.com/watch?v=abc')).toEqual({ media: 'embed', url: 'https://www.youtube.com/watch?v=abc' });

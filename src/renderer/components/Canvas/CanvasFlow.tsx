@@ -54,7 +54,7 @@ import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
 import { ContextMenu } from '../ContextMenu';
-import { ingestImageFile, initialDisplaySize } from './dropImage';
+import { ingestImageFile, imageRejectReason, initialDisplaySize } from './dropImage';
 import { classifyFile, classifyUrl } from './dropMedia';
 import { ingestMediaFile } from './ingestMedia';
 import { MEDIA_SIZE, type MediaState } from '../nodes/MediaNode/types';
@@ -831,12 +831,27 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaPos = useRef<{ x: number; y: number } | null>(null);
 
+  // One notice line for files that could not be added (drop, paste, picker).
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fileNotice) return;
+    const t = setTimeout(() => setFileNotice(null), 4500);
+    return () => clearTimeout(t);
+  }, [fileNotice]);
+
   const spawnImageNodeFromFile = useCallback(async (
     file: File,
     pos: { x: number; y: number },
   ) => {
-    const result = await ingestImageFile(file);
-    if (!result) return;
+    const reason = imageRejectReason(file);
+    if (reason) { setFileNotice(`Couldn't add “${file.name}”: ${reason}`); return; }
+    let result: Awaited<ReturnType<typeof ingestImageFile>> = null;
+    try {
+      result = await ingestImageFile(file);
+    } catch (err) {
+      console.warn('[image] could not store', file.name, err);
+    }
+    if (!result) { setFileNotice(`Couldn't add “${file.name}”`); return; }
     const { width, height } = initialDisplaySize(
       result.naturalWidth,
       result.naturalHeight,
@@ -1159,12 +1174,6 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   }, [addNode, ensureVisible]);
 
   // One path for every dropped / pasted / picked file.
-  const [fileNotice, setFileNotice] = useState<string | null>(null);
-  useEffect(() => {
-    if (!fileNotice) return;
-    const t = setTimeout(() => setFileNotice(null), 4500);
-    return () => clearTimeout(t);
-  }, [fileNotice]);
   const spawnFile = useCallback(async (file: File, pos: { x: number; y: number }) => {
     const kind = classifyFile(file);
     if (kind === 'image') { await spawnImageNodeFromFile(file, pos); return; }
