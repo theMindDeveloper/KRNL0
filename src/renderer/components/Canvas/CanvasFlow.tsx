@@ -1083,6 +1083,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // (switch it to plain text from its header); other text → a text note.
   // Lands at the last pointer position over the canvas.
   const lastPointer = useRef<{ x: number; y: number } | null>(null);
+  const rightDown = useRef<{ x: number; y: number } | null>(null);
   const spawnFiles = useCallback(async (files: File[], pos: { x: number; y: number }) => {
     for (const file of files) {
       await spawnFile(file, pos);
@@ -1618,7 +1619,19 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onEdgeContextMenu={handleEdgeContextMenu}
       onPaneClick={() => { closeCtxMenu(); closePaneCtxMenu(); setEdgeCtxMenu(null); }}
       onPaneMouseMove={(e) => { lastPointer.current = { x: e.clientX, y: e.clientY }; }}
-      onPaneContextMenu={handlePaneContextMenu}
+      // Right-click on empty canvas → wheel. Handled here, not via
+      // onPaneContextMenu: with right-drag panning RF only fires that when the
+      // mouse moved 0px, so any jitter swallowed the menu.
+      onPointerDownCapture={(e: React.PointerEvent) => { if (e.button === 2) rightDown.current = { x: e.clientX, y: e.clientY }; }}
+      onContextMenu={(e: React.MouseEvent) => {
+        const t = e.target as HTMLElement;
+        if (!t.closest('.react-flow__pane') || t.closest('.react-flow__node, .react-flow__edge')) return;
+        e.preventDefault();
+        const d = rightDown.current;
+        rightDown.current = null;
+        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) return; // that was a right-drag pan
+        handlePaneContextMenu(e);
+      }}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onMove={onMove}
