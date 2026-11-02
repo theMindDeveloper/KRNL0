@@ -10,6 +10,7 @@ import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
 import { drawList, drawClear, drawDelete } from './commands/draw';
+import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
 import { mediaAdd, mediaList } from './commands/media';
 import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
 import {
@@ -569,6 +570,20 @@ export class SysFacade {
         case 'list':   return drawList(dCtx, command.json);
         case 'clear':  return drawClear(dCtx);
         case 'delete': return drawDelete(dCtx, command.id);
+      }
+    }
+
+    if (command.kind === 'canvas') {
+      const cCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'list':   return canvasList(cCtx, command.json);
+        case 'add':    return canvasAdd(cCtx, command.name);
+        case 'switch': return canvasSwitch(cCtx, command.ref);
+        case 'rename': return canvasRename(cCtx, command.ref, command.name);
+        case 'delete': return canvasDelete(cCtx, command.ref);
       }
     }
 

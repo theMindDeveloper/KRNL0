@@ -93,10 +93,10 @@ describe('F1 — Topbar left content', () => {
     expect(screen.getByTestId('topbar-brand').textContent).toContain('KRNL0');
   });
 
-  it('renders breadcrumb text "∷ ~/krnl0 / boards / deep-work"', () => {
+  it('renders breadcrumb text "∷ ~/krnl0 / canvas /"', () => {
     renderWithWrapper(React.createElement(TopBar));
     expect(screen.getByTestId('topbar-breadcrumb').textContent).toBe(
-      '∷ ~/krnl0 / boards / deep-work'
+      '∷ ~/krnl0 / canvas /'
     );
   });
 

@@ -9,6 +9,7 @@ export interface Node<TState = unknown, TConfig = unknown> {
   config: TConfig;                     // user-editable settings
   isMother: boolean;
   slot?: number;                       // optional ordering slot for mother nodes
+  canvasId?: string;                   // Decision 33 — free nodes only; shared nodes carry none
 }
 
 export interface RenderProps<TState, TConfig> {

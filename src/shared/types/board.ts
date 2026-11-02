@@ -1,5 +1,8 @@
 import type { Node } from './node';
 import type { Edge } from './edge';
+import type { CanvasMeta } from '../canvas';
+
+export type { CanvasMeta };
 
 export interface BoardViewport {
   x: number;
@@ -80,6 +83,8 @@ export interface DrawStroke {
   size: number;    // base width in flow px
   points: Array<[number, number, number]>;
   createdAt: string;
+  // Decision 33 — canvas this stroke belongs to (stamped on load / add).
+  canvasId?: string;
 }
 
 export interface Board {
@@ -94,6 +99,10 @@ export interface Board {
   completions?: CompletionRecord[];
   // Pen tool strokes (canvas annotations). Optional — absent until drawn.
   drawings?: DrawStroke[];
+  // Decision 33 — free-content canvases. Optional so legacy fixtures type-check;
+  // loadBoardFrom always fills them (default canvas 'canvas-main').
+  canvases?: CanvasMeta[];
+  activeCanvasId?: string;
   // ADR 0008 § 2.1 / § 4.1: layout mode, required (migration sets to 'canvas' for legacy)
   layoutMode: LayoutMode;
   // ADR 0008 § 4.1: station geometry; absent until user resizes panels

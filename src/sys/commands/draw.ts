@@ -6,6 +6,7 @@
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { DrawStroke } from '../../shared/types/board';
+import { activeCanvasOf, isStrokeOnCanvas, type CanvasMeta } from '../../shared/canvas';
 
 export interface DrawCtx {
   boardPath: string;
@@ -34,8 +35,12 @@ export function drawList(ctx: DrawCtx, json: boolean): SysResult {
 export function drawClear(ctx: DrawCtx): SysResult {
   const board = load(ctx);
   if (!board) return { ok: false, message: 'No board found' };
-  const n = (board.drawings ?? []).length;
-  save(ctx, { ...board, drawings: [] });
+  // Decision 33 — only the active canvas's strokes.
+  const active = activeCanvasOf(board as { canvases?: CanvasMeta[]; activeCanvasId?: string });
+  const all = board.drawings ?? [];
+  const kept = all.filter((d) => !isStrokeOnCanvas(d, active));
+  const n = all.length - kept.length;
+  save(ctx, { ...board, drawings: kept });
   return { ok: true, message: `cleared ${n} stroke${n === 1 ? '' : 's'}` };
 }
 

@@ -4,6 +4,8 @@
 
 import { copyFileSync, existsSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
+import { normalizeCanvases, DEFAULT_CANVAS_ID, DEFAULT_CANVAS_NAME } from '../../shared/canvas';
+import type { CanvasBoardLike } from '../../shared/canvas';
 
 // ADR 0001 — local helper; mirrors HabitNode/types.ts toYMD but kept here to
 // avoid importing renderer modules from the main process.
@@ -24,6 +26,9 @@ export interface PartialBoard {
   edges: unknown[];
   // ADR 0008 § 4.1 — layout fields (present after migration or on new boards)
   layoutMode?: string;
+  // Decision 33 — free-content canvases
+  canvases?: Array<{ id: string; name: string }>;
+  activeCanvasId?: string;
   layoutGeometry?: {
     station?: {
       rowFraction: number;
@@ -41,6 +46,8 @@ export function seedBoard(): PartialBoard {
     viewport: { x: 0, y: 220, zoom: 1 },
     // ADR 0008 § 5: new boards default to 'station' layout
     layoutMode: 'station',
+    canvases: [{ id: DEFAULT_CANVAS_ID, name: DEFAULT_CANVAS_NAME }],
+    activeCanvasId: DEFAULT_CANVAS_ID,
     nodes: [
       {
         id: 'mother-pomo',
@@ -612,6 +619,19 @@ function migrateStationSlot(board: Record<string, unknown>): Record<string, unkn
   return board;
 }
 
+// Decision 33 — multiple canvases. Legacy boards get the default canvas and
+// every free node / stroke is stamped onto it; nodes created later without a
+// canvasId (sys CLI pushes) land on the active canvas. Shared mother data
+// (tasks, habit lanes) never carries a canvasId. Idempotent.
+export function migrateCanvases(board: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(board['nodes'])) return board;
+  if (!Array.isArray(board['edges'])) board['edges'] = [];
+  const isObj = (x: unknown): boolean => typeof x === 'object' && x !== null;
+  board['nodes'] = (board['nodes'] as unknown[]).filter(isObj);
+  if (Array.isArray(board['drawings'])) board['drawings'] = (board['drawings'] as unknown[]).filter(isObj);
+  return normalizeCanvases(board as unknown as CanvasBoardLike) as unknown as Record<string, unknown>;
+}
+
 function validateBoardInvariants(board: unknown): unknown {
   if (typeof board !== 'object' || board === null) return board;
   const b = board as Record<string, unknown>;
@@ -664,6 +684,10 @@ export function loadBoardFrom(boardPath: string): unknown {
       // validateBoardInvariants runs last to heal any orphaned TodoItems before
       // the board is handed to the renderer.
       return validateBoardInvariants(
+        // Decision 33: canvas stamping runs after every node-level migration
+        // (including the analytics-mother adoption) so only settled free nodes
+        // are stamped.
+        migrateCanvases(
         // #169: completion-ledger backfill runs outermost — it reads settled
         // task node done/completedAt state (after all node migrations) and
         // writes only the top-level `completions` array.
@@ -708,6 +732,7 @@ export function loadBoardFrom(boardPath: string): unknown {
               ),
             ),
           ),
+        ),
         ),
         ),
       );
