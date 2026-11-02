@@ -53,6 +53,10 @@ export function TextNode({
   const [draft, setDraft] = useState(text);
   const [hover, setHover] = useState(false);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
+  // Text at the moment editing began. The 400 ms autosave may already have
+  // written part of the edit, so Escape restores this, not the live text.
+  const originalRef = useRef(text);
+  const cancellingRef = useRef(false);
 
   // Keep draft in sync if the upstream state.text changes while NOT editing.
   useEffect(() => {
@@ -81,17 +85,25 @@ export function TextNode({
 
   const enterEdit = () => {
     if (editing) return;
+    originalRef.current = text;
+    cancellingRef.current = false;
     setDraft(text);
     setEditing(true);
   };
 
   const commit = () => {
+    // The textarea blurs as it unmounts after Escape; that blur must not
+    // re-save the abandoned draft.
+    if (cancellingRef.current) return;
     if (draft !== text) onCommand('text.setText', { text: draft });
     setEditing(false);
   };
 
   const cancel = () => {
-    setDraft(text);
+    cancellingRef.current = true;
+    const original = originalRef.current;
+    if (text !== original) onCommand('text.setText', { text: original });
+    setDraft(original);
     setEditing(false);
   };
 

@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import React from 'react';
 
 import { TextNode } from '../../../src/renderer/components/nodes/TextNode';
@@ -113,6 +113,28 @@ describe('TextNode — F4 escape cancels', () => {
     fireEvent.keyDown(ta, { key: 'Escape' });
     expect(onCommand).not.toHaveBeenCalled();
     expect(screen.getByText('before')).toBeTruthy();
+  });
+
+  it('Escape after the autosave already fired restores the pre-edit text', () => {
+    vi.useFakeTimers();
+    try {
+      const onCommand = vi.fn();
+      const { rerender } = render(
+        <TextNode node={fixture({ text: 'before' })} selected={false} onCommand={onCommand} onSelect={noop} />,
+      );
+      fireEvent.click(screen.getByTestId('text-node-body'));
+      fireEvent.change(screen.getByTestId('text-node-textarea'), { target: { value: 'edited' } });
+      act(() => { vi.advanceTimersByTime(500); });
+      expect(onCommand).toHaveBeenCalledWith('text.setText', { text: 'edited' });
+      // The store applied the autosave.
+      rerender(<TextNode node={fixture({ text: 'edited' })} selected={false} onCommand={onCommand} onSelect={noop} />);
+      onCommand.mockClear();
+      fireEvent.keyDown(screen.getByTestId('text-node-textarea'), { key: 'Escape' });
+      expect(onCommand).toHaveBeenCalledTimes(1);
+      expect(onCommand).toHaveBeenCalledWith('text.setText', { text: 'before' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
