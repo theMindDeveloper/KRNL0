@@ -6,6 +6,8 @@
 
 <br /><br />
 
+<img src="docs/assets/krnl0-logo.png" alt="KRNL0 logo: a dark voxel cube with its centre voxel lit acid green" width="128" />
+
 # KRNL0
 
 #### One canvas. Every productivity app. Single source of truth.

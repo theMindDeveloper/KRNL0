@@ -75,15 +75,17 @@ function renderWithWrapper(element: React.ReactElement) {
 // ── F1 — Topbar left content ──────────────────────────────────────────────────
 
 describe('F1 — Topbar left content', () => {
-  // Wave C (LifeOS UI refresh) — the brand mark is now an SVG with a dashed
-  // halo + rounded mark block + ■ glyph inside (variant switches per theme).
+  // The brand mark is the "Lit Core" app icon: a dark tile holding a 3×3
+  // voxel cube with the centre voxel lit on each of its three faces.
   it('renders the brand-mark as an SVG with multiple shape children', () => {
     renderWithWrapper(React.createElement(TopBar));
     const mark = screen.getByTestId('topbar-brand-mark');
     expect(mark).toBeTruthy();
     expect(mark.tagName.toLowerCase()).toBe('svg');
-    // halo rect + mark rect + glyph text → at least 3 shape children.
+    // defs + tile + tile edge + cube group → at least 3 children.
     expect(mark.children.length).toBeGreaterThanOrEqual(3);
+    // 3 faces × 9 voxels.
+    expect(mark.querySelectorAll('g g rect').length).toBe(27);
   });
 
   it('renders the wordmark "KRNL0"', () => {

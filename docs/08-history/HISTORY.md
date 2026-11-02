@@ -746,6 +746,7 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 
 ---
 
+<<<<<<< HEAD
 ## [2026-11-02] — Analytics window, readable calendar, pomo highlights, no-scroll windows
 
 **Type:** Feature
@@ -758,3 +759,17 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Right-click menus** shared by Calendar and Clock (task arcs, task rows, pomo wedges): Tag → task, Untag, Details…, Delete segment; Start focus, Mark done, Show on canvas, Unschedule. CLI twins plus new `pomo segments` and `pomo delete-segment`.
 - **Analytics overview:** a plain-language summary on top (headline, four figures with change vs the previous period, focus sparkline, sentences). CLI: `analytics summary`.
 - **No scrolling:** a shared `PagedView` splits content into pages of whole items, flipped with the wheel or ‹ ● ›. Used by Analytics (cards, settings, tables), Todo, the Clock task list, the Calendar agenda and the Ambient Radio lists. The Calendar hour grid shows windows of whole hours (wheel, pager, or drag to an edge), and the Clock dial flexes to the free space.
+=======
+## [2026-11-02] — New "Lit Core" logo and app icons
+
+**Type:** Feature (branding)
+**PRs / Commits:** branch `TMD/krnl-logo-design-c607a2`
+**Files changed:** `build/icon.svg` (new master), `build/icon.png`, `build/icon.ico`, `build/icon.icns` (new), `scripts/generate-icons.mjs` (new), `package.json` (`npm run icons`), `electron-builder.json` (`mac.icon`), `src/renderer/components/TopBar/{index,BrandMark}.tsx`, `tests/unit/renderer/AppChrome.scenarios.test.ts`, `README.md`, `docs/assets/krnl0-logo.png`, `docs/assets/krnl0-social-preview.png`
+**Summary:**
+- **New mark:** a dark 3×3 voxel cube on a near-black tile, with the centre voxel lit acid on each face (the kernel at the core). `build/icon.svg` is the single source.
+- **App icons:** `npm run icons` renders the SVG under Electron and writes the macOS `.icns` (Apple 824/1024 grid with shadow), the Windows `.ico` (BMP entries ≤128px, PNG at 256px so Explorer and the taskbar decode every size) and the 1024px PNG used on Linux and as the window icon.
+- **In-app logo:** the top-bar brand mark is now the same cube (`BrandMark`), identical in every theme.
+- **GitHub:** README shows the logo; `docs/assets/krnl0-social-preview.png` (1280×640) is ready to upload as the repo's social preview.
+
+**Tests:** 0 typecheck errors; 125 files / 1495 tests green.
+>>>>>>> 1aba8c8a8afdb4b8e5c5469b7d25b45977b8349b
