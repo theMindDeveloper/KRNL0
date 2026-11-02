@@ -775,3 +775,20 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **GitHub:** README shows the logo; `docs/assets/krnl0-social-preview.png` (1280×640) is ready to upload as the repo's social preview.
 
 **Tests:** 0 typecheck errors; 125 files / 1495 tests green.
+
+---
+
+## [2026-11-02] — Pen tool, year view, big clock, optional task time
+
+**Type:** Feature
+**PRs / Commits:** branch `TMD/hopeful-moore-10c910` (PR #188)
+**Summary:**
+- **Analytics:** one card per page, sized to the whole page (`PagedView fillItems`): a page never shows part of another card.
+- **Clock:** bigger dial, a **Big Clock** dial-only toggle (`clock dial [on|off]`), and wide invisible hit areas so task arcs are easy to right-click.
+- **Pen tool** (dock Pen / `P`): pen, marker, highlighter and stroke eraser, 8 colours and 3 sizes, built on `perfect-freehand`. Right-click opens a radial tool wheel; Esc exits. Strokes live on `board.drawings` (undoable). CLI: `draw list | delete | clear`.
+- **Panel toggles in canvas mode:** a hidden mother disappears and the others slide into its slot. Analytics has no dock button any more (it's a mother).
+- **Optional task time:** Enter skips the duration in the Todo add row. The task is open-ended (`timeOpen`) and fades out on the Calendar and Clock until a time is set.
+- **Calendar year view:** 12 mini-months with focus heat and planned-task dots that always fit; click a day to open it. CLI: `cal view <day|week|month|year>`.
+- **Month view fix:** cells show only whole chips plus "+N"; today is a soft tint with an acid day pill, so text stays readable.
+
+**Tests:** 0 typecheck errors; 132 files green.

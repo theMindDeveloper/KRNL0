@@ -189,8 +189,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const undoneCount = state.items.filter((i) => !i.done).length;
   const hasDone = state.items.some((i) => i.done);
 
-  const submitTask = (name: string, durationMin: number) => {
-    onCommand('todo.add', { text: name, durationMin });
+  const submitTask = (name: string, durationMin: number | null) => {
+    // Time is optional — no duration → an open-ended task.
+    onCommand('todo.add', durationMin === null ? { text: name } : { text: name, durationMin });
     setPendingName('');
     setDurationValue('');
     setDurationInvalid(false);
@@ -218,6 +219,10 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     } else {
       // duration phase
       if (e.key === 'Enter') {
+        if (durationValue.trim() === '') {
+          submitTask(pendingName, null);
+          return;
+        }
         const parsed = parseInt(durationValue, 10);
         if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
           setDurationInvalid(false);
@@ -740,7 +745,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 }
               }}
               autoFocus
-              placeholder={inputPhase === 'name' ? 'task → spawns a node…' : 'how long? (min)'}
+              placeholder={inputPhase === 'name' ? 'task → spawns a node…' : 'how long? (min, optional — Enter to skip)'}
               style={{
                 flex: 1,
                 background: 'transparent',

@@ -2,7 +2,7 @@
 // Reads the cascade schedule SSOT (selectSchedule) and prints a human-readable
 // or JSON list of all scheduled task placements.
 
-import { loadBoardFrom } from '../../main/persistence/board';
+import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { ScheduledTaskPlacement } from '../../renderer/store/scheduleSelector';
@@ -101,4 +101,24 @@ export async function calShow(
     message: lines.join('\n'),
     data: filtered.map((p) => ({ ...p, text: taskMeta.get(p.taskId)?.text ?? '(unknown)' })),
   };
+}
+
+/** `krnl cal view <day|week|month|year> [--date YYYY-MM-DD]` — switch the Calendar view. */
+export function calView(
+  ctx: CalCtx & { onBoardChanged?: () => void },
+  view: string | undefined,
+  date: string | undefined,
+): SysResult {
+  const views = ['day', 'week', 'month', 'year'];
+  if (!view || !views.includes(view)) return { ok: false, message: 'cal view requires <day|week|month|year>' };
+  if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, message: `bad --date "${date}"` };
+  const board = loadBoard(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const cal = board.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return { ok: false, message: 'No calendar on the board' };
+  cal.config = { ...(cal.config as Record<string, unknown>), view };
+  if (date) cal.state = { ...(cal.state as Record<string, unknown>), anchorDate: date };
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  return { ok: true, message: `calendar → ${view}${date ? ` (${date})` : ''}` };
 }

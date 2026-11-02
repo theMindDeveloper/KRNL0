@@ -246,13 +246,14 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           </ToolbarBtn>
         );
       })}
-      <ToolbarBtn
+      {/* The canvas only has a panel to hide in Station mode. */}
+      {board.layoutMode === 'station' && <ToolbarBtn
         active={canvasShown}
         label="Canvas"
         onClick={toggleCanvas}
       >
         <Glyph kind="canvas" active={canvasShown} />
-      </ToolbarBtn>
+      </ToolbarBtn>}
     </div>
   );
 }

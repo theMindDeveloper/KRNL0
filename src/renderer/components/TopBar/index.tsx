@@ -170,8 +170,9 @@ export function TopBar() {
         </span>
       </div>
 
-      {/* Centre: Station panel toggles when the frame style slots them here (ADR 0009 F9). */}
-      {isStationLayout && MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
+      {/* Centre: panel toggles (ADR 0009 F9) — in Station AND Canvas mode; a
+          hidden mother disappears and the rest close the gap. */}
+      {MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
         <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <StationToolbar variant="inline" />
         </div>

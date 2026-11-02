@@ -132,7 +132,7 @@ import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types'
 // ── Clock ─────────────────────────────────────────────────────────────
 import {
   clockLinkTodo,
-  clockSetViewWindow,
+  clockSetViewWindow, clockSetDialOnly,
   clockSetSelectedDate,
   clockAdvanceDay,
   clockGoToday,
@@ -347,6 +347,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: clockLinkTodo(clockState, args as never) };
         case 'clock.setViewWindow':
           return { state: clockSetViewWindow(clockState, args as never) };
+        case 'clock.setDialOnly':
+          return { state: clockSetDialOnly(clockState, args as never) };
         // ADR 0004 §3.2 — day-selector commands.
         case 'clock.setSelectedDate':
           return { state: clockSetSelectedDate(clockState, args as never) };
@@ -1301,6 +1303,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         currentSessionElapsedSec: 0,
         // #180 — Todo creates EVENTS only.
         kind: 'event',
+        // Time is optional: no duration given → open-ended block.
+        ...(typeof argPlanned === 'number' && Number.isFinite(argPlanned) ? {} : { timeOpen: true }),
       };
 
       const taskNodeId = `task-${crypto.randomUUID()}`;

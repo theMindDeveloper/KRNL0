@@ -31,8 +31,13 @@ export type SysCommand =
   | { kind: 'task'; sub: 'unschedule'; id: string | undefined }
   | { kind: 'task'; sub: 'addNext'; sourceRef: string | undefined; text: string | undefined; durationMin: number | undefined }
   | { kind: 'cal'; sub: 'show'; from: string | undefined; to: string | undefined; json: boolean }
+  | { kind: 'cal'; sub: 'view'; view: string | undefined; date: string | undefined }
   | { kind: 'clock'; sub: 'day'; arg: string | undefined }
   | { kind: 'clock'; sub: 'show'; json: boolean }
+  | { kind: 'clock'; sub: 'dial'; arg: string | undefined }
+  | { kind: 'draw'; sub: 'list'; json: boolean }
+  | { kind: 'draw'; sub: 'clear' }
+  | { kind: 'draw'; sub: 'delete'; id: string | undefined }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
   | { kind: 'habit'; sub: 'done' | 'undo'; name: string | undefined; date: string | undefined }
   | { kind: 'habit'; sub: 'color'; name: string | undefined; color: string | undefined }
@@ -394,6 +399,7 @@ export class SysParser {
     }
 
     if (cmd === 'cal') {
+      if (sub === 'view') return { kind: 'cal', sub: 'view', view: rest[0], date: flag(rest, 'date') };
       if (sub === 'show' || sub === undefined) {
         return {
           kind: 'cal',
@@ -409,6 +415,7 @@ export class SysParser {
       if (sub === 'day') {
         return { kind: 'clock', sub: 'day', arg: rest[0] };
       }
+      if (sub === 'dial') return { kind: 'clock', sub: 'dial', arg: rest[0] };
       if (sub === 'show' || sub === undefined) {
         return { kind: 'clock', sub: 'show', json: hasFlag(rest, 'json') };
       }
@@ -502,6 +509,13 @@ export class SysParser {
           to: flag(rest, 'to'),
         };
       }
+    }
+
+    // Pen tool drawings
+    if (cmd === 'draw') {
+      if (sub === 'list' || sub === undefined) return { kind: 'draw', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'clear') return { kind: 'draw', sub: 'clear' };
+      if (sub === 'delete') return { kind: 'draw', sub: 'delete', id: rest[0] };
     }
 
     if (cmd === 'text') {

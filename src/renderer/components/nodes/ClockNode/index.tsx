@@ -153,6 +153,8 @@ interface TaskEntry {
   parallelBranchIndex: number | null;
   /** 'task' or 'habit' — for future styling differentiation. */
   source: 'task' | 'habit';
+  /** No duration set — the arc fades out toward its end. */
+  timeOpen?: boolean;
 }
 
 /** Check if a habit schedule fires on a given ISO day-of-week. */
@@ -201,6 +203,7 @@ export function ClockNode({
   // filtering. Defaults to today; the day-selector UI below lets the user
   // page through other days without touching the wall-clock hands.
   const { viewWindow, selectedDate } = node.state;
+  const dialOnly = node.state.dialOnly === true;
   // ADR 0009 F6 — the frame style only restyles the dial; every feature stays.
   const clockSkin = useFrameTheme().manifest.components.clock;
 
@@ -322,7 +325,7 @@ export function ClockNode({
 
   // Task info — includes text now.
   const taskInfo = useMemo(() => {
-    const m = new Map<string, { done: boolean; plannedMin: number; parentTodoId: string; text: string; kind: TaskKind }>();
+    const m = new Map<string, { done: boolean; plannedMin: number; parentTodoId: string; text: string; kind: TaskKind; timeOpen: boolean }>();
     if (!board) return m;
     for (const n of board.nodes) {
       if (n.kind !== 'todo.task') continue;
@@ -333,6 +336,7 @@ export function ClockNode({
         parentTodoId: ts.parentTodoId,
         text: ts.text,
         kind: ts.kind ?? 'focus',
+        timeOpen: ts.timeOpen === true,
       });
     }
     return m;
@@ -416,6 +420,7 @@ export function ClockNode({
         parallelGroupId: p.parallelGroupId,
         parallelBranchIndex: p.parallelBranchIndex,
         source: 'task',
+        timeOpen: info.timeOpen,
       });
     }
 
@@ -550,7 +555,22 @@ export function ClockNode({
             <span style={{ color: isToday ? 'var(--cyan)' : 'var(--ink-4)', fontSize: 9 }}>◉</span>
             {isToday ? 'Today · Schedule' : 'Day · Schedule'}
           </span>
-          <span style={{ color: 'var(--ink-4)' }}>CLK.12H</span>
+          <button
+            type="button"
+            data-testid="clock-dial-only"
+            aria-pressed={dialOnly}
+            title={dialOnly ? 'Show schedule' : 'Big clock — dial only'}
+            onClick={(e) => { e.stopPropagation(); onCommand('clock.setDialOnly', {}); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: dialOnly ? 'var(--acid)' : 'transparent',
+              color: dialOnly ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
+              border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
+              fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
+            }}
+          >
+            {dialOnly ? '☰ SCHEDULE' : '⤢ BIG CLOCK'}
+          </button>
         </div>
 
         {/* Day selector — ADR 0004 §3.3. Lets the user page through days
@@ -561,7 +581,7 @@ export function ClockNode({
         <div
           data-testid="clock-day-bar"
           style={{
-            display: 'flex',
+            display: dialOnly ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 4,
@@ -638,7 +658,7 @@ export function ClockNode({
         <div
           data-testid="clock-window-bar"
           style={{
-            display: 'flex',
+            display: dialOnly ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 6,
@@ -721,9 +741,9 @@ export function ClockNode({
             position: 'relative',
             // Flexes with the window so the whole clock always fits: the
             // dial's height comes from the free space, its width follows.
-            flex: '1 1 0',
-            minHeight: 120,
-            maxHeight: inStation ? 414 : 230,
+            flex: dialOnly ? '1 1 auto' : '3 1 0',
+            minHeight: 140,
+            maxHeight: dialOnly ? '100%' : inStation ? 620 : 300,
             aspectRatio: '1 / 1',
             maxWidth: '100%',
             margin: '0 auto',
@@ -810,6 +830,21 @@ export function ClockNode({
                   cap: 'round' | 'butt',
                 ): React.ReactElement => (
                   <g key={`${key}-base`}>
+                    {/* Wide invisible hit area: the drawn arc is thin, this
+                        makes it easy to hover, click and right-click. */}
+                    <path
+                      data-testid="clock-plan-arc-hit"
+                      d={arcPath(s, e, r)}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth={Math.max(12, sw + 8)}
+                      strokeLinecap={cap}
+                      pointerEvents="stroke"
+                      style={{ cursor: 'context-menu' }}
+                      onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                    >
+                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)} · right-click for actions`}</title>
+                    </path>
                     <path
                       data-testid="clock-plan-arc"
                       data-task-id={t.id}
@@ -827,6 +862,27 @@ export function ClockNode({
                   </g>
                 );
 
+                // No set time: draw the arc in fading steps (open-ended).
+                if (t.timeOpen) {
+                  const STEPS = 6;
+                  const span = t.end - t.start;
+                  const hit = baseArc(t.id, t.start, t.end, 'round');
+                  return [
+                    <g key={`${t.id}-open`} data-time-open="true" opacity={0}>{hit}</g>,
+                    ...Array.from({ length: STEPS }, (_, k) => (
+                      <path
+                        key={`${t.id}-open-${k}`}
+                        d={arcPath(t.start + (span * k) / STEPS, t.start + (span * (k + 1)) / STEPS, r)}
+                        fill="none"
+                        stroke={t.colorVar}
+                        strokeWidth={sw}
+                        strokeLinecap={k === 0 ? 'round' : 'butt'}
+                        opacity={opacity * (active ? 0.95 : 0.75) * (1 - k / STEPS)}
+                        pointerEvents="none"
+                      />
+                    )),
+                  ];
+                }
                 if (breakdown === null || breakdown.segments.length <= 1) {
                   return [baseArc(t.id, t.start, t.end, 'round')];
                 }
@@ -1076,7 +1132,7 @@ export function ClockNode({
         {/* Now-playing strip */}
         <div
           style={{
-            display: 'flex',
+            display: dialOnly ? 'none' : 'flex',
             alignItems: 'center',
             gap: 8,
             width: '100%',
@@ -1180,7 +1236,7 @@ export function ClockNode({
         <PagedView
           testId="clock-task-pages"
           resetKey={selectedDate}
-          style={{ width: '100%', flex: tasks.length > 0 ? '1 1 0' : '0 0 auto', minHeight: tasks.length > 0 ? 64 : 0 }}
+          style={{ width: '100%', flex: tasks.length > 0 ? '1 1 0' : '0 0 auto', minHeight: tasks.length > 0 ? 64 : 0, display: dialOnly ? 'none' : undefined }}
           contentStyle={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)' }}
           revealIndex={activeIdx}
         >

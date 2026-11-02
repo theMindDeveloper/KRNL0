@@ -40,6 +40,7 @@ import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapters';
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
+import { DrawLayer } from './DrawLayer';
 import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
@@ -59,6 +60,12 @@ import { todoAdd, todoLinkTask } from '../nodes/TodoNode/commands';
 import type { FrameState } from '../nodes/FrameNode/types';
 import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
+import { isStationHidden } from '../Station/stationVisibility';
+
+// Canvas-mode mother row: first slot x and the step between slots (540 wide +
+// 20 gap) — matches the seeded positions in main/persistence/board.ts.
+const MOTHER_ROW_START_X = -1400;
+const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
 import { FOCUS_NODE_EVENT } from '../../store/scheduleActions';
 
@@ -1084,11 +1091,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const derivedNodes = useMemo((): KrnlRFNode[] => {
     if (!board) return [];
 
-    // Compute slot ordering for mother nodes (sorted by position.x)
+    // Compute slot ordering for mother nodes (sorted by position.x). Mothers
+    // hidden from the top-bar panel toggles disappear in canvas mode too, and
+    // the visible ones close the gap: each is drawn at the next slot of the
+    // mother row (render-only — persisted positions keep the order).
     const motherNodes = board.nodes
-      .filter((n: KrnlNode) => n.isMother)
+      .filter((n: KrnlNode) => n.isMother && !isStationHidden(n))
       .slice()
       .sort((a: KrnlNode, b: KrnlNode) => a.position.x - b.position.x);
+    const rowStartX = Math.min(...motherNodes.map((n) => n.position.x), MOTHER_ROW_START_X);
+    const displayX = new Map<string, number>(
+      motherNodes.map((n, i) => [n.id, rowStartX + i * MOTHER_ROW_STEP]),
+    );
     const slotTotal = motherNodes.length;
     const slotIndexMap = new Map<string, number>(
       motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
@@ -1097,7 +1111,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // Source nodes for RF derivation — drop mothers entirely in station mode.
     const sourceNodes = isStation
       ? board.nodes.filter((n) => !n.isMother)
-      : board.nodes;
+      : board.nodes.filter((n) => !n.isMother || displayX.has(n.id));
 
     const baseNodes: KrnlRFNode[] = sourceNodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
@@ -1109,17 +1123,20 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
       // Mother node: cache by (node ref, slotIndex, slotTotal).
       const slotIndex = slotIndexMap.get(node.id) ?? 1;
+      const x = displayX.get(node.id) ?? node.position.x;
       const cached = rfMotherCache.get(node.id);
       if (
         cached &&
         cached.src === node &&
         cached.slotIndex === slotIndex &&
-        cached.slotTotal === slotTotal
+        cached.slotTotal === slotTotal &&
+        cached.rf.position.x === x
       ) {
         return cached.rf;
       }
 
-      const rf = toRfNode(node, {
+      const shown = x === node.position.x ? node : { ...node, position: { ...node.position, x } };
+      const rf = toRfNode(shown, {
         onCommand,
         onSelect,
         slotIndex,
@@ -1585,6 +1602,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
           Renders in flow coordinates behind the 6 fixed mother nodes via
           ViewportPortal so it pans/zooms with the canvas. */}
       <ChassisLayer dockStyle={dockStyle} />
+
+      {/* Pen tool — strokes + capture layer while drawing */}
+      <DrawLayer />
 
       {/* Left dock */}
       <Panel position="top-left" style={{ margin: 0, padding: 0 }}>

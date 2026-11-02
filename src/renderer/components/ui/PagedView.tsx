@@ -35,6 +35,13 @@ export interface PagedViewProps {
   resetKey?: unknown;
   /** Index of an item that must be visible (its page is shown when it changes). */
   revealIndex?: number;
+  /**
+   * One item per page, sized to the whole page: the content box gets
+   * `--page-h` (the page height) and items should use `height: var(--page-h)`.
+   * A page then always shows exactly one complete item — never a sliver of
+   * the previous or next one.
+   */
+  fillItems?: boolean;
 }
 
 /**
@@ -62,6 +69,7 @@ export function PagedView({
   testId,
   resetKey,
   revealIndex,
+  fillItems = false,
 }: PagedViewProps) {
   const outerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -69,6 +77,7 @@ export function PagedView({
   const [contentH, setContentH] = useState(0);
   const [boxH, setBoxH] = useState(0);
   const [page, setPage] = useState(0);
+  const [itemCount, setItemCount] = useState(0);
   const lastWheel = useRef(0);
   const itemTops = useRef<number[]>([]);
 
@@ -85,6 +94,7 @@ export function PagedView({
       return { top: r.top - base, bottom: r.bottom - base };
     });
     itemTops.current = items.map((i) => i.top);
+    setItemCount((c) => (c === items.length ? c : items.length));
     let next = computePageStarts(items, full);
     if (next.length > 1) next = computePageStarts(items, full - PAGER_H);
     setBoxH((h) => (h === full ? h : full));
@@ -147,7 +157,12 @@ export function PagedView({
       <div style={{ height: pages > 1 ? Math.max(0, visibleH) : '100%', overflow: 'hidden', flexShrink: 0 }}>
         <div
           ref={contentRef}
-          style={{ transform: `translateY(${-start}px)`, transition: 'transform 180ms ease', ...contentStyle }}
+          style={{
+            transform: `translateY(${-start}px)`,
+            transition: 'transform 180ms ease',
+            ...(fillItems ? { ['--page-h' as string]: `${Math.max(0, boxH - (itemCount > 1 ? PAGER_H : 0))}px` } : {}),
+            ...contentStyle,
+          }}
         >
           {children}
         </div>

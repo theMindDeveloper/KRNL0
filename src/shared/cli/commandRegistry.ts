@@ -175,9 +175,19 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'draw',
+    summary: 'Pen tool drawings on the canvas (dock Pen / P to draw; right-click for the tool wheel)',
+    subcommands: [
+      { name: 'list', usage: 'draw list [--json]', summary: 'List strokes (id, tool, colour, points)' },
+      { name: 'delete', usage: 'draw delete <strokeId>', summary: 'Delete one stroke' },
+      { name: 'clear', usage: 'draw clear', summary: 'Delete every stroke' },
+    ],
+  },
+  {
     group: 'cal',
     summary: 'Calendar view of cascade-scheduled tasks (ADR 0003/0005)',
     subcommands: [
+      { name: 'view', usage: 'cal view <day|week|month|year> [--date YYYY-MM-DD]', summary: 'Switch the Calendar view (year = 12 mini-months with focus heat)' },
       { name: 'show', usage: 'cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]', summary: 'List all scheduled task placements, sorted by time' },
     ],
   },
@@ -186,6 +196,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Clock day-selector and wall-clock task view (ADR 0004)',
     subcommands: [
       { name: 'day', usage: 'clock day <YYYY-MM-DD|today|+1|-1>', summary: 'Set the clock selected date (absolute, today, or ±1 day)' },
+      { name: 'dial', usage: 'clock dial [on|off]', summary: 'Dial-only view: the clock face as big as the window allows (toggles without an argument)' },
       { name: 'show', usage: 'clock show [--json]', summary: 'Show scheduled tasks for the clock\'s selected date and view window' },
     ],
   },

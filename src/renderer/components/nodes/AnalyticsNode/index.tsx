@@ -297,6 +297,10 @@ function ChartCard({
     gap: 10,
     transition: 'border-color 140ms, box-shadow 140ms',
     gridColumn: span ? `span ${span}` : undefined,
+    // One card per page, filling it (PagedView fillItems sets --page-h).
+    height: 'var(--page-h, auto)',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
     minHeight: 0,
     minWidth: 0,
   };
@@ -352,9 +356,9 @@ function ChartCard({
         ref={hostRef}
         style={{
           width: '100%',
-          ...(contentHeight === 'auto'
-            ? { minHeight: 0 }
-            : { height: contentHeight, minHeight: 0 }),
+          // The chart takes all the room the page leaves under the title.
+          flex: '1 1 0',
+          minHeight: contentHeight === 'auto' ? 0 : Math.min(120, contentHeight),
           display: 'flex',
           alignItems: 'stretch',
           justifyContent: 'center',
@@ -451,8 +455,10 @@ export function AnalyticsNode({
   // 2026-05-18 (rev 3): node is fixed-size now — no resize handler.
 
   // Container size — drives the grid column count.
-  const [bodyRef, bodySize] = useElementSize<HTMLDivElement>();
-  const colCount = colCountFor(bodySize.width || (state.width ?? 720));
+  const [bodyRef] = useElementSize<HTMLDivElement>();
+  // One card per page (PagedView fillItems) — a single column.
+  void colCountFor;
+  const colCount = 1;
 
   // Clamp span helper — never let a card request more columns than exist.
   const clamp = useCallback(
@@ -615,6 +621,7 @@ export function AnalyticsNode({
           testId="analytics-pages"
           itemSelector="[data-page-item], [data-card-id]"
           resetKey={view}
+          fillItems
           style={{ flex: 1, minWidth: 0 }}
           contentStyle={{ display: 'flex', flexDirection: 'column', gap: 12 }}
         >

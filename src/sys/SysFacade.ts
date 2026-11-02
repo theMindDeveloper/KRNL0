@@ -9,6 +9,7 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
+import { drawList, drawClear, drawDelete } from './commands/draw';
 import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
 import {
   imageAdd,
@@ -528,6 +529,25 @@ export class SysFacade {
       if (command.sub === 'show') {
         return calCmd.calShow(ctx, command.from, command.to, command.json);
       }
+      if (command.sub === 'view') {
+        return calCmd.calView(
+          { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+          command.view,
+          command.date,
+        );
+      }
+    }
+
+    if (command.kind === 'draw') {
+      const dCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'list':   return drawList(dCtx, command.json);
+        case 'clear':  return drawClear(dCtx);
+        case 'delete': return drawDelete(dCtx, command.id);
+      }
     }
 
     if (command.kind === 'clock') {
@@ -538,6 +558,7 @@ export class SysFacade {
       switch (command.sub) {
         case 'day':  return clockCmd.clockDay(ctx, command.arg);
         case 'show': return clockCmd.clockShow(ctx, command.json);
+        case 'dial': return clockCmd.clockDial(ctx, command.arg);
       }
     }
 

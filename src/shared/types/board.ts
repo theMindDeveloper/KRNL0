@@ -67,6 +67,18 @@ export interface CompletionRecord {
   completedAt: string;  // ISO 8601
 }
 
+// Pen tool — one freehand stroke drawn on the canvas, in flow coordinates.
+// Points are [x, y, pressure]; the outline is rebuilt with perfect-freehand.
+export type DrawTool = 'pen' | 'marker' | 'highlighter';
+export interface DrawStroke {
+  id: string;
+  tool: DrawTool;
+  color: string;   // CSS colour
+  size: number;    // base width in flow px
+  points: Array<[number, number, number]>;
+  createdAt: string;
+}
+
 export interface Board {
   version: 1;
   schemaVersion: 2;            // bumped from 1 (ADR 0008 § 4.1)
@@ -77,6 +89,8 @@ export interface Board {
   // #169 — durable completion ledger (see CompletionRecord). Optional so legacy
   // boards load unchanged; migration backfills from existing done tasks.
   completions?: CompletionRecord[];
+  // Pen tool strokes (canvas annotations). Optional — absent until drawn.
+  drawings?: DrawStroke[];
   // ADR 0008 § 2.1 / § 4.1: layout mode, required (migration sets to 'canvas' for legacy)
   layoutMode: LayoutMode;
   // ADR 0008 § 4.1: station geometry; absent until user resizes panels

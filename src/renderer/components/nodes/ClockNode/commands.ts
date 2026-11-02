@@ -50,6 +50,12 @@ export const clockAdvanceDay = (
   return { ...s, selectedDate: `${yy}-${mm}-${dd}` };
 };
 
+/** Dial-only view: the dial alone, as big as the window allows. */
+export const clockSetDialOnly = (s: ClockState, args: { on?: boolean }): ClockState => ({
+  ...s,
+  dialOnly: args?.on === undefined ? !s.dialOnly : !!args.on,
+});
+
 /** Reset the clock's selected day to today (local). */
 export const clockGoToday = (s: ClockState): ClockState => ({
   ...s,

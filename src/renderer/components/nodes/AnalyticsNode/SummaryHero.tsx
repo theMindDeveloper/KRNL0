@@ -28,6 +28,9 @@ export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byD
         flexDirection: 'column',
         gap: 10,
         minWidth: 0,
+        height: 'var(--page-h, auto)',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
       }}
     >
       <div

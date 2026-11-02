@@ -108,6 +108,7 @@ interface ScheduledTask {
   isAnchor: boolean;            // ADR 0003: true iff the user explicitly anchored this task
   kind: TaskKind;               // Decision 28: 'focus' | 'event'
   breakdown: PomoBreakdown | null; // Decision 28: null iff kind === 'event'
+  timeOpen: boolean;            // no duration set — drawn open-ended (fades out)
 }
 
 // One day's slice of a (potentially multi-day) task. `sliceStartMin` and
@@ -574,6 +575,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           isAnchor: p.isAnchor,
           kind: p.kind,
           breakdown: p.breakdown,
+          timeOpen: st.timeOpen === true,
         });
       }
       return out;
@@ -1099,6 +1101,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           onDragOver={handleBlockDragOver}
           onDrop={handleDropOnBlock}
           onClick={handleBlockClick}
+          data-time-open={task.timeOpen ? 'true' : undefined}
           data-plan-state={isDone ? 'done' : isMissed ? 'missed' : 'planned'}
           title={
             `${task.text} · ${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)} · plan ${fmtDur(task.plannedMin)}` +
@@ -1115,7 +1118,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             // Calm by default: a tinted card with a solid colour edge. Done
             // fades; missed is a lighter tint; overrun is a rust strip on the
             // right edge (drawn below) — states that survive any block size.
-            background: `color-mix(in srgb, ${taskTone} ${isMissed ? 12 : 24}%, var(--paper))`,
+            // No set time: the block fades out at the bottom (open-ended).
+            background: task.timeOpen
+              ? `linear-gradient(to bottom, color-mix(in srgb, ${taskTone} 28%, var(--paper)) 0%, color-mix(in srgb, ${taskTone} 14%, transparent) 55%, transparent 100%)`
+              : `color-mix(in srgb, ${taskTone} ${isMissed ? 12 : 24}%, var(--paper))`,
             borderLeft: `3px solid ${taskTone}`,
             borderTopLeftRadius,
             borderTopRightRadius,
@@ -1126,7 +1132,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             zIndex: 2,
             padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : 0,
             opacity: isGrayed ? 0.45 : 1,
-            boxShadow: '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
+            boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
+            ...(task.timeOpen ? { borderImage: `linear-gradient(to bottom, ${taskTone}, transparent) 1` } : {}),
             display: 'flex',
             flexDirection: 'column',
             // A one-line title sits centred in short blocks instead of being
@@ -1266,7 +1273,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           )}
           {detail === 'full' && (
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
-              {fmtMinOfDay(blockStartMin)}–{fmtMinOfDay(blockEndMin)}
+              {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : `${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)}`}
               {overrunMin > 0
                 ? <span data-testid={`task-overrun-${task.id}`} style={{ color: 'var(--rust)', fontWeight: 700 }}> · +{fmtDur(overrunMin)} over</span>
                 : trackedMin > 0 ? ` · ${fmtDur(trackedMin)} tracked` : ''}

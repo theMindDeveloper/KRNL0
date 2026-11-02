@@ -251,13 +251,18 @@
    green fill on today's cell so it reads at a glance. Acid (#c9f158) is
    theme-invariant; the text colour is hard-coded to #1a1814 (cyber light
    --ink) so it stays readable on acid in both themes. */
+/* Today: a soft acid tint + acid edge, so task chips stay readable; the day
+   number gets the solid acid pill. */
 .krnl-month-cell--today {
-  background: var(--acid) !important;
-  color: #1a1814 !important;
-  font-weight: 600;
+  background: color-mix(in srgb, var(--acid) 14%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 70%, transparent);
 }
 .krnl-month-cell--today .krnl-month-cell__day {
   color: #1a1814 !important;
+  background: var(--acid);
+  border-radius: 3px;
+  padding: 1px 3px;
+  align-self: flex-end;
 }
 
 /* ── Calendar WeekView drop-target highlight ─────────────────────────────── */

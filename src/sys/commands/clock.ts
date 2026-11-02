@@ -6,7 +6,7 @@ import type { SysResult } from '../SysFacade';
 import {
   clockSetSelectedDate,
   clockAdvanceDay,
-  clockGoToday,
+  clockGoToday, clockSetDialOnly,
 } from '../../renderer/components/nodes/ClockNode/commands';
 import type { ClockState } from '../../renderer/components/nodes/ClockNode/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
@@ -107,6 +107,18 @@ export async function clockDay(
     message: `Clock day set to ${nextState.selectedDate}.`,
     data: { selectedDate: nextState.selectedDate },
   };
+}
+
+/** `krnl clock dial [on|off]` — dial-only view (toggles without an argument). */
+export async function clockDial(ctx: ClockCtx, arg: string | undefined): Promise<SysResult> {
+  if (arg !== undefined && arg !== 'on' && arg !== 'off') return { ok: false, message: 'clock dial takes on|off (or nothing to toggle)' };
+  const board = loadBoard(ctx);
+  const clockNode = findClockMother(board);
+  if (!clockNode) return { ok: false, message: 'No clock mother node found in board.' };
+  const nextState = clockSetDialOnly(clockNode.state as ClockState, arg === undefined ? {} : { on: arg === 'on' });
+  updateNode(board, clockNode.id, { ...clockNode, state: nextState });
+  saveBoard(ctx, board);
+  return { ok: true, message: `Clock dial-only ${nextState.dialOnly ? 'on' : 'off'}.`, data: { dialOnly: !!nextState.dialOnly } };
 }
 
 /**

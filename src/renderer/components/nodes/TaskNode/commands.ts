@@ -71,10 +71,13 @@ export const taskSetPlannedMin = (
   // event tasks scheduledDurationMin IS the total duration, re-sync it.
   // durationMin/eta mirror the estimate so every view shows the same number.
   const mirrors = { plannedMin, durationMin: plannedMin, eta: `~${plannedMin} min` };
+  // A real duration closes an open-ended (no-time) task.
+  const { timeOpen: _open, ...rest } = state;
+  void _open;
   if (typeof state.scheduledDurationMin === 'number') {
-    return { ...state, ...mirrors, scheduledDurationMin: plannedMin };
+    return { ...rest, ...mirrors, scheduledDurationMin: plannedMin };
   }
-  return { ...state, ...mirrors };
+  return { ...rest, ...mirrors };
 };
 
 // task.setCurrentSessionElapsedSec — Decision 22.1: write the in-flight session

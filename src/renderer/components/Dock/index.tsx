@@ -17,7 +17,7 @@ import type { NodeKind } from '../../../shared/types/node';
 import { DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { useBoardStore } from '../../store/boardStore';
-import { isAnalyticsShown } from '../../store/analyticsMother';
+import { useDrawStore } from '../../store/drawStore';
 
 type ToolMode = 'select' | 'connect';
 
@@ -34,6 +34,8 @@ export interface DockProps {
 
 export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: DockProps) {
   const [activeTool, setActiveTool] = useState<ToolMode>('select');
+  const penActive = useDrawStore((s) => s.active);
+  const togglePen = useDrawStore((s) => s.toggle);
   const [pressed, setPressedKind] = useState<NodeKind | null>(null);
   const [dockMenuOpen, setDockMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
@@ -68,12 +70,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
     };
   }, [dockMenuOpen]);
 
-  // Decision 32 — Analytics is a fixed mother. In Station mode the button
-  // toggles its panel (beside the terminal); in Canvas mode it brings
-  // the mother into view, so it has no on/off state there.
-  const analyticsOpen = useBoardStore((s) =>
-    s.board?.layoutMode === 'station' && isAnalyticsShown(s.board),
-  );
+
 
   // Close picker on outside click.
   useEffect(() => {
@@ -126,12 +123,12 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         fireNode('image');
         return;
       }
-      if (e.key === 'f' || e.key === 'F') {
-        fireNode('frame');
+      if (e.key === 'p' || e.key === 'P') {
+        useDrawStore.getState().toggle();
         return;
       }
-      if (e.key === 'a' || e.key === 'A') {
-        fireNode('analytics');
+      if (e.key === 'f' || e.key === 'F') {
+        fireNode('frame');
         return;
       }
     };
@@ -237,23 +234,20 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         </svg>
       </button>
 
-      {/* Analytics — A. Fixed mother: toggles its window in Station mode, brings it into view in Canvas mode. */}
+      {/* Pen — P. Draw and erase on the canvas; right-click while drawing
+          opens the tool wheel (tools, colours, sizes). */}
       <button
         type="button"
-        data-testid="dock-btn-analytics"
-        title={analyticsOpen ? 'Hide analytics [A]' : 'Show analytics [A]'}
-        aria-label={analyticsOpen ? 'Hide analytics dashboard (A)' : 'Show analytics dashboard (A)'}
-        aria-pressed={analyticsOpen}
-        onClick={() => fireNode('analytics')}
-        style={analyticsOpen ? activeToolBtn : (pressed === 'analytics' ? { ...btnBase, background: 'var(--paper-2)', color: 'var(--ink)' } : btnBase)}
+        data-testid="dock-btn-pen"
+        title={penActive ? 'Pen on — right-click for tools, Esc to stop [P]' : 'Pen [P]'}
+        aria-label="Pen tool (P)"
+        aria-pressed={penActive}
+        onClick={() => togglePen()}
+        style={penActive ? activeToolBtn : btnBase}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 3v18h18" />
-          <path d="M7 15l4-4 3 3 5-6" />
-          <circle cx="7" cy="15" r="1" fill="currentColor" stroke="none" />
-          <circle cx="11" cy="11" r="1" fill="currentColor" stroke="none" />
-          <circle cx="14" cy="14" r="1" fill="currentColor" stroke="none" />
-          <circle cx="19" cy="8" r="1" fill="currentColor" stroke="none" />
+          <path d="M4 20l4-1 11-11-3-3L5 16l-1 4z" />
+          <path d="M14 6l3 3" />
         </svg>
       </button>
 
