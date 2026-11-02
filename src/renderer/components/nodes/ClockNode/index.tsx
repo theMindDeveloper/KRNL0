@@ -1435,7 +1435,7 @@ export function ClockNode({
                 type="button"
                 data-testid="clock-reality-delete"
                 onClick={() => { deleteClockSegment(realityPopup.seg.id); setRealityPopup(null); }}
-                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: '#ff8e64', background: 'transparent', border: '1px solid #ff8e64', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: 'var(--rust)', background: 'transparent', border: '1px solid var(--rust)', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
               >
                 Delete segment
               </button>

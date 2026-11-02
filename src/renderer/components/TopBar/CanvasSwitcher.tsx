@@ -95,7 +95,7 @@ export function CanvasSwitcher() {
                   <span style={{ flex: 1, color: 'var(--ink-3)', fontSize: 10.5 }}>Delete “{c.name}” and its content?</span>
                   <button
                     type="button" data-testid={`canvas-delete-confirm-${c.id}`}
-                    style={{ ...rowBtn, color: '#ff8e64', fontWeight: 700 }}
+                    style={{ ...rowBtn, color: 'var(--rust)', fontWeight: 700 }}
                     onClick={() => { store().deleteCanvas(c.id); setConfirmDel(null); }}
                   >Delete</button>
                   <button type="button" style={rowBtn} onClick={() => setConfirmDel(null)}>Cancel</button>

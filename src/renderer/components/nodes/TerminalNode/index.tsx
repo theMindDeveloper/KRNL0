@@ -265,8 +265,10 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
               gap: 4,
               fontFamily: 'var(--font-mono)',
               fontSize: 9,
+              // The terminal is dark in every theme: use the accent that stays
+              // light on dark (Macintosh light's --acid is near-black).
               color: 'var(--term-bg)',
-              background: 'var(--acid)',
+              background: 'var(--accent-on-dark)',
               padding: '2px 6px',
               borderRadius: 3,
               fontWeight: 600,

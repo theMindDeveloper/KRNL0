@@ -463,7 +463,7 @@ export function PomoNode({
           title={logOpen ? 'Back to the timer' : 'Recorded spans — see and delete them'}
           onClick={(e) => { e.stopPropagation(); setGearOpen(false); setLogOpen((o) => !o); }}
           onMouseDown={(e) => e.stopPropagation()}
-          style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid)', borderColor: 'var(--acid)' } : {}) }}
+          style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid-ink, var(--acid))', borderColor: 'var(--acid-ink, var(--acid))' } : {}) }}
         >
           {logOpen ? '✕' : '☰'}
         </button>

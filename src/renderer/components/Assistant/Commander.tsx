@@ -89,7 +89,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
         <div
           style={{
             height: 3,
-            background: 'linear-gradient(90deg, transparent 0%, var(--acid) 30%, var(--acid-glow) 50%, var(--acid) 70%, transparent 100%)',
+            background: 'linear-gradient(90deg, transparent 0%, var(--accent-on-dark) 30%, var(--accent-on-dark) 50%, var(--accent-on-dark) 70%, transparent 100%)',
             opacity: 0.7,
           }}
         />
@@ -105,11 +105,11 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             fontSize: 10.5,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: 'var(--ink-3)',
+            color: '#8a8270',
           }}
         >
           <span>
-            <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
+            <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--accent-on-dark)' }}>
               ▸
             </span>
             commander · new session
@@ -119,7 +119,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             onClick={onClose}
             style={{
               background: 'transparent', border: 0,
-              color: 'var(--ink-3)', cursor: 'pointer',
+              color: '#8a8270', cursor: 'pointer',
               fontSize: 18, lineHeight: 1, padding: 0,
               width: 22, height: 22,
             }}
@@ -178,7 +178,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             <button
               type="button"
               onClick={onClose}
-              style={{ ...btnStyle, color: 'var(--ink-3)', borderColor: 'rgba(201,241,88,0.15)' }}
+              style={{ ...btnStyle, color: '#8a8270', borderColor: 'rgba(201,241,88,0.15)' }}
             >
               cancel
             </button>
@@ -188,7 +188,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
               style={{
                 ...btnStyle,
                 flex: 1,
-                color: valid ? 'var(--accent-on-dark)' : 'var(--ink-4)',
+                color: valid ? 'var(--accent-on-dark)' : '#6b6354',
                 borderColor: valid ? 'rgba(201,241,88,0.5)' : 'rgba(201,241,88,0.15)',
                 background: valid ? 'rgba(201,241,88,0.08)' : 'transparent',
                 cursor: valid ? 'pointer' : 'not-allowed',
@@ -236,10 +236,10 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{
         display: 'flex', justifyContent: 'space-between',
-        fontSize: 9.5, letterSpacing: '0.12em', color: 'var(--ink-4)',
+        fontSize: 9.5, letterSpacing: '0.12em', color: '#6b6354',
       }}>
         <span>{label}</span>
-        {hint && <span style={{ color: 'var(--ink-4)', textTransform: 'lowercase' }}>{hint}</span>}
+        {hint && <span style={{ color: '#6b6354', textTransform: 'lowercase' }}>{hint}</span>}
       </div>
       {children}
     </div>

@@ -86,8 +86,9 @@ export function Vapor({ m, s, remainingPct, total = 25 }: TimerFaceProps) {
         <div
           style={{
             fontSize: 11,
-            color: 'var(--acid)',
-            textShadow: '0 0 8px rgba(201,241,88,0.4)',
+            // Text on the node's paper: --acid is unreadable on light paper.
+            color: 'var(--acid-ink, var(--acid))',
+            textShadow: '0 0 8px color-mix(in srgb, var(--acid) 40%, transparent)',
           }}
         >
           {Math.round(remainingPct)}% reserve

@@ -360,7 +360,7 @@ export function HabitNode({
                       No repeat
                     </button>
                     <button type="button" disabled={!isRepeatValid(newRepeat)} onClick={() => setRepeatAt(null)}
-                      style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--acid)', color: '#0a0908', cursor: 'pointer', fontSize: 12.5, fontWeight: 650, opacity: isRepeatValid(newRepeat) ? 1 : 0.4 }}>
+                      style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12.5, fontWeight: 650, opacity: isRepeatValid(newRepeat) ? 1 : 0.4 }}>
                       Done
                     </button>
                   </div>

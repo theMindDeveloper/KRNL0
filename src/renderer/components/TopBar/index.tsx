@@ -356,7 +356,7 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
           <span
             style={{
               fontSize: 9.5,
-              color: '#ff8e64',
+              color: 'var(--rust)',
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
               fontWeight: 700,

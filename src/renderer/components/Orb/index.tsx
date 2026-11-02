@@ -580,11 +580,11 @@ export function Orb() {
               fontSize: 10.5,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
-              color: 'var(--ink-3)',
+              color: '#8a8270',
             }}
           >
             <span data-testid="orb-chat-title">
-              <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
+              <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--accent-on-dark)' }}>
                 ◆
               </span>
               krnl0 · assistant
@@ -595,7 +595,7 @@ export function Orb() {
               onClick={() => setOpen(false)}
               style={{
                 background: 'transparent', border: 0,
-                color: 'var(--ink-3)', cursor: 'pointer',
+                color: '#8a8270', cursor: 'pointer',
                 fontSize: 16, lineHeight: 1, padding: 0, width: 20, height: 20,
               }}
               aria-label="Close assistant"
@@ -627,7 +627,7 @@ export function Orb() {
                       textAlign: 'left',
                       background: 'linear-gradient(90deg, rgba(201,241,88,0.18) 0%, rgba(201,241,88,0.06) 60%, rgba(201,241,88,0.10) 100%)',
                       border: '1px solid rgba(201, 241, 88, 0.40)',
-                      color: 'var(--acid)',
+                      color: 'var(--accent-on-dark)',
                       padding: '6px 8px',
                       borderRadius: 4,
                       fontFamily: 'inherit',
@@ -665,7 +665,7 @@ export function Orb() {
             )}
             {history.map((m, i) => (
               <div key={i} style={{ color: m.role === 'user' ? '#8a8270' : '#d4cfc0' }}>
-                <span style={{ color: m.role === 'user' ? 'var(--ink-3)' : 'var(--acid)', marginRight: 4 }}>
+                <span style={{ color: m.role === 'user' ? '#8a8270' : 'var(--accent-on-dark)', marginRight: 4 }}>
                   {m.role === 'user' ? '›' : '◆'}
                 </span>
                 {m.text}
@@ -673,7 +673,7 @@ export function Orb() {
             ))}
             {thinking && (
               <div data-testid="orb-chat-thinking">
-                <span style={{ color: 'var(--acid)', marginRight: 6 }}>◆</span>
+                <span style={{ color: 'var(--accent-on-dark)', marginRight: 6 }}>◆</span>
                 <span style={{ display: 'inline-flex', gap: 3, marginLeft: 4 }}>
                   {[0, 1, 2].map((j) => (
                     <span
@@ -681,7 +681,7 @@ export function Orb() {
                       style={{
                         width: 5, height: 5, borderRadius: '50%',
                         display: 'inline-block',
-                        background: 'var(--acid)', boxShadow: '0 0 6px var(--acid)',
+                        background: 'var(--accent-on-dark)', boxShadow: '0 0 6px var(--accent-on-dark)',
                         animation: 'ai-dot 1.2s ease-in-out infinite',
                         animationDelay: `${j * 0.15}s`,
                       }}
@@ -702,7 +702,7 @@ export function Orb() {
               background: 'rgba(0, 0, 0, 0.2)',
             }}
           >
-            <span style={{ color: 'var(--acid)', fontWeight: 700 }}>›</span>
+            <span style={{ color: 'var(--accent-on-dark)', fontWeight: 700 }}>›</span>
             <input
               ref={inputRef}
               data-testid="orb-chat-input"

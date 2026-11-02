@@ -568,7 +568,7 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
-  color: #1a1814;
+  color: var(--ink-on-bright);
 }
 [data-theme="dark"] .task-check--done {
   /* Green-on-black: dark fill, acid border, acid checkmark. */

@@ -134,7 +134,7 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         {!info.done && !easy && <button type="button" data-testid="task-info-focus" style={btn} onClick={act(() => { void startFocusOnTask(taskId); })}>Focus</button>}
         <button type="button" data-testid="task-info-done" style={btn} onClick={act(() => { void toggleTaskDone(taskId); })}>{info.done ? 'Reopen' : 'Done'}</button>
         <button type="button" data-testid="task-info-show" style={btn} onClick={act(() => focusNode(taskId))}>Show</button>
-        {info.scheduledFor && <button type="button" data-testid="task-info-unschedule" style={{ ...btn, color: '#ff8e64', borderColor: '#ff8e64' }} onClick={act(() => unscheduleTask(taskId))}>Unplan</button>}
+        {info.scheduledFor && <button type="button" data-testid="task-info-unschedule" style={{ ...btn, color: 'var(--rust)', borderColor: 'var(--rust)' }} onClick={act(() => unscheduleTask(taskId))}>Unplan</button>}
       </div>
     </Shell>
   );

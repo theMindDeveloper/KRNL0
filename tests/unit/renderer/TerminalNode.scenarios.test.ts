@@ -197,8 +197,9 @@ describe('F1 — Header anatomy', () => {
     // LIVE badge text
     expect(html).toContain(LIVE_BADGE_TEXT);
 
-    // Acid background on the badge (var(--acid))
-    expect(html).toContain('var(--acid)');
+    // Accent background on the badge — the on-dark accent, since the terminal
+    // is dark in every theme (Macintosh light's --acid is near-black).
+    expect(html).toContain('var(--accent-on-dark)');
   });
 });
 

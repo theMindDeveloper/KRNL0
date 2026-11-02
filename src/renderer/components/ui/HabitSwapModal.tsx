@@ -145,8 +145,8 @@ const pickTitle: React.CSSProperties = { display: 'inline-flex', alignItems: 'ce
 const pickSub: React.CSSProperties = { fontSize: 11.5, color: 'var(--ink-3)', paddingLeft: 21 };
 const primaryBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
-  height: 34, padding: '0 16px', borderRadius: 9, border: 'none', background: 'var(--acid)',
-  color: '#0a0908', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 650,
+  height: 34, padding: '0 16px', borderRadius: 9, border: 'none', background: 'var(--btn-primary-bg)',
+  color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 650,
 };
 const ghostBtn: React.CSSProperties = {
   height: 34, padding: '0 12px', borderRadius: 9, border: 'none', background: 'transparent',

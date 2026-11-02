@@ -1266,8 +1266,8 @@ export function AmbientRadio() {
                           padding: '4px 6px',
                           borderRadius: 4,
                           cursor: 'pointer',
-                          background: playing_ ? 'rgba(244,63,94,.10)' : 'transparent',
-                          borderLeft: `2px solid ${playing_ ? '#f43f5e' : 'transparent'}`,
+                          // Active = a tinted fill, never a left-edge bar.
+                          background: playing_ ? 'rgba(244,63,94,.16)' : 'transparent',
                           transition: 'background .12s',
                         }}
                         onMouseEnter={(e) => { if (!playing_) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,.04)'; }}
@@ -1505,11 +1505,10 @@ export function AmbientRadio() {
                           gap: 6,
                           padding: '3px 5px 3px 4px',
                           marginBottom: 2,
-                          borderLeft: `2px solid ${isFocused ? p.col : 'transparent'}`,
-                          background: isFocused ? `rgba(${p.rgb},.08)` : 'transparent',
+                          background: isFocused ? `rgba(${p.rgb},.14)` : 'transparent',
                           borderRadius: 3,
                           cursor: 'pointer',
-                          transition: 'background .12s, border-color .12s',
+                          transition: 'background .12s',
                         }}
                       >
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.col, boxShadow: `0 0 5px ${p.col}`, flexShrink: 0 }} />
