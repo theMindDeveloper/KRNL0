@@ -195,6 +195,16 @@ type HabitScheduleKind = 'weekly' | 'daily';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+
+/** Screen px per CSS px for `el`: the canvas zoom when the calendar sits on
+ *  the canvas, 1 in Station mode. Pointer positions are screen px while
+ *  `rowHeight` is CSS px, so every pointer→minute conversion divides by this. */
+export function screenScale(el: HTMLElement): number {
+  const css = el.offsetWidth;
+  const screen = el.getBoundingClientRect().width;
+  return css > 0 && Number.isFinite(screen) && screen > 0 ? screen / css : 1;
+}
+
 export function WeekView({ state, config, onCommand, singleDay = false }: WeekViewProps) {
   // Width of the per-day reality rail (left edge of each column), as a CSS
   // length so it scales with the column: wide in the day view (carries a
@@ -292,10 +302,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     e.preventDefault();
     e.stopPropagation();
     const originY = e.clientY;
+    const scale = screenScale(e.currentTarget);
     const dayYMD = task.startISO.slice(0, 10);
     let last = { taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 };
     const onMove = (ev: MouseEvent) => {
-      const deltaMin = Math.round((((ev.clientY - originY) / rowHeight) * 60) / gran) * gran;
+      const deltaMin = Math.round((((ev.clientY - originY) / scale / rowHeight) * 60) / gran) * gran;
       if (edge === 'bottom') {
         last = { taskId: task.id, durationMin: Math.max(gran, origDurationMin + deltaMin), startMinDelta: 0 };
       } else {
@@ -877,7 +888,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     e.preventDefault();
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const relY = Math.max(0, e.clientY - rect.top);
+    const relY = Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget);
     const minute = (relY / rowHeight) * 60;
 
     const items: LayerItem[] = [];
@@ -1045,7 +1056,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         // Band = the slot under the cursor, where the drop lands.
         const rect = e.currentTarget.getBoundingClientRect();
         const relY = Math.max(0, (Number.isFinite(e.clientY) ? e.clientY : 0) - (Number.isFinite(rect.top) ? rect.top : 0));
-        const abs = sliceStartMin + (relY / rowHeight) * 60;
+        const abs = sliceStartMin + (relY / screenScale(e.currentTarget) / rowHeight) * 60;
         const minute = Math.max(0, Math.min(1440 - gran, Math.floor(abs / gran) * gran));
         setSnapPreview((p) => (p && p.dayYMD === dayYMD && p.minute === minute ? p : { dayYMD, minute }));
       };
@@ -1074,7 +1085,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         const clientY = Number.isFinite(e.clientY) ? e.clientY : 0;
         const rectTop = Number.isFinite(rect.top) ? rect.top : 0;
         const relY = Math.max(0, clientY - rectTop);
-        const minutesIntoBlock = (relY / rowHeight) * 60;
+        const minutesIntoBlock = (relY / screenScale(e.currentTarget) / rowHeight) * 60;
         const absMinute = sliceStartMin + (Number.isFinite(minutesIntoBlock) ? minutesIntoBlock : 0);
         // Lands on the slot under the cursor. Another task dropped here also
         // leaves the chain that would push it behind this one (parallelWith),
