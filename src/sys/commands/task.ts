@@ -378,6 +378,20 @@ export async function taskSubtask(
   const seq = siblings.length + 1;
 
   const childId = `task-${randomUUID()}`;
+
+  // Same as the canvas 'Add subtask': the subtask gets its own Todo row,
+  // linked both ways, so it shows in `todo list` and its tick mirrors.
+  let todoItemId: string | null = null;
+  const todoNode = findNode(board, parentTs.parentTodoId);
+  if (todoNode && todoNode.kind === 'todo') {
+    const added = fsmTodoAdd(todoNode.state as TodoState, { text: text.trim() });
+    const item = added.items[added.items.length - 1];
+    if (item) {
+      todoItemId = item.id;
+      updateNode(board, todoNode.id, { ...todoNode, state: todoLinkTask(added, { itemId: item.id, taskNodeId: childId }) });
+    }
+  }
+
   const childState: TaskState = {
     text: text.trim(),
     done: false,
@@ -388,9 +402,11 @@ export async function taskSubtask(
     createdAt: now,
     parentTodoId: parentTs.parentTodoId,
     parentTaskId,
-    todoItemId: null,
+    todoItemId,
     pomoSessionsCompleted: 0,
     plannedMin: parentTs.plannedMin ?? parentTs.durationMin,
+    // No time given → open-ended, like the canvas.
+    timeOpen: true,
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
     kind: 'event', // #180 — Todo creates events only
@@ -835,6 +851,8 @@ export async function taskAddNext(
     todoItemId: addedItem.id,
     pomoSessionsCompleted: 0,
     plannedMin: effectiveDuration,
+    // No time given → open-ended, like the canvas 'Add next task'.
+    ...(durationMin === undefined ? { timeOpen: true } : {}),
     secondsAccumulated: 0,
     currentSessionElapsedSec: 0,
     kind: 'event', // #180 — Todo creates events only

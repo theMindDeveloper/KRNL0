@@ -206,6 +206,22 @@ describe('sys task add', () => {
 
 // ── taskEdit ───────────────────────────────────────────────────────────────────
 
+describe('sys task subtask — Todo parity', () => {
+  it('gives the subtask its own linked Todo row, like the canvas', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'Thesis');
+    const parentId = (addRes.data as { id: string }).id;
+    const res = await taskSubtask(ctx, parentId, 'write tests');
+    expect(res.ok).toBe(true);
+    const childId = (res.data as { id: string }).id;
+    const child = findTasks().find((t) => t.id === childId)!.state as TaskState;
+    const items = (findTodoMother().state as TodoState).items;
+    const row = items.find((i) => i.id === child.todoItemId);
+    expect(row?.text).toBe('write tests');
+    expect(row?.taskNodeId).toBe(childId);
+    expect(child.timeOpen).toBe(true);
+  });
+});
+
 describe('sys task edit', () => {
   it('updates the task text and persists it', async () => {
     const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'old text');
@@ -411,13 +427,13 @@ describe('sys task subtask', () => {
     expect(chainEdge).toBeDefined();
   });
 
-  it('subtask has no todoItemId (not directly linked to a TodoItem)', async () => {
+  it('subtask is linked to its own TodoItem (Decision 22.2 Fix 4 — same as the canvas)', async () => {
     const parentRes = await taskAdd(ctx, TODO_MOTHER_ID, 'parent');
     const parentId = (parentRes.data as { id: string }).id;
     const subRes = await taskSubtask(ctx, parentId, 'subtask');
     const childId = (subRes.data as { id: string }).id;
     const child = findTasks().find((t) => t.id === childId)!;
-    expect((child.state as TaskState).todoItemId).toBeNull();
+    expect((child.state as TaskState).todoItemId).not.toBeNull();
   });
 
   it('returns error when parent task id is missing', async () => {
