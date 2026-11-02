@@ -61,6 +61,7 @@ const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = 
   'image':       { width: 240, height: 180 },
   'frame':       { width: 360, height: 240 },
   'analytics':   { width: 540, height: 540 },
+  'media':       { width: 480, height: 300 },
 };
 
 export function toRfNode(

@@ -10,6 +10,7 @@ import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
 import { drawList, drawClear, drawDelete } from './commands/draw';
+import { mediaAdd, mediaList } from './commands/media';
 import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
 import {
   imageAdd,
@@ -538,6 +539,12 @@ export class SysFacade {
       }
     }
 
+    if (command.kind === 'media') {
+      const res = command.sub === 'add' ? mediaAdd(command.url, command.at) : mediaList(command.json);
+      if (command.sub === 'add' && res.ok) this.deps.onBoardChanged?.();
+      return res;
+    }
+
     if (command.kind === 'draw') {
       const dCtx = {
         boardPath: this.deps.boardPath,
@@ -567,7 +574,7 @@ export class SysFacade {
     // with the habit/todo/task ctx-passing pattern is a future refactor.
     if (command.kind === 'text') {
       switch (command.sub) {
-        case 'add':    return textAdd(command.text, command.at, command.near);
+        case 'add':    return textAdd(command.text, command.at, command.near, command.look);
         case 'set':    return textSet(command.id, command.text);
         case 'resize': return textResize(command.id, command.w, command.h);
       }

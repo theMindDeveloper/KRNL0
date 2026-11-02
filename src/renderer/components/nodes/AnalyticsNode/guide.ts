@@ -73,3 +73,11 @@ export function pageSelector(page: PageId): string {
   const first = Object.entries(LAYOUT).find(([, s]) => s?.page === page && s.row === 0 && s.col === 1)?.[0];
   return first ? `[data-card-id="${first}"]` : '';
 }
+
+/** Cards shown on a page, in reading order (the Summary page has none). */
+export function cardsOfPage(page: PageId): AnalyticsCardId[] {
+  return (Object.entries(LAYOUT) as Array<[AnalyticsCardId | 'summary', Slot]>)
+    .filter(([id, slot]) => id !== 'summary' && slot.page === page)
+    .sort(([, a], [, b]) => a.row - b.row || a.col - b.col)
+    .map(([id]) => id as AnalyticsCardId);
+}

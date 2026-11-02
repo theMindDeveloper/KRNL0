@@ -8,7 +8,7 @@ export type PenTool = DrawTool | 'eraser';
 
 export const PEN_COLORS = ['#f4f6f8', '#c9f158', '#ff8e64', '#5ad1e6', '#b48cff', '#ffd166', '#ff5d8f', '#1a1814'] as const;
 
-export const TOOL_SIZE: Record<DrawTool, number> = { pen: 3, marker: 7, highlighter: 18 };
+export const TOOL_SIZE: Record<DrawTool, number> = { pen: 3, marker: 7, highlighter: 18, arrow: 3 };
 
 interface DrawStore {
   active: boolean;

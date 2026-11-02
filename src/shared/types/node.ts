@@ -37,7 +37,8 @@ export type NodeKind =
   | 'image'
   | 'clock'
   | 'frame'
-  | 'analytics';
+  | 'analytics'
+  | 'media';
 
 // Spec a node-kind module exports to the kernel (commands, events, schema).
 // Renamed from `NodeKind` to avoid shadowing the literal union above.

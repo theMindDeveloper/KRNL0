@@ -149,7 +149,8 @@ import {
 } from '../nodes/FrameNode/commands';
 
 // ── Text + Image ──────────────────────────────────────────────────────
-import { textSetText, textSetSize } from '../nodes/TextNode/commands';
+import { textSetText, textSetSize, textSetLook } from '../nodes/TextNode/commands';
+import { mediaSetPage, mediaSetSize, mediaSetTitle } from '../nodes/MediaNode/commands';
 import {
   imageSetAsset,
   imageSetSize,
@@ -365,6 +366,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
       switch (command) {
         case 'text.setText': return { state: textSetText(s as never, args as never) };
         case 'text.setSize': return { state: textSetSize(s as never, args as never) };
+        case 'text.setLook': return { state: textSetLook(s as never, args as never) };
       }
       break;
     }
@@ -383,6 +385,14 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'frame.setSize':     return { state: frameSetSize(s as never, args as never) };
         case 'frame.setChildren': return { state: frameSetChildren(s as never, args as never) };
         case 'frame.setTint':     return { config: frameSetTint(c as never, args as never) };
+      }
+      break;
+    }
+    case 'media': {
+      switch (command) {
+        case 'media.setPage':  return { state: mediaSetPage(s as never, args as never) };
+        case 'media.setSize':  return { state: mediaSetSize(s as never, args as never) };
+        case 'media.setTitle': return { state: mediaSetTitle(s as never, args as never) };
       }
       break;
     }

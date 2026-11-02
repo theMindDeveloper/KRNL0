@@ -26,6 +26,7 @@ import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
 import { PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, type PageId } from './guide';
 import { PageNav } from './PageNav';
+import { AnalyticsSettings } from './AnalyticsSettings';
 import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
 import { EstimateBars, DailyPlanActual, FocusMix, Legend, COLOR_PLANNED, COLOR_TRACKED, fmtMinutes } from '../../../analytics/charts/PlanVsActual';
 import {
@@ -621,6 +622,7 @@ export function AnalyticsNode({
           display: 'flex',
           gap: 12,
           minHeight: 0,
+          position: 'relative',
         }}
       >
         <PagedView
@@ -676,218 +678,15 @@ export function AnalyticsNode({
         </PagedView>
 
         {settingsOpen && (
-          <SettingsSidebar
-            currentView={view}
+          <AnalyticsSettings
             hiddenCards={hiddenCards}
-            pinnedCards={pinnedCards}
             onToggleHidden={toggleHidden}
-            onTogglePin={togglePin}
             onReset={() => onCommand('analytics.resetCardLayout', {})}
+            onClose={() => onCommand('analytics.setSettingsOpen', { open: false })}
           />
         )}
       </div>
     </div>
-  );
-}
-
-// ── Settings sidebar ─────────────────────────────────────────────────────────
-
-interface SettingsSidebarProps {
-  currentView: AnalyticsView;
-  hiddenCards: readonly AnalyticsCardId[];
-  pinnedCards: readonly AnalyticsCardId[];
-  onToggleHidden: (id: AnalyticsCardId) => void;
-  onTogglePin: (id: AnalyticsCardId) => void;
-  onReset: () => void;
-}
-
-function SettingsSidebar({
-  currentView,
-  hiddenCards,
-  pinnedCards,
-  onToggleHidden,
-  onTogglePin,
-  onReset,
-}: SettingsSidebarProps) {
-  return (
-    <aside
-      data-testid="analytics-settings-sidebar"
-      style={{
-        width: 196,
-        flexShrink: 0,
-        background: 'linear-gradient(180deg, var(--k-an-bg-2, #16191c) 0%, var(--k-an-bg, #101214) 100%)',
-        border: '1px solid var(--k-an-line, #23262a)',
-        borderRadius: 8,
-        padding: '12px 12px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        overflow: 'auto',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            color: 'var(--acid)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            fontWeight: 700,
-          }}
-        >
-          Curate cards
-        </span>
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          data-testid="analytics-reset-layout"
-          onClick={(e) => { e.stopPropagation(); onReset(); }}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-            ...chipBtn(false),
-            borderColor: 'var(--k-an-warm, #ff8e64)',
-            color: 'var(--k-an-warm, #ff8e64)',
-            fontSize: 8,
-          }}
-          title="Show every card, clear pins"
-        >
-          reset
-        </button>
-      </div>
-
-      <p
-        style={{
-          margin: 0,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 9,
-          color: 'var(--k-an-ink-3, #9aa1a8)',
-          letterSpacing: '0.04em',
-          lineHeight: 1.45,
-        }}
-      >
-        <span style={{ color: 'var(--acid)' }}>★</span> pin to top  ·  <span style={{ color: 'var(--k-an-warm, #ff8e64)' }}>✕</span> hide
-      </p>
-
-      <PagedView testId="analytics-settings-pages" style={{ flex: '1 1 0' }} contentStyle={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {ANALYTICS_VIEWS.map((v) => (
-        <div key={v} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 9,
-              color: v === currentView ? 'var(--k-an-ink-1, #eef1f4)' : 'var(--k-an-ink-4, #7d848b)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              fontWeight: v === currentView ? 700 : 500,
-              borderBottom: '1px dashed var(--k-an-line, #23262a)',
-              paddingBottom: 3,
-            }}
-          >
-            {VIEW_LABELS[v]}
-          </span>
-          {CARDS_BY_VIEW[v].map((id) => {
-            const hidden = hiddenCards.includes(id);
-            const pinned = pinnedCards.includes(id);
-            return (
-              <div
-                key={id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '4px 0',
-                  opacity: hidden ? 0.55 : 1,
-                }}
-              >
-                <span
-                  style={{
-                    flex: 1,
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 9.5,
-                    color: hidden ? 'var(--k-an-ink-4, #7d848b)' : 'var(--k-an-ink-2, #c8cdd3)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    textDecoration: hidden ? 'line-through' : 'none',
-                  }}
-                  title={ANALYTICS_CARD_LABELS[id]}
-                >
-                  {ANALYTICS_CARD_LABELS[id]}
-                </span>
-                <button
-                  type="button"
-                  data-testid={`analytics-sidebar-pin-${id}`}
-                  onClick={(e) => { e.stopPropagation(); onTogglePin(id); }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  title={pinned ? 'Unpin' : 'Pin to top'}
-                  style={cardActionBtn(pinned, 'var(--acid)')}
-                >
-                  {pinned ? '★' : '☆'}
-                </button>
-                <button
-                  type="button"
-                  data-testid={`analytics-sidebar-hide-${id}`}
-                  onClick={(e) => { e.stopPropagation(); onToggleHidden(id); }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  title={hidden ? 'Show' : 'Hide'}
-                  style={cardActionBtn(hidden, 'var(--k-an-warm, #ff8e64)')}
-                >
-                  {hidden ? '+' : '✕'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      ))}
-      </PagedView>
-
-      {/* Danger zone — destructive history wipe (hold to confirm). Clears the
-          completion ledger + pomo session history only; habit logs and the
-          live board are untouched. The label names exactly what dies. */}
-      <div
-        data-testid="analytics-danger-zone"
-        style={{
-          marginTop: 4,
-          paddingTop: 10,
-          borderTop: '1px dashed #3a2a2a',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 6,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9,
-            color: 'var(--k-an-warm, #ff8e64)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            fontWeight: 700,
-          }}
-        >
-          Danger zone
-        </span>
-        <HoldButton
-          testId="analytics-clear-history"
-          label="Clear focus history"
-          holdingLabel="Hold to wipe…"
-          onConfirm={() => useBoardStore.getState().clearFocusHistory()}
-          style={{ width: '100%' }}
-        />
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 8.5,
-            color: 'var(--k-an-ink-4, #7d848b)',
-            lineHeight: 1.4,
-          }}
-        >
-          Erases completed-task records &amp; pomo sessions. Habits are kept.
-        </span>
-      </div>
-    </aside>
   );
 }
 

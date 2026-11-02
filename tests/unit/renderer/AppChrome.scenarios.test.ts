@@ -123,11 +123,11 @@ describe('F2 — Topbar right buttons present', () => {
 // ── F3 — Left dock buttons ────────────────────────────────────────────────────
 
 describe('F3 — Left dock contains 5 icon buttons', () => {
-  it('renders a dock with 5 buttons', () => {
+  it('renders a dock with 7 buttons (select, text, sticky, shape, image, pen, frame)', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     const buttons = screen.getByTestId('dock').querySelectorAll('button');
-    expect(buttons.length).toBe(5);
+    expect(buttons.length).toBe(7);
   });
 
   it('renders buttons for select, text, image, pen, frame (analytics is a mother now — no dock button)', () => {

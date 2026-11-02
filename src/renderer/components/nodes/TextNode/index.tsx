@@ -14,6 +14,8 @@ import { NodeResizeControl } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { TextState, TextConfig } from './types';
 import { useCornerProximity } from '../../../hooks/useCornerProximity';
+import { LookBar } from './LookBar';
+import { STICKY_COLORS, type TextLook } from './types';
 
 const AUTOSAVE_MS = 400;
 
@@ -24,6 +26,11 @@ export function TextNode({
 }: NodeProps<TextState, TextConfig>) {
   const state = node.state as TextState;
   const text = state.text ?? '';
+  // Brainstorming look: plain note, coloured sticky, or a shape.
+  const look: TextLook = state.look ?? { kind: 'note' };
+  const lookColor = look.color ?? (look.kind === 'sticky' ? STICKY_COLORS[0] : '#a8e6ff');
+  const isSticky = look.kind === 'sticky';
+  const isShape = look.kind === 'rect' || look.kind === 'ellipse' || look.kind === 'diamond';
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -94,6 +101,7 @@ export function TextNode({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { setHover(false); corner.onMouseLeave(); }}
       onMouseMove={corner.onMouseMove}
+      data-look={look.kind}
       style={{
         width: '100%',
         height: '100%',
@@ -103,11 +111,28 @@ export function TextNode({
         boxShadow: showShadow
           ? '0 2px 0 rgba(26,24,20,.04), 0 8px 24px rgba(26,24,20,.10)'
           : 'none',
-        transition: 'box-shadow 120ms ease, border-style 120ms ease',
+        transition: 'box-shadow 120ms ease, border-style 120ms ease, background 160ms ease',
         position: 'relative',
         boxSizing: 'border-box',
+        ...(isSticky ? {
+          background: lookColor, border: 'none', borderRadius: 4,
+          boxShadow: selected ? '0 0 0 2px var(--acid), 0 10px 22px rgba(0,0,0,0.35)' : '0 10px 22px rgba(0,0,0,0.32), 0 1px 0 rgba(0,0,0,0.1)',
+        } : {}),
+        ...(look.kind === 'rect' || look.kind === 'ellipse' ? {
+          background: `color-mix(in srgb, ${lookColor} 26%, var(--paper))`,
+          border: `2px solid ${lookColor}`,
+          borderRadius: look.kind === 'ellipse' ? '50%' : 12,
+          boxShadow: selected ? '0 0 0 2px var(--acid)' : 'none',
+        } : {}),
+        ...(look.kind === 'diamond' ? { background: 'transparent', border: 'none', boxShadow: 'none' } : {}),
       }}
     >
+      {look.kind === 'diamond' && (
+        <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+          <polygon points="50,1 99,50 50,99 1,50" fill={`color-mix(in srgb, ${lookColor} 26%, var(--paper))`} stroke={selected ? 'var(--acid)' : lookColor} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
+      {selected && <LookBar look={look} onChange={(next) => onCommand('text.setLook', next)} />}
       {/* Resize handle — single bottom-right control with a diagonal-stripe
           glyph. Matches AnalyticsNode for visual consistency; cleaner than
           the 4-corner + 4-side NodeResizer chrome that selected text nodes
@@ -168,13 +193,15 @@ export function TextNode({
             outline: 'none',
             resize: 'none',
             background: 'transparent',
-            padding: '12px 14px',
-            fontFamily: 'var(--font-serif)',
-            fontSize: 18,
+            padding: isShape ? '14px 18%' : '12px 14px',
+            fontFamily: isSticky || isShape ? 'var(--font-sans)' : 'var(--font-serif)',
+            fontSize: isSticky || isShape ? 16 : 18,
             lineHeight: 1.35,
-            color: 'var(--ink)',
+            color: isSticky ? '#1a1814' : 'var(--ink)',
+            textAlign: isShape ? 'center' : 'left',
             letterSpacing: '-0.005em',
             boxSizing: 'border-box',
+            position: 'relative',
           }}
         />
       ) : (
@@ -185,17 +212,20 @@ export function TextNode({
           style={{
             width: '100%',
             height: '100%',
-            padding: '12px 14px',
-            fontFamily: 'var(--font-serif)',
-            fontSize: 18,
+            padding: isShape ? '14px 18%' : '12px 14px',
+            fontFamily: isSticky || isShape ? 'var(--font-sans)' : 'var(--font-serif)',
+            fontSize: isSticky || isShape ? 16 : 18,
+            fontWeight: isSticky || isShape ? 500 : undefined,
             lineHeight: 1.35,
-            color: 'var(--ink)',
+            color: isSticky ? '#1a1814' : 'var(--ink)',
             letterSpacing: '-0.005em',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
-            overflow: 'auto',
+            overflow: 'hidden',
             cursor: 'text',
             boxSizing: 'border-box',
+            position: 'relative',
+            ...(isShape ? { display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' } : {}),
           }}
         >
           {text || (

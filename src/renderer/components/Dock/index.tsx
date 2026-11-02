@@ -18,12 +18,41 @@ import { DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { useBoardStore } from '../../store/boardStore';
 import { useDrawStore } from '../../store/drawStore';
+import { STICKY_COLORS, type TextLook } from '../nodes/TextNode/types';
 
 type ToolMode = 'select' | 'connect';
 
+// The dock can be dragged by its grip and snaps to one of these places; the
+// choice is remembered per machine.
+export type DockAnchor = 'top' | 'middle' | 'bottom' | 'bottom-center';
+const ANCHOR_KEY = 'krnl0-dock-anchor';
+
+function readAnchor(): DockAnchor {
+  try {
+    const v = localStorage.getItem(ANCHOR_KEY);
+    if (v === 'top' || v === 'middle' || v === 'bottom' || v === 'bottom-center') return v;
+  } catch { /* storage unavailable */ }
+  return 'top';
+}
+
+/** Nearest snap place for a drop point inside the canvas box. Exported for tests. */
+export function anchorFor(x: number, y: number, w: number, h: number): DockAnchor {
+  if (y > h * 0.72 && x > w * 0.22 && x < w * 0.78) return 'bottom-center';
+  if (y < h / 3) return 'top';
+  if (y < (h * 2) / 3) return 'middle';
+  return 'bottom';
+}
+
+const ANCHOR_STYLE: Record<DockAnchor, React.CSSProperties> = {
+  top: { left: 14, top: 60 },
+  middle: { left: 14, top: '50%', transform: 'translateY(-50%)' },
+  bottom: { left: 14, bottom: 48 },
+  'bottom-center': { left: '50%', bottom: 16, transform: 'translateX(-50%)', flexDirection: 'row' },
+};
+
 export interface DockProps {
   /** Called when the user clicks a node-creation button or triggers a keyboard shortcut. */
-  onAddNode: (args: { kind: NodeKind; at?: { x: number; y: number } }) => void;
+  onAddNode: (args: { kind: NodeKind; at?: { x: number; y: number }; look?: TextLook }) => void;
   /** Called when the user clicks a tool-mode button. */
   onToolChange?: (tool: ToolMode) => void;
   /** Current mother-row chassis variant. */
@@ -37,6 +66,56 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
   const penActive = useDrawStore((s) => s.active);
   const togglePen = useDrawStore((s) => s.toggle);
   const [pressed, setPressedKind] = useState<NodeKind | null>(null);
+  const [anchor, setAnchor] = useState<DockAnchor>(readAnchor);
+  const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const horizontal = anchor === 'bottom-center';
+
+  const onGripDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    setDrag({ dx: 0, dy: 0 });
+  };
+  const onGripMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStart.current) return;
+    setDrag({ dx: e.clientX - dragStart.current.x, dy: e.clientY - dragStart.current.y });
+  };
+  const onGripUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStart.current) return;
+    dragStart.current = null;
+    // Remember where the dock was dropped so it can glide to its snap spot.
+    const from = rootRef.current?.getBoundingClientRect();
+    if (from) flipFrom.current = { x: from.left, y: from.top };
+    setDrag(null);
+    const box = (rootRef.current?.offsetParent as HTMLElement | null)?.getBoundingClientRect();
+    if (!box) return;
+    const next = anchorFor(e.clientX - box.left, e.clientY - box.top, box.width, box.height);
+    setAnchor(next);
+    try { localStorage.setItem(ANCHOR_KEY, next); } catch { /* ignore */ }
+  };
+
+  // FLIP: after the snap, start the dock where it was dropped (inverse
+  // transform, no transition) and animate the transform away.
+  const flipFrom = useRef<{ x: number; y: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    const from = flipFrom.current;
+    flipFrom.current = null;
+    if (!el || !from) return;
+    const to = el.getBoundingClientRect();
+    const dx = from.x - to.left;
+    const dy = from.y - to.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    const base = ANCHOR_STYLE[anchor].transform ?? '';
+    el.style.transition = 'none';
+    el.style.transform = `translate(${dx}px, ${dy}px) ${base}`;
+    void el.offsetWidth; // commit the start position
+    el.style.transition = 'transform 260ms cubic-bezier(.2,.8,.2,1)';
+    el.style.transform = base;
+  }, [anchor, drag]);
   const [dockMenuOpen, setDockMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
   const dockBtnRef = useRef<HTMLButtonElement>(null);
@@ -87,6 +166,8 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
 
   const handleTool = (tool: ToolMode) => {
     setActiveTool(tool);
+    // Picking a pointer tool leaves the pen.
+    useDrawStore.getState().setActive(false);
     onToolChange?.(tool);
   };
 
@@ -111,6 +192,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
       if (active?.closest('.term-body') || active?.closest('.xterm')) {
         return;
       }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'v' || e.key === 'V') {
         handleTool('select');
         return;
@@ -121,6 +203,14 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
       }
       if (e.key === 'i' || e.key === 'I') {
         fireNode('image');
+        return;
+      }
+      if (e.key === 's' || e.key === 'S') {
+        onAddNode({ kind: 'text', look: { kind: 'sticky', color: STICKY_COLORS[0] } });
+        return;
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        onAddNode({ kind: 'text', look: { kind: 'rect', color: '#a8e6ff' } });
         return;
       }
       if (e.key === 'p' || e.key === 'P') {
@@ -161,21 +251,25 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
     color: 'var(--accent-on-dark)',
   };
 
-  const divider: React.CSSProperties = {
-    height: 1,
-    background: 'var(--paper-3)',
-    margin: '4px 2px',
-  };
+  const divider: React.CSSProperties = horizontal
+    ? { width: 1, alignSelf: 'stretch', background: 'var(--paper-3)', margin: '2px 4px' }
+    : { height: 1, background: 'var(--paper-3)', margin: '4px 2px' };
 
   return (
     <div
+      ref={rootRef}
       data-testid="dock"
+      data-anchor={anchor}
       style={{
         position: 'absolute',
-        left: 14,
-        top: 60,
         display: 'flex',
         flexDirection: 'column',
+        alignItems: 'center',
+        ...ANCHOR_STYLE[anchor],
+        ...(drag ? {
+          transform: `${ANCHOR_STYLE[anchor].transform ?? ''} translate(${drag.dx}px, ${drag.dy}px)`,
+          opacity: 0.85, transition: 'none',
+        } : {}),
         gap: 4,
         padding: 6,
         // Theme-aware solid background. backdrop-filter blur was killing pan
@@ -185,8 +279,33 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         borderRadius: 8,
         boxShadow: 'var(--shadow-1)',
         zIndex: 40,
+        pointerEvents: 'auto',
       }}
     >
+      {/* Grip — drag the dock to the top, middle or bottom of the left edge,
+          or to the bottom centre (lies horizontal there). */}
+      <div
+        data-testid="dock-grip"
+        role="separator"
+        aria-label="Drag to move the toolbar"
+        title="Drag to move the toolbar"
+        onPointerDown={onGripDown}
+        onPointerMove={onGripMove}
+        onPointerUp={onGripUp}
+        onPointerCancel={onGripUp}
+        style={{
+          cursor: drag ? 'grabbing' : 'grab', touchAction: 'none', display: 'grid', placeItems: 'center',
+          ...(horizontal ? { width: 12, alignSelf: 'stretch' } : { height: 12, alignSelf: 'stretch' }),
+          color: 'var(--ink-4)',
+        }}
+      >
+        <svg width={horizontal ? 6 : 14} height={horizontal ? 14 : 6} viewBox={horizontal ? '0 0 6 14' : '0 0 14 6'} fill="currentColor" aria-hidden>
+          {(horizontal ? [[1.5, 2], [4.5, 2], [1.5, 7], [4.5, 7], [1.5, 12], [4.5, 12]] : [[2, 1.5], [7, 1.5], [12, 1.5], [2, 4.5], [7, 4.5], [12, 4.5]]).map(([cx, cy]) => (
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={1} />
+          ))}
+        </svg>
+      </div>
+
       {/* Select tool — V */}
       <button
         type="button"
@@ -215,6 +334,33 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path d="M5 4h14M12 4v16M8 20h8" />
+        </svg>
+      </button>
+
+      {/* Sticky note — S. Shapes — R (rectangle; switch shape from the
+          style bar on the selected node). */}
+      <button
+        type="button"
+        data-testid="dock-btn-sticky"
+        title="Sticky note [S]"
+        aria-label="Add sticky note (S)"
+        onClick={() => onAddNode({ kind: 'text', look: { kind: 'sticky', color: STICKY_COLORS[0] } })}
+        style={btnBase}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        data-testid="dock-btn-shape"
+        title="Shape [R]"
+        aria-label="Add shape (R)"
+        onClick={() => onAddNode({ kind: 'text', look: { kind: 'rect', color: '#a8e6ff' } })}
+        style={btnBase}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+          <rect x="3" y="4" width="11" height="9" rx="1.5" /><circle cx="16" cy="15.5" r="5" />
         </svg>
       </button>
 

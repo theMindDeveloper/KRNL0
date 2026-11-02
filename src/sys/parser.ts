@@ -36,6 +36,8 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'show'; json: boolean }
   | { kind: 'clock'; sub: 'dial'; arg: string | undefined }
   | { kind: 'draw'; sub: 'list'; json: boolean }
+  | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
+  | { kind: 'media'; sub: 'list'; json: boolean }
   | { kind: 'draw'; sub: 'clear' }
   | { kind: 'draw'; sub: 'delete'; id: string | undefined }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
@@ -49,7 +51,7 @@ export type SysCommand =
   | { kind: 'edge'; sub: 'enable' | 'disable'; id: string | undefined }
   | { kind: 'info'; json: boolean }
   | { kind: 'settings'; sub: 'show'; json: boolean }
-  | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined }
+  | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
   | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
   | { kind: 'image'; sub: 'add'; path: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined }
@@ -511,6 +513,15 @@ export class SysParser {
       }
     }
 
+    // Media (drop anything) — links from the CLI
+    if (cmd === 'media') {
+      if (sub === 'add') {
+        const atStr = flag(rest, 'at');
+        return { kind: 'media', sub: 'add', url: rest[0], at: atStr ? parseAt(atStr) : undefined };
+      }
+      if (sub === 'list' || sub === undefined) return { kind: 'media', sub: 'list', json: hasFlag(rest, 'json') };
+    }
+
     // Pen tool drawings
     if (cmd === 'draw') {
       if (sub === 'list' || sub === undefined) return { kind: 'draw', sub: 'list', json: hasFlag(rest, 'json') };
@@ -526,6 +537,12 @@ export class SysParser {
           text: flag(rest, 'text'),
           at: atStr ? parseAt(atStr) : undefined,
           near: flag(rest, 'near'),
+          // Brainstorming looks: --sticky [color] | --shape rect|ellipse|diamond [--color c]
+          look: hasFlag(rest, 'sticky')
+            ? { kind: 'sticky', ...(flag(rest, 'color') ? { color: flag(rest, 'color')! } : {}) }
+            : flag(rest, 'shape')
+              ? { kind: flag(rest, 'shape')!, ...(flag(rest, 'color') ? { color: flag(rest, 'color')! } : {}) }
+              : undefined,
         };
       }
       if (sub === 'set') {

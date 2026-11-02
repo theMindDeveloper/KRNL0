@@ -41,11 +41,15 @@ import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapte
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { DrawLayer } from './DrawLayer';
+import type { TextLook } from '../nodes/TextNode/types';
 import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
 import { ContextMenu } from '../ContextMenu';
 import { ingestImageFile, initialDisplaySize } from './dropImage';
+import { classifyFile, classifyUrl } from './dropMedia';
+import { ingestMediaFile } from './ingestMedia';
+import { MEDIA_SIZE, type MediaState } from '../nodes/MediaNode/types';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
@@ -801,7 +805,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     return () => window.removeEventListener(FOCUS_NODE_EVENT, onFocus);
   }, [setCenter]);
 
-  const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number } }) => {
+  const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number }; look?: TextLook }) => {
     // Auto-enable the layer filter for the spawned kind so the new node is
     // immediately visible. Without this, toggling TEXTS / IMAGES off on the
     // KRNL Dock then clicking "add text" silently spawned a hidden node and
@@ -839,11 +843,16 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       // Entry required only for Record<NodeKind, ...> type completeness.
       clock: {},
       'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
-      text: { text: '' },
+      // Sticky notes / shapes are text nodes with a look (Miro-style).
+      text: args.look && args.look.kind !== 'note'
+        ? { text: '', look: args.look, width: 200, height: args.look.kind === 'sticky' ? 200 : 140 }
+        : { text: '' },
       image: {},
       frame: defaultFrameState() as unknown as Record<string, unknown>,
       // analytics is a permanent mother (Decision 32) — handled above.
       analytics: {},
+      // media is created by dropping a file or link (dropMedia.ts).
+      media: {},
     };
     const defaultConfigByKind: Partial<Record<NodeKind, Record<string, unknown>>> = {
       frame: defaultFrameConfig() as unknown as Record<string, unknown>,
@@ -1005,23 +1014,56 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   );
 
   // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
+  // Drop anything: image / video / audio / PDF files, or a link
+  // (YouTube, Vimeo, … embed; other URLs become a link card).
   const onDragOver = useCallback((e: React.DragEvent) => {
-    if (!Array.from(e.dataTransfer.types).includes('Files')) return;
+    const types = Array.from(e.dataTransfer.types);
+    if (!types.includes('Files') && !types.includes('text/uri-list') && !types.includes('text/plain')) return;
+    if (types.includes('application/krnl-task')) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
+  const spawnMediaNode = useCallback((state: MediaState, pos: { x: number; y: number }) => {
+    const size = MEDIA_SIZE[state.media];
+    const newNode: KrnlNode = {
+      id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: 'media',
+      position: { x: pos.x, y: pos.y },
+      state: { ...state, width: size.width, height: size.height },
+      config: {},
+      isMother: false,
+    };
+    addNode(newNode);
+    const updated = useBoardStore.getState().board;
+    if (updated) void saveBoard(updated);
+    ensureVisible({ x: pos.x, y: pos.y, width: size.width, height: size.height });
+  }, [addNode, ensureVisible]);
+
   const onDrop = useCallback(async (e: React.DragEvent) => {
+    if (Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
     const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-    e.preventDefault();
     const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    if (files.length === 0) {
+      const link = classifyUrl(e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain'));
+      if (!link) return;
+      e.preventDefault();
+      spawnMediaNode({ media: link.media, src: link.url, title: new URL(link.url).hostname.replace(/^www\./, '') }, pos);
+      return;
+    }
+    e.preventDefault();
     for (const file of files) {
-      await spawnImageNodeFromFile(file, pos);
+      const kind = classifyFile(file);
+      if (kind === 'image') {
+        await spawnImageNodeFromFile(file, pos);
+      } else if (kind) {
+        const assetId = await ingestMediaFile(file);
+        if (assetId) spawnMediaNode({ media: kind, src: assetId, title: file.name }, pos);
+      }
       pos.x += 24;
       pos.y += 24;
     }
-  }, [screenToFlowPosition, spawnImageNodeFromFile]);
+  }, [screenToFlowPosition, spawnImageNodeFromFile, spawnMediaNode]);
 
   // ── onConnect — wire a visual link edge between two non-mother nodes ──────
   const onConnect = useCallback((conn: Connection) => {
@@ -1607,7 +1649,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       <DrawLayer />
 
       {/* Left dock */}
-      <Panel position="top-left" style={{ margin: 0, padding: 0 }}>
+      {/* Full-canvas, click-through box so the dock can snap to the top,
+          middle or bottom of the left edge, or the bottom centre. */}
+      <Panel position="top-left" style={{ margin: 0, padding: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         <Dock onAddNode={handleAddNode} dockStyle={dockStyle} onDockStyleChange={setDockStyle} />
       </Panel>
 

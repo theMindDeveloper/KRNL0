@@ -47,3 +47,9 @@ interface KrnlBridge {
 interface Window {
   krnl?: KrnlBridge
 }
+
+// Vite `?url` imports (e.g. the pdf.js worker) resolve to a URL string.
+declare module '*?url' {
+  const src: string;
+  export default src;
+}

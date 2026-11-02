@@ -1,4 +1,4 @@
-import { memo, type ComponentType } from 'react';
+import { memo, lazy, Suspense, createElement, type ComponentType } from 'react';
 import { PomoNode } from './PomoNode';
 import { TodoNode } from './TodoNode';
 import { HabitNode } from './HabitNode';
@@ -20,6 +20,13 @@ import type { KrnlRFNode } from '../Canvas/rfAdapters';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyNodeComponent = ComponentType<NodeProps<any, any>>;
 
+// MediaNode pulls in the player / PDF stack — load it only when a media node
+// is actually on screen.
+const LazyMediaNode = lazy(() => import('./MediaNode').then((m) => ({ default: m.MediaNode as AnyNodeComponent })));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const MediaNode: AnyNodeComponent = (props: NodeProps<any, any>) =>
+  createElement(Suspense, { fallback: null }, createElement(LazyMediaNode, props));
+
 // ── Legacy registry (tests + resolveNodeComponent) ───────────────────────────
 // Wrap each node in React.memo at the registry boundary.
 const NODE_REGISTRY_RAW: Record<string, AnyNodeComponent> = {
@@ -35,6 +42,7 @@ const NODE_REGISTRY_RAW: Record<string, AnyNodeComponent> = {
   clock: ClockNode as AnyNodeComponent,
   frame: FrameNode as AnyNodeComponent,
   analytics: AnalyticsMother as AnyNodeComponent,
+  media: MediaNode as AnyNodeComponent,
 };
 export const NODE_REGISTRY: Record<string, AnyNodeComponent> = Object.fromEntries(
   Object.entries(NODE_REGISTRY_RAW).map(([k, C]) => [k, memo(C)])
@@ -63,4 +71,5 @@ export const NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> 
   clock:          createNodeAdapter(ClockNode as AnyNodeComponent),
   frame:          createNodeAdapter(FrameNode as AnyNodeComponent),
   analytics:      createNodeAdapter(AnalyticsMother as AnyNodeComponent),
+  media:          createNodeAdapter(MediaNode as AnyNodeComponent),
 };

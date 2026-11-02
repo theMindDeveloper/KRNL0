@@ -149,6 +149,12 @@ export function MotherFrame({
         if (!badge) return;
         if (liveX !== cachedX || liveY !== cachedY || liveZ !== cachedZ) {
           badge.style.transform = `translate(${liveX}px, ${liveY}px) scale(${liveZ})`;
+          // The badge is portaled above the canvas, so it would paint over the
+          // left dock — hide it while it sits over the dock.
+          const dock = document.querySelector('[data-testid="dock"]')?.getBoundingClientRect();
+          const over = !!dock && liveX < dock.right + 4 && liveX + 120 * liveZ > dock.left
+            && liveY < dock.bottom && liveY + 18 * liveZ > dock.top;
+          badge.style.opacity = over ? '0' : '1';
           cachedX = liveX;
           cachedY = liveY;
           cachedZ = liveZ;

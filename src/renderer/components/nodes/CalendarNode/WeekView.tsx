@@ -197,7 +197,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // be ~25px per day).
   // A thin strip in every view: a wide labelled rail read as extra task
   // blocks next to the plan. Minutes live in the hover / click popup.
-  const rail = 'min(6px, 10%)';
+  // Pomo spans are background highlights now, so blocks need no rail gutter.
+  const rail = '0px';
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows
   // the same 24-hour grid.
@@ -892,7 +893,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     // lets each be dragged out). A single-lane column shows the first task at
     // full width with a compact chip on its corner — never slivers.
     const colPxAll = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-    const planPx = colPxAll - Math.min(6, colPxAll * 0.1);
+    const planPx = colPxAll;
     const dayLayout = layoutDayBlocks(
       slices.map((sl) => ({ id: sl.task.id, startMin: sl.sliceStartMin, endMin: sl.sliceEndMin, slice: sl })),
       rawLayout,
@@ -1088,7 +1089,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // How much text fits: measured column width × this block's lanes.
       // Unmeasured (tests / first paint) counts as roomy.
       const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-      const railNum = Math.min(6, colPx * 0.1);
+      const railNum = 0;
       const widthPx = ((colPx - railNum) * span) / colCount - 3;
       const detail: 'none' | 'title' | 'full' =
         widthPx < 34 || heightPx < 14 ? 'none' : widthPx < 110 || heightPx < 32 ? 'title' : 'full';
@@ -1123,7 +1124,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             background: task.timeOpen
               ? `linear-gradient(to bottom, color-mix(in srgb, ${taskTone} 28%, var(--paper)) 0%, color-mix(in srgb, ${taskTone} 14%, transparent) 55%, transparent 100%)`
               : `color-mix(in srgb, ${taskTone} ${isMissed ? 12 : 24}%, var(--paper))`,
-            borderLeft: `3px solid ${taskTone}`,
+            // Soft full outline in the task colour (no left accent strip).
+            border: `1px solid color-mix(in srgb, ${taskTone} ${task.timeOpen ? 35 : 55}%, transparent)`,
+            ...(task.timeOpen ? { borderBottomColor: 'transparent' } : {}),
             borderTopLeftRadius,
             borderTopRightRadius,
             borderBottomLeftRadius,
@@ -1134,7 +1137,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : 0,
             opacity: isGrayed ? 0.45 : 1,
             boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
-            ...(task.timeOpen ? { borderImage: `linear-gradient(to bottom, ${taskTone}, transparent) 1` } : {}),
             display: 'flex',
             flexDirection: 'column',
             // A one-line title sits centred in short blocks instead of being
@@ -1429,7 +1431,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             <div style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--acid)' : 'var(--ink)' }}>{fmtMinOfDay(it.startMin)}</div>
             <div style={{ fontSize: 9.5, color: 'var(--ink-4)' }}>{fmtMinOfDay(it.endLabelMin)}</div>
           </div>
-          <div style={{ borderLeft: `3px solid ${it.tone}`, paddingLeft: 8, minWidth: 0 }}>
+          <div style={{ position: 'relative', paddingLeft: 14, minWidth: 0 }}>
+            <span aria-hidden style={{ position: 'absolute', left: 2, top: 5, width: 7, height: 7, borderRadius: 999, background: it.tone }} />
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.25, wordBreak: 'break-word' }}>
               {it.done ? '✓ ' : ''}{it.title}
             </div>
@@ -1545,7 +1548,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             background: isWork
               ? `color-mix(in srgb, ${tone} ${seg.live ? 20 : 13}%, transparent)`
               : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 22%, transparent) 0 1px, transparent 1px 7px)`,
-            borderLeft: `${isWork ? 3 : 2}px ${isWork ? 'solid' : 'dashed'} color-mix(in srgb, ${tone} ${isWork ? 70 : 45}%, transparent)`,
+            borderRadius: 3,
           }}
         />
       );
@@ -1595,7 +1598,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             right: 2,
             height: blockHeight,
             background: `color-mix(in srgb, var(--${habit.color}) 22%, var(--paper))`,
-            borderLeft: `3px solid var(--${habit.color})`,
+            border: `1px solid color-mix(in srgb, var(--${habit.color}) 55%, transparent)`,
             borderRadius: 2,
             overflow: 'hidden',
             zIndex: 1,

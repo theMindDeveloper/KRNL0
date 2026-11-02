@@ -69,7 +69,7 @@ export interface CompletionRecord {
 
 // Pen tool — one freehand stroke drawn on the canvas, in flow coordinates.
 // Points are [x, y, pressure]; the outline is rebuilt with perfect-freehand.
-export type DrawTool = 'pen' | 'marker' | 'highlighter';
+export type DrawTool = 'pen' | 'marker' | 'highlighter' | 'arrow';
 export interface DrawStroke {
   id: string;
   tool: DrawTool;

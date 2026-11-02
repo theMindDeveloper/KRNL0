@@ -14,6 +14,14 @@ const ICONS: Record<PageId, React.ReactNode> = {
   habits: (<path d="M12 21c-4 0-7-2.8-7-6.8 0-3.3 2.4-5.2 3.6-8.2.4 2 1.6 3.2 2.9 3.6C11 6.5 12.8 4.2 15 3c-.4 3 1.4 4.8 2.6 6.6.9 1.4 1.4 2.8 1.4 4.6 0 4-3 6.8-7 6.8z" />),
 };
 
+export function PageIcon({ page, size = 16 }: { page: PageId; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {ICONS[page]}
+    </svg>
+  );
+}
+
 export function PageNav({ current, onPick }: { current: PageId; onPick: (id: PageId) => void }) {
   const label = PAGES.find((p) => p.id === current)?.label ?? '';
   return (

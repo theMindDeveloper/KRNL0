@@ -92,7 +92,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'text',
     summary: 'Manage TextNodes on the canvas',
     subcommands: [
-      { name: 'add', usage: 'text add [--text "..."] [--at x,y] [--near <ref>]', summary: 'Add a text node. --near positions at srcX + srcW + 24, srcY' },
+      { name: 'add', usage: 'text add [--text "..."] [--at x,y] [--near <ref>] [--sticky] [--shape rect|ellipse|diamond] [--color <css>]', summary: 'Add a text node, a sticky note (--sticky) or a shape (--shape). --near positions at srcX + srcW + 24, srcY' },
       { name: 'set', usage: 'text set <id> --text "..."', summary: 'Update text node content' },
       { name: 'resize', usage: 'text resize <id> --w N --h N', summary: 'Resize a text node' },
     ],
@@ -172,6 +172,14 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'stats', usage: 'board stats [--json]', summary: 'Per-kind node counts + per-event edge counts' },
       { name: 'save', usage: 'board save [path]', summary: '(autosave is always on — kept for parity)' },
       { name: 'load', usage: 'board load <path>', summary: 'Load board from path' },
+    ],
+  },
+  {
+    group: 'media',
+    summary: 'Video, audio, PDF, embeds and links on the canvas (drop files/links in the app)',
+    subcommands: [
+      { name: 'add', usage: 'media add <url> [--at x,y]', summary: 'YouTube/Vimeo/SoundCloud/… → embedded player; other URLs → link card' },
+      { name: 'list', usage: 'media list [--json]', summary: 'List media nodes' },
     ],
   },
   {

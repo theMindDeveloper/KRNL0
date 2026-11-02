@@ -98,12 +98,16 @@ export function PagedView({
     const full = outer.clientHeight;
     // Offsets relative to the content box — the page shift (transform) moves
     // the box and its items together, so it cancels out.
-    const base = content.getBoundingClientRect().top;
+    const contentRect = content.getBoundingClientRect();
+    const base = contentRect.top;
+    // Screen rects are scaled by any ancestor transform (the canvas zoom);
+    // page heights are layout px. Divide the scale back out.
+    const scale = content.offsetHeight > 0 && contentRect.height > 0 ? contentRect.height / content.offsetHeight : 1;
     // Visual order (CSS `order` can differ from DOM order).
     const measured = Array.from(content.querySelectorAll<HTMLElement>(itemSelector))
       .map((el) => {
         const r = el.getBoundingClientRect();
-        return { el, top: r.top - base, bottom: r.bottom - base };
+        return { el, top: (r.top - base) / scale, bottom: (r.bottom - base) / scale };
       })
       .filter((m) => m.bottom > m.top)
       .sort((a, b) => a.top - b.top);

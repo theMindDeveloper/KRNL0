@@ -155,6 +155,6 @@ describe('Calendar pomo spans as background highlights', () => {
     const [work, brk] = Array.from(document.querySelectorAll('[data-testid="calendar-reality-block"]')) as HTMLElement[];
     expect(brk!.getAttribute('data-reality-kind')).toBe('break');
     expect(work!.style.background).not.toEqual(brk!.style.background);
-    expect(brk!.style.borderLeft).toMatch(/dashed/);
+    expect(brk!.style.background).toMatch(/repeating-linear-gradient/);
   });
 });

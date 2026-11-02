@@ -31,8 +31,15 @@ const BOARD_DIR =
   process.env.KRNL0_BOARD_DIR ?? join(homedir(), 'Documents', app.getName());
 const ASSETS_DIR = join(BOARD_DIR, 'assets');
 
-const ALLOWED_EXT = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg']);
-const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+// Media dropped on the canvas (video, audio, PDF) shares the asset store.
+const MEDIA_MIME: Record<string, string> = {
+  mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/mp4', ogv: 'video/ogg',
+  mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4', flac: 'audio/flac', aac: 'audio/aac',
+  pdf: 'application/pdf',
+};
+const ALLOWED_EXT = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', ...Object.keys(MEDIA_MIME)]);
+const MAX_BYTES = 25 * 1024 * 1024; // 25 MB (images)
+const MAX_MEDIA_BYTES = 500 * 1024 * 1024; // 500 MB (video / audio / PDF)
 const MIME_BY_EXT: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -40,6 +47,7 @@ const MIME_BY_EXT: Record<string, string> = {
   webp: 'image/webp',
   gif: 'image/gif',
   svg: 'image/svg+xml',
+  ...MEDIA_MIME,
 };
 
 const assetExt = new Map<string, string>();
@@ -89,6 +97,15 @@ function normExt(ext: string): string {
  * / `onerror=` (case-insensitive) to prevent XSS via SVG.
  */
 function validateBytes(ext: string, buf: Uint8Array): void {
+  if (ext in MEDIA_MIME) {
+    if (buf.byteLength === 0 || buf.byteLength > MAX_MEDIA_BYTES) throw new Error('asset:write — invalid size');
+    // PDF must look like a PDF; audio/video containers vary too much for a
+    // cheap magic check and are only ever played, never executed.
+    if (ext === 'pdf' && !(buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46)) {
+      throw new Error('asset:write — PDF magic mismatch');
+    }
+    return;
+  }
   if (buf.byteLength === 0 || buf.byteLength > MAX_BYTES) {
     throw new Error('asset:write â€” invalid size');
   }
