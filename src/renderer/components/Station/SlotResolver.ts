@@ -11,6 +11,7 @@
  *   calendar → top-right-upper    (top row, col 4 — rightmost)
  *   clock    → top-right-lower    (bottom row, right column beside Canvas)
  *   term     → bottom-strip       (not rendered in station mode)
+ *   analytics→ main               (Decision 32 — takes the canvas panel when shown)
  *
  * Layout structure (matches user-provided sketch):
  *   ┌─ DOCK TOP ─────────────────────────────────────┐
@@ -70,4 +71,5 @@ export const SLOT_INDEX: Record<StationSlot, number> = {
   'top-right-upper':  4,
   'top-right-lower':  5,
   'bottom-strip':     6,
+  'main':             7,
 };

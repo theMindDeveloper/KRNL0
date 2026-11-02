@@ -63,7 +63,7 @@ interface Props {
 // src/main/persistence/board.ts — see ADR 0006.
 export const MOTHER_WIDTH = 540;
 export const MOTHER_HEIGHT = 540;
-export const MOTHER_TOTAL = 6;
+export const MOTHER_TOTAL = 7; // Decision 32 — analytics is the seventh mother
 
 export function MotherFrame({
   nodeId,

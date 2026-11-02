@@ -16,6 +16,7 @@ import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange, selectSchedule } from '../../../store/scheduleSelector';
 import { packLanes } from '../../../store/laneLayout';
+import { layoutDayBlocks, BLOCK_TEXT_INSET } from './dayBlockLayout';
 import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
 import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
@@ -30,6 +31,8 @@ import { HabitSwapModal } from '../../ui/HabitSwapModal';
 import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
 import { calcStreak } from '../HabitNode/commands';
 import { toneVarForTask } from '../../../utils/taskColor';
+import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
+import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -495,6 +498,33 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     | { kind: 'task'; task: ScheduledTask }
     | { kind: 'reality'; seg: RealitySeg };
   const [layerMenu, setLayerMenu] = useState<{ x: number; y: number; items: LayerItem[] } | null>(null);
+  // A task row dragged out of the layer picker: the picker goes see-through so
+  // the drop reaches the grid underneath, and closes when the drag ends.
+  const [layerDragging, setLayerDragging] = useState(false);
+  // Right-click menu (shared with the Clock — ContextMenu/scheduleMenus.ts).
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  const openItemMenu = (item: LayerItem, x: number, y: number) => {
+    if (item.kind === 'task') {
+      const t = item.task;
+      const startMs = new Date(t.startISO).getTime();
+      setCtxMenu({
+        x, y,
+        items: taskMenuItems(
+          { id: t.id, text: t.text, done: t.done, startMs, endMs: startMs + t.scheduledDurationMin * 60_000 },
+          { onDetails: () => setTaskPopup({ task: t, x, y }) },
+        ),
+      });
+    } else {
+      const targets = retagOptions.map((pair) => {
+        const [id, text] = pair.split('\u0000') as [string, string];
+        return { id, text };
+      });
+      setCtxMenu({
+        x, y,
+        items: segmentMenuItems(item.seg, { targets, onDetails: () => setRealityPopup({ seg: item.seg, x, y }) }),
+      });
+    }
+  };
 
   // ADR 0003 §4 — read placements from the cascade selector, not raw
   // scheduledFor. The selector derives successor start times from the chain's
@@ -808,11 +838,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     }
     if (items.length === 0) return;
 
-    // Single hit → act directly, no picker noise.
+    // Single hit → its right-click menu directly, no picker noise.
     if (items.length === 1) {
-      const only = items[0]!;
-      if (only.kind === 'task') setTaskPopup({ task: only.task, x: e.clientX, y: e.clientY });
-      else setRealityPopup({ seg: only.seg, x: e.clientX, y: e.clientY });
+      openItemMenu(items[0]!, e.clientX, e.clientY);
       return;
     }
     setLayerMenu({ x: e.clientX, y: e.clientY, items });
@@ -826,39 +854,28 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
     const rawLayout = computeColumnLayout(slices, (MIN_BLOCK_PX / rowHeight) * 60);
 
-    // Only as many parallel lanes as fit at a readable width (~80px); the
-    // rest of a busy cluster collapses into a "+N" chip in the last lane
-    // that lists them. Narrow week columns (<2 readable lanes) keep slivers.
+    // Readable parallel tasks: only as many lanes as fit at MIN_LANE_PX; the
+    // rest of a busy cluster collapses into a "+N" chip that lists them (and
+    // lets each be dragged out). A single-lane column shows the first task at
+    // full width with a compact chip on its corner — never slivers.
     const colPxAll = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-    const maxLanes = Math.floor((colPxAll - Math.min(6, colPxAll * 0.1)) / 80);
-    const colLayout = new Map<string, { colIndex: number; colCount: number; span: number }>();
-    const hiddenSlices: TaskSlice[] = [];
-    for (const sl of slices) {
-      const pl = rawLayout.get(sl.task.id) ?? { colIndex: 0, colCount: 1, span: 1 };
-      if (maxLanes >= 2 && pl.colCount > maxLanes) {
-        if (pl.colIndex >= maxLanes - 1) hiddenSlices.push(sl);
-        else colLayout.set(sl.task.id, { colIndex: pl.colIndex, colCount: maxLanes, span: Math.min(pl.span, maxLanes - 1 - pl.colIndex) });
-      } else {
-        colLayout.set(sl.task.id, pl);
-      }
-    }
-    const hiddenIds = new Set(hiddenSlices.map((sl) => sl.task.id));
-
-    // Group hidden slices that overlap in time → one chip per group.
-    const groups: TaskSlice[][] = [];
-    for (const sl of [...hiddenSlices].sort((a, b) => a.sliceStartMin - b.sliceStartMin)) {
-      const last = groups[groups.length - 1];
-      const lastEnd = last ? Math.max(...last.map((x) => x.sliceEndMin)) : -1;
-      if (last && sl.sliceStartMin < lastEnd) last.push(sl);
-      else groups.push([sl]);
-    }
-    const overflowChips = groups.map((g) => {
-      const start = g[0]!.sliceStartMin;
+    const planPx = colPxAll - Math.min(6, colPxAll * 0.1);
+    const dayLayout = layoutDayBlocks(
+      slices.map((sl) => ({ id: sl.task.id, startMin: sl.sliceStartMin, endMin: sl.sliceEndMin, slice: sl })),
+      rawLayout,
+      planPx,
+    );
+    const colLayout = dayLayout.placements;
+    const hiddenIds = dayLayout.hidden;
+    const overflowChips = dayLayout.overflow.map((og) => {
+      const g = og.slices.map((x) => x.slice);
+      const start = og.startMin;
       return (
         <button
           key={`overflow-${g[0]!.task.id}`}
           type="button"
           data-testid="calendar-overflow-chip"
+          data-compact={og.compact ? 'true' : undefined}
           title={g.map((x) => x.task.text).join(', ')}
           onClick={(e) => {
             e.stopPropagation();
@@ -866,11 +883,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           }}
           style={{
             position: 'absolute',
-            top: (start / 60) * rowHeight,
-            left: `calc(${rail} + (100% - ${rail}) * ${(maxLanes - 1) / maxLanes} + 4px)`,
-            right: 3,
-            height: Math.max(20, Math.min(28, rowHeight / 2)),
+            top: (start / 60) * rowHeight + (og.compact ? 2 : 0),
+            ...(og.compact
+              ? { right: 5, minWidth: 30, padding: '0 4px' }
+              : { left: `calc(${rail} + (100% - ${rail}) * ${og.leftFrac} + 4px)`, right: 3 }),
+            height: og.compact ? 18 : Math.max(20, Math.min(28, rowHeight / 2)),
             zIndex: 3,
+            boxShadow: og.compact ? '0 1px 3px rgba(0,0,0,0.35)' : undefined,
             border: '1px solid var(--paper-3)',
             borderRadius: 4,
             background: 'var(--paper-2)',
@@ -885,7 +904,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             gap: 3,
           }}
         >
-          {g.slice(0, 3).map((x) => (
+          {g.slice(0, og.compact ? 1 : 3).map((x) => (
             <span key={x.task.id} aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: toneVarForTask(x.task.id) }} />
           ))}
           +{g.length}
@@ -1075,7 +1094,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             cursor: isContinuation ? 'pointer' : 'grab',
             overflow: 'hidden',
             zIndex: 2,
-            padding: detail === 'full' ? '3px 6px' : detail === 'title' ? '0 4px' : 0,
+            padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : 0,
             opacity: isGrayed ? 0.45 : 1,
             boxShadow: '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
             display: 'flex',
@@ -1447,64 +1466,47 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     );
   }
 
-  // ── Tracked-reality rail (plan vs reality) ─────────────────────────────────
-  // Reality gets its own rail on the left edge of each day column instead of a
-  // full-width wash behind the plan (which was hard to tell apart from the
-  // planned blocks). Work = solid, coloured by the task it is tagged with
-  // (acid when untagged); break = hatched; a pause is a visible gap. Clicking a
-  // span opens its info popup (times, retag, delete).
+  // ── Tracked reality as background highlights (plan vs reality) ────────────
+  // What the pomo actually recorded is a soft band BEHIND the planned blocks,
+  // across the plan area — not a component-like block. Focus = a faint wash in
+  // the tagged task's tone (acid when untagged) with a thin edge; break = a
+  // faint neutral hatch. A pause is a gap. The bands take no pointer events so
+  // drops reach the hour cells; right-click is resolved by the column's
+  // hit-test (handleColumnContextMenu) → retag / delete menu.
   function renderRealityBlocks(dayYMD: string) {
     const segs = realityByDay.get(dayYMD);
     if (!segs || segs.length === 0) return null;
     return segs.map((seg, i) => {
       const topPx = (seg.startMin / 60) * rowHeight;
-      const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
+      const heightPx = Math.max(2, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
       const tone = isWork ? (seg.taskId ? toneVarForTask(seg.taskId) : 'var(--acid)') : 'var(--ink-3)';
       const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
-      const showLabel = false;
       return (
         <div
           key={`reality-${seg.id}-${i}`}
           data-testid="calendar-reality-block"
           data-reality-kind={seg.kind}
           data-reality-live={seg.live ? 'true' : undefined}
-          onClick={(e) => {
-            e.stopPropagation();
-            setRealityPopup({ seg, x: e.clientX, y: e.clientY });
-          }}
-          title={
+          aria-label={
             seg.live
-              ? `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)} → now (recording)`
-              : `${isWork ? 'Focus' : 'Break'} · ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)} · ${minutes}m`
+              ? `${isWork ? 'Focus' : 'Break'} ${fmtHM(seg.startMs)} to now (recording)`
+              : `${isWork ? 'Focus' : 'Break'} ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)}, ${minutes} minutes`
           }
           style={{
             position: 'absolute',
             top: topPx,
-            left: 1,
-            width: `calc(${rail} - 2px)`,
+            left: 0,
+            right: 0,
             height: heightPx,
-            background: isWork ? `color-mix(in srgb, ${tone} ${seg.live ? 95 : 80}%, transparent)` : 'transparent',
-            backgroundImage: isWork
-              ? undefined
-              : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 55%, transparent) 0 2px, transparent 2px 6px)`,
-            border: isWork ? 'none' : `1px solid color-mix(in srgb, ${tone} 50%, transparent)`,
-            borderRadius: 2,
-            zIndex: 3,
-            cursor: 'pointer',
-            boxShadow: seg.live ? `0 0 8px color-mix(in srgb, ${tone} 60%, transparent)` : undefined,
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'center',
+            pointerEvents: 'none',
+            zIndex: 0,
+            background: isWork
+              ? `color-mix(in srgb, ${tone} ${seg.live ? 20 : 13}%, transparent)`
+              : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 22%, transparent) 0 1px, transparent 1px 7px)`,
+            borderLeft: `${isWork ? 3 : 2}px ${isWork ? 'solid' : 'dashed'} color-mix(in srgb, ${tone} ${isWork ? 70 : 45}%, transparent)`,
           }}
-        >
-          {showLabel && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, fontWeight: 700, color: isWork ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)', paddingTop: 1, pointerEvents: 'none' }}>
-              {minutes}m
-            </span>
-          )}
-        </div>
+        />
       );
     });
   }
@@ -1993,14 +1995,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   );
                 })}
 
+                {/* Issue #166 — tracked reality as background highlights
+                    (zIndex 0, no pointer events — behind habits and tasks) */}
+                {renderRealityBlocks(dayYMD)}
+
                 {/* Habit blocks (zIndex: 1 — behind tasks) */}
                 {renderHabitBlocks(dayYMD)}
 
                 {/* Task blocks rendered as absolute-positioned children */}
                 {renderTaskBlocks(dayYMD)}
-
-                {/* Issue #166 — tracked reality overlay (work/break spans) */}
-                {renderRealityBlocks(dayYMD)}
 
                 {/* #8 — snap-preview band: the exact slot the drop will land on,
                     so you see "13:45" not "the 13:00 hour". */}
@@ -2293,14 +2296,20 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       );
       })()}
 
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onDismiss={() => setCtxMenu(null)} />
+      )}
+
       {/* #7 — overlap layer picker. Right-click enumerates every block under the
           cursor; the user picks which to inspect. */}
       {layerMenu && createPortal(
         <>
-          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 2098 }} />
+          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 2098, pointerEvents: layerDragging ? 'none' : undefined }} />
           <div
             data-testid="calendar-layer-menu"
             style={{
+              pointerEvents: layerDragging ? 'none' : undefined,
+              opacity: layerDragging ? 0.35 : 1,
               position: 'fixed',
               left: Math.min(layerMenu.x + 4, window.innerWidth - 230),
               top: layerMenu.y + 4,
@@ -2328,9 +2337,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   key={i}
                   type="button"
                   data-testid={`calendar-layer-item-${item.kind}`}
+                  draggable={isTask}
+                  onDragStart={isTask ? (e) => {
+                    e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: item.task.id, durationMin: item.task.plannedMin }));
+                    e.dataTransfer.effectAllowed = 'move';
+                    setLayerDragging(true);
+                  } : undefined}
+                  onDragEnd={isTask ? () => { setLayerDragging(false); setLayerMenu(null); } : undefined}
                   onClick={() => {
-                    if (item.kind === 'task') setTaskPopup({ task: item.task, x: layerMenu.x, y: layerMenu.y });
-                    else setRealityPopup({ seg: item.seg, x: layerMenu.x, y: layerMenu.y });
+                    openItemMenu(item, layerMenu.x, layerMenu.y);
                     setLayerMenu(null);
                   }}
                   style={{

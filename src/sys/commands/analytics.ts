@@ -1,7 +1,7 @@
 // sys analytics — CLI reads backed by the pure analytics engine (Decision 29 §6).
 // Headless-capable: buildAnalytics operates on board-JSON alone.
 
-import { loadBoardFrom } from '../../main/persistence/board';
+import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import { buildAnalytics } from '../../renderer/analytics/engine';
 import { registerBuiltinSources } from '../../renderer/analytics/sources';
@@ -148,4 +148,36 @@ export async function analyticsStreaks(
     }
   }
   return { ok: true, message: lines.join('\n'), data: streaks };
+}
+
+// ── Decision 32 — analytics window visibility ──────────────────────────────────
+// Analytics is a fixed mother ('mother-analytics'). In Station mode it takes
+// the canvas panel when shown; visibility is config.stationHidden, default
+// hidden. Canvas mode always shows it in the mother row.
+
+export interface AnalyticsWindowCtx extends AnalyticsCtx {
+  onBoardChanged?: () => void;
+}
+
+export function analyticsWindow(
+  ctx: AnalyticsWindowCtx,
+  action: 'open' | 'close' | 'toggle',
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath);
+  if (typeof raw !== 'object' || raw === null) return { ok: false, message: 'No board found' };
+  const board = raw as Record<string, unknown> & { nodes?: unknown[] };
+  const nodes = Array.isArray(board.nodes) ? (board.nodes as Array<Record<string, unknown>>) : [];
+  const mother = nodes.find((n) => n['kind'] === 'analytics' && n['isMother'] === true);
+  if (!mother) return { ok: false, message: 'No analytics window on the board' };
+  const cfg = (mother['config'] ?? {}) as Record<string, unknown>;
+  // Same default as the renderer: no flag means hidden.
+  const shown = cfg['stationHidden'] === false;
+  const next = action === 'toggle' ? !shown : action === 'open';
+  mother['config'] = { ...cfg, stationHidden: !next };
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  const where = board['layoutMode'] === 'station'
+    ? (next ? ' (shown in place of the canvas)' : ' (canvas panel restored)')
+    : ' (canvas mode always shows it in the mother row; this applies in station mode)';
+  return { ok: true, message: `analytics ${next ? 'opened' : 'closed'}${where}`, data: { shown: next } };
 }

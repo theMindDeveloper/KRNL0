@@ -303,7 +303,7 @@ describe('Decision 22 — board migration', () => {
 
   // ── AC1 — Fresh seed (Decision 23.1) ─────────────────────────────────────────
 
-  it('AC1: seedBoard() produces exactly 6 mothers including mother-clock at the canonical x', () => {
+  it('AC1: seedBoard() produces exactly 7 mothers including mother-clock at the canonical x', () => {
     const board = seedBoard();
 
     // Exactly 6 nodes (the 6 permanent mothers)

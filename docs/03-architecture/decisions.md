@@ -2381,3 +2381,26 @@ Documenting unbuilt commands is how AI agents learn to hallucinate them. The gat
 - Tests encoding the planner model were removed.
 - Analytics gains "Plan vs actual" (docs/06-requirements/analytics-plan-vs-actual.md).
 
+---
+
+## Decision 32 — Analytics is the seventh fixed mother (2026-11-02)
+
+**Status:** Accepted
+
+### Context
+Analytics (#134) was a free-floating child spawned with `A` or the Dock chart button. In Station mode it had no home: it floated inside the embedded canvas, which made it fight with tasks and frames.
+
+### Decision
+- Analytics becomes a mother: `mother-analytics`, kind `analytics`, new `StationSlot` value `'main'`. `MOTHER_TOTAL` is now 7. Seed position is x 1960, right of the terminal.
+- **Station mode:** the `main` slot shares the canvas panel. When Analytics is shown it renders there instead of the canvas. Visibility is `config.stationHidden`, default hidden like the terminal. The `main` slot neither swaps nor accepts a mother swap.
+- **Canvas mode:** a normal fixed window in the mother row.
+- Hosting changes, not the dashboard: `AnalyticsNode/AnalyticsMother.tsx` wraps the existing `AnalyticsNode` in `MotherFrame`.
+- Migration `migrateAddAnalyticsMother` injects the mother, adopts the first child's view state, and removes children and their edges.
+- CLI: `analytics open | close | toggle`.
+
+### Consequences
+- Tests and docs that assumed 6 mothers now say 7.
+- The Dock `A` button no longer creates or deletes nodes.
+
+Requirements: [analytics-window.md](../06-requirements/analytics-window.md).
+

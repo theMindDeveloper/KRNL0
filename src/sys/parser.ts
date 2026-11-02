@@ -10,6 +10,8 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
   | { kind: 'pomo'; sub: 'tag'; ref: string | undefined }
   | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined }
+  | { kind: 'pomo'; sub: 'delete-segment'; segmentId: string | undefined }
+  | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'list'; json: boolean }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
   | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
@@ -111,6 +113,7 @@ export type SysCommand =
   | { kind: 'analytics'; sub: 'show'; view: string | undefined; range: number | undefined; metric: string | undefined; json: boolean }
   | { kind: 'analytics'; sub: 'totals'; range: number | undefined; json: boolean }
   | { kind: 'analytics'; sub: 'streaks'; json: boolean }
+  | { kind: 'analytics'; sub: 'open' | 'close' | 'toggle' }
   | { kind: 'log'; sub: 'tail'; limit: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'stats'; json: boolean }
   | { kind: 'theme'; sub: 'show'; json: boolean }
@@ -264,6 +267,8 @@ export class SysParser {
         return { kind: 'pomo', sub };
       if (sub === 'tag') return { kind: 'pomo', sub: 'tag', ref: rest[0] };
       if (sub === 'retag') return { kind: 'pomo', sub: 'retag', segmentId: rest[0], ref: rest[1] };
+      if (sub === 'delete-segment') return { kind: 'pomo', sub: 'delete-segment', segmentId: rest[0] };
+      if (sub === 'segments') return { kind: 'pomo', sub: 'segments', date: flag(rest, 'date'), json: hasFlag(rest, 'json') };
       if (sub === 'start') {
         const minutesRaw = flag(rest, 'minutes');
         return {
@@ -660,6 +665,10 @@ export class SysParser {
       }
       if (sub === 'streaks') {
         return { kind: 'analytics', sub: 'streaks', json: hasFlag(rest, 'json') };
+      }
+      // Decision 32 — window visibility (Station mode: shown in place of the canvas).
+      if (sub === 'open' || sub === 'close' || sub === 'toggle') {
+        return { kind: 'analytics', sub };
       }
     }
 

@@ -19,13 +19,15 @@ export type LayoutMode = 'canvas' | 'station';
 //   top-right-upper → Calendar
 //   top-right-lower → Clock
 //   bottom-strip    → Term
+//   main            → Analytics (shares the canvas panel; shown in its place)
 export type StationSlot =
   | 'top-left'
   | 'top-center'
   | 'top-right-pre'
   | 'top-right-upper'
   | 'top-right-lower'
-  | 'bottom-strip';
+  | 'bottom-strip'
+  | 'main';
 
 // ADR 0008 § 2.4 — station geometry (rowFraction, columnFractions,
 // rightColumnSplit) persisted per-board only when user resizes panels.

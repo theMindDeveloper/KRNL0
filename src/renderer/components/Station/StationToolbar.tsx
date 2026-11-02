@@ -1,8 +1,9 @@
 /**
  * StationToolbar — top-of-shell strip with toggle icons for every panel.
  *
- * Replaces the per-cell right-click → Hide UX. One row of 7 buttons:
- * Pomo · Todo · Habit · Calendar · Clock · Terminal · Canvas. Each button
+ * Replaces the per-cell right-click → Hide UX. One row of 8 buttons:
+ * Pomo · Todo · Habit · Calendar · Terminal · Clock · Analytics · Canvas.
+ * Analytics and Canvas share one panel (Decision 32). Each button
  * is a toggle:
  *   - Active state = panel visible
  *   - Inactive state = panel hidden (omitted from the layout; neighbours
@@ -31,6 +32,8 @@ const MOTHER_ORDER: MotherEntry[] = [
   { kind: 'calendar', label: 'Cal' },
   { kind: 'term',     label: 'Term' },
   { kind: 'clock',    label: 'Clock' },
+  // Decision 32 — shown in place of the canvas panel.
+  { kind: 'analytics', label: 'Analytics' },
 ];
 
 function Glyph({ kind, active }: { kind: NodeKind | 'canvas'; active: boolean }) {
@@ -91,6 +94,13 @@ function Glyph({ kind, active }: { kind: NodeKind | 'canvas'; active: boolean })
         <svg {...common}>
           <rect x="3" y="5" width="18" height="14" rx="1.5" />
           <path d="M6 10l3 2-3 2M11 14h6" />
+        </svg>
+      );
+    case 'analytics':
+      return (
+        <svg {...common}>
+          <path d="M4 4v16h16" />
+          <path d="M7 15l4-4 3 3 5-6" />
         </svg>
       );
     case 'canvas':
@@ -177,12 +187,24 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
     updateNode(m.id, { config: { ...cfg, stationHidden: !currentlyHidden } });
   };
 
+  // Decision 32 — Analytics and the canvas share one panel. The canvas reads as
+  // visible only when Analytics isn't covering it; turning the canvas on
+  // while Analytics is shown hides Analytics instead of flipping the flag.
+  const analyticsMother = motherByKind.get('analytics');
+  const analyticsShown = !!analyticsMother && !isStationHidden(analyticsMother);
+  const canvasShown = !canvasHidden && !analyticsShown;
+
   const toggleCanvas = () => {
+    if (analyticsShown && analyticsMother) {
+      const cfg = (analyticsMother.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
+      updateNode(analyticsMother.id, { config: { ...cfg, stationHidden: true } });
+      if (!canvasHidden) return;
+    }
     const next: StationGeometry = {
       rowFraction: stationGeo?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
       columnFractions: stationGeo?.columnFractions ?? [],
       rightColumnSplit: stationGeo?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
-      canvasHidden: !canvasHidden,
+      canvasHidden: analyticsShown ? false : !canvasHidden,
     };
     setLayoutGeometry({ station: next });
   };
@@ -235,11 +257,11 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
         );
       })}
       <ToolbarBtn
-        active={!canvasHidden}
+        active={canvasShown}
         label="Canvas"
         onClick={toggleCanvas}
       >
-        <Glyph kind="canvas" active={!canvasHidden} />
+        <Glyph kind="canvas" active={canvasShown} />
       </ToolbarBtn>
     </div>
   );

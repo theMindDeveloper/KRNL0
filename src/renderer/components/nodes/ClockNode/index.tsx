@@ -25,6 +25,8 @@ export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { ClockBezel } from './ClockBezel';
+import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
+import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -250,6 +252,39 @@ export function ClockNode({
     });
     const b = useBoardStore.getState().board;
     if (b) void saveBoard(b);
+  };
+  // Right-click menus — the same builders as the Calendar, so a task or a
+  // pomo segment offers the same actions on both surfaces.
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  const openSegmentMenu = (seg: RealitySegment, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const targets = (useBoardStore.getState().board?.nodes ?? [])
+      .filter((n) => n.kind === 'todo.task' && (n.state as TaskState).parentTaskId === null)
+      .map((n) => ({ id: n.id, text: (n.state as TaskState).text }));
+    const x = e.clientX;
+    const y = e.clientY;
+    setCtxMenu({ x, y, items: segmentMenuItems(seg, { targets, onDetails: () => setRealityPopup({ seg, x, y }) }) });
+  };
+  const openTaskMenu = (taskId: string, startH: number, endH: number, e: React.MouseEvent) => {
+    const node = useBoardStore.getState().board?.nodes.find((n) => n.id === taskId);
+    // Habits ride the dial too but aren't tasks — no task menu for them.
+    if (!node || node.kind !== 'todo.task') return;
+    e.preventDefault();
+    e.stopPropagation();
+    const ts = node.state as TaskState;
+    const dayStart = new Date(selectedDate + 'T00:00:00').getTime();
+    setCtxMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: taskMenuItems({
+        id: taskId,
+        text: ts.text,
+        done: ts.done,
+        startMs: dayStart + startH * 3_600_000,
+        endMs: dayStart + endH * 3_600_000,
+      }),
+    });
   };
   const fmtClockHM = (ms: number) => {
     const d = new Date(ms);
@@ -766,13 +801,15 @@ export function ClockNode({
                   <g key={`${key}-base`}>
                     <path
                       data-testid="clock-plan-arc"
+                      data-task-id={t.id}
+                      onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
                       d={arcPath(s, e, r)}
                       fill="none"
                       stroke={t.colorVar}
                       strokeWidth={sw}
                       strokeLinecap={cap}
                       opacity={opacity * (active ? 0.95 : 0.7)}
-                      style={activeStyle}
+                      style={{ ...activeStyle, cursor: 'context-menu' }}
                     >
                       <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)}`}</title>
                     </path>
@@ -894,6 +931,7 @@ export function ClockNode({
                 e.stopPropagation();
                 setRealityPopup({ seg, x: e.clientX, y: e.clientY });
               };
+              const menu = (e: React.MouseEvent) => openSegmentMenu(seg, e);
               return (
                 <path
                   key={`reality-${seg.id}`}
@@ -901,7 +939,7 @@ export function ClockNode({
                   data-reality-kind={seg.kind}
                   data-reality-live={seg.live ? 'true' : undefined}
                   onClick={open}
-                  onContextMenu={open}
+                  onContextMenu={menu}
                   d={sectorPath(seg.startH, seg.endH, R_FACE - 1)}
                   fill={isWork ? tone : 'url(#clock-break-hatch)'}
                   stroke="none"
@@ -1146,6 +1184,8 @@ export function ClockNode({
             return (
               <div
                 key={t.id}
+                data-testid="clock-task-row"
+                onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '4px 56px 1fr auto',
@@ -1211,6 +1251,9 @@ export function ClockNode({
       </div>
 
       {/* #6/#12 — tracked-reality info + delete popup (right-click an arc). */}
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onDismiss={() => setCtxMenu(null)} />
+      )}
       {realityPopup && createPortal(
         <>
           <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />

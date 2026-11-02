@@ -82,6 +82,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'discard', usage: 'pomo discard', summary: 'Abandon the in-flight span without recording it' },
       { name: 'tag', usage: 'pomo tag <taskRef|none>', summary: 'Label what the pomo is observing (only tags recorded time, never changes the timer)' },
       { name: 'retag', usage: 'pomo retag <segmentId> <taskRef|none>', summary: 'Change which task a recorded span counts toward' },
+      { name: 'segments', usage: 'pomo segments [--date YYYY-MM-DD] [--json]', summary: 'List tracked focus/break spans for a day (ids for retag / delete-segment)' },
+      { name: 'delete-segment', usage: 'pomo delete-segment <segmentId>', summary: 'Delete a recorded focus/break span (Calendar/Clock right-click → Delete segment)' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
       { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor]', summary: 'Update board-scoped PomoConfig on the mother PomoNode' },
     ],
@@ -125,6 +127,9 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources|estimates] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
       { name: 'totals', usage: 'analytics totals [--range N] [--json]', summary: 'Show task/habit/focus totals over N days (default 30)' },
       { name: 'streaks', usage: 'analytics streaks [--json]', summary: 'Show habit streak data' },
+      { name: 'open', usage: 'analytics open', summary: 'Show the Analytics window (station mode: in place of the canvas panel)' },
+      { name: 'close', usage: 'analytics close', summary: 'Hide the Analytics window (station mode: canvas panel returns)' },
+      { name: 'toggle', usage: 'analytics toggle', summary: 'Toggle the Analytics window' },
     ],
   },
   {

@@ -58,8 +58,9 @@ import { defaultPomoConfig } from '../nodes/PomoNode/types';
 import { todoAdd, todoLinkTask } from '../nodes/TodoNode/commands';
 import type { FrameState } from '../nodes/FrameNode/types';
 import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
-import { defaultAnalyticsState, defaultAnalyticsConfig } from '../nodes/AnalyticsNode/types';
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
+import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
+import { FOCUS_NODE_EVENT } from '../../store/scheduleActions';
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
 // Hex literals used instead of CSS var() to skip variable resolution per rect.
@@ -418,7 +419,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
-  const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport } = useReactFlow();
+  const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport, setCenter } = useReactFlow();
 
   // Dock-frame variant (classic | synthesizer | telemetry | phosphor).
   // Hook applies `data-dock` to <html> and persists in localStorage.
@@ -781,6 +782,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   //   right where the user clicked). image opens the OS file picker; the
   //   `at` position is stashed in pendingImageDropPos so the spawn after the
   //   picker resolves at the click point too.
+  // "Show on canvas" from the Calendar / Clock right-click menus (any surface,
+  // no ReactFlow context needed there) — centre the node here.
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const id = (e as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
+      const n = id ? useBoardStore.getState().board?.nodes.find((x) => x.id === id) : undefined;
+      if (n) setCenter(n.position.x + 110, n.position.y + 80, { duration: 400, zoom: 0.9 });
+    };
+    window.addEventListener(FOCUS_NODE_EVENT, onFocus);
+    return () => window.removeEventListener(FOCUS_NODE_EVENT, onFocus);
+  }, [setCenter]);
+
   const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number } }) => {
     // Auto-enable the layer filter for the spawned kind so the new node is
     // immediately visible. Without this, toggling TEXTS / IMAGES off on the
@@ -796,33 +809,23 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       imageFileInputRef.current?.click();
       return;
     }
-    // Analytics is a singleton dashboard — clicking the dock button (or
-    // pressing 'A') toggles: spawn if none exists, otherwise hide every
-    // analytics node currently on the board.
+    // Decision 32 — Analytics is a fixed mother, never spawned. The dock button
+    // (or 'A') toggles its window in Station mode (where it takes the canvas
+    // panel) and brings it into view in Canvas mode (where it sits in the
+    // mother row).
     if (args.kind === 'analytics') {
       const current = useBoardStore.getState().board;
-      const existing = current?.nodes.filter((n) => n.kind === 'analytics') ?? [];
-      if (existing.length > 0) {
-        for (const n of existing) removeNode(n.id);
-        const after = useBoardStore.getState().board;
-        if (after) void saveBoard(after);
+      if (current?.layoutMode === 'station') {
+        toggleAnalyticsShown();
         return;
       }
+      const mother = findAnalyticsMother(current);
+      if (mother) {
+        setCenter(mother.position.x + MOTHER_WIDTH / 2, mother.position.y + MOTHER_HEIGHT / 2, { zoom: 1, duration: 380 });
+      }
+      return;
     }
-    // Analytics default spawn — centered on the user's current viewport so
-    // the new panel appears wherever they're looking, not parked off in the
-    // dead zone to the right of the dock. The 540×540 box is centered via
-    // a half-size top-left offset. `args.at` (explicit right-click spawn)
-    // still wins.
-    const viewportCenter = screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    });
-    const analyticsDefaultPos = {
-      x: viewportCenter.x - 270,
-      y: viewportCenter.y - 270,
-    };
-    const pos = args.at ?? (args.kind === 'analytics' ? analyticsDefaultPos : defaultDockSpawnPos());
+    const pos = args.at ?? defaultDockSpawnPos();
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
       // clock is a permanent mother — never spawnable via handleAddNode.
@@ -832,11 +835,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       text: { text: '' },
       image: {},
       frame: defaultFrameState() as unknown as Record<string, unknown>,
-      analytics: defaultAnalyticsState() as unknown as Record<string, unknown>,
+      // analytics is a permanent mother (Decision 32) — handled above.
+      analytics: {},
     };
     const defaultConfigByKind: Partial<Record<NodeKind, Record<string, unknown>>> = {
       frame: defaultFrameConfig() as unknown as Record<string, unknown>,
-      analytics: defaultAnalyticsConfig() as unknown as Record<string, unknown>,
     };
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -856,11 +859,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const sizes: Partial<Record<NodeKind, { width: number; height: number }>> = {
       text:  { width: 260, height: 120 },
       frame: { width: 360, height: 240 },
-      analytics: { width: 540, height: 540 },
     };
     const sz = sizes[args.kind];
     if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });
-  }, [addNode, removeNode, defaultDockSpawnPos, ensureVisible]);
+  }, [addNode, defaultDockSpawnPos, ensureVisible, setCenter]);
 
   // ── Pane-ctx "+ Task" / "+ Habit" — submit handlers ─────────────────────
   // Task: spawn at click flow pos, parent to todo mother (parentTodoId is a

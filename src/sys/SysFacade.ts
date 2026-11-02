@@ -9,7 +9,7 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
-import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag } from './commands/pomo';
+import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
@@ -30,6 +30,7 @@ import {
   analyticsShow,
   analyticsTotals,
   analyticsStreaks,
+  analyticsWindow,
 } from './commands/analytics';
 import type { AnalyticsCtx } from './commands/analytics';
 import { logTail, logStats, requiresRenderer as logRequiresRenderer } from './commands/log';
@@ -363,6 +364,13 @@ export class SysFacade {
           return analyticsTotals(aCtx, totalsOpts);
         }
         case 'streaks': return analyticsStreaks(aCtx, { json: command.json });
+        case 'open':
+        case 'close':
+        case 'toggle':
+          return analyticsWindow(
+            { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+            command.sub,
+          );
       }
     }
 
@@ -412,6 +420,18 @@ export class SysFacade {
           return command.sub === 'tag'
             ? pomoTag(tagCtx, command.ref)
             : pomoRetag(tagCtx, command.segmentId, command.ref);
+        }
+        case 'delete-segment': {
+          const segCtx = {
+            boardPath: this.deps.boardPath,
+            ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+          };
+          return pomoDeleteSegmentCmd(segCtx, command.segmentId);
+        }
+        case 'segments': {
+          const segOpts: Parameters<typeof pomoSegments>[1] = { json: command.json };
+          if (command.date !== undefined) segOpts.date = command.date;
+          return pomoSegments({ boardPath: this.deps.boardPath }, segOpts);
         }
         case 'status': return pomoStatus();
         case 'config': {

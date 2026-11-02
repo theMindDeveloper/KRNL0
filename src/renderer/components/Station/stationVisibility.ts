@@ -7,12 +7,14 @@
 import type { MotherNodeConfig } from '../../../shared/types';
 import type { Node } from '../../../shared/types/node';
 
-// Terminal mother is default-hidden across every dock variant — users opt in
-// via the StationToolbar toggle. Other mothers stay default-visible.
+// Terminal and Analytics mothers are default-hidden across every dock variant —
+// users opt in via the StationToolbar toggle. Analytics takes the canvas panel
+// when shown (Decision 32), so showing it by default would hide the canvas.
+// Other mothers stay default-visible.
 export function isStationHidden(node: Node | undefined): boolean {
   if (!node) return true; // missing == hidden
   const cfg = (node.config ?? {}) as MotherNodeConfig;
   if (cfg.stationHidden !== undefined) return !!cfg.stationHidden;
-  if (node.kind === 'term') return true;
+  if (node.kind === 'term' || node.kind === 'analytics') return true;
   return false;
 }

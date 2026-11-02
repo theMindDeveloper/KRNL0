@@ -17,6 +17,7 @@ import type { NodeKind } from '../../../shared/types/node';
 import { DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { useBoardStore } from '../../store/boardStore';
+import { isAnalyticsShown } from '../../store/analyticsMother';
 
 type ToolMode = 'select' | 'connect';
 
@@ -67,9 +68,11 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
     };
   }, [dockMenuOpen]);
 
-  // Analytics is a singleton — button reflects whether one is on the board.
+  // Decision 32 — Analytics is a fixed mother. In Station mode the button
+  // toggles its window (in place of the canvas); in Canvas mode it brings
+  // the mother into view, so it has no on/off state there.
   const analyticsOpen = useBoardStore((s) =>
-    (s.board?.nodes ?? []).some((n) => n.kind === 'analytics'),
+    s.board?.layoutMode === 'station' && isAnalyticsShown(s.board),
   );
 
   // Close picker on outside click.
@@ -234,7 +237,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         </svg>
       </button>
 
-      {/* Analytics — A. Singleton dashboard: click to spawn, click again to hide. */}
+      {/* Analytics — A. Fixed mother: toggles its window in Station mode, brings it into view in Canvas mode. */}
       <button
         type="button"
         data-testid="dock-btn-analytics"

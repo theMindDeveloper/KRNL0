@@ -161,9 +161,10 @@ function stressBoard(): Json {
     span('r8', at(15, 0, -4), at(16, 10, -4), 'work', null, ''),
   ];
   nodes.push({
-    id: 'analytics-1', kind: 'analytics', position: { x: -840, y: 1500 }, isMother: false,
+    // Decision 32 — analytics is the seventh mother (slot 'main').
+    id: 'mother-analytics', kind: 'analytics', position: { x: 1960, y: 0 }, isMother: true,
     state: { view: 'estimates', rangeDays: 7, metric: 'taskCount', width: 540, height: 540, hiddenCards: [], pinnedCards: [], settingsOpen: false },
-    config: {},
+    config: { stationSlot: 'main' },
   });
 
   const habit = nodes.find((n) => n.id === 'mother-habit')!;

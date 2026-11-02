@@ -9,6 +9,7 @@ import {
   pomoPause as fsmPause,
   pomoResume as fsmResume,
   pomoDiscard as fsmDiscard,
+  pomoDeleteSegment as fsmDeleteSegment,
   type PomoEnv,
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
@@ -16,6 +17,7 @@ import { resolveNodeRef, resolutionError } from '../../shared/dispatch/resolveRe
 import type { BoardShape } from '../../shared/dispatch/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
+import { selectPomoReality } from '../../renderer/store/pomoReality';
 
 const VALID_FACES: readonly TimerFace[] = TIMER_FACES;
 function isTimerFace(v: unknown): v is TimerFace {
@@ -247,6 +249,60 @@ export function pomoRetag(ctx: PomoTagCtx, segmentId: string | undefined, ref: s
     result = { ok: true, message: `segment ${id.slice(0, 8)} → ${tag.taskId ? `"${tag.label}"` : 'untagged'}` };
   });
   return result;
+}
+
+/** Resolve a unique recorded segment id from a prefix. */
+function resolveSegmentId(state: PomoState, segmentId: string): { id: string } | { error: string } {
+  const matches = state.history.filter((r) => r.id.startsWith(segmentId));
+  if (matches.length === 1) return { id: matches[0]!.id };
+  return { error: matches.length === 0 ? `no segment "${segmentId}"` : `segment "${segmentId}" is ambiguous` };
+}
+
+/**
+ * `krnl pomo delete-segment <segmentId>` — remove a recorded work/break span
+ * (CLI twin of the Calendar / Clock right-click "Delete segment"). The live
+ * in-flight span isn't in history, so it can't be deleted — use `pomo discard`.
+ */
+export function pomoDeleteSegmentCmd(ctx: PomoTagCtx, segmentId: string | undefined): SysResult {
+  if (!segmentId) return { ok: false, message: 'pomo delete-segment requires <segmentId>' };
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  mutatePomoBoard(ctx, (board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    const r = resolveSegmentId(prev, segmentId);
+    if ('error' in r) { result = { ok: false, message: r.error }; return; }
+    node['state'] = fsmDeleteSegment(prev, { id: r.id });
+    result = { ok: true, message: `segment ${r.id.slice(0, 8)} deleted` };
+  });
+  return result;
+}
+
+/**
+ * `krnl pomo segments [--date YYYY-MM-DD] [--json]` — list tracked focus and
+ * break spans (ids for retag / delete-segment). Defaults to today.
+ */
+export function pomoSegments(ctx: { boardPath: string }, opts: { date?: string; json?: boolean }): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as Board | null;
+  if (!raw || !Array.isArray(raw.nodes)) return { ok: false, message: 'No board found' };
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const date = opts.date ?? today;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, message: `bad --date "${date}" (want YYYY-MM-DD)` };
+  const dayStart = new Date(`${date}T00:00:00`).getTime();
+  const dayEnd = dayStart + 86_400_000;
+  const hm = (ms: number) => { const t = new Date(ms); return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; };
+  const segs = selectPomoReality(raw, Date.now())
+    .filter((sg) => sg.endMs > dayStart && sg.startMs < dayEnd)
+    .map((sg) => ({
+      id: sg.id, kind: sg.kind, taskId: sg.taskId, label: sg.label, live: sg.live,
+      start: hm(sg.startMs), end: hm(sg.endMs), minutes: Math.max(1, Math.round((sg.endMs - sg.startMs) / 60_000)),
+    }));
+  if (opts.json) return { ok: true, message: JSON.stringify(segs), data: segs };
+  if (segs.length === 0) return { ok: true, message: `no tracked segments on ${date}`, data: segs };
+  const lines = segs.map((sg) =>
+    `  ${sg.id.slice(0, 8)}  ${sg.kind === 'work' ? 'focus' : 'break'}  ${sg.start}–${sg.live ? 'now  ' : sg.end}  ${String(sg.minutes).padStart(3)}m  ${sg.label || (sg.kind === 'work' ? '(untagged)' : '')}`);
+  return { ok: true, message: [`tracked segments — ${date}`, ...lines].join('\n'), data: segs };
 }
 
 /** Issue #166 — segment-aware status: shows what is currently happening. */
