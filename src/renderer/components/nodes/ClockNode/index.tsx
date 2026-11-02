@@ -28,6 +28,7 @@ import { ClockBezel } from './ClockBezel';
 import { PagedView } from '../../ui/PagedView';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
+import { AppSelect } from '../../ui/AppSelect';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -1357,23 +1358,22 @@ export function ClockNode({
             {realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 Counts toward
-                <select
-                  data-testid="clock-reality-retag"
+                <AppSelect
+                  testId="clock-reality-retag"
                   value={realityPopup.seg.taskId ?? ''}
-                  onChange={(e) => {
-                    const taskId = e.target.value === '' ? null : e.target.value;
+                  options={[
+                    { value: '', label: 'untagged' },
+                    ...(board0?.nodes ?? [])
+                      .filter((n) => n.kind === 'todo.task' && (n.state as { parentTaskId: string | null }).parentTaskId === null)
+                      .map((n) => ({ value: n.id, label: (n.state as { text: string }).text })),
+                  ]}
+                  onChange={(v) => {
+                    const taskId = v === '' ? null : v;
                     retagClockSegment(realityPopup.seg.id, taskId);
                     setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } });
                   }}
-                  style={{ flex: 1, minWidth: 0, background: 'var(--paper-2)', color: 'var(--ink)', border: '1px solid var(--paper-3)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 4px', textTransform: 'none' }}
-                >
-                  <option value="">untagged</option>
-                  {(board0?.nodes ?? [])
-                    .filter((n) => n.kind === 'todo.task' && (n.state as { parentTaskId: string | null }).parentTaskId === null)
-                    .map((n) => (
-                      <option key={n.id} value={n.id}>{(n.state as { text: string }).text}</option>
-                    ))}
-                </select>
+                  style={{ flex: 1, minWidth: 0 }}
+                />
               </label>
             )}
             {!realityPopup.seg.live && (

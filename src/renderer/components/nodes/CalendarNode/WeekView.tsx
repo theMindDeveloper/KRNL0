@@ -18,6 +18,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange, selectSchedule } from '../../../store/scheduleSelector';
 import { packLanes } from '../../../store/laneLayout';
 import { layoutDayBlocks, BLOCK_TEXT_INSET } from './dayBlockLayout';
+import { AppSelect } from '../../ui/AppSelect';
 import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
 import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
@@ -261,11 +262,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // The band must never outlive the drag: a drop on a task block stops
   // propagation before the cell can clear it, and a cancelled drag (Esc, drop
   // outside the grid) never reaches a cell at all.
-  // Task block being dragged (dragover can't read the payload), so the band
-  // over a block can show the real landing slot.
-  const draggingTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const clear = () => { setSnapPreview(null); draggingTaskIdRef.current = null; };
+    const clear = () => setSnapPreview(null);
     window.addEventListener('dragend', clear, true);
     window.addEventListener('drop', clear, true);
     return () => {
@@ -1013,7 +1011,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         setTaskPopup(null);
-        draggingTaskIdRef.current = task.id;
         // BUGFIX: drag payload must carry WORK-time (plannedMin), not block
         // height. scheduledDurationMin on focus tasks is treated as work-time
         // override by the selector, which then adds breaks on top. Using the
@@ -1039,15 +1036,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         if (!isTask) return; // fall through to cell
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        // Band = where the drop lands: another task takes this block's start;
-        // the block itself nudges to the slot under the cursor.
-        let minute = sliceStartMin;
-        if (draggingTaskIdRef.current === task.id) {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const relY = Math.max(0, (Number.isFinite(e.clientY) ? e.clientY : 0) - (Number.isFinite(rect.top) ? rect.top : 0));
-          const abs = sliceStartMin + (relY / rowHeight) * 60;
-          minute = Math.max(0, Math.min(1440 - gran, Math.floor(abs / gran) * gran));
-        }
+        // Band = the slot under the cursor, where the drop lands.
+        const rect = e.currentTarget.getBoundingClientRect();
+        const relY = Math.max(0, (Number.isFinite(e.clientY) ? e.clientY : 0) - (Number.isFinite(rect.top) ? rect.top : 0));
+        const abs = sliceStartMin + (relY / rowHeight) * 60;
+        const minute = Math.max(0, Math.min(1440 - gran, Math.floor(abs / gran) * gran));
         setSnapPreview((p) => (p && p.dayYMD === dayYMD && p.minute === minute ? p : { dayYMD, minute }));
       };
 
@@ -1077,12 +1070,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         const relY = Math.max(0, clientY - rectTop);
         const minutesIntoBlock = (relY / rowHeight) * 60;
         const absMinute = sliceStartMin + (Number.isFinite(minutesIntoBlock) ? minutesIntoBlock : 0);
-        // Another task dropped onto this block runs in parallel with it: it
-        // takes the block's start (anywhere on the block, not just the top).
-        // Dropping a block onto itself still nudges it to the slot under the cursor.
-        const snappedMin = payload.taskId !== task.id
-          ? sliceStartMin
-          : Math.max(0, Math.min(1440 - gran, Math.floor(absMinute / gran) * gran));
+        // Lands on the slot under the cursor. Another task dropped here also
+        // leaves the chain that would push it behind this one (parallelWith),
+        // so it stays exactly where it was dropped, overlapping this block.
+        const snappedMin = Math.max(0, Math.min(1440 - gran, Math.floor(absMinute / gran) * gran));
         const hour = Math.floor(snappedMin / 60);
         const minute = snappedMin % 60;
         scheduleTask(
@@ -2392,22 +2383,23 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             {realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 Counts toward
-                <select
-                  data-testid="calendar-reality-retag"
+                <AppSelect
+                  testId="calendar-reality-retag"
                   value={realityPopup.seg.taskId ?? ''}
-                  onChange={(e) => {
-                    const taskId = e.target.value === '' ? null : e.target.value;
+                  options={[
+                    { value: '', label: 'untagged' },
+                    ...retagOptions.map((pair) => {
+                      const [id, text] = pair.split('\u0000') as [string, string];
+                      return { value: id, label: text };
+                    }),
+                  ]}
+                  onChange={(v) => {
+                    const taskId = v === '' ? null : v;
                     retagRealitySegment(realityPopup.seg.id, taskId);
                     setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } });
                   }}
-                  style={{ flex: 1, minWidth: 0, background: 'var(--paper-2)', color: 'var(--ink)', border: '1px solid var(--paper-3)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 4px', textTransform: 'none' }}
-                >
-                  <option value="">untagged</option>
-                  {retagOptions.map((pair) => {
-                    const [id, text] = pair.split('\u0000') as [string, string];
-                    return <option key={id} value={id}>{text}</option>;
-                  })}
-                </select>
+                  style={{ flex: 1, minWidth: 0 }}
+                />
               </label>
             )}
             {/* #12 — delete a recorded segment (removes it from analytics too).

@@ -16,6 +16,7 @@ import { Vu } from './variants/Vu';
 import { Outline } from './variants/Outline';
 import { Mac } from './variants/Mac';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
+import { AppSelect } from '../../ui/AppSelect';
 
 const TICK_MS = 500;
 
@@ -689,30 +690,20 @@ export function PomoNode({
           >
             <span style={{ color: isTaskMode ? 'var(--acid)' : 'var(--ink-4)' }}>●</span>
             <span>ON</span>
-            <select
-              aria-label="Tag this session with a task"
+            <AppSelect
+              ariaLabel="Tag this session with a task"
+              testId="pomo-tag-select"
               value={state.activeTaskId ?? ''}
-              onChange={(e) => onCommand('pomo.tag', { taskId: e.target.value === '' ? null : e.target.value })}
-              className="pomo-tag-select"
-              style={{
-                flex: 1,
-                minWidth: 0,
-                background: 'transparent',
-                color: 'var(--ink)',
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10.5,
-                cursor: 'pointer',
-              }}
-            >
-              <option value="">untagged</option>
-              {state.activeTaskId !== null && !tagOptions.some((o) => o.id === state.activeTaskId) && (
-                <option value={state.activeTaskId}>{state.label || 'task'}</option>
-              )}
-              {tagOptions.map((o) => (
-                <option key={o.id} value={o.id}>{truncate(o.text, 28)}</option>
-              ))}
-            </select>
+              onChange={(v) => onCommand('pomo.tag', { taskId: v === '' ? null : v })}
+              options={[
+                { value: '', label: 'untagged' },
+                ...(state.activeTaskId !== null && !tagOptions.some((o) => o.id === state.activeTaskId)
+                  ? [{ value: state.activeTaskId, label: state.label || 'task' }]
+                  : []),
+                ...tagOptions.map((o) => ({ value: o.id, label: truncate(o.text, 28) })),
+              ]}
+              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 10.5, padding: '2px 0' }}
+            />
           </label>
 
           {promptDone ? (
