@@ -234,6 +234,10 @@ export function ClockNode({
 
   // #6/#12 — right-click a tracked-reality arc → info popup with delete.
   const [realityPopup, setRealityPopup] = useState<{ seg: RealitySegment; x: number; y: number } | null>(null);
+  // Hover feedback: the task (arc or list row) or pomo wedge under the pointer
+  // gets a soft highlight, so you can see which one a click will act on.
+  const [hoverTaskId, setHoverTaskId] = useState<string | null>(null);
+  const [hoverSegId, setHoverSegId] = useState<string | null>(null);
   const deleteClockSegment = (segId: string) => {
     const st = useBoardStore.getState();
     const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
@@ -824,13 +828,16 @@ export function ClockNode({
                 // Single-stroke ring — same visual language as calendar.
                 // Calendar uses task-tone background + tone-color border;
                 // we render the analog equivalent as one solid arc in tone.
+                const hovered = hoverTaskId === t.id;
+                const hoverOn = () => setHoverTaskId(t.id);
+                const hoverOff = () => setHoverTaskId((h) => (h === t.id ? null : h));
                 const baseArc = (
                   key: string,
                   s: number,
                   e: number,
                   cap: 'round' | 'butt',
                 ): React.ReactElement => (
-                  <g key={`${key}-base`}>
+                  <g key={`${key}-base`} onPointerEnter={hoverOn} onPointerLeave={hoverOff}>
                     {/* Wide invisible hit area: the drawn arc is thin, this
                         makes it easy to hover, click and right-click. */}
                     <path
@@ -855,8 +862,9 @@ export function ClockNode({
                       stroke={t.colorVar}
                       strokeWidth={sw}
                       strokeLinecap={cap}
-                      opacity={opacity * (active ? 0.95 : 0.7)}
-                      style={{ ...activeStyle, cursor: 'context-menu' }}
+                      opacity={hovered ? 1 : opacity * (active ? 0.95 : 0.7)}
+                      data-hovered={hovered ? 'true' : undefined}
+                      style={{ ...activeStyle, cursor: 'context-menu', transition: 'opacity 120ms, filter 120ms', filter: hovered ? 'brightness(1.35)' : undefined }}
                     >
                       <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)}`}</title>
                     </path>
@@ -885,6 +893,7 @@ export function ClockNode({
                       fill="none"
                       stroke={`url(#${gid})`}
                       strokeWidth={sw}
+                      style={{ transition: 'filter 120ms', filter: hovered ? 'brightness(1.35)' : undefined }}
                       strokeLinecap="round"
                       pointerEvents="none"
                     />,
@@ -1014,10 +1023,12 @@ export function ClockNode({
                   data-reality-live={seg.live ? 'true' : undefined}
                   onClick={open}
                   onContextMenu={menu}
+                  onPointerEnter={() => setHoverSegId(seg.id)}
+                  onPointerLeave={() => setHoverSegId((h) => (h === seg.id ? null : h))}
                   d={sectorPath(seg.startH, seg.endH, R_FACE - 1)}
                   fill={isWork ? tone : 'url(#clock-break-hatch)'}
                   stroke="none"
-                  opacity={isWork ? (seg.live ? 0.42 : 0.3) : 0.5}
+                  opacity={(isWork ? (seg.live ? 0.42 : 0.3) : 0.5) + (hoverSegId === seg.id ? 0.2 : 0)}
                   style={
                     seg.live
                       ? { animation: 'clock-arc-pulse 2.4s ease-in-out infinite', color: tone, cursor: 'pointer' }
@@ -1258,7 +1269,12 @@ export function ClockNode({
                 key={t.id}
                 data-testid="clock-task-row"
                 onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                onPointerEnter={() => setHoverTaskId(t.id)}
+                onPointerLeave={() => setHoverTaskId((h) => (h === t.id ? null : h))}
                 style={{
+                  borderRadius: 4,
+                  background: hoverTaskId === t.id ? 'color-mix(in srgb, var(--ink) 6%, transparent)' : 'transparent',
+                  transition: 'background 120ms',
                   display: 'grid',
                   gridTemplateColumns: '4px 56px 1fr auto',
                   alignItems: 'center',

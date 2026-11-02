@@ -878,3 +878,5 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
   - Near-duplicate checks count numbers.
   - A word seen in only one example votes below the tagging threshold on its own.
   - Wrong auto tags already on a board re-classify on load.
+- **Follow-up 27 (Bug Fix):** choosing Light with the dark-only Pro frame still switches to Classic, but going back to Dark now restores Pro (remembered in `krnl0-dock-style-before-light`, unless another frame was picked meanwhile).
+- **Follow-up 28 (UI):** hovering a task arc on the clock, its list row, or a pomo wedge brightens it, so you see what a click acts on. Arc and row highlight together.

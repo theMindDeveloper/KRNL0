@@ -10,7 +10,7 @@ import { useState, useLayoutEffect } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutModeToggle } from '../ui/LayoutModeToggle';
-import { useDockStyle } from '../ChassisLayer/useDockStyle';
+import { useDockStyle, DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
 import { isDarkOnly } from '../ChassisLayer/dockRegistry';
 import { StationToolbar } from '../Station/StationToolbar';
 import { MANIFESTS } from '../../themes/manifests';
@@ -49,6 +49,22 @@ function applyTheme(theme: Theme): void {
   }
 }
 
+const FRAME_BEFORE_LIGHT_KEY = 'krnl0-dock-style-before-light';
+
+function readFrameBeforeLight(): DockStyle | null {
+  try {
+    const v = localStorage.getItem(FRAME_BEFORE_LIGHT_KEY);
+    return v && (DOCK_STYLES as readonly string[]).includes(v) ? (v as DockStyle) : null;
+  } catch { return null; }
+}
+
+function writeFrameBeforeLight(style: DockStyle | null): void {
+  try {
+    if (style) localStorage.setItem(FRAME_BEFORE_LIGHT_KEY, style);
+    else localStorage.removeItem(FRAME_BEFORE_LIGHT_KEY);
+  } catch { /* storage unavailable */ }
+}
+
 export function TopBar() {
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
   const [dockStyle, setDockStyle] = useDockStyle();
@@ -73,10 +89,19 @@ export function TopBar() {
   }, [shownTheme]);
 
   // Light/dark is always available. A dark-only frame style has no light
-  // tokens, so choosing Light also switches to Classic (which has both).
+  // tokens, so choosing Light switches to Classic (which has both) — and
+  // remembers the frame, so going back to Dark restores it (unless another
+  // frame was picked in the meantime).
   const chooseTheme = (next: Theme) => {
     runLookTransition(() => {
-      if (next === 'light' && isDarkOnly(dockStyle)) setDockStyle('classic');
+      if (next === 'light' && isDarkOnly(dockStyle)) {
+        writeFrameBeforeLight(dockStyle);
+        setDockStyle('classic');
+      } else if (next === 'dark') {
+        const before = readFrameBeforeLight();
+        writeFrameBeforeLight(null);
+        if (before && dockStyle === 'classic') setDockStyle(before);
+      }
       applyTheme(next);
       flushSync(() => setTheme(next));
     });
