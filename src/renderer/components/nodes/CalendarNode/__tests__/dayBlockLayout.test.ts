@@ -1,6 +1,6 @@
 /** Readable parallel tasks (calendar-clock-visuals F-PL1..F-PL4). */
 import { describe, it, expect } from 'vitest';
-import { layoutDayBlocks, readableLaneCount, MIN_LANE_PX, type LanePlacement } from '../dayBlockLayout';
+import { layoutDayBlocks, readableLaneCount, MIN_LANE_PX, MIN_SIDE_BY_SIDE, type LanePlacement } from '../dayBlockLayout';
 
 // Five tasks all overlapping 10:00–11:30 — the screenshot case.
 const slices = ['a', 'b', 'c', 'd', 'e'].map((id, i) => ({ id, startMin: 600 + i * 10, endMin: 690 }));
@@ -17,34 +17,28 @@ describe('readableLaneCount', () => {
 });
 
 describe('layoutDayBlocks', () => {
-  it('narrow column (1 lane): first task full width, the rest in one compact chip', () => {
+  it('narrow column: up to 4 parallel tasks stay side by side, the 5th+ go in a chip', () => {
     const l = layoutDayBlocks(slices, raw, 84);
-    expect(l.maxLanes).toBe(1);
-    expect([...l.placements.entries()]).toEqual([['a', { colIndex: 0, colCount: 1, span: 1 }]]);
-    expect([...l.hidden].sort()).toEqual(['b', 'c', 'd', 'e']);
+    expect(l.maxLanes).toBe(MIN_SIDE_BY_SIDE);
+    expect(l.placements.get('a')).toEqual({ colIndex: 0, colCount: 4, span: 1 });
+    expect(l.placements.get('c')).toEqual({ colIndex: 2, colCount: 4, span: 1 });
+    expect([...l.hidden].sort()).toEqual(['d', 'e']);
     expect(l.overflow).toHaveLength(1);
-    expect(l.overflow[0]!.compact).toBe(true);
-    expect(l.overflow[0]!.slices.map((s) => s.id)).toEqual(['b', 'c', 'd', 'e']);
-    expect(l.overflow[0]!.startMin).toBe(610);
-  });
-
-  it('two lanes: one task lane plus a chip lane', () => {
-    const l = layoutDayBlocks(slices, raw, MIN_LANE_PX * 2);
-    expect(l.maxLanes).toBe(2);
-    expect(l.placements.get('a')).toEqual({ colIndex: 0, colCount: 2, span: 1 });
-    expect(l.hidden.size).toBe(4);
     expect(l.overflow[0]!.compact).toBe(false);
-    expect(l.overflow[0]!.leftFrac).toBe(0.5);
+    expect(l.overflow[0]!.leftFrac).toBe(0.75);
   });
 
-  it('every visible block is at least MIN_LANE_PX wide', () => {
-    for (const px of [40, 84, 130, 200, 260, 400]) {
-      const l = layoutDayBlocks(slices, raw, px);
-      for (const p of l.placements.values()) {
-        expect((px * p.span) / p.colCount).toBeGreaterThanOrEqual(Math.min(px, MIN_LANE_PX));
-      }
-      for (const og of l.overflow) expect(Number.isFinite(og.leftFrac)).toBe(true);
-    }
+  it('two parallel tasks in a narrow column: both visible, nothing collapses', () => {
+    const pair = slices.slice(0, 2);
+    const r = new Map<string, LanePlacement>([['a', { colIndex: 0, colCount: 2, span: 1 }], ['b', { colIndex: 1, colCount: 2, span: 1 }]]);
+    const l = layoutDayBlocks(pair, r, 60);
+    expect(l.hidden.size).toBe(0);
+    expect(l.placements.get('b')).toEqual({ colIndex: 1, colCount: 2, span: 1 });
+  });
+
+  it('wide enough for more than 4 lanes: uses the readable count', () => {
+    const l = layoutDayBlocks(slices, raw, MIN_LANE_PX * 5);
+    expect(l.maxLanes).toBe(5);
   });
 
   it('wide column: all lanes fit, nothing collapses', () => {
@@ -55,15 +49,10 @@ describe('layoutDayBlocks', () => {
   });
 
   it('separate overlap runs get separate chips', () => {
-    const two = [
-      { id: 'a', startMin: 60, endMin: 120 }, { id: 'b', startMin: 60, endMin: 120 },
-      { id: 'c', startMin: 600, endMin: 660 }, { id: 'd', startMin: 600, endMin: 660 },
-    ];
-    const r = new Map<string, LanePlacement>([
-      ['a', { colIndex: 0, colCount: 2, span: 1 }], ['b', { colIndex: 1, colCount: 2, span: 1 }],
-      ['c', { colIndex: 0, colCount: 2, span: 1 }], ['d', { colIndex: 1, colCount: 2, span: 1 }],
-    ]);
+    const run = (p: string, at: number) => [0, 1, 2, 3, 4].map((i) => ({ id: `${p}${i}`, startMin: at, endMin: at + 60 }));
+    const two = [...run('a', 60), ...run('c', 600)];
+    const r = new Map<string, LanePlacement>(two.map((s) => [s.id, { colIndex: Number(s.id.slice(1)), colCount: 5, span: 1 }]));
     const l = layoutDayBlocks(two, r, 80);
-    expect(l.overflow.map((o) => o.slices.map((s) => s.id))).toEqual([['b'], ['d']]);
+    expect(l.overflow.map((o) => o.slices.map((s) => s.id))).toEqual([['a3', 'a4'], ['c3', 'c4']]);
   });
 });

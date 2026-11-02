@@ -1098,8 +1098,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
       const railNum = 0;
       const widthPx = ((colPx - railNum) * span) / colCount - 3;
-      const detail: 'none' | 'title' | 'full' =
-        widthPx < 34 || heightPx < 14 ? 'none' : widthPx < 110 || heightPx < 32 ? 'title' : 'full';
+      // A narrow parallel lane shows its title vertically so every block
+      // stays identifiable; only a tiny block goes label-less.
+      const detail: 'none' | 'vertical' | 'title' | 'full' =
+        heightPx < 14 ? 'none'
+        : widthPx < 34 ? (widthPx >= 12 && heightPx >= 36 ? 'vertical' : 'none')
+        : widthPx < 110 || heightPx < 32 ? 'title' : 'full';
 
       return (
         <div
@@ -1258,7 +1262,19 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           )}
           {/* Label — only what fits (see `detail`). Everything else is in the
               hover title and the click popup. */}
-          {detail !== 'none' && (
+          {detail === 'vertical' && (
+            <span
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, color: 'var(--ink)',
+                writingMode: 'vertical-rl', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                position: 'absolute', top: 4, bottom: 4, left: '50%', transform: 'translateX(-50%)',
+                pointerEvents: 'none', zIndex: 1, lineHeight: 1,
+              }}
+            >
+              {task.text}
+            </span>
+          )}
+          {(detail === 'title' || detail === 'full') && (
             <span
               style={{
                 fontFamily: 'var(--font-sans)',
