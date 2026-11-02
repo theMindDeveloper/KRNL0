@@ -126,3 +126,37 @@ describe('board viewport migration — Amendment B', () => {
     expect(second.viewport).toEqual({ x: -300, y: 50, zoom: 1.5 });
   });
 });
+
+describe('mother order survives a reload', () => {
+  let dir: string;
+  let path: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'krnl-mother-order-'));
+    path = join(dir, 'board.json');
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  const mother = (id: string, kind: string, x: number, y = 0) => ({
+    id, kind, isMother: true, position: { x, y }, state: {}, config: {},
+  });
+
+  it('keeps swapped mothers on their swapped slots', () => {
+    writeFileSync(path, JSON.stringify({
+      nodes: [mother('mother-pomo', 'pomo', -840), mother('mother-todo', 'todo', -1400)],
+      edges: [],
+    }), 'utf-8');
+    const b = loadBoardFrom(path) as { nodes: Array<{ id: string; position: { x: number } }> };
+    expect(b.nodes.find((n) => n.id === 'mother-pomo')!.position.x).toBe(-840);
+    expect(b.nodes.find((n) => n.id === 'mother-todo')!.position.x).toBe(-1400);
+  });
+
+  it('snaps a legacy / off-slot layout back to the defaults', () => {
+    writeFileSync(path, JSON.stringify({
+      nodes: [mother('mother-pomo', 'pomo', -1040), mother('mother-todo', 'todo', -520)],
+      edges: [],
+    }), 'utf-8');
+    const b = loadBoardFrom(path) as { nodes: Array<{ id: string; position: { x: number } }> };
+    expect(b.nodes.find((n) => n.id === 'mother-pomo')!.position.x).toBe(-1400);
+    expect(b.nodes.find((n) => n.id === 'mother-todo')!.position.x).toBe(-840);
+  });
+});

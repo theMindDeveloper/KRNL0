@@ -192,12 +192,26 @@ function migrateMotherPositions(board: unknown): Record<string, unknown> {
     nodes: unknown[];
     viewport?: { x: number; y: number; zoom: number };
   };
+  // A user's own mother order (swap / drag-reorder) is kept when it is a
+  // valid arrangement: every known mother on a distinct canonical slot. Any
+  // other layout (legacy spacing, a stray position) snaps back to defaults.
+  const slotXs = new Set(Object.values(NEW_MOTHER_POSITIONS).map((p) => p.x));
+  const seenX = new Set<number>();
+  let keepOrder = true;
+  for (const n of b.nodes) {
+    if (typeof n !== 'object' || n === null || !('id' in n)) continue;
+    const node = n as { id: string; position?: { x: number; y: number } };
+    if (!NEW_MOTHER_POSITIONS[node.id]) continue;
+    const pos = node.position;
+    if (!pos || pos.y !== 0 || !slotXs.has(pos.x) || seenX.has(pos.x)) { keepOrder = false; break; }
+    seenX.add(pos.x);
+  }
   b.nodes = b.nodes.map((n) => {
     if (typeof n !== 'object' || n === null || !('id' in n)) return n;
     const node = n as { id: string; position?: { x: number; y: number }; isMother?: boolean };
     const newPos = NEW_MOTHER_POSITIONS[node.id];
     if (newPos) {
-      return { ...node, position: newPos, isMother: true };
+      return { ...node, position: keepOrder && node.position ? node.position : newPos, isMother: true };
     }
     return node;
   });
