@@ -10,7 +10,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Habit, HabitColor } from './types';
-import { HABIT_COLORS, HABIT_ICONS } from './types';
+import { HABIT_COLORS } from './types';
+import { HabitIcon, HABIT_ICON_IDS, habitIconId } from './HabitIcon';
 
 interface Props {
   habit: Habit;
@@ -128,7 +129,7 @@ export function HabitContextMenu({
             color: `var(--${habit.color ?? 'acid'})`,
           }}
         >
-          {habit.icon ?? '●'}
+          <HabitIcon icon={habit.icon} size={13} fallback="●" />
         </span>
         {renaming ? (
           <input
@@ -249,7 +250,7 @@ export function HabitContextMenu({
               textAlign: 'center',
             }}
           >
-            {habit.icon ?? '●'}
+            <HabitIcon icon={habit.icon} size={13} fallback="●" />
           </span>
         }
         onClick={() => setPickerOpen(pickerOpen === 'icon' ? null : 'icon')}
@@ -264,8 +265,8 @@ export function HabitContextMenu({
             padding: '4px 6px 8px',
           }}
         >
-          {HABIT_ICONS.map((g) => {
-            const selected = g === habit.icon;
+          {HABIT_ICON_IDS.map((g) => {
+            const selected = g === habitIconId(habit.icon);
             return (
               <button
                 key={g}
@@ -285,12 +286,12 @@ export function HabitContextMenu({
                   background: selected ? 'var(--paper-2)' : 'transparent',
                   border: selected ? '1px solid var(--ink-3)' : '1px solid transparent',
                   cursor: 'pointer',
-                  fontSize: 13,
+                  color: selected ? 'var(--ink)' : 'var(--ink-2)',
                   lineHeight: 1,
                   padding: 0,
                 }}
               >
-                {g}
+                <HabitIcon icon={g} size={14} />
               </button>
             );
           })}

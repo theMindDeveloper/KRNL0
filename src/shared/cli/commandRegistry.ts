@@ -63,7 +63,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'view', usage: 'habit view <week|month|year>', summary: 'Set habit view mode' },
       { name: 'list', usage: 'habit list [--json]', summary: 'List all habits' },
       { name: 'rename', usage: 'habit rename <id|name> "<new>"', summary: 'Rename a habit' },
-      { name: 'icon', usage: 'habit icon <id|name> <icon> | --clear', summary: 'Set or clear per-habit icon glyph/emoji' },
+      { name: 'icon', usage: 'habit icon <id|name> <icon> | --clear', summary: 'Set or clear a habit icon: pen, trend, target, code, meditate, run, book, water, sleep, food, brain, strength, coffee, goal, plant, music, clean, write, sun, moon, heart, walk, study, phone' },
       { name: 'note', usage: 'habit note <id|name> "<text>" | --clear', summary: 'Set or clear a free-form note on a habit' },
       { name: 'schedule', usage: 'habit schedule <id|name> --daily --at HH:MM [--duration N]', summary: 'Set daily schedule (--daily / --weekly --days 1,2,5 / --weekdays). --at expects HH:MM format.' },
       { name: 'unschedule', usage: 'habit unschedule <id|name>', summary: 'Clear habit schedule' },

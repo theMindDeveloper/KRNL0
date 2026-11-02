@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { HabitSchedule, IsoDow } from '../nodes/HabitNode/types';
+import { HabitIcon } from '../nodes/HabitNode/HabitIcon';
 import { IconCalendarDay, IconRepeat, IconCheck } from './repeatIcons';
 import { RepeatEditor, describeRepeat, isRepeatValid, toSchedule, type RepeatValue } from './RepeatEditor';
 
@@ -80,7 +81,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 16px 14px 18px' }}>
           <div style={{ width: 38, height: 38, borderRadius: 11, display: 'grid', placeItems: 'center', fontSize: 19, background: 'var(--paper-2)', border: '1px solid var(--paper-3)', flexShrink: 0 }}>
-            {habitIcon ?? '↻'}
+            <HabitIcon icon={habitIcon} size={19} fallback="↻" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{habitName}</div>

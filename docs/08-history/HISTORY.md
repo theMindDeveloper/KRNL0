@@ -871,3 +871,4 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
   - Native pickers are replaced by app-styled ones:
     - New `ui/Popover.tsx`, `ui/AppSelect.tsx` and `ui/TimeField.tsx` (type a time, or pick from hour/minute columns).
     - Used in the calendar task popup (start time), the calendar and clock "Counts toward" retag, and the Pomo task tag.
+- **Follow-up 25 (UI):** habit icons are app SVGs (`HabitNode/HabitIcon.tsx`, 24 line icons in currentColor) instead of emoji, so they follow light and dark themes. Old glyph/emoji icons map to the matching SVG. Used in the Habit window, context menu, lanes, calendar blocks and the repeat dialog.

@@ -19,6 +19,7 @@ import { selectScheduledTasksForRange, selectSchedule } from '../../../store/sch
 import { packLanes } from '../../../store/laneLayout';
 import { layoutDayBlocks, BLOCK_TEXT_INSET } from './dayBlockLayout';
 import { AppSelect } from '../../ui/AppSelect';
+import { HabitIcon } from '../HabitNode/HabitIcon';
 import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
 import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
@@ -1660,7 +1661,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 color: 'var(--ink)',
               }}
             >
-              {habit.icon}
+              <HabitIcon icon={habit.icon} size={10} />
             </span>
           )}
           <span

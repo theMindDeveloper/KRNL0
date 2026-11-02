@@ -15,6 +15,7 @@ import { calcStreak } from '../HabitNode/commands';
 import { HABIT_COLORS, todayLocal, toYMD } from '../HabitNode/types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
+import { HabitIcon } from '../HabitNode/HabitIcon';
 
 const LANE_WIDTH = 280;
 
@@ -208,7 +209,7 @@ export function HabitLaneNode({
             flexShrink: 0,
           }}
         >
-          {habit.icon ?? '▲'}
+          <HabitIcon icon={habit.icon} size={15} fallback="▲" />
         </div>
 
         {/* Name */}
