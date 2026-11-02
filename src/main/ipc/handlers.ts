@@ -7,6 +7,7 @@ import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
 import { loadBoardFrom, saveBoardTo, seedBoard, RendererRevGuard } from '../persistence/board';
 import { notifyBoardChanged } from '../boardIo';
+import { mergeBoards } from '../../shared/boardMerge';
 import { renderMotd } from '../rpc/motd';
 import type { RpcServer } from '../rpc/server';
 
@@ -58,6 +59,14 @@ function loadBoard() {
 // board loaded before a CLI write would revert that write. Track the revision
 // the renderer last saw; a stale save is refused and the renderer reloads.
 const rendererRev = new RendererRevGuard(BOARD_PATH);
+// The board the renderer's next save is derived from — the common ancestor
+// for a three-way merge when that save turns out to be stale. After a merge
+// it is the renderer's own last save until the renderer reloads, because
+// saves already in flight were made before it saw the merged board.
+let rendererBase: Record<string, unknown> | null = null;
+let awaitingReload = false;
+const asBoard = (b: unknown): Record<string, unknown> | null =>
+  typeof b === 'object' && b !== null && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
 
 function saveBoard(data: unknown) {
   saveBoardTo(BOARD_PATH, data);
@@ -71,18 +80,31 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   ipcMain.handle('board:load', async () => {
     const board = loadBoard();
     rendererRev.sync();
+    rendererBase = asBoard(board);
+    awaitingReload = false;
     return board;
   });
 
   ipcMain.handle('board:save', async (_event, data: unknown) => {
-    if (rendererRev.isStale()) {
-      // A newer write landed (sys CLI / Codex). Keep it and make the renderer
-      // reload; it re-reads through board:load, which re-syncs the revision.
+    if (rendererRev.isStale() || awaitingReload) {
+      // A newer write landed (sys CLI / the AI terminal) after the renderer's
+      // last load. Saving as-is would revert it, refusing would drop the
+      // user's edit: merge both onto the common base, then let the renderer
+      // reload the result (its board:load re-syncs the revision).
+      const mine = asBoard(data);
+      const theirs = asBoard(loadBoard());
+      if (rendererBase && mine && theirs) {
+        saveBoard(mergeBoards(rendererBase, mine, theirs));
+        rendererRev.sync();
+        rendererBase = mine;
+        awaitingReload = true;
+      }
       notifyBoardChanged();
       return;
     }
     saveBoard(data);
     rendererRev.sync();
+    rendererBase = asBoard(data);
   });
 
   // Factory reset — overwrite board.json with a fresh canonical seed and return
@@ -92,6 +114,8 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     saveBoard(seedBoard());
     const board = loadBoard();
     rendererRev.sync();
+    rendererBase = asBoard(board);
+    awaitingReload = false;
     return board;
   });
 
