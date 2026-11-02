@@ -19,12 +19,14 @@ import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
 import type { PomoConfig, PomoState } from '../../renderer/components/nodes/PomoNode/types';
 import {
+  todoEdit as fsmTodoEdit,
   todoRemove as fsmTodoRemove,
   todoToggle as fsmTodoToggle,
   tagExamples,
 } from '../../renderer/components/nodes/TodoNode/commands';
 import { classifyTask, mergeTagLibrary } from '../tags/classify';
 import {
+  taskEdit as fsmTaskEdit,
   taskToggle as fsmTaskToggle,
 } from '../../renderer/components/nodes/TaskNode/commands';
 import {
@@ -214,6 +216,41 @@ export function syncCompletion(board: BoardShape, taskId: string): void {
         ...(tag !== undefined ? { tag } : {}),
       })
     : ledgerClear(ledger, taskId);
+}
+
+/**
+ * Rename a task everywhere it shows: the task node, its Todo row (re-tagged
+ * unless hand-tagged), the pomo label while the pomo is on it, and its
+ * completion-ledger entry. A Todo-row rename and a card rename both land
+ * here, so the list, the card, the Calendar / Clock and analytics agree.
+ * Mutates `board` (replaces node entries); false when nothing was renamed.
+ */
+export function renameTask(board: BoardShape, taskId: string, text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const idx = board.nodes.findIndex((n) => n.id === taskId && n.kind === 'todo.task');
+  if (idx === -1) return false;
+  const taskNode = board.nodes[idx]!;
+  const ts = taskNode.state as TaskState;
+  board.nodes[idx] = { ...taskNode, state: fsmTaskEdit(ts, { text: trimmed }) };
+
+  if (ts.todoItemId !== null) {
+    const todoIdx = board.nodes.findIndex((n) => n.id === ts.parentTodoId && n.kind === 'todo');
+    const todoNode = todoIdx === -1 ? undefined : board.nodes[todoIdx];
+    const item = todoNode ? (todoNode.state as TodoState).items.find((i) => i.id === ts.todoItemId) : undefined;
+    if (todoNode && item && item.text !== trimmed) {
+      board.nodes[todoIdx] = { ...todoNode, state: fsmTodoEdit(todoNode.state as TodoState, { id: item.id, text: trimmed }) };
+    }
+  }
+
+  const pomoIdx = board.nodes.findIndex((n) => n.kind === 'pomo');
+  const pomoNode = pomoIdx === -1 ? undefined : board.nodes[pomoIdx];
+  if (pomoNode && (pomoNode.state as PomoState).activeTaskId === taskId) {
+    board.nodes[pomoIdx] = { ...pomoNode, state: { ...(pomoNode.state as PomoState), label: trimmed } };
+  }
+
+  if (ts.done) syncCompletion(board, taskId);
+  return true;
 }
 
 /**

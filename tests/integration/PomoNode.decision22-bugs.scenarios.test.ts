@@ -285,6 +285,22 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(getPomoState().durationMin).toBe(15);
     });
 
+    it('A5: renaming a Todo row renames its task card and the pomo label; renaming the card renames the row', () => {
+      const board = makeBoardWithTasks({
+        pomoState: { status: 'running', startedAt: new Date().toISOString(), activeTaskId: 'task-a', label: 'Task A', durationMin: 25 },
+      });
+      useBoardStore.getState().setBoard(board);
+
+      makeCommandHandler('todo-mother')('todo.edit', { id: 'item-1', text: 'Gym + stretch' });
+      expect(getTaskState('task-a').text).toBe('Gym + stretch');
+      expect(getPomoState().label).toBe('Gym + stretch');
+
+      makeCommandHandler('task-a')('task.edit', { text: 'Gym' });
+      const todo = useBoardStore.getState().board!.nodes.find((n) => n.id === 'todo-mother')!.state as TodoState;
+      expect(todo.items.find((i) => i.id === 'item-1')!.text).toBe('Gym');
+      expect(getPomoState().label).toBe('Gym');
+    });
+
     it('A4: ticking the active task done in the Todo list stops the pomo too', () => {
       const board = makeBoardWithTasks({
         pomoState: { status: 'running', startedAt: new Date(Date.now() - 120_000).toISOString(), activeTaskId: 'task-a', label: 'Task A', durationMin: 25 },

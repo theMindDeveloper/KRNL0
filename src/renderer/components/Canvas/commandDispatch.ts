@@ -51,8 +51,10 @@ import {
   collectDescendants,
   stampCompletedAt,
   completionTagFor,
+  renameTask,
 } from '../../../shared/dispatch/task';
 import type { BoardShape } from '../../../shared/dispatch/types';
+import type { CompletionRecord } from '../../../shared/types/board';
 
 // ── Pomo ──────────────────────────────────────────────────────────────
 import {
@@ -700,6 +702,20 @@ function plannedTaskAt(board: Board, nowMs: number): string | null {
 /** Short id for log lines — keeps text under the 120-char cap. */
 function shortId(id: string): string {
   return id.startsWith('mother-') ? id : id.slice(0, 10);
+}
+
+/** Apply the shared renameTask to the store: one updateNode per changed node
+ *  (same tick → one undo step) and the ledger entry through recordCompletion. */
+function applyTaskRename(taskId: string, text: string): void {
+  const { board, updateNode, recordCompletion } = useBoardStore.getState();
+  if (!board) return;
+  const draft = { ...board, nodes: [...board.nodes] } as unknown as BoardShape;
+  if (!renameTask(draft, taskId, text)) return;
+  draft.nodes.forEach((n, i) => {
+    if (n !== (board.nodes[i] as unknown)) updateNode(n.id, { state: n.state as Node['state'] });
+  });
+  const entry = (draft['completions'] as CompletionRecord[] | undefined)?.find((c) => c.taskId === taskId);
+  if (entry && entry !== board.completions?.find((c) => c.taskId === taskId)) recordCompletion(entry);
 }
 
 /** Session length a fresh pomo START runs at. */
@@ -1577,10 +1593,21 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const nextState = result.state as TodoState;
       updateNode(nodeId, { state: nextState });
       for (const item of nextState.items) {
-        if (!item.done || !item.taskNodeId) continue;
+        if (!item.taskNodeId) continue;
         const prev = prevItems.find((i) => i.id === item.id);
-        if (prev?.tag !== item.tag) syncCompletionLedger(item.taskNodeId);
+        // A renamed row renames its task card, calendar block and pomo label.
+        if (command === 'todo.edit' && prev && prev.text !== item.text) applyTaskRename(item.taskNodeId, item.text);
+        if (item.done && prev?.tag !== item.tag) syncCompletionLedger(item.taskNodeId);
       }
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+      return;
+    }
+
+    // ── task.edit: the card's rename reaches its Todo row, the pomo label and
+    //    the completion ledger too (shared with `krnl task edit`).
+    if (node.kind === 'todo.task' && command === 'task.edit') {
+      applyTaskRename(nodeId, String(args['text'] ?? ''));
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       return;

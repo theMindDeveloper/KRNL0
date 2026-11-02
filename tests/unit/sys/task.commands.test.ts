@@ -216,6 +216,15 @@ describe('sys task edit', () => {
     expect((task.state as TaskState).text).toBe('new text');
   });
 
+  it('renames the linked Todo row too, so the list and the card agree', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'Gym');
+    const taskId = (addRes.data as { id: string }).id;
+    await taskEdit(ctx, taskId, 'Gym + stretch');
+    const items = (findTodoMother().state as TodoState).items;
+    const ts = findTasks().find((t) => t.id === taskId)!.state as TaskState;
+    expect(items.find((i) => i.id === ts.todoItemId)!.text).toBe('Gym + stretch');
+  });
+
   it('returns error when task id is missing', async () => {
     const res = await taskEdit(ctx, undefined, 'text');
     expect(res.ok).toBe(false);

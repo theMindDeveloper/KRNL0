@@ -6,7 +6,6 @@ import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import {
   taskToggle as fsmTaskToggle,
-  taskEdit as fsmTaskEdit,
   taskSetSchedule as fsmTaskSetSchedule,
   taskSetDuration as fsmTaskSetDuration,
 } from '../../renderer/components/nodes/TaskNode/commands';
@@ -27,7 +26,9 @@ import {
   deleteTaskCascade,
   renumberSiblings as sharedRenumberSiblings,
   taskToggleMirror,
+  renameTask,
 } from '../../shared/dispatch/task';
+import type { BoardShape as SharedBoardShape } from '../../shared/dispatch/types';
 import {
   resolveNodeRef,
   resolveTodoItemRef,
@@ -268,8 +269,8 @@ export async function taskEdit(
   if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
   taskId = taskNode.id;
 
-  const nextState = fsmTaskEdit(taskNode.state as TaskState, { text });
-  updateNode(board, taskId, { ...taskNode, state: nextState });
+  // Same as renaming the card: the Todo row, pomo label and ledger follow.
+  renameTask(board as unknown as SharedBoardShape, taskId, text);
   saveBoard(ctx, board);
   return { ok: true, message: `Task "${taskId.slice(0, 8)}" text updated to "${text}".` };
 }
