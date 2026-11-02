@@ -101,7 +101,12 @@ export function toRfNode(
   // are never visually hidden by the frame body. Negative zIndex on the RF
   // wrapper keeps the frame below all other node wrappers regardless of array
   // order, selection state, or RF's elevateNodesOnSelect behavior.
-  const zIndex = node.kind === 'frame' ? -1 : undefined;
+  // Layers: frames at the very back, images / media behind everything else,
+  // notes (text, stickies, shapes) on top. RF lifts selected nodes by +1000.
+  const zIndex = node.kind === 'frame' ? -2
+    : node.kind === 'image' || node.kind === 'media' ? -1
+    : node.kind === 'text' ? 500
+    : undefined;
   return {
     id: node.id,
     type: node.kind,

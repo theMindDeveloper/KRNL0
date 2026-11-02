@@ -17,6 +17,9 @@ import { useCornerProximity } from '../../../hooks/useCornerProximity';
 import { LookBar } from './LookBar';
 import { STICKY_COLORS, type TextLook } from './types';
 
+// Fine paper grain (SVG noise) for sticky notes.
+const PAPER_GRAIN = `url("data:image/svg+xml,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.07 0'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>")}")`;
+
 const AUTOSAVE_MS = 400;
 
 export function TextNode({
@@ -119,8 +122,19 @@ export function TextNode({
         position: 'relative',
         boxSizing: 'border-box',
         ...(isSticky ? {
-          background: lookColor, border: 'none', borderRadius: 4,
-          boxShadow: selected ? '0 0 0 2px var(--acid), 0 10px 22px rgba(0,0,0,0.35)' : '0 10px 22px rgba(0,0,0,0.32), 0 1px 0 rgba(0,0,0,0.1)',
+          // Paper note: ruled lines, a red margin line, a little grain and a
+          // lifted shadow.
+          backgroundColor: lookColor,
+          backgroundImage: [
+            'linear-gradient(90deg, transparent 27px, rgba(220,60,60,0.55) 27px, rgba(220,60,60,0.55) 28.5px, transparent 28.5px)',
+            'repeating-linear-gradient(180deg, transparent 0 23px, rgba(70,110,160,0.22) 23px 24px)',
+            PAPER_GRAIN,
+          ].join(', '),
+          backgroundPosition: '0 0, 0 6px, 0 0', // ruled lines sit just under each 24px text line
+          border: 'none', borderRadius: 3,
+          boxShadow: selected
+            ? '0 0 0 2px var(--acid), 0 14px 26px rgba(0,0,0,0.38)'
+            : '0 1px 1px rgba(0,0,0,0.12), 0 6px 10px rgba(0,0,0,0.16), 0 16px 28px rgba(0,0,0,0.26)',
         } : {}),
         ...(look.kind === 'rect' || look.kind === 'ellipse' ? {
           background: shapeFill,
@@ -198,10 +212,10 @@ export function TextNode({
             outline: 'none',
             resize: 'none',
             background: 'transparent',
-            padding: isShape ? 0 : '12px 14px',
+            padding: isShape ? 0 : isSticky ? '6px 12px 8px 36px' : '12px 14px',
             fontFamily: isSticky || isShape ? 'var(--font-sans)' : 'var(--font-serif)',
             fontSize: isSticky || isShape ? 16 : 18,
-            lineHeight: 1.35,
+            lineHeight: isSticky ? '24px' : 1.35,
             color: isSticky ? '#1a1814' : 'var(--ink)',
             textAlign: isShape ? 'center' : 'left',
             letterSpacing: '-0.005em',
@@ -220,11 +234,11 @@ export function TextNode({
           style={{
             width: '100%',
             height: '100%',
-            padding: isShape ? shapePad : '12px 14px',
+            padding: isShape ? shapePad : isSticky ? '6px 12px 8px 36px' : '12px 14px',
             fontFamily: isSticky || isShape ? 'var(--font-sans)' : 'var(--font-serif)',
             fontSize: isSticky || isShape ? 16 : 18,
             fontWeight: isSticky || isShape ? 500 : undefined,
-            lineHeight: 1.35,
+            lineHeight: isSticky ? '24px' : 1.35,
             color: isSticky ? '#1a1814' : 'var(--ink)',
             letterSpacing: '-0.005em',
             whiteSpace: 'pre-wrap',
