@@ -258,6 +258,18 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // (day + minute-of-day) and paint a thin band there, so the user sees the
   // EXACT target slot instead of the whole hour cell lighting up.
   const [snapPreview, setSnapPreview] = useState<{ dayYMD: string; minute: number } | null>(null);
+  // The band must never outlive the drag: a drop on a task block stops
+  // propagation before the cell can clear it, and a cancelled drag (Esc, drop
+  // outside the grid) never reaches a cell at all.
+  useEffect(() => {
+    const clear = () => setSnapPreview(null);
+    window.addEventListener('dragend', clear, true);
+    window.addEventListener('drop', clear, true);
+    return () => {
+      window.removeEventListener('dragend', clear, true);
+      window.removeEventListener('drop', clear, true);
+    };
+  }, []);
 
   // #7 — live resize draft. While dragging a task block's top/bottom edge we
   // hold a transient override (start-minute delta + duration) so the block
@@ -1023,6 +1035,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         if (!isTask) return; // fall through to cell
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        // Over a block the drop takes the block's start, not the slot band.
+        setSnapPreview(null);
       };
 
       const handleDropOnBlock = (e: DragEvent<HTMLDivElement>) => {
