@@ -75,6 +75,9 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
           // malformed — ignore
           continue;
         }
+        // Valid JSON that isn't a request object ("null", "42") — ignore it
+        // rather than throwing inside the socket listener (crashes main).
+        if (typeof req !== 'object' || req === null) continue;
 
         // TNF9: token mismatch → single exit frame, close immediately
         if (req.token !== token) {
@@ -110,6 +113,9 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
             writeFrame(socket, { v: 1, id: reqId, kind, data: result.message });
           }
           writeFrame(socket, { v: 1, id: reqId, kind: 'exit', code: result.ok ? 0 : 1 });
+        }).catch((err: unknown) => {
+          // Keep the chain alive: a rejected link would skip every later request.
+          console.error('[rpc] request failed', err);
         });
       }
     });
@@ -119,6 +125,11 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
     });
   });
 
+  // A stale socket or a taken pipe name must not crash main; the app still
+  // works without the terminal CLI bridge.
+  server.on('error', (err) => {
+    console.error('[rpc] server error', err);
+  });
   server.listen(socketPath);
 
   return {

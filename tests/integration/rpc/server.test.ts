@@ -277,3 +277,32 @@ describe('TNF9 — single-frame auth rejection', () => {
     expect(exitFrame!.code).toBe(126);
   });
 });
+
+// ── Robustness — a non-object JSON line must not crash the server ─────────
+
+describe('non-request JSON lines', () => {
+  it('ignores "null" and keeps serving the next request on the same socket', async () => {
+    const frames = await new Promise<Array<{ kind: string; code?: number }>>((resolve, reject) => {
+      const socket = net.createConnection({ path: server.socketPath });
+      const got: Array<{ kind: string; code?: number }> = [];
+      let buf = '';
+      const timer = setTimeout(() => { socket.destroy(); reject(new Error('timed out')); }, 5000);
+      socket.on('connect', () => {
+        socket.write('null\n42\n' + JSON.stringify({ v: 1, token: server.token, id: 'after-null', argv: ['version'] }) + '\n');
+      });
+      socket.on('data', (chunk: Buffer) => {
+        buf += chunk.toString('utf8');
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const f = JSON.parse(line) as { kind: string; code?: number };
+          got.push(f);
+          if (f.kind === 'exit') { clearTimeout(timer); socket.destroy(); resolve(got); }
+        }
+      });
+      socket.on('error', (err) => { clearTimeout(timer); reject(err); });
+    });
+    expect(frames.find((f) => f.kind === 'exit')?.code).toBe(0);
+  });
+});
