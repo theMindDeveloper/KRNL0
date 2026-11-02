@@ -107,7 +107,10 @@ export function toRfNode(
     type: node.kind,
     position: node.position,
     draggable: !node.isMother,
-    selectable: true,
+    // Mothers are fixed windows: selecting one only flashed a selection ring
+    // whenever you clicked a control inside it (then the next store sync
+    // cleared it). Children stay selectable.
+    selectable: !node.isMother,
     className: kindClass,
     ...(zIndex !== undefined ? { zIndex } : {}),
     ...sizeFields,

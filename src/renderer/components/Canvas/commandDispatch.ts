@@ -830,6 +830,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         todoItemId: itemId !== '' ? itemId : null,
         pomoSessionsCompleted: 0,
         plannedMin: childPlannedMin,
+        // Time is optional — none given → open-ended.
+        ...(typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1 ? {} : { timeOpen: true }),
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         // #180 — Todo is the planner; it only creates EVENTS. Focus/pomo tasks
@@ -933,6 +935,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         todoItemId: itemId !== '' ? itemId : null,
         pomoSessionsCompleted: 0,
         plannedMin: newPlannedMin,
+        // Time is optional — none given → open-ended.
+        ...(typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1 ? {} : { timeOpen: true }),
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         // #180 — Todo creates EVENTS only.

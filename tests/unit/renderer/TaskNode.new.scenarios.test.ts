@@ -289,11 +289,24 @@ describe('F12 — Add next task inline input', () => {
     fireEvent.change(nameInput, { target: { value: 'next task text' } });
     fireEvent.keyDown(nameInput, { key: 'Enter' });
     // Phase 2: duration
-    const durInput = document.querySelector('input[placeholder="how long? (min)"]') as HTMLInputElement;
+    const durInput = document.querySelector('input[placeholder="how long? (min, optional — Enter to skip)"]') as HTMLInputElement;
     expect(durInput).not.toBeNull();
     fireEvent.change(durInput, { target: { value: '20' } });
     fireEvent.keyDown(durInput, { key: 'Enter' });
     expect(onCommand).toHaveBeenCalledWith('task.addNext', { text: 'next task text', durationMin: 20 });
+  });
+
+  it('time is optional: empty duration + Enter adds the task without a duration', () => {
+    const onCommand = vi.fn();
+    renderTaskNode(makeTaskState({ done: false }), onCommand);
+    fireEvent.contextMenu(screen.getByTestId('task-node-root'));
+    fireEvent.click(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Add next task')!);
+    const nameInput = document.querySelector('input[placeholder="next task name…"]') as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'later' } });
+    fireEvent.keyDown(nameInput, { key: 'Enter' });
+    const durInput = document.querySelector('input[placeholder="how long? (min, optional — Enter to skip)"]') as HTMLInputElement;
+    fireEvent.keyDown(durInput, { key: 'Enter' });
+    expect(onCommand).toHaveBeenCalledWith('task.addNext', { text: 'later' });
   });
 
   it('pressing Escape in name phase dismisses without dispatching', () => {

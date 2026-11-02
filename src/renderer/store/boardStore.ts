@@ -506,6 +506,8 @@ export const useBoardStore = create<BoardStore>((set) => ({
         todoItemId: newItemId,
         pomoSessionsCompleted: 0,
         plannedMin,
+        // Time is optional — none given → open-ended.
+        ...(opts?.durationMin === undefined ? { timeOpen: true } : {}),
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         // #180 — Todo creates events only. A parallel sibling MUST be an event

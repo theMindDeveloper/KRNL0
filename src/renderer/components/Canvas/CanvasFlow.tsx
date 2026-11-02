@@ -943,6 +943,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         todoItemId: newItem.id,
         pomoSessionsCompleted: 0,
         plannedMin: effectivePlanned,
+        // No time given → open-ended (fades out on Calendar / Clock).
+        ...(typeof plannedMin === 'number' && Number.isFinite(plannedMin) && plannedMin >= 1 ? {} : { timeOpen: true }),
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         kind: 'event', // #180 — Todo creates events only (calendar renders events)
@@ -1987,6 +1989,8 @@ function PaneNamePrompt({
       // duration phase (task only)
       if (e.key === 'Enter') {
         e.stopPropagation();
+        // Time is optional (same as the Todo add row): empty → open-ended task.
+        if (duration.trim() === '') { onCommit(name.trim()); return; }
         const parsed = parseInt(duration, 10);
         if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
           setDurationInvalid(false);
@@ -2013,7 +2017,7 @@ function PaneNamePrompt({
 
   const placeholder =
     phase === 'duration'
-      ? 'how long? (min)'
+      ? 'how long? (min, optional — Enter to skip)'
       : kind === 'task'
         ? 'task name…'
         : 'habit name…';
