@@ -746,7 +746,6 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 
 ---
 
-<<<<<<< HEAD
 ## [2026-11-02] — Analytics window, readable calendar, pomo highlights, no-scroll windows
 
 **Type:** Feature
@@ -759,7 +758,11 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Right-click menus** shared by Calendar and Clock (task arcs, task rows, pomo wedges): Tag → task, Untag, Details…, Delete segment; Start focus, Mark done, Show on canvas, Unschedule. CLI twins plus new `pomo segments` and `pomo delete-segment`.
 - **Analytics overview:** a plain-language summary on top (headline, four figures with change vs the previous period, focus sparkline, sentences). CLI: `analytics summary`.
 - **No scrolling:** a shared `PagedView` splits content into pages of whole items, flipped with the wheel or ‹ ● ›. Used by Analytics (cards, settings, tables), Todo, the Clock task list, the Calendar agenda and the Ambient Radio lists. The Calendar hour grid shows windows of whole hours (wheel, pager, or drag to an edge), and the Clock dial flexes to the free space.
-=======
+
+**Tests:** 0 typecheck errors; 131 files green.
+
+---
+
 ## [2026-11-02] — New "Lit Core" logo and app icons
 
 **Type:** Feature (branding)
@@ -772,4 +775,3 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **GitHub:** README shows the logo; `docs/assets/krnl0-social-preview.png` (1280×640) is ready to upload as the repo's social preview.
 
 **Tests:** 0 typecheck errors; 125 files / 1495 tests green.
->>>>>>> 1aba8c8a8afdb4b8e5c5469b7d25b45977b8349b
