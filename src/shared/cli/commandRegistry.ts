@@ -235,6 +235,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Read app settings',
     subcommands: [
       { name: 'show', usage: 'settings show [--json]', summary: 'theme + viewport + boardPath + version' },
+      { name: 'mode', usage: 'settings mode [easy|advanced]', summary: 'Show or set the UI mode (Easy hides links between features; data is the same)' },
     ],
   },
   {

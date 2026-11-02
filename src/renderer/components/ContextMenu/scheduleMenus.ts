@@ -59,7 +59,7 @@ function clip(text: string): string {
 
 export function segmentMenuItems(
   seg: MenuSegment,
-  opts: { targets: readonly RetagTarget[]; onDetails?: () => void },
+  opts: { targets: readonly RetagTarget[]; onDetails?: () => void; easy?: boolean },
 ): ContextMenuItem[] {
   const isWork = seg.kind === 'work';
   const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
@@ -71,7 +71,8 @@ export function segmentMenuItems(
     },
   ];
   // Only finished focus spans carry a tag; the live span is tagged from the Pomo.
-  if (isWork && !seg.live) {
+  // Easy mode never links spans to tasks.
+  if (isWork && !seg.live && !opts.easy) {
     for (const t of opts.targets.filter((x) => x.id !== seg.taskId).slice(0, MAX_RETAG_TARGETS)) {
       items.push({ label: `Tag → ${clip(t.text)}`, onSelect: () => retagSegment(seg.id, t.id) });
     }
@@ -89,7 +90,7 @@ export function segmentMenuItems(
 
 export function taskMenuItems(
   task: MenuTask,
-  opts: { onDetails?: () => void } = {},
+  opts: { onDetails?: () => void; easy?: boolean } = {},
 ): ContextMenuItem[] {
   const span = task.startMs !== undefined && task.endMs !== undefined
     ? ` · ${hm(task.startMs)}–${hm(task.endMs)}`
@@ -98,8 +99,9 @@ export function taskMenuItems(
     { header: true, label: `${clip(task.text)}${span}`, onSelect: () => {} },
   ];
   if (opts.onDetails) items.push({ label: 'Details…', onSelect: opts.onDetails });
+  // Easy mode has no focus linking.
+  if (!opts.easy) items.push({ label: 'Start focus', disabled: task.done, onSelect: () => { void startFocusOnTask(task.id); } });
   items.push(
-    { label: 'Start focus', disabled: task.done, onSelect: () => { void startFocusOnTask(task.id); } },
     { label: task.done ? 'Mark not done' : 'Mark done', onSelect: () => { void toggleTaskDone(task.id); } },
     { label: 'Show on canvas', onSelect: () => focusNode(task.id) },
     { label: 'Unschedule', danger: true, onSelect: () => unscheduleTask(task.id) },

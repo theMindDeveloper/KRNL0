@@ -58,6 +58,7 @@ export type SysCommand =
   | { kind: 'edge'; sub: 'enable' | 'disable'; id: string | undefined }
   | { kind: 'info'; json: boolean }
   | { kind: 'settings'; sub: 'show'; json: boolean }
+  | { kind: 'settings'; sub: 'mode'; mode: string | undefined }
   | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
   | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
@@ -275,6 +276,7 @@ export class SysParser {
       if (sub === 'show' || sub === undefined) {
         return { kind: 'settings', sub: 'show', json: hasFlag(rest, 'json') };
       }
+      if (sub === 'mode') return { kind: 'settings', sub: 'mode', mode: rest[0] };
     }
 
     if (cmd === 'pomo') {

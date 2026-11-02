@@ -103,6 +103,9 @@ export interface Board {
   // loadBoardFrom always fills them (default canvas 'canvas-main').
   canvases?: CanvasMeta[];
   activeCanvasId?: string;
+  // Easy / Advanced (docs/06-requirements/easy-mode.md). UI only — Easy hides
+  // the links between features; data is identical. Absent = advanced.
+  uiMode?: 'easy' | 'advanced';
   // ADR 0008 § 2.1 / § 4.1: layout mode, required (migration sets to 'canvas' for legacy)
   layoutMode: LayoutMode;
   // ADR 0008 § 4.1: station geometry; absent until user resizes panels

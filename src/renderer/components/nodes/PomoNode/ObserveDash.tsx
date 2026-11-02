@@ -13,6 +13,8 @@ export interface ObserveDashProps {
   liveMs: number;
   library: readonly TagDef[];
   nowMs: number;
+  /** Easy mode — all work in one colour. */
+  plain?: boolean;
 }
 
 const HATCH = 'repeating-linear-gradient(135deg, var(--ink-3) 0 1px, transparent 1px 3px)';
@@ -22,7 +24,7 @@ function fmtMin(ms: number): string {
   return min < 60 ? `${min}m` : `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, '0')}m`;
 }
 
-export function ObserveDash({ state, liveMs, library, nowMs }: ObserveDashProps) {
+export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: ObserveDashProps) {
   const dayStart = new Date(nowMs);
   dayStart.setHours(0, 0, 0, 0);
   const d0 = dayStart.getTime();
@@ -34,7 +36,7 @@ export function ObserveDash({ state, liveMs, library, nowMs }: ObserveDashProps)
     const start = Math.max(d0, Date.parse(r.startedAt));
     const end = Math.min(d0 + DAY, Date.parse(r.endedAt));
     if (!(end > start)) continue;
-    const color = spanTone(library, r);
+    const color = spanTone(library, r, plain);
     spans.push({ id: r.id, start, end, break: r.kind === 'break', color });
   }
   const live = (state.status === 'running' || state.status === 'break') && state.startedAt !== null;
@@ -43,7 +45,7 @@ export function ObserveDash({ state, liveMs, library, nowMs }: ObserveDashProps)
     if (nowMs > start) {
       spans.push({
         id: 'live', start, end: nowMs, break: state.status === 'break',
-        color: spanTone(library, { kind: 'work', taskId: state.activeTaskId, tag: state.tag ?? null }),
+        color: spanTone(library, { kind: 'work', taskId: state.activeTaskId, tag: state.tag ?? null }, plain),
       });
     }
   }

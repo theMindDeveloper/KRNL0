@@ -16,6 +16,7 @@ import { StationToolbar } from '../Station/StationToolbar';
 import { MANIFESTS } from '../../themes/manifests';
 import { runLookTransition } from '../../themes/transition';
 import { HoldButton } from '../ui/HoldButton';
+import { useEasyMode } from '../../store/uiMode';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
 import { CanvasSwitcher } from './CanvasSwitcher';
@@ -228,6 +229,8 @@ export function TopBar() {
 
 function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme: Theme; onTheme: (t: Theme) => void }) {
   const factoryReset = useBoardStore((s) => s.factoryReset);
+  const setUiMode = useBoardStore((s) => s.setUiMode);
+  const easy = useEasyMode();
   return createPortal(
     <div
       data-testid="settings-modal"
@@ -303,6 +306,40 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
                 {t === 'light' ? '☀ Light' : '☾ Dark'}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Easy / Advanced — Easy hides the links between features; data is the same. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 9.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
+            Mode
+          </span>
+          <div role="radiogroup" aria-label="Easy or Advanced" style={{ display: 'flex', gap: 6 }}>
+            {([
+              ['easy', 'Easy', 'Plan your day and see where the time went'],
+              ['advanced', 'Advanced', 'Connect tasks, categories and focus'],
+            ] as const).map(([m, label, hint]) => {
+              const on = (m === 'easy') === easy;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  data-testid={`settings-mode-${m}`}
+                  onClick={() => setUiMode(m)}
+                  style={{
+                    flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                    fontFamily: 'var(--font-mono)', color: 'var(--ink)',
+                    border: `1px solid ${on ? 'var(--acid)' : 'var(--paper-3)'}`,
+                    background: on ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
+                  }}
+                >
+                  <div style={{ fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700 }}>{label}</div>
+                  <div style={{ fontSize: 9.5, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.4 }}>{hint}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

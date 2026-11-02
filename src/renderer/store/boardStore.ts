@@ -126,6 +126,8 @@ interface BoardStore {
   // ADR 0008 § 2.1 / § 4.1 — layout mode and geometry actions.
   // Both persist through the same saveBoard IPC path as all other mutations.
   setLayoutMode: (mode: LayoutMode) => void;
+  // Easy / Advanced UI mode — a preference, not undoable.
+  setUiMode: (mode: 'easy' | 'advanced') => void;
   setLayoutGeometry: (geom: Board['layoutGeometry']) => void;
   // Decision 33 — free-content canvases. add/rename/delete are undoable;
   // switching is navigation (no history). All persist via saveBoard.
@@ -450,6 +452,15 @@ export const useBoardStore = create<BoardStore>((set) => ({
     set((s) => {
       if (!s.board) return s;
       const updated: Board = { ...s.board, layoutMode: mode };
+      void saveBoard(updated);
+      return { board: updated };
+    });
+  },
+
+  setUiMode: (mode) => {
+    set((s) => {
+      if (!s.board) return s;
+      const updated: Board = { ...s.board, uiMode: mode };
       void saveBoard(updated);
       return { board: updated };
     });

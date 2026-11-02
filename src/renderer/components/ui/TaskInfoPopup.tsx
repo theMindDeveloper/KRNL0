@@ -16,6 +16,7 @@ import type { TodoState } from '../nodes/TodoNode/types';
 import { calcStreak } from '../nodes/HabitNode/commands';
 import { todayLocal, type HabitState } from '../nodes/HabitNode/types';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
+import { useEasyMode } from '../../store/uiMode';
 
 export interface TaskInfoPopupProps {
   /** A task node id, or `habit-<habitId>` for a habit on the dial. */
@@ -72,6 +73,8 @@ function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () 
 }
 
 function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps) {
+  // Easy mode: name, time and done only — no category, tracked time or focus.
+  const easy = useEasyMode();
   const info = useBoardStore(
     useShallow((s) => {
       const board = s.board;
@@ -118,7 +121,7 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         {info.done && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>✓ DONE</span>}
       </div>
       <div style={{ fontSize: 10, color: 'var(--ink-3)', marginBottom: 8 }}>{when}</div>
-      <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--ink-2)', marginBottom: 10, flexWrap: 'wrap' }}>
+      {!easy && <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--ink-2)', marginBottom: 10, flexWrap: 'wrap' }}>
         {info.catId && info.catColor && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <CategoryIcon id={info.catId} color={info.catColor} size={11} />{info.catLabel}
@@ -126,9 +129,9 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         )}
         <span>plan {info.plannedMin ? fmtMin(info.plannedMin) : '—'}</span>
         <span style={{ color: info.trackedMin > 0 ? 'var(--ink)' : 'var(--ink-4)' }}>tracked {fmtMin(info.trackedMin)}</span>
-      </div>
+      </div>}
       <div style={{ display: 'flex', gap: 4 }}>
-        {!info.done && <button type="button" data-testid="task-info-focus" style={btn} onClick={act(() => { void startFocusOnTask(taskId); })}>Focus</button>}
+        {!info.done && !easy && <button type="button" data-testid="task-info-focus" style={btn} onClick={act(() => { void startFocusOnTask(taskId); })}>Focus</button>}
         <button type="button" data-testid="task-info-done" style={btn} onClick={act(() => { void toggleTaskDone(taskId); })}>{info.done ? 'Reopen' : 'Done'}</button>
         <button type="button" data-testid="task-info-show" style={btn} onClick={act(() => focusNode(taskId))}>Show</button>
         {info.scheduledFor && <button type="button" data-testid="task-info-unschedule" style={{ ...btn, color: '#ff8e64', borderColor: '#ff8e64' }} onClick={act(() => unscheduleTask(taskId))}>Unplan</button>}

@@ -158,6 +158,12 @@ export class SysFacade {
       const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
       return infoCmd.settingsShow(iCtx, command.json);
     }
+    if (command.kind === 'settings' && command.sub === 'mode') {
+      return infoCmd.settingsMode({
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      }, command.mode);
+    }
     if (command.kind === 'viewport' && command.sub === 'show') {
       const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
       return infoCmd.viewportShow(iCtx, command.json);

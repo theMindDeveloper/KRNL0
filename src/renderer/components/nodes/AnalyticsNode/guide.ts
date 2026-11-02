@@ -54,7 +54,13 @@ const LAYOUT: Partial<Record<AnalyticsCardId | 'summary', Slot>> = {
   'sources.list':                { page: 'habits',    row: 0, rows: 2, col: 4, cols: 3 },
 };
 
-const PAGE_INDEX = new Map<PageId, number>(PAGES.map((p, i) => [p.id, i]));
+/** Easy mode hides the pages built on links (per-task plan vs actual, time by tag). */
+export const EASY_HIDDEN_PAGES: ReadonlySet<PageId> = new Set<PageId>(['estimates', 'tags']);
+export const pagesFor = (easy: boolean): readonly AnalyticsPage[] =>
+  easy ? PAGES.filter((p) => !EASY_HIDDEN_PAGES.has(p.id)) : PAGES;
+const pageIndex = (easy: boolean) => new Map<PageId, number>(pagesFor(easy).map((p, i) => [p.id, i]));
+const PAGE_INDEX = pageIndex(false);
+const EASY_PAGE_INDEX = pageIndex(true);
 
 export function isPagedCard(id: string): boolean {
   return id in LAYOUT;
@@ -65,10 +71,11 @@ export function pageOfCard(id: string): PageId | null {
 }
 
 /** CSS grid placement for a card (rows are 2 per page). */
-export function cardPlacement(id: string): CSSProperties {
+export function cardPlacement(id: string, easy = false): CSSProperties {
   const s = LAYOUT[id as AnalyticsCardId | 'summary'];
-  if (!s) return { display: 'none' };
-  const row = (PAGE_INDEX.get(s.page) ?? 0) * 2 + s.row + 1;
+  const index = (easy ? EASY_PAGE_INDEX : PAGE_INDEX).get(s?.page ?? 'summary');
+  if (!s || index === undefined) return { display: 'none' };
+  const row = index * 2 + s.row + 1;
   return { gridRow: `${row} / span ${s.rows}`, gridColumn: `${s.col} / span ${s.cols}` };
 }
 

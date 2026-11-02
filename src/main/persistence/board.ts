@@ -29,6 +29,7 @@ export interface PartialBoard {
   // Decision 33 — free-content canvases
   canvases?: Array<{ id: string; name: string }>;
   activeCanvasId?: string;
+  uiMode?: 'easy' | 'advanced';
   layoutGeometry?: {
     station?: {
       rowFraction: number;
@@ -48,6 +49,8 @@ export function seedBoard(): PartialBoard {
     layoutMode: 'station',
     canvases: [{ id: DEFAULT_CANVAS_ID, name: DEFAULT_CANVAS_NAME }],
     activeCanvasId: DEFAULT_CANVAS_ID,
+    // New boards start in Easy mode (existing boards without it stay Advanced).
+    uiMode: 'easy',
     nodes: [
       {
         id: 'mother-pomo',

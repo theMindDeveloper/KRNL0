@@ -42,12 +42,15 @@ export function spanTagColor(library: readonly TagDef[], tag: string | null | un
  * The one colour of a recorded span: a task span takes its task's tone (the
  * same colour as the task's planned block, so plan and reality overlap in one
  * colour), a named span its category, an unnamed one acid, a break grey.
+ * `plain` (Easy mode) draws every work span acid: plan vs reality by time only.
  */
 export function spanTone(
   library: readonly TagDef[],
   seg: { kind: 'work' | 'break'; taskId?: string | null; tag?: string | null },
+  plain = false,
 ): string {
   if (seg.kind === 'break') return 'var(--ink-3)';
+  if (plain) return 'var(--acid)';
   if (seg.taskId) return toneVarForTask(seg.taskId);
   return spanTagColor(library, seg.tag) ?? 'var(--acid)';
 }

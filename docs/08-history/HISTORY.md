@@ -907,3 +907,12 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - Several canvases for free content: images, drawings, text, media, frames, and the edges between them. Mothers, tasks and habit lanes are shared, so analytics, the completion ledger and pomo history stay the same on every canvas.
 - Top-bar canvas switcher with list, add, inline rename, and delete with confirm. CLI: `canvas list|add|switch|rename|delete`.
 - Old boards migrate onto a "Main" canvas. Deleting a canvas removes only its free nodes, its strokes and the edges touching them.
+
+---
+
+## [2026-11-02] — Easy / Advanced mode
+
+**Type:** Feature  
+**Branch:** `TMD/pomodoro-observer-mode-f9cfd3`  
+**Files changed:** `store/uiMode.ts` (new), board type/schema/seed, `TopBar` settings, Pomo/Clock/Calendar/Todo/Analytics gates, `scheduleMenus`, `TaskInfoPopup`, `CanvasFlow`, `sys` (`settings mode`), `tests/unit/easyMode.test.ts`, `docs/06-requirements/easy-mode.md`  
+**Summary:** A global Easy / Advanced switch in Settings. Easy hides the links between features and keeps the data identical: the Pomo is a stopwatch with breaks that never asks or names anything, recorded time is one colour, there are no tags or Focus buttons, and Analytics drops the plan-vs-actual and time-by-tag pages. Plan and reality are compared by time on the Clock and Calendar. New boards start in Easy and existing boards stay Advanced. CLI: `krnl settings mode [easy|advanced]`. Also fixed: Start no longer re-suggests a planned task over a continued name.
