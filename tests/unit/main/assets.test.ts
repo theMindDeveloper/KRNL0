@@ -170,3 +170,37 @@ describe('file persistence — no base64 in stored bytes', () => {
     expect(onDisk[3]).toBe(0x47);
   });
 });
+
+describe('streaming + path import (fast media)', () => {
+  it('serves byte ranges so video can start and seek', async () => {
+    const { writeAsset, assetResponse } = await import('../../../src/main/ipc/assets');
+    const { assetId } = writeAsset('mp4', new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+    const part = assetResponse(assetId, 'bytes=2-5');
+    expect(part.status).toBe(206);
+    expect(part.headers.get('Content-Range')).toBe('bytes 2-5/10');
+    expect(Array.from(new Uint8Array(await part.arrayBuffer()))).toEqual([2, 3, 4, 5]);
+    const whole = assetResponse(assetId, null);
+    expect(whole.status).toBe(200);
+    expect(whole.headers.get('Accept-Ranges')).toBe('bytes');
+    expect(assetResponse(assetId, 'bytes=50-').status).toBe(416);
+  });
+
+  it('serves .mov as mp4 so H.264 movs play', async () => {
+    const { writeAsset, assetResponse } = await import('../../../src/main/ipc/assets');
+    const { assetId } = writeAsset('mov', new Uint8Array([1, 2, 3]));
+    expect(assetResponse(assetId, null).headers.get('Content-Type')).toBe('video/mp4');
+  });
+
+  it('imports a file from disk by copying it', async () => {
+    const { importAssetFromPath, assetResponse } = await import('../../../src/main/ipc/assets');
+    const { writeFileSync } = await import('fs');
+    const src = join(tmp, 'clip.wav');
+    writeFileSync(src, new Uint8Array([82, 73, 70, 70, 9, 9]));
+    const { assetId, ext } = importAssetFromPath(src);
+    expect(ext).toBe('wav');
+    expect(Array.from(new Uint8Array(await assetResponse(assetId, null).arrayBuffer()))).toEqual([82, 73, 70, 70, 9, 9]);
+    const bad = join(tmp, 'fake.pdf');
+    writeFileSync(bad, new Uint8Array([1, 2, 3, 4]));
+    expect(() => importAssetFromPath(bad)).toThrow(/PDF magic/);
+  });
+});

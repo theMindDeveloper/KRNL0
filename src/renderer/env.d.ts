@@ -33,6 +33,8 @@ interface KrnlBridge {
   onPtyExit: (sessionId: string, callback: () => void) => () => void
   // Asset persistence (Decision 21)
   assetWrite: (ext: string, bytes: Uint8Array) => Promise<KrnlAssetWriteResult>
+  assetPathOf?: (file: File) => string | null
+  assetImportPath?: (path: string) => Promise<KrnlAssetWriteResult>
   assetRead: (assetId: string) => Promise<KrnlAssetReadResult | null>
   assetDelete: (assetId: string) => Promise<void>
   onBoardChanged: (callback: () => void) => () => void

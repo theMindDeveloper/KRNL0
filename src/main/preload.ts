@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('krnl', {
   // Board persistence
@@ -32,6 +32,13 @@ contextBridge.exposeInMainWorld('krnl', {
   // Electron structured-clones across the IPC bridge without base64.
   assetWrite: (ext: string, bytes: Uint8Array) =>
     ipcRenderer.invoke('asset:write', { ext, bytes }),
+  // Dropped files: their on-disk path (Electron webUtils) and a fast import
+  // that copies the file in main — no bytes over IPC.
+  assetPathOf: (file: File) => {
+    try { return webUtils.getPathForFile(file) || null } catch { return null }
+  },
+  assetImportPath: (path: string) =>
+    ipcRenderer.invoke('asset:importPath', { path }),
   assetRead: (assetId: string) =>
     ipcRenderer.invoke('asset:read', { assetId }),
   assetDelete: (assetId: string) =>

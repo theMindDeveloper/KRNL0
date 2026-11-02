@@ -17,6 +17,15 @@ import { useCornerProximity } from '../../../hooks/useCornerProximity';
 import { LookBar } from './LookBar';
 import { STICKY_COLORS, type TextLook } from './types';
 
+// Sticky notes are handwritten (Caveat, via Fontsource — loaded on demand).
+const STICKY_FONT = "'Caveat', 'Segoe Print', 'Comic Sans MS', cursive";
+let stickyFontLoaded = false;
+function loadStickyFont(): void {
+  if (stickyFontLoaded) return;
+  stickyFontLoaded = true;
+  void import('@fontsource/caveat/500.css').catch(() => { stickyFontLoaded = false; });
+}
+
 // Fine paper grain (SVG noise) for sticky notes.
 const PAPER_GRAIN = `url("data:image/svg+xml,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.07 0'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>")}")`;
 
@@ -33,6 +42,7 @@ export function TextNode({
   const look: TextLook = state.look ?? { kind: 'note' };
   const lookColor = look.color ?? (look.kind === 'sticky' ? STICKY_COLORS[0] : '#a8e6ff');
   const isSticky = look.kind === 'sticky';
+  if (isSticky) loadStickyFont();
   const isShape = look.kind === 'rect' || look.kind === 'ellipse' || look.kind === 'diamond';
   // Padding that keeps text inside the shape's inscribed box (a diamond's is
   // the middle 50%, an ellipse's roughly the middle 70%).
@@ -122,16 +132,17 @@ export function TextNode({
         position: 'relative',
         boxSizing: 'border-box',
         ...(isSticky ? {
-          // Paper note: ruled lines, a red margin line, a little grain and a
-          // lifted shadow.
-          backgroundColor: lookColor,
-          backgroundImage: [
-            'linear-gradient(90deg, transparent 27px, rgba(220,60,60,0.55) 27px, rgba(220,60,60,0.55) 28.5px, transparent 28.5px)',
-            'repeating-linear-gradient(180deg, transparent 0 23px, rgba(70,110,160,0.22) 23px 24px)',
-            PAPER_GRAIN,
+          // Paper note. ONE `background` shorthand (colour last): mixing the
+          // shorthand with backgroundColor let a re-render drop the paper
+          // colour, leaving the lines on black.
+          background: [
+            'linear-gradient(90deg, transparent 29px, rgba(214,72,72,0.45) 29px, rgba(214,72,72,0.45) 30.5px, transparent 30.5px) 0 0',
+            'repeating-linear-gradient(180deg, transparent 0 27px, rgba(60,90,140,0.13) 27px 28px) 0 10px',
+            'linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 40%) 0 0',
+            `${PAPER_GRAIN} 0 0`,
+            lookColor,
           ].join(', '),
-          backgroundPosition: '0 0, 0 6px, 0 0', // ruled lines sit just under each 24px text line
-          border: 'none', borderRadius: 3,
+          border: 'none', borderRadius: '2px 2px 14px 2px',
           boxShadow: selected
             ? '0 0 0 2px var(--acid), 0 14px 26px rgba(0,0,0,0.38)'
             : '0 1px 1px rgba(0,0,0,0.12), 0 6px 10px rgba(0,0,0,0.16), 0 16px 28px rgba(0,0,0,0.26)',
@@ -149,6 +160,14 @@ export function TextNode({
         <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
           <polygon points="50,1 99,50 50,99 1,50" fill={shapeFill} stroke={selected ? 'var(--acid)' : lookColor} strokeWidth={2} vectorEffect="non-scaling-stroke" />
         </svg>
+      )}
+      {isSticky && (
+        // Folded corner.
+        <span aria-hidden style={{
+          position: 'absolute', right: 0, bottom: 0, width: 22, height: 22, pointerEvents: 'none',
+          background: 'linear-gradient(135deg, rgba(0,0,0,0.16) 0%, rgba(0,0,0,0.05) 45%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.15) 100%)',
+          borderTopLeftRadius: 6, borderBottomRightRadius: 14,
+        }} />
       )}
       {selected && <LookBar look={look} onChange={(next) => onCommand('text.setLook', next)} />}
       {/* Resize handle — single bottom-right control with a diagonal-stripe
@@ -212,11 +231,11 @@ export function TextNode({
             outline: 'none',
             resize: 'none',
             background: 'transparent',
-            padding: isShape ? 0 : isSticky ? '6px 12px 8px 36px' : '12px 14px',
-            fontFamily: isSticky || isShape ? 'var(--font-sans)' : 'var(--font-serif)',
-            fontSize: isSticky || isShape ? 16 : 18,
-            lineHeight: isSticky ? '24px' : 1.35,
-            color: isSticky ? '#1a1814' : 'var(--ink)',
+            padding: isShape ? 0 : isSticky ? '6px 14px 10px 40px' : '12px 14px',
+            fontFamily: isSticky ? STICKY_FONT : isShape ? 'var(--font-sans)' : 'var(--font-serif)',
+            fontSize: isSticky ? 21 : isShape ? 16 : 18,
+            lineHeight: isSticky ? '28px' : 1.35,
+            color: isSticky ? '#2a2620' : 'var(--ink)',
             textAlign: isShape ? 'center' : 'left',
             letterSpacing: '-0.005em',
             boxSizing: 'border-box',
@@ -234,12 +253,12 @@ export function TextNode({
           style={{
             width: '100%',
             height: '100%',
-            padding: isShape ? shapePad : isSticky ? '6px 12px 8px 36px' : '12px 14px',
-            fontFamily: isSticky || isShape ? 'var(--font-sans)' : 'var(--font-serif)',
-            fontSize: isSticky || isShape ? 16 : 18,
+            padding: isShape ? shapePad : isSticky ? '6px 14px 10px 40px' : '12px 14px',
+            fontFamily: isSticky ? STICKY_FONT : isShape ? 'var(--font-sans)' : 'var(--font-serif)',
+            fontSize: isSticky ? 21 : isShape ? 16 : 18,
             fontWeight: isSticky || isShape ? 500 : undefined,
-            lineHeight: isSticky ? '24px' : 1.35,
-            color: isSticky ? '#1a1814' : 'var(--ink)',
+            lineHeight: isSticky ? '28px' : 1.35,
+            color: isSticky ? '#2a2620' : 'var(--ink)',
             letterSpacing: '-0.005em',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
