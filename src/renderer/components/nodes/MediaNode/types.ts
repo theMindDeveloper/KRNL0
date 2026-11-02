@@ -42,5 +42,23 @@ export const MEDIA_SIZE: Record<MediaKind, { width: number; height: number }> = 
 
 /** URL the player / viewer loads. */
 export function mediaUrl(s: Pick<MediaState, 'media' | 'src'>): string {
-  return s.media === 'embed' || s.media === 'link' ? s.src : `krnl-asset://${s.src.toLowerCase()}`;
+  if (s.media === 'embed') return cleanEmbedUrl(s.src);
+  return s.media === 'link' ? s.src : `krnl-asset://${s.src.toLowerCase()}`;
+}
+
+/**
+ * A YouTube link copied from a Mix / playlist (`watch?v=…&list=RD…&start_radio=1`)
+ * won't play in an embed: auto-generated Mix playlists are not embeddable, so
+ * the player stays black. Keep just the video (and its start time).
+ */
+export function cleanEmbedUrl(raw: string): string {
+  let u: URL;
+  try { u = new URL(raw); } catch { return raw; }
+  if (!/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname)) return raw;
+  const v = u.searchParams.get('v');
+  if (!v && u.hostname.endsWith('youtube.com')) return raw; // a real playlist / channel page
+  const t = u.searchParams.get('t') ?? u.searchParams.get('start');
+  for (const k of [...u.searchParams.keys()]) if (k !== 'v') u.searchParams.delete(k);
+  if (t) u.searchParams.set('t', t);
+  return u.href;
 }

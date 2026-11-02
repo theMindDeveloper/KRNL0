@@ -905,11 +905,15 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const onFocus = (e: Event) => {
       const id = (e as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
       const n = id ? useBoardStore.getState().board?.nodes.find((x) => x.id === id) : undefined;
-      if (n) setCenter(n.position.x + 110, n.position.y + 80, { duration: 400, zoom: 0.9 });
+      if (!n) return;
+      // Use the drawn position: the mother row is placed at render time.
+      const at = getNodes().find((x) => x.id === n.id)?.position ?? n.position;
+      if (n.isMother) setCenter(at.x + MOTHER_WIDTH / 2, at.y + MOTHER_HEIGHT / 2, { duration: 400, zoom: 0.9 });
+      else setCenter(at.x + 110, at.y + 80, { duration: 400, zoom: 0.9 });
     };
     window.addEventListener(FOCUS_NODE_EVENT, onFocus);
     return () => window.removeEventListener(FOCUS_NODE_EVENT, onFocus);
-  }, [setCenter]);
+  }, [setCenter, getNodes]);
 
   const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number }; look?: TextLook }) => {
     // Auto-enable the layer filter for the spawned kind so the new node is

@@ -24,10 +24,11 @@ function sortedLog(log: string[]): string[] {
 
 export function habitAdd(
   state: HabitState,
-  args: { name: string; color?: HabitColor },
+  args: { name: string; color?: HabitColor; schedule?: unknown },
   env: HabitEnv = defaultEnv,
 ): HabitState {
   const trimmed = args.name.trim();
+  const schedule = parseAddSchedule(args.schedule);
   if (!trimmed) return state;
   const color: HabitColor = args.color && isHabitColor(args.color) ? args.color : 'acid';
   const habit: Habit = {
@@ -37,8 +38,25 @@ export function habitAdd(
     log: [],
     archived: false,
     color,
+    ...(schedule ? { schedule } : {}),
   };
   return { ...state, habits: [...state.habits, habit] };
+}
+
+// Optional repeat set while adding (Habit window's repeat picker). Anything
+// malformed is dropped: the habit is still added, just unscheduled.
+function parseAddSchedule(raw: unknown): HabitSchedule | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as { kind?: unknown; timeOfDay?: unknown; days?: unknown; durationMin?: unknown };
+  if (typeof r.timeOfDay !== 'string' || !isValidTimeOfDay(r.timeOfDay)) return undefined;
+  const dur = typeof r.durationMin === 'number' && r.durationMin >= 5 && r.durationMin <= 480 ? { durationMin: r.durationMin } : {};
+  if (r.kind === 'daily') return { kind: 'daily', timeOfDay: r.timeOfDay, ...dur };
+  if (r.kind === 'weekdays') return { kind: 'weekdays', timeOfDay: r.timeOfDay, ...dur };
+  if (r.kind === 'weekly' && Array.isArray(r.days)) {
+    const days = [...new Set(r.days.filter((d): d is IsoDow => Number.isInteger(d) && d >= 1 && d <= 7))].sort((a, b) => a - b);
+    if (days.length) return { kind: 'weekly', timeOfDay: r.timeOfDay, days, ...dur };
+  }
+  return undefined;
 }
 
 // Toggles a date in the habit's log.

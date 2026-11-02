@@ -4,6 +4,7 @@
 //   YouTube / Vimeo / … URL → MediaNode 'embed' (react-player can play it)
 //   other http(s) URL       → MediaNode 'link'
 
+import { cleanEmbedUrl } from '../nodes/MediaNode/types';
 import type { MediaKind } from '../nodes/MediaNode/types';
 
 const EXT_KIND: Record<string, Exclude<MediaKind, 'embed' | 'link' | 'file'>> = {
@@ -41,7 +42,7 @@ export function classifyUrl(raw: string): { media: 'embed' | 'link'; url: string
   let u: URL;
   try { u = new URL(text); } catch { return null; }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-  if (EMBED_HOSTS.some((re) => re.test(u.hostname))) return { media: 'embed', url: u.href };
+  if (EMBED_HOSTS.some((re) => re.test(u.hostname))) return { media: 'embed', url: cleanEmbedUrl(u.href) };
   const kind = EXT_KIND[fileExt(u.pathname)];
   // Direct video / audio file links play in the same player.
   if (kind === 'video' || kind === 'audio') return { media: 'embed', url: u.href };

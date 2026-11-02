@@ -423,6 +423,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
       onSelect: startNoteEdit,
     },
+    // Only for tasks that are on the calendar.
+    ...(state.scheduledFor
+      ? [{ label: 'Show on calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTaskOnCalendar(taskId)); } }]
+      : []),
     {
       label: 'Delete',
       danger: true,

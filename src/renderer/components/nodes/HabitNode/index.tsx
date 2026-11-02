@@ -15,6 +15,9 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { RepeatEditor, describeRepeat, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
+import { IconRepeat } from '../../ui/repeatIcons';
 import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -83,6 +86,9 @@ export function HabitNode({
 }: NodeProps<HabitState, HabitConfig>) {
   const { state, config } = node;
   const [newName, setNewName] = useState('');
+  // Optional repeat for the habit being added (null = no schedule).
+  const [newRepeat, setNewRepeat] = useState<RepeatValue | null>(null);
+  const [repeatAt, setRepeatAt] = useState<{ x: number; y: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -131,8 +137,12 @@ export function HabitNode({
     if (e.key === 'Enter') {
       const trimmed = newName.trim();
       if (!trimmed) return;
-      onCommand('habit.add', { name: trimmed });
+      onCommand('habit.add', {
+        name: trimmed,
+        ...(newRepeat && isRepeatValid(newRepeat) ? { schedule: toSchedule(newRepeat) } : {}),
+      });
       setNewName('');
+      setNewRepeat(null);
     }
   };
 
@@ -266,6 +276,7 @@ export function HabitNode({
               paddingTop: 10,
             }}
           >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               type="text"
               placeholder="+ add habit"
@@ -295,6 +306,67 @@ export function HabitNode({
                 boxSizing: 'border-box',
               }}
             />
+            <button
+              type="button"
+              data-testid="habit-add-repeat"
+              title={newRepeat ? describeRepeat(newRepeat) : 'Repeat (optional)'}
+              aria-pressed={!!newRepeat}
+              onClick={(e) => {
+                e.stopPropagation();
+                const r = e.currentTarget.getBoundingClientRect();
+                setRepeatAt({ x: r.right, y: r.bottom });
+                setNewRepeat((v) => v ?? { kind: 'daily', days: [], timeOfDay: '07:00', durationMin: 25 });
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                height: 24, padding: '0 8px', borderRadius: 7, cursor: 'pointer',
+                fontFamily: 'var(--font-sans)', fontSize: 11,
+                border: `1px solid ${newRepeat ? 'var(--acid)' : 'var(--paper-3)'}`,
+                background: newRepeat ? 'color-mix(in srgb, var(--acid) 14%, transparent)' : 'transparent',
+                color: newRepeat ? 'var(--ink)' : 'var(--ink-3)',
+              }}
+            >
+              <IconRepeat />{newRepeat ? 'Repeats' : 'Repeat'}
+            </button>
+            </div>
+            {newRepeat && !repeatAt && (
+              <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
+                {describeRepeat(newRepeat)} · press Enter to add
+              </div>
+            )}
+            {repeatAt && newRepeat && createPortal(
+              <>
+                <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+                <div
+                  data-testid="habit-add-repeat-pop"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'fixed', zIndex: 1999, width: 380, boxSizing: 'border-box',
+                    left: Math.max(8, Math.min(repeatAt.x - 380, window.innerWidth - 388)),
+                    top: Math.max(8, Math.min(repeatAt.y + 6, window.innerHeight - 330)),
+                    padding: 16, borderRadius: 14, background: 'var(--paper)', color: 'var(--ink)',
+                    border: '1px solid var(--paper-3)', boxShadow: '0 24px 60px rgba(0,0,0,0.5)', fontFamily: 'var(--font-sans)',
+                  }}
+                >
+                  <RepeatEditor value={newRepeat} onChange={setNewRepeat} testIdPrefix="habit-add" />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+                    <button type="button" onClick={() => { setNewRepeat(null); setRepeatAt(null); }}
+                      style={{ height: 32, padding: '0 12px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 12.5 }}>
+                      No repeat
+                    </button>
+                    <button type="button" disabled={!isRepeatValid(newRepeat)} onClick={() => setRepeatAt(null)}
+                      style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--acid)', color: '#0a0908', cursor: 'pointer', fontSize: 12.5, fontWeight: 650, opacity: isRepeatValid(newRepeat) ? 1 : 0.4 }}>
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </>,
+              document.body,
+            )}
           </div>
 
           {menu && menuHabit && (

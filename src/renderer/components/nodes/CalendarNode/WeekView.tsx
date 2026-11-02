@@ -4,6 +4,7 @@
 // rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
 // HabitSwapModal. NowLine is rendered as an overlay.
 
+import { CALENDAR_REVEAL_EVENT } from '../../../store/scheduleActions';
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -701,6 +702,31 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   };
   const win = hourWindow(gridTop, gridH, rowHeight, rowCount);
 
+  // "Show on calendar" (task right-click): scroll the hour window to the
+  // task and pulse its block.
+  useEffect(() => {
+    const onReveal = (e: Event) => {
+      const det = (e as CustomEvent<{ taskId?: string; startISO?: string }>).detail;
+      const el = gridBodyRef.current;
+      if (!det?.taskId || !el) return;
+      const start = det.startISO ? new Date(det.startISO) : null;
+      if (start && !Number.isNaN(start.getTime())) {
+        el.scrollTop = Math.max(0, (start.getHours() - 1) * rowHeight);
+        setGridTop(el.scrollTop);
+      }
+      window.setTimeout(() => {
+        const block = el.querySelector<HTMLElement>(`[data-testid="task-block-${CSS.escape(det.taskId!)}"]`);
+        if (!block) return;
+        block.animate(
+          [{ boxShadow: '0 0 0 0 var(--acid)' }, { boxShadow: '0 0 0 4px var(--acid)' }, { boxShadow: '0 0 0 0 var(--acid)' }],
+          { duration: 700, iterations: 3, easing: 'ease-in-out' },
+        );
+      }, 80);
+    };
+    window.addEventListener(CALENDAR_REVEAL_EVENT, onReveal);
+    return () => window.removeEventListener(CALENDAR_REVEAL_EVENT, onReveal);
+  }, [rowHeight]);
+
   // Whether any task is scheduled this week (controls empty-state hint).
   const hasTasksThisWeek = slicesByDay.size > 0;
 
@@ -718,28 +744,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     habit: HabitDragPayload;
     isoDow: IsoDow;
   } | null>(null);
-
-  const dispatchSchedule = useCallback(
-    (
-      kind: HabitScheduleKind,
-      cell: { dayYMD: string; hour: number },
-      habit: HabitDragPayload,
-      timeOfDay: string,
-      durationMin: number,
-    ) => {
-      const isoDow = ymdToIsoDow(cell.dayYMD);
-      const schedule: HabitSchedule =
-        kind === 'daily'
-          ? { kind: 'daily', timeOfDay, durationMin }
-          : { kind: 'weekly', timeOfDay, days: [isoDow], durationMin };
-      onCommand('calendar.scheduleHabit', {
-        habitId: habit.habitId,
-        habitMotherId: habit.habitMotherId,
-        schedule,
-      });
-    },
-    [onCommand],
-  );
 
   // Resolve the habit record and mother-node index for the HabitSwapModal header.
   // Reads directly from store state — no re-render subscription needed since
@@ -2406,16 +2410,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             isoDow={swapModal.isoDow}
             defaultTimeOfDay={defaultTimeOfDay}
             defaultDurationMin={25}
-            onConfirm={(kind, timeOfDay, durationMin) => {
+            onConfirm={(schedule) => {
               const snap = swapModal;
               setSwapModal(null);
-              dispatchSchedule(
-                kind,
-                { dayYMD: snap.dayYMD, hour: snap.hour },
-                snap.habit,
-                timeOfDay,
-                durationMin,
-              );
+              onCommand('calendar.scheduleHabit', {
+                habitId: snap.habit.habitId,
+                habitMotherId: snap.habit.habitMotherId,
+                schedule,
+              });
             }}
             onCancel={() => setSwapModal(null)}
           />
