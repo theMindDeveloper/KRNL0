@@ -862,3 +862,4 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Tests:** 131 files / 1589 passed, 0 typecheck errors. Exercised in the browser preview (`vite.preview.config.ts`), not yet in the Electron window. One unrelated Station test timed out once under full-suite load and passes on its own.
 
 - **Follow-up 19:** merged `TMD/task-completion-tagging-c87ea6` (ADR 0016: Todo Done/Archive, smart task tags with picker and custom tags, time by tag). Its Analytics **Time** view is a new **Time by tag** page in the paged Analytics (donut, ranked list, daily bars), with a tag icon in the page nav. Conflicts in `sys/parser.ts`, `sys/commands/analytics.ts` and this file were resolved by keeping both sides. Tests: 141 files / 1657 green.
+- **Follow-up 20:** README showcase further down uses the v0.10 screenshots (the 0.8 and old Station images are gone).
