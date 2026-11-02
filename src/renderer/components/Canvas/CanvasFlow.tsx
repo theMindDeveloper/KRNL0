@@ -41,6 +41,8 @@ import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapte
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { DrawLayer } from './DrawLayer';
+import { PieMenu } from '../ui/PieMenu';
+import { canvasWheelItems } from './canvasWheel';
 import type { TextLook } from '../nodes/TextNode/types';
 import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
@@ -722,6 +724,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // rather than an empty placeholder node.
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingImageDropPos = useRef<{ x: number; y: number } | null>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingMediaPos = useRef<{ x: number; y: number } | null>(null);
 
   const spawnImageNodeFromFile = useCallback(async (
     file: File,
@@ -1040,6 +1044,21 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     ensureVisible({ x: pos.x, y: pos.y, width: size.width, height: size.height });
   }, [addNode, ensureVisible]);
 
+  // One path for every dropped / pasted / picked file.
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fileNotice) return;
+    const t = setTimeout(() => setFileNotice(null), 4500);
+    return () => clearTimeout(t);
+  }, [fileNotice]);
+  const spawnFile = useCallback(async (file: File, pos: { x: number; y: number }) => {
+    const kind = classifyFile(file);
+    if (kind === 'image') { await spawnImageNodeFromFile(file, pos); return; }
+    const assetId = await ingestMediaFile(file);
+    if (!assetId) { setFileNotice(`Couldn't add “${file.name}”`); return; }
+    spawnMediaNode({ media: kind, src: assetId, title: file.name, size: file.size }, pos);
+  }, [spawnImageNodeFromFile, spawnMediaNode]);
+
   const onDrop = useCallback(async (e: React.DragEvent) => {
     if (Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
     const files = Array.from(e.dataTransfer.files);
@@ -1053,17 +1072,63 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     }
     e.preventDefault();
     for (const file of files) {
-      const kind = classifyFile(file);
-      if (kind === 'image') {
-        await spawnImageNodeFromFile(file, pos);
-      } else if (kind) {
-        const assetId = await ingestMediaFile(file);
-        if (assetId) spawnMediaNode({ media: kind, src: assetId, title: file.name }, pos);
-      }
+      await spawnFile(file, pos);
       pos.x += 24;
       pos.y += 24;
     }
-  }, [screenToFlowPosition, spawnImageNodeFromFile, spawnMediaNode]);
+  }, [screenToFlowPosition, spawnFile, spawnMediaNode]);
+
+  // ── Paste anything (Ctrl/Cmd+V) ────────────────────────────────────────────
+  // Files → image / media nodes; a link → embedded player or website preview
+  // (switch it to plain text from its header); other text → a text note.
+  // Lands at the last pointer position over the canvas.
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
+  const spawnFiles = useCallback(async (files: File[], pos: { x: number; y: number }) => {
+    for (const file of files) {
+      await spawnFile(file, pos);
+      pos = { x: pos.x + 24, y: pos.y + 24 };
+    }
+  }, [spawnFile]);
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.closest('.term-body') || active?.closest('.xterm')) return;
+      const data = e.clipboardData;
+      if (!data) return;
+      const at = lastPointer.current ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      const pos = screenToFlowPosition(at);
+      const files = Array.from(data.files);
+      if (files.length > 0) {
+        e.preventDefault();
+        void spawnFiles(files, pos);
+        return;
+      }
+      const text = data.getData('text/plain').trim();
+      if (!text) return;
+      e.preventDefault();
+      const link = !/\s/.test(text) ? classifyUrl(text) : null;
+      if (link) {
+        spawnMediaNode({ media: link.media, src: link.url, title: new URL(link.url).hostname.replace(/^www\./, '') }, pos);
+        return;
+      }
+      const lines = text.split('\n').length;
+      addNode({
+        id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: 'text',
+        position: pos,
+        state: { text, width: 280, height: Math.min(600, 60 + lines * 24) },
+        config: {},
+        isMother: false,
+      });
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [screenToFlowPosition, spawnFiles, spawnMediaNode, addNode]);
 
   // ── onConnect — wire a visual link edge between two non-mother nodes ──────
   const onConnect = useCallback((conn: Connection) => {
@@ -1552,6 +1617,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onNodeContextMenu={onNodeContextMenu}
       onEdgeContextMenu={handleEdgeContextMenu}
       onPaneClick={() => { closeCtxMenu(); closePaneCtxMenu(); setEdgeCtxMenu(null); }}
+      onPaneMouseMove={(e) => { lastPointer.current = { x: e.clientX, y: e.clientY }; }}
       onPaneContextMenu={handlePaneContextMenu}
       onDrop={onDrop}
       onDragOver={onDragOver}
@@ -1658,6 +1724,30 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       {/* Hidden file picker for the dock's "image" button (no placeholder
           node is ever created — the picker spawns a real ImageNode with an
           assetId in one step). */}
+      {fileNotice && (
+        <div role="status" data-testid="canvas-file-notice" style={{
+          position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 50,
+          padding: '8px 14px', borderRadius: 999, background: 'var(--paper-2)', border: '1px solid var(--rust)',
+          color: 'var(--ink)', fontFamily: 'var(--font-sans)', fontSize: 12.5, boxShadow: 'var(--shadow-1)',
+        }}>{fileNotice}</div>
+      )}
+
+      {/* File picker for the wheel's Media → Video/PDF (any file works). */}
+      <input
+        ref={mediaFileInputRef}
+        type="file"
+        accept="*/*"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          const pos = pendingMediaPos.current ?? defaultDockSpawnPos();
+          pendingMediaPos.current = null;
+          await spawnFile(file, pos);
+        }}
+        style={{ display: 'none' }}
+        data-testid="canvas-media-file-input"
+      />
       <input
         ref={imageFileInputRef}
         type="file"
@@ -1688,57 +1778,23 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
           the dock's create buttons but anchors the new node to where the
           user actually right-clicked instead of the dock-spawn lane. */}
       {paneCtxMenu !== null && (
-        <ContextMenu
+        <PieMenu
+          testId="canvas-wheel"
           x={paneCtxMenu.x}
           y={paneCtxMenu.y}
-          items={[
-            {
-              label: '+ Task',
-              onSelect: () => {
-                setPaneNamePrompt({
-                  kind: 'task',
-                  x: paneCtxMenu.x,
-                  y: paneCtxMenu.y,
-                  flowX: paneCtxMenu.flowX,
-                  flowY: paneCtxMenu.flowY,
-                });
-              },
+          onClose={closePaneCtxMenu}
+          items={canvasWheelItems({
+            task: () => setPaneNamePrompt({ kind: 'task', x: paneCtxMenu.x, y: paneCtxMenu.y, flowX: paneCtxMenu.flowX, flowY: paneCtxMenu.flowY }),
+            habit: () => setPaneNamePrompt({ kind: 'habit', x: paneCtxMenu.x, y: paneCtxMenu.y, flowX: paneCtxMenu.flowX, flowY: paneCtxMenu.flowY }),
+            note: () => handleAddNode({ kind: 'text', at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+            look: (look) => handleAddNode({ kind: 'text', look, at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+            image: () => handleAddNode({ kind: 'image', at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+            mediaFile: () => {
+              pendingMediaPos.current = { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY };
+              mediaFileInputRef.current?.click();
             },
-            {
-              label: '+ Habit (pinned lane)',
-              onSelect: () => {
-                setPaneNamePrompt({
-                  kind: 'habit',
-                  x: paneCtxMenu.x,
-                  y: paneCtxMenu.y,
-                  flowX: paneCtxMenu.flowX,
-                  flowY: paneCtxMenu.flowY,
-                });
-              },
-            },
-            {
-              label: '+ Text note',
-              onSelect: () => handleAddNode({
-                kind: 'text',
-                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
-              }),
-            },
-            {
-              label: '+ Image…',
-              onSelect: () => handleAddNode({
-                kind: 'image',
-                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
-              }),
-            },
-            {
-              label: '+ Frame',
-              onSelect: () => handleAddNode({
-                kind: 'frame',
-                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
-              }),
-            },
-          ]}
-          onDismiss={closePaneCtxMenu}
+            frame: () => handleAddNode({ kind: 'frame', at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+          })}
         />
       )}
 

@@ -3,7 +3,7 @@
 // plain web link. Files live in the asset store (krnl-asset://<id>); links
 // keep their URL.
 
-export type MediaKind = 'video' | 'audio' | 'pdf' | 'embed' | 'link';
+export type MediaKind = 'video' | 'audio' | 'pdf' | 'embed' | 'link' | 'file';
 
 export interface MediaState {
   media: MediaKind;
@@ -14,6 +14,8 @@ export interface MediaState {
   height?: number;
   /** PDF: current page (1-based). */
   page?: number;
+  /** Dropped files: size in bytes (shown on the card). */
+  size?: number;
 }
 
 export type MediaConfig = Record<string, never>;
@@ -23,7 +25,8 @@ export const MEDIA_SIZE: Record<MediaKind, { width: number; height: number }> = 
   embed: { width: 480, height: 300 },
   audio: { width: 360, height: 110 },
   pdf: { width: 420, height: 560 },
-  link: { width: 320, height: 96 },
+  link: { width: 420, height: 300 },
+  file: { width: 280, height: 120 },
 };
 
 /** URL the player / viewer loads. */

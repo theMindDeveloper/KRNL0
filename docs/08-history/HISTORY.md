@@ -803,3 +803,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
   - **Dock:** draggable by its grip. It snaps to top, middle or bottom of the left edge, or bottom centre (horizontal), glides into place, and remembers the spot.
   - **Brainstorming:** sticky notes (S) and shapes (R: rectangle, ellipse, diamond) with a style bar for shape and colour. CLI: `text add --sticky | --shape`.
   - **Drop anything:** video, audio and PDF files, and YouTube, Vimeo or SoundCloud links, become media nodes (react-player, pdf.js); other links become link cards. The asset store accepts media up to 500 MB. CLI: `media add <url> | list`.
+- **Follow-up 5:**
+  - **Analytics blur:** text stays sharp in the zoomed canvas (pager shifts with margin, not transform).
+  - **Canvas right-click wheel** (shared `ui/PieMenu`, nested panels): Task · Habit · Note · Sticky (colours) · Shapes (rect/ellipse/diamond) · Media (image, any file) · Frame · Pen (tools, colours).
+  - **Dock:** the Shape button opens a shape picker. Faint shortcut letters sit on dock buttons and wheel slices. The dock draws over the SPINE badge (badge portals into the canvas root) instead of hiding it.
+  - **Shapes:** text stays inside the shape's inscribed box, with a stronger fill.
+  - **Ctrl+V:** files become image/media nodes; a link becomes a player or website preview (the "Aa" switch turns it into text); other text becomes a note.
+  - **Any file drops:** .mov and .wav are detected by extension; unknown types become a download card. Media cards are rebuilt: custom audio player, video with a codec fallback, website preview, PDF pages, file card.

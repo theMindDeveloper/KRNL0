@@ -38,6 +38,9 @@ const MEDIA_MIME: Record<string, string> = {
   pdf: 'application/pdf',
 };
 const ALLOWED_EXT = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', ...Object.keys(MEDIA_MIME)]);
+// Any other file dropped on the canvas is kept as an opaque download.
+const GENERIC_EXT_RE = /^[a-z0-9]{1,10}$/;
+const isStorableExt = (ext: string) => ALLOWED_EXT.has(ext) || GENERIC_EXT_RE.test(ext);
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB (images)
 const MAX_MEDIA_BYTES = 500 * 1024 * 1024; // 500 MB (video / audio / PDF)
 const MIME_BY_EXT: Record<string, string> = {
@@ -65,7 +68,7 @@ function rebuildExtMap(): void {
       if (dot <= 0) continue;
       const id = file.slice(0, dot);
       const ext = file.slice(dot + 1).toLowerCase();
-      if (/^[A-Z0-9]{20,32}$/.test(id) && ALLOWED_EXT.has(ext)) {
+      if (/^[A-Z0-9]{20,32}$/.test(id) && isStorableExt(ext)) {
         assetExt.set(id, ext);
       }
     }
@@ -97,7 +100,7 @@ function normExt(ext: string): string {
  * / `onerror=` (case-insensitive) to prevent XSS via SVG.
  */
 function validateBytes(ext: string, buf: Uint8Array): void {
-  if (ext in MEDIA_MIME) {
+  if (ext in MEDIA_MIME || !ALLOWED_EXT.has(ext)) {
     if (buf.byteLength === 0 || buf.byteLength > MAX_MEDIA_BYTES) throw new Error('asset:write — invalid size');
     // PDF must look like a PDF; audio/video containers vary too much for a
     // cheap magic check and are only ever played, never executed.
@@ -174,7 +177,7 @@ export interface AssetWriteResult {
  */
 export function writeAsset(rawExt: string, buf: Uint8Array): AssetWriteResult {
   const ext = normExt(rawExt);
-  if (!ALLOWED_EXT.has(ext)) {
+  if (!isStorableExt(ext)) {
     throw new Error(`asset:write â€” unsupported ext "${ext}"`);
   }
   validateBytes(ext, buf);

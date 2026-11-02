@@ -75,9 +75,19 @@ describe('writeAsset — magic byte validation', () => {
     expect(writeAsset('webp', WEBP_MAGIC).ext).toBe('webp');
   });
 
-  it('rejects extension not in whitelist', async () => {
+  it('rejects malformed extensions (any plain extension is kept as a download)', async () => {
     const { writeAsset } = await import('../../../src/main/ipc/assets');
-    expect(() => writeAsset('bmp', PNG_MAGIC)).toThrow(/unsupported/);
+    expect(() => writeAsset('../evil', PNG_MAGIC)).toThrow(/unsupported/);
+    expect(() => writeAsset('waytoolongextension', PNG_MAGIC)).toThrow(/unsupported/);
+    expect(writeAsset('zip', PNG_MAGIC).ext).toBe('zip');
+  });
+
+  it('accepts video / audio and checks PDF magic', async () => {
+    const { writeAsset } = await import('../../../src/main/ipc/assets');
+    expect(writeAsset('mov', new Uint8Array([0, 0, 0, 20, 102, 116, 121, 112])).ext).toBe('mov');
+    expect(writeAsset('wav', new Uint8Array([82, 73, 70, 70])).ext).toBe('wav');
+    expect(() => writeAsset('pdf', PNG_MAGIC)).toThrow(/PDF magic/);
+    expect(writeAsset('pdf', new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])).ext).toBe('pdf');
   });
 
   it('rejects empty file', async () => {

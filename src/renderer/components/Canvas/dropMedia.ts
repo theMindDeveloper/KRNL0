@@ -6,7 +6,7 @@
 
 import type { MediaKind } from '../nodes/MediaNode/types';
 
-const EXT_KIND: Record<string, Exclude<MediaKind, 'embed' | 'link'>> = {
+const EXT_KIND: Record<string, Exclude<MediaKind, 'embed' | 'link' | 'file'>> = {
   mp4: 'video', webm: 'video', mov: 'video', m4v: 'video', ogv: 'video',
   mp3: 'audio', wav: 'audio', ogg: 'audio', m4a: 'audio', flac: 'audio', aac: 'audio',
   pdf: 'pdf',
@@ -18,12 +18,16 @@ export function fileExt(name: string): string {
 }
 
 /** What a dropped file becomes. Exported for tests. */
-export function classifyFile(file: { name: string; type: string }): 'image' | Exclude<MediaKind, 'embed' | 'link'> | null {
-  if (file.type.startsWith('image/')) return 'image';
+export function classifyFile(file: { name: string; type: string }): 'image' | Exclude<MediaKind, 'embed' | 'link'> {
+  const ext = fileExt(file.name);
+  // Extension first: Windows often reports .mov / .wav with an empty or odd MIME.
+  if (EXT_KIND[ext]) return EXT_KIND[ext]!;
+  if (file.type.startsWith('image/') && ext !== 'heic') return 'image';
   if (file.type === 'application/pdf') return 'pdf';
   if (file.type.startsWith('video/')) return 'video';
   if (file.type.startsWith('audio/')) return 'audio';
-  return EXT_KIND[fileExt(file.name)] ?? null;
+  // Anything else becomes a file card (download).
+  return 'file';
 }
 
 const EMBED_HOSTS = [

@@ -31,6 +31,10 @@ export function TextNode({
   const lookColor = look.color ?? (look.kind === 'sticky' ? STICKY_COLORS[0] : '#a8e6ff');
   const isSticky = look.kind === 'sticky';
   const isShape = look.kind === 'rect' || look.kind === 'ellipse' || look.kind === 'diamond';
+  // Padding that keeps text inside the shape's inscribed box (a diamond's is
+  // the middle 50%, an ellipse's roughly the middle 70%).
+  const shapePad = look.kind === 'diamond' ? '25%' : look.kind === 'ellipse' ? '15%' : '12px 14px';
+  const shapeFill = `color-mix(in srgb, ${lookColor} 42%, var(--paper))`;
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -119,7 +123,7 @@ export function TextNode({
           boxShadow: selected ? '0 0 0 2px var(--acid), 0 10px 22px rgba(0,0,0,0.35)' : '0 10px 22px rgba(0,0,0,0.32), 0 1px 0 rgba(0,0,0,0.1)',
         } : {}),
         ...(look.kind === 'rect' || look.kind === 'ellipse' ? {
-          background: `color-mix(in srgb, ${lookColor} 26%, var(--paper))`,
+          background: shapeFill,
           border: `2px solid ${lookColor}`,
           borderRadius: look.kind === 'ellipse' ? '50%' : 12,
           boxShadow: selected ? '0 0 0 2px var(--acid)' : 'none',
@@ -129,7 +133,7 @@ export function TextNode({
     >
       {look.kind === 'diamond' && (
         <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-          <polygon points="50,1 99,50 50,99 1,50" fill={`color-mix(in srgb, ${lookColor} 26%, var(--paper))`} stroke={selected ? 'var(--acid)' : lookColor} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+          <polygon points="50,1 99,50 50,99 1,50" fill={shapeFill} stroke={selected ? 'var(--acid)' : lookColor} strokeWidth={2} vectorEffect="non-scaling-stroke" />
         </svg>
       )}
       {selected && <LookBar look={look} onChange={(next) => onCommand('text.setLook', next)} />}
@@ -173,6 +177,7 @@ export function TextNode({
         </svg>
       </NodeResizeControl>
       {editing ? (
+        <div style={isShape ? { position: 'absolute', inset: 0, padding: shapePad, boxSizing: 'border-box', display: 'flex', alignItems: 'center' } : { width: '100%', height: '100%' }}>
         <textarea
           ref={taRef}
           className="text-body"
@@ -193,7 +198,7 @@ export function TextNode({
             outline: 'none',
             resize: 'none',
             background: 'transparent',
-            padding: isShape ? '14px 18%' : '12px 14px',
+            padding: isShape ? 0 : '12px 14px',
             fontFamily: isSticky || isShape ? 'var(--font-sans)' : 'var(--font-serif)',
             fontSize: isSticky || isShape ? 16 : 18,
             lineHeight: 1.35,
@@ -202,8 +207,11 @@ export function TextNode({
             letterSpacing: '-0.005em',
             boxSizing: 'border-box',
             position: 'relative',
+            overflow: 'hidden',
+            ...(isShape ? { height: `${Math.max(1, draft.split('\n').length) * 1.35}em`, maxHeight: '100%' } : {}),
           }}
         />
+        </div>
       ) : (
         <div
           className="text-body"
@@ -212,7 +220,7 @@ export function TextNode({
           style={{
             width: '100%',
             height: '100%',
-            padding: isShape ? '14px 18%' : '12px 14px',
+            padding: isShape ? shapePad : '12px 14px',
             fontFamily: isSticky || isShape ? 'var(--font-sans)' : 'var(--font-serif)',
             fontSize: isSticky || isShape ? 16 : 18,
             fontWeight: isSticky || isShape ? 500 : undefined,

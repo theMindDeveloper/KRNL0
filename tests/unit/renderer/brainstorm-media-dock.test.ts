@@ -35,7 +35,11 @@ describe('drop anything', () => {
     expect(classifyFile({ name: 'talk.mp4', type: 'video/mp4' })).toBe('video');
     expect(classifyFile({ name: 'song.mp3', type: '' })).toBe('audio');
     expect(classifyFile({ name: 'paper.pdf', type: 'application/pdf' })).toBe('pdf');
-    expect(classifyFile({ name: 'notes.docx', type: 'application/msword' })).toBeNull();
+    // Windows often gives .mov / .wav an empty or odd MIME — the extension wins.
+    expect(classifyFile({ name: 'clip.MOV', type: '' })).toBe('video');
+    expect(classifyFile({ name: 'take.wav', type: 'audio/x-wav' })).toBe('audio');
+    // Anything else becomes a file card.
+    expect(classifyFile({ name: 'notes.docx', type: 'application/msword' })).toBe('file');
   });
   it('classifies links: players embed, the rest become link cards', () => {
     expect(classifyUrl('https://www.youtube.com/watch?v=abc')).toEqual({ media: 'embed', url: 'https://www.youtube.com/watch?v=abc' });
@@ -79,5 +83,18 @@ describe('pen arrow tool', () => {
     const s = { id: 'a', tool: 'arrow' as const, color: '#fff', size: 3, createdAt: '', points: pts };
     expect(strokesHit([s], 50, 2, 3)).toEqual(['a']);
     expect(strokesHit([s], 50, 30, 3)).toEqual([]);
+  });
+});
+
+import { canvasWheelItems } from '../../../src/renderer/components/Canvas/canvasWheel';
+
+describe('canvas wheel', () => {
+  it('first ring is a few categories; sub-panels hold the rest; shortcuts shown', () => {
+    const noop = () => {};
+    const items = canvasWheelItems({ task: noop, habit: noop, note: noop, look: noop, image: noop, mediaFile: noop, frame: noop });
+    expect(items.map((i) => i.key)).toEqual(['task', 'habit', 'note', 'sticky', 'shapes', 'media', 'frame', 'pen']);
+    expect(items.find((i) => i.key === 'shapes')!.children!.map((c) => c.key)).toEqual(['rect', 'ellipse', 'diamond']);
+    expect(items.find((i) => i.key === 'pen')!.children!.length).toBeGreaterThanOrEqual(5);
+    expect(items.find((i) => i.key === 'note')!.shortcut).toBe('N');
   });
 });

@@ -43,6 +43,22 @@ export function anchorFor(x: number, y: number, w: number, h: number): DockAncho
   return 'bottom';
 }
 
+/** Faint keyboard-shortcut letter in a dock button's corner. */
+function KeyHint({ k }: { k: string }) {
+  return (
+    <span aria-hidden style={{
+      position: 'absolute', right: 3, bottom: 1, fontFamily: 'var(--font-mono)', fontSize: 8, lineHeight: 1,
+      opacity: 0.38, pointerEvents: 'none', color: 'currentColor',
+    }}>{k}</span>
+  );
+}
+
+const SHAPE_CHOICES: Array<{ kind: 'rect' | 'ellipse' | 'diamond'; label: string; color: string; icon: React.ReactNode }> = [
+  { kind: 'rect', label: 'Rectangle', color: '#a8e6ff', icon: <rect x="4" y="6" width="16" height="12" rx="2" /> },
+  { kind: 'ellipse', label: 'Ellipse', color: '#b9f5a8', icon: <ellipse cx="12" cy="12" rx="8.5" ry="6.5" /> },
+  { kind: 'diamond', label: 'Diamond', color: '#d9c2ff', icon: <path d="M12 3.5l8.5 8.5-8.5 8.5L3.5 12z" /> },
+];
+
 const ANCHOR_STYLE: Record<DockAnchor, React.CSSProperties> = {
   top: { left: 14, top: 60 },
   middle: { left: 14, top: '50%', transform: 'translateY(-50%)' },
@@ -67,6 +83,13 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
   const togglePen = useDrawStore((s) => s.toggle);
   const [pressed, setPressedKind] = useState<NodeKind | null>(null);
   const [anchor, setAnchor] = useState<DockAnchor>(readAnchor);
+  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!shapeMenuOpen) return;
+    const close = () => setShapeMenuOpen(false);
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [shapeMenuOpen]);
   const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -210,7 +233,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         return;
       }
       if (e.key === 'r' || e.key === 'R') {
-        onAddNode({ kind: 'text', look: { kind: 'rect', color: '#a8e6ff' } });
+        setShapeMenuOpen((o) => !o);
         return;
       }
       if (e.key === 'p' || e.key === 'P') {
@@ -228,6 +251,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
   }, [onAddNode, onToolChange]);
 
   const btnBase: React.CSSProperties = {
+    position: 'relative',
     width: 36,
     height: 36,
     display: 'grid',
@@ -243,6 +267,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
   };
 
   const activeToolBtn: React.CSSProperties = {
+    position: 'relative',
     ...btnBase,
     // Fixed dark key in every mode. Its glyph uses --accent-on-dark, never
     // --acid: light styles (Mac, Blueprint) turn --acid dark, which made
@@ -318,6 +343,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path d="M5 3l14 9-7 1-3 7L5 3z" />
         </svg>
+        <KeyHint k="V" />
       </button>
 
       {/* Divider */}
@@ -335,6 +361,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path d="M5 4h14M12 4v16M8 20h8" />
         </svg>
+        <KeyHint k="N" />
       </button>
 
       {/* Sticky note — S. Shapes — R (rectangle; switch shape from the
@@ -350,19 +377,49 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
           <path d="M5 4h14v11l-5 5H5z" /><path d="M14 20v-5h5" />
         </svg>
+        <KeyHint k="S" />
       </button>
-      <button
-        type="button"
-        data-testid="dock-btn-shape"
-        title="Shape [R]"
-        aria-label="Add shape (R)"
-        onClick={() => onAddNode({ kind: 'text', look: { kind: 'rect', color: '#a8e6ff' } })}
-        style={btnBase}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-          <rect x="3" y="4" width="11" height="9" rx="1.5" /><circle cx="16" cy="15.5" r="5" />
-        </svg>
-      </button>
+      <div style={{ position: 'relative' }}>
+        <button
+          type="button"
+          data-testid="dock-btn-shape"
+          title="Shape [R]"
+          aria-label="Choose a shape (R)"
+          aria-expanded={shapeMenuOpen}
+          onClick={() => setShapeMenuOpen((o) => !o)}
+          style={shapeMenuOpen ? activeToolBtn : btnBase}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+            <rect x="3" y="4" width="11" height="9" rx="1.5" /><circle cx="16" cy="15.5" r="5" />
+          </svg>
+          <KeyHint k="R" />
+        </button>
+        {shapeMenuOpen && (
+          <div
+            data-testid="dock-shape-menu"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute', zIndex: 50, display: 'flex', gap: 2, padding: 4, borderRadius: 10,
+              background: 'var(--paper-2)', border: '1px solid var(--paper-3)', boxShadow: 'var(--shadow-1)',
+              ...(horizontal ? { bottom: 'calc(100% + 10px)', left: '50%', transform: 'translateX(-50%)' } : { left: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)' }),
+            }}
+          >
+            {SHAPE_CHOICES.map((sh) => (
+              <button
+                key={sh.kind}
+                type="button"
+                data-testid={`dock-shape-${sh.kind}`}
+                title={sh.label}
+                aria-label={sh.label}
+                onClick={() => { setShapeMenuOpen(false); onAddNode({ kind: 'text', look: { kind: sh.kind, color: sh.color } }); }}
+                style={{ ...btnBase, width: 34, height: 34 }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={`color-mix(in srgb, ${sh.color} 35%, transparent)`} stroke={sh.color} strokeWidth="1.8" strokeLinejoin="round">{sh.icon}</svg>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Image / ASCII — I */}
       <button
@@ -378,6 +435,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
           <circle cx="9" cy="10" r="2" />
           <path d="M21 16l-5-5-9 9" />
         </svg>
+        <KeyHint k="I" />
       </button>
 
       {/* Pen — P. Draw and erase on the canvas; right-click while drawing
@@ -395,6 +453,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
           <path d="M4 20l4-1 11-11-3-3L5 16l-1 4z" />
           <path d="M14 6l3 3" />
         </svg>
+        <KeyHint k="P" />
       </button>
 
       {/* Frame — F. Glassy 3D container that softly groups whatever is dropped
@@ -412,6 +471,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
           <path d="M3 9h18" opacity="0.55" />
           <path d="M6 5v14" opacity="0.35" />
         </svg>
+        <KeyHint k="F" />
       </button>
 
       {/* Mother-row chassis-style picker — opens a tile flyout. Button shows
