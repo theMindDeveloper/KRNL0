@@ -4,10 +4,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync, utimesSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadBoardFrom, saveBoardTo, RendererRevGuard } from '../../../src/main/persistence/board';
+import { loadBoardFrom, saveBoardTo, RendererRevGuard, BoardUnreadableError } from '../../../src/main/persistence/board';
 
 let tmpDir = '';
 let boardPath = '';
@@ -46,7 +46,22 @@ describe('board persistence safety', () => {
     saveBoardTo(boardPath, { nodes: [{ id: 'a' }], edges: [] });
     saveBoardTo(boardPath, { nodes: [{ id: 'b' }], edges: [] });
     expect(JSON.parse(readFileSync(boardPath, 'utf-8')).nodes[0].id).toBe('b');
-    expect(existsSync(`${boardPath}.tmp`)).toBe(false);
+    expect(readdirSync(tmpDir)).toEqual(['board.json']);
+  });
+
+  it('refuses to hand back the seed when board.json exists but cannot be read', () => {
+    // A directory in place of the file: readFileSync fails with a non-parse
+    // error, like a lock that outlasts the retries.
+    mkdirSync(boardPath);
+    expect(() => loadBoardFrom(boardPath)).toThrow(BoardUnreadableError);
+    // No backup, no seed written over it.
+    expect(readdirSync(tmpDir)).toEqual(['board.json']);
+  });
+
+  it('throws when a save cannot be written instead of reporting success', () => {
+    const blocker = join(tmpDir, 'not-a-dir');
+    writeFileSync(blocker, 'x', 'utf-8');
+    expect(() => saveBoardTo(join(blocker, 'board.json'), { nodes: [], edges: [] })).toThrow(/could not be saved/);
   });
 });
 

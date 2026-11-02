@@ -674,10 +674,45 @@ function validateBoardInvariants(board: unknown): unknown {
   return { ...b, nodes: healed };
 }
 
+/**
+ * board.json exists but cannot be read safely — a lock, a permission error, or
+ * an unparseable file whose backup copy failed. Callers must NOT fall back to
+ * the seed here: the next save would overwrite the user's only copy.
+ */
+export class BoardUnreadableError extends Error {
+  constructor(message: string, readonly cause?: unknown) {
+    super(message);
+    this.name = 'BoardUnreadableError';
+  }
+}
+
+const TRANSIENT_READ_CODES = new Set(['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'ENFILE', 'EAGAIN']);
+
+/**
+ * Read board.json as text. Returns null when the file does not exist. A read
+ * blocked by antivirus / OneDrive is retried briefly; if it still fails this
+ * throws BoardUnreadableError instead of pretending the board is empty.
+ */
+export function readBoardText(boardPath: string): string | null {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return readFileSync(boardPath, 'utf-8');
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? '';
+      if (code === 'ENOENT') return null;
+      if (TRANSIENT_READ_CODES.has(code) && attempt < 5) {
+        sleepSync(40 * (attempt + 1));
+        continue;
+      }
+      throw new BoardUnreadableError(`board.json could not be read (${code || 'error'}) — is another program holding it?`, err);
+    }
+  }
+}
+
 export function loadBoardFrom(boardPath: string): unknown {
   try {
-    if (existsSync(boardPath)) {
-      const raw = readFileSync(boardPath, 'utf-8');
+    const raw = existsSync(boardPath) ? readBoardText(boardPath) : null;
+    if (raw !== null) {
       const parsed: unknown = JSON.parse(raw);
       // Migration order matters: shape-promoting migrations (pomo config rename,
       // task plannedMin backfill from durationMin) must run BEFORE
@@ -741,23 +776,31 @@ export function loadBoardFrom(boardPath: string): unknown {
       );
     }
   } catch (err) {
+    if (err instanceof BoardUnreadableError) throw err;
     // The file exists but cannot be parsed/migrated. Keep a copy before we
     // hand back the seed — the next save would otherwise overwrite the user's
-    // only copy of their board.
-    backupCorruptBoard(boardPath, err);
+    // only copy of their board. No copy, no seed.
+    if (!backupCorruptBoard(boardPath, err)) {
+      throw new BoardUnreadableError('board.json is unreadable and could not be backed up; it was left untouched', err);
+    }
   }
   return seedBoard();
 }
 
-/** Copy an unreadable board.json aside as `board.json.corrupt-<timestamp>`. */
-export function backupCorruptBoard(boardPath: string, err: unknown): void {
+/**
+ * Copy an unreadable board.json aside as `board.json.corrupt-<timestamp>`.
+ * True when the data is safe to replace (copied, or there was no file).
+ */
+export function backupCorruptBoard(boardPath: string, err: unknown): boolean {
   try {
-    if (!existsSync(boardPath)) return;
+    if (!existsSync(boardPath)) return true;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     copyFileSync(boardPath, `${boardPath}.corrupt-${stamp}`);
     console.error(`[board] could not read ${boardPath}; backed up as .corrupt-${stamp}`, err);
+    return true;
   } catch (backupErr) {
     console.error('[board] failed to back up corrupt board', backupErr);
+    return false;
   }
 }
 
@@ -774,8 +817,15 @@ function sleepSync(ms: number): void {
 export function writeFileAtomic(path: string, text: string): void {
   const dir = dirname(path);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, text, 'utf-8');
+  // Unique per writer: two processes (a second app instance, a CLI) must
+  // never truncate each other's half-written temp file.
+  const tmp = `${path}.${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`;
+  try {
+    writeFileSync(tmp, text, 'utf-8');
+  } catch (err) {
+    try { unlinkSync(tmp); } catch { /* never created */ }
+    throw err;
+  }
   for (let attempt = 0; ; attempt++) {
     try {
       renameSync(tmp, path);
@@ -823,10 +873,13 @@ export class RendererRevGuard {
   }
 }
 
+/** Throws when the write fails, so callers never report a save that didn't happen. */
 export function saveBoardTo(boardPath: string, data: unknown): void {
   try {
     writeFileAtomic(boardPath, JSON.stringify(data, null, 2));
   } catch (err) {
     console.error(`[board] failed to save ${boardPath}`, err);
+    const code = (err as NodeJS.ErrnoException).code;
+    throw new Error(`board.json could not be saved${code ? ` (${code})` : ''}`);
   }
 }

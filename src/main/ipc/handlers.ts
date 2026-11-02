@@ -96,7 +96,15 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   });
 
   ipcMain.handle('board:saveViewport', async (_event, viewport: unknown) => {
-    const board = loadBoard();
+    // A pan is never worth risking the board: if it can't be read right now
+    // (locked by antivirus / sync), skip this viewport write.
+    let board: unknown;
+    try {
+      board = loadBoard();
+    } catch (err) {
+      console.warn('[board] viewport not saved:', err instanceof Error ? err.message : err);
+      return;
+    }
     const merged = typeof board === 'object' && board !== null
       ? { ...(board as Record<string, unknown>), viewport, savedAt: new Date().toISOString() }
       : { viewport, savedAt: new Date().toISOString() };
@@ -114,8 +122,12 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       onBoardChanged: notifyBoardChanged,
       ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
     });
-    const result = await facade.run(argv);
-    return { ok: result.ok, message: result.message ?? '' };
+    try {
+      const result = await facade.run(argv);
+      return { ok: result.ok, message: result.message ?? '' };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   // cli:dispatch — main→renderer command dispatch for renderer-coupled commands.
