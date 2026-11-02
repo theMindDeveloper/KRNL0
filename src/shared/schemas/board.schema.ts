@@ -8,6 +8,7 @@ export const NodeSchema = z.object({
   config: z.unknown(),
   isMother: z.boolean(),
   slot: z.number().optional(),
+  canvasId: z.string().optional(),
 });
 
 export const EdgeSchema = z.object({
@@ -36,6 +37,9 @@ export const BoardSchema = z.object({
   edges: z.array(EdgeSchema),
   // ADR 0008 § 2.1: layout mode required after migration
   layoutMode: z.enum(['canvas', 'station']),
+  // Decision 33 — free-content canvases
+  canvases: z.array(z.object({ id: z.string().min(1), name: z.string() })).optional(),
+  activeCanvasId: z.string().optional(),
   // ADR 0008 § 4.1: station geometry optional (persisted only after user resizes)
   layoutGeometry: z
     .object({

@@ -42,6 +42,10 @@ export type SysCommand =
   | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'media'; sub: 'list'; json: boolean }
   | { kind: 'draw'; sub: 'clear' }
+  | { kind: 'canvas'; sub: 'list'; json: boolean }
+  | { kind: 'canvas'; sub: 'add'; name: string | undefined }
+  | { kind: 'canvas'; sub: 'switch' | 'delete'; ref: string | undefined }
+  | { kind: 'canvas'; sub: 'rename'; ref: string | undefined; name: string | undefined }
   | { kind: 'draw'; sub: 'delete'; id: string | undefined }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
   | { kind: 'habit'; sub: 'done' | 'undo'; name: string | undefined; date: string | undefined }
@@ -554,6 +558,16 @@ export class SysParser {
       if (sub === 'list' || sub === undefined) return { kind: 'draw', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'clear') return { kind: 'draw', sub: 'clear' };
       if (sub === 'delete') return { kind: 'draw', sub: 'delete', id: rest[0] };
+    }
+
+    // Free-content canvases (Decision 33). Names may contain spaces.
+    if (cmd === 'canvas') {
+      const words = rest.filter((w) => !w.startsWith('--'));
+      const join = (ws: string[]): string | undefined => (ws.length ? ws.join(' ') : undefined);
+      if (sub === 'list' || sub === undefined) return { kind: 'canvas', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'add') return { kind: 'canvas', sub: 'add', name: join(words) };
+      if (sub === 'switch' || sub === 'delete') return { kind: 'canvas', sub, ref: join(words) };
+      if (sub === 'rename') return { kind: 'canvas', sub: 'rename', ref: words[0], name: join(words.slice(1)) };
     }
 
     if (cmd === 'text') {

@@ -880,3 +880,20 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
   - Wrong auto tags already on a board re-classify on load.
 - **Follow-up 27 (Bug Fix):** choosing Light with the dark-only Pro frame still switches to Classic, but going back to Dark now restores Pro (remembered in `krnl0-dock-style-before-light`, unless another frame was picked meanwhile).
 - **Follow-up 28 (UI):** hovering a task arc on the clock, its list row, or a pomo wedge brightens it, so you see what a click acts on. Arc and row highlight together.
+
+
+## [2026-11-02] — Multiple canvases (Decision 33)
+
+**Type:** Feature
+**PRs / Commits:** not committed yet (awaiting in-app check)
+**Files changed:**
+- **New:** `src/shared/canvas.ts`, `src/sys/commands/canvas.ts`, `src/renderer/components/TopBar/CanvasSwitcher.tsx`, `docs/06-requirements/canvases.md`, `tests/unit/canvases.test.ts`
+- **Model / migration:** `shared/types/{board,node}.ts`, `shared/schemas/board.schema.ts`, `main/persistence/board.ts` (`migrateCanvases`, seed gets `canvas-main`)
+- **Store / render:** `store/boardStore.ts`, `Canvas/CanvasFlow.tsx`, `Canvas/DrawLayer.tsx`, `TopBar/index.tsx`
+- **CLI:** `sys/{parser,SysFacade}.ts`, `sys/commands/draw.ts`, `shared/cli/commandRegistry.ts`
+- **Docs:** ADR Decision 33
+
+**Summary:**
+- Several canvases for free content: images, drawings, text, media, frames, and the edges between them. Mothers, tasks and habit lanes are shared, so analytics, the completion ledger and pomo history stay the same on every canvas.
+- Top-bar canvas switcher with list, add, inline rename, and delete with confirm. CLI: `canvas list|add|switch|rename|delete`.
+- Old boards migrate onto a "Main" canvas. Deleting a canvas removes only its free nodes, its strokes and the edges touching them.

@@ -196,6 +196,17 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'canvas',
+    summary: 'Free-content canvases (mothers, tasks and analytics are shared across all of them)',
+    subcommands: [
+      { name: 'list', usage: 'canvas list [--json]', summary: 'List canvases (* = active) with free-node counts' },
+      { name: 'add', usage: 'canvas add <name>', summary: 'Create a canvas and switch to it' },
+      { name: 'switch', usage: 'canvas switch <id|name>', summary: 'Make a canvas active' },
+      { name: 'rename', usage: 'canvas rename <id|name> <new name>', summary: 'Rename a canvas' },
+      { name: 'delete', usage: 'canvas delete <id|name>', summary: 'Delete a canvas and its free content (never mother data; not the last one)' },
+    ],
+  },
+  {
     group: 'cal',
     summary: 'Calendar view of cascade-scheduled tasks (ADR 0003/0005)',
     subcommands: [

@@ -2404,3 +2404,34 @@ Analytics (#134) was a free-floating child spawned with `A` or the Dock chart bu
 
 Requirements: [analytics-window.md](../06-requirements/analytics-window.md).
 
+
+
+## Decision 33 — Multiple canvases for free content; mother data stays shared (2026-11-02)
+
+**Status:** Accepted
+
+### Context
+The user wants several canvases for free-form content (images, drawings, text, media, frames). The mother nodes carry the real data: tasks, pomo history, habits and the completion ledger. Analytics reads that data, so it must never split or duplicate per canvas.
+
+### Decision
+- **One `board.json`.** The board gets `canvases: {id, name}[]` and `activeCanvasId`. Free nodes and pen strokes get a `canvasId`.
+- **Shared vs free.** Mothers (`isMother`) and the mother-data kinds `todo.task`, `habit.lane`, `habit.day` and `pomo.session` are *shared*. They carry no `canvasId` and show on every canvas. Every other node is *free* and belongs to exactly one canvas. `completions` and pomo `history` are board-level, so they are untouched by canvases.
+- **Visibility.** The canvas renders shared nodes, plus the free nodes and strokes of the active canvas. An edge renders only when both of its ends are visible. Store selectors and analytics keep reading all of `board.nodes`. The filter lives only in `CanvasFlow` and the pen eraser.
+- **Migration** (`migrateCanvases`, every load, idempotent):
+  - A board with no canvas list gets `canvas-main` / "Main".
+  - A free node or stroke with a missing or unknown `canvasId` goes to the active canvas. Legacy content therefore lands on Main, and nodes the sys CLI pushes land where the user is.
+  - A stray `canvasId` on a shared node is removed.
+- **Store.**
+  - `addNode` / `addStroke` always stamp the active canvas, which also covers pasted copies.
+  - `addCanvas`, `renameCanvas` and `deleteCanvas` are undoable. `switchCanvas` is navigation, with no history entry.
+  - Undo and redo keep the canvas you are on.
+- **Delete** removes the canvas, its free nodes, its strokes, and any edge touching a removed node. Shared nodes are never removed. The last canvas cannot be deleted.
+- **One implementation:** `src/shared/canvas.ts` is used by the migration, the store and the CLI.
+- **CLI:** `canvas list | add | switch | rename | delete`. `draw clear` and the pen "Clear all" clear the active canvas only.
+- **UI:** the top-bar breadcrumb ends in a canvas chip. It opens a `Popover` with the canvas list, inline rename, an in-popover delete confirm, and "+ New canvas".
+
+### Consequences
+- Viewports are not stored per canvas. Switching keeps the camera where it is.
+- `node list` and other CLI listings show nodes from all canvases.
+
+Requirements: [canvases.md](../06-requirements/canvases.md).

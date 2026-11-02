@@ -79,6 +79,7 @@ const MOTHER_ROW_START_X = -1400;
 const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
 import { FOCUS_NODE_EVENT } from '../../store/scheduleActions';
+import { activeCanvasOf, edgesOnCanvas, isOnCanvas, isSharedNode, isStrokeOnCanvas, visibleNodeIds } from '../../../shared/canvas';
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
 // Hex literals used instead of CSS var() to skip variable resolution per rect.
@@ -906,6 +907,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       const id = (e as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
       const n = id ? useBoardStore.getState().board?.nodes.find((x) => x.id === id) : undefined;
       if (!n) return;
+      // A free node on another canvas: go to that canvas first (Decision 33).
+      if (!isSharedNode(n) && n.canvasId) useBoardStore.getState().switchCanvas(n.canvasId);
       // Use the drawn position: the mother row is placed at render time.
       const at = getNodes().find((x) => x.id === n.id)?.position ?? n.position;
       if (n.isMother) setCenter(at.x + MOTHER_WIDTH / 2, at.y + MOTHER_HEIGHT / 2, { duration: 400, zoom: 0.9 });
@@ -1346,10 +1349,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
     );
 
-    // Source nodes for RF derivation — drop mothers entirely in station mode.
-    const sourceNodes = isStation
+    // Source nodes for RF derivation — drop mothers entirely in station mode,
+    // and free nodes that belong to another canvas (Decision 33).
+    const canvasId = activeCanvasOf(board);
+    const sourceNodes = (isStation
       ? board.nodes.filter((n) => !n.isMother)
-      : board.nodes.filter((n) => !n.isMother || displayX.has(n.id));
+      : board.nodes.filter((n) => !n.isMother || displayX.has(n.id))
+    ).filter((n) => isOnCanvas(n, canvasId));
 
     const baseNodes: KrnlRFNode[] = sourceNodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
@@ -1408,7 +1414,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       return { ...rf, hidden: true };
     });
 
-    const strokeNodes = (board.drawings ?? []).map(strokeRfNode);
+    const strokeNodes = (board.drawings ?? []).filter((d) => isStrokeOnCanvas(d, canvasId)).map(strokeRfNode);
     return [...filteredBase, ...swapNodes, ...strokeNodes];
   }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation]);
 
@@ -1451,9 +1457,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const motherIds = isStation
       ? new Set(board.nodes.filter((n) => n.isMother).map((n) => n.id))
       : null;
+    const onCanvas = edgesOnCanvas(board.edges, visibleNodeIds(board.nodes, activeCanvasOf(board)));
     const visibleEdges = motherIds
-      ? board.edges.filter((e) => !motherIds.has(e.from.nodeId) && !motherIds.has(e.to.nodeId))
-      : board.edges;
+      ? onCanvas.filter((e) => !motherIds.has(e.from.nodeId) && !motherIds.has(e.to.nodeId))
+      : onCanvas;
     return visibleEdges.map((edge) => {
       const srcKind = kindMap.get(edge.from.nodeId) ?? '';
       const tgtKind = kindMap.get(edge.to.nodeId) ?? '';
