@@ -272,3 +272,7 @@
 .calendar-cell--just-dropped {
   animation: krnl-drop-flash 240ms ease-out;
 }
+
+/* See CanvasFlow: embeds ignore the mouse while a button is held, so drags
+   that cross a YouTube / website card still end on mouse-up. */
+.krnl-pointer-held iframe { pointer-events: none !important; }

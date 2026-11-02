@@ -7,7 +7,7 @@
 // Links can be switched to plain text from the header.
 
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { NodeResizeControl, useStore } from '@xyflow/react';
+import { NodeResizeControl } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { MEDIA_SIZE, mediaUrl, type MediaConfig, type MediaState } from './types';
@@ -115,22 +115,6 @@ const chipBtn: React.CSSProperties = {
   color: 'var(--ink-2)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600,
 };
 
-// ── Crisp iframes ───────────────────────────────────────────────────────────
-// A cross-origin iframe (YouTube, websites) is drawn by its own process at
-// its CSS size, then the canvas zoom stretches that bitmap → blur at any zoom
-// but 100%. Render it at its real on-screen size and undo the canvas zoom, so
-// the two scales cancel and it's drawn pixel-for-pixel.
-function Crisp({ children }: { children: ReactNode }) {
-  const z = useStore((st) => Math.max(0.05, Math.round(st.transform[2] * 100) / 100));
-  return (
-    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', left: 0, top: 0, width: `${100 * z}%`, height: `${100 * z}%`, transform: `scale(${1 / z})`, transformOrigin: '0 0' }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 // ── Video / embed ───────────────────────────────────────────────────────────
 
 function VideoPlayer({ url, onAspect }: { url: string; onAspect: (a: number) => void }) {
@@ -149,7 +133,6 @@ function VideoPlayer({ url, onAspect }: { url: string; onAspect: (a: number) => 
   }
   return (
     <Suspense fallback={<Centered><Spinner /></Centered>}>
-      <MaybeCrisp crisp={!isFile}>
       <ReactPlayer
         url={url}
         controls
@@ -164,7 +147,6 @@ function VideoPlayer({ url, onAspect }: { url: string; onAspect: (a: number) => 
         }}
         style={{ position: 'absolute', inset: 0 }}
       />
-      </MaybeCrisp>
     </Suspense>
   );
 }
@@ -246,17 +228,13 @@ function WebPreview({ url }: { url: string }) {
   const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } })();
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-      <Crisp>
       <iframe
         title={host}
         src={url}
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         referrerPolicy="no-referrer"
-        style={{ width: '100%', height: '100%', border: 'none', background: '#fff', display: 'block' }}
+        style={{ flex: 1, border: 'none', background: '#fff' }}
       />
-      </Crisp>
-      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
         <img alt="" width={12} height={12} src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} style={{ borderRadius: 3 }} />
         <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{url}</span>
@@ -282,10 +260,6 @@ function FileCard({ name, size, tone }: { name: string; size: number | undefined
       </div>
     </div>
   );
-}
-
-function MaybeCrisp({ crisp, children }: { crisp: boolean; children: ReactNode }) {
-  return crisp ? <Crisp>{children}</Crisp> : <>{children}</>;
 }
 
 function Centered({ children }: { children: ReactNode }) {

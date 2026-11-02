@@ -94,6 +94,8 @@ interface BoardStore {
   // Pen tool strokes — undoable, persisted on board.drawings.
   addStroke: (stroke: DrawStroke) => void;
   removeStrokes: (ids: readonly string[]) => void;
+  /** Move strokes by a flow-space offset (one undo step for the whole batch). */
+  moveStrokes: (moves: ReadonlyArray<{ id: string; dx: number; dy: number }>) => void;
   clearDrawings: () => void;
   // Destructive, non-undoable: wipe the "what I did" record — the completion
   // ledger (#169) and every pomo node's session history — leaving the live
@@ -347,6 +349,22 @@ export const useBoardStore = create<BoardStore>((set) => ({
       if (!s.board || ids.length === 0) return s;
       const drop = new Set(ids);
       const board = { ...s.board, drawings: (s.board.drawings ?? []).filter((d) => !drop.has(d.id)) };
+      void saveBoard(board);
+      return { ...pushHistory(s), board };
+    }),
+
+  moveStrokes: (moves) =>
+    set((s) => {
+      if (!s.board || moves.length === 0) return s;
+      const by = new Map(moves.map((m) => [m.id, m]));
+      const board = {
+        ...s.board,
+        drawings: (s.board.drawings ?? []).map((d) => {
+          const m = by.get(d.id);
+          if (!m || (m.dx === 0 && m.dy === 0)) return d;
+          return { ...d, points: d.points.map(([x, y, p]) => [x + m.dx, y + m.dy, p] as [number, number, number]) };
+        }),
+      };
       void saveBoard(board);
       return { ...pushHistory(s), board };
     }),

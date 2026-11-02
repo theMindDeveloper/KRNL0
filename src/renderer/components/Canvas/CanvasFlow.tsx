@@ -42,6 +42,8 @@ import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { DrawLayer } from './DrawLayer';
 import { motherRowY } from './motherRow';
+import { DrawStrokeNode, STROKE_NODE_PREFIX, STROKE_Z, strokeBox } from './DrawStrokeNode';
+import type { DrawStroke } from '../../../shared/types/board';
 import { targetNodeIdAt } from './connectTarget';
 import { PieMenu } from '../ui/PieMenu';
 import { canvasWheelItems } from './canvasWheel';
@@ -340,7 +342,39 @@ const ALL_NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> = {
   ...NODE_TYPES,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   'swap-button': SwapButtonNode as ComponentType<any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  'draw-stroke': DrawStrokeNode as ComponentType<any>,
 };
+
+// Pen strokes as RF nodes (see DrawStrokeNode). Cached per stroke reference.
+// `data.node` is a stand-in so code that reads data.node.kind / isMother
+// keeps working; the real stroke is data.stroke.
+const strokeNodeCache = new WeakMap<DrawStroke, KrnlRFNode>();
+function strokeRfNode(s: DrawStroke): KrnlRFNode {
+  const hit = strokeNodeCache.get(s);
+  if (hit) return hit;
+  const b = strokeBox(s);
+  const id = STROKE_NODE_PREFIX + s.id;
+  const rf = {
+    id,
+    type: 'draw-stroke',
+    position: { x: b.x, y: b.y },
+    width: b.w,
+    height: b.h,
+    measured: { width: b.w, height: b.h },
+    zIndex: STROKE_Z,
+    connectable: false,
+    // Only the ink takes the mouse (see DrawStrokeNode).
+    style: { pointerEvents: 'none' as const },
+    data: {
+      node: { id, kind: 'drawing', isMother: false, position: { x: b.x, y: b.y }, config: {}, state: {} },
+      stroke: s,
+    },
+  } as unknown as KrnlRFNode;
+  strokeNodeCache.set(s, rf);
+  return rf;
+}
+const isStrokeId = (id: string): boolean => id.startsWith(STROKE_NODE_PREFIX);
 
 // Stable empty fallback for the nodes-selector when board is null. Sharing
 // one reference prevents the selector from returning a fresh `[]` per call.
@@ -487,6 +521,28 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     window.addEventListener('krnl:ensure-visible', onEnsureVisible);
     return () => window.removeEventListener('krnl:ensure-visible', onEnsureVisible);
   }, [ensureVisible]);
+
+  // While a mouse button is held (dragging nodes, a marquee, panning), embedded
+  // pages (YouTube, websites) must not catch the mouse: an iframe swallows the
+  // mouse-up when the cursor is over it, so the drag never ended. Clicks that
+  // start inside an iframe never reach this document, so using the embed is
+  // unaffected.
+  useEffect(() => {
+    const root = document.documentElement;
+    const hold = () => root.classList.add('krnl-pointer-held');
+    const release = () => root.classList.remove('krnl-pointer-held');
+    window.addEventListener('pointerdown', hold, true);
+    window.addEventListener('pointerup', release, true);
+    window.addEventListener('pointercancel', release, true);
+    window.addEventListener('blur', release);
+    return () => {
+      release();
+      window.removeEventListener('pointerdown', hold, true);
+      window.removeEventListener('pointerup', release, true);
+      window.removeEventListener('pointercancel', release, true);
+      window.removeEventListener('blur', release);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const el = canvasContainerRef.current;
@@ -708,7 +764,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const taskIds: string[] = [];
     const otherIds: string[] = [];
     const currentBoard = useBoardStore.getState().board;
+    const strokeIds = ctxMenu.nodeIds.filter(isStrokeId).map((id) => id.slice(STROKE_NODE_PREFIX.length));
+    if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
     for (const id of ctxMenu.nodeIds) {
+      if (isStrokeId(id)) continue;
       const node = currentBoard?.nodes.find((n) => n.id === id);
       if (node?.kind === 'todo.task') taskIds.push(id);
       else otherIds.push(id);
@@ -719,6 +778,22 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (updated) void saveBoard(updated);
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
+
+  // Delete / Backspace removes selected drawings (other nodes delete from
+  // their right-click menu).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.xterm'))) return;
+      const ids = getNodes().filter((n) => n.selected && isStrokeId(n.id)).map((n) => n.id.slice(STROKE_NODE_PREFIX.length));
+      if (!ids.length) return;
+      e.preventDefault();
+      useBoardStore.getState().removeStrokes(ids);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [getNodes]);
 
   // Global undo/redo: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z = redo.
   // Skipped when focus is on an editable surface so it doesn't fight inputs.
@@ -1329,7 +1404,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       return { ...rf, hidden: true };
     });
 
-    return [...filteredBase, ...swapNodes];
+    const strokeNodes = (board.drawings ?? []).map(strokeRfNode);
+    return [...filteredBase, ...swapNodes, ...strokeNodes];
   }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
@@ -1543,18 +1619,29 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       // collision.
       for (const id of collidedIds) triggerBump(id);
 
+      const strokeMoves: Array<{ id: string; dx: number; dy: number }> = [];
       for (const change of changes) {
         if (change.type === 'position') {
           if (change.dragging === true) {
             isDraggingRef.current = true;
           } else if (change.dragging === false) {
             isDraggingRef.current = false;
-            if (change.position) {
+            if (change.position && isStrokeId(change.id)) {
+              // Strokes live on board.drawings: move their points by how far
+              // the box moved. All strokes of one drag are one undo step.
+              const sid = change.id.slice(STROKE_NODE_PREFIX.length);
+              const s = useBoardStore.getState().board?.drawings?.find((d) => d.id === sid);
+              if (s) {
+                const b = strokeBox(s);
+                strokeMoves.push({ id: sid, dx: change.position.x - b.x, dy: change.position.y - b.y });
+              }
+            } else if (change.position) {
               commitDragEnd(change.id);
             }
           }
         }
       }
+      if (strokeMoves.length) useBoardStore.getState().moveStrokes(strokeMoves);
     },
     // commitDragEnd is stable (declared just below via useCallback)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1650,7 +1737,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // "active" id while RF is showing many nodes selected.
   const onSelectionChange = useCallback(
     ({ nodes }: OnSelectionChangeParams) => {
-      selectNode(nodes.length === 1 ? nodes[0]!.id : null);
+      selectNode(nodes.length === 1 && !isStrokeId(nodes[0]!.id) ? nodes[0]!.id : null);
     },
     [selectNode]
   );

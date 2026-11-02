@@ -189,7 +189,7 @@ export function DrawLayer() {
           data-testid="draw-layer"
           style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none', zIndex: 100000 }}
         >
-          {(drawings ?? []).map((s) => <StrokeSvg key={s.id} s={s} />)}
+          {/* Saved strokes are canvas nodes (DrawStrokeNode); this draws only the live one. */}
           {live && <StrokeSvg s={{ points: live, size: (TOOL_SIZE[liveTool] * sizeScale) / getZoom(), tool: liveTool, color }} />}
         </svg>
       </ViewportPortal>
