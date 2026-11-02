@@ -21,6 +21,7 @@ import { boardTagLibrary, spanTagFor } from '../../../store/spanTags';
 import { SpanLabeler } from './SpanLabeler';
 import { DoingPicker, type DoingChoice } from './DoingPicker';
 import { SpanLog } from './SpanLog';
+import { useEasyMode } from '../../../store/uiMode';
 import { ObserveDash } from './ObserveDash';
 
 const TICK_MS = 500;
@@ -132,7 +133,9 @@ export function PomoNode({
   // The "Are you done?" prompt fires once the work threshold is reached. The
   // timer keeps running (arc keeps growing) — NO auto-break, NO auto-stop.
   // Observe mode: no threshold, so no prompt — the timer just counts up.
-  const observe = config.mode === 'observe';
+  // Easy mode is always Observe and never asks, names or links anything.
+  const easy = useEasyMode();
+  const observe = easy || config.mode === 'observe';
   const promptDone = !observe && state.status === 'running' && liveWorkMs >= thresholdMs;
 
   // Issue #166 slice 5 — OS notification when threshold is first reached.
@@ -226,13 +229,13 @@ export function PomoNode({
     const grew = state.history.length > prevHistoryLen.current;
     prevHistoryLen.current = state.history.length;
     // Only unnamed spans are asked about; a continued name/task carries over.
-    if (observe && grew && lastRec && lastRec.kind === 'work' && !lastRec.taskId && !lastRec.label) setAskId(lastRec.id);
-  }, [observe, state.history.length, lastRec]);
+    if (observe && !easy && grew && lastRec && lastRec.kind === 'work' && !lastRec.taskId && !lastRec.label) setAskId(lastRec.id);
+  }, [observe, easy, state.history.length, lastRec]);
   const askRec = askId ? state.history.find((r) => r.id === askId) : undefined;
   const tagLibrary = useBoardStore((s) => boardTagLibrary(s.board));
   // Observe mode — what is being recorded (carried across breaks and stops),
   // what Continue resumes, and recent names to pick from instead.
-  const doing: DoingChoice | null = !observe ? null
+  const doing: DoingChoice | null = !observe || easy ? null
     : state.activeTaskId ? { label: state.label || 'task', tag: null, taskId: state.activeTaskId }
     : state.label ? { label: state.label, tag: state.tag ?? null, taskId: null } : null;
   const continueName = doing?.label ?? '';
@@ -465,8 +468,8 @@ export function PomoNode({
           {logOpen ? '✕' : '☰'}
         </button>
         {/* Mode switch — Pomodoro rhythm, or just observe where the time goes.
-            Locked while a span is in flight, like the gear. */}
-        <div
+            Locked while a span is in flight, like the gear. Hidden in Easy mode. */}
+        {!easy && <div
           role="group"
           aria-label="Pomo mode"
           style={{ display: 'flex', border: '1px solid var(--paper-3)', borderRadius: 4, overflow: 'hidden' }}
@@ -503,7 +506,7 @@ export function PomoNode({
               </button>
             );
           })}
-        </div>
+        </div>}
         {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight */}
         <button
           type="button"
@@ -691,7 +694,7 @@ export function PomoNode({
             library={tagLibrary}
             taskName={taskName}
             onDelete={(id) => onCommand('pomo.deleteSegment', { id })}
-            onName={(id) => { setAskId(id); setLogOpen(false); }}
+            {...(easy ? {} : { onName: (id: string) => { setAskId(id); setLogOpen(false); } })}
           />
           {/* DEV-only (#180) — record a finished 30-min span ending now, to try
               the "log this span" flow without waiting. Not in production builds. */}
@@ -711,7 +714,7 @@ export function PomoNode({
         <div style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap }}>
           {/* PR4 — timer face switch: swap inner face without touching outer chrome */}
           {observe ? (
-            <ObserveDash state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} />
+            <ObserveDash state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} plain={easy} />
           ) : (<>
           {activeFace === 'ascii' && (
             <Ascii m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
@@ -819,7 +822,7 @@ export function PomoNode({
               Calendar/Clock. Starting untagged suggests the task planned now. */}
           {/* Observe mode — pick what you're doing (recent, a task, or new);
               Start / Continue / Back to work record it. */}
-          {observe && !askRec && (
+          {observe && !easy && !askRec && (
             <DoingPicker
               caption={state.status === 'running' ? 'doing' : 'next'}
               current={doing}

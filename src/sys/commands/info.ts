@@ -5,7 +5,7 @@
 // `krnl settings show` — theme + viewport + boardPath + version.
 // `krnl viewport show` — viewport coords.
 
-import { loadBoardFrom } from '../../main/persistence/board';
+import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { BoardShape } from '../../shared/dispatch/types';
 
@@ -99,4 +99,25 @@ export async function viewportShow(ctx: InfoCtx, json = false): Promise<SysResul
     message: `x=${viewport.x}  y=${viewport.y}  zoom=${viewport.zoom}`,
     data: viewport,
   };
+}
+
+/**
+ * `krnl settings mode [easy|advanced]` — show or set the UI mode
+ * (docs/06-requirements/easy-mode.md). Display preference only: every other
+ * command works the same in both modes.
+ */
+export function settingsMode(
+  ctx: { boardPath: string; onBoardChanged?: () => void },
+  mode: string | undefined,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { uiMode?: string }) | null;
+  if (!raw) return { ok: false, message: 'No board found' };
+  const current = raw.uiMode === 'easy' ? 'easy' : 'advanced';
+  if (mode === undefined) return { ok: true, message: `mode: ${current}`, data: { mode: current } };
+  if (mode !== 'easy' && mode !== 'advanced') {
+    return { ok: false, message: `settings mode: expected easy or advanced, got "${mode}"` };
+  }
+  saveBoardTo(ctx.boardPath, { ...raw, uiMode: mode, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  return { ok: true, message: `mode: ${mode}`, data: { mode } };
 }

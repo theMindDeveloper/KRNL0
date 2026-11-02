@@ -24,7 +24,8 @@ import { HoldButton } from '../../ui/HoldButton';
 import { PagedView } from '../../ui/PagedView';
 import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
-import { PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, type PageId } from './guide';
+import { EASY_HIDDEN_PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
+import { useEasyMode } from '../../../store/uiMode';
 import { PageNav } from './PageNav';
 import { AnalyticsSettings } from './AnalyticsSettings';
 import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
@@ -288,6 +289,7 @@ function ChartCard({
   children,
 }: ChartCardProps) {
   const [hostRef, hostSize] = useElementSize<HTMLDivElement>();
+  const easy = useEasyMode();
 
   if (hidden) return null;
 
@@ -305,7 +307,7 @@ function ChartCard({
     transition: 'border-color 140ms, box-shadow 140ms',
     gridColumn: span ? `span ${span}` : undefined,
     // Its cell in the page grid (6 columns × 2 rows per page, see guide.ts).
-    ...cardPlacement(cardId),
+    ...cardPlacement(cardId, easy),
     boxSizing: 'border-box',
     overflow: 'hidden',
     minHeight: 0,
@@ -456,9 +458,16 @@ export function AnalyticsNode({
   const pinnedCards = state.pinnedCards ?? [];
   const settingsOpen = state.settingsOpen ?? false;
 
+  // Easy mode drops the link-based pages (plan vs actual, time by tag).
+  const easy = useEasyMode();
+  const pages = pagesFor(easy);
   const isHidden = useCallback(
-    (id: AnalyticsCardId) => hiddenCards.includes(id) || !isPagedCard(id),
-    [hiddenCards],
+    (id: AnalyticsCardId) => {
+      if (hiddenCards.includes(id) || !isPagedCard(id)) return true;
+      const page = pageOfCard(id);
+      return easy && page !== null && EASY_HIDDEN_PAGES.has(page);
+    },
+    [hiddenCards, easy],
   );
   const isPinned = useCallback(
     (id: AnalyticsCardId) => pinnedCards.includes(id),
@@ -597,7 +606,7 @@ export function AnalyticsNode({
 
       {/* Page icons + range chips — one compact row; the rest is charts. */}
       <div style={toolbarStyle}>
-        <PageNav current={currentPage} onPick={(id) => setJumpTo(pageSelector(id))} />
+        <PageNav current={currentPage} pages={pages} onPick={(id) => setJumpTo(pageSelector(id))} />
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', gap: 4 }}>
           {RANGE_PRESETS.map((days) => (
@@ -641,7 +650,7 @@ export function AnalyticsNode({
             // Each page = 2 rows of the grid, each row half a page (minus the gap).
             display: 'grid',
             gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
-            gridTemplateRows: `repeat(${PAGES.length * 2}, calc((var(--page-h, 400px) - 10px) / 2))`,
+            gridTemplateRows: `repeat(${pages.length * 2}, calc((var(--page-h, 400px) - 10px) / 2))`,
             gap: 10,
           }}
         >

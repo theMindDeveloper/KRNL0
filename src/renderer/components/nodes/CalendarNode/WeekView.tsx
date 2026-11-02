@@ -35,6 +35,7 @@ import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
 import { calcStreak } from '../HabitNode/commands';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { boardTagLibrary, spanTone } from '../../../store/spanTags';
+import { useEasyMode } from '../../../store/uiMode';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { PagedView } from '../../ui/PagedView';
@@ -436,9 +437,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // Plan vs reality — tracked seconds per task (tagged pomo work spans), used
   // to flag an overrun on the planned block.
   const pomoNodeForTracked = useBoardStore(selectPomoNode);
+  // Easy mode: planned blocks show the plan only (no tracked / overrun badges).
+  const easy = useEasyMode();
   const trackedByTask = useMemo(
-    () => trackedSecondsByTask(pomoOnlyBoard(pomoNodeForTracked), liveMs),
-    [pomoNodeForTracked, liveMs],
+    () => (easy ? new Map<string, number>() : trackedSecondsByTask(pomoOnlyBoard(pomoNodeForTracked), liveMs)),
+    [easy, pomoNodeForTracked, liveMs],
   );
 
   // Open root tasks a reality span can be retagged to.
@@ -532,7 +535,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         x, y,
         items: taskMenuItems(
           { id: t.id, text: t.text, done: t.done, startMs, endMs: startMs + t.scheduledDurationMin * 60_000 },
-          { onDetails: () => setTaskPopup({ task: t, x, y }) },
+          { easy, onDetails: () => setTaskPopup({ task: t, x, y }) },
         ),
       });
     } else {
@@ -542,7 +545,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       });
       setCtxMenu({
         x, y,
-        items: segmentMenuItems(item.seg, { targets, onDetails: () => setRealityPopup({ seg: item.seg, x, y }) }),
+        items: segmentMenuItems(item.seg, { targets, easy, onDetails: () => setRealityPopup({ seg: item.seg, x, y }) }),
       });
     }
   };
@@ -1516,7 +1519,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 key={`sr-${r.id}-${i}`}
                 style={{
                   position: 'absolute', top: 0, bottom: 0, left: pct(r.startMin), width: widthPct(r.startMin, r.endMin),
-                  background: r.kind === 'work' ? spanTone(tagLibrary, r) : 'transparent',
+                  background: r.kind === 'work' ? spanTone(tagLibrary, r, easy) : 'transparent',
                   backgroundImage: r.kind === 'work' ? undefined : 'repeating-linear-gradient(135deg, var(--ink-3) 0 1px, transparent 1px 3px)',
                 }}
               />
@@ -1567,7 +1570,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const topPx = (seg.startMin / 60) * rowHeight;
       const heightPx = Math.max(2, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
-      const tone = spanTone(tagLibrary, seg);
+      const tone = spanTone(tagLibrary, seg, easy);
       const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
       return (
         <div
@@ -2260,7 +2263,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             </div>
             {layerMenu.items.map((item, i) => {
               const isTask = item.kind === 'task';
-              const tone = isTask ? toneVarForTask(item.task.id) : spanTone(tagLibrary, item.seg);
+              const tone = isTask ? toneVarForTask(item.task.id) : spanTone(tagLibrary, item.seg, easy);
               const label = isTask
                 ? item.task.text || 'Untitled task'
                 : `Tracked · ${item.seg.kind === 'work' ? 'focus' : 'break'} ${fmtHM(item.seg.startMs)}–${fmtHM(item.seg.endMs)}`;
@@ -2354,11 +2357,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 aria-hidden
                 style={{
                   width: 10, height: 10, borderRadius: 999, flexShrink: 0,
-                  background: spanTone(tagLibrary, realityPopup.seg),
+                  background: spanTone(tagLibrary, realityPopup.seg, easy),
                 }}
               />
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>
-                {realityPopup.seg.kind === 'work' ? (!realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}
+                {realityPopup.seg.kind === 'work' ? (!easy && !realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}
               </span>
               {realityPopup.seg.live && (
                 <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em' }}>◆ LIVE</span>
@@ -2383,7 +2386,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             </div>
             {/* Plan vs reality — which task this time counts toward. Only work
                 spans carry a tag; the live span is retagged from the Pomo. */}
-            {realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
+            {!easy && realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 Counts toward
                 <AppSelect

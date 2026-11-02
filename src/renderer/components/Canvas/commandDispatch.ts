@@ -43,6 +43,7 @@ import type { Node } from '@shared/types/node';
 import type { Board } from '@shared/types';
 import { selectSchedule } from '../../store/scheduleSelector';
 import { spanTagFor } from '../../store/spanTags';
+import { isEasyBoard } from '../../store/uiMode';
 import { parallelizeChainEdges } from '../../store/chainWalker';
 import type { Edge } from '@shared/types/edge';
 import {
@@ -240,13 +241,15 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
     case 'pomo': {
       const pomoCfg = (c as unknown as PomoConfig | null) ?? defaultPomoConfig();
       // Observe mode — a start/stop misclick must not leave a sliver span.
+      // Easy mode is always Observe (a stopwatch with breaks).
+      const observeMode = pomoCfg.mode === 'observe' || isEasyBoard(useBoardStore.getState().board);
       const observeBlips = (next: PomoState): PomoState =>
-        pomoCfg.mode === 'observe' ? pomoDropBlips(s as unknown as PomoState, next) : next;
+        observeMode ? pomoDropBlips(s as unknown as PomoState, next) : next;
       switch (command) {
         case 'pomo.start': {
           // Observe mode has no session length; leaving it restores the configured one.
           const cur = s as unknown as PomoState;
-          const durationMin = pomoCfg.mode === 'observe'
+          const durationMin = observeMode
             ? OBSERVE_SPAN_MIN
             : cur.durationMin === OBSERVE_SPAN_MIN ? pomoCfg.sessionMin : undefined;
           return { state: pomoStart(s as never, { ...(args as object), ...(durationMin !== undefined && args['durationMin'] === undefined ? { durationMin } : {}) }) };
@@ -1685,7 +1688,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     //    The tag shows on the pomo and can be changed or cleared at once.
     if (command === 'pomo.start' && node.kind === 'pomo' && result.state !== undefined) {
       const started = result.state as PomoState;
-      if (started.status === 'running' && started.activeTaskId === null && args['activeTaskId'] === undefined) {
+      // Only when nothing is named (a continued free-text name wins) and never in Easy mode.
+      if (started.status === 'running' && started.activeTaskId === null && !started.label && args['activeTaskId'] === undefined && !isEasyBoard(board)) {
         const suggested = plannedTaskAt(board, Date.now());
         if (suggested) {
           const t = board.nodes.find((n) => n.id === suggested)!;

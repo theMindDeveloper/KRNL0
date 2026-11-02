@@ -14,8 +14,9 @@ export interface SpanLogProps {
   library: readonly TagDef[];
   taskName: (id: string) => string | undefined;
   onDelete: (id: string) => void;
-  /** Name or rename a work span (opens the labeler). */
-  onName: (id: string) => void;
+  /** Name or rename a work span (opens the labeler). Absent in Easy mode:
+   *  names are hidden and spans show in one colour. */
+  onName?: (id: string) => void;
 }
 
 const ymd = (ms: number) => new Date(ms).toLocaleDateString('en-CA');
@@ -29,6 +30,7 @@ function fmtDur(ms: number): string {
 }
 
 export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLogProps) {
+  const plain = !onName;
   const [dayOffset, setDayOffset] = useState(0);
   const day = ymd(Date.now() - dayOffset * 86_400_000);
   const rows = history
@@ -50,9 +52,9 @@ export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLo
           const start = Date.parse(r.startedAt);
           const end = Date.parse(r.endedAt);
           const isBreak = r.kind === 'break';
-          const cat = !isBreak && !r.taskId && r.tag ? tagDisplay(library, r.tag) : null;
+          const cat = !plain && !isBreak && !r.taskId && r.tag ? tagDisplay(library, r.tag) : null;
           const unnamed = !isBreak && !r.taskId && !r.label;
-          const name = isBreak ? 'Break' : r.taskId ? (taskName(r.taskId) ?? r.label) || 'task' : r.label || 'name it…';
+          const name = isBreak ? 'Break' : plain ? 'Work' : r.taskId ? (taskName(r.taskId) ?? r.label) || 'task' : r.label || 'name it…';
           return (
             <div
               key={r.id}
@@ -63,10 +65,10 @@ export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLo
                 ? <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0, background: 'repeating-linear-gradient(135deg, var(--ink-3) 0 1px, transparent 1px 3px)' }} />
                 : cat
                   ? <CategoryIcon id={cat.id} color={cat.color} size={11} />
-                  : <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, flexShrink: 0, background: spanTone(library, r) }} />}
+                  : <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, flexShrink: 0, background: spanTone(library, r, plain) }} />}
               <span style={{ color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{hm(start)}–{hm(end)}</span>
-              {isBreak ? (
-                <span style={{ flex: 1, minWidth: 0, color: 'var(--ink-3)' }}>{name}</span>
+              {isBreak || !onName ? (
+                <span style={{ flex: 1, minWidth: 0, color: isBreak ? 'var(--ink-3)' : 'var(--ink)' }}>{name}</span>
               ) : (
                 <button
                   type="button"

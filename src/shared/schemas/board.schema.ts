@@ -40,6 +40,8 @@ export const BoardSchema = z.object({
   // Decision 33 — free-content canvases
   canvases: z.array(z.object({ id: z.string().min(1), name: z.string() })).optional(),
   activeCanvasId: z.string().optional(),
+  // Easy / Advanced UI mode; absent = advanced
+  uiMode: z.enum(['easy', 'advanced']).optional(),
   // ADR 0008 § 4.1: station geometry optional (persisted only after user resizes)
   layoutGeometry: z
     .object({

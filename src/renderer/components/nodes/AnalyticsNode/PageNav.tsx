@@ -2,7 +2,7 @@
 // (line icons, 16px), the active one filled. Hover shows the page name; the
 // current page's name is printed next to the icons.
 
-import { PAGES, type PageId } from './guide';
+import { PAGES, type AnalyticsPage, type PageId } from './guide';
 
 const ICONS: Record<PageId, React.ReactNode> = {
   summary: (<><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>),
@@ -23,11 +23,11 @@ export function PageIcon({ page, size = 16 }: { page: PageId; size?: number }) {
   );
 }
 
-export function PageNav({ current, onPick }: { current: PageId; onPick: (id: PageId) => void }) {
-  const label = PAGES.find((p) => p.id === current)?.label ?? '';
+export function PageNav({ current, onPick, pages = PAGES }: { current: PageId; onPick: (id: PageId) => void; pages?: readonly AnalyticsPage[] }) {
+  const label = pages.find((p) => p.id === current)?.label ?? '';
   return (
     <div data-testid="analytics-page-nav" style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
-      {PAGES.map((p) => {
+      {pages.map((p) => {
         const on = p.id === current;
         return (
           <button

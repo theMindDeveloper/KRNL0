@@ -6,6 +6,7 @@ import { packLanes } from '../../../store/laneLayout';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { boardTagLibrary, spanTone } from '../../../store/spanTags';
 import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
+import { useEasyMode } from '../../../store/uiMode';
 import type { PomoState } from '../PomoNode/types';
 import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
@@ -231,6 +232,8 @@ export function ClockNode({
   // real time. The 30-second hand tick is too coarse; add a 1-second cursor
   // that only runs when there is an in-flight segment (zero idle cost).
   const board0 = useBoardStore((s) => s.board);
+  // Easy mode: recorded time in one colour, no retag / focus links.
+  const easy = useEasyMode();
   const tagLibrary = boardTagLibrary(board0);
   const isLive = pomoIsLive(board0);
   const [liveMs, setLiveMs] = useState(() => Date.now());
@@ -276,7 +279,7 @@ export function ClockNode({
       .map((n) => ({ id: n.id, text: (n.state as TaskState).text }));
     const x = e.clientX;
     const y = e.clientY;
-    setCtxMenu({ x, y, items: segmentMenuItems(seg, { targets, onDetails: () => setRealityPopup({ seg, x, y }) }) });
+    setCtxMenu({ x, y, items: segmentMenuItems(seg, { targets, easy, onDetails: () => setRealityPopup({ seg, x, y }) }) });
   };
   const openTaskMenu = (taskId: string, startH: number, endH: number, e: React.MouseEvent) => {
     const node = useBoardStore.getState().board?.nodes.find((n) => n.id === taskId);
@@ -1023,7 +1026,7 @@ export function ClockNode({
                 Click a wedge for times, retag and delete. */}
             {realitySegments.map((seg) => {
               const isWork = seg.kind === 'work';
-              const tone = spanTone(tagLibrary, seg);
+              const tone = spanTone(tagLibrary, seg, easy);
               const open = (e: React.MouseEvent) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1382,15 +1385,15 @@ export function ClockNode({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: spanTone(tagLibrary, realityPopup.seg) }} />
-              <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? (!realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}</span>
+              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: spanTone(tagLibrary, realityPopup.seg, easy) }} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? (!easy && !realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}</span>
               {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>◆ LIVE</span>}
             </div>
             <div style={{ color: 'var(--ink-3)', fontSize: 10, marginBottom: 10, letterSpacing: '0.04em' }}>
               {fmtClockHM(realityPopup.seg.startMs)} {realityPopup.seg.live ? '→ now' : `– ${fmtClockHM(realityPopup.seg.endMs)}`}
               {' · '}{Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
             </div>
-            {realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
+            {!easy && realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 Counts toward
                 <AppSelect

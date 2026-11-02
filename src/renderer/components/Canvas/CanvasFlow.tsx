@@ -33,6 +33,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useBoardStore } from '../../store/boardStore';
+import { isEasyBoard } from '../../store/uiMode';
 import { saveBoard, emit } from '../../store/eventLog';
 import { wouldCreateChainCycle } from '../../store/chainWalker';
 import { useViewportPersistence } from '../../store/useViewportPersistence';
@@ -1280,6 +1281,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       (srcIsTask && (tgtIsTask || tgtIsHabitLane)) ||
       (srcIsHabitLane && tgtIsTask);
     const event = isTaskFlow ? 'task.next' : 'link';
+    // Easy mode: no task ↔ habit links (task chains still work).
+    if (isTaskFlow && (srcIsHabitLane || tgtIsHabitLane) && isEasyBoard(board)) {
+      emit('sys.error', 'Task–habit links are an Advanced feature (Settings → Mode)', { severity: 'warn' });
+      return;
+    }
 
     // Dedup: refuse to add a second edge with the same (source, target, event).
     // Drag-to-connect is easy to fire twice; the canvas should not accumulate

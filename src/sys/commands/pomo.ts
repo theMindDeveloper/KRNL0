@@ -65,14 +65,15 @@ export function pomoStart(label?: string, minutes?: number): SysResult {
       return;
     }
     const cfg = node['config'] ?? {};
-    const sessionMin = cfg['mode'] === 'observe'
+    const easy = (board as { uiMode?: string }).uiMode === 'easy';
+    const sessionMin = cfg['mode'] === 'observe' || easy
       ? OBSERVE_SPAN_MIN
       : minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
     const startArgs: { label?: string; durationMin?: number; activeTaskId?: string | null } = { durationMin: sessionMin };
     if (label !== undefined) startArgs.label = label;
     // Same as the UI: an untagged start is tagged with the open task whose
     // planned block contains "now" (time-model F5).
-    const suggested = label === undefined && prev.activeTaskId === null ? plannedTaskNow(board) : null;
+    const suggested = label === undefined && prev.activeTaskId === null && !prev.label && !easy ? plannedTaskNow(board) : null;
     if (suggested) {
       startArgs.activeTaskId = suggested.id;
       startArgs.label = suggested.text;

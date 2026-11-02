@@ -4,6 +4,7 @@ import type { NodeProps } from '../types';
 import type { TodoConfig, TodoItem, TodoState } from './types';
 import { todoBuckets, todoReclassify, todoTagLibrary, visibleItems } from './commands';
 import { tagDisplay } from '../../../../shared/tags/classify';
+import { useEasyMode } from '../../../store/uiMode';
 import { TagPicker } from './TagPicker';
 import { isoToYMD, todayLocal, addDays } from '../../../analytics/dateRange';
 import { defaultTodoConfig } from './types';
@@ -71,6 +72,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   const buckets = todoBuckets(state, nowMs);
   const tagLibrary = todoTagLibrary(state);
+  // Easy mode: no tags and no pomo linking — just add, schedule, done.
+  const easy = useEasyMode();
   const rawItems = visibleItems({ ...state, items: [...buckets.active, ...buckets.done] }, config);
 
   // Build a map from taskNodeId → plannedMin so drag payloads can include duration.
@@ -353,19 +356,21 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           if (item?.taskNodeId) startTimeEdit(itemId, item.taskNodeId);
         },
       },
-      {
-        label: 'Set tag…',
-        onSelect: () => {
-          if (ctxMenu) setTagPicker({ x: ctxMenu.x, y: ctxMenu.y, itemId });
+      ...(easy ? [] : [
+        {
+          label: 'Set tag…',
+          onSelect: () => {
+            if (ctxMenu) setTagPicker({ x: ctxMenu.x, y: ctxMenu.y, itemId });
+          },
         },
-      },
-      {
-        label: 'Start pomo',
-        disabled: !hasTaskNode,
-        onSelect: () => {
-          onCommand('todo.startPomoForItem', { itemId });
+        {
+          label: 'Start pomo',
+          disabled: !hasTaskNode,
+          onSelect: () => {
+            onCommand('todo.startPomoForItem', { itemId });
+          },
         },
-      },
+      ]),
       {
         label: 'Delete',
         danger: true,
@@ -595,7 +600,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       {/* F2 / ADR 0016: tag pill — click to re-tag. A dashed border marks
           a tag the classifier guessed; solid means the user chose it.
           Untagged rows get a faint "+" so there's always a way in. */}
-      {(() => {
+      {!easy && (() => {
         const disp = item.tag !== undefined ? tagDisplay(tagLibrary, item.tag) : null;
         const isAuto = item.tagSource === 'auto';
         return (
