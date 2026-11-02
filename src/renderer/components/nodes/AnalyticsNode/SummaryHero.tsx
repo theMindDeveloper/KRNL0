@@ -7,6 +7,7 @@
 
 import type { AnalyticsSummary } from '../../../analytics/summary';
 import type { DayBucket } from '../../../analytics/types';
+import { cardPlacement } from './guide';
 
 const INSET = 12;
 
@@ -28,9 +29,9 @@ export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byD
         flexDirection: 'column',
         gap: 10,
         minWidth: 0,
-        height: 'var(--page-h, auto)',
         boxSizing: 'border-box',
         overflow: 'hidden',
+        ...cardPlacement('summary'),
       }}
     >
       <div

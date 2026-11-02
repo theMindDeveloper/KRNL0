@@ -24,8 +24,8 @@ import { HoldButton } from '../../ui/HoldButton';
 import { PagedView } from '../../ui/PagedView';
 import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
-import { GUIDE, cardOrder, isGuideCard } from './guide';
-import { GuideNav, RAIL_MIN_PANEL } from './GuideNav';
+import { PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, type PageId } from './guide';
+import { PageNav } from './PageNav';
 import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
 import { EstimateBars, DailyPlanActual, FocusMix, Legend, COLOR_PLANNED, COLOR_TRACKED, fmtMinutes } from '../../../analytics/charts/PlanVsActual';
 import {
@@ -299,10 +299,8 @@ function ChartCard({
     gap: 10,
     transition: 'border-color 140ms, box-shadow 140ms',
     gridColumn: span ? `span ${span}` : undefined,
-    // One card per page, filling it (PagedView fillItems sets --page-h),
-    // in guide order.
-    height: 'var(--page-h, auto)',
-    order: cardOrder(cardId),
+    // Its cell in the page grid (6 columns × 2 rows per page, see guide.ts).
+    ...cardPlacement(cardId),
     boxSizing: 'border-box',
     overflow: 'hidden',
     minHeight: 0,
@@ -454,7 +452,7 @@ export function AnalyticsNode({
   const settingsOpen = state.settingsOpen ?? false;
 
   const isHidden = useCallback(
-    (id: AnalyticsCardId) => hiddenCards.includes(id) || !isGuideCard(id),
+    (id: AnalyticsCardId) => hiddenCards.includes(id) || !isPagedCard(id),
     [hiddenCards],
   );
   const isPinned = useCallback(
@@ -473,8 +471,8 @@ export function AnalyticsNode({
   // 2026-05-18 (rev 3): node is fixed-size now — no resize handler.
 
   // Container size — drives the grid column count.
-  const [bodyRef, bodySize] = useElementSize<HTMLDivElement>();
-  const navAsRow = bodySize.width > 0 && bodySize.width < RAIL_MIN_PANEL;
+  const [bodyRef] = useElementSize<HTMLDivElement>();
+  const currentPage: PageId = currentCard && currentCard !== 'summary' ? (pageOfCard(currentCard) ?? 'summary') : 'summary';
   // One card per page (PagedView fillItems) — a single column.
   void colCountFor;
   const colCount = 1;
@@ -592,8 +590,9 @@ export function AnalyticsNode({
         </button>
       </div>
 
-      {/* Range chips (pages are listed beside the chart). */}
+      {/* Page icons + range chips — one compact row; the rest is charts. */}
       <div style={toolbarStyle}>
+        <PageNav current={currentPage} onPick={(id) => setJumpTo(pageSelector(id))} />
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', gap: 4 }}>
           {RANGE_PRESETS.map((days) => (
@@ -620,16 +619,10 @@ export function AnalyticsNode({
           overflow: 'hidden',
           padding: '12px 14px 16px',
           display: 'flex',
-          flexDirection: navAsRow ? 'column' : 'row',
           gap: 12,
           minHeight: 0,
         }}
       >
-        <GuideNav
-          asRow={navAsRow}
-          current={currentCard ?? 'summary'}
-          onPick={(id) => setJumpTo(id === 'summary' ? '[data-testid="analytics-summary"]' : `[data-card-id="${id}"]`)}
-        />
         <PagedView
           testId="analytics-pages"
           itemSelector="[data-page-item], [data-card-id]"
@@ -638,7 +631,13 @@ export function AnalyticsNode({
           onPageChange={onPageChange}
           showPager={false}
           style={{ flex: 1, minWidth: 0 }}
-          contentStyle={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+          contentStyle={{
+            // Each page = 2 rows of the grid, each row half a page (minus the gap).
+            display: 'grid',
+            gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+            gridTemplateRows: `repeat(${PAGES.length * 2}, calc((var(--page-h, 400px) - 10px) / 2))`,
+            gap: 10,
+          }}
         >
           <SummaryHero summary={summary} byDay={byDay} />
           {ANALYTICS_VIEWS.map((v) => (

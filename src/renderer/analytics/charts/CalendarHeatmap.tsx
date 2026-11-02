@@ -45,21 +45,41 @@ export function CalendarHeatmap({
   }
   const totalCols = (cells[cells.length - 1]?.col ?? 0) + 1;
 
-  const cellSize = boxW && boxH
-    ? Math.max(3, Math.min((boxW - DOW_W) / totalCols - gap, (boxH - LABEL_H) / 7 - gap, 28))
-    : cellProp;
+  // In a box, pick how many stacked bands (1–4 runs of weeks) give the
+  // biggest cells, so a tall card is filled instead of holding a thin strip.
+  const BAND_GAP = 8;
+  let bands = 1;
+  let cellSize = cellProp;
+  if (boxW && boxH) {
+    let best = -1;
+    for (let b = 1; b <= 4; b++) {
+      const perBand = Math.ceil(totalCols / b);
+      const cs = Math.min((boxW - DOW_W) / perBand - gap, (boxH - b * LABEL_H - (b - 1) * BAND_GAP) / (7 * b) - gap, 28);
+      if (cs > best + 0.5) { best = cs; bands = b; }
+    }
+    cellSize = Math.max(3, best);
+  }
+  const perBand = Math.ceil(totalCols / bands);
   const step = cellSize + gap;
-  const width = DOW_W + totalCols * step;
-  const height = LABEL_H + 7 * step;
+  const bandH = LABEL_H + 7 * step;
+  const width = DOW_W + perBand * step;
+  const height = bands * bandH + (bands - 1) * BAND_GAP;
+  const place = (col: number) => ({
+    x: DOW_W + (col % perBand) * step,
+    y: Math.floor(col / perBand) * (bandH + BAND_GAP) + LABEL_H,
+  });
 
   // First column of each month, labelled only if there's room since the last label.
-  const monthLabels: Array<{ x: number; label: string }> = [];
+  const monthLabels: Array<{ x: number; y: number; label: string }> = [];
+  let lastKey = '';
   let lastX = -Infinity;
   for (const c of cells) {
     if (c.date.slice(8) !== '01' && c !== cells[0]) continue;
-    const x = DOW_W + c.col * step;
-    if (x - lastX < 26) continue;
-    monthLabels.push({ x, label: MONTHS[Number(c.date.slice(5, 7)) - 1] ?? '' });
+    const { x, y } = place(c.col);
+    const key = String(y);
+    if (key === lastKey && x - lastX < 26) continue;
+    monthLabels.push({ x, y: y - 5, label: MONTHS[Number(c.date.slice(5, 7)) - 1] ?? '' });
+    lastKey = key;
     lastX = x;
   }
 
@@ -72,13 +92,13 @@ export function CalendarHeatmap({
       style={{ display: 'block', margin: '0 auto' }}
     >
       {monthLabels.map((m) => (
-        <text key={`${m.label}-${m.x}`} x={m.x} y={9} fontSize={8.5} fill={COLOR_LABEL} fontFamily="var(--font-mono)">
+        <text key={`${m.label}-${m.x}-${m.y}`} x={m.x} y={m.y} fontSize={8.5} fill={COLOR_LABEL} fontFamily="var(--font-mono)">
           {m.label}
         </text>
       ))}
-      {['M', '', 'W', '', 'F', '', ''].map((d, r) => d && step >= 8 ? (
-        <text key={r} x={0} y={LABEL_H + r * step + cellSize * 0.8} fontSize={Math.min(9, cellSize)} fill={COLOR_LABEL} fontFamily="var(--font-mono)">{d}</text>
-      ) : null)}
+      {Array.from({ length: bands }, (_, b) => ['M', '', 'W', '', 'F', '', ''].map((d, r) => d && step >= 8 ? (
+        <text key={`${b}-${r}`} x={0} y={b * (bandH + BAND_GAP) + LABEL_H + r * step + cellSize * 0.8} fontSize={Math.min(9, cellSize)} fill={COLOR_LABEL} fontFamily="var(--font-mono)">{d}</text>
+      ) : null))}
       {cells.map((c) => {
         const intensity = c.value / yMax;
         const fill =
@@ -88,8 +108,8 @@ export function CalendarHeatmap({
         return (
           <rect
             key={c.date}
-            x={DOW_W + c.col * step}
-            y={LABEL_H + c.row * step}
+            x={place(c.col).x}
+            y={place(c.col).y + c.row * step}
             width={cellSize}
             height={cellSize}
             rx={Math.min(3, cellSize / 4)}
