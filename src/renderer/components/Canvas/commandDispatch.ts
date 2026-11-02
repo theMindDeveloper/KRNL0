@@ -455,22 +455,22 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
       }
       break;
     }
-    case 'terminal': {
-      // T20: term.sessionStart / term.sessionEnd — update TermState.sessionId.
-      // T21: term.setTitle — update TermState.title.
-      // T22: term.setFontSize — update TermConfig.fontSize.
-      // T23: term.clear — side-effect written to PTY by the node's makeCommandHandler.
+    case 'term': {
+      // T20: term.sessionStart / term.sessionEnd are runtime-only: a PTY id
+      // means nothing after a restart, and persisting it would cost an undo
+      // step on every terminal start. termSessionStart/End stay as the pure
+      // contract for tests.
+      // T21: term.setTitle — update TermState.title (shown in the header).
+      // T22: term.setFontSize — update TermConfig.fontSize (applied live).
+      // T23: term.clear — handled in the renderer (TERM_CLEAR_EVENT); nothing persists.
       // T24: term.setShell — update TermConfig.shell.
       const termState = s as unknown as TermState;
       const termCfg = c as unknown as TermConfig;
       switch (command) {
-        case 'term.sessionStart': {
-          const res = termSessionStart(termState, args as { sessionId: string });
-          return { state: res.state as Node['state'] };
-        }
+        case 'term.sessionStart':
         case 'term.sessionEnd': {
-          const res = termSessionEnd(termState, args as { sessionId: string });
-          return { state: res.state as Node['state'] };
+          void termSessionStart; void termSessionEnd;
+          return null;
         }
         case 'term.setTitle': {
           const res = termSetTitle(termState, args as { title: string });
@@ -481,7 +481,6 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { config: res.config as Node['config'] };
         }
         case 'term.clear': {
-          // T23: ptyWrite side-effect — handled via cli:dispatch in Phase 2.
           void termClear;
           return null;
         }

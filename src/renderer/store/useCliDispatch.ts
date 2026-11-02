@@ -12,7 +12,10 @@
 import { useEffect } from 'react';
 import { useBoardStore } from './boardStore';
 import { emit, saveBoard } from './eventLog';
-import { deleteTaskNodesCascade } from '../components/Canvas/commandDispatch';
+import { deleteTaskNodesCascade, makeCommandHandler } from '../components/Canvas/commandDispatch';
+import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
+import type { BoardShape } from '../../shared/dispatch/types';
+import { TERM_CLEAR_EVENT, TERM_FONT_MIN, TERM_FONT_MAX } from '../components/nodes/TerminalNode/constants';
 import { sfxEngine } from '../sfx/sfxEngine';
 import { useEventLog } from './eventLog/store';
 import type { Board } from '../../shared/types';
@@ -53,17 +56,56 @@ export function useCliDispatch(): void {
             break;
           }
 
+          // Undo / redo persist like the keyboard shortcut does; otherwise the
+          // next CLI write (which reads board.json) brings the change back.
           case 'undo': {
+            if (store.getState().history.length === 0) { ok = true; message = 'Nothing to undo'; break; }
             store.getState().undo();
+            const undone = store.getState().board;
+            if (undone) void saveBoard(undone);
             ok = true;
             message = 'Undo applied';
             break;
           }
 
           case 'redo': {
+            if (store.getState().future.length === 0) { ok = true; message = 'Nothing to redo'; break; }
             store.getState().redo();
+            const redone = store.getState().board;
+            if (redone) void saveBoard(redone);
             ok = true;
             message = 'Redo applied';
+            break;
+          }
+
+          case 'term.setTitle':
+          case 'term.setFontSize':
+          case 'term.clear': {
+            const { board } = store.getState();
+            const termNode = board?.nodes.find((n) => n.kind === 'term');
+            if (!termNode) { message = 'No terminal on the board'; break; }
+            if (command === 'term.clear') {
+              window.dispatchEvent(new CustomEvent(TERM_CLEAR_EVENT, { detail: { nodeId: termNode.id } }));
+              ok = true;
+              message = 'Terminal cleared';
+              break;
+            }
+            if (command === 'term.setTitle') {
+              const title = typeof args['title'] === 'string' ? args['title'].trim() : '';
+              if (!title) { message = 'term setTitle requires "<title>"'; break; }
+              makeCommandHandler(termNode.id)('term.setTitle', { title });
+              ok = true;
+              message = `Terminal title set to "${title}"`;
+              break;
+            }
+            const size = args['fontSize'];
+            if (typeof size !== 'number' || !Number.isFinite(size) || size < TERM_FONT_MIN || size > TERM_FONT_MAX) {
+              message = `term setFontSize requires a number from ${TERM_FONT_MIN} to ${TERM_FONT_MAX}`;
+              break;
+            }
+            makeCommandHandler(termNode.id)('term.setFontSize', { fontSize: size });
+            ok = true;
+            message = `Terminal font size set to ${size}`;
             break;
           }
 
@@ -106,13 +148,23 @@ export function useCliDispatch(): void {
             const { id, x, y } = args as { id: string; x: number; y: number };
             const { board, updateNode } = store.getState();
             if (!board) { message = 'No board loaded'; break; }
-            const node = board.nodes.find((n) => n.id === id);
-            if (!node) { message = `No node with id "${id}"`; break; }
-            updateNode(id, { position: { x, y } } as Partial<Node>);
+            // Same ref rule as every other command: id, ≥4-char prefix, or unique text.
+            const ref = resolveNodeRef(board as unknown as BoardShape, id);
+            if (!ref.ok) {
+              message = ref.reason === 'ambiguous'
+                ? `"${id}" matches several nodes: ${(ref.matches ?? []).map((m) => m.slice(0, 12)).join(', ')}`
+                : `No node matching "${id}"`;
+              break;
+            }
+            const node = board.nodes.find((n) => n.id === ref.id);
+            if (!node) { message = `No node matching "${id}"`; break; }
+            // Mother nodes are fixed-position (AGENTS.md hard rule 6).
+            if (node.isMother) { message = `${node.kind} is a fixed window and can't be moved`; break; }
+            updateNode(node.id, { position: { x, y } } as Partial<Node>);
             const updated = store.getState().board;
             if (updated) void saveBoard(updated);
             ok = true;
-            message = `Node ${id.slice(0, 8)} moved to (${x}, ${y})`;
+            message = `Node ${node.id.slice(0, 8)} moved to (${x}, ${y})`;
             break;
           }
 

@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import type { NodeProps } from '../types';
 import type { TermState, TermConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
-import { HEADER_LABEL, LIVE_BADGE_TEXT } from './constants';
+import { HEADER_LABEL, LIVE_BADGE_TEXT, TERM_CLEAR_EVENT } from './constants';
 import { startTerminalSession } from './session';
 import { MotdBanner } from './MotdBanner';
 import pkg from '../../../../../package.json';
@@ -27,6 +27,32 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
   useEffect(() => {
     if (termRef.current && xtermColors) termRef.current.options.theme = { ...xtermColors };
   }, [xtermColors]);
+
+  // `krnl term setFontSize` — apply live, then refit so the PTY gets the new cols/rows.
+  const fontSize = node.config?.fontSize;
+  useEffect(() => {
+    const t = termRef.current;
+    if (!t || fontSize === undefined || t.options.fontSize === fontSize) return;
+    t.options.fontSize = fontSize;
+    try { fitRef.current?.fit(); } catch { /* not measured yet */ }
+    const sid = sessionIdRef.current;
+    if (sid) window.krnl?.ptyResize(sid, t.cols, t.rows);
+  }, [fontSize]);
+
+  // `krnl term clear` — clears the screen and scrollback of this terminal.
+  useEffect(() => {
+    const onClear = (e: Event) => {
+      const id = (e as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
+      if (id && id !== node.id) return;
+      termRef.current?.clear();
+    };
+    window.addEventListener(TERM_CLEAR_EVENT, onClear);
+    return () => window.removeEventListener(TERM_CLEAR_EVENT, onClear);
+  }, [node.id]);
+
+  // `krnl term setTitle` — a custom title replaces the default header label.
+  const customTitle = node.state?.title;
+  const headerLabel = customTitle && customTitle !== 'Terminal' ? customTitle : HEADER_LABEL;
 
   const copySelection = () => {
     const sel = termRef.current?.getSelection() ?? '';
@@ -228,7 +254,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
               letterSpacing: '0.04em',
             }}
           >
-            {HEADER_LABEL}
+            {headerLabel}
           </span>
           {/* LIVE badge */}
           <div
