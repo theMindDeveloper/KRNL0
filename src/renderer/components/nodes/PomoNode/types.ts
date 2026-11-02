@@ -68,6 +68,8 @@ export interface PomoConfig {
   longBreakEvery: number;
   /** Timer face variant — defaults to 'vapor' if missing. */
   face?: TimerFace;
+  /** Stop records the session so far (default) or discards it. One Stop button either way. */
+  countStopped?: boolean;
 }
 
 export const defaultPomoState = (): PomoState => ({

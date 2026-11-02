@@ -17,11 +17,19 @@
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
+import { PagedView } from '../../ui/PagedView';
+import { summarizeAnalytics } from '../../../analytics/summary';
+import { SummaryHero } from './SummaryHero';
+import { PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, type PageId } from './guide';
+import { PageNav } from './PageNav';
+import { AnalyticsSettings } from './AnalyticsSettings';
 import { computeEstimates, describeAccuracy } from '../../../analytics/estimates';
+import { computeTagBreakdown } from '../../../analytics/tags';
+import { TagDailyBars, TagList } from '../../../analytics/charts/TagCharts';
 import { EstimateBars, DailyPlanActual, FocusMix, Legend, COLOR_PLANNED, COLOR_TRACKED, fmtMinutes } from '../../../analytics/charts/PlanVsActual';
 import {
   ActivityStrip,
@@ -68,6 +76,7 @@ const VIEW_LABELS: Record<AnalyticsView, string> = {
   patterns: 'Patterns',
   insights: 'Insights',
   estimates: 'Plan vs actual',
+  time: 'Time',
   sources: 'Sources',
 };
 
@@ -119,6 +128,7 @@ const CARDS_BY_VIEW: Record<AnalyticsView, readonly AnalyticsCardId[]> = {
     'insights.histogramTasks',
   ],
   estimates: ['estimates.kpis', 'estimates.perTask', 'estimates.daily', 'estimates.mix'],
+  time: ['time.donut', 'time.list', 'time.daily'],
   sources: ['sources.list', 'sources.streaks'],
 };
 
@@ -294,6 +304,10 @@ function ChartCard({
     gap: 10,
     transition: 'border-color 140ms, box-shadow 140ms',
     gridColumn: span ? `span ${span}` : undefined,
+    // Its cell in the page grid (6 columns × 2 rows per page, see guide.ts).
+    ...cardPlacement(cardId),
+    boxSizing: 'border-box',
+    overflow: 'hidden',
     minHeight: 0,
     minWidth: 0,
   };
@@ -349,9 +363,9 @@ function ChartCard({
         ref={hostRef}
         style={{
           width: '100%',
-          ...(contentHeight === 'auto'
-            ? { minHeight: 0 }
-            : { height: contentHeight, minHeight: 0 }),
+          // The chart takes all the room the page leaves under the title.
+          flex: '1 1 0',
+          minHeight: contentHeight === 'auto' ? 0 : Math.min(120, contentHeight),
           display: 'flex',
           alignItems: 'stretch',
           justifyContent: 'center',
@@ -412,6 +426,22 @@ export function AnalyticsNode({
   const year = state.year ?? new Date(todayLocal() + 'T00:00:00').getFullYear();
 
   const byDay = analytics.byDay(range);
+  // The year heatmap always shows the last 365 days, whatever the range.
+  const yearRange = useMemo(() => lastNDays(365), []);
+  const yearByDay = analytics.byDay(yearRange);
+
+  // One sequence of full-page cards (no tabs). The header names the card on
+  // screen; "All charts" jumps straight to any card.
+  const [currentCard, setCurrentCard] = useState<string | null>(null);
+  const [jumpTo, setJumpTo] = useState<string | null>(null);
+
+  const onPageChange = useCallback((item: HTMLElement | null) => {
+    setCurrentCard(item?.getAttribute('data-card-id') ?? (item ? 'summary' : null));
+    setJumpTo(null);
+  }, []);
+
+  // Plain-language summary on top of Overview (same text as `analytics summary`).
+  const summary = summarizeAnalytics(analytics, range, prevRange, state.rangeDays);
   const tot = analytics.totals(range);
   const prevTot = analytics.totals(prevRange);
   const open = analytics.open();
@@ -427,7 +457,7 @@ export function AnalyticsNode({
   const settingsOpen = state.settingsOpen ?? false;
 
   const isHidden = useCallback(
-    (id: AnalyticsCardId) => hiddenCards.includes(id),
+    (id: AnalyticsCardId) => hiddenCards.includes(id) || !isPagedCard(id),
     [hiddenCards],
   );
   const isPinned = useCallback(
@@ -446,8 +476,11 @@ export function AnalyticsNode({
   // 2026-05-18 (rev 3): node is fixed-size now — no resize handler.
 
   // Container size — drives the grid column count.
-  const [bodyRef, bodySize] = useElementSize<HTMLDivElement>();
-  const colCount = colCountFor(bodySize.width || (state.width ?? 720));
+  const [bodyRef] = useElementSize<HTMLDivElement>();
+  const currentPage: PageId = currentCard && currentCard !== 'summary' ? (pageOfCard(currentCard) ?? 'summary') : 'summary';
+  // One card per page (PagedView fillItems) — a single column.
+  void colCountFor;
+  const colCount = 1;
 
   // Clamp span helper — never let a card request more columns than exist.
   const clamp = useCallback(
@@ -562,20 +595,9 @@ export function AnalyticsNode({
         </button>
       </div>
 
-      {/* Tabs + range chips */}
+      {/* Page icons + range chips — one compact row; the rest is charts. */}
       <div style={toolbarStyle}>
-        {ANALYTICS_VIEWS.map((v) => (
-          <button
-            key={v}
-            type="button"
-            data-testid={`analytics-tab-${v}`}
-            onClick={(e) => { e.stopPropagation(); onCommand('analytics.setView', { view: v }); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={tabPill(view === v)}
-          >
-            {VIEW_LABELS[v]}
-          </button>
-        ))}
+        <PageNav current={currentPage} onPick={(id) => setJumpTo(pageSelector(id))} />
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', gap: 4 }}>
           {RANGE_PRESETS.map((days) => (
@@ -593,21 +615,41 @@ export function AnalyticsNode({
         </div>
       </div>
 
-      {/* Body — split: cards on the left, settings sidebar on the right */}
+      {/* Body — split: cards on the left, settings sidebar on the right.
+          No scrolling: cards are split into pages (PagedView). */}
       <div
         ref={bodyRef}
         style={{
           flex: 1,
-          overflow: 'auto',
+          overflow: 'hidden',
           padding: '12px 14px 16px',
           display: 'flex',
           gap: 12,
           minHeight: 0,
+          position: 'relative',
         }}
       >
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+        <PagedView
+          testId="analytics-pages"
+          itemSelector="[data-page-item], [data-card-id]"
+          fillItems
+          revealSelector={jumpTo}
+          onPageChange={onPageChange}
+          showPager={false}
+          style={{ flex: 1, minWidth: 0 }}
+          contentStyle={{
+            // Each page = 2 rows of the grid, each row half a page (minus the gap).
+            display: 'grid',
+            gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+            gridTemplateRows: `repeat(${PAGES.length * 2}, calc((var(--page-h, 400px) - 10px) / 2))`,
+            gap: 10,
+          }}
+        >
+          <SummaryHero summary={summary} byDay={byDay} />
+          {ANALYTICS_VIEWS.map((v) => (
           <ViewBody
-            view={view}
+            key={v}
+            view={v}
             state={state}
             byDay={byDay}
             dow={dow}
@@ -634,17 +676,17 @@ export function AnalyticsNode({
             radarAxes={radarAxes}
             colCount={colCount}
             clamp={clamp}
+            yearByDay={yearByDay}
           />
-        </div>
+          ))}
+        </PagedView>
 
         {settingsOpen && (
-          <SettingsSidebar
-            currentView={view}
+          <AnalyticsSettings
             hiddenCards={hiddenCards}
-            pinnedCards={pinnedCards}
             onToggleHidden={toggleHidden}
-            onTogglePin={togglePin}
             onReset={() => onCommand('analytics.resetCardLayout', {})}
+            onClose={() => onCommand('analytics.setSettingsOpen', { open: false })}
           />
         )}
       </div>
@@ -652,209 +694,12 @@ export function AnalyticsNode({
   );
 }
 
-// ── Settings sidebar ─────────────────────────────────────────────────────────
-
-interface SettingsSidebarProps {
-  currentView: AnalyticsView;
-  hiddenCards: readonly AnalyticsCardId[];
-  pinnedCards: readonly AnalyticsCardId[];
-  onToggleHidden: (id: AnalyticsCardId) => void;
-  onTogglePin: (id: AnalyticsCardId) => void;
-  onReset: () => void;
-}
-
-function SettingsSidebar({
-  currentView,
-  hiddenCards,
-  pinnedCards,
-  onToggleHidden,
-  onTogglePin,
-  onReset,
-}: SettingsSidebarProps) {
-  return (
-    <aside
-      data-testid="analytics-settings-sidebar"
-      style={{
-        width: 196,
-        flexShrink: 0,
-        background: 'linear-gradient(180deg, var(--k-an-bg-2, #16191c) 0%, var(--k-an-bg, #101214) 100%)',
-        border: '1px solid var(--k-an-line, #23262a)',
-        borderRadius: 8,
-        padding: '12px 12px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        overflow: 'auto',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            color: 'var(--acid)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            fontWeight: 700,
-          }}
-        >
-          Curate cards
-        </span>
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          data-testid="analytics-reset-layout"
-          onClick={(e) => { e.stopPropagation(); onReset(); }}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-            ...chipBtn(false),
-            borderColor: 'var(--k-an-warm, #ff8e64)',
-            color: 'var(--k-an-warm, #ff8e64)',
-            fontSize: 8,
-          }}
-          title="Show every card, clear pins"
-        >
-          reset
-        </button>
-      </div>
-
-      <p
-        style={{
-          margin: 0,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 9,
-          color: 'var(--k-an-ink-3, #9aa1a8)',
-          letterSpacing: '0.04em',
-          lineHeight: 1.45,
-        }}
-      >
-        <span style={{ color: 'var(--acid)' }}>★</span> pin to top  ·  <span style={{ color: 'var(--k-an-warm, #ff8e64)' }}>✕</span> hide
-      </p>
-
-      {ANALYTICS_VIEWS.map((v) => (
-        <div key={v} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 9,
-              color: v === currentView ? 'var(--k-an-ink-1, #eef1f4)' : 'var(--k-an-ink-4, #7d848b)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              fontWeight: v === currentView ? 700 : 500,
-              borderBottom: '1px dashed var(--k-an-line, #23262a)',
-              paddingBottom: 3,
-            }}
-          >
-            {VIEW_LABELS[v]}
-          </span>
-          {CARDS_BY_VIEW[v].map((id) => {
-            const hidden = hiddenCards.includes(id);
-            const pinned = pinnedCards.includes(id);
-            return (
-              <div
-                key={id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '4px 0',
-                  opacity: hidden ? 0.55 : 1,
-                }}
-              >
-                <span
-                  style={{
-                    flex: 1,
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 9.5,
-                    color: hidden ? 'var(--k-an-ink-4, #7d848b)' : 'var(--k-an-ink-2, #c8cdd3)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    textDecoration: hidden ? 'line-through' : 'none',
-                  }}
-                  title={ANALYTICS_CARD_LABELS[id]}
-                >
-                  {ANALYTICS_CARD_LABELS[id]}
-                </span>
-                <button
-                  type="button"
-                  data-testid={`analytics-sidebar-pin-${id}`}
-                  onClick={(e) => { e.stopPropagation(); onTogglePin(id); }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  title={pinned ? 'Unpin' : 'Pin to top'}
-                  style={cardActionBtn(pinned, 'var(--acid)')}
-                >
-                  {pinned ? '★' : '☆'}
-                </button>
-                <button
-                  type="button"
-                  data-testid={`analytics-sidebar-hide-${id}`}
-                  onClick={(e) => { e.stopPropagation(); onToggleHidden(id); }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  title={hidden ? 'Show' : 'Hide'}
-                  style={cardActionBtn(hidden, 'var(--k-an-warm, #ff8e64)')}
-                >
-                  {hidden ? '+' : '✕'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      ))}
-
-      {/* Danger zone — destructive history wipe (hold to confirm). Clears the
-          completion ledger + pomo session history only; habit logs and the
-          live board are untouched. The label names exactly what dies. */}
-      <div
-        data-testid="analytics-danger-zone"
-        style={{
-          marginTop: 4,
-          paddingTop: 10,
-          borderTop: '1px dashed #3a2a2a',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 6,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9,
-            color: 'var(--k-an-warm, #ff8e64)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            fontWeight: 700,
-          }}
-        >
-          Danger zone
-        </span>
-        <HoldButton
-          testId="analytics-clear-history"
-          label="Clear focus history"
-          holdingLabel="Hold to wipe…"
-          onConfirm={() => useBoardStore.getState().clearFocusHistory()}
-          style={{ width: '100%' }}
-        />
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 8.5,
-            color: 'var(--k-an-ink-4, #7d848b)',
-            lineHeight: 1.4,
-          }}
-        >
-          Erases completed-task records &amp; pomo sessions. Habits are kept.
-        </span>
-      </div>
-    </aside>
-  );
-}
-
 // ── view body ────────────────────────────────────────────────────────────────
 
 interface ViewBodyProps {
   view: AnalyticsView;
+  /** Last 365 days — the year heatmap ignores the range chips. */
+  yearByDay: ReturnType<ReturnType<typeof useAnalytics>['byDay']>;
   state: AnalyticsState;
   byDay: ReturnType<ReturnType<typeof useAnalytics>['byDay']>;
   dow: ReturnType<ReturnType<typeof useAnalytics>['byDayOfWeek']>;
@@ -896,10 +741,10 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
   if (!est) return null;
   const k = est.kpis;
   const tile = (label: string, value: string, sub: string, testId: string) => (
-    <div data-testid={testId} style={{ flex: '1 1 140px', minWidth: 130, padding: '10px 12px', border: '1px solid #2a2e33', borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#aab0b7' }}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 22, fontWeight: 700, color: '#eef0f2', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: '#aab0b7', marginTop: 2 }}>{sub}</div>
+    <div data-testid={testId} style={{ minWidth: 0, padding: '12px 14px', border: '1px solid #2a2e33', borderRadius: 10, background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#aab0b7' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(20px, 4vh, 30px)', fontWeight: 700, color: '#eef0f2', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: '#aab0b7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
     </div>
   );
   const card = (id: AnalyticsCardId, title: string, span: number, contentHeight: number, body: (size: { width: number; height: number }) => React.ReactNode) => (
@@ -923,7 +768,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
       {
         cardId: 'estimates.kpis' as const,
         render: () => card('estimates.kpis', `Plan vs actual · last ${state.rangeDays}d`, 3, 96, () => (
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: 'minmax(0, 1fr)', gap: 10, width: '100%', height: '100%' }}>
             {tile('Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy')}
             {tile('Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned')}
             {tile('Tracked', fmtMinutes(k.trackedMin), `${k.overCount} over · ${k.underCount} within plan`, 'estimates-kpi-tracked')}
@@ -936,7 +781,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
         render: () => card('estimates.perTask', 'Estimate vs actual · per task', 2, 250, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Legend items={[{ label: 'Planned (estimate)', color: COLOR_PLANNED }, { label: 'Tracked (pomo, tagged)', color: COLOR_TRACKED }]} />
-            <EstimateBars tasks={est.tasks} width={chartWidth(size.width, 480)} />
+            <EstimateBars tasks={est.tasks} width={chartWidth(size.width, 480)} {...(size.height > 0 ? { height: size.height - 30 } : {})} />
           </div>
         )),
       },
@@ -952,6 +797,70 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Legend items={[{ label: 'Planned on calendar', color: COLOR_PLANNED }, { label: 'Worked (pomo)', color: COLOR_TRACKED }]} />
             <DailyPlanActual days={est.days} width={chartWidth(size.width, 640)} height={chartHeight(size.height - 20, 170)} />
+          </div>
+        )),
+      },
+    ],
+    state.pinnedCards ?? [],
+  );
+  return <div style={cardGridStyle}>{cards.map((c) => <CardSlot key={c.cardId}>{c.render()}</CardSlot>)}</div>;
+}
+
+// ── Time by tag (ADR 0016) ────────────────────────────────────────────────────
+// Completed tasks grouped by their tag: minutes are pomo time tracked against
+// the task, else its estimate. See analytics/tags.ts.
+function TimeView(props: ViewBodyProps & { cardGridStyle: React.CSSProperties }) {
+  const { range, settingsOpen, isHidden, isPinned, toggleHidden, togglePin, clamp, cardGridStyle, state } = props;
+  const board = useBoardStore((s) => s.board);
+  const res = useMemo(
+    () => (board ? computeTagBreakdown(board, range, Date.now()) : null),
+    [board, range],
+  );
+  if (!res) return null;
+  const slices: DonutSlice[] = res.tags.map((t) => ({ id: t.id, label: t.label, value: t.minutes, color: t.color }));
+  const card = (id: AnalyticsCardId, title: string, span: number, contentHeight: number, body: (size: { width: number; height: number }) => React.ReactNode) => (
+    <ChartCard
+      key={id}
+      cardId={id}
+      title={title}
+      span={clamp(span)}
+      contentHeight={contentHeight}
+      hidden={isHidden(id)}
+      pinned={isPinned(id)}
+      settingsOpen={settingsOpen}
+      onToggleHidden={() => toggleHidden(id)}
+      onTogglePin={() => togglePin(id)}
+    >
+      {body}
+    </ChartCard>
+  );
+  const cards = orderCards(
+    [
+      {
+        cardId: 'time.donut' as const,
+        render: () => card('time.donut', `Time by tag · last ${state.rangeDays}d`, 1, 260, (size) => (
+          <DonutChart
+            data={slices}
+            innerRatio={0.55}
+            size={Math.min(220, chartWidth(size.width, 220))}
+            centerPrimary={fmtMinutes(res.totalMin)}
+            centerSecondary={`${res.totalCount} tasks`}
+            formatValue={fmtMinutes}
+          />
+        )),
+      },
+      {
+        cardId: 'time.list' as const,
+        render: () => card('time.list', 'Tags ranked · time · share · tasks', 2, 260, (size) => (
+          <TagList tags={res.tags} width={chartWidth(size.width, 420)} />
+        )),
+      },
+      {
+        cardId: 'time.daily' as const,
+        render: () => card('time.daily', 'Daily mix by tag', 3, 190, (size) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Legend items={res.tags.map((t) => ({ label: t.label, color: t.color }))} />
+            <TagDailyBars days={res.days} tags={res.tags} width={chartWidth(size.width, 640)} height={chartHeight(size.height - 24, 150)} />
           </div>
         )),
       },
@@ -983,13 +892,10 @@ function ViewBody(props: ViewBodyProps) {
 
   // Grid track count is driven by the measured node width so cards never
   // squeeze below 280px and never leave random whitespace on the right.
-  const cardGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
-    gap: 12,
-    alignItems: 'stretch',
-    gridAutoRows: 'min-content',
-  };
+  // Cards from every view join one ordered sequence (guide order, then the
+  // extras), so the per-view grid wrappers step out of the layout.
+  void colCount;
+  const cardGridStyle: React.CSSProperties = { display: 'contents' };
 
   const metricPicker = (currentMetric: AnalyticsMetric, onChange: (m: AnalyticsMetric) => void) => (
     <div style={{ display: 'flex', gap: 4 }}>
@@ -1149,6 +1055,10 @@ function ViewBody(props: ViewBodyProps) {
     return <EstimatesView {...props} cardGridStyle={cardGridStyle} />;
   }
 
+  if (view === 'time') {
+    return <TimeView {...props} cardGridStyle={cardGridStyle} />;
+  }
+
   if (view === 'calendar') {
     return (
       <div style={cardGridStyle}>
@@ -1164,10 +1074,8 @@ function ViewBody(props: ViewBodyProps) {
           onToggleHidden={() => toggleHidden('calendar.heatmap')}
           onTogglePin={() => togglePin('calendar.heatmap')}
         >
-          {() => (
-            <div style={{ width: '100%', overflowX: 'auto' }}>
-              <CalendarHeatmap data={byDay} metric={state.metric} />
-            </div>
+          {(size) => (
+            <CalendarHeatmap data={props.yearByDay} metric={state.metric} width={size.width} height={size.height} />
           )}
         </ChartCard>
       </div>
@@ -1507,7 +1415,7 @@ function ViewBody(props: ViewBodyProps) {
         onTogglePin={() => togglePin('sources.list')}
       >
         {() => (
-          <div style={{ width: '100%', overflow: 'auto' }}>
+          <PagedView style={{ width: '100%', height: '100%' }} itemSelector="tbody > tr">
             <table
               style={{
                 width: '100%',
@@ -1537,7 +1445,7 @@ function ViewBody(props: ViewBodyProps) {
                 })}
               </tbody>
             </table>
-          </div>
+          </PagedView>
         )}
       </ChartCard>
       {streaks.perHabit.length > 0 && (
@@ -1552,7 +1460,7 @@ function ViewBody(props: ViewBodyProps) {
           onTogglePin={() => togglePin('sources.streaks')}
         >
           {() => (
-            <div style={{ width: '100%', overflow: 'auto' }}>
+            <PagedView style={{ width: '100%', height: '100%' }} itemSelector="tbody > tr">
               <table
                 style={{
                   width: '100%',
@@ -1573,7 +1481,7 @@ function ViewBody(props: ViewBodyProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </PagedView>
           )}
         </ChartCard>
       )}

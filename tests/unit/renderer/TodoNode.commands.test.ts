@@ -30,10 +30,13 @@ describe('TodoNode commands (Decision #10)', () => {
       const s = defaultTodoState();
       const next = todoAdd(s, { text: 'buy oat milk' }, env(T0, 'id-1'));
       expect(next.items).toHaveLength(1);
+      // ADR 0016 — untagged adds are auto-classified ("buy … milk" → chores).
       expect(next.items[0]).toEqual({
         id: 'id-1',
         text: 'buy oat milk',
         done: false,
+        tag: 'chores',
+        tagSource: 'auto',
         createdAt: T0,
         completedAt: null,
         taskNodeId: null,
@@ -70,8 +73,8 @@ describe('TodoNode commands (Decision #10)', () => {
       expect(s.items[0]?.tag).toBe('WORK');
     });
 
-    it('omits tag from item when not provided', () => {
-      const s = todoAdd(defaultTodoState(), { text: 'no tag' }, env(T0, 'id-1'));
+    it('omits tag from item when not provided and nothing matches', () => {
+      const s = todoAdd(defaultTodoState(), { text: 'zxqv' }, env(T0, 'id-1'));
       expect(s.items[0]?.tag).toBeUndefined();
     });
   });

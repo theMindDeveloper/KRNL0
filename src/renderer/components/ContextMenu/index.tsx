@@ -5,7 +5,7 @@
  * overflow:hidden ancestor. Dismisses on click-outside (capture phase) or ESC.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface ContextMenuItem {
@@ -13,6 +13,8 @@ export interface ContextMenuItem {
   onSelect: () => void;
   danger?: boolean;
   disabled?: boolean;
+  /** Non-interactive caption row (e.g. "Focus · 09:10–09:35 · 25m"). */
+  header?: boolean;
 }
 
 export interface ContextMenuProps {
@@ -24,6 +26,17 @@ export interface ContextMenuProps {
 
 export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  // Keep the menu fully on screen: flip it left / up when it would overflow.
+  const [pos, setPos] = useState({ left: x, top: y });
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    const w = el?.offsetWidth ?? 0;
+    const h = el?.offsetHeight ?? 0;
+    setPos({
+      left: w && x + w > window.innerWidth - 4 ? Math.max(4, x - w) : x,
+      top: h && y + h > window.innerHeight - 4 ? Math.max(4, window.innerHeight - h - 4) : y,
+    });
+  }, [x, y, items.length]);
 
   useEffect(() => {
     // Capture-phase listeners fire before any target's bubbling handlers.
@@ -50,8 +63,8 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
       ref={menuRef}
       style={{
         position: 'fixed',
-        left: x,
-        top: y,
+        left: pos.left,
+        top: pos.top,
         zIndex: 9999,
         background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
@@ -64,7 +77,26 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
         userSelect: 'none',
       }}
     >
-      {items.map((item, i) => (
+      {items.map((item, i) => item.header ? (
+        <div
+          key={i}
+          role="presentation"
+          style={{
+            padding: '5px 14px 6px',
+            fontSize: 10,
+            color: 'var(--ink-3)',
+            letterSpacing: '0.04em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: 280,
+            borderBottom: '1px solid var(--paper-3)',
+            marginBottom: 3,
+          }}
+        >
+          {item.label}
+        </div>
+      ) : (
         <button
           key={i}
           type="button"

@@ -51,7 +51,7 @@ function applyTheme(theme: Theme): void {
 
 export function TopBar() {
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
-  const [dockStyle] = useDockStyle();
+  const [dockStyle, setDockStyle] = useDockStyle();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const rf = useReactFlow();
 
@@ -72,19 +72,22 @@ export function TopBar() {
     document.documentElement.setAttribute('data-theme', shownTheme);
   }, [shownTheme]);
 
-  const handleThemeToggle = () => {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+  // Light/dark is always available. A dark-only frame style has no light
+  // tokens, so choosing Light also switches to Classic (which has both).
+  const chooseTheme = (next: Theme) => {
     runLookTransition(() => {
+      if (next === 'light' && isDarkOnly(dockStyle)) setDockStyle('classic');
       applyTheme(next);
       flushSync(() => setTheme(next));
     });
   };
+  const handleThemeToggle = () => chooseTheme(shownTheme === 'dark' ? 'light' : 'dark');
 
   const handleFit = () => {
     rf.fitView({ padding: 0.2, duration: 300 });
   };
 
-  const themeLabel = theme === 'dark' ? '☾ DARK' : '☀ LIGHT';
+  const themeLabel = shownTheme === 'dark' ? '☾ DARK' : '☀ LIGHT';
 
   return (
     <div
@@ -170,8 +173,9 @@ export function TopBar() {
         </span>
       </div>
 
-      {/* Centre: Station panel toggles when the frame style slots them here (ADR 0009 F9). */}
-      {isStationLayout && MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
+      {/* Centre: panel toggles (ADR 0009 F9) — in Station AND Canvas mode; a
+          hidden mother disappears and the rest close the gap. */}
+      {MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
         <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <StationToolbar variant="inline" />
         </div>
@@ -181,14 +185,12 @@ export function TopBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <LayoutModeToggle />
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
-        {!darkOnly && (
-          <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
-        )}
+        <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
         <TopBarButton label="⚙" onClick={() => setSettingsOpen(true)} testId="topbar-settings" />
       </div>
 
       {settingsOpen && (
-        <SettingsModal onClose={() => setSettingsOpen(false)} />
+        <SettingsModal theme={shownTheme} onTheme={chooseTheme} onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   );
@@ -196,7 +198,7 @@ export function TopBar() {
 
 // ── Program settings modal (factory reset) ──────────────────────────────────
 
-function SettingsModal({ onClose }: { onClose: () => void }) {
+function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme: Theme; onTheme: (t: Theme) => void }) {
   const factoryReset = useBoardStore((s) => s.factoryReset);
   return createPortal(
     <div
@@ -246,6 +248,34 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
           >
             ×
           </button>
+        </div>
+
+        {/* Appearance — first, so the reset below is never the only thing here. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 9.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
+            Appearance
+          </span>
+          <div role="radiogroup" aria-label="Light or dark" style={{ display: 'flex', gap: 6 }}>
+            {(['light', 'dark'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="radio"
+                aria-checked={theme === t}
+                data-testid={`settings-theme-${t}`}
+                onClick={() => onTheme(t)}
+                style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
+                  border: `1px solid ${theme === t ? 'var(--acid)' : 'var(--paper-3)'}`,
+                  background: theme === t ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
+                  color: 'var(--ink)',
+                }}
+              >
+                {t === 'light' ? '☀ Light' : '☾ Dark'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div

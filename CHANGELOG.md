@@ -5,6 +5,32 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-11-02
+
+### Added
+- **Analytics window** — Analytics is a fixed mother window: its own panel beside the terminal in Station mode, a fixed window in Canvas mode. Eight full-window pages switched by toolbar icons (Summary · Activity · Year · Hours · Plan vs actual · Time by tag · Insights · Habits), a plain-language summary, a full-window settings view, and no scrolling anywhere.
+- **Pen tool** — pen, marker, highlighter, arrow and eraser with colours and sizes (perfect-freehand), a two-ring tool wheel on right-click, a pen-tip cursor, and middle-drag pan.
+- **Canvas wheel** — right-click empty canvas for a radial menu with nested panels: Task · Habit · Note · Sticky · Shapes · Media · Frame · Pen.
+- **Brainstorming** — paper sticky notes (handwritten, ruled lines, red margin) and shapes (rectangle, ellipse, diamond) with a style bar.
+- **Drop or paste anything** — video, audio, PDF, YouTube/Vimeo/SoundCloud links, websites and any other file become cards (react-player, pdf.js); links can switch to plain text. Files import instantly by path and stream with seeking.
+- **Calendar** — year view, readable parallel tasks ("+N" chips), pomo sessions as background highlights, right-click menus shared with the Clock, optional task times (open-ended tasks fade out).
+- **Clock** — Big Clock (dial-only) mode, bigger dial, easy-to-hit task arcs.
+- **Task tags** — every task is auto-tagged (Code, Study, Writing, Reading, Meetings, Admin, Planning, Health, Chores, Social, Creative); click a tag to change it or create your own. Finished tasks move to a Done list, then an Archive by day.
+- **Habits & Routines** — habits double as recurring events: set a repeat (every day, weekdays or picked days, time, length) when adding one or when dropping it on the Calendar.
+- **Drawings are objects** — select, box-select, move and delete strokes like any node; they draw above everything.
+- **Pomo** — icon controls (Stop · Break · Pause/Resume/End break) and a "Count stopped sessions" setting instead of a separate Reset.
+- **Show on calendar** — right-click a scheduled task to jump to it on the Calendar.
+- **Movable dock** — drag it to the top, middle or bottom of the left edge, or bottom centre, with shortcut hints on every button.
+- CLI: `analytics open|close|toggle|summary`, `pomo segments|delete-segment`, `clock dial`, `cal view`, `draw list|delete|clear`, `media add|list`, `text add --sticky|--shape`, `todo tag`, `todo tags list|add|remove`, `todo archive`, `analytics show --view tags`, `pomo config --count-stopped on|off`.
+
+### Fixed
+- Light/dark is always available (and in Settings); the gear no longer looks like the theme button.
+- Mother windows no longer flash a selection ring when clicked; easier node connections (drop anywhere on a node).
+- Media sits behind other nodes and notes sit on top; Month-view cells stay readable.
+- Canvas mode: nodes never hide behind the window row, and switching Station ↔ Canvas keeps the view on the same spot.
+- Drags no longer get stuck over YouTube or website cards; YouTube Mix links play; cards no longer blur on hover.
+- Dropping a task on another calendar task puts them side by side; dropdown lists are readable in dark mode.
+
 ## [Unreleased]
 
 ### Added

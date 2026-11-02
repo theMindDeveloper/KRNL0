@@ -44,6 +44,7 @@ export function textAdd(
   text: string | undefined,
   at: { x: number; y: number } | undefined,
   near?: string,
+  look?: { kind: string; color?: string },
 ): SysResult {
   let position = at ?? { x: 0, y: 0 };
   if (near) {
@@ -58,11 +59,15 @@ export function textAdd(
       kind: 'text',
       position,
       isMother: false,
-      state: { text: text ?? '' },
+      state: {
+        text: text ?? '',
+        ...(look ? { look: { kind: look.kind, ...(look.color ? { color: look.color } : {}) } } : {}),
+        ...(look && look.kind !== 'note' ? { width: 200, height: look.kind === 'sticky' ? 200 : 140 } : {}),
+      },
       config: {},
     });
   });
-  return { ok: true, message: `text node added: ${id}`, data: { id } };
+  return { ok: true, message: `${look && look.kind !== 'note' ? look.kind : 'text'} node added: ${id}`, data: { id } };
 }
 
 export function textSet(

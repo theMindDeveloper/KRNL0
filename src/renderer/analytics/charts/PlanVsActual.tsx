@@ -49,12 +49,14 @@ export function Legend({ items }: { items: Array<{ label: string; color: string;
  * (top) and tracked (below). Tracked longer than planned is an overrun; the
  * value label turns rust.
  */
-export function EstimateBars({ tasks, width, maxRows = 10 }: { tasks: readonly TaskEstimate[]; width: number; maxRows?: number }) {
-  const rows = tasks.slice(0, maxRows);
+export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tasks: readonly TaskEstimate[]; width: number; height?: number; maxRows?: number }) {
+  // Given a box height, rows grow to fill it (and as many rows fit as room allows).
+  const fitRows = boxH ? Math.max(1, Math.floor(boxH / 26)) : maxRows;
+  const rows = tasks.slice(0, Math.min(fitRows, boxH ? 30 : maxRows));
   const labelW = Math.min(150, Math.max(90, width * 0.32));
   const valueW = 92;
-  const rowH = 26;
-  const barH = 8;
+  const rowH = boxH && rows.length > 0 ? Math.max(26, Math.min(64, (boxH - 4) / rows.length)) : 26;
+  const barH = Math.max(8, Math.min(18, Math.round(rowH * 0.3)));
   const plotW = Math.max(40, width - labelW - valueW - 8);
   const max = Math.max(1, ...rows.map((t) => Math.max(t.plannedMin, t.trackedMin)));
   const x = (v: number) => (v / max) * plotW;

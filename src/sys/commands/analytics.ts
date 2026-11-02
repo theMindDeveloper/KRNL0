@@ -1,13 +1,16 @@
 // sys analytics — CLI reads backed by the pure analytics engine (Decision 29 §6).
 // Headless-capable: buildAnalytics operates on board-JSON alone.
 
-import { loadBoardFrom } from '../../main/persistence/board';
+import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import { buildAnalytics } from '../../renderer/analytics/engine';
 import { registerBuiltinSources } from '../../renderer/analytics/sources';
 import { lastNDays, todayLocal } from '../../renderer/analytics/dateRange';
 import type { BoardLike } from '../../renderer/analytics/types';
 import { computeEstimates, describeAccuracy } from '../../renderer/analytics/estimates';
+import { summarizeAnalytics } from '../../renderer/analytics/summary';
+import { addDays } from '../../renderer/analytics/dateRange';
+import { computeTagBreakdown } from '../../renderer/analytics/tags';
 import type { Board } from '../../shared/types';
 
 // Register sources once — idempotent guard inside registerBuiltinSources.
@@ -38,6 +41,7 @@ export async function analyticsShow(
   const today = todayLocal();
   const range = lastNDays(rangeDays, today);
   if (opts.view === 'estimates') return analyticsEstimates(ctx, rangeDays, range, opts.json === true);
+  if (opts.view === 'tags') return analyticsTags(ctx, rangeDays, range, opts.json === true);
 
   const board = loadBoard(ctx);
   const engine = buildAnalytics(board);
@@ -64,6 +68,36 @@ export async function analyticsShow(
 }
 
 /** Plan vs actual — estimate vs tracked per task, planned vs worked per day. */
+// ADR 0016 — where the time went, by tag (same numbers as the AnalyticsNode "Time" view).
+function analyticsTags(
+  ctx: AnalyticsCtx,
+  rangeDays: number,
+  range: { start: string; end: string },
+  json: boolean,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as Record<string, unknown> | null;
+  const board = {
+    nodes: Array.isArray(raw?.['nodes']) ? raw!['nodes'] : [],
+    edges: Array.isArray(raw?.['edges']) ? raw!['edges'] : [],
+    completions: Array.isArray(raw?.['completions']) ? raw!['completions'] : [],
+  } as unknown as Board;
+  const res = computeTagBreakdown(board, range, Date.now());
+  if (json) {
+    const payload = { range: { days: rangeDays, start: range.start, end: range.end }, ...res };
+    return { ok: true, message: JSON.stringify(payload), data: payload };
+  }
+  const lines = [
+    `time by tag — last ${rangeDays} days (${range.start} → ${range.end})`,
+    `  ${res.totalCount} tasks done · ${res.totalMin} min`,
+    '',
+    ...res.tags.map((t) =>
+      `  ${t.label.padEnd(14)} ${String(t.minutes).padStart(5)} min  ${String(Math.round(t.share * 100)).padStart(3)}%  (${t.count} task${t.count === 1 ? '' : 's'})`,
+    ),
+  ];
+  if (res.tags.length === 0) lines.push('  no completed tasks in range');
+  return { ok: true, message: lines.join('\n'), data: res };
+}
+
 function analyticsEstimates(
   ctx: AnalyticsCtx,
   rangeDays: number,
@@ -148,4 +182,50 @@ export async function analyticsStreaks(
     }
   }
   return { ok: true, message: lines.join('\n'), data: streaks };
+}
+
+/**
+ * `analytics summary [--range N] [--json]` — the plain-language summary shown
+ * on top of the Overview tab (analytics/summary.ts).
+ */
+export async function analyticsSummary(ctx: AnalyticsCtx, opts: { range?: number; json?: boolean }): Promise<SysResult> {
+  const rangeDays = (typeof opts.range === 'number' && opts.range > 0) ? opts.range : 30;
+  const range = lastNDays(rangeDays, todayLocal());
+  const prevRange = { start: addDays(range.start, -rangeDays), end: addDays(range.start, -1) };
+  const summary = summarizeAnalytics(buildAnalytics(loadBoard(ctx)), range, prevRange, rangeDays);
+  if (opts.json) return { ok: true, message: JSON.stringify(summary), data: summary };
+  const stats = summary.stats.map((s) => `${s.label}: ${s.value}${s.deltaPct === null ? '' : ` (${s.deltaPct >= 0 ? '+' : ''}${s.deltaPct}%)`}`);
+  return { ok: true, message: [summary.headline, '', ...summary.sentences.map((t) => `  • ${t}`), '', `  ${stats.join(' · ')}`].join('\n'), data: summary };
+}
+
+// ── Decision 32 — analytics window visibility ──────────────────────────────────
+// Analytics is a fixed mother ('mother-analytics'). In Station mode it has its
+// own panel beside the terminal; visibility is config.stationHidden, default
+// shown. Canvas mode always shows it in the mother row.
+
+export interface AnalyticsWindowCtx extends AnalyticsCtx {
+  onBoardChanged?: () => void;
+}
+
+export function analyticsWindow(
+  ctx: AnalyticsWindowCtx,
+  action: 'open' | 'close' | 'toggle',
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath);
+  if (typeof raw !== 'object' || raw === null) return { ok: false, message: 'No board found' };
+  const board = raw as Record<string, unknown> & { nodes?: unknown[] };
+  const nodes = Array.isArray(board.nodes) ? (board.nodes as Array<Record<string, unknown>>) : [];
+  const mother = nodes.find((n) => n['kind'] === 'analytics' && n['isMother'] === true);
+  if (!mother) return { ok: false, message: 'No analytics window on the board' };
+  const cfg = (mother['config'] ?? {}) as Record<string, unknown>;
+  // Same default as the renderer: no flag means shown.
+  const shown = cfg['stationHidden'] !== true;
+  const next = action === 'toggle' ? !shown : action === 'open';
+  mother['config'] = { ...cfg, stationHidden: !next };
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  const where = board['layoutMode'] === 'station'
+    ? (next ? ' (panel shown beside the terminal)' : ' (panel hidden)')
+    : ' (canvas mode always shows it in the mother row; this applies in station mode)';
+  return { ok: true, message: `analytics ${next ? 'opened' : 'closed'}${where}`, data: { shown: next } };
 }

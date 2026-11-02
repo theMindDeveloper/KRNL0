@@ -10,6 +10,7 @@ import type { DockStyle } from './useDockStyle';
 import { DOCK_REGISTRY } from './dockRegistry';
 import { useBoardStore } from '../../store/boardStore';
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
+import { motherRowY } from '../Canvas/motherRow';
 
 type Bounds = { left: number; top: number; width: number; height: number };
 
@@ -30,20 +31,23 @@ export function CanvasChassis({ dockStyle }: { dockStyle: DockStyle }) {
     }
     return Number.isFinite(minX) ? { minX, maxX } : null;
   });
+  // The mother row is lifted above the topmost node in Canvas mode; the
+  // chrome follows it.
+  const rowY = useBoardStore((s) => (s.board ? motherRowY(s.board.nodes) : 0));
 
   const bounds = useMemo<Bounds | null>(() => {
     if (!def.canvasBounds) return null;
     if (def.canvasBounds.kind === 'static') {
-      return { ...def.canvasBounds.rect };
+      return { ...def.canvasBounds.rect, top: def.canvasBounds.rect.top + rowY };
     }
     // fit-mothers
     const { topOffset, height, sidePad, minWidth } = def.canvasBounds;
     if (!motherBounds) {
-      return { left: -minWidth / 2, top: topOffset, width: minWidth, height };
+      return { left: -minWidth / 2, top: topOffset + rowY, width: minWidth, height };
     }
     const width = Math.max(minWidth, (motherBounds.maxX - motherBounds.minX) + sidePad * 2);
-    return { left: motherBounds.minX - sidePad, top: topOffset, width, height };
-  }, [def.canvasBounds, motherBounds]);
+    return { left: motherBounds.minX - sidePad, top: topOffset + rowY, width, height };
+  }, [def.canvasBounds, motherBounds, rowY]);
 
   if (!def.Chrome || !bounds) return null;
   const Chrome = def.Chrome;

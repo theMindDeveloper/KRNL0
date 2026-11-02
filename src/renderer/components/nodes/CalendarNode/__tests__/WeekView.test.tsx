@@ -792,8 +792,9 @@ describe('WeekView — overlap disambiguation (#6/#7)', () => {
     render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
-    // Single hit → opens the reality popup directly (no menu).
+    // Single hit → the segment's right-click menu; "Details…" opens the popup.
     fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+    fireEvent.click(screen.getByRole('button', { name: 'Details…' }));
 
     const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
     expect(popup).toBeTruthy();
@@ -813,8 +814,8 @@ describe('WeekView — delete tracked-reality segment (#12)', () => {
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
     fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
 
-    const del = document.querySelector('[data-testid="calendar-reality-delete"]') as HTMLElement;
-    expect(del).toBeTruthy();
+    // Right-click menu → Delete segment.
+    const del = screen.getByRole('button', { name: 'Delete segment' });
     act(() => { fireEvent.click(del); });
 
     const pomo = useBoardStore.getState().board!.nodes.find((n) => n.kind === 'pomo')!;

@@ -61,6 +61,7 @@ const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = 
   'image':       { width: 240, height: 180 },
   'frame':       { width: 360, height: 240 },
   'analytics':   { width: 540, height: 540 },
+  'media':       { width: 480, height: 300 },
 };
 
 export function toRfNode(
@@ -100,13 +101,26 @@ export function toRfNode(
   // are never visually hidden by the frame body. Negative zIndex on the RF
   // wrapper keeps the frame below all other node wrappers regardless of array
   // order, selection state, or RF's elevateNodesOnSelect behavior.
-  const zIndex = node.kind === 'frame' ? -1 : undefined;
+  // Layers: frames at the very back, images / media behind everything else,
+  // notes (text, stickies, shapes) on top. RF lifts selected nodes by +1000.
+  const zIndex = node.kind === 'frame' ? -2
+    : node.kind === 'image' || node.kind === 'media' ? -1
+    : node.kind === 'text' ? 500
+    : undefined;
   return {
     id: node.id,
     type: node.kind,
     position: node.position,
     draggable: !node.isMother,
-    selectable: true,
+    // Mothers are fixed windows: selecting one only flashed a selection ring
+    // whenever you clicked a control inside it (then the next store sync
+    // cleared it). Children stay selectable.
+    selectable: !node.isMother,
+    // React Flow sets pointer-events:none on a node that is neither selectable
+    // nor draggable, so clicks went straight through a mother to the canvas
+    // behind it (controls dead, the canvas wheel opening on right-click).
+    // Mothers take input themselves.
+    ...(node.isMother ? { style: { pointerEvents: 'all' as const } } : {}),
     className: kindClass,
     ...(zIndex !== undefined ? { zIndex } : {}),
     ...sizeFields,

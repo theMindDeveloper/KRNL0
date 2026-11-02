@@ -25,6 +25,9 @@ export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
 import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { ClockBezel } from './ClockBezel';
+import { PagedView } from '../../ui/PagedView';
+import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
+import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -150,6 +153,8 @@ interface TaskEntry {
   parallelBranchIndex: number | null;
   /** 'task' or 'habit' — for future styling differentiation. */
   source: 'task' | 'habit';
+  /** No duration set — the arc fades out toward its end. */
+  timeOpen?: boolean;
 }
 
 /** Check if a habit schedule fires on a given ISO day-of-week. */
@@ -198,6 +203,7 @@ export function ClockNode({
   // filtering. Defaults to today; the day-selector UI below lets the user
   // page through other days without touching the wall-clock hands.
   const { viewWindow, selectedDate } = node.state;
+  const dialOnly = node.state.dialOnly === true;
   // ADR 0009 F6 — the frame style only restyles the dial; every feature stays.
   const clockSkin = useFrameTheme().manifest.components.clock;
 
@@ -251,6 +257,39 @@ export function ClockNode({
     const b = useBoardStore.getState().board;
     if (b) void saveBoard(b);
   };
+  // Right-click menus — the same builders as the Calendar, so a task or a
+  // pomo segment offers the same actions on both surfaces.
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  const openSegmentMenu = (seg: RealitySegment, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const targets = (useBoardStore.getState().board?.nodes ?? [])
+      .filter((n) => n.kind === 'todo.task' && (n.state as TaskState).parentTaskId === null)
+      .map((n) => ({ id: n.id, text: (n.state as TaskState).text }));
+    const x = e.clientX;
+    const y = e.clientY;
+    setCtxMenu({ x, y, items: segmentMenuItems(seg, { targets, onDetails: () => setRealityPopup({ seg, x, y }) }) });
+  };
+  const openTaskMenu = (taskId: string, startH: number, endH: number, e: React.MouseEvent) => {
+    const node = useBoardStore.getState().board?.nodes.find((n) => n.id === taskId);
+    // Habits ride the dial too but aren't tasks — no task menu for them.
+    if (!node || node.kind !== 'todo.task') return;
+    e.preventDefault();
+    e.stopPropagation();
+    const ts = node.state as TaskState;
+    const dayStart = new Date(selectedDate + 'T00:00:00').getTime();
+    setCtxMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: taskMenuItems({
+        id: taskId,
+        text: ts.text,
+        done: ts.done,
+        startMs: dayStart + startH * 3_600_000,
+        endMs: dayStart + endH * 3_600_000,
+      }),
+    });
+  };
   const fmtClockHM = (ms: number) => {
     const d = new Date(ms);
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -286,7 +325,7 @@ export function ClockNode({
 
   // Task info — includes text now.
   const taskInfo = useMemo(() => {
-    const m = new Map<string, { done: boolean; plannedMin: number; parentTodoId: string; text: string; kind: TaskKind }>();
+    const m = new Map<string, { done: boolean; plannedMin: number; parentTodoId: string; text: string; kind: TaskKind; timeOpen: boolean }>();
     if (!board) return m;
     for (const n of board.nodes) {
       if (n.kind !== 'todo.task') continue;
@@ -297,6 +336,7 @@ export function ClockNode({
         parentTodoId: ts.parentTodoId,
         text: ts.text,
         kind: ts.kind ?? 'focus',
+        timeOpen: ts.timeOpen === true,
       });
     }
     return m;
@@ -380,6 +420,7 @@ export function ClockNode({
         parallelGroupId: p.parallelGroupId,
         parallelBranchIndex: p.parallelBranchIndex,
         source: 'task',
+        timeOpen: info.timeOpen,
       });
     }
 
@@ -493,7 +534,9 @@ export function ClockNode({
           gap: 10,
           height: '100%',
           boxSizing: 'border-box',
-          overflowY: 'auto',
+          // No scrolling: the dial flexes to the free space and the task
+          // list pages (PagedView).
+          overflow: 'hidden',
         }}
       >
         {/* Header */}
@@ -512,7 +555,22 @@ export function ClockNode({
             <span style={{ color: isToday ? 'var(--cyan)' : 'var(--ink-4)', fontSize: 9 }}>◉</span>
             {isToday ? 'Today · Schedule' : 'Day · Schedule'}
           </span>
-          <span style={{ color: 'var(--ink-4)' }}>CLK.12H</span>
+          <button
+            type="button"
+            data-testid="clock-dial-only"
+            aria-pressed={dialOnly}
+            title={dialOnly ? 'Show schedule' : 'Big clock — dial only'}
+            onClick={(e) => { e.stopPropagation(); onCommand('clock.setDialOnly', {}); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: dialOnly ? 'var(--acid)' : 'transparent',
+              color: dialOnly ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
+              border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
+              fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
+            }}
+          >
+            {dialOnly ? '☰ SCHEDULE' : '⤢ BIG CLOCK'}
+          </button>
         </div>
 
         {/* Day selector — ADR 0004 §3.3. Lets the user page through days
@@ -523,7 +581,7 @@ export function ClockNode({
         <div
           data-testid="clock-day-bar"
           style={{
-            display: 'flex',
+            display: dialOnly ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 4,
@@ -600,7 +658,7 @@ export function ClockNode({
         <div
           data-testid="clock-window-bar"
           style={{
-            display: 'flex',
+            display: dialOnly ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 6,
@@ -678,11 +736,19 @@ export function ClockNode({
             Sizes shrunk ~10% from the prior 92%/460/244 so labels above
             and below stay visible on smaller screens. */}
         <div
-          style={
-            inStation
-              ? { position: 'relative', width: '83%', maxWidth: 414, aspectRatio: '1 / 1', margin: '0 auto', overflow: 'visible' }
-              : { position: 'relative', width: 220, height: 220, margin: '0 auto', overflow: 'visible' }
-          }
+          data-testid="clock-dial"
+          style={{
+            position: 'relative',
+            // Flexes with the window so the whole clock always fits: the
+            // dial's height comes from the free space, its width follows.
+            flex: dialOnly ? '1 1 auto' : '3 1 0',
+            minHeight: 140,
+            maxHeight: dialOnly ? '100%' : inStation ? 620 : 300,
+            aspectRatio: '1 / 1',
+            maxWidth: '100%',
+            margin: '0 auto',
+            overflow: 'visible',
+          }}
         >
           <svg
             viewBox={(() => {
@@ -764,21 +830,65 @@ export function ClockNode({
                   cap: 'round' | 'butt',
                 ): React.ReactElement => (
                   <g key={`${key}-base`}>
+                    {/* Wide invisible hit area: the drawn arc is thin, this
+                        makes it easy to hover, click and right-click. */}
+                    <path
+                      data-testid="clock-plan-arc-hit"
+                      d={arcPath(s, e, r)}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth={Math.max(12, sw + 8)}
+                      strokeLinecap={cap}
+                      pointerEvents="stroke"
+                      style={{ cursor: 'context-menu' }}
+                      onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                    >
+                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)} · right-click for actions`}</title>
+                    </path>
                     <path
                       data-testid="clock-plan-arc"
+                      data-task-id={t.id}
+                      onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
                       d={arcPath(s, e, r)}
                       fill="none"
                       stroke={t.colorVar}
                       strokeWidth={sw}
                       strokeLinecap={cap}
                       opacity={opacity * (active ? 0.95 : 0.7)}
-                      style={activeStyle}
+                      style={{ ...activeStyle, cursor: 'context-menu' }}
                     >
                       <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)}`}</title>
                     </path>
                   </g>
                 );
 
+                // No set time: one arc whose colour fades smoothly to nothing
+                // toward its end (a gradient laid along the arc's chord).
+                if (t.timeOpen) {
+                  const p0 = pt(t.start, r);
+                  const p1 = pt(t.end, r);
+                  const gid = `clock-open-${t.id}`;
+                  const hit = baseArc(t.id, t.start, t.end, 'round');
+                  return [
+                    <defs key={`${t.id}-open-defs`}>
+                      <linearGradient id={gid} gradientUnits="userSpaceOnUse" x1={p0.x} y1={p0.y} x2={p1.x} y2={p1.y}>
+                        <stop offset="0%" stopColor={t.colorVar} stopOpacity={opacity * (active ? 0.95 : 0.8)} />
+                        <stop offset="55%" stopColor={t.colorVar} stopOpacity={opacity * 0.35} />
+                        <stop offset="100%" stopColor={t.colorVar} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>,
+                    <g key={`${t.id}-open`} data-time-open="true" opacity={0}>{hit}</g>,
+                    <path
+                      key={`${t.id}-open-arc`}
+                      d={arcPath(t.start, t.end, r)}
+                      fill="none"
+                      stroke={`url(#${gid})`}
+                      strokeWidth={sw}
+                      strokeLinecap="round"
+                      pointerEvents="none"
+                    />,
+                  ];
+                }
                 if (breakdown === null || breakdown.segments.length <= 1) {
                   return [baseArc(t.id, t.start, t.end, 'round')];
                 }
@@ -894,6 +1004,7 @@ export function ClockNode({
                 e.stopPropagation();
                 setRealityPopup({ seg, x: e.clientX, y: e.clientY });
               };
+              const menu = (e: React.MouseEvent) => openSegmentMenu(seg, e);
               return (
                 <path
                   key={`reality-${seg.id}`}
@@ -901,7 +1012,7 @@ export function ClockNode({
                   data-reality-kind={seg.kind}
                   data-reality-live={seg.live ? 'true' : undefined}
                   onClick={open}
-                  onContextMenu={open}
+                  onContextMenu={menu}
                   d={sectorPath(seg.startH, seg.endH, R_FACE - 1)}
                   fill={isWork ? tone : 'url(#clock-break-hatch)'}
                   stroke="none"
@@ -1027,7 +1138,7 @@ export function ClockNode({
         {/* Now-playing strip */}
         <div
           style={{
-            display: 'flex',
+            display: dialOnly ? 'none' : 'flex',
             alignItems: 'center',
             gap: 8,
             width: '100%',
@@ -1127,15 +1238,13 @@ export function ClockNode({
           )}
         </div>
 
-        {/* Task list */}
-        <div
-          style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1,
-            fontFamily: 'var(--font-mono)',
-          }}
+        {/* Task list — pages of whole rows, never a scrollbar. */}
+        <PagedView
+          testId="clock-task-pages"
+          resetKey={selectedDate}
+          style={{ width: '100%', flex: tasks.length > 0 ? '1 1 0' : '0 0 auto', minHeight: tasks.length > 0 ? 64 : 0, display: dialOnly ? 'none' : undefined }}
+          contentStyle={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)' }}
+          revealIndex={activeIdx}
         >
           {tasks.map((t, i) => {
             const ended = isToday && nowFloat >= t.end;
@@ -1146,6 +1255,8 @@ export function ClockNode({
             return (
               <div
                 key={t.id}
+                data-testid="clock-task-row"
+                onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '4px 56px 1fr auto',
@@ -1207,10 +1318,13 @@ export function ClockNode({
               </div>
             );
           })}
-        </div>
+        </PagedView>
       </div>
 
       {/* #6/#12 — tracked-reality info + delete popup (right-click an arc). */}
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onDismiss={() => setCtxMenu(null)} />
+      )}
       {realityPopup && createPortal(
         <>
           <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />

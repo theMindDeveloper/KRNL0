@@ -43,7 +43,11 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'add', usage: 'todo add "<text>" [--tag <label>]', summary: 'Add a TodoItem + linked TaskNode (both created, bidirectional link)' },
       { name: 'check', usage: 'todo check <ref>', summary: 'Toggle a TodoItem done/undone — <ref> accepts id-prefix or text match' },
-      { name: 'list', usage: 'todo list [--json]', summary: 'List all TodoItems (--json prints bare JSON)' },
+      { name: 'list', usage: 'todo list [--done|--archived|--all] [--json]', summary: 'List TodoItems — default: open + done today; --done today only, --archived past days, --all everything. [Tag?] = auto tag' },
+      { name: 'tag', usage: 'todo tag <ref> <tag|auto>', summary: 'Hand-tag a TodoItem (id or label; unknown labels create a custom tag). "auto" hands it back to the classifier' },
+      { name: 'tags', usage: 'todo tags [list|add "<label>" [--keywords a,b] [--color c]|remove <id>] [--json]', summary: 'List, create or remove tags. Built-ins: code, study, writing, reading, meetings, admin, planning, health, chores, social, creative' },
+      { name: 'archive', usage: 'todo archive', summary: 'Move every done item to the archive now (otherwise they move when the day ends)' },
+      { name: 'clear-archive', usage: 'todo clear-archive', summary: 'Delete archived items and their task nodes. Analytics history is kept' },
     ],
   },
   {
@@ -82,15 +86,17 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'discard', usage: 'pomo discard', summary: 'Abandon the in-flight span without recording it' },
       { name: 'tag', usage: 'pomo tag <taskRef|none>', summary: 'Label what the pomo is observing (only tags recorded time, never changes the timer)' },
       { name: 'retag', usage: 'pomo retag <segmentId> <taskRef|none>', summary: 'Change which task a recorded span counts toward' },
+      { name: 'segments', usage: 'pomo segments [--date YYYY-MM-DD] [--json]', summary: 'List tracked focus/break spans for a day (ids for retag / delete-segment)' },
+      { name: 'delete-segment', usage: 'pomo delete-segment <segmentId>', summary: 'Delete a recorded focus/break span (Calendar/Clock right-click → Delete segment)' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
-      { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor]', summary: 'Update board-scoped PomoConfig on the mother PomoNode' },
+      { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor] [--count-stopped on|off]', summary: 'Update board-scoped PomoConfig on the mother PomoNode (count-stopped: does Stop record the session so far)' },
     ],
   },
   {
     group: 'text',
     summary: 'Manage TextNodes on the canvas',
     subcommands: [
-      { name: 'add', usage: 'text add [--text "..."] [--at x,y] [--near <ref>]', summary: 'Add a text node. --near positions at srcX + srcW + 24, srcY' },
+      { name: 'add', usage: 'text add [--text "..."] [--at x,y] [--near <ref>] [--sticky] [--shape rect|ellipse|diamond] [--color <css>]', summary: 'Add a text node, a sticky note (--sticky) or a shape (--shape). --near positions at srcX + srcW + 24, srcY' },
       { name: 'set', usage: 'text set <id> --text "..."', summary: 'Update text node content' },
       { name: 'resize', usage: 'text resize <id> --w N --h N', summary: 'Resize a text node' },
     ],
@@ -122,9 +128,13 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'analytics',
     summary: 'Analytics reads from board state (headless-capable)',
     subcommands: [
-      { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources|estimates] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
+      { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources|estimates|tags] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
       { name: 'totals', usage: 'analytics totals [--range N] [--json]', summary: 'Show task/habit/focus totals over N days (default 30)' },
       { name: 'streaks', usage: 'analytics streaks [--json]', summary: 'Show habit streak data' },
+      { name: 'summary', usage: 'analytics summary [--range N] [--json]', summary: 'Plain-language summary (the text on top of the Overview tab)' },
+      { name: 'open', usage: 'analytics open', summary: 'Show the Analytics window (station mode: its panel beside the terminal)' },
+      { name: 'close', usage: 'analytics close', summary: 'Hide the Analytics window (station mode panel)' },
+      { name: 'toggle', usage: 'analytics toggle', summary: 'Toggle the Analytics window' },
     ],
   },
   {
@@ -169,9 +179,27 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'media',
+    summary: 'Video, audio, PDF, embeds and links on the canvas (drop files/links in the app)',
+    subcommands: [
+      { name: 'add', usage: 'media add <url> [--at x,y]', summary: 'YouTube/Vimeo/SoundCloud/… → embedded player; other URLs → link card' },
+      { name: 'list', usage: 'media list [--json]', summary: 'List media nodes' },
+    ],
+  },
+  {
+    group: 'draw',
+    summary: 'Pen tool drawings on the canvas (dock Pen / P to draw; right-click for the tool wheel)',
+    subcommands: [
+      { name: 'list', usage: 'draw list [--json]', summary: 'List strokes (id, tool, colour, points)' },
+      { name: 'delete', usage: 'draw delete <strokeId>', summary: 'Delete one stroke' },
+      { name: 'clear', usage: 'draw clear', summary: 'Delete every stroke' },
+    ],
+  },
+  {
     group: 'cal',
     summary: 'Calendar view of cascade-scheduled tasks (ADR 0003/0005)',
     subcommands: [
+      { name: 'view', usage: 'cal view <day|week|month|year> [--date YYYY-MM-DD]', summary: 'Switch the Calendar view (year = 12 mini-months with focus heat)' },
       { name: 'show', usage: 'cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]', summary: 'List all scheduled task placements, sorted by time' },
     ],
   },
@@ -180,6 +208,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Clock day-selector and wall-clock task view (ADR 0004)',
     subcommands: [
       { name: 'day', usage: 'clock day <YYYY-MM-DD|today|+1|-1>', summary: 'Set the clock selected date (absolute, today, or ±1 day)' },
+      { name: 'dial', usage: 'clock dial [on|off]', summary: 'Dial-only view: the clock face as big as the window allows (toggles without an argument)' },
       { name: 'show', usage: 'clock show [--json]', summary: 'Show scheduled tasks for the clock\'s selected date and view window' },
     ],
   },

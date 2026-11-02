@@ -1,8 +1,9 @@
 /**
  * StationToolbar — top-of-shell strip with toggle icons for every panel.
  *
- * Replaces the per-cell right-click → Hide UX. One row of 7 buttons:
- * Pomo · Todo · Habit · Calendar · Clock · Terminal · Canvas. Each button
+ * Replaces the per-cell right-click → Hide UX. One row of 8 buttons:
+ * Pomo · Todo · Habit · Calendar · Terminal · Analytics · Clock · Canvas.
+ * Analytics has its own panel beside the terminal (Decision 32). Each button
  * is a toggle:
  *   - Active state = panel visible
  *   - Inactive state = panel hidden (omitted from the layout; neighbours
@@ -30,6 +31,8 @@ const MOTHER_ORDER: MotherEntry[] = [
   { kind: 'habit',    label: 'Habit' },
   { kind: 'calendar', label: 'Cal' },
   { kind: 'term',     label: 'Term' },
+  // Decision 32 — bottom row, beside the terminal.
+  { kind: 'analytics', label: 'Analytics' },
   { kind: 'clock',    label: 'Clock' },
 ];
 
@@ -91,6 +94,13 @@ function Glyph({ kind, active }: { kind: NodeKind | 'canvas'; active: boolean })
         <svg {...common}>
           <rect x="3" y="5" width="18" height="14" rx="1.5" />
           <path d="M6 10l3 2-3 2M11 14h6" />
+        </svg>
+      );
+    case 'analytics':
+      return (
+        <svg {...common}>
+          <path d="M4 4v16h16" />
+          <path d="M7 15l4-4 3 3 5-6" />
         </svg>
       );
     case 'canvas':
@@ -177,6 +187,8 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
     updateNode(m.id, { config: { ...cfg, stationHidden: !currentlyHidden } });
   };
 
+  const canvasShown = !canvasHidden;
+
   const toggleCanvas = () => {
     const next: StationGeometry = {
       rowFraction: stationGeo?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
@@ -234,13 +246,14 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           </ToolbarBtn>
         );
       })}
-      <ToolbarBtn
-        active={!canvasHidden}
+      {/* The canvas only has a panel to hide in Station mode. */}
+      {board.layoutMode === 'station' && <ToolbarBtn
+        active={canvasShown}
         label="Canvas"
         onClick={toggleCanvas}
       >
-        <Glyph kind="canvas" active={!canvasHidden} />
-      </ToolbarBtn>
+        <Glyph kind="canvas" active={canvasShown} />
+      </ToolbarBtn>}
     </div>
   );
 }

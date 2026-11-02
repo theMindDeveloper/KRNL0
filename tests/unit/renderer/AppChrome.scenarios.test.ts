@@ -123,20 +123,21 @@ describe('F2 — Topbar right buttons present', () => {
 // ── F3 — Left dock buttons ────────────────────────────────────────────────────
 
 describe('F3 — Left dock contains 5 icon buttons', () => {
-  it('renders a dock with 5 buttons', () => {
+  it('renders a dock with 7 buttons (select, text, sticky, shape, image, pen, frame)', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     const buttons = screen.getByTestId('dock').querySelectorAll('button');
-    expect(buttons.length).toBe(5);
+    expect(buttons.length).toBe(7);
   });
 
-  it('renders buttons for select, text, image, analytics, frame', () => {
+  it('renders buttons for select, text, image, pen, frame (analytics is a mother now — no dock button)', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
     expect(screen.getByTestId('dock-btn-select')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-text')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-image')).toBeTruthy();
-    expect(screen.getByTestId('dock-btn-analytics')).toBeTruthy();
+    expect(screen.queryByTestId('dock-btn-analytics')).toBeNull();
+    expect(screen.getByTestId('dock-btn-pen')).toBeTruthy();
     expect(screen.getByTestId('dock-btn-frame')).toBeTruthy();
   });
 });
@@ -167,11 +168,12 @@ describe('F4 — Dock button dispatches board.addNode intent', () => {
     expect(onAddNode).not.toHaveBeenCalled();
   });
 
-  it('clicking analytics dock button calls onAddNode with { kind: "analytics" }', () => {
+  it('clicking the pen dock button toggles the pen (no node spawned)', () => {
     const onAddNode = vi.fn();
     renderWithWrapper(React.createElement(Dock, { onAddNode }));
-    fireEvent.click(screen.getByTestId('dock-btn-analytics'));
-    expect(onAddNode).toHaveBeenCalledWith({ kind: 'analytics' });
+    fireEvent.click(screen.getByTestId('dock-btn-pen'));
+    expect(screen.getByTestId('dock-btn-pen').getAttribute('aria-pressed')).toBe('true');
+    expect(onAddNode).not.toHaveBeenCalled();
   });
 
   it('clicking frame dock button calls onAddNode with { kind: "frame" }', () => {

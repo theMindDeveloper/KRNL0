@@ -116,39 +116,9 @@
   display: none !important;
 }
 
-/* ── Unified node hover highlight ───────────────────────────────────────────
-   Approach: ::after pseudo-element inset ring so box-shadow (elevation) is
-   never touched. box-shadow is a single property — compositing !important
-   over an inline value drops the card's own elevation shadow, causing a
-   visible lift/flatten jump on hover. Rendering the ring via ::after leaves
-   the inline shadow untouched on every card (mothers, tasks, lanes, text,
-   image). border-radius:inherit so the ring tracks each card's own corner
-   radius (6px mothers, 10px children). pointer-events:none so clicks still
-   reach the card. Symmetric 120ms fade in both directions via transition. */
-.react-flow__node > div:not(.react-flow__handle)::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-.react-flow__node:hover > div:not(.react-flow__handle)::after {
-  opacity: 1;
-}
-
-/* Frames opt out of the hover ring. Frames are large containers whose child
- * nodes render as DOM siblings (not descendants), so as the cursor crosses
- * onto a child the frame loses its :hover state, then regains it as the
- * cursor exits the child — producing a strobe that "flashes everything in
- * it and itself." A solid resting frame is calmer than a hover ring that
- * can never stay lit while you traverse the area. */
-.react-flow__node.krnl-kind-frame:hover > div:not(.react-flow__handle)::after {
-  opacity: 0;
-}
+/* No hover ring on nodes: its opacity fade promoted each card to its own
+   GPU layer, which the canvas zoom then stretched, so cards blurred under
+   the cursor. */
 
 /* ── Selection ring strategy ────────────────────────────────────────────────
    Every KRNL node renders its visible card as the FIRST child div of the RF
@@ -251,13 +221,18 @@
    green fill on today's cell so it reads at a glance. Acid (#c9f158) is
    theme-invariant; the text colour is hard-coded to #1a1814 (cyber light
    --ink) so it stays readable on acid in both themes. */
+/* Today: a soft acid tint + acid edge, so task chips stay readable; the day
+   number gets the solid acid pill. */
 .krnl-month-cell--today {
-  background: var(--acid) !important;
-  color: #1a1814 !important;
-  font-weight: 600;
+  background: color-mix(in srgb, var(--acid) 14%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 70%, transparent);
 }
 .krnl-month-cell--today .krnl-month-cell__day {
   color: #1a1814 !important;
+  background: var(--acid);
+  border-radius: 3px;
+  padding: 1px 3px;
+  align-self: flex-end;
 }
 
 /* ── Calendar WeekView drop-target highlight ─────────────────────────────── */
@@ -297,3 +272,7 @@
 .calendar-cell--just-dropped {
   animation: krnl-drop-flash 240ms ease-out;
 }
+
+/* See CanvasFlow: embeds ignore the mouse while a button is held, so drags
+   that cross a YouTube / website card still end on mouse-up. */
+.krnl-pointer-held iframe { pointer-events: none !important; }

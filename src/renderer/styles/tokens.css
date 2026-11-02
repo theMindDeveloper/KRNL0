@@ -647,6 +647,9 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   border-color: var(--ink-3);
   outline: 1px solid var(--habit-color, var(--acid));
   outline-offset: 1px;
+  /* Above its neighbours: every cell is position:relative, so the next one
+     painted over the right side of this outline. */
+  z-index: 1;
 }
 /* Today + done: keep the two-color body but add the today outline so the
    "today" cue survives the done fill. */
@@ -759,3 +762,7 @@ input[type="number"]::-webkit-outer-spin-button {
 @media (prefers-reduced-motion: reduce) {
   .krnl-live-badge { animation: none; }
 }
+
+/* Native <select> lists inherit the OS colours (white on white in dark themes). */
+select option { background: var(--paper); color: var(--ink); }
+[data-theme="dark"] select { color-scheme: dark; }

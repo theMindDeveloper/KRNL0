@@ -10,7 +10,12 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
   | { kind: 'pomo'; sub: 'tag'; ref: string | undefined }
   | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined }
-  | { kind: 'todo'; sub: 'list'; json: boolean }
+  | { kind: 'pomo'; sub: 'delete-segment'; segmentId: string | undefined }
+  | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
+  | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
+  | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
+  | { kind: 'todo'; sub: 'tags'; action: string | undefined; label: string | undefined; keywords: string | undefined; color: string | undefined; json: boolean }
+  | { kind: 'todo'; sub: 'archive' | 'clear-archive' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
   | { kind: 'todo'; sub: 'add'; text: string | undefined; tag: string | undefined }
   | { kind: 'task'; sub: 'list'; todoId: string | undefined; json: boolean }
@@ -29,8 +34,15 @@ export type SysCommand =
   | { kind: 'task'; sub: 'unschedule'; id: string | undefined }
   | { kind: 'task'; sub: 'addNext'; sourceRef: string | undefined; text: string | undefined; durationMin: number | undefined }
   | { kind: 'cal'; sub: 'show'; from: string | undefined; to: string | undefined; json: boolean }
+  | { kind: 'cal'; sub: 'view'; view: string | undefined; date: string | undefined }
   | { kind: 'clock'; sub: 'day'; arg: string | undefined }
   | { kind: 'clock'; sub: 'show'; json: boolean }
+  | { kind: 'clock'; sub: 'dial'; arg: string | undefined }
+  | { kind: 'draw'; sub: 'list'; json: boolean }
+  | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
+  | { kind: 'media'; sub: 'list'; json: boolean }
+  | { kind: 'draw'; sub: 'clear' }
+  | { kind: 'draw'; sub: 'delete'; id: string | undefined }
   | { kind: 'habit'; sub: 'add' | 'streak' | 'remove'; name: string | undefined }
   | { kind: 'habit'; sub: 'done' | 'undo'; name: string | undefined; date: string | undefined }
   | { kind: 'habit'; sub: 'color'; name: string | undefined; color: string | undefined }
@@ -42,7 +54,7 @@ export type SysCommand =
   | { kind: 'edge'; sub: 'enable' | 'disable'; id: string | undefined }
   | { kind: 'info'; json: boolean }
   | { kind: 'settings'; sub: 'show'; json: boolean }
-  | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined }
+  | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
   | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
   | { kind: 'image'; sub: 'add'; path: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined }
@@ -91,7 +103,7 @@ export type SysCommand =
   | { kind: 'habit'; sub: 'show'; ref: string | undefined; json: boolean }
   | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
-  | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined }
+  | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined }
   | {
       kind: 'frame';
       sub: 'add';
@@ -111,6 +123,8 @@ export type SysCommand =
   | { kind: 'analytics'; sub: 'show'; view: string | undefined; range: number | undefined; metric: string | undefined; json: boolean }
   | { kind: 'analytics'; sub: 'totals'; range: number | undefined; json: boolean }
   | { kind: 'analytics'; sub: 'streaks'; json: boolean }
+  | { kind: 'analytics'; sub: 'open' | 'close' | 'toggle' }
+  | { kind: 'analytics'; sub: 'summary'; range: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'tail'; limit: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'stats'; json: boolean }
   | { kind: 'theme'; sub: 'show'; json: boolean }
@@ -157,6 +171,7 @@ function positiveNum(raw: string | undefined, what: string): number | undefined 
 /** Flags that never take a value — everything else consumes the next token. */
 const BOOLEAN_FLAGS = new Set([
   'json', 'child', 'clear', 'daily', 'force', 'mother', 'weekdays', 'weekly', 'delete',
+  'all', 'archived', 'done',
 ]);
 
 /**
@@ -264,6 +279,8 @@ export class SysParser {
         return { kind: 'pomo', sub };
       if (sub === 'tag') return { kind: 'pomo', sub: 'tag', ref: rest[0] };
       if (sub === 'retag') return { kind: 'pomo', sub: 'retag', segmentId: rest[0], ref: rest[1] };
+      if (sub === 'delete-segment') return { kind: 'pomo', sub: 'delete-segment', segmentId: rest[0] };
+      if (sub === 'segments') return { kind: 'pomo', sub: 'segments', date: flag(rest, 'date'), json: hasFlag(rest, 'json') };
       if (sub === 'start') {
         const minutesRaw = flag(rest, 'minutes');
         return {
@@ -282,12 +299,34 @@ export class SysParser {
           long: positiveNum(flag(allArgs, 'long'), '--long'),
           every: positiveNum(flag(allArgs, 'every'), '--every'),
           face: flag(allArgs, 'face'),
+          // --count-stopped on|off: does Stop record the session so far?
+          countStopped: ((v) => (v === undefined ? undefined : !/^(off|no|false|0)$/i.test(v)))(flag(allArgs, 'count-stopped')),
         };
       }
     }
 
     if (cmd === 'todo') {
-      if (sub === 'list')  return { kind: 'todo', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'list') {
+        const scope = hasFlag(rest, 'all') ? 'all'
+          : hasFlag(rest, 'archived') ? 'archived'
+            : hasFlag(rest, 'done') ? 'done'
+              : 'today';
+        return { kind: 'todo', sub: 'list', json: hasFlag(rest, 'json'), scope };
+      }
+      // ADR 0016 — tags + archive.
+      if (sub === 'tag') return { kind: 'todo', sub: 'tag', ref: rest[0], tag: rest[1] };
+      if (sub === 'tags') {
+        return {
+          kind: 'todo', sub: 'tags',
+          action: rest[0] !== undefined && !rest[0].startsWith('--') ? rest[0] : undefined,
+          label: rest[1] !== undefined && !rest[1].startsWith('--') ? rest[1] : undefined,
+          keywords: flag(rest, 'keywords'),
+          color: flag(rest, 'color'),
+          json: hasFlag(rest, 'json'),
+        };
+      }
+      if (sub === 'archive') return { kind: 'todo', sub: 'archive' };
+      if (sub === 'clear-archive') return { kind: 'todo', sub: 'clear-archive' };
       if (sub === 'check') return { kind: 'todo', sub: 'check', id: rest[0] };
       if (sub === 'add') {
         return { kind: 'todo', sub: 'add', text: rest[0], tag: flag(rest, 'tag') };
@@ -388,6 +427,7 @@ export class SysParser {
     }
 
     if (cmd === 'cal') {
+      if (sub === 'view') return { kind: 'cal', sub: 'view', view: rest[0], date: flag(rest, 'date') };
       if (sub === 'show' || sub === undefined) {
         return {
           kind: 'cal',
@@ -403,6 +443,7 @@ export class SysParser {
       if (sub === 'day') {
         return { kind: 'clock', sub: 'day', arg: rest[0] };
       }
+      if (sub === 'dial') return { kind: 'clock', sub: 'dial', arg: rest[0] };
       if (sub === 'show' || sub === undefined) {
         return { kind: 'clock', sub: 'show', json: hasFlag(rest, 'json') };
       }
@@ -498,6 +539,22 @@ export class SysParser {
       }
     }
 
+    // Media (drop anything) — links from the CLI
+    if (cmd === 'media') {
+      if (sub === 'add') {
+        const atStr = flag(rest, 'at');
+        return { kind: 'media', sub: 'add', url: rest[0], at: atStr ? parseAt(atStr) : undefined };
+      }
+      if (sub === 'list' || sub === undefined) return { kind: 'media', sub: 'list', json: hasFlag(rest, 'json') };
+    }
+
+    // Pen tool drawings
+    if (cmd === 'draw') {
+      if (sub === 'list' || sub === undefined) return { kind: 'draw', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'clear') return { kind: 'draw', sub: 'clear' };
+      if (sub === 'delete') return { kind: 'draw', sub: 'delete', id: rest[0] };
+    }
+
     if (cmd === 'text') {
       if (sub === 'add') {
         const atStr = flag(rest, 'at');
@@ -506,6 +563,12 @@ export class SysParser {
           text: flag(rest, 'text'),
           at: atStr ? parseAt(atStr) : undefined,
           near: flag(rest, 'near'),
+          // Brainstorming looks: --sticky [color] | --shape rect|ellipse|diamond [--color c]
+          look: hasFlag(rest, 'sticky')
+            ? { kind: 'sticky', ...(flag(rest, 'color') ? { color: flag(rest, 'color')! } : {}) }
+            : flag(rest, 'shape')
+              ? { kind: flag(rest, 'shape')!, ...(flag(rest, 'color') ? { color: flag(rest, 'color')! } : {}) }
+              : undefined,
         };
       }
       if (sub === 'set') {
@@ -660,6 +723,13 @@ export class SysParser {
       }
       if (sub === 'streaks') {
         return { kind: 'analytics', sub: 'streaks', json: hasFlag(rest, 'json') };
+      }
+      // Decision 32 — window visibility (Station mode: its panel beside the terminal).
+      if (sub === 'open' || sub === 'close' || sub === 'toggle') {
+        return { kind: 'analytics', sub };
+      }
+      if (sub === 'summary') {
+        return { kind: 'analytics', sub: 'summary', range: positiveNum(flag(rest, 'range'), '--range'), json: hasFlag(rest, 'json') };
       }
     }
 

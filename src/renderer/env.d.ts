@@ -33,6 +33,8 @@ interface KrnlBridge {
   onPtyExit: (sessionId: string, callback: () => void) => () => void
   // Asset persistence (Decision 21)
   assetWrite: (ext: string, bytes: Uint8Array) => Promise<KrnlAssetWriteResult>
+  assetPathOf?: (file: File) => string | null
+  assetImportPath?: (path: string) => Promise<KrnlAssetWriteResult>
   assetRead: (assetId: string) => Promise<KrnlAssetReadResult | null>
   assetDelete: (assetId: string) => Promise<void>
   onBoardChanged: (callback: () => void) => () => void
@@ -47,3 +49,12 @@ interface KrnlBridge {
 interface Window {
   krnl?: KrnlBridge
 }
+
+// Vite `?url` imports (e.g. the pdf.js worker) resolve to a URL string.
+declare module '*?url' {
+  const src: string;
+  export default src;
+}
+
+/** App version from package.json, injected by electron-vite `define`. */
+declare const __APP_VERSION__: string | undefined;

@@ -11,6 +11,7 @@
  *   calendar → top-right-upper    (top row, col 4 — rightmost)
  *   clock    → top-right-lower    (bottom row, right column beside Canvas)
  *   term     → bottom-strip       (not rendered in station mode)
+ *   analytics→ bottom-right-pre   (Decision 32 — bottom row, beside the terminal)
  *
  * Layout structure (matches user-provided sketch):
  *   ┌─ DOCK TOP ─────────────────────────────────────┐
@@ -54,6 +55,7 @@ export const SLOT_DEFAULTS = {
   bottom: {
     canvas:   60,   // Embedded canvas — widest
     terminal: 15,   // Terminal — hideable via right-click
+    analytics: 25,  // Analytics — beside the terminal (Decision 32)
     clock:    25,   // Clock — mirrors top-row Calendar's column width
   },
   // Minimum sizes (percent)
@@ -70,4 +72,5 @@ export const SLOT_INDEX: Record<StationSlot, number> = {
   'top-right-upper':  4,
   'top-right-lower':  5,
   'bottom-strip':     6,
+  'bottom-right-pre': 7,
 };

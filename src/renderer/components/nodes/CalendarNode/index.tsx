@@ -8,6 +8,7 @@ import type { CalendarConfig, CalendarState } from './types';
 import { defaultCalendarConfig } from './types';
 import { MonthView } from './MonthView';
 import { WeekView } from './WeekView';
+import { YearView } from './YearView';
 
 export function CalendarNode({
   node,
@@ -46,11 +47,7 @@ export function CalendarNode({
           />
         );
       case 'year':
-        return (
-          <div style={placeholderStyle}>
-            <span>Year view (coming in Slice 4)</span>
-          </div>
-        );
+        return <YearView state={node.state as CalendarState} onCommand={onCommand} />;
       default: {
         const _exhaustive: never = config.view;
         void _exhaustive;

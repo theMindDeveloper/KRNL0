@@ -8,7 +8,8 @@ import type { MotherNodeConfig } from '../../../shared/types';
 import type { Node } from '../../../shared/types/node';
 
 // Terminal mother is default-hidden across every dock variant — users opt in
-// via the StationToolbar toggle. Other mothers stay default-visible.
+// via the StationToolbar toggle. Other mothers (Analytics included) stay
+// default-visible.
 export function isStationHidden(node: Node | undefined): boolean {
   if (!node) return true; // missing == hidden
   const cfg = (node.config ?? {}) as MotherNodeConfig;

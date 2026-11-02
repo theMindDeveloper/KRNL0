@@ -5,6 +5,8 @@ export interface ClockState {
    *  YYYY-MM-DD, local. Independent of CalendarState (each viewer owns
    *  its own temporal cursor — §3.1). */
   selectedDate: string;
+  /** Show only the dial, as big as the window allows (hides bars and list). */
+  dialOnly?: boolean;
 }
 
 export type ClockConfig = Record<string, never>;

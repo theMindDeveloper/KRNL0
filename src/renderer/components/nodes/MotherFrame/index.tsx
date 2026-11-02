@@ -14,7 +14,7 @@
 // reads, zero layout flushes. Badge style uses CSS `transform:translate` (not
 // top/left) so the write is also compositor-level.
 
-import { createContext, useCallback, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
 import { saveBoard } from '../../../store/eventLog';
@@ -63,7 +63,7 @@ interface Props {
 // src/main/persistence/board.ts — see ADR 0006.
 export const MOTHER_WIDTH = 540;
 export const MOTHER_HEIGHT = 540;
-export const MOTHER_TOTAL = 6;
+export const MOTHER_TOTAL = 7; // Decision 32 — analytics is the seventh mother
 
 export function MotherFrame({
   nodeId,
@@ -89,6 +89,14 @@ export function MotherFrame({
   const total = String(slotTotal).padStart(2, '0');
 
   const badgeRef = useRef<HTMLDivElement>(null);
+  // Portal the badge into the canvas root (not <body>) so it shares the
+  // canvas stacking context: it still escapes the node's clipping, but the
+  // dock and other canvas panels draw on top of it.
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    setPortalTarget((frameRef.current?.closest('.react-flow') as HTMLElement | null) ?? document.body);
+  }, []);
 
   // Drop target — accepts a mother-drag payload and swaps slots with the
   // dragged source. Both variants opt in: canvas uses it for the new drag
@@ -161,6 +169,7 @@ export function MotherFrame({
   const isStation = variant === 'station';
   return (
     <div
+      ref={frameRef}
       className="mother-frame"
       onMouseEnter={() => setHoveredNodeId(nodeId)}
       onMouseLeave={() => setHoveredNodeId(null)}
@@ -225,7 +234,7 @@ export function MotherFrame({
           by overflow:hidden on the station mother frame ("splice box cut in
           half" bug). Skip it entirely in station variant. */}
       {variant !== 'station' && (
-        typeof document !== 'undefined' && createPortal(
+        typeof document !== 'undefined' && portalTarget && createPortal(
           <div
             ref={badgeRef}
             className="mother-frame__badge"
@@ -247,7 +256,8 @@ export function MotherFrame({
               textTransform: 'uppercase',
               fontWeight: 600,
               border: '1px solid var(--paper-3)',
-              zIndex: 5,
+              // Above the nodes, under canvas panels (the dock).
+              zIndex: 4,
               pointerEvents: 'none',
               whiteSpace: 'nowrap',
             }}
@@ -255,7 +265,7 @@ export function MotherFrame({
             <span style={{ color: 'var(--spine-hot)', marginRight: 1 }}>{idx}</span>
             <span> · spine · {total}</span>
           </div>,
-          document.body,
+          portalTarget,
         )
       )}
     </div>

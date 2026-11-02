@@ -21,6 +21,7 @@
  * shell #090811, per-preset accent colour, JetBrains Mono).
  */
 
+import { PagedView } from '../ui/PagedView';
 import {
   useState,
   useEffect,
@@ -1238,11 +1239,10 @@ export function AmbientRadio() {
               </div>
 
               {favsOpen && (
+                <PagedView style={{ maxHeight: 160 }} itemSelector={"[data-testid='ambient-radio-yt-favs'] > *"}>
                 <div
                   data-testid="ambient-radio-yt-favs"
                   style={{
-                    maxHeight: 160,
-                    overflowY: 'auto',
                     borderBottom: '1px solid rgba(255,255,255,.05)',
                     background: 'rgba(244,63,94,.02)',
                     padding: ytFavs.length === 0 ? '10px' : '4px 6px',
@@ -1308,18 +1308,18 @@ export function AmbientRadio() {
                     );
                   })}
                 </div>
+                </PagedView>
               )}
             </>
           )}
 
           {/* Settings panel — focused layer */}
           {settingsOpen ? (
+            <PagedView style={{ maxHeight: 280 }} itemSelector={"[data-testid='ambient-radio-settings'] > *"}>
             <div data-testid="ambient-radio-settings" style={{
               padding: '8px 10px 10px',
               borderBottom: '1px solid rgba(255,255,255,.05)',
               background: 'rgba(255,255,255,.015)',
-              maxHeight: 280,
-              overflowY: 'auto',
             }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1434,6 +1434,7 @@ export function AmbientRadio() {
                 </div>
               )}
             </div>
+            </PagedView>
           ) : (
             <>
               {/* Preset chips — tap to layer */}
@@ -1484,11 +1485,10 @@ export function AmbientRadio() {
 
               {/* Active-layer mixer rows */}
               {activeLayers.size > 0 && (
+                <PagedView style={{ maxHeight: 150 }} itemSelector={"[data-testid='ambient-radio-mixer'] > *"}>
                 <div data-testid="ambient-radio-mixer" style={{
                   padding: '4px 8px 6px',
                   borderTop: '1px solid rgba(255,255,255,.03)',
-                  maxHeight: 150,
-                  overflowY: 'auto',
                 }}>
                   {activeIdsArr.map((id) => {
                     const p = PRESET_BY_ID[id];
@@ -1545,6 +1545,7 @@ export function AmbientRadio() {
                     );
                   })}
                 </div>
+                </PagedView>
               )}
             </>
           )}

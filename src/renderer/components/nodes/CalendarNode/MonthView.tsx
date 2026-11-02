@@ -4,7 +4,7 @@
 // the minimal task-schedule data is subscribed; unrelated store changes
 // (node positions, pomo state, etc.) do not re-render this component.
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
@@ -53,6 +53,25 @@ const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as cons
 
 // Max task chips shown per cell before "+N more" overflow label.
 const MAX_CHIPS = 3;
+// Readable chip row height (10px text + padding) and the cell chrome above /
+// below the chips (day number, habit dots, padding).
+const CHIP_ROW_PX = 15;
+const CELL_CHROME_PX = 26;
+
+/**
+ * How many chips a cell can show without squashing: whole rows only, and one
+ * row is kept for "+N" when tasks overflow. Exported for tests.
+ */
+export function chipsThatFit(cellHeight: number, taskCount: number): { shown: number; overflow: number } {
+  if (cellHeight <= 0) {
+    const shown = Math.min(MAX_CHIPS, taskCount);
+    return { shown, overflow: taskCount - shown };
+  }
+  const rows = Math.max(0, Math.floor((cellHeight - CELL_CHROME_PX) / CHIP_ROW_PX));
+  if (taskCount <= rows) return { shown: taskCount, overflow: 0 };
+  const shown = Math.max(0, Math.min(MAX_CHIPS, rows - 1));
+  return { shown, overflow: taskCount - shown };
+}
 
 // Truncate task text to ~14 chars + ellipsis.
 function truncateLabel(text: string): string {
@@ -119,6 +138,19 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
   const lastDate = new Date(lastCellYMD + 'T00:00:00');
   lastDate.setDate(lastDate.getDate() + 1);
   const monthRangeToISO = `${toYMD(lastDate)}T00:00`;
+  // One cell's height (6 equal rows) — decides how many chips fit.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [cellH, setCellH] = useState(0);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setCellH(Math.max(0, (el.clientHeight - 6 - 2 * 5) / 6));
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, []);
+
   const scheduledTasks = useBoardStore(
     useShallow((s): ScheduledTask[] => {
       if (!s.board) return [];
@@ -351,6 +383,7 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
 
       {/* Day cell grid — 6 rows × 7 cols = 42 cells */}
       <div
+        ref={gridRef}
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
@@ -371,8 +404,10 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
             })();
           const dayNum = parseInt(ymd.slice(8, 10), 10);
           const tasks = tasksByDay.get(ymd) ?? [];
-          const visible = tasks.slice(0, MAX_CHIPS);
-          const overflow = tasks.length - MAX_CHIPS;
+          // Only whole, readable chips; the rest go into "+N".
+          const fit = chipsThatFit(cellH, tasks.length);
+          const visible = tasks.slice(0, fit.shown);
+          const overflow = fit.overflow;
 
           // Compute habit dots for this cell.
           const cellDate = parseAnchorDate(ymd);
@@ -488,10 +523,9 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
                       style={{
                         fontFamily: 'var(--font-mono)',
                         fontSize: 10,
-                        color: isToday ? '#1a1814' : 'var(--ink-1)',
-                        background: isToday
-                          ? 'rgba(26, 24, 20, 0.12)'
-                          : 'var(--paper-3)',
+                        color: 'var(--ink-1)',
+                        background: 'var(--paper-3)',
+                        flexShrink: 0,
                         borderRadius: 2,
                         padding: '1px 3px',
                         overflow: 'hidden',
@@ -509,11 +543,13 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
                       style={{
                         fontFamily: 'var(--font-mono)',
                         fontSize: 9,
-                        color: isToday ? '#1a1814' : 'var(--ink-3)',
+                        color: 'var(--ink-3)',
                         lineHeight: '1.3',
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap',
                       }}
                     >
-                      +{overflow} more
+                      +{overflow}{fit.shown > 0 ? ' more' : ''}
                     </div>
                   )}
                 </div>

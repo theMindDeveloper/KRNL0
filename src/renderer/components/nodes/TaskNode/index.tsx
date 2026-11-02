@@ -285,15 +285,17 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     setInlineDurationInvalid(false);
   };
 
-  const submitInline = (name: string, durationMin: number) => {
+  const submitInline = (name: string, durationMin: number | null) => {
+    // Time is optional: no duration → an open-ended task.
+    const dur = durationMin === null ? {} : { durationMin };
     if (inlineMode === 'subtask') {
-      onCommand('task.addSubtask', { text: name, durationMin });
+      onCommand('task.addSubtask', { text: name, ...dur });
     } else if (inlineMode === 'sibling') {
       // ADR 0004 §2 — internal mode 'sibling' / UI label "Add parallel task".
-      useBoardStore.getState().insertSiblingTaskAfter(node.id, { text: name, durationMin });
+      useBoardStore.getState().insertSiblingTaskAfter(node.id, { text: name, ...dur });
     } else if (inlineMode === 'next') {
       // ADR 0004 §2 — sequential successor at the same chain level.
-      onCommand('task.addNext', { text: name, durationMin });
+      onCommand('task.addNext', { text: name, ...dur });
     }
     cancelInline();
   };
@@ -316,6 +318,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       // duration phase
       if (e.key === 'Enter') {
         e.stopPropagation();
+        if (inlineDuration.trim() === '') { submitInline(inlineName.trim(), null); return; }
         const parsed = parseInt(inlineDuration, 10);
         if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
           setInlineDurationInvalid(false);
@@ -420,6 +423,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
       onSelect: startNoteEdit,
     },
+    // Only for tasks that are on the calendar.
+    ...(state.scheduledFor
+      ? [{ label: 'Show on calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTaskOnCalendar(taskId)); } }]
+      : []),
     {
       label: 'Delete',
       danger: true,
@@ -775,7 +782,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
                   : inlineMode === 'next'
                     ? 'next task name…'
                     : 'parallel task name…'
-                : 'how long? (min)'
+                : 'how long? (min, optional — Enter to skip)'
             }
             onChange={(e) => {
               if (inlinePhase === 'name') {

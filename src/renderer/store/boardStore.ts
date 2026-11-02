@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { saveBoard } from './eventLog';
 import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig, CompletionRecord } from '../../shared/types';
+import type { DrawStroke } from '../../shared/types/board';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
 import { recordCompletion as recordCompletionLedger, clearCompletion as clearCompletionLedger } from './completionLedger';
@@ -90,6 +91,12 @@ interface BoardStore {
   // reverts both the done-state and the ledger entry together.
   recordCompletion: (entry: CompletionRecord) => void;
   clearCompletion: (taskId: string) => void;
+  // Pen tool strokes — undoable, persisted on board.drawings.
+  addStroke: (stroke: DrawStroke) => void;
+  removeStrokes: (ids: readonly string[]) => void;
+  /** Move strokes by a flow-space offset (one undo step for the whole batch). */
+  moveStrokes: (moves: ReadonlyArray<{ id: string; dx: number; dy: number }>) => void;
+  clearDrawings: () => void;
   // Destructive, non-undoable: wipe the "what I did" record — the completion
   // ledger (#169) and every pomo node's session history — leaving the live
   // board (tasks, habits, layout) untouched. Persists and clears undo/redo so a
@@ -329,6 +336,47 @@ export const useBoardStore = create<BoardStore>((set) => ({
       };
     }),
 
+  addStroke: (stroke) =>
+    set((s) => {
+      if (!s.board) return s;
+      const board = { ...s.board, drawings: [...(s.board.drawings ?? []), stroke] };
+      void saveBoard(board);
+      return { ...pushHistory(s), board };
+    }),
+
+  removeStrokes: (ids) =>
+    set((s) => {
+      if (!s.board || ids.length === 0) return s;
+      const drop = new Set(ids);
+      const board = { ...s.board, drawings: (s.board.drawings ?? []).filter((d) => !drop.has(d.id)) };
+      void saveBoard(board);
+      return { ...pushHistory(s), board };
+    }),
+
+  moveStrokes: (moves) =>
+    set((s) => {
+      if (!s.board || moves.length === 0) return s;
+      const by = new Map(moves.map((m) => [m.id, m]));
+      const board = {
+        ...s.board,
+        drawings: (s.board.drawings ?? []).map((d) => {
+          const m = by.get(d.id);
+          if (!m || (m.dx === 0 && m.dy === 0)) return d;
+          return { ...d, points: d.points.map(([x, y, p]) => [x + m.dx, y + m.dy, p] as [number, number, number]) };
+        }),
+      };
+      void saveBoard(board);
+      return { ...pushHistory(s), board };
+    }),
+
+  clearDrawings: () =>
+    set((s) => {
+      if (!s.board || !(s.board.drawings ?? []).length) return s;
+      const board = { ...s.board, drawings: [] };
+      void saveBoard(board);
+      return { ...pushHistory(s), board };
+    }),
+
   clearCompletion: (taskId) =>
     set((s) => {
       if (!s.board) return s;
@@ -476,6 +524,8 @@ export const useBoardStore = create<BoardStore>((set) => ({
         todoItemId: newItemId,
         pomoSessionsCompleted: 0,
         plannedMin,
+        // Time is optional — none given → open-ended.
+        ...(opts?.durationMin === undefined ? { timeOpen: true } : {}),
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         // #180 — Todo creates events only. A parallel sibling MUST be an event

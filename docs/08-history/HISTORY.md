@@ -746,6 +746,23 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 
 ---
 
+## [2026-11-02] — Analytics window, readable calendar, pomo highlights, no-scroll windows
+
+**Type:** Feature
+**PRs / Commits:** branch `TMD/hopeful-moore-10c910`
+**Files changed:** `src/main/persistence/board.ts`, `src/shared/types/board.ts`, `src/renderer/components/Station/*`, `src/renderer/components/nodes/AnalyticsNode/{AnalyticsMother,SummaryHero,index}.tsx`, `src/renderer/components/nodes/CalendarNode/{WeekView,dayBlockLayout,hourWindow}.ts(x)`, `src/renderer/components/nodes/{ClockNode,TodoNode}/index.tsx`, `src/renderer/components/ContextMenu/{index,scheduleMenus}.ts(x)`, `src/renderer/components/ui/PagedView.tsx`, `src/renderer/store/{analyticsMother,scheduleActions}.ts`, `src/renderer/analytics/summary.ts`, `src/sys/{parser,SysFacade}.ts`, `src/sys/commands/{analytics,pomo}.ts`, `src/shared/cli/commandRegistry.ts`, docs (Decision 32, `analytics-window.md`, `calendar-clock-visuals.md` F15–F19), tests
+**Summary:**
+- **Analytics is the seventh fixed mother** (Decision 32, slot `bottom-right-pre`). Station mode: its own panel in the bottom row beside the terminal (Canvas | Term | Analytics | Clock), shown by default, with its own panel toggle. Canvas mode: a fixed window in the mother row. Migration adopts any free-floating analytics node. CLI: `analytics open | close | toggle`.
+- **Readable parallel tasks:** a day column caps lanes at 64 px; extra tasks collapse into a "+N" chip (a compact corner chip on single-lane week columns). Hidden tasks can be dragged out of the chip's list.
+- **Pomo spans are background highlights** behind tasks (focus = tinted wash, break = hatch), with no pointer events so drops still land.
+- **Right-click menus** shared by Calendar and Clock (task arcs, task rows, pomo wedges): Tag → task, Untag, Details…, Delete segment; Start focus, Mark done, Show on canvas, Unschedule. CLI twins plus new `pomo segments` and `pomo delete-segment`.
+- **Analytics overview:** a plain-language summary on top (headline, four figures with change vs the previous period, focus sparkline, sentences). CLI: `analytics summary`.
+- **No scrolling:** a shared `PagedView` splits content into pages of whole items, flipped with the wheel or ‹ ● ›. Used by Analytics (cards, settings, tables), Todo, the Clock task list, the Calendar agenda and the Ambient Radio lists. The Calendar hour grid shows windows of whole hours (wheel, pager, or drag to an edge), and the Clock dial flexes to the free space.
+
+**Tests:** 0 typecheck errors; 131 files green.
+
+---
+
 ## [2026-11-02] — New "Lit Core" logo and app icons
 
 **Type:** Feature (branding)
@@ -758,3 +775,90 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **GitHub:** README shows the logo; `docs/assets/krnl0-social-preview.png` (1280×640) is ready to upload as the repo's social preview.
 
 **Tests:** 0 typecheck errors; 125 files / 1495 tests green.
+
+---
+
+## [2026-11-02] — Pen tool, year view, big clock, optional task time
+
+**Type:** Feature
+**PRs / Commits:** branch `TMD/hopeful-moore-10c910` (PR #188)
+**Summary:**
+- **Analytics:** one card per page, sized to the whole page (`PagedView fillItems`): a page never shows part of another card.
+- **Clock:** bigger dial, a **Big Clock** dial-only toggle (`clock dial [on|off]`), and wide invisible hit areas so task arcs are easy to right-click.
+- **Pen tool** (dock Pen / `P`): pen, marker, highlighter and stroke eraser, 8 colours and 3 sizes, built on `perfect-freehand`. Right-click opens a radial tool wheel; Esc exits. Strokes live on `board.drawings` (undoable). CLI: `draw list | delete | clear`.
+- **Panel toggles in canvas mode:** a hidden mother disappears and the others slide into its slot. Analytics has no dock button any more (it's a mother).
+- **Optional task time:** Enter skips the duration in the Todo add row. The task is open-ended (`timeOpen`) and fades out on the Calendar and Clock until a time is set.
+- **Calendar year view:** 12 mini-months with focus heat and planned-task dots that always fit; click a day to open it. CLI: `cal view <day|week|month|year>`.
+- **Month view fix:** cells show only whole chips plus "+N"; today is a soft tint with an acid day pill, so text stays readable.
+
+**Tests:** 0 typecheck errors; 132 files green.
+- **Follow-up:** Analytics drops the six tabs for an 8-page guide (Summary, Activity, Year, When you work, Plan vs actual, Per task, Where time went, Habit streaks), with an icon-tile index and the other charts behind "More charts". The year heatmap always shows 365 days and fills its card. Per-task bars grow to fill their card. The Calendar task popup is redesigned (header with colour and span, start/length editor with quick lengths, one action row). Clock open-ended arcs use a smooth gradient fade.
+- **Follow-up 2:** the All-charts popover, icons and extra charts are gone. Analytics shows a plain text page list beside the chart (Summary · Activity · Year · Hours · Estimates · Per task · Time split · Streaks), or a wrapping row on narrow panels, with no dot pager. The Estimates figures are an even 2×2 grid.
+- **Follow-up 3:** no side rail. Pages are switched with a row of SVG icon buttons in the toolbar; the active one is filled, with the page name beside the icons. 7 pages each fill the window with a 6×2 grid of related charts: Summary · Activity · Year · Hours · Plan vs actual · Insights · Habits. This brings back most charts without scrolling. The year heatmap stacks into 1–4 bands to fill tall cards.
+- **Follow-up 4:**
+  - **Analytics:** pages align in canvas mode (pager divides out the canvas zoom). Settings opens as a full-window view with a card per page, a switch per chart and the history wipe in the footer.
+  - **Calendar:** events have no left gutter or left accent strip; they use a soft outline in the task colour.
+  - **Mother badge:** the badge hides while it sits over the dock.
+  - **Pen:** redesigned as an SVG pie menu (tools, sizes, colours, clear; every slice is a big target), with a pen-tip cursor, an arrow tool and middle-drag pan. The dock stays usable while drawing, and Select leaves the pen.
+  - **Dock:** draggable by its grip. It snaps to top, middle or bottom of the left edge, or bottom centre (horizontal), glides into place, and remembers the spot.
+  - **Brainstorming:** sticky notes (S) and shapes (R: rectangle, ellipse, diamond) with a style bar for shape and colour. CLI: `text add --sticky | --shape`.
+  - **Drop anything:** video, audio and PDF files, and YouTube, Vimeo or SoundCloud links, become media nodes (react-player, pdf.js); other links become link cards. The asset store accepts media up to 500 MB. CLI: `media add <url> | list`.
+- **Follow-up 5:**
+  - **Analytics blur:** text stays sharp in the zoomed canvas (pager shifts with margin, not transform).
+  - **Canvas right-click wheel** (shared `ui/PieMenu`, nested panels): Task · Habit · Note · Sticky (colours) · Shapes (rect/ellipse/diamond) · Media (image, any file) · Frame · Pen (tools, colours).
+  - **Dock:** the Shape button opens a shape picker. Faint shortcut letters sit on dock buttons and wheel slices. The dock draws over the SPINE badge (badge portals into the canvas root) instead of hiding it.
+  - **Shapes:** text stays inside the shape's inscribed box, with a stronger fill.
+  - **Ctrl+V:** files become image/media nodes; a link becomes a player or website preview (the "Aa" switch turns it into text); other text becomes a note.
+  - **Any file drops:** .mov and .wav are detected by extension; unknown types become a download card. Media cards are rebuilt: custom audio player, video with a codec fallback, website preview, PDF pages, file card.
+- **Follow-up 6:** the right-click wheel works again. The dock's full-canvas container was an RF `<Panel>`, which forces `pointer-events: all` and swallowed every canvas click; it is now a plain click-through layer. Media cards take their content's shape (video frame size, 16:9 embeds, PDF page) and keep it while resizing.
+- **Follow-up 7:** the right-click wheel opens reliably. With right-drag panning, React Flow only fired `onPaneContextMenu` when the mouse moved 0 px between press and release, so any jitter dropped it. The canvas now handles `contextmenu` itself: up to 6 px of movement still counts as a click, real right-drag pans are ignored, and nodes and edges keep their own menus.
+- **Follow-up 8:** there is now one wheel design. The pen wheel (right-click while drawing) uses the same nested `PieMenu` as the canvas wheel, from one shared list: Pen · Marker · Highlight · Arrow · Eraser · Colour ▸ · Size ▸ · Clear, with Done in the centre. The canvas wheel's Pen panel shows the same items.
+- **Follow-up 9:** time is optional in every task prompt: the canvas right-click Task prompt and the task card's next / parallel / subtask input (Enter skips; the task is open-ended). Mother windows are no longer canvas-selectable, so clicking a control inside one (e.g. Habit's Week/Month/Year) no longer flashes a selection ring.
+- **Follow-up 10:** easier wiring. Handles snap from 48 px away, and dropping a connection anywhere on a node's body connects to that node, keeping the direction of the handle the drag started from.
+- **Follow-up 11:** layer order is frames < images/media < everything else < notes (text, stickies, shapes); selected nodes still lift. Sticky notes look like paper: ruled lines, a red margin, fine grain and a lifted shadow; text sits on the lines.
+- **Follow-up 12:**
+  - **Faster media:** dropped files are imported by path (main copies the file; no bytes over IPC). `krnl-asset://` streams with HTTP Range support, so video and audio start at once and can seek. `.mov` is served as `video/mp4`, so H.264 movs play.
+  - **Sticky notes:** the paper colour could vanish on re-render (shorthand/longhand background mix), leaving lines on black; fixed with a single `background`. Stickies now use handwritten Caveat (Fontsource), softer ruled lines, a red margin and a folded corner.
+- **Follow-up 13:**
+  - **Sticky notes:** the "cursed" (black) note is fixed. The paper-grain SVG's filter reference was double-encoded (`%2523n`), so the SVG painted a solid black square over the note.
+  - **Light / dark:** always available. The top-bar toggle shows for every style (choosing Light on a dark-only style switches to Classic), and Settings has an Appearance section above Factory reset. Before, the dark-only default hid the toggle, so the ⚙ in its place, which opens the reset, looked like the theme button.
+  - **Pen wheel:** the older two-ring design is back as the only pen wheel; the canvas wheel's Pen item opens it.
+- **Follow-up 14:** no more blur. Website and YouTube cards render at their on-screen size and undo the canvas zoom, so they stay sharp at any zoom. The node hover ring is gone: its fade put each card on its own GPU layer, which the zoom then stretched, so to-do cards blurred under the cursor.
+- **Follow-up 15:** nodes keep one position in both modes and never sit behind a mother window. In Canvas mode the mother row lifts itself above the topmost node (render-only, `motherRow.ts`; the canvas chrome follows it). The camera stays centred on the same spot when the canvas area changes size (Station ↔ Canvas, window resize), so a node made in one mode isn't far off in the other. Drawings render above every node, mothers included.
+- **Follow-up 16:** mother windows take clicks again (React Flow turned off mouse input on nodes that are neither selectable nor draggable). Drags end when released over a YouTube / website card. Drawings are canvas nodes: click or box-select, drag, Delete. Redesigned calendar task popup and habit cadence dialog (shared `RepeatEditor`: every day, weekdays or picked days, time, length); the Habit window's add row has an optional Repeat. Task right-click has "Show on calendar" (opens the week, pulses the block; the camera stays put in Station mode). YouTube Mix links (`list=RD…`) play (the playlist part is dropped). The highlighted habit cell's ring is no longer covered by the next cell. The embed counter-scale was reverted (it changed page layout with zoom).
+- **Follow-up 17:** the Habit window is "Habits & Routines": the add row reads "+ add habit or recurring event", and scheduled habits show a ↻ repeat mark on the calendar.
+- **Follow-up 18:** Pomo controls are icons: Stop, Break, and Pause / Resume / End break as the main button (ending a break records it). Reset is gone: Pomo settings has "Count stopped sessions" (on = Stop records the work so far, off = Stop discards), with a CLI twin `pomo config --count-stopped on|off`. Native dropdown lists are readable in dark themes. Dropping a task anywhere on another task's calendar block runs it in parallel (same start).
+## [2026-11-02] — Todo Done/Archive, smart task tags, time by tag (ADR 0016)
+
+**Type:** Feature
+**PRs / Commits:** branch `TMD/task-completion-tagging-c87ea6`
+**Files changed:**
+- **New:** `src/shared/tags/{taxonomy,classify}.ts`, `src/renderer/components/nodes/TodoNode/TagPicker.tsx`, `src/renderer/analytics/{tags.ts,charts/TagCharts.tsx}`
+- **Todo node:** `TodoNode/{types,commands,index}.tsx`
+- **Wiring:** `Canvas/commandDispatch.ts`, `shared/dispatch/task.ts`, `shared/types/board.ts`, `analytics/{types,sources/taskSource}.ts`, `AnalyticsNode/{types,index}.tsx`, `analytics/charts/{common,DonutChart}.ts(x)`
+- **CLI:** `sys/{parser,SysFacade,commands/todo,commands/analytics}.ts`, `shared/cli/commandRegistry.ts`
+- **Docs:** `claude/CLAUDE.md`, ADR 0016, `docs/06-requirements/todo-node.md` (F16–F25), `docs/04-visual-system/design-tokens.md`
+- **Tests:** 6 new files
+
+**Summary:**
+- **Done → Archive:**
+  - A ticked task now leaves the open list and waits in a collapsed **Done (N)** dropdown.
+  - After its completion day it shows under **Archive (N)**, grouped by day. The buckets are derived from the clock, so no midnight job is needed.
+  - "ARCHIVE DONE" replaces "CLEAR DONE" and archives early. Nothing is deleted.
+  - Ticking an archived row restores it. The Archive's CLEAR deletes rows and task nodes but keeps the analytics ledger.
+- **Smart tags:**
+  - An offline, deterministic classifier sorts every task into 11 built-in categories, or leaves it as "Other" rather than guessing.
+  - Click a tag to open a picker with best guesses first; you can create custom tags there.
+  - Hand tags teach the classifier and re-file similar open tasks at once.
+  - Auto tags are dashed and hand tags are solid. Existing items are backfilled on first load.
+- **Time by tag:**
+  - Completions record their tag on the ledger, and re-tagging a done task updates it.
+  - The new Analytics **Time** view shows a donut, a ranked list and daily stacked bars, built on pomo-tracked minutes, else planned minutes.
+- **CLI:** `todo list --done|--archived|--all`, `todo tag`, `todo tags list|add|remove`, `todo archive`, `todo clear-archive`, `analytics show --view tags`.
+- **Text containment rule:**
+  - Donut % labels used to sit on the ring and cross slice edges. Chart labels are now fitted with `fitArcLabel` / `fitCircleLabel`: shrink to 8 px, else hide, always 3 px clear of every edge.
+  - The rule is in the visual-system docs and enforced by a randomized geometry test.
+
+**Tests:** 131 files / 1589 passed, 0 typecheck errors. Exercised in the browser preview (`vite.preview.config.ts`), not yet in the Electron window. One unrelated Station test timed out once under full-suite load and passes on its own.
+
+- **Follow-up 19:** merged `TMD/task-completion-tagging-c87ea6` (ADR 0016: Todo Done/Archive, smart task tags with picker and custom tags, time by tag). Its Analytics **Time** view is a new **Time by tag** page in the paged Analytics (donut, ranked list, daily bars), with a tag icon in the page nav. Conflicts in `sys/parser.ts`, `sys/commands/analytics.ts` and this file were resolved by keeping both sides. Tests: 141 files / 1657 green.

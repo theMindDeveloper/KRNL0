@@ -19,13 +19,15 @@ export type LayoutMode = 'canvas' | 'station';
 //   top-right-upper → Calendar
 //   top-right-lower → Clock
 //   bottom-strip    → Term
+//   bottom-right-pre → Analytics (bottom row, beside the terminal — Decision 32)
 export type StationSlot =
   | 'top-left'
   | 'top-center'
   | 'top-right-pre'
   | 'top-right-upper'
   | 'top-right-lower'
-  | 'bottom-strip';
+  | 'bottom-strip'
+  | 'bottom-right-pre';
 
 // ADR 0008 § 2.4 — station geometry (rowFraction, columnFractions,
 // rightColumnSplit) persisted per-board only when user resizes panels.
@@ -63,6 +65,21 @@ export interface CompletionRecord {
   text: string;         // task text at completion time (node may be gone later)
   plannedMin: number;   // budgeted minutes at completion time
   completedAt: string;  // ISO 8601
+  // ADR 0016 — tag id the task was filed under at completion time (refreshed
+  // if the user re-tags it later). Absent = untagged ("Other").
+  tag?: string;
+}
+
+// Pen tool — one freehand stroke drawn on the canvas, in flow coordinates.
+// Points are [x, y, pressure]; the outline is rebuilt with perfect-freehand.
+export type DrawTool = 'pen' | 'marker' | 'highlighter' | 'arrow';
+export interface DrawStroke {
+  id: string;
+  tool: DrawTool;
+  color: string;   // CSS colour
+  size: number;    // base width in flow px
+  points: Array<[number, number, number]>;
+  createdAt: string;
 }
 
 export interface Board {
@@ -75,6 +92,8 @@ export interface Board {
   // #169 — durable completion ledger (see CompletionRecord). Optional so legacy
   // boards load unchanged; migration backfills from existing done tasks.
   completions?: CompletionRecord[];
+  // Pen tool strokes (canvas annotations). Optional — absent until drawn.
+  drawings?: DrawStroke[];
   // ADR 0008 § 2.1 / § 4.1: layout mode, required (migration sets to 'canvas' for legacy)
   layoutMode: LayoutMode;
   // ADR 0008 § 4.1: station geometry; absent until user resizes panels

@@ -17,6 +17,10 @@ import { useBoardStore } from '../../../src/renderer/store/boardStore';
 import type { Board } from '../../../src/shared/types';
 import type { StationSlot } from '../../../src/shared/types/board';
 
+// The first dynamic import pulls in every node kind via the registry; give it
+// room when the whole suite runs in parallel.
+vi.setConfig({ testTimeout: 30_000 });
+
 // jsdom does not implement ResizeObserver — stub it so TerminalNode/MotdBanner mounts.
 if (typeof global.ResizeObserver === 'undefined') {
   global.ResizeObserver = class ResizeObserver {

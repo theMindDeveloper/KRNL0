@@ -40,15 +40,27 @@ import { NODE_TYPES } from '../nodes/registry';
 import { toRfNode, toRfEdge, type KrnlRFNode, type RFNodeData } from './rfAdapters';
 import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
+import { DrawLayer } from './DrawLayer';
+import { motherRowY } from './motherRow';
+import { DrawStrokeNode, STROKE_NODE_PREFIX, STROKE_Z, strokeBox } from './DrawStrokeNode';
+import type { DrawStroke } from '../../../shared/types/board';
+import { targetNodeIdAt } from './connectTarget';
+import { PieMenu } from '../ui/PieMenu';
+import { canvasWheelItems } from './canvasWheel';
+import { useDrawStore } from '../../store/drawStore';
+import type { TextLook } from '../nodes/TextNode/types';
 import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
 import { ContextMenu } from '../ContextMenu';
 import { ingestImageFile, initialDisplaySize } from './dropImage';
+import { classifyFile, classifyUrl } from './dropMedia';
+import { ingestMediaFile } from './ingestMedia';
+import { MEDIA_SIZE, type MediaState } from '../nodes/MediaNode/types';
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import type { NodeKind } from '../../../shared/types/node';
 import type { Edge as KrnlEdge } from '../../../shared/types/edge';
-import type { Connection } from '@xyflow/react';
+import type { Connection, FinalConnectionState } from '@xyflow/react';
 import type { TaskState } from '../nodes/TaskNode/types';
 import type { HabitLaneState } from '../nodes/HabitLaneNode/types';
 import type { HabitState } from '../nodes/HabitNode/types';
@@ -58,8 +70,15 @@ import { defaultPomoConfig } from '../nodes/PomoNode/types';
 import { todoAdd, todoLinkTask } from '../nodes/TodoNode/commands';
 import type { FrameState } from '../nodes/FrameNode/types';
 import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
-import { defaultAnalyticsState, defaultAnalyticsConfig } from '../nodes/AnalyticsNode/types';
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
+import { isStationHidden } from '../Station/stationVisibility';
+
+// Canvas-mode mother row: first slot x and the step between slots (540 wide +
+// 20 gap) — matches the seeded positions in main/persistence/board.ts.
+const MOTHER_ROW_START_X = -1400;
+const MOTHER_ROW_STEP = 560;
+import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
+import { FOCUS_NODE_EVENT } from '../../store/scheduleActions';
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
 // Hex literals used instead of CSS var() to skip variable resolution per rect.
@@ -323,7 +342,39 @@ const ALL_NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> = {
   ...NODE_TYPES,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   'swap-button': SwapButtonNode as ComponentType<any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  'draw-stroke': DrawStrokeNode as ComponentType<any>,
 };
+
+// Pen strokes as RF nodes (see DrawStrokeNode). Cached per stroke reference.
+// `data.node` is a stand-in so code that reads data.node.kind / isMother
+// keeps working; the real stroke is data.stroke.
+const strokeNodeCache = new WeakMap<DrawStroke, KrnlRFNode>();
+function strokeRfNode(s: DrawStroke): KrnlRFNode {
+  const hit = strokeNodeCache.get(s);
+  if (hit) return hit;
+  const b = strokeBox(s);
+  const id = STROKE_NODE_PREFIX + s.id;
+  const rf = {
+    id,
+    type: 'draw-stroke',
+    position: { x: b.x, y: b.y },
+    width: b.w,
+    height: b.h,
+    measured: { width: b.w, height: b.h },
+    zIndex: STROKE_Z,
+    connectable: false,
+    // Only the ink takes the mouse (see DrawStrokeNode).
+    style: { pointerEvents: 'none' as const },
+    data: {
+      node: { id, kind: 'drawing', isMother: false, position: { x: b.x, y: b.y }, config: {}, state: {} },
+      stroke: s,
+    },
+  } as unknown as KrnlRFNode;
+  strokeNodeCache.set(s, rf);
+  return rf;
+}
+const isStrokeId = (id: string): boolean => id.startsWith(STROKE_NODE_PREFIX);
 
 // Stable empty fallback for the nodes-selector when board is null. Sharing
 // one reference prevents the selector from returning a fresh `[]` per call.
@@ -405,6 +456,11 @@ function getMemoizedRfEdge(
 
 // ── Inner canvas (must be inside ReactFlowProvider) ───────────────────────────
 
+// Size of the canvas area the saved viewport was last framed for (see the
+// ResizeObserver in CanvasFlowInner). Module-level so it survives the
+// remount when switching Station ↔ Canvas.
+let lastCanvasSize: { w: number; h: number } | null = null;
+
 // CanvasFlowInner receives the initial viewport as a prop (already loaded).
 // This ensures defaultViewport captures the persisted value from board.json.
 interface CanvasFlowInnerProps {
@@ -418,7 +474,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
-  const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport } = useReactFlow();
+  const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport, setCenter } = useReactFlow();
 
   // Dock-frame variant (classic | synthesizer | telemetry | phosphor).
   // Hook applies `data-dock` to <html> and persists in localStorage.
@@ -466,12 +522,53 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     return () => window.removeEventListener('krnl:ensure-visible', onEnsureVisible);
   }, [ensureVisible]);
 
+  // While a mouse button is held (dragging nodes, a marquee, panning), embedded
+  // pages (YouTube, websites) must not catch the mouse: an iframe swallows the
+  // mouse-up when the cursor is over it, so the drag never ended. Clicks that
+  // start inside an iframe never reach this document, so using the embed is
+  // unaffected.
+  useEffect(() => {
+    const root = document.documentElement;
+    const hold = () => root.classList.add('krnl-pointer-held');
+    const release = () => root.classList.remove('krnl-pointer-held');
+    window.addEventListener('pointerdown', hold, true);
+    window.addEventListener('pointerup', release, true);
+    window.addEventListener('pointercancel', release, true);
+    window.addEventListener('blur', release);
+    return () => {
+      release();
+      window.removeEventListener('pointerdown', hold, true);
+      window.removeEventListener('pointerup', release, true);
+      window.removeEventListener('pointercancel', release, true);
+      window.removeEventListener('blur', release);
+    };
+  }, []);
+
   useLayoutEffect(() => {
     const el = canvasContainerRef.current;
     if (!el) return;
     const update = () => {
       const r = el.getBoundingClientRect();
       updateCanvasRect(r.left, r.top);
+      // Keep the camera centred on the same spot when the canvas area changes
+      // size: switching Station ↔ Canvas (a new canvas mounts in a different
+      // box) or resizing the window. Without this the view stays pinned to the
+      // top-left corner, so what was in the middle of one mode lands off to
+      // the side in the other.
+      if (r.width < 1 || r.height < 1) return;
+      const prev = lastCanvasSize;
+      lastCanvasSize = { w: r.width, h: r.height };
+      if (!prev || (prev.w === r.width && prev.h === r.height)) return;
+      const dx = (r.width - prev.w) / 2;
+      const dy = (r.height - prev.h) / 2;
+      // Next frame: on mount React Flow applies its starting viewport first.
+      requestAnimationFrame(() => {
+        const v = getViewport();
+        const next = { x: v.x + dx, y: v.y + dy, zoom: v.zoom };
+        void setRfViewport(next);
+        updateViewport(next.x, next.y, next.zoom);
+        setViewport(next);
+      });
     };
     update();
     const observer = new ResizeObserver(update);
@@ -667,7 +764,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const taskIds: string[] = [];
     const otherIds: string[] = [];
     const currentBoard = useBoardStore.getState().board;
+    const strokeIds = ctxMenu.nodeIds.filter(isStrokeId).map((id) => id.slice(STROKE_NODE_PREFIX.length));
+    if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
     for (const id of ctxMenu.nodeIds) {
+      if (isStrokeId(id)) continue;
       const node = currentBoard?.nodes.find((n) => n.id === id);
       if (node?.kind === 'todo.task') taskIds.push(id);
       else otherIds.push(id);
@@ -678,6 +778,22 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (updated) void saveBoard(updated);
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
+
+  // Delete / Backspace removes selected drawings (other nodes delete from
+  // their right-click menu).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.xterm'))) return;
+      const ids = getNodes().filter((n) => n.selected && isStrokeId(n.id)).map((n) => n.id.slice(STROKE_NODE_PREFIX.length));
+      if (!ids.length) return;
+      e.preventDefault();
+      useBoardStore.getState().removeStrokes(ids);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [getNodes]);
 
   // Global undo/redo: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z = redo.
   // Skipped when focus is on an editable surface so it doesn't fight inputs.
@@ -710,6 +826,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // rather than an empty placeholder node.
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingImageDropPos = useRef<{ x: number; y: number } | null>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingMediaPos = useRef<{ x: number; y: number } | null>(null);
 
   const spawnImageNodeFromFile = useCallback(async (
     file: File,
@@ -781,7 +899,23 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   //   right where the user clicked). image opens the OS file picker; the
   //   `at` position is stashed in pendingImageDropPos so the spawn after the
   //   picker resolves at the click point too.
-  const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number } }) => {
+  // "Show on canvas" from the Calendar / Clock right-click menus (any surface,
+  // no ReactFlow context needed there) — centre the node here.
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const id = (e as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
+      const n = id ? useBoardStore.getState().board?.nodes.find((x) => x.id === id) : undefined;
+      if (!n) return;
+      // Use the drawn position: the mother row is placed at render time.
+      const at = getNodes().find((x) => x.id === n.id)?.position ?? n.position;
+      if (n.isMother) setCenter(at.x + MOTHER_WIDTH / 2, at.y + MOTHER_HEIGHT / 2, { duration: 400, zoom: 0.9 });
+      else setCenter(at.x + 110, at.y + 80, { duration: 400, zoom: 0.9 });
+    };
+    window.addEventListener(FOCUS_NODE_EVENT, onFocus);
+    return () => window.removeEventListener(FOCUS_NODE_EVENT, onFocus);
+  }, [setCenter, getNodes]);
+
+  const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number }; look?: TextLook }) => {
     // Auto-enable the layer filter for the spawned kind so the new node is
     // immediately visible. Without this, toggling TEXTS / IMAGES off on the
     // KRNL Dock then clicking "add text" silently spawned a hidden node and
@@ -796,47 +930,44 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       imageFileInputRef.current?.click();
       return;
     }
-    // Analytics is a singleton dashboard — clicking the dock button (or
-    // pressing 'A') toggles: spawn if none exists, otherwise hide every
-    // analytics node currently on the board.
+    // Decision 32 — Analytics is a fixed mother, never spawned. The dock button
+    // (or 'A') toggles its window in Station mode (where it takes the canvas
+    // panel) and brings it into view in Canvas mode (where it sits in the
+    // mother row).
     if (args.kind === 'analytics') {
       const current = useBoardStore.getState().board;
-      const existing = current?.nodes.filter((n) => n.kind === 'analytics') ?? [];
-      if (existing.length > 0) {
-        for (const n of existing) removeNode(n.id);
-        const after = useBoardStore.getState().board;
-        if (after) void saveBoard(after);
+      if (current?.layoutMode === 'station') {
+        toggleAnalyticsShown();
         return;
       }
+      const mother = findAnalyticsMother(current);
+      if (mother) {
+        const y = motherRowY(current?.nodes ?? []);
+        const rf = getNodes().find((n) => n.id === mother.id);
+        setCenter((rf?.position.x ?? mother.position.x) + MOTHER_WIDTH / 2, y + MOTHER_HEIGHT / 2, { zoom: 1, duration: 380 });
+      }
+      return;
     }
-    // Analytics default spawn — centered on the user's current viewport so
-    // the new panel appears wherever they're looking, not parked off in the
-    // dead zone to the right of the dock. The 540×540 box is centered via
-    // a half-size top-left offset. `args.at` (explicit right-click spawn)
-    // still wins.
-    const viewportCenter = screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    });
-    const analyticsDefaultPos = {
-      x: viewportCenter.x - 270,
-      y: viewportCenter.y - 270,
-    };
-    const pos = args.at ?? (args.kind === 'analytics' ? analyticsDefaultPos : defaultDockSpawnPos());
+    const pos = args.at ?? defaultDockSpawnPos();
     const defaultState: Record<NodeKind, Record<string, unknown>> = {
       pomo: {}, todo: {}, habit: {}, term: {}, calendar: {},
       // clock is a permanent mother — never spawnable via handleAddNode.
       // Entry required only for Record<NodeKind, ...> type completeness.
       clock: {},
       'pomo.session': {}, 'todo.task': {}, 'habit.day': {},
-      text: { text: '' },
+      // Sticky notes / shapes are text nodes with a look (Miro-style).
+      text: args.look && args.look.kind !== 'note'
+        ? { text: '', look: args.look, width: 200, height: args.look.kind === 'sticky' ? 200 : 140 }
+        : { text: '' },
       image: {},
       frame: defaultFrameState() as unknown as Record<string, unknown>,
-      analytics: defaultAnalyticsState() as unknown as Record<string, unknown>,
+      // analytics is a permanent mother (Decision 32) — handled above.
+      analytics: {},
+      // media is created by dropping a file or link (dropMedia.ts).
+      media: {},
     };
     const defaultConfigByKind: Partial<Record<NodeKind, Record<string, unknown>>> = {
       frame: defaultFrameConfig() as unknown as Record<string, unknown>,
-      analytics: defaultAnalyticsConfig() as unknown as Record<string, unknown>,
     };
     const newNode: KrnlNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -856,11 +987,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const sizes: Partial<Record<NodeKind, { width: number; height: number }>> = {
       text:  { width: 260, height: 120 },
       frame: { width: 360, height: 240 },
-      analytics: { width: 540, height: 540 },
     };
     const sz = sizes[args.kind];
     if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });
-  }, [addNode, removeNode, defaultDockSpawnPos, ensureVisible]);
+  }, [addNode, defaultDockSpawnPos, ensureVisible, setCenter]);
 
   // ── Pane-ctx "+ Task" / "+ Habit" — submit handlers ─────────────────────
   // Task: spawn at click flow pos, parent to todo mother (parentTodoId is a
@@ -921,6 +1051,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         todoItemId: newItem.id,
         pomoSessionsCompleted: 0,
         plannedMin: effectivePlanned,
+        // No time given → open-ended (fades out on Calendar / Clock).
+        ...(typeof plannedMin === 'number' && Number.isFinite(plannedMin) && plannedMin >= 1 ? {} : { timeOpen: true }),
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         kind: 'event', // #180 — Todo creates events only (calendar renders events)
@@ -996,25 +1128,138 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   );
 
   // ── Drag-drop image files onto the canvas (image-node F1/F2) ──────────────
+  // Drop anything: image / video / audio / PDF files, or a link
+  // (YouTube, Vimeo, … embed; other URLs become a link card).
   const onDragOver = useCallback((e: React.DragEvent) => {
-    if (!Array.from(e.dataTransfer.types).includes('Files')) return;
+    const types = Array.from(e.dataTransfer.types);
+    if (!types.includes('Files') && !types.includes('text/uri-list') && !types.includes('text/plain')) return;
+    if (types.includes('application/krnl-task')) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
+  const spawnMediaNode = useCallback((state: MediaState, pos: { x: number; y: number }) => {
+    const size = MEDIA_SIZE[state.media];
+    const newNode: KrnlNode = {
+      id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: 'media',
+      position: { x: pos.x, y: pos.y },
+      state: { ...state, width: size.width, height: size.height },
+      config: {},
+      isMother: false,
+    };
+    addNode(newNode);
+    const updated = useBoardStore.getState().board;
+    if (updated) void saveBoard(updated);
+    ensureVisible({ x: pos.x, y: pos.y, width: size.width, height: size.height });
+  }, [addNode, ensureVisible]);
+
+  // One path for every dropped / pasted / picked file.
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fileNotice) return;
+    const t = setTimeout(() => setFileNotice(null), 4500);
+    return () => clearTimeout(t);
+  }, [fileNotice]);
+  const spawnFile = useCallback(async (file: File, pos: { x: number; y: number }) => {
+    const kind = classifyFile(file);
+    if (kind === 'image') { await spawnImageNodeFromFile(file, pos); return; }
+    const assetId = await ingestMediaFile(file);
+    if (!assetId) { setFileNotice(`Couldn't add “${file.name}”`); return; }
+    spawnMediaNode({ media: kind, src: assetId, title: file.name, size: file.size }, pos);
+  }, [spawnImageNodeFromFile, spawnMediaNode]);
+
   const onDrop = useCallback(async (e: React.DragEvent) => {
+    if (Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
     const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-    e.preventDefault();
     const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    if (files.length === 0) {
+      const link = classifyUrl(e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain'));
+      if (!link) return;
+      e.preventDefault();
+      spawnMediaNode({ media: link.media, src: link.url, title: new URL(link.url).hostname.replace(/^www\./, '') }, pos);
+      return;
+    }
+    e.preventDefault();
     for (const file of files) {
-      await spawnImageNodeFromFile(file, pos);
+      await spawnFile(file, pos);
       pos.x += 24;
       pos.y += 24;
     }
-  }, [screenToFlowPosition, spawnImageNodeFromFile]);
+  }, [screenToFlowPosition, spawnFile, spawnMediaNode]);
+
+  // ── Paste anything (Ctrl/Cmd+V) ────────────────────────────────────────────
+  // Files → image / media nodes; a link → embedded player or website preview
+  // (switch it to plain text from its header); other text → a text note.
+  // Lands at the last pointer position over the canvas.
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
+  const rightDown = useRef<{ x: number; y: number } | null>(null);
+  const spawnFiles = useCallback(async (files: File[], pos: { x: number; y: number }) => {
+    for (const file of files) {
+      await spawnFile(file, pos);
+      pos = { x: pos.x + 24, y: pos.y + 24 };
+    }
+  }, [spawnFile]);
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.closest('.term-body') || active?.closest('.xterm')) return;
+      const data = e.clipboardData;
+      if (!data) return;
+      const at = lastPointer.current ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      const pos = screenToFlowPosition(at);
+      const files = Array.from(data.files);
+      if (files.length > 0) {
+        e.preventDefault();
+        void spawnFiles(files, pos);
+        return;
+      }
+      const text = data.getData('text/plain').trim();
+      if (!text) return;
+      e.preventDefault();
+      const link = !/\s/.test(text) ? classifyUrl(text) : null;
+      if (link) {
+        spawnMediaNode({ media: link.media, src: link.url, title: new URL(link.url).hostname.replace(/^www\./, '') }, pos);
+        return;
+      }
+      const lines = text.split('\n').length;
+      addNode({
+        id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: 'text',
+        position: pos,
+        state: { text, width: 280, height: Math.min(600, 60 + lines * 24) },
+        config: {},
+        isMother: false,
+      });
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [screenToFlowPosition, spawnFiles, spawnMediaNode, addNode]);
+
+  // Dropped a connection on a node's body instead of its dot → connect anyway,
+  // keeping the direction of the handle the drag started from.
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+    if (state.isValid || !state.fromNode) return;
+    const pt = 'changedTouches' in event ? event.changedTouches[0] : event;
+    if (!pt) return;
+    const id = targetNodeIdAt(pt.clientX, pt.clientY);
+    if (!id || id === state.fromNode.id) return;
+    const fromSource = state.fromHandle?.type !== 'target';
+    onConnectRef.current({
+      source: fromSource ? state.fromNode.id : id,
+      target: fromSource ? id : state.fromNode.id,
+      sourceHandle: null,
+      targetHandle: null,
+    });
+  }, []);
 
   // ── onConnect — wire a visual link edge between two non-mother nodes ──────
+  const onConnectRef = useRef<(c: Connection) => void>(() => {});
   const onConnect = useCallback((conn: Connection) => {
     if (!conn.source || !conn.target) return;
     if (conn.source === conn.target) return;
@@ -1069,6 +1314,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
   }, [addEdge]);
+  useEffect(() => { onConnectRef.current = onConnect; }, [onConnect]);
 
   // In station mode the mothers are rendered as station cells in
   // StationLayout — the embedded canvas must hide them (and their edges) so
@@ -1082,11 +1328,19 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const derivedNodes = useMemo((): KrnlRFNode[] => {
     if (!board) return [];
 
-    // Compute slot ordering for mother nodes (sorted by position.x)
+    // Compute slot ordering for mother nodes (sorted by position.x). Mothers
+    // hidden from the top-bar panel toggles disappear in canvas mode too, and
+    // the visible ones close the gap: each is drawn at the next slot of the
+    // mother row (render-only — persisted positions keep the order).
     const motherNodes = board.nodes
-      .filter((n: KrnlNode) => n.isMother)
+      .filter((n: KrnlNode) => n.isMother && !isStationHidden(n))
       .slice()
       .sort((a: KrnlNode, b: KrnlNode) => a.position.x - b.position.x);
+    const rowStartX = Math.min(...motherNodes.map((n) => n.position.x), MOTHER_ROW_START_X);
+    const displayX = new Map<string, number>(
+      motherNodes.map((n, i) => [n.id, rowStartX + i * MOTHER_ROW_STEP]),
+    );
+    const rowY = motherRowY(board.nodes);
     const slotTotal = motherNodes.length;
     const slotIndexMap = new Map<string, number>(
       motherNodes.map((n: KrnlNode, i: number) => [n.id, i + 1])
@@ -1095,7 +1349,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // Source nodes for RF derivation — drop mothers entirely in station mode.
     const sourceNodes = isStation
       ? board.nodes.filter((n) => !n.isMother)
-      : board.nodes;
+      : board.nodes.filter((n) => !n.isMother || displayX.has(n.id));
 
     const baseNodes: KrnlRFNode[] = sourceNodes.map((node: KrnlNode) => {
       const onCommand = getCommandHandler(node.id);
@@ -1107,17 +1361,21 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
       // Mother node: cache by (node ref, slotIndex, slotTotal).
       const slotIndex = slotIndexMap.get(node.id) ?? 1;
+      const x = displayX.get(node.id) ?? node.position.x;
       const cached = rfMotherCache.get(node.id);
       if (
         cached &&
         cached.src === node &&
         cached.slotIndex === slotIndex &&
-        cached.slotTotal === slotTotal
+        cached.slotTotal === slotTotal &&
+        cached.rf.position.x === x &&
+        cached.rf.position.y === rowY
       ) {
         return cached.rf;
       }
 
-      const rf = toRfNode(node, {
+      const shown = x === node.position.x && rowY === node.position.y ? node : { ...node, position: { x, y: rowY } };
+      const rf = toRfNode(shown, {
         onCommand,
         onSelect,
         slotIndex,
@@ -1150,7 +1408,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       return { ...rf, hidden: true };
     });
 
-    return [...filteredBase, ...swapNodes];
+    const strokeNodes = (board.drawings ?? []).map(strokeRfNode);
+    return [...filteredBase, ...swapNodes, ...strokeNodes];
   }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
@@ -1364,18 +1623,29 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       // collision.
       for (const id of collidedIds) triggerBump(id);
 
+      const strokeMoves: Array<{ id: string; dx: number; dy: number }> = [];
       for (const change of changes) {
         if (change.type === 'position') {
           if (change.dragging === true) {
             isDraggingRef.current = true;
           } else if (change.dragging === false) {
             isDraggingRef.current = false;
-            if (change.position) {
+            if (change.position && isStrokeId(change.id)) {
+              // Strokes live on board.drawings: move their points by how far
+              // the box moved. All strokes of one drag are one undo step.
+              const sid = change.id.slice(STROKE_NODE_PREFIX.length);
+              const s = useBoardStore.getState().board?.drawings?.find((d) => d.id === sid);
+              if (s) {
+                const b = strokeBox(s);
+                strokeMoves.push({ id: sid, dx: change.position.x - b.x, dy: change.position.y - b.y });
+              }
+            } else if (change.position) {
               commitDragEnd(change.id);
             }
           }
         }
       }
+      if (strokeMoves.length) useBoardStore.getState().moveStrokes(strokeMoves);
     },
     // commitDragEnd is stable (declared just below via useCallback)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1471,7 +1741,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // "active" id while RF is showing many nodes selected.
   const onSelectionChange = useCallback(
     ({ nodes }: OnSelectionChangeParams) => {
-      selectNode(nodes.length === 1 ? nodes[0]!.id : null);
+      selectNode(nodes.length === 1 && !isStrokeId(nodes[0]!.id) ? nodes[0]!.id : null);
     },
     [selectNode]
   );
@@ -1488,10 +1758,27 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      // Easier wiring: snap to a handle from further away, and dropping
+      // anywhere on a node (not just on its dot) still connects.
+      connectionRadius={48}
+      onConnectEnd={onConnectEnd}
       onNodeContextMenu={onNodeContextMenu}
       onEdgeContextMenu={handleEdgeContextMenu}
       onPaneClick={() => { closeCtxMenu(); closePaneCtxMenu(); setEdgeCtxMenu(null); }}
-      onPaneContextMenu={handlePaneContextMenu}
+      onPaneMouseMove={(e) => { lastPointer.current = { x: e.clientX, y: e.clientY }; }}
+      // Right-click on empty canvas → wheel. Handled here, not via
+      // onPaneContextMenu: with right-drag panning RF only fires that when the
+      // mouse moved 0px, so any jitter swallowed the menu.
+      onPointerDownCapture={(e: React.PointerEvent) => { if (e.button === 2) rightDown.current = { x: e.clientX, y: e.clientY }; }}
+      onContextMenu={(e: React.MouseEvent) => {
+        const t = e.target as HTMLElement;
+        if (!t.closest('.react-flow__pane') || t.closest('.react-flow__node, .react-flow__edge')) return;
+        e.preventDefault();
+        const d = rightDown.current;
+        rightDown.current = null;
+        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) return; // that was a right-drag pan
+        handlePaneContextMenu(e);
+      }}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onMove={onMove}
@@ -1584,14 +1871,45 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
           ViewportPortal so it pans/zooms with the canvas. */}
       <ChassisLayer dockStyle={dockStyle} />
 
+      {/* Pen tool — strokes + capture layer while drawing */}
+      <DrawLayer />
+
       {/* Left dock */}
-      <Panel position="top-left" style={{ margin: 0, padding: 0 }}>
+      {/* Full-canvas, click-through box so the dock can snap to the top,
+          middle or bottom of the left edge, or the bottom centre. */}
+      {/* Not an RF <Panel>: Panel forces pointer-events:all, which made this
+          full-canvas box swallow every click (incl. right-click). */}
+      <div data-testid="dock-layer" style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none' }}>
         <Dock onAddNode={handleAddNode} dockStyle={dockStyle} onDockStyleChange={setDockStyle} />
-      </Panel>
+      </div>
 
       {/* Hidden file picker for the dock's "image" button (no placeholder
           node is ever created — the picker spawns a real ImageNode with an
           assetId in one step). */}
+      {fileNotice && (
+        <div role="status" data-testid="canvas-file-notice" style={{
+          position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 50,
+          padding: '8px 14px', borderRadius: 999, background: 'var(--paper-2)', border: '1px solid var(--rust)',
+          color: 'var(--ink)', fontFamily: 'var(--font-sans)', fontSize: 12.5, boxShadow: 'var(--shadow-1)',
+        }}>{fileNotice}</div>
+      )}
+
+      {/* File picker for the wheel's Media → Video/PDF (any file works). */}
+      <input
+        ref={mediaFileInputRef}
+        type="file"
+        accept="*/*"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          const pos = pendingMediaPos.current ?? defaultDockSpawnPos();
+          pendingMediaPos.current = null;
+          await spawnFile(file, pos);
+        }}
+        style={{ display: 'none' }}
+        data-testid="canvas-media-file-input"
+      />
       <input
         ref={imageFileInputRef}
         type="file"
@@ -1622,57 +1940,24 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
           the dock's create buttons but anchors the new node to where the
           user actually right-clicked instead of the dock-spawn lane. */}
       {paneCtxMenu !== null && (
-        <ContextMenu
+        <PieMenu
+          testId="canvas-wheel"
           x={paneCtxMenu.x}
           y={paneCtxMenu.y}
-          items={[
-            {
-              label: '+ Task',
-              onSelect: () => {
-                setPaneNamePrompt({
-                  kind: 'task',
-                  x: paneCtxMenu.x,
-                  y: paneCtxMenu.y,
-                  flowX: paneCtxMenu.flowX,
-                  flowY: paneCtxMenu.flowY,
-                });
-              },
+          onClose={closePaneCtxMenu}
+          items={canvasWheelItems({
+            task: () => setPaneNamePrompt({ kind: 'task', x: paneCtxMenu.x, y: paneCtxMenu.y, flowX: paneCtxMenu.flowX, flowY: paneCtxMenu.flowY }),
+            habit: () => setPaneNamePrompt({ kind: 'habit', x: paneCtxMenu.x, y: paneCtxMenu.y, flowX: paneCtxMenu.flowX, flowY: paneCtxMenu.flowY }),
+            note: () => handleAddNode({ kind: 'text', at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+            look: (look) => handleAddNode({ kind: 'text', look, at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+            image: () => handleAddNode({ kind: 'image', at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+            mediaFile: () => {
+              pendingMediaPos.current = { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY };
+              mediaFileInputRef.current?.click();
             },
-            {
-              label: '+ Habit (pinned lane)',
-              onSelect: () => {
-                setPaneNamePrompt({
-                  kind: 'habit',
-                  x: paneCtxMenu.x,
-                  y: paneCtxMenu.y,
-                  flowX: paneCtxMenu.flowX,
-                  flowY: paneCtxMenu.flowY,
-                });
-              },
-            },
-            {
-              label: '+ Text note',
-              onSelect: () => handleAddNode({
-                kind: 'text',
-                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
-              }),
-            },
-            {
-              label: '+ Image…',
-              onSelect: () => handleAddNode({
-                kind: 'image',
-                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
-              }),
-            },
-            {
-              label: '+ Frame',
-              onSelect: () => handleAddNode({
-                kind: 'frame',
-                at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY },
-              }),
-            },
-          ]}
-          onDismiss={closePaneCtxMenu}
+            frame: () => handleAddNode({ kind: 'frame', at: { x: paneCtxMenu.flowX, y: paneCtxMenu.flowY } }),
+            pen: () => useDrawStore.getState().openWheel(paneCtxMenu.x, paneCtxMenu.y),
+          })}
         />
       )}
 
@@ -1850,6 +2135,8 @@ function PaneNamePrompt({
       // duration phase (task only)
       if (e.key === 'Enter') {
         e.stopPropagation();
+        // Time is optional (same as the Todo add row): empty → open-ended task.
+        if (duration.trim() === '') { onCommit(name.trim()); return; }
         const parsed = parseInt(duration, 10);
         if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 480) {
           setDurationInvalid(false);
@@ -1876,7 +2163,7 @@ function PaneNamePrompt({
 
   const placeholder =
     phase === 'duration'
-      ? 'how long? (min)'
+      ? 'how long? (min, optional — Enter to skip)'
       : kind === 'task'
         ? 'task name…'
         : 'habit name…';

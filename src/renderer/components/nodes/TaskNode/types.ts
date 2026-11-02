@@ -16,6 +16,10 @@ export interface TaskState {
   pomoSessionsCompleted: number; // number of completed pomo sessions for this task
   // Decision 22 — per-task pomodoro accounting:
   plannedMin: number;            // total minutes budgeted for this task (default = pomo.sessionMin)
+  /** No duration was given: plannedMin is only a placeholder for layout, and
+   *  Calendar / Clock draw the block open-ended (fading out at the end).
+   *  Cleared as soon as a duration is set. */
+  timeOpen?: boolean;
   secondsAccumulated: number;    // total seconds spent across all pomo sessions for this task
   currentSessionElapsedSec: number; // in-flight session checkpoint (cleared on session end)
   // ADR 0001 — Calendar integration (Slice 1). Both fields are optional so

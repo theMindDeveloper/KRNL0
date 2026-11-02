@@ -12,6 +12,9 @@
  *   │      Embedded Canvas                │ Term   │ Clock  │
  *   └─ DOCK BOTTOM ──────────────────────────────────────────┘
  *
+ * Decision 32 — the Analytics mother has its own bottom-row panel beside the
+ * terminal: Canvas | Term | Analytics | Clock.
+ *
  * - Top row: 4 equal-width mother cells
  * - Bottom row: Canvas (60%) + Terminal (15%) + Clock (25%)
  * - StationToolbar (top strip) toggles each panel's visibility; hidden
@@ -54,6 +57,7 @@ const PANEL_IDS = {
   colCal:    'station-col-cal',
   bottomCanvas:   'station-bottom-canvas',
   bottomTerminal: 'station-bottom-terminal',
+  bottomAnalytics: 'station-bottom-analytics',
   bottomClock:    'station-bottom-clock',
 } as const;
 
@@ -117,13 +121,17 @@ export function StationLayout() {
   const visibleTopDefs = TOP_ROW_DEFS.filter((d) => !isStationHidden(motherBySlot.get(d.slot)));
   const termHidden  = isStationHidden(motherBySlot.get('bottom-strip'));
   const clockHidden = isStationHidden(motherBySlot.get('top-right-lower'));
+  // Decision 32 — Analytics is a mother panel in the bottom row, beside the terminal.
+  const analyticsHidden = isStationHidden(motherBySlot.get('bottom-right-pre'));
   const bottomVisible = {
-    canvas:   !canvasHidden,
-    terminal: !termHidden,
-    clock:    !clockHidden,
+    canvas:    !canvasHidden,
+    terminal:  !termHidden,
+    analytics: !analyticsHidden,
+    clock:     !clockHidden,
   };
+
   const topRowVisible    = visibleTopDefs.length > 0;
-  const bottomRowVisible = bottomVisible.canvas || bottomVisible.terminal || bottomVisible.clock;
+  const bottomRowVisible = bottomVisible.canvas || bottomVisible.terminal || bottomVisible.analytics || bottomVisible.clock;
 
   const outerGroupRef = useRef<GroupImperativeHandle | null>(null);
   const topGroupRef = useRef<GroupImperativeHandle | null>(null);
@@ -196,14 +204,16 @@ export function StationLayout() {
   // and the clock column slides out of alignment with the calendar above.
   const clockSize = SLOT_DEFAULTS.columns['top-right-upper'];
   const terminalSize = bottomVisible.terminal ? SLOT_DEFAULTS.bottom.terminal : 0;
+  const analyticsSize = bottomVisible.analytics ? SLOT_DEFAULTS.bottom.analytics : 0;
   const canvasSize = bottomVisible.canvas
-    ? Math.max(SLOT_DEFAULTS.minCanvas, 100 - clockSize - terminalSize)
+    ? Math.max(SLOT_DEFAULTS.minCanvas, 100 - clockSize - terminalSize - analyticsSize)
     : 0;
 
   const bottomRowChildren: React.ReactNode[] = [];
   const bottomItems = [
     bottomVisible.canvas   && { id: PANEL_IDS.bottomCanvas,   size: canvasSize,   min: SLOT_DEFAULTS.minCanvas,  node: <EmbeddedCanvasCell /> },
     bottomVisible.terminal && { id: PANEL_IDS.bottomTerminal, size: terminalSize, min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="bottom-strip" /></CellWrapper> },
+    bottomVisible.analytics && { id: PANEL_IDS.bottomAnalytics, size: analyticsSize, min: SLOT_DEFAULTS.minColumn, node: <CellWrapper><StationCell slot="bottom-right-pre" /></CellWrapper> },
     bottomVisible.clock    && { id: PANEL_IDS.bottomClock,    size: clockSize,    min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="top-right-lower" /></CellWrapper> },
   ].filter(Boolean) as Array<{ id: string; size: number; min: number; node: React.ReactNode }>;
   bottomItems.forEach((it, i) => {

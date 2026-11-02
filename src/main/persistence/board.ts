@@ -119,6 +119,10 @@ export function seedBoard(): PartialBoard {
         // ADR 0008 § 4.2
         config: { shell: 'default', fontSize: 13, stationSlot: 'bottom-strip' },
       },
+      // Decision 32 — seventh mother: Analytics. Fixed window right of the
+      // terminal in canvas mode; its own panel beside the terminal in station
+      // mode.
+      analyticsMotherSeed(),
     ],
     edges: [],
   };
@@ -136,7 +140,32 @@ const NEW_MOTHER_POSITIONS: Record<string, { x: number; y: number }> = {
   'mother-calendar': { x:   280, y: 0 }, // Wave-D — moved up to slot 4
   'mother-clock':    { x:   840, y: 0 }, // Wave-D — moved up to slot 5
   'mother-term':     { x:  1400, y: 0 }, // Wave-D — terminal pinned rightmost
+  'mother-analytics': { x: 1960, y: 0 }, // Decision 32 — right of the terminal
 };
+
+// Decision 32 — the analytics mother as seeded / injected by migration. State
+// mirrors defaultAnalyticsState() (AnalyticsNode/types.ts); kept inline so
+// main-process code doesn't import renderer modules.
+function analyticsMotherSeed(state?: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: 'mother-analytics',
+    kind: 'analytics',
+    position: { x: 1960, y: 0 },
+    isMother: true,
+    state: {
+      view: 'overview',
+      rangeDays: 30,
+      metric: 'taskCount',
+      width: 540,
+      height: 540,
+      hiddenCards: [],
+      pinnedCards: [],
+      settingsOpen: false,
+      ...(state ?? {}),
+    },
+    config: { stationSlot: 'bottom-right-pre' },
+  };
+}
 
 function migrateMotherPositions(board: unknown): Record<string, unknown> {
   if (
@@ -350,6 +379,34 @@ function migrateAddClockMother(board: Record<string, unknown>): Record<string, u
   return board;
 }
 
+// Decision 32 — Analytics became a fixed mother. Inject 'mother-analytics' into
+// older boards and adopt any free-floating analytics child: the first one's
+// view state (tab, range, hidden / pinned cards) carries over, then every
+// child analytics node and its edges are dropped. Idempotent.
+function migrateAddAnalyticsMother(board: Record<string, unknown>): Record<string, unknown> {
+  const nodes = board['nodes'];
+  if (!Array.isArray(nodes)) return board;
+  const isObj = (n: unknown): n is Record<string, unknown> => typeof n === 'object' && n !== null;
+  const children = nodes.filter((n) => isObj(n) && n['kind'] === 'analytics' && n['id'] !== 'mother-analytics');
+  const hasMother = nodes.some((n) => isObj(n) && n['id'] === 'mother-analytics');
+  if (hasMother && children.length === 0) return board;
+  const childIds = new Set(children.map((n) => (n as Record<string, unknown>)['id']));
+  const kept = nodes.filter((n) => !(isObj(n) && childIds.has(n['id'])));
+  if (!hasMother) {
+    const first = children[0] as Record<string, unknown> | undefined;
+    const adopted = first && isObj(first['state']) ? { ...(first['state'] as Record<string, unknown>) } : undefined;
+    // Size is fixed by the mother frame — don't carry a stale persisted size.
+    if (adopted) { delete adopted['width']; delete adopted['height']; }
+    kept.push(analyticsMotherSeed(adopted));
+  }
+  board['nodes'] = kept;
+  const edges = board['edges'];
+  if (Array.isArray(edges) && childIds.size > 0) {
+    board['edges'] = edges.filter((e) => !(isObj(e) && (childIds.has(e['source']) || childIds.has(e['target']))));
+  }
+  return board;
+}
+
 // Decision 24.2 — strip legacy windowStartHour from clock nodes; ensure
 // viewWindow is set. Idempotent: safe to run on already-migrated boards
 // (windowStartHour will simply be absent; viewWindow will already exist).
@@ -534,6 +591,7 @@ const MOTHER_STATION_SLOTS: Record<string, string> = {
   calendar: 'top-right-upper',
   clock:    'top-right-lower',
   term:     'bottom-strip',
+  analytics: 'bottom-right-pre',
 };
 
 function migrateStationSlot(board: Record<string, unknown>): Record<string, unknown> {
@@ -628,6 +686,9 @@ export function loadBoardFrom(boardPath: string): unknown {
                     // so the injected calendar node gets STATE/CONFIG_DEFAULTS healing.
                     // Decision 23.1: migrateAddClockMother runs immediately after
                     // migrateAddCalendarMother (same reason — before migrateNodeStates).
+                    // Decision 32: analytics mother injected/adopted alongside the
+                    // other mother injections, before migrateNodeStates.
+                    migrateAddAnalyticsMother(
                     migrateAddClockMother(
                       migrateAddCalendarMother(
                         // Decision 28: migrateTaskKind runs after migrateTaskPlannedMin
@@ -640,6 +701,7 @@ export function loadBoardFrom(boardPath: string): unknown {
                           ),
                         ),
                       ),
+                    ),
                     ),
                   ),
                 ),

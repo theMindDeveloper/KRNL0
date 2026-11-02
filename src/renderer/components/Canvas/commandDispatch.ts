@@ -47,6 +47,7 @@ import {
   deleteTaskCascade,
   collectDescendants,
   stampCompletedAt,
+  completionTagFor,
 } from '../../../shared/dispatch/task';
 import type { BoardShape } from '../../../shared/dispatch/types';
 
@@ -84,6 +85,13 @@ import {
   todoClearDone,
   todoLinkTask,
   todoSetItemSchedule,
+  todoSetItemTag,
+  todoAddTag,
+  todoRemoveTag,
+  todoArchiveDone,
+  todoClearArchived,
+  todoReclassify,
+  todoBuckets,
 } from '../nodes/TodoNode/commands';
 import type { TodoState } from '../nodes/TodoNode/types';
 
@@ -132,7 +140,7 @@ import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types'
 // ── Clock ─────────────────────────────────────────────────────────────
 import {
   clockLinkTodo,
-  clockSetViewWindow,
+  clockSetViewWindow, clockSetDialOnly,
   clockSetSelectedDate,
   clockAdvanceDay,
   clockGoToday,
@@ -149,7 +157,8 @@ import {
 } from '../nodes/FrameNode/commands';
 
 // ── Text + Image ──────────────────────────────────────────────────────
-import { textSetText, textSetSize } from '../nodes/TextNode/commands';
+import { textSetText, textSetSize, textSetLook } from '../nodes/TextNode/commands';
+import { mediaSetPage, mediaSetSize, mediaSetTitle, mediaSetAspect } from '../nodes/MediaNode/commands';
 import {
   imageSetAsset,
   imageSetSize,
@@ -280,6 +289,13 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'todo.edit':           return { state: todoEdit(s as never, args as never) };
         case 'todo.remove':         return { state: todoRemove(s as never, args as never) };
         case 'todo.clearDone':      return { state: todoClearDone(s as never) };
+        // ADR 0016 — tags + Done/Archive lifecycle.
+        case 'todo.setItemTag':     return { state: todoSetItemTag(s as never, args as never) };
+        case 'todo.addTag':         return { state: todoAddTag(s as never, args as never) };
+        case 'todo.removeTag':      return { state: todoRemoveTag(s as never, args as never) };
+        case 'todo.archiveDone':    return { state: todoArchiveDone(s as never) };
+        case 'todo.clearArchived':  return { state: todoClearArchived(s as never) };
+        case 'todo.reclassify':     return { state: todoReclassify(s as never) };
         // ADR 0001 — calendar integration: set/clear schedule on a TodoItem
         // (for items that haven't yet spawned a TaskNode).
         case 'task.setSchedule':    return { state: todoSetItemSchedule(s as never, args as never) };
@@ -347,6 +363,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: clockLinkTodo(clockState, args as never) };
         case 'clock.setViewWindow':
           return { state: clockSetViewWindow(clockState, args as never) };
+        case 'clock.setDialOnly':
+          return { state: clockSetDialOnly(clockState, args as never) };
         // ADR 0004 §3.2 — day-selector commands.
         case 'clock.setSelectedDate':
           return { state: clockSetSelectedDate(clockState, args as never) };
@@ -363,6 +381,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
       switch (command) {
         case 'text.setText': return { state: textSetText(s as never, args as never) };
         case 'text.setSize': return { state: textSetSize(s as never, args as never) };
+        case 'text.setLook': return { state: textSetLook(s as never, args as never) };
       }
       break;
     }
@@ -381,6 +400,15 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'frame.setSize':     return { state: frameSetSize(s as never, args as never) };
         case 'frame.setChildren': return { state: frameSetChildren(s as never, args as never) };
         case 'frame.setTint':     return { config: frameSetTint(c as never, args as never) };
+      }
+      break;
+    }
+    case 'media': {
+      switch (command) {
+        case 'media.setPage':  return { state: mediaSetPage(s as never, args as never) };
+        case 'media.setSize':  return { state: mediaSetSize(s as never, args as never) };
+        case 'media.setTitle': return { state: mediaSetTitle(s as never, args as never) };
+        case 'media.setAspect': return { state: mediaSetAspect(s as never, args as never) };
       }
       break;
     }
@@ -456,11 +484,13 @@ function syncCompletionLedger(taskNodeId: string): void {
   if (!taskNode || taskNode.kind !== 'todo.task') return;
   const ts = taskNode.state as TaskState;
   if (ts.done && ts.completedAt) {
+    const tag = board ? completionTagFor(board, ts) : undefined;
     recordCompletion({
       taskId: taskNodeId,
       text: ts.text,
       plannedMin: ts.plannedMin ?? ts.durationMin ?? 25,
       completedAt: ts.completedAt,
+      ...(tag !== undefined ? { tag } : {}),
     });
   } else {
     clearCompletion(taskNodeId);
@@ -817,6 +847,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         todoItemId: itemId !== '' ? itemId : null,
         pomoSessionsCompleted: 0,
         plannedMin: childPlannedMin,
+        // Time is optional — none given → open-ended.
+        ...(typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1 ? {} : { timeOpen: true }),
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         // #180 — Todo is the planner; it only creates EVENTS. Focus/pomo tasks
@@ -920,6 +952,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         todoItemId: itemId !== '' ? itemId : null,
         pomoSessionsCompleted: 0,
         plannedMin: newPlannedMin,
+        // Time is optional — none given → open-ended.
+        ...(typeof argDuration === 'number' && Number.isFinite(argDuration) && argDuration >= 1 ? {} : { timeOpen: true }),
         secondsAccumulated: 0,
         currentSessionElapsedSec: 0,
         // #180 — Todo creates EVENTS only.
@@ -1301,6 +1335,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         currentSessionElapsedSec: 0,
         // #180 — Todo creates EVENTS only.
         kind: 'event',
+        // Time is optional: no duration given → open-ended block.
+        ...(typeof argPlanned === 'number' && Number.isFinite(argPlanned) ? {} : { timeOpen: true }),
       };
 
       const taskNodeId = `task-${crypto.randomUUID()}`;
@@ -1423,6 +1459,40 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
 
       const final = useBoardStore.getState().board;
       if (final) void saveBoard(final);
+      return;
+    }
+
+    // ── todo.clearArchived: drop archived rows + their TaskNodes ───────────
+    //    Same cascade as clearDone. The completion ledger keeps the analytics.
+    if (node.kind === 'todo' && command === 'todo.clearArchived' && result.state !== undefined) {
+      const archived = todoBuckets(node.state as TodoState).archived;
+      updateNode(nodeId, { state: result.state });
+      const taskIds = archived
+        .filter((item) => item.taskNodeId)
+        .map((item) => item.taskNodeId as string);
+      if (taskIds.length > 0) deleteTaskNodesCascade(taskIds, { skipHistory: true });
+      const final = useBoardStore.getState().board;
+      if (final) void saveBoard(final);
+      return;
+    }
+
+    // ── ADR 0016: a re-tag (or re-tagging edit) of a done item must reach
+    //    its completion-ledger entry, which is what analytics reads.
+    if (
+      node.kind === 'todo' &&
+      (command === 'todo.setItemTag' || command === 'todo.edit' || command === 'todo.removeTag') &&
+      result.state !== undefined
+    ) {
+      const prevItems = (node.state as TodoState).items;
+      const nextState = result.state as TodoState;
+      updateNode(nodeId, { state: nextState });
+      for (const item of nextState.items) {
+        if (!item.done || !item.taskNodeId) continue;
+        const prev = prevItems.find((i) => i.id === item.id);
+        if (prev?.tag !== item.tag) syncCompletionLedger(item.taskNodeId);
+      }
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
       return;
     }
 

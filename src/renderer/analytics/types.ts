@@ -122,5 +122,6 @@ export interface BoardLike {
     text: string;
     plannedMin: number;
     completedAt: string;
+    tag?: string;
   }>;
 }

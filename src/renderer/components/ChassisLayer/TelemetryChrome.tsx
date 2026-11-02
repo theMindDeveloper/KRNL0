@@ -137,7 +137,8 @@ export function TelemetryChrome() {
     const m = motherById[kind];
     if (!m) return;
     // Mother is 540×540; aim at center.
-    rf.setCenter?.(m.position.x + 270, m.position.y + 270, { zoom: 1, duration: 380 });
+    const at = rf.getNode?.(m.id)?.position ?? m.position; // drawn spot (mother row is render-placed)
+    rf.setCenter?.(at.x + 270, at.y + 270, { zoom: 1, duration: 380 });
   };
 
   // ── AOS·LOS — pomo time remaining, or boot uptime fallback ────────────

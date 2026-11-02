@@ -299,11 +299,10 @@ describe('Task arcs reflect past / future state', () => {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 describe('Header', () => {
-  it('shows the CLK.12H kind tag', () => {
+  it('shows the Big Clock (dial-only) toggle', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
-    const clkTag = screen.getByText('CLK.12H');
-    expect(clkTag).toBeDefined();
+    expect(screen.getByTestId('clock-dial-only').textContent).toMatch(/BIG CLOCK/);
   });
 
   it('shows "Today · Schedule" title', () => {

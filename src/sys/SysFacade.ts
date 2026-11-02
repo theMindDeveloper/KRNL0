@@ -9,7 +9,9 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize } from './commands/text';
-import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag } from './commands/pomo';
+import { drawList, drawClear, drawDelete } from './commands/draw';
+import { mediaAdd, mediaList } from './commands/media';
+import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
@@ -30,6 +32,8 @@ import {
   analyticsShow,
   analyticsTotals,
   analyticsStreaks,
+  analyticsWindow,
+  analyticsSummary,
 } from './commands/analytics';
 import type { AnalyticsCtx } from './commands/analytics';
 import { logTail, logStats, requiresRenderer as logRequiresRenderer } from './commands/log';
@@ -363,6 +367,18 @@ export class SysFacade {
           return analyticsTotals(aCtx, totalsOpts);
         }
         case 'streaks': return analyticsStreaks(aCtx, { json: command.json });
+        case 'summary': {
+          const sumOpts: Parameters<typeof analyticsSummary>[1] = { json: command.json };
+          if (command.range !== undefined) sumOpts.range = command.range;
+          return analyticsSummary(aCtx, sumOpts);
+        }
+        case 'open':
+        case 'close':
+        case 'toggle':
+          return analyticsWindow(
+            { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+            command.sub,
+          );
       }
     }
 
@@ -413,6 +429,18 @@ export class SysFacade {
             ? pomoTag(tagCtx, command.ref)
             : pomoRetag(tagCtx, command.segmentId, command.ref);
         }
+        case 'delete-segment': {
+          const segCtx = {
+            boardPath: this.deps.boardPath,
+            ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+          };
+          return pomoDeleteSegmentCmd(segCtx, command.segmentId);
+        }
+        case 'segments': {
+          const segOpts: Parameters<typeof pomoSegments>[1] = { json: command.json };
+          if (command.date !== undefined) segOpts.date = command.date;
+          return pomoSegments({ boardPath: this.deps.boardPath }, segOpts);
+        }
         case 'status': return pomoStatus();
         case 'config': {
           const cfgOpts: Parameters<typeof pomoConfig>[0] = {};
@@ -421,6 +449,7 @@ export class SysFacade {
           if (command.long !== undefined) cfgOpts.long = command.long;
           if (command.every !== undefined) cfgOpts.every = command.every;
           if (command.face !== undefined) cfgOpts.face = command.face;
+          if (command.countStopped !== undefined) cfgOpts.countStopped = command.countStopped;
           const res = pomoConfig(cfgOpts);
           // The file-path variant writes board.json directly; tell the
           // renderer to reload or its next save would revert the change.
@@ -466,7 +495,18 @@ export class SysFacade {
       switch (command.sub) {
         case 'add':   return todo.todoAdd(ctx, command.text, command.tag);
         case 'check': return todo.todoCheck(ctx, command.id);
-        case 'list':  return todo.todoList(ctx, command.json);
+        case 'list':  return todo.todoList(ctx, command.json, command.scope);
+        case 'tag':   return todo.todoTag(ctx, command.ref, command.tag);
+        case 'tags': {
+          const opts: Parameters<typeof todo.todoTags>[1] = { json: command.json };
+          if (command.action !== undefined) opts.action = command.action;
+          if (command.label !== undefined) opts.label = command.label;
+          if (command.keywords !== undefined) opts.keywords = command.keywords;
+          if (command.color !== undefined) opts.color = command.color;
+          return todo.todoTags(ctx, opts);
+        }
+        case 'archive':       return todo.todoArchive(ctx);
+        case 'clear-archive': return todo.todoClearArchive(ctx);
       }
     }
 
@@ -502,6 +542,31 @@ export class SysFacade {
       if (command.sub === 'show') {
         return calCmd.calShow(ctx, command.from, command.to, command.json);
       }
+      if (command.sub === 'view') {
+        return calCmd.calView(
+          { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+          command.view,
+          command.date,
+        );
+      }
+    }
+
+    if (command.kind === 'media') {
+      const res = command.sub === 'add' ? mediaAdd(command.url, command.at) : mediaList(command.json);
+      if (command.sub === 'add' && res.ok) this.deps.onBoardChanged?.();
+      return res;
+    }
+
+    if (command.kind === 'draw') {
+      const dCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      };
+      switch (command.sub) {
+        case 'list':   return drawList(dCtx, command.json);
+        case 'clear':  return drawClear(dCtx);
+        case 'delete': return drawDelete(dCtx, command.id);
+      }
     }
 
     if (command.kind === 'clock') {
@@ -512,6 +577,7 @@ export class SysFacade {
       switch (command.sub) {
         case 'day':  return clockCmd.clockDay(ctx, command.arg);
         case 'show': return clockCmd.clockShow(ctx, command.json);
+        case 'dial': return clockCmd.clockDial(ctx, command.arg);
       }
     }
 
@@ -520,7 +586,7 @@ export class SysFacade {
     // with the habit/todo/task ctx-passing pattern is a future refactor.
     if (command.kind === 'text') {
       switch (command.sub) {
-        case 'add':    return textAdd(command.text, command.at, command.near);
+        case 'add':    return textAdd(command.text, command.at, command.near, command.look);
         case 'set':    return textSet(command.id, command.text);
         case 'resize': return textResize(command.id, command.w, command.h);
       }

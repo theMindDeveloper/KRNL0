@@ -283,3 +283,18 @@ Block characters (`█`, `▀`, `▄`, `▙`, `▟`) appear in:
 - Mother node fixed-slot tag prefix
 
 Not decoration. Deliberate statement: *the terminal is foundational*.
+
+---
+
+## Rule — text never touches an edge
+
+No text in the app may touch or cross the edge of the shape it sits in: a chart slice, the donut hole, a bar, a plot gutter, a pill or a card.
+
+- **Charts (SVG).** Size every label with the helpers in `src/renderer/analytics/charts/common.ts`:
+  - `fitArcLabel` is for donut and pie slices.
+  - `fitCircleLabel` is for the text in the donut hole.
+  - `textWidth` + `TEXT_INSET` size axis gutters.
+
+  Each label keeps `TEXT_INSET` (3 px) of clearance on every side, which also covers the dark text halo. If a label doesn't fit, shrink it down to `MIN_LABEL_FONT` (8 px). If it still doesn't fit, don't draw it. The legend or tooltip already carries the value. Never place a label at a fixed spot or behind a fixed `pct >= N` check.
+- **HTML.** Any text box that can get long needs `overflow: hidden; text-overflow: ellipsis; white-space: nowrap` plus a max width (see the Todo tag pill), or it must wrap. Padding is never zero on a bordered container.
+- **Enforced by** `tests/unit/renderer/analytics.textContainment.test.tsx`. It checks 3,000 random slice layouts plus rendered donuts, and fails if any label's box leaves its slice. New chart types add a case there.
