@@ -16,13 +16,24 @@ export interface MediaState {
   page?: number;
   /** Dropped files: size in bytes (shown on the card). */
   size?: number;
+  /** Content width / height (video frame, PDF page). The card keeps it. */
+  aspect?: number;
+}
+
+/** Card chrome around the content: header + bottom margin, side margins. */
+export const MEDIA_CHROME = { v: 42, h: 12 };
+
+/** Card height that fits `aspect` at `width`. */
+export function heightForAspect(width: number, aspect: number): number {
+  return Math.round((width - MEDIA_CHROME.h) / aspect + MEDIA_CHROME.v);
 }
 
 export type MediaConfig = Record<string, never>;
 
 export const MEDIA_SIZE: Record<MediaKind, { width: number; height: number }> = {
   video: { width: 480, height: 300 },
-  embed: { width: 480, height: 300 },
+  // 16:9 players: (480 - 12) / (16/9) + 42
+  embed: { width: 480, height: 305 },
   audio: { width: 360, height: 110 },
   pdf: { width: 420, height: 560 },
   link: { width: 420, height: 300 },

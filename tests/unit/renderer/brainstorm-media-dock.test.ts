@@ -98,3 +98,17 @@ describe('canvas wheel', () => {
     expect(items.find((i) => i.key === 'note')!.shortcut).toBe('N');
   });
 });
+
+import { mediaSetAspect } from '../../../src/renderer/components/nodes/MediaNode/commands';
+
+describe('media cards take the content shape', () => {
+  it('fits height to the aspect at the current width, ignores junk', () => {
+    const v = mediaSetAspect({ media: 'video', src: 'X', title: 'clip', width: 480, height: 300 }, { aspect: 16 / 9 });
+    expect(v.aspect).toBeCloseTo(16 / 9);
+    expect(v.height).toBe(Math.round((480 - 12) / (16 / 9) + 42));
+    const portrait = mediaSetAspect(v, { aspect: 9 / 16 });
+    expect(portrait.height).toBeGreaterThan(800);
+    expect(mediaSetAspect(v, { aspect: Number.NaN })).toBe(v);
+    expect(mediaSetAspect(v, { aspect: 16 / 9 })).toBe(v);
+  });
+});

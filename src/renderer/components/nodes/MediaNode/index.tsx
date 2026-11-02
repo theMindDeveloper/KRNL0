@@ -42,6 +42,12 @@ export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, M
   const k = KIND[s.media];
   const min = s.media === 'file' ? { w: 220, h: 96 } : s.media === 'audio' ? { w: 280, h: 104 } : { w: 240, h: 160 };
   const isUrl = s.media === 'embed' || s.media === 'link';
+  // The card takes the content's shape: embeds start 16:9, files report theirs.
+  const fit = (aspect: number) => onCommand('media.setAspect', { aspect });
+  useEffect(() => {
+    if (s.media === 'embed' && s.aspect === undefined) fit(16 / 9);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.media, s.aspect]);
 
   // Links: show as plain text instead (turns the node into a text note).
   const toText = () => {
@@ -81,17 +87,18 @@ export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, M
 
       {/* Body */}
       <div className="nodrag nowheel" style={{ flex: 1, minHeight: 0, position: 'relative', margin: '0 6px 6px', borderRadius: 10, overflow: 'hidden', background: s.media === 'video' || s.media === 'embed' ? '#000' : 'var(--paper-2)' }}>
-        {s.media === 'pdf' && <PdfView url={url} page={s.page ?? 1} onPage={(page) => onCommand('media.setPage', { page })} />}
+        {s.media === 'pdf' && <PdfView url={url} page={s.page ?? 1} onPage={(page) => onCommand('media.setPage', { page })} onAspect={fit} />}
         {s.media === 'audio' && <AudioPlayer url={url} tone={k.tone} />}
         {s.media === 'file' && <FileCard name={s.title} size={s.size} tone={k.tone} />}
         {s.media === 'link' && <WebPreview url={url} />}
-        {(s.media === 'video' || s.media === 'embed') && <VideoPlayer url={url} />}
+        {(s.media === 'video' || s.media === 'embed') && <VideoPlayer url={url} onAspect={fit} />}
       </div>
 
       <NodeResizeControl
         position="bottom-right"
         minWidth={min.w}
         minHeight={min.h}
+        keepAspectRatio={s.aspect !== undefined}
         onResizeEnd={(_e, p) => onCommand('media.setSize', { width: p.width, height: p.height })}
         style={{ background: 'transparent', border: 'none', width: 18, height: 18, right: 2, bottom: 2, zIndex: 3 }}
       >
@@ -110,7 +117,7 @@ const chipBtn: React.CSSProperties = {
 
 // ── Video / embed ───────────────────────────────────────────────────────────
 
-function VideoPlayer({ url }: { url: string }) {
+function VideoPlayer({ url, onAspect }: { url: string; onAspect: (a: number) => void }) {
   const [error, setError] = useState(false);
   if (error) {
     return (
@@ -124,7 +131,20 @@ function VideoPlayer({ url }: { url: string }) {
   }
   return (
     <Suspense fallback={<Centered><Spinner /></Centered>}>
-      <ReactPlayer url={url} controls width="100%" height="100%" playsinline onError={() => setError(true)} style={{ position: 'absolute', inset: 0 }} />
+      <ReactPlayer
+        url={url}
+        controls
+        width="100%"
+        height="100%"
+        playsinline
+        onError={() => setError(true)}
+        onReady={(p: { getInternalPlayer: () => unknown }) => {
+          // Files: read the real frame size. Embeds stay 16:9.
+          const el = p.getInternalPlayer() as HTMLVideoElement | null;
+          if (el && 'videoWidth' in el && el.videoWidth > 0 && el.videoHeight > 0) onAspect(el.videoWidth / el.videoHeight);
+        }}
+        style={{ position: 'absolute', inset: 0 }}
+      />
     </Suspense>
   );
 }
@@ -255,7 +275,7 @@ function Spinner() {
 
 // ── PDF (pdf.js) — one page fitted to the card, ‹ › to turn pages ──────────
 
-function PdfView({ url, page, onPage }: { url: string; page: number; onPage: (p: number) => void }) {
+function PdfView({ url, page, onPage, onAspect }: { url: string; page: number; onPage: (p: number) => void; onAspect: (a: number) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const docRef = useRef<{ numPages: number; getPage: (n: number) => Promise<unknown> } | null>(null);
@@ -301,6 +321,8 @@ function PdfView({ url, page, onPage }: { url: string; page: number; onPage: (p:
       };
       if (cancelled) return;
       const base = p.getViewport({ scale: 1 });
+      // Card follows the page shape (page bar adds a little height).
+      if (page === 1) onAspect(base.width / (base.height + 34));
       const scale = Math.min((box.w - 12) / base.width, (box.h - 12) / base.height) * (window.devicePixelRatio || 1);
       const vp = p.getViewport({ scale });
       canvas.width = Math.floor(vp.width);

@@ -150,7 +150,7 @@ import {
 
 // ── Text + Image ──────────────────────────────────────────────────────
 import { textSetText, textSetSize, textSetLook } from '../nodes/TextNode/commands';
-import { mediaSetPage, mediaSetSize, mediaSetTitle } from '../nodes/MediaNode/commands';
+import { mediaSetPage, mediaSetSize, mediaSetTitle, mediaSetAspect } from '../nodes/MediaNode/commands';
 import {
   imageSetAsset,
   imageSetSize,
@@ -393,6 +393,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'media.setPage':  return { state: mediaSetPage(s as never, args as never) };
         case 'media.setSize':  return { state: mediaSetSize(s as never, args as never) };
         case 'media.setTitle': return { state: mediaSetTitle(s as never, args as never) };
+        case 'media.setAspect': return { state: mediaSetAspect(s as never, args as never) };
       }
       break;
     }

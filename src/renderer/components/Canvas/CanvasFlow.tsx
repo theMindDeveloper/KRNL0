@@ -1717,9 +1717,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       {/* Left dock */}
       {/* Full-canvas, click-through box so the dock can snap to the top,
           middle or bottom of the left edge, or the bottom centre. */}
-      <Panel position="top-left" style={{ margin: 0, padding: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+      {/* Not an RF <Panel>: Panel forces pointer-events:all, which made this
+          full-canvas box swallow every click (incl. right-click). */}
+      <div data-testid="dock-layer" style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none' }}>
         <Dock onAddNode={handleAddNode} dockStyle={dockStyle} onDockStyleChange={setDockStyle} />
-      </Panel>
+      </div>
 
       {/* Hidden file picker for the dock's "image" button (no placeholder
           node is ever created — the picker spawns a real ImageNode with an

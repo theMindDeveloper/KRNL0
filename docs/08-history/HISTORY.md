@@ -810,3 +810,4 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
   - **Shapes:** text stays inside the shape's inscribed box, with a stronger fill.
   - **Ctrl+V:** files become image/media nodes; a link becomes a player or website preview (the "Aa" switch turns it into text); other text becomes a note.
   - **Any file drops:** .mov and .wav are detected by extension; unknown types become a download card. Media cards are rebuilt: custom audio player, video with a codec fallback, website preview, PDF pages, file card.
+- **Follow-up 6:** the right-click wheel works again. The dock's full-canvas container was an RF `<Panel>`, which forces `pointer-events: all` and swallowed every canvas click; it is now a plain click-through layer. Media cards take their content's shape (video frame size, 16:9 embeds, PDF page) and keep it while resizing.
