@@ -97,11 +97,21 @@ vi.mock('../../../src/sys/SysFacade', () => ({
 // ---------------------------------------------------------------------------
 
 /** A minimal fake IPC event with a sender that captures send() calls. */
+let nextSenderId = 1;
 function makeEvent() {
+  const listeners = new Map<string, Array<(...a: unknown[]) => void>>();
+  const add = (name: string, fn: (...a: unknown[]) => void) => {
+    listeners.set(name, [...(listeners.get(name) ?? []), fn]);
+  };
   return {
     sender: {
+      id: nextSenderId++,
       send: vi.fn(),
       isDestroyed: vi.fn(() => false),
+      on: vi.fn(add),
+      once: vi.fn(add),
+      /** Test helper: fire a webContents event. */
+      emit: (name: string, ...args: unknown[]) => { for (const fn of listeners.get(name) ?? []) fn(...args); },
     },
   };
 }
@@ -385,6 +395,34 @@ describe('F13 — pty:resize', () => {
 // ---------------------------------------------------------------------------
 // F15 — pty:kill removes the session and calls proc.kill()
 // ---------------------------------------------------------------------------
+
+describe('PTY sessions die with their page', () => {
+  it('a reload of the owning page kills its shells', async () => {
+    const event = makeEvent();
+    await createSession(80, 24, event);
+    const proc = lastSpawnedProc!;
+    // (event, url, isInPlace, isMainFrame)
+    event.sender.emit('did-start-navigation', {}, 'http://x', false, true);
+    expect(proc.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it('an in-page or sub-frame navigation leaves them alone', async () => {
+    const event = makeEvent();
+    await createSession(80, 24, event);
+    const proc = lastSpawnedProc!;
+    event.sender.emit('did-start-navigation', {}, 'http://x#a', true, true);
+    event.sender.emit('did-start-navigation', {}, 'http://embed', false, false);
+    expect(proc.kill).not.toHaveBeenCalled();
+  });
+
+  it('a destroyed window kills its shells', async () => {
+    const event = makeEvent();
+    await createSession(80, 24, event);
+    const proc = lastSpawnedProc!;
+    event.sender.emit('destroyed');
+    expect(proc.kill).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('F15 — pty:kill', () => {
   it('calls proc.kill() for a known sessionId', async () => {

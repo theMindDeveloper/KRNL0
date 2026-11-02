@@ -37,6 +37,34 @@ process.env['KRNL0_BOARD_PATH'] = BOARD_PATH;
 
 // Active PTY sessions keyed by sessionId
 const ptySessions = new Map<string, pty.IPty>();
+// Which renderer owns each session. A reload, navigation or renderer crash
+// never runs the old page's cleanup, so main kills that page's shells itself;
+// otherwise every reload leaves another shell running until the app quits.
+const ptyOwner = new Map<string, number>();
+const watchedSenders = new Set<number>();
+
+function killSessionsOf(senderId: number): void {
+  for (const [sid, owner] of ptyOwner) {
+    if (owner !== senderId) continue;
+    try { ptySessions.get(sid)?.kill(); } catch { /* already gone */ }
+    ptySessions.delete(sid);
+    ptyOwner.delete(sid);
+  }
+}
+
+function watchSender(sender: Electron.WebContents): void {
+  if (watchedSenders.has(sender.id)) return;
+  watchedSenders.add(sender.id);
+  const id = sender.id;
+  sender.on('did-start-navigation', (_e, _url, isInPlace, isMainFrame) => {
+    if (isMainFrame && !isInPlace) killSessionsOf(id);
+  });
+  sender.on('render-process-gone', () => killSessionsOf(id));
+  sender.once('destroyed', () => {
+    killSessionsOf(id);
+    watchedSenders.delete(id);
+  });
+}
 
 // Phase 2: renderer-coupled dispatch. Set by registerHandlers().
 // Used by SysFacade for viewport/undo/redo/theme commands.
@@ -459,10 +487,13 @@ export function registerHandlers(rpcServer?: RpcServer): void {
 
     proc.onExit(() => {
       ptySessions.delete(sessionId);
+      ptyOwner.delete(sessionId);
       safeSend(`pty:exit:${sessionId}`);
     });
 
     ptySessions.set(sessionId, proc);
+    ptyOwner.set(sessionId, event.sender.id);
+    watchSender(event.sender);
 
     // T1–T6: build MOTD and include in the reply so the renderer writes it
     // synchronously before subscribing to pty:data (avoids any IPC race).
@@ -495,6 +526,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     if (proc) {
       proc.kill();
       ptySessions.delete(sessionId);
+      ptyOwner.delete(sessionId);
     }
   });
 
