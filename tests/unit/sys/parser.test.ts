@@ -282,3 +282,15 @@ describe('SysParser', () => {
     });
   });
 });
+
+describe('SysParser — flags where the subcommand goes', () => {
+  it('runs the default subcommand with those flags', () => {
+    expect(SysParser.parse(['cal', '--from', '2026-11-02'])).toMatchObject({ kind: 'cal', sub: 'show', from: '2026-11-02' });
+    expect(SysParser.parse(['clock', '--json'])).toEqual({ kind: 'clock', sub: 'show', json: true });
+    expect(SysParser.parse(['canvas', '--json'])).toMatchObject({ kind: 'canvas', sub: 'list', json: true });
+    expect(SysParser.parse(['settings', '--json'])).toMatchObject({ kind: 'settings', sub: 'show', json: true });
+  });
+  it('still rejects a group that has no default', () => {
+    expect(SysParser.parse(['task', '--json'])).toBeNull();
+  });
+});

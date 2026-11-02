@@ -214,7 +214,12 @@ export class SysParser {
   }
 
   private static parseStrict(argv: string[]): SysCommand | null {
-    const [cmd, sub, ...rawRest] = argv;
+    const [cmd, first, ...afterFirst] = argv;
+    // `krnl cal --from …`, `krnl clock --json`: a flag where the subcommand
+    // goes means "the default subcommand with these flags".
+    const flagFirst = first !== undefined && first.startsWith('--') && cmd !== 'say';
+    const sub = flagFirst ? undefined : first;
+    const rawRest = flagFirst ? [first, ...afterFirst] : afterFirst;
     const rest = hoistPositionals(rawRest);
 
     if (!cmd || cmd === 'help') return { kind: 'help', group: sub, sub: rest[0] };

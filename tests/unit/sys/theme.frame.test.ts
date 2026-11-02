@@ -80,3 +80,14 @@ describe('sys theme show', () => {
     expect(JSON.parse(res.message ?? '{}')).toEqual({ theme: 'dark', frame: 'unknown' });
   });
 });
+
+describe('sys theme show — light / dark', () => {
+  it('reports the theme the open window shows (it is not board data)', async () => {
+    const { SysFacade } = await import('../../../src/sys/SysFacade');
+    const cliDispatch = vi.fn(async (cmd: string) => ({ ok: true, message: cmd === 'theme.get' ? 'light' : 'pro' }));
+    const res = await new SysFacade({ boardPath, cliDispatch }).run(['theme', 'show', '--json']);
+    expect(JSON.parse(res.message ?? '{}')).toEqual({ theme: 'light', frame: 'pro' });
+    const info = await new SysFacade({ boardPath, cliDispatch }).run(['info', '--json']);
+    expect((JSON.parse(info.message ?? '{}') as { theme: string }).theme).toBe('light');
+  });
+});

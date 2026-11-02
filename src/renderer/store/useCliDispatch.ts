@@ -138,6 +138,12 @@ export function useCliDispatch(): void {
             break;
           }
 
+          case 'theme.get': {
+            ok = true;
+            message = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+            break;
+          }
+
           case 'theme.frame.get': {
             ok = true;
             message = getDockStyle();

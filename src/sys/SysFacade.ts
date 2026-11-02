@@ -100,6 +100,13 @@ export class SysFacade {
     this.version = readVersion();
   }
 
+  /** light / dark as the open window shows it; undefined when headless. */
+  private async windowTheme(): Promise<string | undefined> {
+    if (!this.deps.cliDispatch) return undefined;
+    const r = await this.deps.cliDispatch('theme.get', {});
+    return r.ok && (r.message === 'light' || r.message === 'dark') ? r.message : undefined;
+  }
+
   async run(argv: string[]): Promise<SysResult> {
     if (argv.length === 0) {
       return { ok: true, message: generateHelp(this.version) };
@@ -152,10 +159,14 @@ export class SysFacade {
     // ── Info / settings / viewport reads ────────────────────────────────────
     if (command.kind === 'info') {
       const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
+      const theme = await this.windowTheme();
+      if (theme) iCtx.theme = theme;
       return infoCmd.infoShow(iCtx, command.json);
     }
     if (command.kind === 'settings' && command.sub === 'show') {
       const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
+      const theme = await this.windowTheme();
+      if (theme) iCtx.theme = theme;
       return infoCmd.settingsShow(iCtx, command.json);
     }
     if (command.kind === 'settings' && command.sub === 'mode') {
@@ -304,6 +315,8 @@ export class SysFacade {
           const r = await this.deps.cliDispatch('theme.frame.get', {});
           if (r.ok) tCtx.frame = r.message;
         }
+        const theme = await this.windowTheme();
+        if (theme) tCtx.theme = theme;
         return themeShow(tCtx, command.json);
       }
       if (command.sub === 'frames') {

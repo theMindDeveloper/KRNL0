@@ -12,6 +12,9 @@ import type { BoardShape } from '../../shared/dispatch/types';
 export interface InfoCtx {
   boardPath: string;
   version: string;
+  /** light / dark, when an open window reported it (the theme is a window
+   *  preference, not board data). */
+  theme?: string;
 }
 
 function loadBoard(ctx: InfoCtx): BoardShape {
@@ -35,7 +38,7 @@ export async function infoShow(ctx: InfoCtx, json = false): Promise<SysResult> {
   const info = {
     version: ctx.version,
     boardPath: ctx.boardPath,
-    theme: rawBoard.theme ?? 'unknown',
+    theme: ctx.theme ?? rawBoard.theme ?? 'unknown',
     viewport: rawBoard.viewport ?? null,
     nodeCount: board.nodes.length,
     edgeCount: board.edges.length,
@@ -72,7 +75,7 @@ export async function settingsShow(ctx: InfoCtx, json = false): Promise<SysResul
   const settings = {
     version: ctx.version,
     boardPath: ctx.boardPath,
-    theme: rawBoard.theme ?? 'unknown',
+    theme: ctx.theme ?? rawBoard.theme ?? 'unknown',
     viewport: rawBoard.viewport ?? null,
   };
   if (json) return { ok: true, message: JSON.stringify(settings), data: settings };

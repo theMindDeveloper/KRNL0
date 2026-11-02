@@ -15,12 +15,14 @@ export interface ThemeCtx {
   boardPath: string;
   /** Active frame style, when a renderer window reported it. */
   frame?: string;
+  /** light / dark, when a renderer window reported it. */
+  theme?: string;
 }
 
 export async function themeShow(ctx: ThemeCtx, json = false): Promise<SysResult> {
   const raw = loadBoardFrom(ctx.boardPath);
   const board = (typeof raw === 'object' && raw !== null) ? raw as Record<string, unknown> : {};
-  const theme = (typeof board['theme'] === 'string') ? board['theme'] : 'unknown';
+  const theme = ctx.theme ?? ((typeof board['theme'] === 'string') ? board['theme'] : 'unknown');
   const frame = ctx.frame ?? 'unknown';
 
   if (json) {
