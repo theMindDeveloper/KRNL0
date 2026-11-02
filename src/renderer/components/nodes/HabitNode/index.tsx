@@ -41,6 +41,7 @@ import { useLocalDay } from '../../../hooks/useLocalDay';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HabitPopover } from './HabitPopover';
 import { HabitContextMenu } from './HabitContextMenu';
+import { HabitIcon } from './HabitIcon';
 
 function getISOWeek(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -557,7 +558,7 @@ const WeekRow = memo(function WeekRow({
             lineHeight: 1,
           }}
         >
-          {glyph}
+          <HabitIcon icon={glyph} size={13} />
         </span>
         <div
           style={{
@@ -761,7 +762,7 @@ const MonthRow = memo(function MonthRow({
             lineHeight: 1,
           }}
         >
-          {glyph}
+          <HabitIcon icon={glyph} size={13} />
         </span>
         <div
           style={{
@@ -970,7 +971,7 @@ const YearRow = memo(function YearRow({
             lineHeight: 1,
           }}
         >
-          {glyph}
+          <HabitIcon icon={glyph} size={13} />
         </span>
         <div
           style={{

@@ -42,6 +42,7 @@ const TASK_RECT = { width: 220, height: 120 } as const;
 import type { Node } from '@shared/types/node';
 import type { Board } from '@shared/types';
 import { selectSchedule } from '../../store/scheduleSelector';
+import { parallelizeChainEdges } from '../../store/chainWalker';
 import type { Edge } from '@shared/types/edge';
 import {
   deleteTaskCascade,
@@ -1168,6 +1169,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         itemId?: string;
         scheduledFor: string;
         scheduledDurationMin?: number;
+        /** Dropped onto this task's block: run in parallel with it. */
+        parallelWith?: string;
       };
       if (!scheduleArgs.scheduledFor) return;
       // A Todo row dragged before it has a task node: create the task (linked
@@ -1180,6 +1183,21 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const targetTask = currentBoard.nodes.find((n) => n.id === taskId);
       if (!targetTask || targetTask.kind !== 'todo.task') return;
       const prevTask = targetTask.state as TaskState;
+
+      // Parallel drop: unlink the moved task from the chain that would push
+      // it behind the target, and fork it alongside the target instead.
+      const withId = scheduleArgs.parallelWith;
+      const withTask = withId ? currentBoard.nodes.find((n) => n.id === withId) : undefined;
+      if (withTask && withTask.kind === 'todo.task' && withTask.id !== taskId) {
+        const sameTodo = (withTask.state as TaskState).parentTodoId === prevTask.parentTodoId;
+        const edges = parallelizeChainEdges(currentBoard.edges, taskId, withTask.id, sameTodo, (from, to) => ({
+          id: `edge-${crypto.randomUUID()}`,
+          from: { nodeId: from, event: 'task.next' },
+          to: { nodeId: to, command: 'task.activate' },
+          enabled: true,
+        }));
+        useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges } } : s));
+      }
 
       const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
         scheduledFor: scheduleArgs.scheduledFor,

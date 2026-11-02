@@ -6,6 +6,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { toneVarForTask } from '../../../utils/taskColor';
+import { TimeField } from '../../ui/TimeField';
 
 export interface TaskPopupTask {
   id: string;
@@ -108,10 +109,10 @@ export function TaskPopup(p: Props) {
         {/* Editor */}
         <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'end', gap: 8 }}>
-            <label style={field}>
+            <div style={field}>
               <span style={fieldLabel}>Start</span>
-              <input data-testid="task-popup-time" type="time" value={p.time} onChange={(e) => p.onTime(e.target.value)} style={input} />
-            </label>
+              <TimeField testId="task-popup-time" value={p.time} onChange={p.onTime} />
+            </div>
             <span aria-hidden style={{ color: 'var(--ink-4)', paddingBottom: 9, fontSize: 13 }}>→</span>
             <div style={field}>
               <span style={fieldLabel}>End</span>

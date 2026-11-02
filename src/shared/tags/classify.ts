@@ -39,6 +39,9 @@ const STOPWORDS = new Set([
   'a', 'an', 'the', 'and', 'or', 'to', 'for', 'of', 'on', 'in', 'at', 'with',
   'my', 'me', 'i', 'is', 'it', 'up', 'do', 'get', 'go', 'some', 'new', 'from',
   'about', 'into', 'by', 'this', 'that', 'be', 'all', 'more', 'min', 'mins', 'm',
+  // Placeholder words say nothing about what a task is about: "task 1",
+  // "task 2" must not all follow one hand tag.
+  'task', 'todo', 'thing', 'stuff', 'item', 'misc', 'test', 'untitled',
 ]);
 
 /** Light English stemmer — enough to fold plurals and -ing/-ed forms. */
@@ -62,6 +65,13 @@ export function tokenize(text: string): string[] {
     if (!raw || STOPWORDS.has(raw) || /^\d+$/.test(raw)) continue;
     out.add(stem(raw));
   }
+  return [...out];
+}
+
+/** Tokens for near-duplicate checks: numbers count, so "plan 1" ≠ "plan 2". */
+function dupTokens(text: string): string[] {
+  const out = new Set(tokenize(text));
+  for (const raw of text.toLowerCase().split(/[^a-z0-9äöüß]+/)) if (/^\d+$/.test(raw)) out.add(raw);
   return [...out];
 }
 
@@ -170,6 +180,7 @@ export function scoreTags(
     // token → tagId → count, over hand-tagged examples only.
     const learned = new Map<string, Map<string, number>>();
     const wanted = new Set(tokens);
+    const dupMine = dupTokens(text);
     let bestDup: { id: string; sim: number } | null = null;
     for (const ex of examples) {
       const id = findTag(library, ex.tag)?.id;
@@ -181,13 +192,15 @@ export function scoreTags(
         per.set(id, (per.get(id) ?? 0) + 1);
         learned.set(tok, per);
       }
-      const sim = jaccard(tokens, exTokens);
+      const sim = jaccard(dupMine, dupTokens(ex.text));
       if (sim >= NEAR_DUP_JACCARD && (!bestDup || sim > bestDup.sim)) bestDup = { id, sim };
     }
     for (const per of learned.values()) {
       let total = 0;
       for (const c of per.values()) total += c;
-      for (const [id, c] of per) bump(id, 1.5 * (c / total));
+      // A word seen in one example only is weak evidence (below MIN_SCORE on
+      // its own): one hand tag can't drag every task sharing a word with it.
+      for (const [id, c] of per) bump(id, (c >= 2 ? 1.5 : 0.75) * (c / total));
     }
     if (bestDup) bump(bestDup.id, 3 * bestDup.sim);
   }

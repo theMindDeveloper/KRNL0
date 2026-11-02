@@ -3,7 +3,9 @@
 //
 // The lane packer (store/laneLayout.ts) puts every task of an overlap cluster
 // side by side. In a narrow week column that makes 4–5 parallel tasks thin,
-// unreadable slivers. This caps the lanes at what fits at a readable width:
+// unreadable slivers. Up to MIN_SIDE_BY_SIDE parallel tasks always sit side by
+// side (each block stays visible and clickable, a narrow one shows its title
+// vertically). Beyond that, lanes are capped at what fits at a readable width:
 //   - lanes ≥ 2: the first (maxLanes − 1) lanes show; the rest collapse into a
 //     chip in the last lane.
 //   - lanes = 1 (a column narrower than two readable lanes): lane 0 shows at
@@ -15,6 +17,8 @@
 
 /** Narrowest lane that still carries a readable, ellipsized title. */
 export const MIN_LANE_PX = 64;
+/** Parallel tasks that always get their own lane, however narrow the column. */
+export const MIN_SIDE_BY_SIDE = 4;
 /** Padding between block text and the block edge (both sides). */
 export const BLOCK_TEXT_INSET = 4;
 
@@ -58,7 +62,7 @@ export function layoutDayBlocks<T extends DayBlockSlice>(
   planPx: number,
   minLanePx = MIN_LANE_PX,
 ): DayBlockLayout<T> {
-  const maxLanes = readableLaneCount(planPx, minLanePx);
+  const maxLanes = Math.max(MIN_SIDE_BY_SIDE, readableLaneCount(planPx, minLanePx));
   const placements = new Map<string, LanePlacement>();
   const hiddenSlices: T[] = [];
   for (const sl of slices) {

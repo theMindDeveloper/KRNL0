@@ -27,7 +27,7 @@ export type SysCommand =
   | { kind: 'task'; sub: 'subtask'; parentId: string | undefined; text: string | undefined }
   | { kind: 'task'; sub: 'duration'; id: string | undefined; minutes: number | undefined }
   | { kind: 'task'; sub: 'sibling'; id: string | undefined }
-  | { kind: 'task'; sub: 'parallel'; id: string | undefined }
+  | { kind: 'task'; sub: 'parallel'; id: string | undefined; with?: string | undefined }
   | { kind: 'task'; sub: 'reset-pomo'; id: string | undefined }
   | { kind: 'task'; sub: 'chain'; refs: string[] }
   | { kind: 'task'; sub: 'schedule'; id: string | undefined; at: string | undefined; durationMin: number | undefined }
@@ -385,7 +385,8 @@ export class SysParser {
         return { kind: 'task', sub: 'sibling', id: rest[0] };
       }
       if (sub === 'parallel') {
-        return { kind: 'task', sub: 'parallel', id: rest[0] };
+        const w = flag(rest, 'with');
+        return w !== undefined ? { kind: 'task', sub: 'parallel', id: rest[0], with: w } : { kind: 'task', sub: 'parallel', id: rest[0] };
       }
       if (sub === 'reset-pomo') {
         return { kind: 'task', sub: 'reset-pomo', id: rest[0] };

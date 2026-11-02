@@ -305,3 +305,39 @@ export function walkChain(
 
   return units;
 }
+
+/**
+ * Rewire task.next edges so `movedId` runs in parallel with `targetId`
+ * (calendar: a task dropped onto another task). The moved task is spliced out
+ * of its own chain (its prevs link straight to its nexts), then — when both
+ * tasks share a todo — it copies the target's incoming and outgoing links so
+ * the walker sees a fork / convergence with the target. Without this, a moved
+ * task chained after the target is pushed behind it again by the #168 rule.
+ * Pure: returns a new edge list (unchanged input when nothing needs to move).
+ */
+export function parallelizeChainEdges<E extends { id: string; from: { nodeId: string; event: string }; to: { nodeId: string; command: string }; enabled?: boolean }>(
+  edges: readonly E[],
+  movedId: string,
+  targetId: string,
+  sameTodo: boolean,
+  makeEdge: (fromId: string, toId: string) => E,
+): E[] {
+  if (movedId === targetId) return [...edges];
+  const isNext = (e: E) => e.from.event === 'task.next';
+  const prevs = edges.filter((e) => isNext(e) && e.to.nodeId === movedId).map((e) => e.from.nodeId);
+  const nexts = edges.filter((e) => isNext(e) && e.from.nodeId === movedId).map((e) => e.to.nodeId);
+  let out = edges.filter((e) => !(isNext(e) && (e.from.nodeId === movedId || e.to.nodeId === movedId)));
+  const has = (from: string, to: string) => out.some((e) => isNext(e) && e.from.nodeId === from && e.to.nodeId === to);
+  const link = (from: string, to: string) => {
+    if (from === to || has(from, to) || wouldCreateChainCycle(out, from, to)) return;
+    out = [...out, makeEdge(from, to)];
+  };
+  for (const p of prevs) for (const n of nexts) link(p, n);
+  if (sameTodo) {
+    for (const e of out.filter(isNext)) {
+      if (e.to.nodeId === targetId) link(e.from.nodeId, movedId);
+      if (e.from.nodeId === targetId) link(movedId, e.to.nodeId);
+    }
+  }
+  return out;
+}

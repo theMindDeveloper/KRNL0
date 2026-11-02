@@ -84,12 +84,12 @@ export interface Habit {
   note?: string;        // free-form text shown under the habit row
 }
 
-// Built-in icon palette presented in the context menu. Mix of mono glyphs
-// and emoji so users can pick something representational. Single grapheme.
+// Built-in icon ids (drawn as theme-aware SVGs by HabitNode/HabitIcon.tsx —
+// no emoji). Old glyph/emoji values still render via its legacy map.
 export const HABIT_ICONS: readonly string[] = [
-  '✎', '↗', '◍', '⌬', '◆', '▷', '○', '✦',
-  '🧘', '🏃', '📖', '💧', '🛌', '🥗', '🧠', '💪',
-  '☕', '🎯', '🌱', '🎵', '🧹', '✍️', '☀️', '🌙',
+  'pen', 'trend', 'target', 'code', 'meditate', 'run', 'book', 'water',
+  'sleep', 'food', 'brain', 'strength', 'coffee', 'goal', 'plant', 'music',
+  'clean', 'write', 'sun', 'moon', 'heart', 'walk', 'study', 'phone',
 ];
 
 export interface HabitState {

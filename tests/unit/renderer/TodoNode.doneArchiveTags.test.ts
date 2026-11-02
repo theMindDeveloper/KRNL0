@@ -118,7 +118,7 @@ describe('F22 — re-tagging teaches the classifier', () => {
   it('a correction re-classifies similar open auto-tagged items', () => {
     let s = defaultTodoState();
     s = todoAdd(s, { text: 'krnl0 sprint review' }, env(at(TODAY), 'one'));
-    s = todoAdd(s, { text: 'krnl0 sprint planning poker' }, env(at(TODAY), 'two'));
+    s = todoAdd(s, { text: 'krnl0 sprint demo' }, env(at(TODAY), 'two'));
     s = todoSetItemTag(s, { id: 'one', tag: 'study' });
     expect(tagExamples(s)).toEqual([{ text: 'krnl0 sprint review', tag: 'study' }]);
     expect(s.items.find((i) => i.id === 'two')?.tag).toBe('study');

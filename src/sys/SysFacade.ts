@@ -525,7 +525,9 @@ export class SysFacade {
         case 'subtask':    return task.taskSubtask(ctx, command.parentId, command.text);
         case 'duration':   return task.taskDuration(ctx, command.id, command.minutes);
         case 'sibling':    return task.taskSibling(ctx, command.id);
-        case 'parallel':   return task.taskParallel(ctx, command.id);
+        case 'parallel':   return command.with !== undefined
+          ? task.taskParallelWith(ctx, command.id, command.with)
+          : task.taskParallel(ctx, command.id);
         case 'reset-pomo': return task.taskResetPomo(ctx, command.id);
         case 'chain':      return task.taskChain(ctx, command.refs);
         case 'schedule':   return task.taskSchedule(ctx, command.id, command.at, command.durationMin);
