@@ -226,7 +226,17 @@ describe('TodoNode commands (Decision #10)', () => {
         s = todoAdd(s, { text: `item ${i}` }, env(T0, `id-${i}`));
       }
       const vis = visibleItems(s, { showCompleted: true, maxVisible: 3 });
-      expect(vis).toHaveLength(3);
+      // Open items are never hidden by the cap (the list pages them).
+      expect(vis).toHaveLength(10);
+    });
+
+    it('maxVisible trims done items only', () => {
+      let s = defaultTodoState();
+      for (let i = 0; i < 4; i++) s = todoAdd(s, { text: `item ${i}` }, env(T0, `id-${i}`));
+      s = todoToggle(s, { id: 'id-0' }, env(T1));
+      s = todoToggle(s, { id: 'id-1' }, env(T1));
+      const vis = visibleItems(s, { showCompleted: true, maxVisible: 3 });
+      expect(vis.map((i) => i.id)).toEqual(['id-2', 'id-3', 'id-0']);
     });
 
     it('does not mutate the original state.items array', () => {

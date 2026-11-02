@@ -281,12 +281,16 @@ export const todoClearArchived = (state: TodoState, nowMs: number = Date.now()):
 // Render helper (pure, applied to a copy — Decision #10):
 //   1. Filter by showCompleted if false
 //   2. Sort: undone first (ascending createdAt), done last (ascending createdAt)
-//   3. Slice to maxVisible
-export const visibleItems = (state: TodoState, config: TodoConfig): TodoItem[] =>
-  [...state.items]
+//   3. Slice to maxVisible — but never past an open item: the list pages its
+//      rows, and a cap that hid open items made a newly added task (sorted
+//      last) silently missing while the header still counted it.
+export const visibleItems = (state: TodoState, config: TodoConfig): TodoItem[] => {
+  const sorted = [...state.items]
     .filter((i) => config.showCompleted || !i.done)
     .sort((a, b) => {
       if (a.done !== b.done) return a.done ? 1 : -1;
       return a.createdAt.localeCompare(b.createdAt);
-    })
-    .slice(0, config.maxVisible);
+    });
+  const open = sorted.filter((i) => !i.done).length;
+  return sorted.slice(0, Math.max(config.maxVisible, open));
+};
