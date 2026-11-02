@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
     "reset": "node scripts/reset-board.mjs",
     "reset:hard": "node scripts/reset-board.mjs --hard",
+    "icons": "electron scripts/generate-icons.mjs",
     "postinstall": "electron-rebuild -f -w node-pty"
   },
   "bin": {
