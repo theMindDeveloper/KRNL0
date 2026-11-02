@@ -35,7 +35,14 @@ export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
       if (ref.current?.contains(t) || anchor?.contains(t)) return;
       onClose();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // A field marked data-own-escape handles Escape itself (e.g. cancel an
+      // inline rename) instead of closing the whole popover.
+      if ((e.target as HTMLElement | null)?.closest?.('[data-own-escape]')) return;
+      e.stopPropagation();
+      onClose();
+    };
     window.addEventListener('pointerdown', onDown, true);
     window.addEventListener('keydown', onKey, true);
     return () => {
