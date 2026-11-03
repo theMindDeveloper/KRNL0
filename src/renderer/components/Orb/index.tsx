@@ -27,6 +27,7 @@ import {
 } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../renderer/store/boardStore';
+import { isFreshBoard } from './freshBoard';
 import { voicePlayer } from '../Assistant/VoicePlayer';
 import { ScriptRunner } from '../Assistant/ScriptRunner';
 import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
@@ -263,9 +264,12 @@ export function Orb() {
       pool.push({ clip: 'pa_its_late', text: "it's late. tomorrow exists." });
     }
 
-    const pick = pool[Math.floor(Math.random() * pool.length)]!;
-
     window.setTimeout(() => {
+      // A brand-new board gets an introduction and a pointer to the tour,
+      // not "welcome back". Read here: the board loads after the orb mounts.
+      const pick = isFreshBoard(useBoardStore.getState().board)
+        ? { clip: 'intro_01', text: "Welcome to KRNL0. I'm your system assistant. Click me for a tour." }
+        : pool[Math.floor(Math.random() * pool.length)]!;
       setOrbState('speaking');
       setCaption(pick.text);
       voicePlayer.play(pick.clip).catch(() => { /* missing clip → caption only */ });
