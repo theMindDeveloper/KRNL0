@@ -8,6 +8,14 @@
 
 import { mutateBoard, readBoardFile } from '../../main/boardIo';
 import type { SysResult } from '../SysFacade';
+import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
+import type { BoardShape } from '../../shared/dispatch/types';
+
+/** The full id `ref` names among `kind` nodes, or null. */
+function refIn(board: { nodes: Array<Record<string, unknown>> }, ref: string, kind: string): string | null {
+  const r = resolveNodeRef(board as unknown as BoardShape, ref, kind);
+  return r.ok ? r.id : null;
+}
 
 function newId(): string {
   return `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -80,8 +88,10 @@ export function textSet(
   }
   let found = false;
   mutateBoard((board) => {
+    // id, a ≥4-char prefix or unique text, like every other ref.
+    const target = refIn(board, id, 'text');
     for (const n of board.nodes) {
-      if (n['id'] === id && n['kind'] === 'text') {
+      if (target !== null && n['id'] === target && n['kind'] === 'text') {
         const state = (n['state'] as Record<string, unknown> | undefined) ?? {};
         n['state'] = { ...state, text };
         found = true;
@@ -103,10 +113,13 @@ export function textResize(
   if (w === undefined || h === undefined || isNaN(w) || isNaN(h)) {
     return { ok: false, message: 'sys text resize: missing --w/--h' };
   }
+  if (w < 1 || h < 1) return { ok: false, message: 'sys text resize: --w and --h must be positive' };
   let found = false;
   mutateBoard((board) => {
+    // id, a ≥4-char prefix or unique text, like every other ref.
+    const target = refIn(board, id, 'text');
     for (const n of board.nodes) {
-      if (n['id'] === id && n['kind'] === 'text') {
+      if (target !== null && n['id'] === target && n['kind'] === 'text') {
         const state = (n['state'] as Record<string, unknown> | undefined) ?? {};
         n['state'] = { ...state, width: Math.round(w), height: Math.round(h) };
         found = true;

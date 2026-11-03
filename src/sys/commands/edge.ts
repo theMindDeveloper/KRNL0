@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { BoardShape, AnyEdge } from '../../shared/dispatch/types';
-import { resolveNodeRef, resolveEdgeRef, resolutionError } from '../../shared/dispatch/resolveRef';
+import { resolveNodeRef, resolveEdgeRef, resolutionError, uniquePrefixes } from '../../shared/dispatch/resolveRef';
 import { wouldCreateChainCycle } from '../../renderer/store/chainWalker';
 
 export interface EdgeCtx {
@@ -93,9 +93,10 @@ export async function edgeList(ctx: EdgeCtx, json = false): Promise<SysResult> {
   const edges = board.edges;
   if (json) return { ok: true, message: JSON.stringify(edges), data: edges };
   if (edges.length === 0) return { ok: true, message: '(no edges)', data: [] };
+  const short = uniquePrefixes(edges.map((e) => e.id));
   const lines = edges.map((e) => {
     const enabled = e.enabled === false ? '✗' : '✓';
-    return `${e.id.slice(0, 8)}  ${enabled}  ${e.from.nodeId.slice(0, 8)}:${e.from.event} → ${e.to.nodeId.slice(0, 8)}:${e.to.command}`;
+    return `${short.get(e.id)}  ${enabled}  ${e.from.nodeId.slice(0, 8)}:${e.from.event} → ${e.to.nodeId.slice(0, 8)}:${e.to.command}`;
   });
   return { ok: true, message: lines.join('\n'), data: edges };
 }

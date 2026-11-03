@@ -115,6 +115,17 @@ describe('sys text', () => {
     expect(state.width).toBe(500);
     expect(state.height).toBe(300);
   });
+
+  it('text set / resize accept the short id a listing prints, and reject a non-positive size', async () => {
+    const { SysFacade } = await import('../../../src/sys/SysFacade');
+    const facade = new SysFacade();
+    const add = await facade.run(['text', 'add', '--text', 'orig']);
+    const id = (add.data as { id: string }).id;
+    const prefix = id.slice(0, id.length - 3);
+    expect((await facade.run(['text', 'set', prefix, '--text', 'via prefix'])).ok).toBe(true);
+    expect(((readBoard().nodes[0] as Record<string, unknown>)['state'] as { text: string }).text).toBe('via prefix');
+    expect((await facade.run(['text', 'resize', prefix, '--w', '-100', '--h', '0'])).ok).toBe(false);
+  });
 });
 
 describe('sys image', () => {

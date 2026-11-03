@@ -12,6 +12,14 @@ import { extname } from 'path';
 import { mutateBoard, readBoardFile } from '../../main/boardIo';
 import { writeAsset } from '../../main/ipc/assets';
 import type { SysResult } from '../SysFacade';
+import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
+import type { BoardShape } from '../../shared/dispatch/types';
+
+/** The full id `ref` names among `kind` nodes, or null. */
+function refIn(board: { nodes: Array<Record<string, unknown>> }, ref: string, kind: string): string | null {
+  const r = resolveNodeRef(board as unknown as BoardShape, ref, kind);
+  return r.ok ? r.id : null;
+}
 
 function newId(): string {
   return `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -110,8 +118,10 @@ export function imageReplace(
   }
   let found = false;
   mutateBoard((board) => {
+    // id, a ≥4-char prefix or unique text, like every other ref.
+    const target = refIn(board, id, 'image');
     for (const n of board.nodes) {
-      if (n['id'] === id && n['kind'] === 'image') {
+      if (target !== null && n['id'] === target && n['kind'] === 'image') {
         const state = (n['state'] as Record<string, unknown> | undefined) ?? {};
         n['state'] = { ...state, assetId: imported.assetId, src: null };
         found = true;
@@ -133,10 +143,13 @@ export function imageResize(
   if (w === undefined || h === undefined || isNaN(w) || isNaN(h)) {
     return { ok: false, message: 'sys image resize: missing --w/--h' };
   }
+  if (w < 1 || h < 1) return { ok: false, message: 'sys image resize: --w and --h must be positive' };
   let found = false;
   mutateBoard((board) => {
+    // id, a ≥4-char prefix or unique text, like every other ref.
+    const target = refIn(board, id, 'image');
     for (const n of board.nodes) {
-      if (n['id'] === id && n['kind'] === 'image') {
+      if (target !== null && n['id'] === target && n['kind'] === 'image') {
         const state = (n['state'] as Record<string, unknown> | undefined) ?? {};
         n['state'] = { ...state, width: Math.round(w), height: Math.round(h) };
         found = true;
@@ -153,8 +166,10 @@ export function imageClear(id: string | undefined): SysResult {
   if (!id) return { ok: false, message: 'sys image clear: missing <id>' };
   let found = false;
   mutateBoard((board) => {
+    // id, a ≥4-char prefix or unique text, like every other ref.
+    const target = refIn(board, id, 'image');
     for (const n of board.nodes) {
-      if (n['id'] === id && n['kind'] === 'image') {
+      if (target !== null && n['id'] === target && n['kind'] === 'image') {
         const state = (n['state'] as Record<string, unknown> | undefined) ?? {};
         n['state'] = {
           ...state,

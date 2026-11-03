@@ -118,3 +118,14 @@ describe('resolveEdgeRef', () => {
     if (r.ok) expect(r.id).toBe('edge-aaaa1111-0000-0000-0000-000000000001');
   });
 });
+
+describe('uniquePrefixes', () => {
+  it('prints the shortest prefix (≥ 8) that no other id shares', async () => {
+    const { uniquePrefixes } = await import('../../../src/shared/dispatch/resolveRef');
+    const ids = ['node-1730000000000-aaaa', 'node-1730000000001-bbbb', 'mother-todo'];
+    const short = uniquePrefixes(ids);
+    expect(short.get('mother-todo')).toBe('mother-t');
+    expect(short.get(ids[0]!)).toBe('node-1730000000000');
+    expect(short.get(ids[1]!)).toBe('node-1730000000001');
+  });
+});

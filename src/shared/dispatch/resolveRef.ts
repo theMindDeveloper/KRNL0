@@ -179,3 +179,19 @@ export function resolutionError(
   }
   return `No ${what} matching "${ref}"`;
 }
+
+/**
+ * Shortest prefix of each id (at least `min` chars) that no other id in
+ * `pool` starts with — what listings print, so every id they show can be
+ * typed back as a ref. `node-<timestamp>-…` and `task-<uuid>` ids share long
+ * prefixes, so a fixed 8-char slice was often ambiguous.
+ */
+export function uniquePrefixes(ids: readonly string[], pool: readonly string[] = ids, min = 8): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const id of ids) {
+    let len = Math.min(min, id.length);
+    while (len < id.length && pool.some((p) => p !== id && p.startsWith(id.slice(0, len)))) len++;
+    out.set(id, id.slice(0, len));
+  }
+  return out;
+}

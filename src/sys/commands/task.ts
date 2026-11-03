@@ -33,6 +33,7 @@ import {
   resolveNodeRef,
   resolveTodoItemRef,
   resolutionError,
+  uniquePrefixes,
 } from '../../shared/dispatch/resolveRef';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
 import { TASK_STEP_X, TASK_STEP_Y, MOTHER_OFFSET_Y } from '../layout';
@@ -73,9 +74,19 @@ function findNode(board: BoardShape, id: string): AnyNode | null {
   ) as AnyNode | undefined) ?? null;
 }
 
+// Why the last findTaskNode returned null (not found vs ambiguous), so the
+// error names the matches instead of claiming nothing matched.
+let lastTaskRefError = '';
+
+/** The message for a ref findTaskNode just failed to resolve. */
+function noTaskMessage(ref: string): string {
+  return lastTaskRefError || `No task node matching "${ref}"`;
+}
+
 function findTaskNode(board: BoardShape, ref: string): AnyNode | null {
   // Accept full id, prefix (≥4 chars), or unique task-text match via resolveRef.
   const r = resolveNodeRef(board, ref, 'todo.task');
+  lastTaskRefError = r.ok ? '' : resolutionError('task node', ref, r);
   if (!r.ok) return null;
   const n = findNode(board, r.id);
   if (!n || n.kind !== 'todo.task') return null;
@@ -266,7 +277,7 @@ export async function taskEdit(
   if (!text) return { ok: false, message: 'task edit requires <text>' };
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
-  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
   // Same as renaming the card: the Todo row, pomo label and ledger follow.
@@ -282,14 +293,14 @@ export async function taskToggle(
   if (!taskId) return { ok: false, message: 'task toggle requires a <id>' };
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
-  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
   // Shared with the renderer: toggles, stamps completedAt, mirrors to the
   // TodoItem and records/clears the completion ledger (#169).
   const env = { uuid: () => randomUUID(), now: () => new Date().toISOString() };
   const result = taskToggleMirror(board, taskId, env);
-  if (!result) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!result) return { ok: false, message: noTaskMessage(taskId) };
   const nextState = { done: result.done };
 
   saveBoard(ctx, board);
@@ -307,7 +318,7 @@ export async function taskDelete(
   if (!taskId) return { ok: false, message: 'task delete requires a <id>' };
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
-  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
   // T17: Use shared cascade — handles pomo cancel + TodoItem cleanup + renumber.
@@ -328,7 +339,7 @@ export async function taskStartPomo(
   if (!taskId) return { ok: false, message: 'task pomo requires a <id>' };
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
-  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
   const pomoMother = findPomoMother(board);
@@ -364,7 +375,7 @@ export async function taskSubtask(
   if (!text) return { ok: false, message: 'task subtask requires <text>' };
   const board = loadBoard(ctx);
   const parentNode = findTaskNode(board, parentTaskId);
-  if (!parentNode) return { ok: false, message: `No task node matching "${parentTaskId}"` };
+  if (!parentNode) return { ok: false, message: noTaskMessage(parentTaskId) };
   parentTaskId = parentNode.id;
 
   const parentTs = parentNode.state as TaskState;
@@ -454,7 +465,7 @@ export async function taskDuration(
   }
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
-  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
   // Guard: if the pomo mother is actively running, refuse to change duration.
@@ -488,7 +499,7 @@ export async function taskSibling(
   if (!taskId) return { ok: false, message: 'task sibling requires a <taskId>' };
   const board = loadBoard(ctx);
   const sourceNode = findTaskNode(board, taskId);
-  if (!sourceNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!sourceNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = sourceNode.id;
 
   const sourceTs = sourceNode.state as TaskState;
@@ -607,7 +618,7 @@ export async function taskResetPomo(
   if (!taskId) return { ok: false, message: 'task reset-pomo requires a <taskId>' };
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
-  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
   const ts = taskNode.state as TaskState;
@@ -636,7 +647,7 @@ export async function taskChain(ctx: TaskCtx, refs: string[]): Promise<SysResult
   const ids: string[] = [];
   for (const ref of refs) {
     const node = findTaskNode(board, ref);
-    if (!node) return { ok: false, message: `No task node matching "${ref}"` };
+    if (!node) return { ok: false, message: noTaskMessage(ref) };
     ids.push(node.id);
   }
   let added = 0;
@@ -715,7 +726,7 @@ export async function taskSchedule(
   at = normalized;
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
-  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
   const ts = taskNode.state as TaskState;
@@ -757,7 +768,7 @@ export async function taskUnschedule(
   if (!taskId) return { ok: false, message: 'task unschedule requires a <ref>' };
   const board = loadBoard(ctx);
   let taskNode = findTaskNode(board, taskId);
-  if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
   let ts = taskNode.state as TaskState;
@@ -814,7 +825,7 @@ export async function taskAddNext(
   if (!text) return { ok: false, message: 'task addNext requires <text>' };
   const board = loadBoard(ctx);
   const sourceNode = findTaskNode(board, sourceRef);
-  if (!sourceNode) return { ok: false, message: `No task node matching "${sourceRef}"` };
+  if (!sourceNode) return { ok: false, message: noTaskMessage(sourceRef) };
 
   const sourceTs = sourceNode.state as TaskState;
   const effectiveDuration = durationMin ?? sourceTs.durationMin;
@@ -930,8 +941,8 @@ export async function taskParallelWith(
   const board = loadBoard(ctx);
   const moved = findTaskNode(board, ref);
   const target = findTaskNode(board, withRef);
-  if (!moved) return { ok: false, message: `No task node matching "${ref}"` };
-  if (!target) return { ok: false, message: `No task node matching "${withRef}"` };
+  if (!moved) return { ok: false, message: noTaskMessage(ref) };
+  if (!target) return { ok: false, message: noTaskMessage(withRef) };
   if (moved.id === target.id) return { ok: false, message: 'task parallel: a task cannot run in parallel with itself.' };
   const start = selectSchedule(board as unknown as Board).placements.get(target.id)?.startISO.slice(0, 16);
   if (!start) return { ok: false, message: `task parallel: "${target.id.slice(0, 8)}" is not on the calendar.` };
@@ -981,7 +992,7 @@ export async function taskKind(
   }
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, ref);
-  if (!taskNode) return { ok: false, message: `No task node matching "${ref}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(ref) };
 
   const ts = taskNode.state as TaskState;
   if (ts.kind === taskKind) {
@@ -1014,7 +1025,7 @@ export async function taskNote(
   }
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, ref);
-  if (!taskNode) return { ok: false, message: `No task node matching "${ref}"` };
+  if (!taskNode) return { ok: false, message: noTaskMessage(ref) };
 
   const ts = taskNode.state as TaskState;
   let nextState: TaskState;
@@ -1081,11 +1092,12 @@ export async function taskList(
     return { ok: true, message: 'No tasks.', data: [] };
   }
 
+  const short = uniquePrefixes(tasks.map((n) => n.id), (board.nodes as AnyNode[]).map((n) => n.id));
   const lines = tasks.map((n) => {
     const ts = n.state as TaskState;
     const status = ts.done ? '[x]' : '[ ]';
     const indent = '  '.repeat(ts.layer);
-    return `${status} ${n.id.slice(0, 8)}  ${indent}#${ts.sequenceNumber} L${ts.layer} — ${ts.text}`;
+    return `${status} ${short.get(n.id)}  ${indent}#${ts.sequenceNumber} L${ts.layer} — ${ts.text}`;
   });
 
   return {
