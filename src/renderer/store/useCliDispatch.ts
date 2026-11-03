@@ -25,6 +25,7 @@ import type { HabitLaneState } from '../components/nodes/HabitLaneNode/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import { getDockStyle, setDockStyle } from '../components/ChassisLayer/useDockStyle';
 import { isFrameStyleId } from '../../shared/frameStyles';
+import { radioControl } from '../components/AmbientRadio/radioControl';
 
 export function useCliDispatch(): void {
   const store = useBoardStore;
@@ -203,6 +204,40 @@ export function useCliDispatch(): void {
             }
             ok = true;
             message = `Marquee deleted ${inside.length} node(s) (${taskIds.length} task(s))`;
+            break;
+          }
+
+          case 'radio.list':
+          case 'radio.status':
+          case 'radio.play':
+          case 'radio.remove':
+          case 'radio.stop':
+          case 'radio.volume': {
+            const radio = radioControl();
+            if (!radio) { message = 'The Ambient Radio is not open in this window'; break; }
+            const ids = radio.presets().map((p) => p.id).filter((id) => id !== 'yt');
+            const preset = (args as { preset?: string }).preset?.toLowerCase();
+            if (preset !== undefined && preset === 'yt') { message = 'YouTube needs a link: paste it into the radio'; break; }
+            if (preset !== undefined && !ids.includes(preset)) { message = `Unknown preset "${preset}" (${ids.join(', ')})`; break; }
+            if (command === 'radio.play') radio.play(preset);
+            if (command === 'radio.remove' && preset !== undefined) radio.remove(preset);
+            if (command === 'radio.stop') radio.stop();
+            if (command === 'radio.volume') radio.setVolume((args as { volume: number }).volume);
+            if (command === 'radio.list') {
+              ok = true;
+              message = radio.presets().filter((p) => p.id !== 'yt').map((p) => `${p.id.padEnd(6)} ${p.sub}`).join('\n');
+              break;
+            }
+            // Report what the panel will show once React applies the change.
+            const s = radio.status();
+            const playing = command === 'radio.play' ? true : command === 'radio.stop' ? false : s.playing;
+            const layers = new Set(s.layers);
+            if (command === 'radio.play' && preset) layers.add(preset);
+            if (command === 'radio.play' && !preset && layers.size === 0) layers.add(s.focused);
+            if (command === 'radio.remove' && preset) layers.delete(preset);
+            const volume = command === 'radio.volume' ? Math.round((args as { volume: number }).volume) : s.volume;
+            ok = true;
+            message = `radio: ${playing && layers.size > 0 ? 'playing' : 'paused'} · ${layers.size > 0 ? [...layers].join(' + ') : 'no layers'} · volume ${volume}`;
             break;
           }
 

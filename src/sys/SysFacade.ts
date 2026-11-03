@@ -444,6 +444,24 @@ export class SysFacade {
       if (command.sub === 'list') return this.deps.cliDispatch('sfx.list', {});
     }
 
+    if (command.kind === 'radio') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'radio requires an open renderer window', data: { exitCode: 2 } };
+      }
+      switch (command.sub) {
+        case 'play': return this.deps.cliDispatch('radio.play', command.preset !== undefined ? { preset: command.preset } : {});
+        case 'remove':
+          if (!command.preset) return { ok: false, message: 'radio remove requires <preset> (see: krnl radio list)' };
+          return this.deps.cliDispatch('radio.remove', { preset: command.preset });
+        case 'volume':
+          if (command.volume === undefined || command.volume < 0 || command.volume > 100) {
+            return { ok: false, message: 'radio volume requires a number from 0 to 100' };
+          }
+          return this.deps.cliDispatch('radio.volume', { volume: command.volume });
+        default: return this.deps.cliDispatch(`radio.${command.sub}`, {});
+      }
+    }
+
     if (command.kind === 'pomo') {
       switch (command.sub) {
         case 'start':  return pomoStart(command.label, command.minutes);

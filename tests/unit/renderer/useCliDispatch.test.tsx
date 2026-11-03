@@ -114,3 +114,30 @@ describe('marquee delete', () => {
     expect(ids).not.toContain(note.id);   // the text note at (10,10) is gone
   });
 });
+
+describe('radio commands', () => {
+  it('say so when no radio is open', () => {
+    expect(run('radio.status')).toEqual({ ok: false, message: 'The Ambient Radio is not open in this window' });
+  });
+
+  it('drive the registered radio and report the result', async () => {
+    const { registerRadio } = await import('../../../src/renderer/components/AmbientRadio/radioControl');
+    const calls: string[] = [];
+    const off = registerRadio({
+      presets: () => [{ id: 'rain', name: 'Rain', sub: 'gentle rainfall' }, { id: 'fire', name: 'Fire', sub: 'crackling fire' }, { id: 'yt', name: 'YouTube', sub: 'video stream' }],
+      status: () => ({ playing: false, layers: [], focused: 'rain', volume: 60 }),
+      play: (id) => calls.push(`play:${id ?? ''}`),
+      remove: (id) => calls.push(`remove:${id}`),
+      stop: () => calls.push('stop'),
+      setVolume: (v) => calls.push(`vol:${v}`),
+    });
+    expect(run('radio.play', { preset: 'Fire' })).toEqual({ ok: true, message: 'radio: playing · fire · volume 60' });
+    expect(run('radio.play')).toEqual({ ok: true, message: 'radio: playing · rain · volume 60' });
+    expect(run('radio.play', { preset: 'jazz' }).ok).toBe(false);
+    expect(run('radio.play', { preset: 'yt' }).ok).toBe(false);
+    expect(run('radio.volume', { volume: 30 }).message).toBe('radio: paused · no layers · volume 30');
+    expect(run('radio.list').message).toBe('rain   gentle rainfall\nfire   crackling fire');
+    expect(calls).toEqual(['play:fire', 'play:', 'vol:30']);
+    off();
+  });
+});

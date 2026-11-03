@@ -240,6 +240,18 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'radio',
+    summary: 'Ambient Radio — the sound mix in the open window',
+    subcommands: [
+      { name: 'list', usage: 'radio list', summary: 'The presets you can mix (dark, rain, fire, synth, white, brown)' },
+      { name: 'status', usage: 'radio status', summary: 'Playing or paused, the layers in the mix, master volume' },
+      { name: 'play', usage: 'radio play [<preset>]', summary: 'Play (resume) the mix; with a preset, add that layer to it' },
+      { name: 'remove', usage: 'radio remove <preset>', summary: 'Take a layer out of the mix' },
+      { name: 'stop', usage: 'radio stop', summary: 'Pause the mix (it is kept for the next play)' },
+      { name: 'volume', usage: 'radio volume <0-100>', summary: 'Set the master volume' },
+    ],
+  },
+  {
     group: 'term',
     summary: 'Control the active TerminalNode session',
     subcommands: [

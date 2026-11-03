@@ -86,6 +86,10 @@ export type SysCommand =
   | { kind: 'sfx'; sub: 'play'; clipId: string | undefined }
   | { kind: 'sfx'; sub: 'stop' }
   | { kind: 'sfx'; sub: 'list' }
+  | { kind: 'radio'; sub: 'list' | 'status' | 'stop' }
+  | { kind: 'radio'; sub: 'play'; preset: string | undefined }
+  | { kind: 'radio'; sub: 'remove'; preset: string | undefined }
+  | { kind: 'radio'; sub: 'volume'; volume: number | undefined }
   | { kind: 'help'; group: string | undefined; sub: string | undefined }
   // Decision 29 — new commands
   | { kind: 'task'; sub: 'kind'; ref: string | undefined; taskKind: 'focus' | 'event' | undefined }
@@ -780,6 +784,18 @@ export class SysParser {
       if (sub === 'play') return { kind: 'sfx', sub: 'play', clipId: rest[0] };
       if (sub === 'stop') return { kind: 'sfx', sub: 'stop' };
       if (sub === 'list') return { kind: 'sfx', sub: 'list' };
+    }
+
+    // Ambient Radio — the mix in the open window.
+    if (cmd === 'radio') {
+      if (sub === 'list' || sub === 'status' || sub === 'stop') return { kind: 'radio', sub };
+      if (sub === undefined) return { kind: 'radio', sub: 'status' };
+      if (sub === 'play') return { kind: 'radio', sub: 'play', preset: rest[0] };
+      if (sub === 'remove') return { kind: 'radio', sub: 'remove', preset: rest[0] };
+      if (sub === 'volume') {
+        const v = rest[0] !== undefined ? Number(rest[0]) : NaN;
+        return { kind: 'radio', sub: 'volume', volume: Number.isFinite(v) ? v : undefined };
+      }
     }
 
     return null;

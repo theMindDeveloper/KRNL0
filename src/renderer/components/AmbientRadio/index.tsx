@@ -23,6 +23,7 @@
 
 import { PagedView } from '../ui/PagedView';
 import { Z as LAYERS } from '../ui/layers';
+import { registerRadio } from './radioControl';
 import {
   useState,
   useEffect,
@@ -710,6 +711,23 @@ export function AmbientRadio() {
       ytSetVolume(Math.round((vol / 100) * (ytLv / 100) * 100));
     }
   }, [layerVolumes.yt]);
+
+  // ── CLI (`krnl radio …`) — drives the same handlers as the panel ─────────
+  const cliRef = useRef({ toggleLayer, togglePlay, onVolumeChange, volume });
+  cliRef.current = { toggleLayer, togglePlay, onVolumeChange, volume };
+  useEffect(() => registerRadio({
+    presets: () => PRESETS.map((p) => ({ id: p.id, name: p.name, sub: p.sub })),
+    status: () => ({ playing: playingRef.current, layers: Array.from(activeLayersRef.current), focused: focusedIdRef.current, volume: cliRef.current.volume }),
+    play: (id) => {
+      const active = activeLayersRef.current;
+      // Resume a paused mix first, so adding a layer doesn't leave the rest silent.
+      if (!playingRef.current && (active.size > 0 || id === undefined)) cliRef.current.togglePlay();
+      if (id !== undefined && !active.has(id as LayerId)) cliRef.current.toggleLayer(id as LayerId);
+    },
+    remove: (id) => { if (activeLayersRef.current.has(id as LayerId)) cliRef.current.toggleLayer(id as LayerId); },
+    stop: () => { if (playingRef.current) cliRef.current.togglePlay(); },
+    setVolume: (v) => cliRef.current.onVolumeChange(v),
+  }), []);
 
   // ── Drag handlers ────────────────────────────────────────────────────────
   const onHeaderMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
