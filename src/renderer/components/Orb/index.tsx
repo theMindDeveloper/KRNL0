@@ -33,6 +33,7 @@ import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
 import { CLICK_CLIPS } from '../Assistant/clipMap';
 import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
+import { CloseButton } from '../ui/CloseButton';
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'running';
 interface ChatMsg { role: 'user' | 'ai'; text: string }
@@ -589,19 +590,7 @@ export function Orb() {
               </span>
               krnl0 · assistant
             </span>
-            <button
-              type="button"
-              data-testid="orb-chat-close"
-              onClick={() => setOpen(false)}
-              style={{
-                background: 'transparent', border: 0,
-                color: '#8a8270', cursor: 'pointer',
-                fontSize: 16, lineHeight: 1, padding: 0, width: 20, height: 20,
-              }}
-              aria-label="Close assistant"
-            >
-              ×
-            </button>
+            <CloseButton tone="dark" testId="orb-chat-close" label="Close assistant" onClick={() => setOpen(false)} />
           </div>
 
           {/* History — scrollable */}

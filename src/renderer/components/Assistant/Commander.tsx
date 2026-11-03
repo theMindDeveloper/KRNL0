@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { voicePlayer } from './VoicePlayer';
+import { CloseButton } from '../ui/CloseButton';
 
 interface CommanderProps {
   onClose: () => void;
@@ -114,19 +115,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             </span>
             commander · new session
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent', border: 0,
-              color: '#8a8270', cursor: 'pointer',
-              fontSize: 18, lineHeight: 1, padding: 0,
-              width: 22, height: 22,
-            }}
-            aria-label="Close commander"
-          >
-            ×
-          </button>
+          <CloseButton tone="dark" label="Close commander" onClick={onClose} />
         </div>
 
         <form onSubmit={onSubmit} style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>

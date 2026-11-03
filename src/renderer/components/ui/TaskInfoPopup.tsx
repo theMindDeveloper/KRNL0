@@ -3,6 +3,7 @@
 // planned time, time actually tracked on it, and quick actions. Mirrors the
 // tracked-span popup so tasks, habits and observed time behave the same on click.
 
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
@@ -45,6 +46,12 @@ export function TaskInfoPopup(props: TaskInfoPopupProps) {
 }
 
 function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () => void; children: React.ReactNode }) {
+  // Esc closes, like the Calendar's task popup.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return createPortal(
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
@@ -53,7 +60,10 @@ function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () 
         style={{
           position: 'fixed',
           left: Math.min(x + 4, window.innerWidth - 270),
-          top: Math.min(y + 6, window.innerHeight - 170),
+          top: Math.max(8, Math.min(y + 6, window.innerHeight - 170)),
+          // A tall popup near the bottom scrolls instead of leaving the screen.
+          maxHeight: 'calc(100vh - 16px)',
+          overflowY: 'auto',
           zIndex: 1999,
           width: 250,
           background: 'var(--paper)',

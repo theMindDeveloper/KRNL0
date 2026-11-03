@@ -20,6 +20,7 @@ import { useEasyMode } from '../../store/uiMode';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
 import { CanvasSwitcher } from './CanvasSwitcher';
+import { CloseButton } from '../ui/CloseButton';
 
 type Theme = 'light' | 'dark';
 
@@ -264,21 +265,7 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
             Settings
           </span>
           <div style={{ flex: 1 }} />
-          <button
-            type="button"
-            data-testid="settings-close"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--ink-3)',
-              cursor: 'pointer',
-              fontSize: 16,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
+          <CloseButton testId="settings-close" label="Close settings" onClick={onClose} />
         </div>
 
         {/* Appearance — first, so the reset below is never the only thing here. */}

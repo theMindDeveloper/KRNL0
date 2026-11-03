@@ -9,6 +9,7 @@ import type { HabitSchedule, IsoDow } from '../nodes/HabitNode/types';
 import { HabitIcon } from '../nodes/HabitNode/HabitIcon';
 import { IconCalendarDay, IconRepeat, IconCheck } from './repeatIcons';
 import { RepeatEditor, describeRepeat, isRepeatValid, toSchedule, type RepeatValue } from './RepeatEditor';
+import { CloseButton } from './CloseButton';
 
 const DOW_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 
@@ -89,9 +90,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
               Dropped on {dateLabel}{streakDays > 0 ? ` · ${streakDays}-day streak` : ''}
             </div>
           </div>
-          <button type="button" aria-label="Cancel" onClick={onCancel} style={iconBtn}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8" /></svg>
-          </button>
+          <CloseButton label="Cancel" onClick={onCancel} />
         </div>
 
         {/* Two quick picks */}
@@ -151,8 +150,4 @@ const primaryBtn: React.CSSProperties = {
 const ghostBtn: React.CSSProperties = {
   height: 34, padding: '0 12px', borderRadius: 9, border: 'none', background: 'transparent',
   color: 'var(--ink-3)', fontFamily: 'var(--font-sans)', fontSize: 13, cursor: 'pointer',
-};
-const iconBtn: React.CSSProperties = {
-  width: 30, height: 30, flexShrink: 0, borderRadius: 8, border: 'none', background: 'transparent',
-  color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0,
 };

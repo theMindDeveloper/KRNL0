@@ -9,6 +9,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { PAGES, cardsOfPage } from './guide';
 import { PageIcon } from './PageNav';
 import { ANALYTICS_CARD_LABELS, type AnalyticsCardId } from './types';
+import { SwitchVisual } from '../../ui/Switch';
 
 interface Props {
   hiddenCards: readonly AnalyticsCardId[];
@@ -70,7 +71,7 @@ export function AnalyticsSettings({ hiddenCards, onToggleHidden, onReset, onClos
                   <span style={{ flex: 1, minWidth: 0, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: on ? 'var(--k-an-ink-1, #eef1f4)' : 'var(--k-an-ink-4, #7d848b)' }}>
                     {ANALYTICS_CARD_LABELS[id]}
                   </span>
-                  <span aria-hidden style={switchTrack(on)}><span style={switchKnob(on)} /></span>
+                  <SwitchVisual on={on} offTrack="var(--k-an-line-2, #2a2e33)" />
                 </button>
               );
             })}
@@ -107,14 +108,6 @@ const row: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '4px 2px', borderRadius: 6,
   background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 11.5,
 };
-const switchTrack = (on: boolean): React.CSSProperties => ({
-  width: 26, height: 15, flexShrink: 0, borderRadius: 999, position: 'relative', transition: 'background 120ms',
-  background: on ? 'var(--acid, #c9f158)' : 'var(--k-an-line-2, #2a2e33)',
-});
-const switchKnob = (on: boolean): React.CSSProperties => ({
-  position: 'absolute', top: 2, left: on ? 13 : 2, width: 11, height: 11, borderRadius: 999, transition: 'left 120ms',
-  background: on ? 'var(--k-an-on-accent, #0e1012)' : 'var(--k-an-ink-3, #9aa1a8)',
-});
 const doneBtn: React.CSSProperties = {
   padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--acid, #c9f158)',
   color: 'var(--k-an-on-accent, #0e1012)', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 650,

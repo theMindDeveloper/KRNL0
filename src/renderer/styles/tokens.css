@@ -766,3 +766,27 @@ input[type="number"]::-webkit-outer-spin-button {
 /* Native <select> lists inherit the OS colours (white on white in dark themes). */
 select option { background: var(--paper); color: var(--ink); }
 [data-theme="dark"] select { color-scheme: dark; }
+
+/* ui/CloseButton — one close affordance for every dialog / popup / panel. */
+.krnl-close-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--close-c, var(--ink-3));
+  cursor: pointer;
+  transition: color 120ms, background 120ms;
+}
+.krnl-close-btn:hover {
+  color: var(--close-c-hover, var(--ink));
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.krnl-close-btn:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 1px;
+}

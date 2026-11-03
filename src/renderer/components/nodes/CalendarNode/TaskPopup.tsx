@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { TimeField } from '../../ui/TimeField';
+import { CloseButton } from '../../ui/CloseButton';
 
 export interface TaskPopupTask {
   id: string;
@@ -103,9 +104,7 @@ export function TaskPopup(p: Props) {
               {day} · {task.timeOpen ? `${hm(startMs)} · no set length` : `${hm(startMs)}–${hm(endMs)} · ${fmtLen(task.scheduledDurationMin)}`}
             </div>
           </div>
-          <button type="button" aria-label="Close" onClick={p.onClose} style={iconBtn}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8" /></svg>
-          </button>
+          <CloseButton onClick={p.onClose} />
         </div>
 
         {/* Editor */}
@@ -206,8 +205,4 @@ const actionBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden',
   padding: '7px 6px', borderRadius: 8, border: '1px solid var(--paper-3)', background: 'var(--paper)',
   color: 'var(--ink)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 550,
-};
-const iconBtn: React.CSSProperties = {
-  width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: 'none', background: 'transparent',
-  color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0,
 };

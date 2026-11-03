@@ -24,6 +24,7 @@ import { SpanLog } from './SpanLog';
 import { useEasyMode } from '../../../store/uiMode';
 import { ObserveDash } from './ObserveDash';
 import { useAwayGap } from './useAwayGap';
+import { Switch } from '../../ui/Switch';
 
 const TICK_MS = 500;
 
@@ -589,22 +590,11 @@ export function PomoNode({
           {/* Does Stop record the session so far? (one Stop button either way) */}
           {!observe && <div className="pomo-settings-row">
             <span className="pomo-settings-label" title="On: Stop records the work so far. Off: Stop discards the session.">Count stopped sessions</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={config.countStopped !== false}
-              data-testid="pomo-settings-countStopped"
-              onClick={(e) => { e.stopPropagation(); onCommand('pomo.setConfig', { config: { countStopped: config.countStopped === false } }); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                width: 34, height: 20, borderRadius: 999, border: 'none', cursor: 'pointer', padding: 2,
-                background: config.countStopped !== false ? 'var(--acid)' : 'var(--paper-3)',
-                display: 'flex', justifyContent: config.countStopped !== false ? 'flex-end' : 'flex-start',
-                transition: 'background 120ms',
-              }}
-            >
-              <span style={{ width: 16, height: 16, borderRadius: 999, background: config.countStopped !== false ? '#0a0908' : 'var(--ink-3)' }} />
-            </button>
+            <Switch
+              checked={config.countStopped !== false}
+              testId="pomo-settings-countStopped"
+              onChange={(on) => onCommand('pomo.setConfig', { config: { countStopped: on } })}
+            />
           </div>}
 
           {!observe && (<>
