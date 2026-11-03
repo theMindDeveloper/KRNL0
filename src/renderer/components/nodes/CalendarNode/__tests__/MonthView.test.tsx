@@ -399,3 +399,27 @@ describe('MonthView — picking a day', () => {
     expect(onCommand).toHaveBeenCalledWith('calendar.setView', { view: 'day' });
   });
 });
+
+describe('MonthView — drops (ADR 0001 §9)', () => {
+  const drop = (cell: Element, payload: unknown) => {
+    const data = JSON.stringify(payload);
+    const dataTransfer = { types: ['application/krnl-task'], getData: () => data, dropEffect: '' };
+    fireEvent.dragOver(cell, { dataTransfer });
+    fireEvent.drop(cell, { dataTransfer });
+  };
+
+  it('a scheduled task keeps its time of day on the new date; a Todo row starts at 09:00', () => {
+    useBoardStore.setState({
+      board: {
+        version: 1, schemaVersion: 2, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 }, edges: [], layoutMode: 'canvas',
+        nodes: [{ id: 't1', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'a', scheduledFor: '2026-05-04T14:30' } }],
+      } as never,
+    });
+    const onCommand = vi.fn();
+    render(<MonthView state={makeState()} config={makeConfig()} onCommand={onCommand} />);
+    drop(document.querySelector('[data-testid="month-cell-2026-05-12"]')!, { taskId: 't1' });
+    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't1', scheduledFor: '2026-05-12T14:30' });
+    drop(document.querySelector('[data-testid="month-cell-2026-05-13"]')!, { itemId: 'row1', durationMin: 25 });
+    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { itemId: 'row1', scheduledFor: '2026-05-13T09:00', scheduledDurationMin: 25 });
+  });
+});

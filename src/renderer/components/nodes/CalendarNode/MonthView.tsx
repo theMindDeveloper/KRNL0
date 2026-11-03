@@ -230,6 +230,31 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
     onCommand('calendar.selectDate', { date: ymd });
     onCommand('calendar.setAnchor', { date: ymd });
   };
+  // ADR 0001 §9 — a month day cell takes task drops (Todo rows, canvas tasks,
+  // other month chips). There is no hour here: a task that already has a time
+  // keeps its time of day on the new date; a new one starts at 09:00.
+  const isTaskDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('application/krnl-task');
+  const handleDrop = (ymd: string, e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.removeAttribute('data-drop-target');
+    if (!isTaskDrag(e)) return;
+    e.preventDefault();
+    let payload: { taskId?: string; itemId?: string; durationMin?: number };
+    try { payload = JSON.parse(e.dataTransfer.getData('application/krnl-task')) as typeof payload; } catch { return; }
+    const board = useBoardStore.getState().board;
+    const task = payload.taskId ? board?.nodes.find((n) => n.id === payload.taskId) : undefined;
+    const current = (task?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor;
+    const time = typeof current === 'string' && /T\d{2}:\d{2}/.test(current) ? current.slice(11, 16) : '09:00';
+    const scheduledFor = `${ymd}T${time}`;
+    if (payload.taskId) onCommand('calendar.schedule', { taskId: payload.taskId, scheduledFor });
+    else if (payload.itemId) {
+      onCommand('calendar.schedule', {
+        itemId: payload.itemId,
+        scheduledFor,
+        ...(typeof payload.durationMin === 'number' ? { scheduledDurationMin: payload.durationMin } : {}),
+      });
+    }
+  };
+
   const handleCellDoubleClick = (ymd: string) => {
     onCommand('calendar.setAnchor', { date: ymd });
     onCommand('calendar.setView', { view: 'day' });
@@ -448,9 +473,17 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
               data-testid={`month-cell-${ymd}`}
               data-date={ymd}
               data-today={isToday ? 'true' : undefined}
-              className={isToday ? 'krnl-month-cell--today' : undefined}
+              className={isToday ? 'krnl-month-cell krnl-month-cell--today' : 'krnl-month-cell'}
               onClick={inCurrentMonth ? () => handleCellClick(ymd) : undefined}
               onDoubleClick={inCurrentMonth ? () => handleCellDoubleClick(ymd) : undefined}
+              onDragOver={inCurrentMonth ? (e) => {
+                if (!isTaskDrag(e)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                e.currentTarget.setAttribute('data-drop-target', 'true');
+              } : undefined}
+              onDragLeave={inCurrentMonth ? (e) => e.currentTarget.removeAttribute('data-drop-target') : undefined}
+              onDrop={inCurrentMonth ? (e) => handleDrop(ymd, e) : undefined}
               style={{
                 position: 'relative',
                 background: isSelected && !isToday ? 'var(--paper-2)' : 'transparent',
@@ -542,7 +575,13 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     <div
                       key={task.id}
                       data-testid="month-task-chip"
-                      title={`${task.text} · click for details`}
+                      title={`${task.text} · click for details, drag to another day`}
+                      draggable
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: task.id }));
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
                       onClick={(e) => { e.stopPropagation(); setTaskPopup({ taskId: task.id, x: e.clientX, y: e.clientY }); }}
                       style={{
                         fontFamily: 'var(--font-mono)',
