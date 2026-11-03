@@ -1055,3 +1055,17 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Plan vs actual:** "+N more" when tasks don't fit (they were dropped silently).
 - **Analytics:** the per-card ☆ / − buttons are gone — they only appeared under the settings panel that covers the cards, and pinning never moved a card (each card has a fixed grid cell). Hiding stays in the settings panel.
 - **Review follow-ups (batches 5–8):** the mother-row height is saved only from a real two-row split; the clock stays locked to the calendar column when other bottom panels change; canvas Delete / Enter act only while focus is on the canvas (a selection left in the embedded canvas is safe while typing in a Station panel); EXITED survives a remount; a terminal's cleanup never removes a newer mount's host; the analytics view jump handles Summary and skips pages Easy mode hides; a stale save whose payload can't be normalised still merges.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 10): tasks, habit lanes, CLI parity
+
+**Type:** Bug Fix / Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `f6c9501` … `78a4c4b`
+**Files changed:** `TaskNode/index.tsx`, `HabitLaneNode/index.tsx`, `HabitNode/HabitContextMenu.tsx`, `Canvas/CanvasFlow.tsx`, `sys/{parser,SysFacade}.ts`, `sys/commands/{habit,task,text,analytics,clock,cal}.ts`, `shared/cli/commandRegistry.ts`, `docs/06-requirements/task-node.md` (F10 / F11), tests
+**Summary:**
+- **Task cards:** "Add parallel task" is saved (it lived only in memory, so the next CLI write or a quit lost it); an open-ended task shows "no set time" with no made-up estimate or overrun; opening "Edit time" and leaving it unchanged writes nothing (it used to turn an open-ended task into a fixed 25-minute one); the card's Delete offers UNDO.
+- **Habit lanes:** `krnl habit remove` / `archive` take the habit's lanes with them; an orphan lane's cleanup is saved and leaves no undo slot (undoing to it re-created the orphan, which deleted itself again — a stuck undo); an archived habit's lane goes away; new "Unpin lane (keep the habit)"; the lane's Delete offers UNDO; the 7-day strip follows the same schedule rule as the tick; lane numbers count lanes instead of reading uuid digits.
+- **Frames:** a task moved on one canvas also leaves frames on the other canvases.
+- **CLI parity (hard rule 8):** `text look <id> --note|--sticky|--shape …|--color`, `analytics cards | hide | unhide | reset-cards`, `clock half [am|pm]`, `cal zoom <1-6>`; `task addNext`'s placeholder estimate follows the source's plan as the canvas does.
