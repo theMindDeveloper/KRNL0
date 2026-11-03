@@ -361,30 +361,8 @@ function ChartCard({
         </span>
         <div style={{ flex: 1 }} />
         {toolbar}
-        {settingsOpen && (
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button
-              type="button"
-              data-testid={`analytics-card-pin-${cardId}`}
-              onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              title={pinned ? 'Unpin card' : 'Pin to top'}
-              style={cardActionBtn(pinned, 'var(--acid)')}
-            >
-              {pinned ? '★' : '☆'}
-            </button>
-            <button
-              type="button"
-              data-testid={`analytics-card-hide-${cardId}`}
-              onClick={(e) => { e.stopPropagation(); onToggleHidden(); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              title="Hide card"
-              style={cardActionBtn(false, 'var(--k-an-warm, #ff8e64)')}
-            >
-              −
-            </button>
-          </div>
-        )}
+        {/* Hiding cards lives in the settings panel; the old per-card ☆ / −
+            buttons only showed while that panel covered the cards. */}
       </div>
       <div
         ref={hostRef}
@@ -402,25 +380,6 @@ function ChartCard({
       </div>
     </div>
   );
-}
-
-function cardActionBtn(active: boolean, accent: string): React.CSSProperties {
-  return {
-    width: 22,
-    height: 22,
-    display: 'grid',
-    placeItems: 'center',
-    background: active ? accent : 'transparent',
-    color: active ? 'var(--k-an-on-accent, #0e1012)' : accent,
-    border: `1px solid ${accent}`,
-    borderRadius: 4,
-    cursor: 'pointer',
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    fontWeight: 700,
-    lineHeight: 1,
-    padding: 0,
-  };
 }
 
 // Most chart components still take width/height props. Pad the measured host
