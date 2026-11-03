@@ -14,6 +14,9 @@ export interface TermSurface {
   getSelection?(): string;
   clearSelection?(): void;
   scrollToTop?(): void;
+  /** xterm's paste: normalises line endings and wraps the text in bracketed-
+   *  paste markers when the shell asked for them, then emits it via onData. */
+  paste?(text: string): void;
 }
 
 /** Minimal FitAddon surface. */
@@ -176,7 +179,11 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
       // Prevent xterm from emitting ^V (0x16) to the pty, then paste.
       void (async () => {
         const text = await krnl.clipboardReadText?.();
-        if (text && sid) void krnl.ptyWrite(sid, text);
+        if (!text || !sid) return;
+        // Through xterm's paste, so a multi-line paste reaches the shell as
+        // one paste (bracketed) instead of running each line as typed.
+        if (term.paste) term.paste(text);
+        else void krnl.ptyWrite(sid, text);
       })();
       return false;
     }

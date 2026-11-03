@@ -88,7 +88,11 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     const sid = sessionIdRef.current;
     if (!sid) return;
     const text = await window.krnl?.clipboardReadText();
-    if (text) void window.krnl?.ptyWrite(sid, text);
+    if (!text) return;
+    // xterm's paste (bracketed when the shell wants it), as Ctrl+V does.
+    const t = termRef.current;
+    if (t) t.paste(text);
+    else void window.krnl?.ptyWrite(sid, text);
   };
   const selectAll = () => termRef.current?.selectAll();
 

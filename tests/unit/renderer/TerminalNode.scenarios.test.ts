@@ -653,3 +653,20 @@ describe('shell exit and restart', () => {
     expect(handler!({ type: 'keydown', key: 'L', ctrlKey: true, shiftKey: true, metaKey: false, altKey: false } as KeyboardEvent)).toBe(false);
   });
 });
+
+describe('paste goes through xterm', () => {
+  it('Ctrl+V hands the clipboard to term.paste (bracketed, one paste) instead of raw writes', async () => {
+    let handler: ((e: KeyboardEvent) => boolean) | null = null;
+    const { deps, krnl } = makeDeps();
+    const paste = vi.fn();
+    Object.assign(deps.term, {
+      paste,
+      attachCustomKeyEventHandler: (h: (e: KeyboardEvent) => boolean) => { handler = h; },
+    });
+    krnl.clipboardReadTextMock.mockResolvedValueOnce('line 1\nline 2');
+    await startTerminalSession(deps);
+    handler!({ type: 'keydown', key: 'v', ctrlKey: true, shiftKey: false, metaKey: false, altKey: false } as KeyboardEvent);
+    await vi.waitFor(() => expect(paste).toHaveBeenCalledWith('line 1\nline 2'));
+    expect(krnl.ptyWriteMock).not.toHaveBeenCalled();
+  });
+});
