@@ -11,7 +11,7 @@
 import { useEffect } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import type { LayoutMode } from '../../../shared/types';
-import { shortcutBlocked } from '../../utils/keyboardTargets';
+import { isModalOpen } from '../../utils/keyboardTargets';
 
 export function LayoutModeToggle() {
   const layoutMode = useBoardStore((s) => s.board?.layoutMode ?? 'canvas');
@@ -28,7 +28,9 @@ export function LayoutModeToggle() {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod || !e.shiftKey) return;
       if (e.key !== 'L' && e.key !== 'l') return;
-      if (shortcutBlocked(e)) return;
+      // A chord no field or shell uses, so it also works from the terminal
+      // (which holds focus at start); only a modal dialog blocks it.
+      if (isModalOpen()) return;
       e.preventDefault();
       toggle();
     };

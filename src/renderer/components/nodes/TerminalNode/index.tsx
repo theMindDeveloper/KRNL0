@@ -19,6 +19,10 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  // The shell ran and is gone (exit / crash): the badge says so until Enter
+  // starts a new one (session.ts).
+  const hadSessionRef = useRef(false);
+  const ended = activeSessionId === null && hadSessionRef.current;
   // xterm colours come from the frame-style manifest and follow live switches (ADR 0009 F8).
   const { style: frameStyle, mode: frameMode } = useFrameTheme();
   const xtermColors = xtermFor(frameStyle, frameMode);
@@ -144,7 +148,17 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
         fit,
         krnl: window.krnl,
         onCommand,
-        setSessionId: (id) => { sessionIdRef.current = id; setActiveSessionId(id); },
+        setSessionId: (id) => {
+          sessionIdRef.current = id;
+          if (id) {
+            hadSessionRef.current = true;
+            // Resizes during the spawn were dropped (no id yet): catch up once.
+            try { fitRef.current?.fit(); } catch { /* ignore */ }
+            const t = termRef.current;
+            if (t) window.krnl?.ptyResize(id, t.cols, t.rows);
+          }
+          setActiveSessionId(id);
+        },
         isCancelled: () => cancelled,
       });
       if (cancelled) sessionCleanup?.();
@@ -259,6 +273,8 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           {/* LIVE badge */}
           <div
             className="badge"
+            data-testid="term-badge"
+            title={ended ? 'The shell exited — press Enter in the terminal to start a new one' : undefined}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -267,8 +283,9 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
               fontSize: 9,
               // The terminal is dark in every theme: use the accent that stays
               // light on dark (Macintosh light's --acid is near-black).
-              color: 'var(--term-bg)',
-              background: 'var(--accent-on-dark)',
+              color: ended ? 'var(--ink-3)' : 'var(--term-bg)',
+              background: ended ? 'transparent' : 'var(--accent-on-dark)',
+              border: ended ? '1px solid var(--ink-4)' : '1px solid transparent',
               padding: '2px 6px',
               borderRadius: 3,
               fontWeight: 600,
@@ -280,9 +297,10 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
               style={{
                 width: 4, height: 4, borderRadius: '50%',
                 background: 'var(--term-bg)', flexShrink: 0,
+                display: ended ? 'none' : undefined,
               }}
             />
-            {LIVE_BADGE_TEXT}
+            {ended ? 'EXITED' : LIVE_BADGE_TEXT}
           </div>
         </div>
 
@@ -326,6 +344,9 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
             setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
           }}
           onKeyDown={(e) => {
+            // Ctrl/Cmd+Shift+L is the app's layout toggle: let it reach the
+            // window (session.ts keeps it away from the shell).
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'L' || e.key === 'l')) return;
             e.stopPropagation();
             // Ctrl+Shift+C → explicit copy (Ctrl+C alone is SIGINT, handled
             // in session.ts attachCustomKeyEventHandler).

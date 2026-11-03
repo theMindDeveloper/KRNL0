@@ -611,3 +611,45 @@ describe('F8 — React Flow Handles', () => {
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// A shell that exits or fails to start never leaves a dead terminal
+// ---------------------------------------------------------------------------
+
+describe('shell exit and restart', () => {
+  it('after `exit`, Enter starts a new shell and input goes to it', async () => {
+    const { deps, term, krnl } = makeDeps();
+    const ids: Array<string | null> = [];
+    deps.setSessionId = (id) => { ids.push(id); };
+    await startTerminalSession(deps);
+    krnl.fireExit();
+    expect(term.writeCalls.join('')).toMatch(/Process exited\] Press Enter/);
+    expect(ids.at(-1)).toBeNull();
+    // Typing while dead is not sent anywhere; Enter restarts.
+    term.simulateInput('x');
+    expect(krnl.ptyWriteMock).not.toHaveBeenCalled();
+    krnl.ptyCreateMock.mockResolvedValueOnce({ sessionId: 'sid-2', motd: '' });
+    term.simulateInput('\r');
+    await vi.waitFor(() => expect(ids.at(-1)).toBe('sid-2'));
+    term.simulateInput('ls');
+    expect(krnl.ptyWriteMock).toHaveBeenCalledWith('sid-2', 'ls');
+  });
+
+  it('a shell that cannot start says why and retries on Enter', async () => {
+    const { deps, term, krnl } = makeDeps();
+    krnl.ptyCreateMock.mockRejectedValueOnce(new Error('pwsh.exe not found'));
+    const cleanup = await startTerminalSession(deps);
+    expect(term.writeCalls.join('')).toMatch(/could not start: pwsh\.exe not found/);
+    term.simulateInput('\r');
+    await vi.waitFor(() => expect(krnl.ptyCreateMock).toHaveBeenCalledTimes(2));
+    cleanup();
+  });
+
+  it('Ctrl+Shift+L is kept from the shell (it is the layout toggle)', async () => {
+    let handler: ((e: KeyboardEvent) => boolean) | null = null;
+    const { deps } = makeDeps();
+    (deps.term as { attachCustomKeyEventHandler?: (h: (e: KeyboardEvent) => boolean) => void }).attachCustomKeyEventHandler = (h) => { handler = h; };
+    await startTerminalSession(deps);
+    expect(handler!({ type: 'keydown', key: 'L', ctrlKey: true, shiftKey: true, metaKey: false, altKey: false } as KeyboardEvent)).toBe(false);
+  });
+});
