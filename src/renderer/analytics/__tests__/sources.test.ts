@@ -67,9 +67,11 @@ describe('habitSource', () => {
       },
     ]);
     const events = habitSource.collect(board);
-    expect(events).toHaveLength(3);
+    // Archiving stops tracking a habit; the days it was done still count.
+    expect(events).toHaveLength(4);
     expect(events.every((e) => e.type === 'habit.checkin')).toBe(true);
     expect(events.filter((e) => e.date === '2026-05-11')).toHaveLength(2);
+    expect(events.some((e) => (e.metadata as { habitId: string }).habitId === 'c')).toBe(true);
   });
 });
 
