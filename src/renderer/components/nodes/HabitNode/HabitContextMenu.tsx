@@ -29,6 +29,8 @@ interface Props {
   onPinAsLane?: () => void;
   // True when a lane already exists for this habit; disables the pin item.
   laneExists?: boolean;
+  // Only a lane's own menu passes this: remove the lane, keep the habit.
+  onUnpinLane?: () => void;
 }
 
 const MENU_WIDTH = 232;
@@ -44,6 +46,7 @@ export function HabitContextMenu({
   onClose,
   onPinAsLane,
   laneExists,
+  onUnpinLane,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -414,6 +417,16 @@ export function HabitContextMenu({
             </button>
           </div>
         </div>
+      )}
+
+      {onUnpinLane && (
+        <>
+          <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
+          <MenuItem
+            label="Unpin lane (keep the habit)"
+            onClick={() => { onUnpinLane(); onClose(); }}
+          />
+        </>
       )}
 
       {onPinAsLane && (

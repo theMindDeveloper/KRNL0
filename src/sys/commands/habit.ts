@@ -91,6 +91,27 @@ function writeBoard(ctx: HabitCtx, board: BoardShape, mother: MotherHabitNode): 
   ctx.onBoardChanged?.();
 }
 
+/** Drop the canvas lanes pinned for a habit (and their edges), as the UI does. */
+function removeLanesFor(board: BoardShape, habitId: string): number {
+  const laneIds = new Set(
+    board.nodes
+      .filter((n) => typeof n === 'object' && n !== null
+        && (n as { kind?: unknown }).kind === 'habit.lane'
+        && ((n as { state?: { habitId?: unknown } }).state?.habitId === habitId))
+      .map((n) => (n as { id: string }).id),
+  );
+  if (laneIds.size === 0) return 0;
+  board.nodes = board.nodes.filter((n) => !laneIds.has((n as { id?: string }).id ?? ''));
+  const edges = (board as { edges?: unknown[] }).edges;
+  if (Array.isArray(edges)) {
+    (board as { edges?: unknown[] }).edges = edges.filter((e) => {
+      const ed = e as { from?: { nodeId?: string }; to?: { nodeId?: string } };
+      return !laneIds.has(ed.from?.nodeId ?? '') && !laneIds.has(ed.to?.nodeId ?? '');
+    });
+  }
+  return laneIds.size;
+}
+
 // Resolve idOrName → habit. Order: exact id → ≥4-char id prefix → exact name
 // (case-insensitive). Mirrors the global resolveRef rule for consistency.
 function resolveHabit(
@@ -265,10 +286,13 @@ export async function cliRemove(
   const resolved = resolveHabit(mother.state, idOrName);
   if ('error' in resolved) return { ok: false, message: resolved.error };
   mother.state = habitRemove(mother.state, { id: resolved.habit.id });
+  // Its lanes go with it (left behind they were orphans that only the open
+  // window cleaned up, in memory).
+  const lanes = removeLanesFor(board, resolved.habit.id);
   writeBoard(ctx, board, mother);
   return {
     ok: true,
-    message: `habit removed: "${resolved.habit.name}"`,
+    message: `habit removed: "${resolved.habit.name}"${lanes ? ` (and ${lanes} lane${lanes === 1 ? '' : 's'})` : ''}`,
     data: { id: resolved.habit.id },
   };
 }
@@ -521,10 +545,12 @@ export async function cliArchive(
     return { ok: true, message: `habit "${resolved.habit.name}" is already archived`, data: { id: resolved.habit.id } };
   }
   mother.state = habitArchive(mother.state, { id: resolved.habit.id });
+  // An archived habit isn't tracked: no lane to tick on the canvas.
+  const lanes = removeLanesFor(board, resolved.habit.id);
   writeBoard(ctx, board, mother);
   return {
     ok: true,
-    message: `habit archived: "${resolved.habit.name}"`,
+    message: `habit archived: "${resolved.habit.name}"${lanes ? ` (lane removed)` : ''}`,
     data: { id: resolved.habit.id },
   };
 }
