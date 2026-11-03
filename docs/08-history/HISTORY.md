@@ -1014,3 +1014,17 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Smaller:** selecting text in a note or frame label no longer drags the node; long notes scroll while editing; the habit add field clears on Escape and never drops a half-set repeat silently; a picked image that can't be used says why on the node; a brand-new board is greeted with an introduction and a pointer to the tour.
 - **Todo F10 retired:** a single click on a row's text was specified to start its pomo, but it would fire on the first half of every double-click (rename). "Start pomo" stays in the row menu; the misleading pointer cursor is gone.
 - **Dev:** pure helpers moved out of the Pomo, Clock, Task, Week and Year component files, so React Fast Refresh hot-swaps them instead of reloading the page. The stale-save merge is now also covered through the real `board:save` IPC handler.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 7): terminal that survives, Station sizes, notes
+
+**Type:** Bug Fix / Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `f32406c` … `a42f113`
+**Files changed:** `TerminalNode/{index.tsx,session.ts,liveTerminals.ts (new)}`, `main/{ipc/handlers.ts,preload.ts}`, `renderer/env.d.ts`, `store/useCliDispatch.ts`, `Station/{StationLayout.tsx,restoredSizes.ts (new),useStationViewportGate.ts}`, `Canvas/CanvasFlow.tsx`, `ui/LayoutModeToggle.tsx`, `TextNode/{index.tsx,editEvent.ts (new)}`, `shared/{types/board.ts,schemas/board.schema.ts}`, `docs/06-requirements/terminal-node.md` (F4 / F15 amended), tests (+ xterm mock `options` / `refresh`)
+**Summary:**
+- **Terminal survives remounts:** switching Station ↔ Canvas, hiding the terminal panel or swapping slots used to kill the shell (and whatever ran in it, the AI included) and wipe the output. The xterm and its PTY now live in a per-node registry; unmount detaches, the next mount re-attaches and refits. Shells still end with their window (main kills them on reload / navigation / crash / close). Spec F4 / F15 amended.
+- **Terminal never dead:** after `exit` (or a crash) the badge reads EXITED and Enter starts a new shell; a shell that cannot start prints why in red and retries on Enter (it used to be a blank black box). One catch-up resize after spawn, so the PTY never keeps stale columns. `krnl term setShell` is now used for the next shell (it was saved but never read). Ctrl+Shift+L works from inside the terminal. A short panel gets the one-line banner. The right-click menu is the shared ContextMenu (closes on outside click, not clipped by narrow panels).
+- **Station:** in the narrow-window fallback (below 1024 × 640) the canvas now draws the mother nodes, and Dock "A" / ensure-visible act as Canvas mode. Panel sizes (row split, top columns, every bottom panel) come back after a reload or a layout switch.
+- **Notes:** a note whose text runs past its box fades at the bottom; Enter or F2 opens the selected note for editing.
