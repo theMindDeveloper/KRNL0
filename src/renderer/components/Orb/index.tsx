@@ -35,6 +35,7 @@ import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
 import { Z } from '../ui/layers';
+import { isTypingTarget, isControlTarget, isModalOpen } from '../../utils/keyboardTargets';
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'running';
 interface ChatMsg { role: 'user' | 'ai'; text: string }
@@ -375,16 +376,13 @@ export function Orb() {
 
   // ── Space push-to-talk ────────────────────────────────────────────────────
   useEffect(() => {
-    const isTypingTarget = (t: EventTarget | null): boolean => {
-      if (!(t instanceof HTMLElement)) return false;
-      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return true;
-      const active = document.activeElement as HTMLElement | null;
-      if (active?.closest('.term-body') || active?.closest('.xterm')) return true;
-      return false;
-    };
+    // Space belongs to whatever has focus: a field, the terminal, or a
+    // button / radio / switch it activates. Push-to-talk only takes a Space
+    // nothing else would use, and never behind a modal.
+    const spaceTaken = (t: EventTarget | null): boolean => isTypingTarget(t) || isControlTarget(t) || isModalOpen();
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape' && open) { setOpen(false); return; }
-      if (isTypingTarget(e.target)) return;
+      if (spaceTaken(e.target)) return;
       if (e.code === 'Space' && orbState === 'idle') {
         e.preventDefault();
         setOrbState('listening');

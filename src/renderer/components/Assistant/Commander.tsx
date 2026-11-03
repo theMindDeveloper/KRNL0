@@ -76,6 +76,9 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
     >
       {/* Popup — same gradient/glass treatment as orb chat panel */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Commander — new session"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 460,

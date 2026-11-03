@@ -6,7 +6,7 @@
  * Theme toggle writes data-theme on <html> and persists to localStorage.
  */
 
-import { useState, useLayoutEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutModeToggle } from '../ui/LayoutModeToggle';
@@ -233,9 +233,22 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
   const factoryReset = useBoardStore((s) => s.factoryReset);
   const setUiMode = useBoardStore((s) => s.setUiMode);
   const easy = useEasyMode();
+  // Escape closes, like every other dialog — unless a dropdown inside handles it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if ((e.target as HTMLElement | null)?.closest?.('[data-own-escape]')) return;
+      onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return createPortal(
     <div
       data-testid="settings-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
       onClick={onClose}
       style={{
         position: 'fixed',

@@ -19,6 +19,7 @@ import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { useBoardStore } from '../../store/boardStore';
 import { useDrawStore } from '../../store/drawStore';
 import { STICKY_COLORS, type TextLook } from '../nodes/TextNode/types';
+import { shortcutBlocked } from '../../utils/keyboardTargets';
 
 type ToolMode = 'select' | 'connect';
 
@@ -203,18 +204,9 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
   // Register keyboard shortcuts (F8)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-        return;
-      }
-      // Bail when focus is inside any terminal node — xterm focus may live on
-      // a hidden helper textarea, but if focus has fallen to the body the
-      // tagName check above misses it. Treat anything inside .term-body /
-      // .xterm as "user is typing in the terminal."
-      const active = document.activeElement as HTMLElement | null;
-      if (active?.closest('.term-body') || active?.closest('.xterm')) {
-        return;
-      }
+      // Not while typing (fields, the terminal) and not behind a modal: N, S,
+      // F… would add nodes to a board the user can't see.
+      if (shortcutBlocked(e)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'v' || e.key === 'V') {
         handleTool('select');

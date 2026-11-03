@@ -68,6 +68,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
       <div
         data-testid="habit-swap-modal"
         role="dialog"
+        aria-modal="true"
         aria-label={`Repeat ${habitName}`}
         onClick={stop} onPointerDown={stop} onPointerUp={stop} onMouseDown={stop} onMouseUp={stop} onContextMenu={stop}
         style={{

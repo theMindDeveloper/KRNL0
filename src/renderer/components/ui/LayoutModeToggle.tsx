@@ -11,6 +11,7 @@
 import { useEffect } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import type { LayoutMode } from '../../../shared/types';
+import { shortcutBlocked } from '../../utils/keyboardTargets';
 
 export function LayoutModeToggle() {
   const layoutMode = useBoardStore((s) => s.board?.layoutMode ?? 'canvas');
@@ -27,9 +28,7 @@ export function LayoutModeToggle() {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod || !e.shiftKey) return;
       if (e.key !== 'L' && e.key !== 'l') return;
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      if (shortcutBlocked(e)) return;
       e.preventDefault();
       toggle();
     };

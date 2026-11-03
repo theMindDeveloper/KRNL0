@@ -74,6 +74,7 @@ import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types'
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
+import { shortcutBlocked } from '../../utils/keyboardTargets';
 
 // Canvas-mode mother row: first slot x and the step between slots (540 wide +
 // 20 gap) — matches the seeded positions in main/persistence/board.ts.
@@ -782,21 +783,32 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
 
-  // Delete / Backspace removes selected drawings (other nodes delete from
-  // their right-click menu).
+  // Delete / Backspace removes what is selected: drawings and free nodes
+  // (tasks with their chain cascade, as from the right-click menu). Mother
+  // nodes are fixed and never deleted. Ctrl+Z brings it back.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.xterm'))) return;
-      const ids = getNodes().filter((n) => n.selected && isStrokeId(n.id)).map((n) => n.id.slice(STROKE_NODE_PREFIX.length));
-      if (!ids.length) return;
+      if (shortcutBlocked(e)) return;
+      const board = useBoardStore.getState().board;
+      const selected = getNodes().filter((n) => n.selected).map((n) => n.id);
+      const strokeIds = selected.filter(isStrokeId).map((id) => id.slice(STROKE_NODE_PREFIX.length));
+      const nodes = selected
+        .filter((id) => !isStrokeId(id))
+        .map((id) => board?.nodes.find((n) => n.id === id))
+        .filter((n): n is NonNullable<typeof n> => !!n && !n.isMother);
+      if (!strokeIds.length && !nodes.length) return;
       e.preventDefault();
-      useBoardStore.getState().removeStrokes(ids);
+      if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
+      const taskIds = nodes.filter((n) => n.kind === 'todo.task').map((n) => n.id);
+      if (taskIds.length) deleteTaskNodesCascade(taskIds);
+      for (const n of nodes) if (n.kind !== 'todo.task') removeNode(n.id);
+      const updated = useBoardStore.getState().board;
+      if (updated && nodes.length) void saveBoard(updated);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [getNodes]);
+  }, [getNodes, removeNode]);
 
   // Global undo/redo: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z = redo.
   // Skipped when focus is on an editable surface so it doesn't fight inputs.
@@ -804,9 +816,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      if (shortcutBlocked(e)) return;
       const key = e.key.toLowerCase();
       if (key === 'z' && !e.shiftKey) {
         e.preventDefault();
