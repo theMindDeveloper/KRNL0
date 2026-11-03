@@ -17,7 +17,7 @@
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
@@ -71,6 +71,18 @@ import {
   defaultAnalyticsState,
 } from './types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
+
+// The page each (older) view name opens: `krnl analytics show --view …` and
+// the saved view land on their page instead of always on Summary.
+const VIEW_PAGE: Record<AnalyticsView, PageId> = {
+  overview: 'summary',
+  calendar: 'year',
+  patterns: 'hours',
+  insights: 'insights',
+  estimates: 'estimates',
+  time: 'tags',
+  sources: 'habits',
+};
 
 const VIEW_LABELS: Record<AnalyticsView, string> = {
   overview: 'Overview',
@@ -457,6 +469,15 @@ export function AnalyticsNode({
     setCurrentCard(item?.getAttribute('data-card-id') ?? (item ? 'summary' : null));
     setJumpTo(null);
   }, []);
+
+  // Open the saved / CLI-set view's page. Deferred a frame so the pager has
+  // measured its cards (and its first page report has passed).
+  useEffect(() => {
+    const page = view ? VIEW_PAGE[view] : undefined;
+    if (!page || page === 'summary') return;
+    const id = requestAnimationFrame(() => setJumpTo(pageSelector(page)));
+    return () => cancelAnimationFrame(id);
+  }, [view]);
 
   // Plain-language summary on top of Overview (same text as `analytics summary`).
   const summary = summarizeAnalytics(analytics, range, prevRange, state.rangeDays);
