@@ -78,7 +78,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Control the Pomodoro timer',
     subcommands: [
       { name: 'start', usage: 'pomo start [--label "..."] [--minutes 25]', summary: 'Start a pomo session' },
-      { name: 'stop', usage: 'pomo stop', summary: 'Stop the timer and record the in-flight span' },
+      { name: 'stop', usage: 'pomo stop [--at HH:MM|YYYY-MM-DDTHH:MM]', summary: 'Stop the timer and record the in-flight span (--at: end it at an earlier moment, e.g. when you left)' },
       { name: 'pause', usage: 'pomo pause', summary: 'Pause a running session' },
       { name: 'resume', usage: 'pomo resume', summary: 'Resume a paused session, or go back to work from a break (records the break)' },
       { name: 'break', usage: 'pomo break', summary: 'Switch from work to an open-ended break' },

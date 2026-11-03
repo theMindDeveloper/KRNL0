@@ -409,6 +409,22 @@ export const pomoStop = (
 };
 
 /**
+ * Stop as if Stop had been pressed at `atMs` — for time the app could not
+ * see (the machine slept, or the app was closed while the pomo ran). The
+ * span ends at `atMs`, clamped between its start and now; nothing after it
+ * is recorded. Same records as pomoStop otherwise.
+ */
+export const pomoStopAt = (
+  state: PomoState,
+  args: { atMs: number },
+  env: PomoEnv = defaultEnv,
+): PomoState => {
+  if (state.startedAt === null || (state.status !== 'running' && state.status !== 'break')) return pomoStop(state, {}, env);
+  const at = Math.min(env.now(), Math.max(Date.parse(state.startedAt), args.atMs));
+  return pomoStop(state, {}, { now: () => at, uuid: env.uuid });
+};
+
+/**
  * #12 — delete a recorded segment by id. Removes it from history so it vanishes
  * from the Clock, Calendar AND analytics (pomoSource reads history live). No-op
  * if the id isn't present. Goes through a normal history-pushed store mutation

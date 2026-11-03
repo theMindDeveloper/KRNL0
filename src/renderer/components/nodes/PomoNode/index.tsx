@@ -23,8 +23,20 @@ import { DoingPicker, type DoingChoice } from './DoingPicker';
 import { SpanLog } from './SpanLog';
 import { useEasyMode } from '../../../store/uiMode';
 import { ObserveDash } from './ObserveDash';
+import { useAwayGap } from './useAwayGap';
 
 const TICK_MS = 500;
+
+/** "18:02" — local wall-clock time of an epoch ms. */
+const clockHM = (ms: number): string => {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+/** "15h 12m" / "42m". */
+const spanText = (ms: number): string => {
+  const min = Math.round(ms / 60_000);
+  return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`;
+};
 
 function formatRemaining(ms: number): string {
   const safe = Math.max(0, ms);
@@ -136,7 +148,9 @@ export function PomoNode({
   // Easy mode is always Observe and never asks, names or links anything.
   const easy = useEasyMode();
   const observe = easy || config.mode === 'observe';
-  const promptDone = !observe && state.status === 'running' && liveWorkMs >= thresholdMs;
+  // Time the app couldn't see (sleep / closed app) is asked about, not booked.
+  const { gap: away, dismiss: dismissAway } = useAwayGap(state.status, state.startedAt);
+  const promptDone = !away && !observe && state.status === 'running' && liveWorkMs >= thresholdMs;
 
   // Issue #166 slice 5 — OS notification when threshold is first reached.
   // Fires once per transition false→true; uses Web Notification API (works
@@ -902,7 +916,38 @@ export function PomoNode({
 
           {/* Observe mode: Start → (Break ⇄ Back to work) → Stop. Work and
               breaks are both recorded spans; there is no pause. */}
-          {observe && state.status !== 'paused' ? (
+          {away ? (
+            <div
+              data-testid="pomo-away"
+              className="pomo-controls"
+              style={{
+                display: 'flex', flexDirection: 'column', gap: 6, padding: '8px',
+                border: '1px solid var(--rust)', borderRadius: 6,
+                background: 'color-mix(in srgb, var(--rust) 8%, transparent)',
+              }}
+            >
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--ink)', textAlign: 'center', letterSpacing: '0.04em' }}>
+                AWAY {clockHM(away.fromMs)}–{clockHM(away.toMs)} · {spanText(away.toMs - away.fromMs)}
+              </span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'center' }}>
+                The {state.status === 'break' ? 'break' : 'timer'} kept running. Count that time?
+              </span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" data-testid="pomo-away-keep" onClick={dismissAway} style={ghostBtnStyle} title="Keep the whole span as recorded">
+                  COUNT IT
+                </button>
+                <button
+                  type="button"
+                  data-testid="pomo-away-stop"
+                  onClick={() => { onCommand('pomo.stop', { atMs: away.fromMs }); dismissAway(); }}
+                  style={primaryBtnStyle}
+                  title="Record the span up to when you left, and stop"
+                >
+                  STOP AT {clockHM(away.fromMs)}
+                </button>
+              </div>
+            </div>
+          ) : observe && state.status !== 'paused' ? (
             <div className="pomo-controls" style={{ display: 'flex', gap: 6 }}>
               {state.status === 'running' && (
                 <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={{ ...ghostBtnStyle, height: 38 }} title="Break — records the work so far, then times your break">

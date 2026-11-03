@@ -438,7 +438,7 @@ export class SysFacade {
     if (command.kind === 'pomo') {
       switch (command.sub) {
         case 'start':  return pomoStart(command.label, command.minutes);
-        case 'stop':   return pomoStop();
+        case 'stop':   return pomoStop(command.at);
         case 'break':  return pomoBreak();
         case 'extend': return pomoExtend();
         case 'pause':  return pomoPause();

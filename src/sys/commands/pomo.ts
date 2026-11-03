@@ -4,6 +4,7 @@ import { OBSERVE_SPAN_MIN, TIMER_FACES } from '../../renderer/components/nodes/P
 import {
   pomoStart as fsmStart,
   pomoStop as fsmStop,
+  pomoStopAt as fsmStopAt,
   pomoBreak as fsmBreak,
   pomoExtend as fsmExtend,
   pomoPause as fsmPause,
@@ -143,17 +144,45 @@ export function pomoDiscard(): SysResult {
 }
 
 /** Issue #166 — record the in-flight segment before going idle. */
-export function pomoStop(): SysResult {
+/**
+ * `pomo stop [--at HH:MM|YYYY-MM-DDTHH:MM]` — record the in-flight span and go
+ * idle. `--at` ends it at an earlier moment (time the machine slept or the
+ * app was closed is then not counted).
+ */
+export function pomoStop(at?: string): SysResult {
+  let atMs: number | undefined;
+  if (at !== undefined) {
+    atMs = parseStopAt(at, Date.now());
+    if (atMs === undefined) return { ok: false, message: `bad --at "${at}" (want HH:MM today or YYYY-MM-DDTHH:MM)` };
+    if (atMs > Date.now()) return { ok: false, message: `--at ${at} is in the future` };
+  }
   let found = false;
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);
     if (!node) return;
     const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
-    node['state'] = fsmStop(prev, {}, cliEnv());
+    node['state'] = atMs !== undefined ? fsmStopAt(prev, { atMs }, cliEnv()) : fsmStop(prev, {}, cliEnv());
     found = true;
   });
   if (!found) return { ok: false, message: 'No Pomodoro node found on the board' };
-  return { ok: true, message: 'Pomodoro stopped' };
+  return { ok: true, message: at !== undefined ? `Pomodoro stopped as of ${at}` : 'Pomodoro stopped' };
+}
+
+/** "HH:MM" (today, local) or "YYYY-MM-DDTHH:MM" (local) → epoch ms. */
+export function parseStopAt(at: string, nowMs: number): number | undefined {
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(at);
+  if (hm) {
+    const h = Number(hm[1]);
+    const m = Number(hm[2]);
+    if (h > 23 || m > 59) return undefined;
+    const d = new Date(nowMs);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+  }
+  const full = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(at);
+  if (!full) return undefined;
+  const [y, mo, d, h, mi] = full.slice(1).map(Number) as [number, number, number, number, number];
+  const t = new Date(y, mo - 1, d, h, mi);
+  return t.getMonth() === mo - 1 && t.getDate() === d && h < 24 && mi < 60 ? t.getTime() : undefined;
 }
 
 /** Issue #166 — transition running/paused → break, recording the work span. */

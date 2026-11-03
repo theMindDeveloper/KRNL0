@@ -68,6 +68,7 @@ import {
   pomoBreak,
   pomoExtend,
   pomoStop,
+  pomoStopAt,
   pomoSetConfig,
   pomoSetFace,
   pomoClearActiveTask,
@@ -291,7 +292,14 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         // Issue #166 — observer-model verbs.
         case 'pomo.break':    return { state: observeBlips(pomoBreak(s as never)) };
         case 'pomo.extend':   return { state: pomoExtend(s as never) };
-        case 'pomo.stop':     return { state: observeBlips(pomoStop(s as never)) };
+        case 'pomo.stop': {
+          // `atMs`: stop as of an earlier moment (the away prompt).
+          const atMs = args['atMs'];
+          const stopped = typeof atMs === 'number' && Number.isFinite(atMs)
+            ? pomoStopAt(s as never, { atMs })
+            : pomoStop(s as never);
+          return { state: observeBlips(stopped) };
+        }
         case 'pomo.setConfig': {
           const config = pomoSetConfig(pomoCfg, args as never);
           // An idle timer shows its next session length; keep it in step.

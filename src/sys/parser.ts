@@ -6,7 +6,7 @@ export type SysCommand =
   | { kind: 'node'; sub: 'remove'; id: string | undefined; force: boolean }
   | { kind: 'node'; sub: 'set-position'; id: string | undefined; x: number | undefined; y: number | undefined }
   | { kind: 'node'; sub: 'add'; nodeKind: string | undefined; at: { x: number; y: number } | undefined }
-  | { kind: 'pomo'; sub: 'stop' | 'status' | 'break' | 'extend' | 'pause' | 'resume' | 'discard' }
+  | { kind: 'pomo'; sub: 'stop' | 'status' | 'break' | 'extend' | 'pause' | 'resume' | 'discard'; at?: string }
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
   | { kind: 'pomo'; sub: 'tag'; ref: string | undefined }
   | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined; text?: string | undefined; tag?: string | undefined }
@@ -285,7 +285,11 @@ export class SysParser {
     }
 
     if (cmd === 'pomo') {
-      if (sub === 'stop' || sub === 'status' || sub === 'break' || sub === 'extend'
+      if (sub === 'stop') {
+        const at = flag(rest, 'at');
+        return at !== undefined ? { kind: 'pomo', sub, at } : { kind: 'pomo', sub };
+      }
+      if (sub === 'status' || sub === 'break' || sub === 'extend'
         || sub === 'pause' || sub === 'resume' || sub === 'discard')
         return { kind: 'pomo', sub };
       if (sub === 'tag') return { kind: 'pomo', sub: 'tag', ref: rest[0] };
