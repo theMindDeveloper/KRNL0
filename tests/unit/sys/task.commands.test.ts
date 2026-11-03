@@ -19,6 +19,9 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   taskAdd,
+  taskAddNext,
+  taskSchedule,
+  taskUnschedule,
   taskEdit,
   taskToggle,
   taskDelete,
@@ -361,6 +364,31 @@ describe('sys task delete', () => {
   it('returns error when task id is unknown', async () => {
     const res = await taskDelete(ctx, 'nonexistent');
     expect(res.ok).toBe(false);
+  });
+});
+
+// ── parity with the canvas: chains and the running pomo ────────────────────────
+
+describe('sys task — chain and pomo parity', () => {
+  it('unschedule on a chain successor takes the chain off via its anchor', async () => {
+    const a = (await taskAdd(ctx, TODO_MOTHER_ID, 'first', 30)).data as { id: string };
+    const b = (await taskAddNext(ctx, a.id, 'second', 30)).data as { id: string };
+    expect((await taskSchedule(ctx, a.id, '2026-11-03T09:00')).ok).toBe(true);
+    const res = await taskUnschedule(ctx, b.id);
+    expect(res.ok).toBe(true);
+    const anchor = findTasks().find((t) => t.id === a.id)!.state as TaskState;
+    expect(anchor.scheduledFor ?? null).toBeNull();
+  });
+
+  it('toggling the task the pomo is on done stops and untags the pomo', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'deep work', 45);
+    const taskId = (addRes.data as { id: string }).id;
+    await taskStartPomo(ctx, taskId);
+    await taskToggle(ctx, taskId);
+    const ps = findPomoMother().state as PomoState;
+    expect(ps.status).toBe('idle');
+    expect(ps.activeTaskId).toBeNull();
+    expect(ps.history.at(-1)?.taskId).toBe(taskId);
   });
 });
 

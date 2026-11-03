@@ -756,13 +756,22 @@ export async function taskUnschedule(
 ): Promise<SysResult> {
   if (!taskId) return { ok: false, message: 'task unschedule requires a <ref>' };
   const board = loadBoard(ctx);
-  const taskNode = findTaskNode(board, taskId);
+  let taskNode = findTaskNode(board, taskId);
   if (!taskNode) return { ok: false, message: `No task node matching "${taskId}"` };
   taskId = taskNode.id;
 
-  const ts = taskNode.state as TaskState;
-  if (!('scheduledFor' in ts)) {
-    return { ok: true, message: `Task "${taskId.slice(0, 8)}" was not scheduled.` };
+  let ts = taskNode.state as TaskState;
+  let chainNote = '';
+  if (!ts.scheduledFor) {
+    // A chain successor stores no time: it is placed by its chain's anchor.
+    // Unscheduling it takes the chain off, like the Calendar's 'Unschedule chain'.
+    const anchorId = selectSchedule(board as unknown as Board).placements.get(taskId)?.anchorTaskId;
+    const anchor = anchorId && anchorId !== taskId ? findNode(board, anchorId) : null;
+    if (!anchor) return { ok: true, message: `Task "${taskId.slice(0, 8)}" was not scheduled.` };
+    taskNode = anchor;
+    taskId = anchor.id;
+    ts = anchor.state as TaskState;
+    chainNote = ' (its chain, via the anchor)';
   }
   const nextState = fsmTaskSetSchedule(ts, { scheduledFor: null });
   updateNode(board, taskId, { ...taskNode, state: nextState });
@@ -782,7 +791,7 @@ export async function taskUnschedule(
   saveBoard(ctx, board);
   return {
     ok: true,
-    message: `Task "${taskId.slice(0, 8)}" unscheduled.`,
+    message: `Task "${taskId.slice(0, 8)}" unscheduled${chainNote}.`,
     data: { id: taskId },
   };
 }

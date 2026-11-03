@@ -8,7 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
 import { selectPomoReality } from '../../store/pomoReality';
 import { boardTagLibrary } from '../../store/spanTags';
-import { focusNode, startFocusOnTask, toggleHabitToday, toggleTaskDone, unscheduleTask } from '../../store/scheduleActions';
+import { focusNode, scheduleAnchorOf, startFocusOnTask, toggleHabitToday, toggleTaskDone, unscheduleTask } from '../../store/scheduleActions';
 import { tagDisplay } from '../../../shared/tags/classify';
 import { toneVarForTask } from '../../utils/taskColor';
 import type { TaskState } from '../nodes/TaskNode/types';
@@ -103,6 +103,8 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
   );
   if (!info) return null;
 
+  // The task whose time places this one (itself, or its chain's anchor).
+  const planAnchor = scheduleAnchorOf(taskId);
   const tone = toneVarForTask(taskId);
   const start = startMs ?? (info.scheduledFor ? new Date(info.scheduledFor).getTime() : undefined);
   const end = endMs ?? (start !== undefined && info.plannedMin ? start + info.plannedMin * 60_000 : undefined);
@@ -134,7 +136,8 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         {!info.done && !easy && <button type="button" data-testid="task-info-focus" style={btn} onClick={act(() => { void startFocusOnTask(taskId); })}>Focus</button>}
         <button type="button" data-testid="task-info-done" style={btn} onClick={act(() => { void toggleTaskDone(taskId); })}>{info.done ? 'Reopen' : 'Done'}</button>
         <button type="button" data-testid="task-info-show" style={btn} onClick={act(() => focusNode(taskId))}>Show</button>
-        {info.scheduledFor && <button type="button" data-testid="task-info-unschedule" style={{ ...btn, color: 'var(--rust)', borderColor: 'var(--rust)' }} onClick={act(() => unscheduleTask(taskId))}>Unplan</button>}
+        {/* A chain successor has no scheduledFor of its own but is planned too. */}
+        {planAnchor && <button type="button" data-testid="task-info-unschedule" title={planAnchor === taskId ? 'Remove from the calendar (keeps the task)' : 'Remove the whole chain from the calendar (keeps the tasks)'} style={{ ...btn, color: 'var(--rust)', borderColor: 'var(--rust)' }} onClick={act(() => { void unscheduleTask(taskId); })}>{planAnchor === taskId ? 'Unplan' : 'Unplan chain'}</button>}
       </div>
     </Shell>
   );

@@ -312,6 +312,18 @@ export function taskToggleMirror(
     }
   }
 
+  // Same as the card / Todo row / popup: finishing the task the pomo is on
+  // stops the pomo (recording the real span) and untags it.
+  if (nextState.done) {
+    const pomoIdx = board.nodes.findIndex((n) => n.kind === 'pomo');
+    const pomoNode = pomoIdx === -1 ? undefined : board.nodes[pomoIdx]!;
+    const ps = pomoNode?.state as PomoState | undefined;
+    if (pomoNode && ps && ps.activeTaskId === taskId && ps.status !== 'idle') {
+      const cfg = (pomoNode.config as PomoConfig | null) ?? undefined;
+      board.nodes[pomoIdx] = { ...pomoNode, state: fsmPomoClearActiveTask(fsmPomoStop(ps), cfg) };
+    }
+  }
+
   syncCompletion(board, taskId);
   return { board, done: nextState.done };
 }
