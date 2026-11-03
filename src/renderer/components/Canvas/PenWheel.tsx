@@ -61,7 +61,7 @@ export function PenWheel({ x, y, onClose }: { x: number; y: number; onClose: () 
   const inner: Slice[] = [
     ...TOOLS.map((t) => {
       const on = tool === t.id;
-      return { key: t.id, label: t.label, on, fill: on ? '#c9f158' : BASE, content: icon(t.paths, on ? '#0e1012' : '#e8ebee'), pick: () => setTool(t.id) };
+      return { key: t.id, label: t.label, on, fill: on ? 'var(--accent-on-dark)' : BASE, content: icon(t.paths, on ? '#0e1012' : '#e8ebee'), pick: () => setTool(t.id) };
     }),
     ...SIZES.map((sz) => {
       const on = sizeScale === sz.v;
@@ -99,8 +99,7 @@ export function PenWheel({ x, y, onClose }: { x: number; y: number; onClose: () 
           role="button"
           aria-label={sl.label}
           d={sector(r0, r1, a0, a1)}
-          fill={sl.fill}
-          stroke={sl.on ? '#c9f158' : 'rgba(255,255,255,0.07)'}
+          style={{ fill: sl.fill, stroke: sl.on ? 'var(--accent-on-dark)' : 'rgba(255,255,255,0.07)' }}
           strokeWidth={sl.on ? 2 : 1}
           onPointerEnter={() => setHover(sl.label)}
           onPointerLeave={() => setHover(null)}

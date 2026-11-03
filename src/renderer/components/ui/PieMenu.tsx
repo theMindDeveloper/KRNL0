@@ -88,7 +88,9 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
           const rm = (R0 + R1) / 2;
           const px = rm * Math.cos(mid);
           const py = rm * Math.sin(mid);
-          const fill = it.swatch ?? (it.active ? '#c9f158' : 'rgba(30,33,37,0.97)');
+          // The wheel is dark in every theme: the active wedge takes the
+          // theme's on-dark accent (lime, cyan, amber, white …), never a fixed lime.
+          const fill = it.swatch ?? (it.active ? 'var(--accent-on-dark)' : 'rgba(30,33,37,0.97)');
           const ink = it.active && !it.swatch ? '#0e1012' : '#e8ebee';
           return (
             <g key={it.key}>
@@ -98,8 +100,7 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
                 role="button"
                 aria-label={it.label}
                 d={sector(R0, R1, a0, a1)}
-                fill={fill}
-                stroke={it.active ? '#c9f158' : 'rgba(255,255,255,0.07)'}
+                style={{ fill, stroke: it.active ? 'var(--accent-on-dark)' : 'rgba(255,255,255,0.07)' }}
                 strokeWidth={it.active ? 2 : 1}
                 onPointerEnter={() => setHover(it.label)}
                 onPointerLeave={() => setHover(null)}
