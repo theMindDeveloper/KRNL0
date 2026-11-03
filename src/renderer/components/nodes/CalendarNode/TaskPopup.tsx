@@ -197,9 +197,10 @@ const seg = (on: boolean): React.CSSProperties => ({
   color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
   transition: 'background 120ms, color 120ms',
 });
+// The app's primary button (same tokens as the habit swap dialog and Settings).
 const primaryBtn: React.CSSProperties = {
-  height: 36, borderRadius: 9, border: 'none', background: 'var(--acid)',
-  color: 'var(--ink-on-bright, #111)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 650,
+  height: 36, borderRadius: 9, border: 'none', background: 'var(--btn-primary-bg)',
+  color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 650,
   transition: 'opacity 120ms',
 };
 const actionBtn: React.CSSProperties = {
