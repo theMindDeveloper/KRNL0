@@ -8,6 +8,7 @@ import { HEADER_LABEL, LIVE_BADGE_TEXT, TERM_CLEAR_EVENT } from './constants';
 import { startTerminalSession } from './session';
 import { getLiveTerminal, setLiveTerminal, type LiveTerminal } from './liveTerminals';
 import { MotdBanner } from './MotdBanner';
+import { ContextMenu } from '../../ContextMenu';
 import pkg from '../../../../../package.json';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { xtermFor } from '../../../themes/applyFrameTheme';
@@ -45,6 +46,21 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     const sid = sessionIdRef.current;
     if (sid) window.krnl?.ptyResize(sid, t.cols, t.rows);
   }, [fontSize]);
+
+  // Height of the column that holds banner + xterm: a short panel gets the
+  // one-line banner, not the 9-row logo. Measured on the column (not the
+  // xterm body) so the banner switching size can't feed back into it.
+  const [bodyHeightPx, setBodyHeightPx] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const column = containerRef.current?.parentElement;
+    if (!column || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height;
+      if (h) setBodyHeightPx(Math.round(h));
+    });
+    ro.observe(column);
+    return () => ro.disconnect();
+  }, []);
 
   // `krnl term clear` — clears the screen and scrollback of this terminal.
   useEffect(() => {
@@ -338,7 +354,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
         {/* MOTD banner — rendered as React above xterm so PowerShell/PSReadLine
             can't clear it on startup. See MotdBanner.tsx header for rationale. */}
-        <MotdBanner version={pkg.version} sessionId={activeSessionId} />
+        <MotdBanner version={pkg.version} sessionId={activeSessionId} {...(bodyHeightPx !== undefined ? { bodyHeightPx } : {})} />
 
         {/* xterm mount — nodrag/nopan/nowheel keep RF from consuming pointer
             events. tabIndex=-1 + nodesFocusable={false} on <ReactFlow> stop RF
@@ -372,8 +388,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+            setMenu({ x: e.clientX, y: e.clientY });
           }}
           onKeyDown={(e) => {
             // Ctrl/Cmd+Shift+L is the app's layout toggle: let it reach the
@@ -394,66 +409,20 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           style={{ width: '100%', flex: 1, minHeight: 0, background: 'var(--term-bg)', position: 'relative' }}
         />
 
+        {/* The app's shared menu: portalled to <body> (MotherFrame's
+            containment trapped the old click-away blanket) and kept inside
+            the window, so a narrow Station panel can't clip it. */}
         {menu && (
-          <>
-            {/* Click-away blanket */}
-            <div
-              onClick={() => setMenu(null)}
-              onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}
-              style={{ position: 'fixed', inset: 0, zIndex: 10 }}
-            />
-            <div
-              className="nodrag nopan nowheel"
-              style={{
-                position: 'absolute',
-                left: menu.x,
-                top: menu.y + 30 /* offset for header height */,
-                zIndex: 11,
-                background: 'var(--paper)',
-                border: '1px solid var(--ink-3)',
-                borderRadius: 4,
-                padding: 4,
-                minWidth: 140,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-              }}
-            >
-              {[
-                { label: 'Copy', action: copySelection, disabled: !termRef.current?.getSelection() },
-                { label: 'Paste', action: () => void pasteClipboard(), disabled: false },
-                { label: 'Select All', action: selectAll, disabled: false },
-              ].map((it) => (
-                <button
-                  key={it.label}
-                  type="button"
-                  disabled={it.disabled}
-                  onClick={(e) => { e.stopPropagation(); it.action(); setMenu(null); focusTerm(); }}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '6px 10px',
-                    background: 'transparent',
-                    border: 0,
-                    color: it.disabled ? 'var(--ink-3)' : 'var(--ink)',
-                    cursor: it.disabled ? 'default' : 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: 'inherit',
-                    borderRadius: 2,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!it.disabled) (e.currentTarget as HTMLElement).style.background = 'var(--paper-2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = 'transparent';
-                  }}
-                >
-                  {it.label}
-                </button>
-              ))}
-            </div>
-          </>
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            onDismiss={() => setMenu(null)}
+            items={[
+              { label: 'Copy', onSelect: () => { copySelection(); focusTerm(); }, disabled: !termRef.current?.getSelection() },
+              { label: 'Paste', onSelect: () => { void pasteClipboard(); focusTerm(); } },
+              { label: 'Select All', onSelect: () => { selectAll(); focusTerm(); } },
+            ]}
+          />
         )}
       </div>
     </MotherFrame>
