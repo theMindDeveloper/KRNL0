@@ -100,11 +100,16 @@ export class SysFacade {
     this.version = readVersion();
   }
 
-  /** light / dark as the open window shows it; undefined when headless. */
+  /** light / dark as the open window shows it; undefined when headless.
+   *  Read commands must stay instant: a busy or reloading window gets
+   *  1.5 s, then the board's own field is reported instead. */
   private async windowTheme(): Promise<string | undefined> {
     if (!this.deps.cliDispatch) return undefined;
-    const r = await this.deps.cliDispatch('theme.get', {});
-    return r.ok && (r.message === 'light' || r.message === 'dark') ? r.message : undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), 1500); });
+    const r = await Promise.race([this.deps.cliDispatch('theme.get', {}), timeout]);
+    if (timer) clearTimeout(timer);
+    return r && r.ok && (r.message === 'light' || r.message === 'dark') ? r.message : undefined;
   }
 
   async run(argv: string[]): Promise<SysResult> {
