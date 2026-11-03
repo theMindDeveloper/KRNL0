@@ -1083,3 +1083,16 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Readable in every theme:** the Todo done checkbox is the task card's checkbox (a fixed black fill hid the mark in every light theme); Media error links and Commander hints use the always-dark palette (Macintosh light made them near-black on black); the Analytics tiles, off-switch knob and header line use the panel's own tokens.
 - **One accent:** task and pomo glows follow the frame style's accent instead of a fixed lime; resize grips use `--ink-4`; the calendar task popup's primary button uses the primary-button tokens; the canvas node menu is the shared ContextMenu.
 - **One shell:** the habit menu, the calendar task popup and media cards use the shared menu / popover / card radius and shadow tokens (`de8b2a1`).
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 12): assistant and chrome
+
+**Type:** Bug Fix
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `8ab6586` … HEAD
+**Files changed:** `Assistant/{ScriptRunner.ts,flows/tutorialPomoTodo.ts,flows/focusSession.ts}`, `main/preload.ts` (`sysRun`), `renderer/env.d.ts`, `dev/previewBridge.ts`, `Orb/index.tsx`, `Dock/index.tsx`, `StatusBar/index.tsx`, `AnalyticsNode/index.tsx`, tests
+**Summary:**
+- **Assistant commands:** flows run `krnl` commands in main through the CLI facade with their arguments intact. They used to be typed into a hidden shell: multi-word task names were cut to their first word (so Commander sessions always "went wrong") and every command waited out a 5 s timeout. Failures now show in the caption; a stopped flow can't resume when another starts; stopping a flow stops the radio.
+- **Tutorials:** the removed double-click "bind to Pomodoro" lesson is replaced by the current way (Start pomo on the Todo row; skipped in Easy mode); the "wait for you to do it" steps ignore tasks that were already on the board; the focus session says what starting really does and no longer promises a break announcement.
+- **Orb and chrome:** the chat panel and caption open toward free space and the orb can't park under the top bar; a chat message launches a flow only when it names it (typing "a" started a Pomodoro); quick actions stay after the first message; the placeholder names the real shortcut (hold Space). The Dock's shape button closes its own menu; the status bar counts sessions to the Pomo's real long break; the Analytics header gets each frame style's header skin.
