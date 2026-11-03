@@ -973,7 +973,7 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 
 **Type:** Bug Fix / Docs
 **Branch:** `TMD/autonomous-app-improvement-5e64b2`
-**Commits:** `15afd11` … `d3c3881`
+**Commits:** `15afd11` … `d721973`
 **Files changed:** `ui/PieMenu.tsx`, `Canvas/PenWheel.tsx`, `CalendarNode/{NowLine,WeekView}.tsx`, `analytics/sources/habitSource.ts`, `shared/dispatch/resolveRef.ts`, `sys/commands/{node,edge,task,text,image,pomo,draw,cal}.ts`, `docs/04-visual-system/design-tokens.md`, tests
 **Summary:**
 - **Theme accents:** the pie menu and pen wheel use `--accent-on-dark` instead of a fixed lime, so Blueprint, Submarine and Macintosh show their own accent.
@@ -981,3 +981,4 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Analytics:** archiving a habit keeps its past check-ins in the totals.
 - **CLI refs:** listings print the shortest unique prefix (8+) so every printed id can be typed back; ambiguous task refs list their matches; `text` / `image` commands accept prefixes; resize rejects non-positive sizes; segment and stroke refs need 4+ characters; `cal show` rejects unpadded/impossible dates; `pomo segments` uses the real local day end on DST days.
 - **Docs:** the visual-system colour table is regenerated from `tokens.css` and documents the accent pairs, the shared `ui/` components and the no-left-edge-bar rule.
+- **Follow-ups to batches 2–3:** split midnight spans are timestamped inside their own day (hour / weekday charts), and the stale-save merge merges arrays of plain values (habit logs, keywords) as sets, so concurrent ticks from the UI and the CLI both survive.
