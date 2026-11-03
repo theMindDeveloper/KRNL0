@@ -102,7 +102,7 @@ export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, M
         onResizeEnd={(_e, p) => onCommand('media.setSize', { width: p.width, height: p.height })}
         style={{ background: 'transparent', border: 'none', width: 18, height: 18, right: 2, bottom: 2, zIndex: 3 }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" style={{ position: 'absolute', right: 2, bottom: 2, cursor: 'nwse-resize', color: '#7d848b', pointerEvents: 'none' }} aria-hidden>
+        <svg width="14" height="14" viewBox="0 0 14 14" style={{ position: 'absolute', right: 2, bottom: 2, cursor: 'nwse-resize', color: 'var(--ink-4)', pointerEvents: 'none' }} aria-hidden>
           <path d="M13 5L5 13M13 9L9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
       </NodeResizeControl>

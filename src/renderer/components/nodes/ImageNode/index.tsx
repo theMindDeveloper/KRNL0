@@ -148,7 +148,7 @@ export function ImageNode({
             right: 2,
             bottom: 2,
             cursor: 'nwse-resize',
-            color: '#7d848b',
+            color: 'var(--ink-4)',
             pointerEvents: 'none',
             opacity: showHandle ? 1 : 0,
             transition: 'opacity 140ms ease',

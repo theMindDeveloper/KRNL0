@@ -735,7 +735,7 @@ export function PomoNode({
                     border: '1.5px solid',
                     borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
                     background: ps === 'done' ? 'var(--rust)' : 'transparent',
-                    boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
+                    boxShadow: ps === 'active' ? '0 0 0 3px color-mix(in srgb, var(--rust) 16%, transparent)' : 'none',
                     flexShrink: 0,
                   }}
                 />
@@ -1061,11 +1061,11 @@ function CycleCounter({
         gap: 7,
         padding: '3px 8px',
         background: hasAny
-          ? 'linear-gradient(90deg, rgba(201,241,88,0.10), rgba(201,241,88,0.02) 60%)'
+          ? 'linear-gradient(90deg, color-mix(in srgb, var(--acid) 10%, transparent), color-mix(in srgb, var(--acid) 2%, transparent) 60%)'
           : 'var(--paper-2)',
-        border: `1px solid ${hasAny ? 'rgba(201,241,88,0.40)' : 'var(--paper-3)'}`,
+        border: `1px solid ${hasAny ? 'color-mix(in srgb, var(--acid) 40%, transparent)' : 'var(--paper-3)'}`,
         borderRadius: 4,
-        boxShadow: hasAny ? '0 0 8px rgba(201,241,88,0.14) inset' : 'none',
+        boxShadow: hasAny ? '0 0 8px color-mix(in srgb, var(--acid) 14%, transparent) inset' : 'none',
       }}
     >
       {/* Numeric badge */}
@@ -1089,7 +1089,7 @@ function CycleCounter({
             fontWeight: 700,
             lineHeight: 1,
             color: cellColor,
-            textShadow: hasAny ? '0 0 6px rgba(201,241,88,0.5)' : 'none',
+            textShadow: hasAny ? '0 0 6px color-mix(in srgb, var(--acid) 50%, transparent)' : 'none',
           }}
         >
           {cyclesToday}
@@ -1107,7 +1107,7 @@ function CycleCounter({
               height: 7,
               background: 'var(--acid)',
               transform: 'rotate(45deg)',
-              boxShadow: '0 0 5px rgba(201,241,88,0.5)',
+              boxShadow: '0 0 5px color-mix(in srgb, var(--acid) 50%, transparent)',
               flexShrink: 0,
             }}
           />

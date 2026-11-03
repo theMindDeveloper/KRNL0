@@ -455,7 +455,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       ? 'var(--acid)'
       : 'var(--paper-3)';
   const boxShadow = isActiveRunning
-    ? '0 0 0 2px var(--acid), 0 0 24px rgba(201,241,88,0.45)'
+    ? '0 0 0 2px var(--acid), 0 0 24px color-mix(in srgb, var(--acid) 45%, transparent)'
     : isActivePaused
       ? '0 0 0 2px var(--acid)'
       : 'var(--shadow-1)';
@@ -501,7 +501,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             letterSpacing: '0.04em',
             pointerEvents: 'none',
             boxShadow: isActiveRunning
-              ? '0 0 6px rgba(201,241,88,0.4)'
+              ? '0 0 6px color-mix(in srgb, var(--acid) 40%, transparent)'
               : '0 0 0 1px var(--paper-2)',
             zIndex: 1,
           }}
