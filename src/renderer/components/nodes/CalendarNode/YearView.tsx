@@ -6,34 +6,15 @@
 
 import { useMemo } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
-import { selectSchedule } from '../../../store/scheduleSelector';
-import { selectPomoReality } from '../../../store/pomoReality';
 import type { NodeProps } from '../types';
 import type { CalendarConfig, CalendarState } from './types';
+import { yearActivity } from './yearActivity';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
-/** Per-day planned task count and focus minutes for one year. Exported for tests. */
-export function yearActivity(board: Parameters<typeof selectSchedule>[0] | null, year: number, nowMs: number) {
-  const tasks = new Map<string, number>();
-  const focus = new Map<string, number>();
-  if (!board) return { tasks, focus };
-  for (const p of selectSchedule(board).placements.values()) {
-    const day = p.startISO.slice(0, 10);
-    if (day.startsWith(`${year}-`)) tasks.set(day, (tasks.get(day) ?? 0) + 1);
-  }
-  for (const seg of selectPomoReality(board, nowMs)) {
-    if (seg.kind !== 'work') continue;
-    const day = ymd(new Date(seg.startMs));
-    if (!day.startsWith(`${year}-`)) continue;
-    focus.set(day, (focus.get(day) ?? 0) + (seg.endMs - seg.startMs) / 60_000);
-  }
-  return { tasks, focus };
-}
 
 interface Props {
   state: CalendarState;

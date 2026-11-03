@@ -18,11 +18,7 @@ import { selectPomoReality, pomoIsLive, type RealitySegment } from '../../../sto
 import type { TaskState, TaskKind } from '../TaskNode/types';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
-
-// Kept for backward-compat — timelineSelector.colorTokens.test.ts imports this.
-// The new analog design no longer renders break arcs, but the tokens must still
-// exist in tokens.css (Decision 24.2 contract test).
-export const BREAK_TOKENS = ['ink-2', 'ink-3'] as const;
+import { Z } from '../../ui/layers';
 
 // Shared palette across Clock, Calendar, Todo. See src/renderer/utils/taskColor.ts.
 import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
@@ -32,6 +28,7 @@ import { PagedView } from '../../ui/PagedView';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { AppSelect } from '../../ui/AppSelect';
+import { wallHoursFromDayStart, msAtWallHours } from './wallHours';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -88,9 +85,13 @@ function sectorPath(startH: number, endH: number, r: number): string {
 
 /** Format hour-float as "9:30am". */
 function fmtTime(h: number): string {
-  const hr = Math.floor(h);
-  const m = Math.round((h - hr) * 60);
-  const ampm = hr >= 12 && hr < 24 ? 'pm' : 'am';
+  // Whole minutes, wrapped into one day: a task that began yesterday
+  // (h < 0) or ends tomorrow (h > 24) shows its wall-clock time, and
+  // 9.9999 h reads 10:00, not 9:60.
+  const total = ((Math.round(h * 60) % 1440) + 1440) % 1440;
+  const hr = Math.floor(total / 60);
+  const m = total % 60;
+  const ampm = hr >= 12 ? 'pm' : 'am';
   const hr12 = ((hr + 11) % 12) + 1;
   return `${hr12}:${String(m).padStart(2, '0')}${ampm}`;
 }
@@ -141,8 +142,12 @@ const NUMERALS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
 // render as arcs in the clock; habits behave like events (no breakdown).
 interface TaskEntry {
   id: string;
-  start: number;   // hour-float, e.g. 9.5 = 9:30 AM
+  start: number;   // hour-float, e.g. 9.5 = 9:30 AM — clipped to the 12-hour window (drawing)
   end: number;
+  /** The real start / end (hours from the day start), unclipped — for the
+   *  times the list, menus and popups show and for "ended" (F5). */
+  realStart: number;
+  realEnd: number;
   name: string;
   /** Resolved CSS color (a `var(--token)` string). Tasks use their tone,
    *  habits use their habit color. Single source of truth — render code
@@ -288,17 +293,20 @@ export function ClockNode({
     e.preventDefault();
     e.stopPropagation();
     const ts = node.state as TaskState;
-    const dayStart = new Date(selectedDate + 'T00:00:00').getTime();
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
-      items: taskMenuItems({
-        id: taskId,
-        text: ts.text,
-        done: ts.done,
-        startMs: dayStart + startH * 3_600_000,
-        endMs: dayStart + endH * 3_600_000,
-      }),
+      items: taskMenuItems(
+        {
+          id: taskId,
+          text: ts.text,
+          done: ts.done,
+          startMs: msAtWallHours(selectedDate, startH),
+          endMs: msAtWallHours(selectedDate, endH),
+        },
+        // Same menu as the Calendar: Easy mode has no focus linking.
+        { easy, onDetails: () => setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: msAtWallHours(selectedDate, startH), endMs: msAtWallHours(selectedDate, endH) }) },
+      ),
     });
   };
   // Left-click a task (arc or list row) → what it is: name, plan, tracked time.
@@ -308,8 +316,7 @@ export function ClockNode({
     const node = useBoardStore.getState().board?.nodes.find((n) => n.id === taskId);
     if (!taskId.startsWith('habit-') && (!node || node.kind !== 'todo.task')) return;
     e.stopPropagation();
-    const dayStart = new Date(selectedDate + 'T00:00:00').getTime();
-    setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: dayStart + startH * 3_600_000, endMs: dayStart + endH * 3_600_000 });
+    setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: msAtWallHours(selectedDate, startH), endMs: msAtWallHours(selectedDate, endH) });
   };
   const fmtClockHM = (ms: number) => {
     const d = new Date(ms);
@@ -434,6 +441,8 @@ export function ClockNode({
         id: p.taskId,
         start: Math.max(startH, winLo),
         end: Math.min(endH, winHi),
+        realStart: startH,
+        realEnd: endH,
         name: info.text,
         colorVar: TONE_VAR[colorFor(p.taskId)],
         plannedMin: info.plannedMin,
@@ -460,6 +469,8 @@ export function ClockNode({
         id: `habit-${h.id}`,
         start: Math.max(startH, winLo),
         end: Math.min(endH, winHi),
+        realStart: startH,
+        realEnd: endH,
         name: h.name,
         colorVar: `var(--${h.color})`,
         plannedMin: durMin,
@@ -481,13 +492,12 @@ export function ClockNode({
   const realitySegments = useMemo(() => {
     const segs = selectPomoReality(board0, liveMs);
     if (segs.length === 0) return [] as Array<RealitySegment & { startH: number; endH: number }>;
-    const dayStartMs = new Date(selectedDate + 'T00:00:00').getTime();
     const winLo = viewWindow === 1 ? 12 : 0;
     const winHi = viewWindow === 1 ? 24 : 12;
     const out: Array<RealitySegment & { startH: number; endH: number }> = [];
     for (const seg of segs) {
-      const startH = (seg.startMs - dayStartMs) / 3_600_000;
-      const endH = (seg.endMs - dayStartMs) / 3_600_000;
+      const startH = wallHoursFromDayStart(seg.startMs, selectedDate);
+      const endH = wallHoursFromDayStart(seg.endMs, selectedDate);
       if (!(endH > startH)) continue;
       if (endH <= 0 || startH >= 24) continue;
       if (endH <= winLo || startH >= winHi) continue;
@@ -831,7 +841,7 @@ export function ClockNode({
               const arcs = tasks.flatMap((t, i) => {
                 // `ended` (faded arc) only makes sense for today — a 9am task
                 // on tomorrow is not "ended" at 3pm today.
-                const ended = isToday && nowFloat >= t.end;
+                const ended = isToday && nowFloat >= t.realEnd;
                 const active = i === activeIdx;
                 const opacity = ended ? 0.4 : 1;
                 const sw = stroke;
@@ -865,16 +875,16 @@ export function ClockNode({
                       strokeLinecap={cap}
                       pointerEvents="stroke"
                       style={{ cursor: 'pointer' }}
-                      onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
-                      onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                      onClick={(ev) => openTaskInfo(t.id, t.realStart, t.realEnd, ev)}
+                      onContextMenu={(ev) => openTaskMenu(t.id, t.realStart, t.realEnd, ev)}
                     >
-                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)} · click for details, right-click for actions`}</title>
+                      <title>{`${t.name} · ${fmtTime(t.realStart)}–${fmtTime(t.realEnd)} · click for details, right-click for actions`}</title>
                     </path>
                     <path
                       data-testid="clock-plan-arc"
                       data-task-id={t.id}
-                      onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
-                      onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                      onClick={(ev) => openTaskInfo(t.id, t.realStart, t.realEnd, ev)}
+                      onContextMenu={(ev) => openTaskMenu(t.id, t.realStart, t.realEnd, ev)}
                       d={arcPath(s, e, r)}
                       fill="none"
                       stroke={t.colorVar}
@@ -884,7 +894,7 @@ export function ClockNode({
                       data-hovered={hovered ? 'true' : undefined}
                       style={{ ...activeStyle, cursor: 'context-menu', transition: 'opacity 120ms, filter 120ms', filter: hovered ? 'brightness(1.35)' : undefined }}
                     >
-                      <title>{`${t.name} · ${fmtTime(t.start)}–${fmtTime(t.end)}`}</title>
+                      <title>{`${t.name} · ${fmtTime(t.realStart)}–${fmtTime(t.realEnd)}`}</title>
                     </path>
                   </g>
                 );
@@ -1277,7 +1287,7 @@ export function ClockNode({
           revealIndex={activeIdx}
         >
           {tasks.map((t, i) => {
-            const ended = isToday && nowFloat >= t.end;
+            const ended = isToday && nowFloat >= t.realEnd;
             const on    = i === activeIdx;
             // Strike through only what is actually done; a past task that is
             // still open is just dimmed (striking it read as "finished").
@@ -1286,8 +1296,8 @@ export function ClockNode({
               <div
                 key={t.id}
                 data-testid="clock-task-row"
-                onClick={(ev) => openTaskInfo(t.id, t.start, t.end, ev)}
-                onContextMenu={(ev) => openTaskMenu(t.id, t.start, t.end, ev)}
+                onClick={(ev) => openTaskInfo(t.id, t.realStart, t.realEnd, ev)}
+                onContextMenu={(ev) => openTaskMenu(t.id, t.realStart, t.realEnd, ev)}
                 onPointerEnter={() => setHoverTaskId(t.id)}
                 onPointerLeave={() => setHoverTaskId((h) => (h === t.id ? null : h))}
                 style={{
@@ -1323,7 +1333,7 @@ export function ClockNode({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {fmtTime(t.start)}
+                  {fmtTime(t.realStart)}
                 </span>
                 {/* Name */}
                 <span
@@ -1366,14 +1376,14 @@ export function ClockNode({
       )}
       {realityPopup && createPortal(
         <>
-          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
           <div
             data-testid="clock-reality-popup"
             style={{
               position: 'fixed',
               left: Math.min(realityPopup.x + 4, window.innerWidth - 250),
               top: realityPopup.y + 6,
-              zIndex: 1999,
+              zIndex: Z.popup,
               background: 'var(--paper)',
               border: '1px solid var(--paper-3)',
               borderRadius: 8,
@@ -1419,7 +1429,7 @@ export function ClockNode({
                 type="button"
                 data-testid="clock-reality-delete"
                 onClick={() => { deleteClockSegment(realityPopup.seg.id); setRealityPopup(null); }}
-                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: '#ff8e64', background: 'transparent', border: '1px solid #ff8e64', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: 'var(--rust)', background: 'transparent', border: '1px solid var(--rust)', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
               >
                 Delete segment
               </button>

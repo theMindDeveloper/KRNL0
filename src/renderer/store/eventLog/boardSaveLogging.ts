@@ -95,5 +95,22 @@ export async function saveBoard(data: unknown): Promise<void> {
   if (typeof window === 'undefined') return;
   const bridge = (window as unknown as MaybeWindow).krnl;
   if (!bridge?.boardSave) return;
-  await bridge.boardSave(data);
+  await bridge.boardSave(withLiveViewport(data));
+}
+
+// The live camera sits in the store's `viewport`, not in `board.viewport`
+// (that one is only read at load; writing it per pan frame would re-render
+// the whole board). Without this, every content save wrote the launch-time
+// view over the one `board:saveViewport` stored, so a restart jumped back.
+let liveViewport: (() => unknown) | null = null;
+
+/** Registered by boardStore: where saves read the current camera from. */
+export function setLiveViewportSource(fn: () => unknown): void {
+  liveViewport = fn;
+}
+
+function withLiveViewport(data: unknown): unknown {
+  if (!liveViewport || typeof data !== 'object' || data === null || !('nodes' in data)) return data;
+  const viewport = liveViewport();
+  return viewport ? { ...(data as Record<string, unknown>), viewport } : data;
 }

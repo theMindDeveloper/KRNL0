@@ -1,7 +1,7 @@
 /**
  * AmbientRadio — viewport-fixed ambient music / noise widget with layer mixing.
  *
- * Lives on the same overlay layer as the Orb (`position: fixed; zIndex: 200`).
+ * Lives on the same overlay layer as the Orb (`position: fixed; zIndex: Z.widget`).
  * Drag the header to move; release with the widget pulled at least 30px past
  * the left/right viewport edge to snap-collapse into a 14px peek tab.
  *
@@ -22,6 +22,8 @@
  */
 
 import { PagedView } from '../ui/PagedView';
+import { Z as LAYERS } from '../ui/layers';
+import { registerRadio } from './radioControl';
 import {
   useState,
   useEffect,
@@ -124,7 +126,7 @@ const PARAMS_KEY = 'krnl0-ambient-radio-params';
 const STATE_KEY  = 'krnl0-ambient-radio-state';
 const FAVS_KEY   = 'krnl0-ambient-radio-yt-favs';
 const FAVS_MAX   = 50;
-const Z = 200;
+const Z = LAYERS.widget;
 const SNAP_PAST_EDGE = 30;
 const PEEK_PX = 14;
 
@@ -710,6 +712,23 @@ export function AmbientRadio() {
     }
   }, [layerVolumes.yt]);
 
+  // ── CLI (`krnl radio …`) — drives the same handlers as the panel ─────────
+  const cliRef = useRef({ toggleLayer, togglePlay, onVolumeChange, volume });
+  cliRef.current = { toggleLayer, togglePlay, onVolumeChange, volume };
+  useEffect(() => registerRadio({
+    presets: () => PRESETS.map((p) => ({ id: p.id, name: p.name, sub: p.sub })),
+    status: () => ({ playing: playingRef.current, layers: Array.from(activeLayersRef.current), focused: focusedIdRef.current, volume: cliRef.current.volume }),
+    play: (id) => {
+      const active = activeLayersRef.current;
+      // Resume a paused mix first, so adding a layer doesn't leave the rest silent.
+      if (!playingRef.current && (active.size > 0 || id === undefined)) cliRef.current.togglePlay();
+      if (id !== undefined && !active.has(id as LayerId)) cliRef.current.toggleLayer(id as LayerId);
+    },
+    remove: (id) => { if (activeLayersRef.current.has(id as LayerId)) cliRef.current.toggleLayer(id as LayerId); },
+    stop: () => { if (playingRef.current) cliRef.current.togglePlay(); },
+    setVolume: (v) => cliRef.current.onVolumeChange(v),
+  }), []);
+
   // ── Drag handlers ────────────────────────────────────────────────────────
   const onHeaderMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -1266,8 +1285,8 @@ export function AmbientRadio() {
                           padding: '4px 6px',
                           borderRadius: 4,
                           cursor: 'pointer',
-                          background: playing_ ? 'rgba(244,63,94,.10)' : 'transparent',
-                          borderLeft: `2px solid ${playing_ ? '#f43f5e' : 'transparent'}`,
+                          // Active = a tinted fill, never a left-edge bar.
+                          background: playing_ ? 'rgba(244,63,94,.16)' : 'transparent',
                           transition: 'background .12s',
                         }}
                         onMouseEnter={(e) => { if (!playing_) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,.04)'; }}
@@ -1505,11 +1524,10 @@ export function AmbientRadio() {
                           gap: 6,
                           padding: '3px 5px 3px 4px',
                           marginBottom: 2,
-                          borderLeft: `2px solid ${isFocused ? p.col : 'transparent'}`,
-                          background: isFocused ? `rgba(${p.rgb},.08)` : 'transparent',
+                          background: isFocused ? `rgba(${p.rgb},.14)` : 'transparent',
                           borderRadius: 3,
                           cursor: 'pointer',
-                          transition: 'background .12s, border-color .12s',
+                          transition: 'background .12s',
                         }}
                       >
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.col, boxShadow: `0 0 5px ${p.col}`, flexShrink: 0 }} />

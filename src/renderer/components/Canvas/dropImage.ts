@@ -1,16 +1,16 @@
 /**
- * dropImage.ts â€” drag-drop and replace image ingestion (Decision 21).
+ * dropImage.ts — drag-drop and replace image ingestion (Decision 21).
  *
  * Pipeline:
- *   File â†’ validate MIME/size â†’ measure natural dimensions in the renderer
- *   via `new Image()` â†’ ship bytes to main as Uint8Array â†’ main writes the
+ *   File → validate MIME/size → measure natural dimensions in the renderer
+ *   via `new Image()` → ship bytes to main as Uint8Array → main writes the
  *   asset to disk and returns the assetId. Caller decides whether to create
  *   a new node or dispatch image.setAsset on an existing one.
  *
  * No base64 anywhere. Renderer never touches `fs`.
  */
 
-const ALLOWED_MIME = new Set<string>([
+export const ALLOWED_MIME: ReadonlySet<string> = new Set<string>([
   'image/png',
   'image/jpeg',
   'image/webp',
@@ -39,7 +39,7 @@ export interface IngestedImage {
 
 /**
  * Measure natural width/height via an offscreen <img>. SVGs without an
- * intrinsic size report 0Ã—0 in some browsers â€” we fall back to 300Ã—300 in
+ * intrinsic size report 0×0 in some browsers — we fall back to 300×300 in
  * that case so the placeholder size is sensible.
  */
 function measureNatural(file: File): Promise<{ w: number; h: number }> {
@@ -60,18 +60,23 @@ function measureNatural(file: File): Promise<{ w: number; h: number }> {
   });
 }
 
+/** Why a file can't become an ImageNode, in words for the user; null if it can. */
+export function imageRejectReason(file: { type: string; size: number }): string | null {
+  if (!ALLOWED_MIME.has(file.type)) return 'images must be PNG, JPEG, WebP, GIF or SVG';
+  if (file.size === 0) return 'the file is empty';
+  if (file.size > MAX_BYTES) return 'images must be under 25 MB';
+  return null;
+}
+
 /**
  * Validate, measure, and persist the file. Returns null if validation fails
  * (caller should treat as "skip this file"). Throws only on unexpected IPC
  * failures.
  */
 export async function ingestImageFile(file: File): Promise<IngestedImage | null> {
-  if (!ALLOWED_MIME.has(file.type)) {
-    console.warn('[image] rejected: unsupported mime', file.type);
-    return null;
-  }
-  if (file.size === 0 || file.size > MAX_BYTES) {
-    console.warn('[image] rejected: bad size', file.size);
+  const reason = imageRejectReason(file);
+  if (reason) {
+    console.warn('[image] rejected:', reason, file.type, file.size);
     return null;
   }
 
@@ -83,7 +88,7 @@ export async function ingestImageFile(file: File): Promise<IngestedImage | null>
   const bytes = new Uint8Array(buf);
 
   if (!window.krnl?.assetWrite) {
-    console.warn('[image] krnl.assetWrite unavailable â€” cannot persist');
+    console.warn('[image] krnl.assetWrite unavailable — cannot persist');
     return null;
   }
   const { assetId } = await window.krnl.assetWrite(ext, bytes);

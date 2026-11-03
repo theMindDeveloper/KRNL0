@@ -108,8 +108,70 @@ const PRO_DARK: TokenMap = {
   '--k-clock-readout': '#9a9a9a',
 };
 
+/**
+ * Pro light — the same matte, squared-off frame in daylight: cool light-grey
+ * panels, graphite ink, and the one lime accent kept as a fill (dark text on
+ * it) with deep green where it is text. The terminal stays dark, as in every
+ * style.
+ */
+const PRO_LIGHT: TokenMap = {
+  ...AN_THEMED,
+  '--paper': '#ebebe8',
+  '--paper-2': '#e1e1dd',
+  '--paper-3': '#cdcdc8',
+  '--node-bg': '#f7f7f5',
+  '--ink': '#141414',
+  '--ink-2': '#2b2b2b',
+  '--ink-3': '#4c4c4c',
+  '--ink-4': '#5c5c5c',
+  '--ink-on-bright': '#141414',
+  '--acid': '#c9f158',
+  '--acid-ink': '#3f5c0a',
+  '--accent-on-dark': '#c9f158',
+  '--acid-glow': '#b5dd3c',
+  '--acid-faint': 'rgba(94, 125, 29, 0.10)',
+  '--spine': '#5e7d1d',
+  '--spine-hot': '#7ea22b',
+  '--rust': '#c4512f',
+  '--rust-deep': '#a83e2a',
+  '--cyan': '#0e7490',
+  '--cyan-glow': '#0891b2',
+  '--purple': '#6d4fd6',
+  '--term-bg': '#0b0b10',
+  '--term-bg-2': '#15151b',
+  '--term-fg': '#c9cfc6',
+  '--term-dim': '#808080',
+  '--grid': 'rgba(0, 0, 0, 0.06)',
+  '--grid-strong': 'rgba(0, 0, 0, 0.12)',
+  '--frame-edge': 'rgba(0, 0, 0, 0.12)',
+  '--frame-bg': 'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.25) 100%)',
+  '--frame-shadow': 'inset 0 1px 0 rgba(255,255,255,0.8), 0 14px 32px rgba(0,0,0,0.08)',
+  '--btn-primary-bg': '#141414',
+  '--btn-primary-bg-hover': '#2b2b2b',
+  '--btn-primary-fg': '#c9f158',
+  '--btn-primary-ring': 'rgba(94, 125, 29, 0.40)',
+  '--k-now': '#dc2626',
+  '--k-cal-grid': '#e2e2de',
+  '--k-cal-today': 'rgba(94, 125, 29, 0.07)',
+  '--k-pointer-core': '#fff5ec',
+  '--k-mother-radius': '6px',
+  '--k-mother-wash': 'linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 18%)',
+  '--k-mother-shadow': 'inset 0 1px 0 rgba(255,255,255,0.9), 0 0 0 1px #cfcfca, 0 18px 36px rgba(0,0,0,0.10)',
+  '--k-term-border': '#1a1a1a',
+  '--k-clock-bezel': '#e6e6e2',
+  '--k-clock-bezel-edge': '#cdcdc8',
+  '--k-clock-face': '#fbfbf9',
+  '--k-clock-face-edge': '#d4d4cf',
+  '--k-clock-track': '#ebebe8',
+  '--k-clock-tick-major': '#3a3a3a',
+  '--k-clock-tick-minor': '#c2c2bd',
+  '--k-clock-num': '#5c5c5c',
+  '--k-clock-hand': '#141414',
+  '--k-clock-readout': '#5c5c5c',
+};
+
 const PRO: ThemeManifest = {
-  tokens: { dark: PRO_DARK },
+  tokens: { light: PRO_LIGHT, dark: PRO_DARK },
   components: {
     pomo: { face: 'blocks' },
     clock: { bezel: 'ring', hand: 'line', readoutWindow: true },

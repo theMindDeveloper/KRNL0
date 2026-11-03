@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { saveBoard } from './eventLog';
+import { saveBoard, setLiveViewportSource } from './eventLog';
 import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig, CompletionRecord } from '../../shared/types';
 import type { DrawStroke } from '../../shared/types/board';
 import type { TaskState } from '../components/nodes/TaskNode/types';
@@ -720,3 +720,6 @@ export const useBoardStore = create<BoardStore>((set) => ({
     if (updated) void saveBoard(updated);
   },
 }));
+
+// Content saves carry the live camera (see boardSaveLogging).
+setLiveViewportSource(() => useBoardStore.getState().viewport);

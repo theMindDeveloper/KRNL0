@@ -13,7 +13,7 @@ Today a frame style (Classic, Synthesizer, Telemetry, KRNL Dock, Blueprint, Maci
 | F1 | Every frame style declares a `ThemeManifest` (tokens per mode, component variants, slots, fonts). The manifest lives on its `DOCK_REGISTRY` entry; there is no second registry. |
 | F2 | `applyFrameTheme(id, mode)` writes the manifest's tokens as CSS custom properties on `<html>` using the token names components already read (`--paper`, `--ink*`, `--acid`, `--rust`, `--cyan`, …) plus new `--k-*` tokens for values that were previously hard-coded. Because the tokens sit on `<html>`, mother nodes **and** child canvas nodes (task, text, image) inherit them. |
 | F3 | The Classic manifest reproduces today's look exactly: every new `--k-*` token defaults to the literal it replaces. Classic stays `DEFAULT_DOCK_STYLE`. |
-| F4 | A new frame style `pro` ("Pro · matte graphite") ships: neutral graphite surfaces, one lit acid accent, matte panels, dark-only. |
+| F4 | A new frame style `pro` ("Pro · matte graphite") ships: neutral graphite surfaces, one lit acid accent, matte panels. Amended 2026-11-03: Pro has a light mode too (light-grey panels, graphite ink, the lime kept as a fill), so choosing Light on Pro stays on Pro instead of switching to the default style. The default style (id `classic`) is shown as "Paper · Cream & lime"; `krnl theme frame paper` is an alias. |
 | F5 | `sys theme frames` lists every frame style (id, label, modes, active marker). `sys theme frame <id>` switches the frame style in the open window. `sys theme show` reports both `theme` (light/dark) and `frame`. All three support `--json`. |
 | F6 | The Clock dial renders the same feature set in every style: task arcs (outer lane), pomo session arcs (inner lane: done / running / remaining), 60 ticks, numerals with 12 highlighted, now-pointer, hour/minute/second hands, hub, HH:MM readout. A style only changes appearance through `components.clock` params. |
 | F7 | `components.pomo.face` is the default Timer face for a style. It is used only when the node has no face of its own; a face the user picked in Pomo settings always wins. |
@@ -87,7 +87,7 @@ Feature: Frame-style theme engine
     And <html> has no data-dock attribute
 
   Scenario: F4 — Pro frame style exists
-    Then the dock registry contains "pro" with label "Pro" and theme "dark-only"
+    Then the dock registry contains "pro" with label "Pro", with light and dark modes
 
   Scenario: F5 — CLI lists and switches frame styles
     When I run "sys theme frames --json"

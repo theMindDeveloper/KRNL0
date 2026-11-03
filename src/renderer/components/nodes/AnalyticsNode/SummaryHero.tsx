@@ -49,7 +49,7 @@ export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byD
             <div
               key={s.key}
               data-testid={`analytics-summary-stat-${s.key}`}
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--k-an-line, #23262a)', borderRadius: 8, padding: '8px 10px', minWidth: 0 }}
+              style={{ background: 'var(--k-an-tile, rgba(255,255,255,0.03))', border: '1px solid var(--k-an-line, #23262a)', borderRadius: 8, padding: '8px 10px', minWidth: 0 }}
             >
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #9aa1a8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {s.label}

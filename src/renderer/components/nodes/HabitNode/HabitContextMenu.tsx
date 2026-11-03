@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import type { Habit, HabitColor } from './types';
 import { HABIT_COLORS } from './types';
 import { HabitIcon, HABIT_ICON_IDS, habitIconId } from './HabitIcon';
+import { Z } from '../../ui/layers';
 
 interface Props {
   habit: Habit;
@@ -28,6 +29,8 @@ interface Props {
   onPinAsLane?: () => void;
   // True when a lane already exists for this habit; disables the pin item.
   laneExists?: boolean;
+  // Only a lane's own menu passes this: remove the lane, keep the habit.
+  onUnpinLane?: () => void;
 }
 
 const MENU_WIDTH = 232;
@@ -43,10 +46,13 @@ export function HabitContextMenu({
   onClose,
   onPinAsLane,
   laneExists,
+  onUnpinLane,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState(false);
+  // Escape unmounts the input, and its blur would commit the typed draft.
+  const cancelledRef = useRef(false);
   const [draft, setDraft] = useState(habit.name);
   const [pickerOpen, setPickerOpen] = useState<'color' | 'icon' | 'note' | null>(null);
   // Inline note draft — window.prompt() is blocked in Electron renderer.
@@ -90,6 +96,7 @@ export function HabitContextMenu({
   const clampedY = Math.round(Math.min(Math.max(0, anchor.y), Math.max(0, vh - estHeight)));
 
   const commitRename = () => {
+    if (cancelledRef.current) return;
     const trimmed = draft.trim();
     if (trimmed && trimmed !== habit.name) onRename(trimmed);
     setRenaming(false);
@@ -106,12 +113,13 @@ export function HabitContextMenu({
         left: clampedX,
         top: clampedY,
         width: MENU_WIDTH,
-        background: 'var(--node-bg)',
+        // Same shell as the shared ContextMenu.
+        background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
         borderRadius: 6,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        boxShadow: 'var(--shadow-1)',
         padding: 8,
-        zIndex: 9999,
+        zIndex: Z.contextMenu,
         fontFamily: 'var(--font-sans)',
         maxHeight: `calc(100vh - ${clampedY + 16}px)`,
         overflowY: 'auto',
@@ -140,6 +148,7 @@ export function HabitContextMenu({
             onKeyDown={(e) => {
               if (e.key === 'Enter') commitRename();
               if (e.key === 'Escape') {
+                cancelledRef.current = true;
                 setDraft(habit.name);
                 setRenaming(false);
               }
@@ -179,6 +188,7 @@ export function HabitContextMenu({
         label="Rename"
         onClick={() => {
           setDraft(habit.name);
+          cancelledRef.current = false;
           setRenaming(true);
           setPickerOpen(null);
         }}
@@ -408,6 +418,16 @@ export function HabitContextMenu({
             </button>
           </div>
         </div>
+      )}
+
+      {onUnpinLane && (
+        <>
+          <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
+          <MenuItem
+            label="Unpin lane (keep the habit)"
+            onClick={() => { onUnpinLane(); onClose(); }}
+          />
+        </>
       )}
 
       {onPinAsLane && (

@@ -6,7 +6,7 @@ import type { SysResult } from '../SysFacade';
 import {
   clockSetSelectedDate,
   clockAdvanceDay,
-  clockGoToday, clockSetDialOnly,
+  clockGoToday, clockSetDialOnly, clockSetViewWindow,
 } from '../../renderer/components/nodes/ClockNode/commands';
 import type { ClockState } from '../../renderer/components/nodes/ClockNode/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
@@ -14,6 +14,7 @@ import type { ScheduledTaskPlacement } from '../../renderer/store/scheduleSelect
 import type { Board } from '../../shared/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
+import { isValidYMD, localYMD } from '../../shared/ymd';
 
 export interface ClockCtx {
   boardPath: string;
@@ -121,6 +122,19 @@ export async function clockDial(ctx: ClockCtx, arg: string | undefined): Promise
   return { ok: true, message: `Clock dial-only ${nextState.dialOnly ? 'on' : 'off'}.`, data: { dialOnly: !!nextState.dialOnly } };
 }
 
+/** `krnl clock half [am|pm]` — the AM / PM switch on the dial. */
+export async function clockHalf(ctx: ClockCtx, arg: string | undefined): Promise<SysResult> {
+  if (arg !== undefined && arg !== 'am' && arg !== 'pm') return { ok: false, message: 'clock half takes am|pm (or nothing to toggle)' };
+  const board = loadBoard(ctx);
+  const clockNode = findClockMother(board);
+  if (!clockNode) return { ok: false, message: 'No clock mother node found in board.' };
+  const cur = (clockNode.state as ClockState).viewWindow === 1 ? 1 : 0;
+  const win: 0 | 1 = arg === 'am' ? 0 : arg === 'pm' ? 1 : (cur === 1 ? 0 : 1);
+  updateNode(board, clockNode.id, { ...clockNode, state: clockSetViewWindow(clockNode.state as ClockState, { window: win }) });
+  saveBoard(ctx, board);
+  return { ok: true, message: `Clock shows ${win === 1 ? 'PM (12:00–24:00)' : 'AM (00:00–12:00)'}.`, data: { viewWindow: win } };
+}
+
 /**
  * `krnl clock show [--json]`
  * Shows scheduled tasks for the clock's selectedDate, filtered by viewWindow
@@ -135,7 +149,10 @@ export async function clockShow(
   if (!clockNode) return { ok: false, message: 'No clock mother node found in board.' };
 
   const clockState = clockNode.state as ClockState;
-  const { selectedDate, viewWindow } = clockState;
+  const { viewWindow } = clockState;
+  // A bad stored day (written before dates were validated) must not make
+  // every later `clock show` throw — show today instead.
+  const selectedDate = isValidYMD(clockState.selectedDate) ? clockState.selectedDate : localYMD(new Date());
 
   // Window boundaries (minutes-of-day).
   const windowStartMin = viewWindow === 1 ? 720 : 0;

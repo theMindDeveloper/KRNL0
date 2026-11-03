@@ -1,5 +1,6 @@
 import type { ClockState } from './types';
 import { todayLocalYMD } from './types';
+import { isValidYMD } from '../../../../shared/ymd';
 
 export const clockLinkTodo = (
   s: ClockState,
@@ -18,14 +19,13 @@ export const clockSetViewWindow = (
 
 // ── ADR 0004 §3.2 — day-selector commands ──────────────────────────────────
 
-const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Set the clock's selected day. Validates YYYY-MM-DD; otherwise no-op. */
 export const clockSetSelectedDate = (
   s: ClockState,
   args: { date: string },
 ): ClockState => {
-  if (typeof args.date !== 'string' || !YMD_RE.test(args.date)) return s;
+  if (!isValidYMD(args.date)) return s;
   return { ...s, selectedDate: args.date };
 };
 

@@ -1,6 +1,7 @@
 import type { Flow, FlowStep, BoardSnapshot, OrbState } from './types';
 import type { VoicePlayer } from './VoicePlayer';
 import type { Viewport } from '@xyflow/react';
+import { radioControl } from '../AmbientRadio/radioControl';
 
 // Callbacks the runner uses to update React state and the canvas.
 export type RunnerDeps = {
@@ -23,23 +24,25 @@ const WAIT_FOR_BOARD_POLL_MS = 150;
 
 export class ScriptRunner {
   private aborted = false;
-  private ptySession: string | null = null;
+  // Each run's token: a flow stopped mid-wait must not resume (and interleave)
+  // when another one starts before its wait ends.
+  private runSeq = 0;
 
   constructor(private deps: RunnerDeps) {}
 
   abort(): void {
     this.aborted = true;
+    this.runSeq++;
     this.deps.voice.stop();
-    if (this.ptySession) {
-      window.krnl?.ptyKill(this.ptySession).catch(() => {});
-      this.ptySession = null;
-    }
+    // "Stop" means silence: a tutorial may have started the radio.
+    radioControl()?.stop();
     this.deps.setCaption(null);
     this.deps.setOrbState('idle');
     this.deps.setActiveFlowId(null);
   }
 
   async run(flow: Flow, params?: Record<string, string>): Promise<void> {
+    const runId = ++this.runSeq;
     this.aborted = false;
     this.deps.setActiveFlowId(flow.id);
 
@@ -47,13 +50,13 @@ export class ScriptRunner {
     const steps = flow.steps(snapshot, params);
 
     for (let i = 0; i < steps.length; i++) {
-      if (this.aborted) break;
+      if (this.aborted || runId !== this.runSeq) break;
       const step = steps[i]!;
       const next = steps[i + 1];
       await this.executeStep(step, next);
     }
 
-    if (!this.aborted) {
+    if (!this.aborted && runId === this.runSeq) {
       this.deps.setCaption(null);
       this.deps.setOrbState('idle');
       this.deps.setActiveFlowId(null);
@@ -114,7 +117,13 @@ export class ScriptRunner {
         this.deps.setOrbState('running');
         this.deps.setCaption(`$ krnl ${step.argv.join(' ')}`);
 
-        await this.runViaPty(step.argv);
+        const res = await this.runKrnl(step.argv);
+        // Say what went wrong, where the user can see it (there is no
+        // terminal output to "check" — the command runs in main).
+        if (res && !res.ok) {
+          this.deps.setCaption(`krnl ${step.argv[0] ?? ''}: ${res.message}`);
+          await new Promise<void>((r) => setTimeout(r, 1800));
+        }
 
         this.deps.setOrbState('speaking');
         break;
@@ -194,40 +203,21 @@ export class ScriptRunner {
     }
   }
 
-  // Spawn a hidden PTY, run the krnl command, wait for exit or 5s timeout.
-  // Falls back gracefully if krnl isn't in PATH.
-  private async runViaPty(argv: string[]): Promise<void> {
+  // Run the command in main through the CLI's facade (sys:run): argv goes
+  // through exactly as given — no shell, so a task called "review notes" or
+  // "don't forget #2" stays one argument — and the result comes back as soon
+  // as it is done. (Typing it into a hidden shell split names on spaces and
+  // always waited out a 5 s timeout: an interactive shell never exits.)
+  private async runKrnl(argv: string[]): Promise<{ ok: boolean; message: string } | null> {
+    const run = window.krnl?.sysRun;
+    if (!run) {
+      await new Promise<void>((r) => setTimeout(r, 300));
+      return null;
+    }
     try {
-      const result = await window.krnl?.ptyCreate(80, 24);
-      if (!result) {
-        await new Promise<void>((r) => setTimeout(r, 1500));
-        return;
-      }
-      const sessionId = typeof result === 'string' ? result : result.sessionId;
-      this.ptySession = sessionId;
-
-      await new Promise<void>((resolve) => {
-        const TIMEOUT = 5000;
-        let settled = false;
-
-        const settle = () => {
-          if (settled) return;
-          settled = true;
-          this.ptySession = null;
-          resolve();
-        };
-
-        const unsubExit = window.krnl!.onPtyExit(sessionId, settle);
-        window.krnl!.ptyWrite(sessionId, `krnl ${argv.join(' ')}\r`);
-
-        setTimeout(() => {
-          unsubExit();
-          window.krnl?.ptyKill(sessionId).catch(() => {});
-          settle();
-        }, TIMEOUT);
-      });
-    } catch {
-      await new Promise<void>((r) => setTimeout(r, 1500));
+      return await run(argv);
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) };
     }
   }
 }

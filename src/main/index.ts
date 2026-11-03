@@ -27,6 +27,22 @@ if (process.env['KRNL0_USER_DATA']) {
   app.setPath('userData', process.env['KRNL0_USER_DATA']);
 }
 
+// One app instance per user-data folder. Two instances on the same board.json
+// each keep their own lost-update guard and keep reverting each other's
+// saves. A second launch focuses the running window instead. The lock is per
+// userData, so isolated worktrees (scripts/dev.mjs) still run side by side.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  });
+}
+
 // ── macOS / Chromium GPU compositing hints ─────────────────────────────────
 // MUST be set before app.whenReady() — Chromium reads these once at startup.
 // Goal: keep the canvas, Orb glows, and xterm WebGL renderer on the GPU path
@@ -250,6 +266,7 @@ function setupCliDir(): string {
 let rpcServer: RpcServer | undefined;
 
 app.whenReady().then(async () => {
+  if (!gotSingleInstanceLock) return;
   // Windows taskbar icon — without a unique AppUserModelID, Windows groups
   // our window under Electron's generic model ID and pins the default
   // Electron icon to the taskbar even when BrowserWindow({ icon }) is set.

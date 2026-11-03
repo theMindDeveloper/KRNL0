@@ -16,6 +16,7 @@ import type { TextState, TextConfig } from './types';
 import { useCornerProximity } from '../../../hooks/useCornerProximity';
 import { LookBar } from './LookBar';
 import { STICKY_COLORS, type TextLook } from './types';
+import { TEXT_EDIT_EVENT } from './editEvent';
 
 // Sticky notes are handwritten (Caveat, via Fontsource — loaded on demand).
 const STICKY_FONT = "'Caveat', 'Segoe Print', 'Comic Sans MS', cursive";
@@ -53,6 +54,24 @@ export function TextNode({
   const [draft, setDraft] = useState(text);
   const [hover, setHover] = useState(false);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
+  // Text at the moment editing began. The 400 ms autosave may already have
+  // written part of the edit, so Escape restores this, not the live text.
+  const originalRef = useRef(text);
+  const cancellingRef = useRef(false);
+  // Text taller than the box fades out at the bottom, so "there is more" is
+  // visible without opening the note.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || editing) return;
+    const check = () => setOverflowing(el.scrollHeight > el.clientHeight + 1);
+    check();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, editing]);
 
   // Keep draft in sync if the upstream state.text changes while NOT editing.
   useEffect(() => {
@@ -81,17 +100,36 @@ export function TextNode({
 
   const enterEdit = () => {
     if (editing) return;
+    originalRef.current = text;
+    cancellingRef.current = false;
     setDraft(text);
     setEditing(true);
   };
 
+  // Enter / F2 on the canvas with this note selected (CanvasFlow).
+  const enterEditRef = useRef(enterEdit);
+  enterEditRef.current = enterEdit;
+  useEffect(() => {
+    const onEdit = (e: Event) => {
+      if ((e as CustomEvent<{ nodeId: string }>).detail?.nodeId === node.id) enterEditRef.current();
+    };
+    window.addEventListener(TEXT_EDIT_EVENT, onEdit);
+    return () => window.removeEventListener(TEXT_EDIT_EVENT, onEdit);
+  }, [node.id]);
+
   const commit = () => {
+    // The textarea blurs as it unmounts after Escape; that blur must not
+    // re-save the abandoned draft.
+    if (cancellingRef.current) return;
     if (draft !== text) onCommand('text.setText', { text: draft });
     setEditing(false);
   };
 
   const cancel = () => {
-    setDraft(text);
+    cancellingRef.current = true;
+    const original = originalRef.current;
+    if (text !== original) onCommand('text.setText', { text: original });
+    setDraft(original);
     setEditing(false);
   };
 
@@ -199,7 +237,7 @@ export function TextNode({
             right: 2,
             bottom: 2,
             cursor: 'nwse-resize',
-            color: '#7d848b',
+            color: 'var(--ink-4)',
             pointerEvents: 'none',
             opacity: showHandle ? 1 : 0,
             transition: 'opacity 140ms ease',
@@ -213,7 +251,9 @@ export function TextNode({
         <div style={isShape ? { position: 'absolute', inset: 0, padding: shapePad, boxSizing: 'border-box', display: 'flex', alignItems: 'center' } : { width: '100%', height: '100%' }}>
         <textarea
           ref={taRef}
-          className="text-body"
+          // nodrag: selecting text with the mouse must not move the note;
+          // nowheel: the wheel scrolls a long note instead of zooming.
+          className="text-body nodrag nowheel"
           data-testid="text-node-textarea"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -240,7 +280,9 @@ export function TextNode({
             letterSpacing: '-0.005em',
             boxSizing: 'border-box',
             position: 'relative',
-            overflow: 'hidden',
+            // Shapes size to their lines; a long note scrolls while editing
+            // instead of hiding what is past the box.
+            overflow: isShape ? 'hidden' : 'auto',
             ...(isShape ? { height: `${Math.max(1, draft.split('\n').length) * 1.35}em`, maxHeight: '100%' } : {}),
           }}
         />
@@ -248,8 +290,20 @@ export function TextNode({
       ) : (
         <div
           className="text-body"
+          ref={bodyRef}
           data-testid="text-node-body"
+          data-overflowing={overflowing || undefined}
           onClick={enterEdit}
+          // Keyboard: Tab to the note, Enter (or F2) to edit it.
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === 'F2') {
+              e.preventDefault();
+              e.stopPropagation();
+              enterEdit();
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',
@@ -267,6 +321,10 @@ export function TextNode({
             boxSizing: 'border-box',
             position: 'relative',
             ...(isShape ? { display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' } : {}),
+            ...(overflowing ? {
+              maskImage: 'linear-gradient(to bottom, #000 calc(100% - 28px), transparent)',
+              WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 28px), transparent)',
+            } : {}),
           }}
         >
           {text || (

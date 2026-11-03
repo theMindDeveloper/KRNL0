@@ -11,6 +11,7 @@ import {
   cliSchedule,
   cliUnschedule,
   cliArchive,
+  cliRemove,
   cliShow,
   type HabitCtx,
 } from '../../../src/sys/commands/habit';
@@ -232,5 +233,29 @@ describe('habit show', () => {
     const data = JSON.parse(res.message ?? '{}');
     expect(data.schedule).toBeDefined();
     expect(data.schedule.kind).toBe('daily');
+  });
+});
+
+describe('habit lanes follow their habit (CLI)', () => {
+  const addLane = (habitId: string) => {
+    const b = readBoard();
+    b.nodes.push({ id: `habit-lane-${habitId}`, kind: 'habit.lane', isMother: false, position: { x: 0, y: 900 }, state: { habitId }, config: {} });
+    writeFileSync(boardPath, JSON.stringify(b), 'utf-8');
+  };
+  const lanes = () => readBoard().nodes.filter((n: { kind: string }) => n.kind === 'habit.lane');
+
+  it('habit remove deletes its lane', async () => {
+    const id = findMother().state.habits[0].id as string;
+    addLane(id);
+    const res = await cliRemove(ctx, 'Exercise');
+    expect(res.ok).toBe(true);
+    expect(lanes()).toHaveLength(0);
+  });
+
+  it('habit archive drops its lane too', async () => {
+    const id = findMother().state.habits[0].id as string;
+    addLane(id);
+    expect((await cliArchive(ctx, 'Exercise')).ok).toBe(true);
+    expect(lanes()).toHaveLength(0);
   });
 });

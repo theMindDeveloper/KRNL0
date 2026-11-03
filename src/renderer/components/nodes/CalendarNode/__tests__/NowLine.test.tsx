@@ -142,3 +142,13 @@ describe('NowLine — cleanup on unmount', () => {
     clearSpy.mockRestore();
   });
 });
+
+describe('NowLine — day view', () => {
+  it('centres the dot in the single day column', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-14T10:30:00'));
+    const { container } = render(<NowLine {...makeProps({ weekStartDate: '2026-05-14', days: 1, gutterWidth: 0 })} />);
+    const dot = container.querySelector('[data-testid="now-line-dot"]') as HTMLElement;
+    expect(dot.style.left).toContain('50%');
+  });
+});

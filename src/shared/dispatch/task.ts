@@ -19,18 +19,19 @@ import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
 import type { PomoConfig, PomoState } from '../../renderer/components/nodes/PomoNode/types';
 import {
+  todoEdit as fsmTodoEdit,
   todoRemove as fsmTodoRemove,
   todoToggle as fsmTodoToggle,
   tagExamples,
 } from '../../renderer/components/nodes/TodoNode/commands';
 import { classifyTask, mergeTagLibrary } from '../tags/classify';
 import {
+  taskEdit as fsmTaskEdit,
   taskToggle as fsmTaskToggle,
 } from '../../renderer/components/nodes/TaskNode/commands';
 import {
-  pomoCancel as fsmPomoCancel,
   pomoClearActiveTask as fsmPomoClearActiveTask,
-  pomoSkipBreak as fsmPomoSkipBreak,
+  pomoStop as fsmPomoStop,
 } from '../../renderer/components/nodes/PomoNode/commands';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -124,15 +125,10 @@ export function deleteTaskCascade(
   if (pomoNode) {
     const ps = pomoNode.state as PomoState;
     if (ps.activeTaskId !== null && allDescendants.has(ps.activeTaskId)) {
-      let cancelledState = ps;
-      // pomoCancel only covers running/paused; pomoSkipBreak transitions a
-      // 'break' status back to idle. Without that branch, deleting a task
-      // mid-break would leave the break timer ticking on a phantom session.
-      if (ps.status === 'running' || ps.status === 'paused') {
-        cancelledState = fsmPomoCancel(ps);
-      } else if (ps.status === 'break') {
-        cancelledState = fsmPomoSkipBreak(ps);
-      }
+      // pomoStop records the in-flight span with its real length (a break as
+      // a break) and goes idle from running, paused or break — so deleting a
+      // task mid-session neither loses the time nor books the session cap.
+      const cancelledState = ps.status === 'idle' ? ps : fsmPomoStop(ps);
       // Pass the pomo mother's live config so durationMin/breakMin snap back
       // to user-configured defaults — without this, a deleted task left the
       // pomo stuck on the task's per-session minutes (user report 2026-05-18).
@@ -223,6 +219,41 @@ export function syncCompletion(board: BoardShape, taskId: string): void {
 }
 
 /**
+ * Rename a task everywhere it shows: the task node, its Todo row (re-tagged
+ * unless hand-tagged), the pomo label while the pomo is on it, and its
+ * completion-ledger entry. A Todo-row rename and a card rename both land
+ * here, so the list, the card, the Calendar / Clock and analytics agree.
+ * Mutates `board` (replaces node entries); false when nothing was renamed.
+ */
+export function renameTask(board: BoardShape, taskId: string, text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const idx = board.nodes.findIndex((n) => n.id === taskId && n.kind === 'todo.task');
+  if (idx === -1) return false;
+  const taskNode = board.nodes[idx]!;
+  const ts = taskNode.state as TaskState;
+  board.nodes[idx] = { ...taskNode, state: fsmTaskEdit(ts, { text: trimmed }) };
+
+  if (ts.todoItemId !== null) {
+    const todoIdx = board.nodes.findIndex((n) => n.id === ts.parentTodoId && n.kind === 'todo');
+    const todoNode = todoIdx === -1 ? undefined : board.nodes[todoIdx];
+    const item = todoNode ? (todoNode.state as TodoState).items.find((i) => i.id === ts.todoItemId) : undefined;
+    if (todoNode && item && item.text !== trimmed) {
+      board.nodes[todoIdx] = { ...todoNode, state: fsmTodoEdit(todoNode.state as TodoState, { id: item.id, text: trimmed }) };
+    }
+  }
+
+  const pomoIdx = board.nodes.findIndex((n) => n.kind === 'pomo');
+  const pomoNode = pomoIdx === -1 ? undefined : board.nodes[pomoIdx];
+  if (pomoNode && (pomoNode.state as PomoState).activeTaskId === taskId) {
+    board.nodes[pomoIdx] = { ...pomoNode, state: { ...(pomoNode.state as PomoState), label: trimmed } };
+  }
+
+  if (ts.done) syncCompletion(board, taskId);
+  return true;
+}
+
+/**
  * ADR 0016 — the tag a completion is filed under: the linked TodoItem's tag,
  * else the task's own legacy tag, else a fresh classification of its text (so
  * subtasks without a Todo row still land in a category).
@@ -278,6 +309,18 @@ export function taskToggleMirror(
         const todoIdx = board.nodes.indexOf(todoNode);
         board.nodes[todoIdx] = { ...todoNode, state: newTodo };
       }
+    }
+  }
+
+  // Same as the card / Todo row / popup: finishing the task the pomo is on
+  // stops the pomo (recording the real span) and untags it.
+  if (nextState.done) {
+    const pomoIdx = board.nodes.findIndex((n) => n.kind === 'pomo');
+    const pomoNode = pomoIdx === -1 ? undefined : board.nodes[pomoIdx]!;
+    const ps = pomoNode?.state as PomoState | undefined;
+    if (pomoNode && ps && ps.activeTaskId === taskId && ps.status !== 'idle') {
+      const cfg = (pomoNode.config as PomoConfig | null) ?? undefined;
+      board.nodes[pomoIdx] = { ...pomoNode, state: fsmPomoClearActiveTask(fsmPomoStop(ps), cfg) };
     }
   }
 

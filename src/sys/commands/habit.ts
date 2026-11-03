@@ -37,6 +37,7 @@ import {
   isValidTimeOfDay,
   todayLocal,
 } from '../../renderer/components/nodes/HabitNode/types';
+import { isValidYMD } from '../../shared/ymd';
 
 export interface HabitCtx {
   boardPath: string;
@@ -88,6 +89,27 @@ function writeBoard(ctx: HabitCtx, board: BoardShape, mother: MotherHabitNode): 
   });
   saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
   ctx.onBoardChanged?.();
+}
+
+/** Drop the canvas lanes pinned for a habit (and their edges), as the UI does. */
+function removeLanesFor(board: BoardShape, habitId: string): number {
+  const laneIds = new Set(
+    board.nodes
+      .filter((n) => typeof n === 'object' && n !== null
+        && (n as { kind?: unknown }).kind === 'habit.lane'
+        && ((n as { state?: { habitId?: unknown } }).state?.habitId === habitId))
+      .map((n) => (n as { id: string }).id),
+  );
+  if (laneIds.size === 0) return 0;
+  board.nodes = board.nodes.filter((n) => !laneIds.has((n as { id?: string }).id ?? ''));
+  const edges = (board as { edges?: unknown[] }).edges;
+  if (Array.isArray(edges)) {
+    (board as { edges?: unknown[] }).edges = edges.filter((e) => {
+      const ed = e as { from?: { nodeId?: string }; to?: { nodeId?: string } };
+      return !laneIds.has(ed.from?.nodeId ?? '') && !laneIds.has(ed.to?.nodeId ?? '');
+    });
+  }
+  return laneIds.size;
 }
 
 // Resolve idOrName → habit. Order: exact id → ≥4-char id prefix → exact name
@@ -149,13 +171,6 @@ export async function cliAdd(ctx: HabitCtx, name: string | undefined): Promise<S
   };
 }
 
-/** True iff `s` is a real calendar date in strict `YYYY-MM-DD` form. */
-function isValidYMD(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const [y, m, d] = s.split('-').map(Number) as [number, number, number];
-  const dt = new Date(y, m - 1, d);
-  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
-}
 
 /**
  * `habit done` / `habit undo` — set (not toggle) a day's mark, so retrying a
@@ -271,10 +286,13 @@ export async function cliRemove(
   const resolved = resolveHabit(mother.state, idOrName);
   if ('error' in resolved) return { ok: false, message: resolved.error };
   mother.state = habitRemove(mother.state, { id: resolved.habit.id });
+  // Its lanes go with it (left behind they were orphans that only the open
+  // window cleaned up, in memory).
+  const lanes = removeLanesFor(board, resolved.habit.id);
   writeBoard(ctx, board, mother);
   return {
     ok: true,
-    message: `habit removed: "${resolved.habit.name}"`,
+    message: `habit removed: "${resolved.habit.name}"${lanes ? ` (and ${lanes} lane${lanes === 1 ? '' : 's'})` : ''}`,
     data: { id: resolved.habit.id },
   };
 }
@@ -527,10 +545,12 @@ export async function cliArchive(
     return { ok: true, message: `habit "${resolved.habit.name}" is already archived`, data: { id: resolved.habit.id } };
   }
   mother.state = habitArchive(mother.state, { id: resolved.habit.id });
+  // An archived habit isn't tracked: no lane to tick on the canvas.
+  const lanes = removeLanesFor(board, resolved.habit.id);
   writeBoard(ctx, board, mother);
   return {
     ok: true,
-    message: `habit archived: "${resolved.habit.name}"`,
+    message: `habit archived: "${resolved.habit.name}"${lanes ? ` (lane removed)` : ''}`,
     data: { id: resolved.habit.id },
   };
 }

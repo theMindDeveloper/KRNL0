@@ -15,6 +15,7 @@ import {
   deleteSegment,
   retagSegment,
   unscheduleTask,
+  scheduleAnchorOf,
   toggleTaskDone,
   startFocusOnTask,
   focusNode,
@@ -104,7 +105,12 @@ export function taskMenuItems(
   items.push(
     { label: task.done ? 'Mark not done' : 'Mark done', onSelect: () => { void toggleTaskDone(task.id); } },
     { label: 'Show on canvas', onSelect: () => focusNode(task.id) },
-    { label: 'Unschedule', danger: true, onSelect: () => unscheduleTask(task.id) },
+    {
+      // A chain successor is placed by its anchor: unscheduling it takes the chain off.
+      label: scheduleAnchorOf(task.id) === task.id ? 'Unschedule' : 'Unschedule chain',
+      danger: true,
+      onSelect: () => { void unscheduleTask(task.id); },
+    },
   );
   return items;
 }

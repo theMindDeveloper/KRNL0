@@ -67,9 +67,11 @@ describe('habitSource', () => {
       },
     ]);
     const events = habitSource.collect(board);
-    expect(events).toHaveLength(3);
+    // Archiving stops tracking a habit; the days it was done still count.
+    expect(events).toHaveLength(4);
     expect(events.every((e) => e.type === 'habit.checkin')).toBe(true);
     expect(events.filter((e) => e.date === '2026-05-11')).toHaveLength(2);
+    expect(events.some((e) => (e.metadata as { habitId: string }).habitId === 'c')).toBe(true);
   });
 });
 
@@ -161,5 +163,29 @@ describe('calcHabitStreak', () => {
 
   it('returns 0 when today is missing', () => {
     expect(calcHabitStreak(['2026-05-14'], '2026-05-16')).toBe(0);
+  });
+});
+
+describe('pomoSource — a span over midnight', () => {
+  it('splits into one event per day, each timestamped inside its own day', async () => {
+    const { byHourOfDay } = await import('../bucketBy');
+    const start = new Date(2026, 10, 2, 23, 30);
+    const end = new Date(2026, 10, 3, 0, 30);
+    const board = makeBoard([{
+      id: 'p', kind: 'pomo',
+      state: { history: [{ id: 's1', startedAt: start.toISOString(), endedAt: end.toISOString(), durationMin: 60, completed: true, kind: 'work' }] },
+    }]);
+    const work = pomoSource.collect(board).filter((e) => e.type === 'pomo.work');
+    expect(work.map((e) => [e.date, e.durationMin])).toEqual([['2026-11-02', 30], ['2026-11-03', 30]]);
+    for (const e of work) {
+      const d = new Date(e.isoTimestamp!);
+      const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      expect(ymd).toBe(e.date);
+    }
+    const hours = byHourOfDay(work, { start: '2026-11-02', end: '2026-11-03' });
+    expect(hours[23]!.focusMin).toBe(30);
+    expect(hours[0]!.focusMin).toBe(30);
+    // Still one completed session, on the day it ended.
+    expect(pomoSource.collect(board).filter((e) => e.type === 'pomo.session').map((e) => e.date)).toEqual(['2026-11-03']);
   });
 });

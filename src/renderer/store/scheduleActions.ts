@@ -15,7 +15,7 @@ import { useBoardStore } from './boardStore';
 import { saveBoard } from './eventLog';
 import { pomoDeleteSegment, pomoRetagSegment } from '../components/nodes/PomoNode/commands';
 import type { PomoState } from '../components/nodes/PomoNode/types';
-import { taskSetSchedule } from '../components/nodes/TaskNode/commands';
+import { selectSchedule } from './scheduleSelector';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 
 function persist(): void {
@@ -46,17 +46,40 @@ export function retagSegment(segId: string, taskId: string | null): void {
   persist();
 }
 
-export function unscheduleTask(taskId: string): void {
-  const st = useBoardStore.getState();
-  const node = st.board?.nodes.find((n) => n.id === taskId);
-  if (!node || node.kind !== 'todo.task') return;
-  st.updateNode(taskId, { state: taskSetSchedule(node.state as TaskState, { scheduledFor: null }) });
-  persist();
+/**
+ * The task whose `scheduledFor` puts `taskId` on the calendar: the task itself
+ * when it is an anchor, else the anchor of its chain (successors are placed
+ * at read time and store no time of their own). Null when not on the calendar.
+ */
+export function scheduleAnchorOf(taskId: string): string | null {
+  const board = useBoardStore.getState().board;
+  const node = board?.nodes.find((n) => n.id === taskId);
+  if (!board || !node || node.kind !== 'todo.task') return null;
+  if ((node.state as TaskState).scheduledFor) return taskId;
+  return selectSchedule(board).placements.get(taskId)?.anchorTaskId ?? null;
 }
 
-async function dispatchToTask(taskId: string, command: string): Promise<void> {
+/** Where `taskId` sits on the calendar right now (anchors and chain successors). */
+export function placementOf(taskId: string): { startISO: string; endISO: string } | null {
+  const p = selectSchedule(useBoardStore.getState().board).placements.get(taskId);
+  return p ? { startISO: p.startISO, endISO: p.endISO } : null;
+}
+
+/**
+ * Take a task off the calendar. A chain successor has no time of its own, so
+ * this unschedules the chain's anchor (the whole chain leaves the calendar);
+ * the menu says "Unschedule chain" in that case. Goes through the dispatcher
+ * so the linked Todo row's time is cleared too (CLI: task unschedule).
+ */
+export async function unscheduleTask(taskId: string): Promise<void> {
+  const anchor = scheduleAnchorOf(taskId);
+  if (!anchor) return;
+  await dispatchToTask(anchor, 'task.setSchedule', { scheduledFor: null });
+}
+
+async function dispatchToTask(taskId: string, command: string, args: Record<string, unknown> = {}): Promise<void> {
   const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
-  makeCommandHandler(taskId)(command, {});
+  makeCommandHandler(taskId)(command, args);
 }
 
 export function toggleTaskDone(taskId: string): Promise<void> {
@@ -92,8 +115,9 @@ export const CALENDAR_REVEAL_EVENT = 'krnl:calendar-reveal';
  */
 export async function showTaskOnCalendar(taskId: string): Promise<void> {
   const board = useBoardStore.getState().board;
-  const task = board?.nodes.find((n) => n.id === taskId);
-  const when = (task?.state as TaskState | undefined)?.scheduledFor;
+  // The block's real start: a chain successor has no scheduledFor, and a
+  // pushed anchor (Decision 30) can land on a later day than it stores.
+  const when = placementOf(taskId)?.startISO;
   const cal = board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
   if (!when || !cal) return;
   const d = new Date(when);

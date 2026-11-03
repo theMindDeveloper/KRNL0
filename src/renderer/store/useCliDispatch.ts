@@ -12,7 +12,11 @@
 import { useEffect } from 'react';
 import { useBoardStore } from './boardStore';
 import { emit, saveBoard } from './eventLog';
-import { deleteTaskNodesCascade } from '../components/Canvas/commandDispatch';
+import { deleteTaskNodesCascade, makeCommandHandler } from '../components/Canvas/commandDispatch';
+import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
+import { activeCanvasOf, isOnCanvas } from '../../shared/canvas';
+import type { BoardShape } from '../../shared/dispatch/types';
+import { TERM_CLEAR_EVENT, TERM_FONT_MIN, TERM_FONT_MAX } from '../components/nodes/TerminalNode/constants';
 import { sfxEngine } from '../sfx/sfxEngine';
 import { useEventLog } from './eventLog/store';
 import type { Board } from '../../shared/types';
@@ -21,6 +25,7 @@ import type { HabitLaneState } from '../components/nodes/HabitLaneNode/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import { getDockStyle, setDockStyle } from '../components/ChassisLayer/useDockStyle';
 import { isFrameStyleId } from '../../shared/frameStyles';
+import { radioControl } from '../components/AmbientRadio/radioControl';
 
 export function useCliDispatch(): void {
   const store = useBoardStore;
@@ -53,17 +58,67 @@ export function useCliDispatch(): void {
             break;
           }
 
+          // Undo / redo persist like the keyboard shortcut does; otherwise the
+          // next CLI write (which reads board.json) brings the change back.
           case 'undo': {
+            if (store.getState().history.length === 0) { ok = true; message = 'Nothing to undo'; break; }
             store.getState().undo();
+            const undone = store.getState().board;
+            if (undone) void saveBoard(undone);
             ok = true;
             message = 'Undo applied';
             break;
           }
 
           case 'redo': {
+            if (store.getState().future.length === 0) { ok = true; message = 'Nothing to redo'; break; }
             store.getState().redo();
+            const redone = store.getState().board;
+            if (redone) void saveBoard(redone);
             ok = true;
             message = 'Redo applied';
+            break;
+          }
+
+          case 'term.setShell': {
+            const termNode = store.getState().board?.nodes.find((n) => n.kind === 'term');
+            if (!termNode) { message = 'No terminal on the board'; break; }
+            const shell = typeof args['shell'] === 'string' ? args['shell'].trim() : '';
+            if (!shell) { message = 'term setShell requires <shell> (e.g. pwsh.exe, /bin/bash, or default)'; break; }
+            makeCommandHandler(termNode.id)('term.setShell', { shell });
+            ok = true;
+            message = `Terminal shell set to ${shell} — used for the next shell (type exit, then Enter)`;
+            break;
+          }
+
+          case 'term.setTitle':
+          case 'term.setFontSize':
+          case 'term.clear': {
+            const { board } = store.getState();
+            const termNode = board?.nodes.find((n) => n.kind === 'term');
+            if (!termNode) { message = 'No terminal on the board'; break; }
+            if (command === 'term.clear') {
+              window.dispatchEvent(new CustomEvent(TERM_CLEAR_EVENT, { detail: { nodeId: termNode.id } }));
+              ok = true;
+              message = 'Terminal cleared';
+              break;
+            }
+            if (command === 'term.setTitle') {
+              const title = typeof args['title'] === 'string' ? args['title'].trim() : '';
+              if (!title) { message = 'term setTitle requires "<title>"'; break; }
+              makeCommandHandler(termNode.id)('term.setTitle', { title });
+              ok = true;
+              message = `Terminal title set to "${title}"`;
+              break;
+            }
+            const size = args['fontSize'];
+            if (typeof size !== 'number' || !Number.isFinite(size) || size < TERM_FONT_MIN || size > TERM_FONT_MAX) {
+              message = `term setFontSize requires a number from ${TERM_FONT_MIN} to ${TERM_FONT_MAX}`;
+              break;
+            }
+            makeCommandHandler(termNode.id)('term.setFontSize', { fontSize: size });
+            ok = true;
+            message = `Terminal font size set to ${size}`;
             break;
           }
 
@@ -96,6 +151,12 @@ export function useCliDispatch(): void {
             break;
           }
 
+          case 'theme.get': {
+            ok = true;
+            message = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+            break;
+          }
+
           case 'theme.frame.get': {
             ok = true;
             message = getDockStyle();
@@ -106,13 +167,23 @@ export function useCliDispatch(): void {
             const { id, x, y } = args as { id: string; x: number; y: number };
             const { board, updateNode } = store.getState();
             if (!board) { message = 'No board loaded'; break; }
-            const node = board.nodes.find((n) => n.id === id);
-            if (!node) { message = `No node with id "${id}"`; break; }
-            updateNode(id, { position: { x, y } } as Partial<Node>);
+            // Same ref rule as every other command: id, ≥4-char prefix, or unique text.
+            const ref = resolveNodeRef(board as unknown as BoardShape, id);
+            if (!ref.ok) {
+              message = ref.reason === 'ambiguous'
+                ? `"${id}" matches several nodes: ${(ref.matches ?? []).map((m) => m.slice(0, 12)).join(', ')}`
+                : `No node matching "${id}"`;
+              break;
+            }
+            const node = board.nodes.find((n) => n.id === ref.id);
+            if (!node) { message = `No node matching "${id}"`; break; }
+            // Mother nodes are fixed-position (AGENTS.md hard rule 6).
+            if (node.isMother) { message = `${node.kind} is a fixed window and can't be moved`; break; }
+            updateNode(node.id, { position: { x, y } } as Partial<Node>);
             const updated = store.getState().board;
             if (updated) void saveBoard(updated);
             ok = true;
-            message = `Node ${id.slice(0, 8)} moved to (${x}, ${y})`;
+            message = `Node ${node.id.slice(0, 8)} moved to (${x}, ${y})`;
             break;
           }
 
@@ -121,28 +192,63 @@ export function useCliDispatch(): void {
             const { board } = store.getState();
             if (!board) { message = 'No board loaded'; break; }
 
-            // Find task nodes in the rect
+            // Every node on the current canvas whose top-left corner is in the
+            // rect, as the help says — except the fixed mother windows.
             const minX = Math.min(x1, x2);
             const maxX = Math.max(x1, x2);
             const minY = Math.min(y1, y2);
             const maxY = Math.max(y1, y2);
+            const canvasId = activeCanvasOf(board);
+            const inside = board.nodes.filter((n) => {
+              if (n.isMother || !isOnCanvas(n, canvasId)) return false;
+              const { x, y } = n.position;
+              return x >= minX && x <= maxX && y >= minY && y <= maxY;
+            });
+            const taskIds = inside.filter((n) => n.kind === 'todo.task').map((n) => n.id);
+            const otherIds = inside.filter((n) => n.kind !== 'todo.task').map((n) => n.id);
 
-            const taskIds = board.nodes
-              .filter((n) => {
-                if (n.kind !== 'todo.task') return false;
-                const px = n.position.x;
-                const py = n.position.y;
-                return px >= minX && px <= maxX && py >= minY && py <= maxY;
-              })
-              .map((n) => n.id);
-
-            if (taskIds.length > 0) {
-              deleteTaskNodesCascade(taskIds);
+            if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
+            for (const id of otherIds) store.getState().removeNode(id);
+            if (inside.length > 0) {
               const updated = store.getState().board as Board | null;
               if (updated) void saveBoard(updated);
             }
             ok = true;
-            message = `Marquee deleted ${taskIds.length} task(s)`;
+            message = `Marquee deleted ${inside.length} node(s) (${taskIds.length} task(s))`;
+            break;
+          }
+
+          case 'radio.list':
+          case 'radio.status':
+          case 'radio.play':
+          case 'radio.remove':
+          case 'radio.stop':
+          case 'radio.volume': {
+            const radio = radioControl();
+            if (!radio) { message = 'The Ambient Radio is not open in this window'; break; }
+            const ids = radio.presets().map((p) => p.id).filter((id) => id !== 'yt');
+            const preset = (args as { preset?: string }).preset?.toLowerCase();
+            if (preset !== undefined && preset === 'yt') { message = 'YouTube needs a link: paste it into the radio'; break; }
+            if (preset !== undefined && !ids.includes(preset)) { message = `Unknown preset "${preset}" (${ids.join(', ')})`; break; }
+            if (command === 'radio.play') radio.play(preset);
+            if (command === 'radio.remove' && preset !== undefined) radio.remove(preset);
+            if (command === 'radio.stop') radio.stop();
+            if (command === 'radio.volume') radio.setVolume((args as { volume: number }).volume);
+            if (command === 'radio.list') {
+              ok = true;
+              message = radio.presets().filter((p) => p.id !== 'yt').map((p) => `${p.id.padEnd(6)} ${p.sub}`).join('\n');
+              break;
+            }
+            // Report what the panel will show once React applies the change.
+            const s = radio.status();
+            const playing = command === 'radio.play' ? true : command === 'radio.stop' ? false : s.playing;
+            const layers = new Set(s.layers);
+            if (command === 'radio.play' && preset) layers.add(preset);
+            if (command === 'radio.play' && !preset && layers.size === 0) layers.add(s.focused);
+            if (command === 'radio.remove' && preset) layers.delete(preset);
+            const volume = command === 'radio.volume' ? Math.round((args as { volume: number }).volume) : s.volume;
+            ok = true;
+            message = `radio: ${playing && layers.size > 0 ? 'playing' : 'paused'} · ${layers.size > 0 ? [...layers].join(' + ') : 'no layers'} · volume ${volume}`;
             break;
           }
 

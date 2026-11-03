@@ -19,6 +19,8 @@ import { FRAME_PADDING, FRAME_MIN_W, FRAME_MIN_H } from '../layout';
 export interface FrameCtx {
   boardPath: string;
   onBoardChanged?: () => void;
+  /** Window content size; without it the viewport's top-left is the best guess. */
+  viewSize?: () => { width: number; height: number } | null;
 }
 
 const VALID_TINTS: readonly FrameTint[] = ['cyan', 'spine', 'rust', 'plum', 'neutral'];
@@ -276,14 +278,16 @@ export async function frameAdd(
   } else if (opts.at) {
     position = opts.at;
   } else {
-    // Default: viewport center if known, else (0, 0).
-    // Canvas center = (-vp.x / vp.zoom, -vp.y / vp.zoom).
-    // Frame top-left = canvas center - (width/2, height/2).
+    // Default: the centre of what the user is looking at. The saved viewport
+    // is the flow-space offset of the window's top-left corner
+    // (-vp.x / zoom, -vp.y / zoom); adding half the window size (in flow
+    // units) gives the visible centre. Headless (no window) → the top-left.
     const rawBoard = board as unknown as { viewport?: { x: number; y: number; zoom: number } };
     const vp = rawBoard.viewport;
-    if (vp) {
-      const centerX = Math.round(-vp.x / vp.zoom);
-      const centerY = Math.round(-vp.y / vp.zoom);
+    if (vp && vp.zoom > 0) {
+      const view = ctx.viewSize?.() ?? null;
+      const centerX = Math.round((-vp.x + (view ? view.width / 2 : 0)) / vp.zoom);
+      const centerY = Math.round((-vp.y + (view ? view.height / 2 : 0)) / vp.zoom);
       position = { x: centerX - Math.round(width / 2), y: centerY - Math.round(height / 2) };
     } else {
       position = { x: 0, y: 0 };

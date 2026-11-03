@@ -4,6 +4,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Z } from './layers';
 
 export interface PieItem {
   key: string;
@@ -71,14 +72,14 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
   return createPortal(
     <div data-testid={testId} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
       <style>{CSS}</style>
-      <div onPointerDown={onClose} style={{ position: 'fixed', inset: 0, zIndex: 3000 }} />
+      <div onPointerDown={onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.radialBackdrop }} />
       <svg
         key={stack.length}
         className="krnl-piemenu"
         width={R * 2}
         height={R * 2}
         viewBox={`${-R} ${-R} ${R * 2} ${R * 2}`}
-        style={{ position: 'fixed', left: cx - R, top: cy - R, zIndex: 3001, overflow: 'visible', filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.55))' }}
+        style={{ position: 'fixed', left: cx - R, top: cy - R, zIndex: Z.radial, overflow: 'visible', filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.55))' }}
       >
         <circle r={R - 2} fill="rgba(12,14,16,0.74)" />
         {level.map((it, i) => {
@@ -88,7 +89,9 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
           const rm = (R0 + R1) / 2;
           const px = rm * Math.cos(mid);
           const py = rm * Math.sin(mid);
-          const fill = it.swatch ?? (it.active ? '#c9f158' : 'rgba(30,33,37,0.97)');
+          // The wheel is dark in every theme: the active wedge takes the
+          // theme's on-dark accent (lime, cyan, amber, white …), never a fixed lime.
+          const fill = it.swatch ?? (it.active ? 'var(--accent-on-dark)' : 'rgba(30,33,37,0.97)');
           const ink = it.active && !it.swatch ? '#0e1012' : '#e8ebee';
           return (
             <g key={it.key}>
@@ -98,8 +101,7 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
                 role="button"
                 aria-label={it.label}
                 d={sector(R0, R1, a0, a1)}
-                fill={fill}
-                stroke={it.active ? '#c9f158' : 'rgba(255,255,255,0.07)'}
+                style={{ fill, stroke: it.active ? 'var(--accent-on-dark)' : 'rgba(255,255,255,0.07)' }}
                 strokeWidth={it.active ? 2 : 1}
                 onPointerEnter={() => setHover(it.label)}
                 onPointerLeave={() => setHover(null)}

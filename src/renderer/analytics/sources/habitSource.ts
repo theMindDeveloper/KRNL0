@@ -1,5 +1,8 @@
 // Habit data source — emits one 'habit.checkin' per (habit, YYYY-MM-DD) pair
-// across all non-archived habits on the habit mother node.
+// across every habit on the habit mother node, archived ones included:
+// archiving stops tracking a habit, it doesn't undo the days it was done
+// (like the task completion ledger keeps deleted tasks' completions).
+// Per-habit lists (streaks, listHabits) still leave archived habits out.
 
 import type { AnalyticsDataSource, AnalyticsEvent, BoardLike } from '../types';
 import type { HabitSchedule } from '../../components/nodes/HabitNode/types';
@@ -27,7 +30,6 @@ export const habitSource: AnalyticsDataSource = {
       const s = n.state as HabitStateLike;
       const habits = s.habits ?? [];
       for (const h of habits) {
-        if (h.archived) continue;
         const log = h.log ?? [];
         for (const ymd of log) {
           out.push({

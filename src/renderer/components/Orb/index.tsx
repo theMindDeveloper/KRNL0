@@ -27,12 +27,16 @@ import {
 } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../renderer/store/boardStore';
+import { isFreshBoard } from './freshBoard';
 import { voicePlayer } from '../Assistant/VoicePlayer';
 import { ScriptRunner } from '../Assistant/ScriptRunner';
 import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
 import { CLICK_CLIPS } from '../Assistant/clipMap';
 import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
+import { CloseButton } from '../ui/CloseButton';
+import { Z } from '../ui/layers';
+import { isTypingTarget, isControlTarget, isModalOpen } from '../../utils/keyboardTargets';
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'running';
 interface ChatMsg { role: 'user' | 'ai'; text: string }
@@ -76,10 +80,18 @@ function defaultPos(): OrbPos {
   return { x: 120, y: window.innerHeight - ORB_SIZE - 24 };
 }
 
+// The top bar (44px) is the window's drag strip: an orb parked there can't
+// be clicked or dragged, so it never goes above it.
+const TOP_CLEAR = 44 + ORB_MARGIN;
+// Chat panel and caption size, to open them toward the free side.
+const PANEL_W = 340;
+const PANEL_H = 480;
+const CAPTION_W = 280;
+
 function clampPos(pos: OrbPos): OrbPos {
   return {
     x: Math.max(ORB_MARGIN, Math.min(window.innerWidth - ORB_SIZE - ORB_MARGIN, pos.x)),
-    y: Math.max(ORB_MARGIN, Math.min(window.innerHeight - ORB_SIZE - ORB_MARGIN, pos.y)),
+    y: Math.max(TOP_CLEAR, Math.min(window.innerHeight - ORB_SIZE - ORB_MARGIN, pos.y)),
   };
 }
 
@@ -118,7 +130,7 @@ function getBoardSnapshot(): BoardSnapshot {
     return {
       nodeCount: 0, taskCount: 0, habitCount: 0,
       hasPomo: false, hasTodo: false, hasCalendar: false, hasClock: false,
-      scheduledTaskCount: 0, chainedTaskCount: 0,
+      scheduledTaskCount: 0, scheduledTaskTexts: [], chainedTaskCount: 0,
       taskTexts: [], firstTaskText: null,
       viewport,
       nodePositions: {},
@@ -127,10 +139,12 @@ function getBoardSnapshot(): BoardSnapshot {
   const tasks  = board.nodes.filter((n) => n.kind === 'todo.task');
   const habits = board.nodes.filter((n) => n.kind === 'habit');
 
-  const scheduledTaskCount = tasks.filter((n) => {
+  const scheduledTasks = tasks.filter((n) => {
     const s = n.state as { scheduledFor?: unknown };
     return s.scheduledFor !== undefined && s.scheduledFor !== null;
-  }).length;
+  });
+  const scheduledTaskCount = scheduledTasks.length;
+  const scheduledTaskTexts = scheduledTasks.map((n) => (n.state as { text?: string }).text ?? '');
 
   const chainedTaskCount = new Set(
     board.edges
@@ -169,6 +183,7 @@ function getBoardSnapshot(): BoardSnapshot {
     hasClock: board.nodes.some((n) => n.kind === 'clock'),
     nodePositions,
     scheduledTaskCount,
+    scheduledTaskTexts,
     chainedTaskCount,
     taskTexts,
     firstTaskText: taskTexts[0] ?? null,
@@ -257,9 +272,12 @@ export function Orb() {
       pool.push({ clip: 'pa_its_late', text: "it's late. tomorrow exists." });
     }
 
-    const pick = pool[Math.floor(Math.random() * pool.length)]!;
-
     window.setTimeout(() => {
+      // A brand-new board gets an introduction and a pointer to the tour,
+      // not "welcome back". Read here: the board loads after the orb mounts.
+      const pick = isFreshBoard(useBoardStore.getState().board)
+        ? { clip: 'intro_01', text: "Welcome to KRNL0. I'm your system assistant. Click me for a tour." }
+        : pool[Math.floor(Math.random() * pool.length)]!;
       setOrbState('speaking');
       setCaption(pick.text);
       voicePlayer.play(pick.clip).catch(() => { /* missing clip → caption only */ });
@@ -370,16 +388,13 @@ export function Orb() {
 
   // ── Space push-to-talk ────────────────────────────────────────────────────
   useEffect(() => {
-    const isTypingTarget = (t: EventTarget | null): boolean => {
-      if (!(t instanceof HTMLElement)) return false;
-      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return true;
-      const active = document.activeElement as HTMLElement | null;
-      if (active?.closest('.term-body') || active?.closest('.xterm')) return true;
-      return false;
-    };
+    // Space belongs to whatever has focus: a field, the terminal, or a
+    // button / radio / switch it activates. Push-to-talk only takes a Space
+    // nothing else would use, and never behind a modal.
+    const spaceTaken = (t: EventTarget | null): boolean => isTypingTarget(t) || isControlTarget(t) || isModalOpen();
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape' && open) { setOpen(false); return; }
-      if (isTypingTarget(e.target)) return;
+      if (spaceTaken(e.target)) return;
       if (e.code === 'Space' && orbState === 'idle') {
         e.preventDefault();
         setOrbState('listening');
@@ -422,10 +437,12 @@ export function Orb() {
     setInput('');
     setThinking(true);
 
-    // Check if the text matches a flow.
+    // A flow runs only when the message names it — its label or its id as
+    // words ("focus session"). Matching any fragment of a label made "a" or
+    // "start" launch a real Pomodoro.
+    const said = text.toLowerCase().trim();
     const matchingFlow = FLOWS.find((f) =>
-      f.label.toLowerCase().includes(text.toLowerCase()) ||
-      text.toLowerCase().includes(f.id.replace('-', ' '))
+      said.includes(f.label.toLowerCase()) || said.includes(f.id.replace(/-/g, ' '))
     );
 
     window.setTimeout(() => {
@@ -482,6 +499,11 @@ export function Orb() {
 
   // Caption panel position — anchored relative to orb.
   const captionAboveOrb = pos.y > 120;
+  // Open the panel / caption toward the room: right-aligned to the orb near
+  // the right edge, below it near the top (they used to leave the window).
+  const panelAlignRight = pos.x + PANEL_W > window.innerWidth - ORB_MARGIN;
+  const panelBelow = pos.y < PANEL_H + 80;
+  const captionAlignRight = pos.x + CAPTION_W > window.innerWidth - ORB_MARGIN;
 
   // Commander launch handler — closes popup, runs sessionFromCommanderFlow with params.
   const onCommanderLaunch = useCallback((params: { label: string; tasks: string; startISO?: string }) => {
@@ -508,7 +530,7 @@ export function Orb() {
         position: 'fixed',
         left: pos.x,
         top: pos.y,
-        zIndex: 200,
+        zIndex: Z.widget,
         fontFamily: 'var(--font-mono)',
         animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
       }}
@@ -518,9 +540,9 @@ export function Orb() {
         <div
           style={{
             position: 'absolute',
-            left: 0,
+            ...(captionAlignRight ? { right: 0 } : { left: 0 }),
             [captionAboveOrb ? 'bottom' : 'top']: 76,
-            width: 280,
+            width: CAPTION_W,
             background: isRunning
               ? 'rgba(14,13,11,0.96)'
               : 'rgba(14,13,11,0.94)',
@@ -550,10 +572,10 @@ export function Orb() {
           data-testid="orb-chat-panel"
           style={{
             position: 'absolute',
-            left: 0,
-            bottom: 80,
-            width: 340,
-            maxHeight: 480,
+            ...(panelAlignRight ? { right: 0 } : { left: 0 }),
+            ...(panelBelow ? { top: 80 } : { bottom: 80 }),
+            width: PANEL_W,
+            maxHeight: PANEL_H,
             background: 'rgba(14, 13, 11, 0.94)',
             backdropFilter: 'blur(18px) saturate(140%)',
             border: '1px solid rgba(201, 241, 88, 0.22)',
@@ -580,28 +602,16 @@ export function Orb() {
               fontSize: 10.5,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
-              color: 'var(--ink-3)',
+              color: '#8a8270',
             }}
           >
             <span data-testid="orb-chat-title">
-              <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
+              <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--accent-on-dark)' }}>
                 ◆
               </span>
               krnl0 · assistant
             </span>
-            <button
-              type="button"
-              data-testid="orb-chat-close"
-              onClick={() => setOpen(false)}
-              style={{
-                background: 'transparent', border: 0,
-                color: 'var(--ink-3)', cursor: 'pointer',
-                fontSize: 16, lineHeight: 1, padding: 0, width: 20, height: 20,
-              }}
-              aria-label="Close assistant"
-            >
-              ×
-            </button>
+            <CloseButton tone="dark" testId="orb-chat-close" label="Close assistant" onClick={() => setOpen(false)} />
           </div>
 
           {/* History — scrollable */}
@@ -615,7 +625,9 @@ export function Orb() {
               lineHeight: 1.5,
             }}
           >
-            {history.length === 0 && !thinking && (
+            {/* Quick actions stay after the first message (they used to vanish
+                until a reload). */}
+            {!thinking && (
               <div style={{ color: '#8a8270' }}>
                 <div style={{ marginBottom: 8 }}>how can i help?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -627,7 +639,7 @@ export function Orb() {
                       textAlign: 'left',
                       background: 'linear-gradient(90deg, rgba(201,241,88,0.18) 0%, rgba(201,241,88,0.06) 60%, rgba(201,241,88,0.10) 100%)',
                       border: '1px solid rgba(201, 241, 88, 0.40)',
-                      color: 'var(--acid)',
+                      color: 'var(--accent-on-dark)',
                       padding: '6px 8px',
                       borderRadius: 4,
                       fontFamily: 'inherit',
@@ -665,7 +677,7 @@ export function Orb() {
             )}
             {history.map((m, i) => (
               <div key={i} style={{ color: m.role === 'user' ? '#8a8270' : '#d4cfc0' }}>
-                <span style={{ color: m.role === 'user' ? 'var(--ink-3)' : 'var(--acid)', marginRight: 4 }}>
+                <span style={{ color: m.role === 'user' ? '#8a8270' : 'var(--accent-on-dark)', marginRight: 4 }}>
                   {m.role === 'user' ? '›' : '◆'}
                 </span>
                 {m.text}
@@ -673,7 +685,7 @@ export function Orb() {
             ))}
             {thinking && (
               <div data-testid="orb-chat-thinking">
-                <span style={{ color: 'var(--acid)', marginRight: 6 }}>◆</span>
+                <span style={{ color: 'var(--accent-on-dark)', marginRight: 6 }}>◆</span>
                 <span style={{ display: 'inline-flex', gap: 3, marginLeft: 4 }}>
                   {[0, 1, 2].map((j) => (
                     <span
@@ -681,7 +693,7 @@ export function Orb() {
                       style={{
                         width: 5, height: 5, borderRadius: '50%',
                         display: 'inline-block',
-                        background: 'var(--acid)', boxShadow: '0 0 6px var(--acid)',
+                        background: 'var(--accent-on-dark)', boxShadow: '0 0 6px var(--accent-on-dark)',
                         animation: 'ai-dot 1.2s ease-in-out infinite',
                         animationDelay: `${j * 0.15}s`,
                       }}
@@ -702,13 +714,13 @@ export function Orb() {
               background: 'rgba(0, 0, 0, 0.2)',
             }}
           >
-            <span style={{ color: 'var(--acid)', fontWeight: 700 }}>›</span>
+            <span style={{ color: 'var(--accent-on-dark)', fontWeight: 700 }}>›</span>
             <input
               ref={inputRef}
               data-testid="orb-chat-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={thinking ? 'thinking…' : 'ask anything · ⌘+J to listen'}
+              placeholder={thinking ? 'thinking…' : 'ask anything · hold Space to talk'}
               disabled={thinking}
               autoComplete="off"
               spellCheck={false}

@@ -6,7 +6,7 @@
  * Theme toggle writes data-theme on <html> and persists to localStorage.
  */
 
-import { useState, useLayoutEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutModeToggle } from '../ui/LayoutModeToggle';
@@ -20,6 +20,8 @@ import { useEasyMode } from '../../store/uiMode';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
 import { CanvasSwitcher } from './CanvasSwitcher';
+import { CloseButton } from '../ui/CloseButton';
+import { Z } from '../ui/layers';
 
 type Theme = 'light' | 'dark';
 
@@ -136,7 +138,7 @@ export function TopBar() {
         paddingLeft: IS_MAC ? MAC_TRAFFIC_LIGHT_INSET : 16,
         paddingRight: 158,
         flexShrink: 0,
-        zIndex: 100,
+        zIndex: Z.chrome,
         boxSizing: 'border-box',
         WebkitAppRegion: 'drag',
       } as React.CSSProperties}
@@ -231,14 +233,27 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
   const factoryReset = useBoardStore((s) => s.factoryReset);
   const setUiMode = useBoardStore((s) => s.setUiMode);
   const easy = useEasyMode();
+  // Escape closes, like every other dialog — unless a dropdown inside handles it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if ((e.target as HTMLElement | null)?.closest?.('[data-own-escape]')) return;
+      onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return createPortal(
     <div
       data-testid="settings-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
       onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 4000,
+        zIndex: Z.modal,
         background: 'rgba(0,0,0,0.55)',
         display: 'grid',
         placeItems: 'center',
@@ -264,21 +279,7 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
             Settings
           </span>
           <div style={{ flex: 1 }} />
-          <button
-            type="button"
-            data-testid="settings-close"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--ink-3)',
-              cursor: 'pointer',
-              fontSize: 16,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
+          <CloseButton testId="settings-close" label="Close settings" onClick={onClose} />
         </div>
 
         {/* Appearance — first, so the reset below is never the only thing here. */}
@@ -356,7 +357,7 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
           <span
             style={{
               fontSize: 9.5,
-              color: '#ff8e64',
+              color: 'var(--rust)',
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
               fontWeight: 700,

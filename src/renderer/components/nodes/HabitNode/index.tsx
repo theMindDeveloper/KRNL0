@@ -42,6 +42,8 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HabitPopover } from './HabitPopover';
 import { HabitContextMenu } from './HabitContextMenu';
 import { HabitIcon } from './HabitIcon';
+import { Z } from '../../ui/layers';
+import { undoable } from '../../../store/undoNotice';
 
 function getISOWeek(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -135,12 +137,21 @@ export function HabitNode({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      // Same as the Todo add field: Escape abandons what was typed.
+      setNewName('');
+      setNewRepeat(null);
+      return;
+    }
     if (e.key === 'Enter') {
       const trimmed = newName.trim();
       if (!trimmed) return;
+      // A half-set repeat (weekly, no days) is never dropped silently: the
+      // hint below says what is missing and Enter waits for it.
+      if (newRepeat && !isRepeatValid(newRepeat)) return;
       onCommand('habit.add', {
         name: trimmed,
-        ...(newRepeat && isRepeatValid(newRepeat) ? { schedule: toSchedule(newRepeat) } : {}),
+        ...(newRepeat ? { schedule: toSchedule(newRepeat) } : {}),
       });
       setNewName('');
       setNewRepeat(null);
@@ -333,20 +344,26 @@ export function HabitNode({
             </button>
             </div>
             {newRepeat && !repeatAt && (
-              <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
-                {describeRepeat(newRepeat)} · press Enter to add
-              </div>
+              isRepeatValid(newRepeat) ? (
+                <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
+                  {describeRepeat(newRepeat)} · press Enter to add
+                </div>
+              ) : (
+                <div data-testid="habit-add-repeat-invalid" style={{ marginTop: 5, fontSize: 10.5, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
+                  Repeat isn't finished (days, time or minutes) — open it to fix, or Esc to clear
+                </div>
+              )
             )}
             {repeatAt && newRepeat && createPortal(
               <>
-                <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+                <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
                 <div
                   data-testid="habit-add-repeat-pop"
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                   style={{
-                    position: 'fixed', zIndex: 1999, width: 380, boxSizing: 'border-box',
+                    position: 'fixed', zIndex: Z.popup, width: 380, boxSizing: 'border-box',
                     left: Math.max(8, Math.min(repeatAt.x - 380, window.innerWidth - 388)),
                     top: Math.max(8, Math.min(repeatAt.y + 6, window.innerHeight - 330)),
                     padding: 16, borderRadius: 14, background: 'var(--paper)', color: 'var(--ink)',
@@ -360,7 +377,7 @@ export function HabitNode({
                       No repeat
                     </button>
                     <button type="button" disabled={!isRepeatValid(newRepeat)} onClick={() => setRepeatAt(null)}
-                      style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--acid)', color: '#0a0908', cursor: 'pointer', fontSize: 12.5, fontWeight: 650, opacity: isRepeatValid(newRepeat) ? 1 : 0.4 }}>
+                      style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12.5, fontWeight: 650, opacity: isRepeatValid(newRepeat) ? 1 : 0.4 }}>
                       Done
                     </button>
                   </div>
@@ -378,7 +395,10 @@ export function HabitNode({
               onSetColor={(color) => onCommand('habit.setColor', { id: menu.habitId, color })}
               onSetIcon={(icon) => onCommand('habit.setIcon', { id: menu.habitId, icon })}
               onSetNote={(note) => onCommand('habit.setNote', { id: menu.habitId, note })}
-              onDelete={() => onCommand('habit.remove', { id: menu.habitId })}
+              onDelete={() => {
+                const name = state.habits.find((h) => h.id === menu.habitId)?.name ?? 'habit';
+                undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id: menu.habitId }));
+              }}
               onPinAsLane={() => onCommand('habit.spawnLane', { habitId: menu.habitId })}
               laneExists={pinnedHabitIds.has(menu.habitId)}
               onClose={() => setMenu(null)}

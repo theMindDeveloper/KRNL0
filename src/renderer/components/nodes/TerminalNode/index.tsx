@@ -4,9 +4,11 @@ import { FitAddon } from '@xterm/addon-fit';
 import type { NodeProps } from '../types';
 import type { TermState, TermConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
-import { HEADER_LABEL, LIVE_BADGE_TEXT } from './constants';
+import { HEADER_LABEL, LIVE_BADGE_TEXT, TERM_CLEAR_EVENT } from './constants';
 import { startTerminalSession } from './session';
+import { getLiveTerminal, setLiveTerminal, type LiveTerminal } from './liveTerminals';
 import { MotdBanner } from './MotdBanner';
+import { ContextMenu } from '../../ContextMenu';
 import pkg from '../../../../../package.json';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { xtermFor } from '../../../themes/applyFrameTheme';
@@ -19,6 +21,10 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  // The shell ran and is gone (exit / crash): the badge says so until Enter
+  // starts a new one (session.ts).
+  const hadSessionRef = useRef(false);
+  const ended = activeSessionId === null && hadSessionRef.current;
   // xterm colours come from the frame-style manifest and follow live switches (ADR 0009 F8).
   const { style: frameStyle, mode: frameMode } = useFrameTheme();
   const xtermColors = xtermFor(frameStyle, frameMode);
@@ -27,6 +33,49 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
   useEffect(() => {
     if (termRef.current && xtermColors) termRef.current.options.theme = { ...xtermColors };
   }, [xtermColors]);
+
+  // `krnl term setFontSize` — apply live, then refit so the PTY gets the new cols/rows.
+  const fontSize = node.config?.fontSize;
+  const shellRef = useRef(node.config?.shell);
+  shellRef.current = node.config?.shell;
+  useEffect(() => {
+    const t = termRef.current;
+    if (!t || fontSize === undefined || t.options.fontSize === fontSize) return;
+    t.options.fontSize = fontSize;
+    try { fitRef.current?.fit(); } catch { /* not measured yet */ }
+    const sid = sessionIdRef.current;
+    if (sid) window.krnl?.ptyResize(sid, t.cols, t.rows);
+  }, [fontSize]);
+
+  // Height of the column that holds banner + xterm: a short panel gets the
+  // one-line banner, not the 9-row logo. Measured on the column (not the
+  // xterm body) so the banner switching size can't feed back into it.
+  const [bodyHeightPx, setBodyHeightPx] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const column = containerRef.current?.parentElement;
+    if (!column || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height;
+      if (h) setBodyHeightPx(Math.round(h));
+    });
+    ro.observe(column);
+    return () => ro.disconnect();
+  }, []);
+
+  // `krnl term clear` — clears the screen and scrollback of this terminal.
+  useEffect(() => {
+    const onClear = (e: Event) => {
+      const id = (e as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
+      if (id && id !== node.id) return;
+      termRef.current?.clear();
+    };
+    window.addEventListener(TERM_CLEAR_EVENT, onClear);
+    return () => window.removeEventListener(TERM_CLEAR_EVENT, onClear);
+  }, [node.id]);
+
+  // `krnl term setTitle` — a custom title replaces the default header label.
+  const customTitle = node.state?.title;
+  const headerLabel = customTitle && customTitle !== 'Terminal' ? customTitle : HEADER_LABEL;
 
   const copySelection = () => {
     const sel = termRef.current?.getSelection() ?? '';
@@ -39,114 +88,161 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     const sid = sessionIdRef.current;
     if (!sid) return;
     const text = await window.krnl?.clipboardReadText();
-    if (text) void window.krnl?.ptyWrite(sid, text);
+    if (!text) return;
+    // xterm's paste (bracketed when the shell wants it), as Ctrl+V does.
+    const t = termRef.current;
+    if (t) t.paste(text);
+    else void window.krnl?.ptyWrite(sid, text);
   };
   const selectAll = () => termRef.current?.selectAll();
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const term = new Terminal({
-      fontSize: node.config?.fontSize ?? 11.5,
-      fontFamily: "'JetBrains Mono', monospace",
-      theme: { ...(xtermColorsRef.current ?? {
-        background: '#05040a',
-        foreground: '#d4cfc0',
-        cursor: '#c9f158',
-        cursorAccent: '#0e0d0b',
-      }) },
-      cursorBlink: true,
-      scrollback: 5000,
-      // No smoothScrollDuration — the animation feels heavy on macOS
-      // trackpads because each flick queues an easing tail that delays the
-      // next gesture's response. Instant jumps match iTerm2 / Ghostty.
-      // Larger per-tick line counts make a small two-finger swipe move the
-      // buffer visibly (1 = stock = sluggish for trackpads, 3 = snappy).
-      scrollSensitivity: 3,
-      fastScrollSensitivity: 8,
-      allowProposedApi: true,
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-
-    // Renderer choice. The DOM renderer thrashes layout under heavy TUI
-    // ANSI traffic so we want a GPU-backed renderer (issue #73). The
-    // earlier implementation loaded WebGL *after* term.open() and *after*
-    // the initial fit(), which introduced a cols/rows drift that broke
-    // TUIs:
-    //
-    //   1. DOM-renderer fit measures the container → cols = N₁
-    //   2. PTY is spawned at cols = N₁
-    //   3. WebGL addon loads ~50-100ms later, re-fits against subtly
-    //      different WebGL cell metrics → cols = N₂
-    //   4. ptyResize is sent. PTY now thinks cols = N₂. claude reads N₂
-    //      from TIOCGWINSZ and renders assuming N₂ columns.
-    //   5. Visible xterm rendering drifts a column away from what claude
-    //      writes — text wraps in the middle of words ("specifically
-    //      running" → "running\ns Claude"), input boxes shift, table
-    //      borders collapse. (User report 2026-05-17.)
-    //
-    // Fix: load the renderer addon *before* term.open() and *before*
-    // startTerminalSession's first fit + ptyCreate runs. One measure, one
-    // PTY spawn, no drift. We use dynamic import (kept jsdom-safe — these
-    // modules touch `self` at module-load and crash in node test envs) and
-    // gate term.open() + session start behind the same async boundary.
-    //
-    // Canvas renderer is the default — fast enough for TUIs, stable under
-    // Electron's BrowserView paint pipeline, avoids GL-context lifetime
-    // issues when nodes go offscreen. WebGL was the prior choice but its
-    // async load created the cols/rows drift this commit fixes; if it's
-    // ever re-introduced as an opt-in, do it via a preload bridge flag
-    // (window.krnl.config), NOT process.env — `process` is undefined in
-    // the renderer context and crashes the init promise (user report
-    // 2026-05-17: "process is not defined", terminal renders as black).
-
-    let cancelled = false;
-    let sessionCleanup: (() => void) | null = null;
-
-    const init = async () => {
-      try {
-        const { CanvasAddon } = await import('@xterm/addon-canvas');
-        term.loadAddon(new CanvasAddon());
-      } catch { /* fall through to DOM */ }
-
-      if (cancelled || !containerRef.current) return;
-      term.open(containerRef.current);
-
-      sessionCleanup = await startTerminalSession({
-        term,
-        fit,
-        krnl: window.krnl,
-        onCommand,
-        setSessionId: (id) => { sessionIdRef.current = id; setActiveSessionId(id); },
-        isCancelled: () => cancelled,
-      });
-      if (cancelled) sessionCleanup?.();
+    // Session changes reach whichever component is mounted right now.
+    const bindSession = (id: string | null) => {
+      sessionIdRef.current = id;
+      if (id) {
+        hadSessionRef.current = true;
+        // Resizes during the spawn were dropped (no id yet): catch up once.
+        try { fitRef.current?.fit(); } catch { /* ignore */ }
+        const t = termRef.current;
+        if (t) window.krnl?.ptyResize(id, t.cols, t.rows);
+      }
+      setActiveSessionId(id);
     };
 
-    termRef.current = term;
-    fitRef.current = fit;
+    let entry = getLiveTerminal(node.id);
+    let reattachRaf = 0;
+    if (entry) {
+      // Remount (layout switch, panel shown again, slot swap): the same shell
+      // and scrollback come back — re-attach and refit to the new size.
+      container.appendChild(entry.host);
+      const e = entry;
+      reattachRaf = requestAnimationFrame(() => {
+        try { e.fit.fit(); } catch { /* not measured yet */ }
+        if (e.sessionId) window.krnl?.ptyResize(e.sessionId, e.term.cols, e.term.rows);
+        e.term.refresh(0, e.term.rows - 1);
+      });
+    } else {
+      const term = new Terminal({
+        fontSize: node.config?.fontSize ?? 11.5,
+        fontFamily: "'JetBrains Mono', monospace",
+        theme: { ...(xtermColorsRef.current ?? {
+          background: '#05040a',
+          foreground: '#d4cfc0',
+          cursor: '#c9f158',
+          cursorAccent: '#0e0d0b',
+        }) },
+        cursorBlink: true,
+        scrollback: 5000,
+        // No smoothScrollDuration — the animation feels heavy on macOS
+        // trackpads because each flick queues an easing tail that delays the
+        // next gesture's response. Instant jumps match iTerm2 / Ghostty.
+        // Larger per-tick line counts make a small two-finger swipe move the
+        // buffer visibly (1 = stock = sluggish for trackpads, 3 = snappy).
+        scrollSensitivity: 3,
+        fastScrollSensitivity: 8,
+        allowProposedApi: true,
+      });
+      const fit = new FitAddon();
+      term.loadAddon(fit);
+      const host = document.createElement('div');
+      host.style.width = '100%';
+      host.style.height = '100%';
+      container.appendChild(host);
+      const e: LiveTerminal = { term, fit, host, sessionId: null, everStarted: false, onSession: null, onCommand, shell: () => undefined };
+      setLiveTerminal(node.id, e);
+      entry = e;
 
-    // Defer the renderer-load → open → session-start sequence to the next
-    // animation frame so the container has real dimensions before the
-    // first fit() runs (absolute-positioned nodes may not be measured
-    // synchronously).
-    const raf = requestAnimationFrame(() => { void init(); });
+      // Renderer choice. The DOM renderer thrashes layout under heavy TUI
+      // ANSI traffic so we want a GPU-backed renderer (issue #73). The
+      // earlier implementation loaded WebGL *after* term.open() and *after*
+      // the initial fit(), which introduced a cols/rows drift that broke
+      // TUIs:
+      //
+      //   1. DOM-renderer fit measures the container → cols = N₁
+      //   2. PTY is spawned at cols = N₁
+      //   3. WebGL addon loads ~50-100ms later, re-fits against subtly
+      //      different WebGL cell metrics → cols = N₂
+      //   4. ptyResize is sent. PTY now thinks cols = N₂. claude reads N₂
+      //      from TIOCGWINSZ and renders assuming N₂ columns.
+      //   5. Visible xterm rendering drifts a column away from what claude
+      //      writes — text wraps in the middle of words ("specifically
+      //      running" → "running\ns Claude"), input boxes shift, table
+      //      borders collapse. (User report 2026-05-17.)
+      //
+      // Fix: load the renderer addon *before* term.open() and *before*
+      // startTerminalSession's first fit + ptyCreate runs. One measure, one
+      // PTY spawn, no drift. We use dynamic import (kept jsdom-safe — these
+      // modules touch `self` at module-load and crash in node test envs) and
+      // gate term.open() + session start behind the same async boundary.
+      //
+      // Canvas renderer is the default — fast enough for TUIs, stable under
+      // Electron's BrowserView paint pipeline, avoids GL-context lifetime
+      // issues when nodes go offscreen. WebGL was the prior choice but its
+      // async load created the cols/rows drift this commit fixes; if it's
+      // ever re-introduced as an opt-in, do it via a preload bridge flag
+      // (window.krnl.config), NOT process.env — `process` is undefined in
+      // the renderer context and crashes the init promise (user report
+      // 2026-05-17: "process is not defined", terminal renders as black).
+
+      const init = async () => {
+        try {
+          const { CanvasAddon } = await import('@xterm/addon-canvas');
+          term.loadAddon(new CanvasAddon());
+        } catch { /* fall through to DOM */ }
+        term.open(host);
+        await startTerminalSession({
+          term,
+          fit,
+          krnl: window.krnl,
+          onCommand: (command, args) => e.onCommand(command, args),
+          setSessionId: (id) => { e.sessionId = id; if (id) e.everStarted = true; e.onSession?.(id); },
+          // The session belongs to the board, not to this mount.
+          isCancelled: () => false,
+          // Read at every start, so `krnl term setShell` applies to the next shell.
+          shell: () => e.shell(),
+        });
+      };
+      // Defer the renderer-load → open → session-start sequence to the next
+      // animation frame so the container has real dimensions before the
+      // first fit() runs. Not cancelled on unmount: under StrictMode the
+      // remount has re-attached the host by the time this fires.
+      requestAnimationFrame(() => { void init(); });
+    }
+
+    const live = entry;
+    // EXITED survives a remount: the badge reads the terminal, not this mount.
+    hadSessionRef.current = live.everStarted;
+    setActiveSessionId(live.sessionId);
+    live.onSession = bindSession;
+    live.onCommand = onCommand;
+    live.shell = () => shellRef.current;
+    termRef.current = live.term;
+    fitRef.current = live.fit;
+    // Theme / font changes made while detached (those effects ran first).
+    if (xtermColorsRef.current) live.term.options.theme = { ...xtermColorsRef.current };
+    const size = node.config?.fontSize;
+    if (size !== undefined && live.term.options.fontSize !== size) live.term.options.fontSize = size;
+    if (live.sessionId) bindSession(live.sessionId);
 
     const ro = new ResizeObserver(() => {
       try { fitRef.current?.fit(); } catch { /* ignore */ }
       const t = termRef.current;
-      const s = sessionIdRef.current;
-      if (t && s) window.krnl?.ptyResize(s, t.cols, t.rows);
+      const sid = sessionIdRef.current;
+      if (t && sid) window.krnl?.ptyResize(sid, t.cols, t.rows);
     });
-    ro.observe(containerRef.current);
+    ro.observe(container);
 
     return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-      sessionCleanup?.();
+      cancelAnimationFrame(reattachRaf);
       ro.disconnect();
-      term.dispose();
+      // Detach, don't kill: the next mount picks the terminal up again.
+      if (live.onSession === bindSession) live.onSession = null;
+      // Only if it is still here: an overlapping newer mount may own it now.
+      if (live.host.parentElement === container) live.host.remove();
       termRef.current = null;
       fitRef.current = null;
       sessionIdRef.current = null;
@@ -228,19 +324,24 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
               letterSpacing: '0.04em',
             }}
           >
-            {HEADER_LABEL}
+            {headerLabel}
           </span>
           {/* LIVE badge */}
           <div
             className="badge"
+            data-testid="term-badge"
+            title={ended ? 'The shell exited — press Enter in the terminal to start a new one' : undefined}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--font-mono)',
               fontSize: 9,
-              color: 'var(--term-bg)',
-              background: 'var(--acid)',
+              // The terminal is dark in every theme: use the accent that stays
+              // light on dark (Macintosh light's --acid is near-black).
+              color: ended ? 'var(--ink-3)' : 'var(--term-bg)',
+              background: ended ? 'transparent' : 'var(--accent-on-dark)',
+              border: ended ? '1px solid var(--ink-4)' : '1px solid transparent',
               padding: '2px 6px',
               borderRadius: 3,
               fontWeight: 600,
@@ -252,15 +353,16 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
               style={{
                 width: 4, height: 4, borderRadius: '50%',
                 background: 'var(--term-bg)', flexShrink: 0,
+                display: ended ? 'none' : undefined,
               }}
             />
-            {LIVE_BADGE_TEXT}
+            {ended ? 'EXITED' : LIVE_BADGE_TEXT}
           </div>
         </div>
 
         {/* MOTD banner — rendered as React above xterm so PowerShell/PSReadLine
             can't clear it on startup. See MotdBanner.tsx header for rationale. */}
-        <MotdBanner version={pkg.version} sessionId={activeSessionId} />
+        <MotdBanner version={pkg.version} sessionId={activeSessionId} {...(bodyHeightPx !== undefined ? { bodyHeightPx } : {})} />
 
         {/* xterm mount — nodrag/nopan/nowheel keep RF from consuming pointer
             events. tabIndex=-1 + nodesFocusable={false} on <ReactFlow> stop RF
@@ -294,10 +396,12 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+            setMenu({ x: e.clientX, y: e.clientY });
           }}
           onKeyDown={(e) => {
+            // Ctrl/Cmd+Shift+L is the app's layout toggle: let it reach the
+            // window (session.ts keeps it away from the shell).
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'L' || e.key === 'l')) return;
             e.stopPropagation();
             // Ctrl+Shift+C → explicit copy (Ctrl+C alone is SIGINT, handled
             // in session.ts attachCustomKeyEventHandler).
@@ -313,66 +417,20 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           style={{ width: '100%', flex: 1, minHeight: 0, background: 'var(--term-bg)', position: 'relative' }}
         />
 
+        {/* The app's shared menu: portalled to <body> (MotherFrame's
+            containment trapped the old click-away blanket) and kept inside
+            the window, so a narrow Station panel can't clip it. */}
         {menu && (
-          <>
-            {/* Click-away blanket */}
-            <div
-              onClick={() => setMenu(null)}
-              onContextMenu={(e) => { e.preventDefault(); setMenu(null); }}
-              style={{ position: 'fixed', inset: 0, zIndex: 10 }}
-            />
-            <div
-              className="nodrag nopan nowheel"
-              style={{
-                position: 'absolute',
-                left: menu.x,
-                top: menu.y + 30 /* offset for header height */,
-                zIndex: 11,
-                background: 'var(--paper)',
-                border: '1px solid var(--ink-3)',
-                borderRadius: 4,
-                padding: 4,
-                minWidth: 140,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-              }}
-            >
-              {[
-                { label: 'Copy', action: copySelection, disabled: !termRef.current?.getSelection() },
-                { label: 'Paste', action: () => void pasteClipboard(), disabled: false },
-                { label: 'Select All', action: selectAll, disabled: false },
-              ].map((it) => (
-                <button
-                  key={it.label}
-                  type="button"
-                  disabled={it.disabled}
-                  onClick={(e) => { e.stopPropagation(); it.action(); setMenu(null); focusTerm(); }}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '6px 10px',
-                    background: 'transparent',
-                    border: 0,
-                    color: it.disabled ? 'var(--ink-3)' : 'var(--ink)',
-                    cursor: it.disabled ? 'default' : 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: 'inherit',
-                    borderRadius: 2,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!it.disabled) (e.currentTarget as HTMLElement).style.background = 'var(--paper-2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = 'transparent';
-                  }}
-                >
-                  {it.label}
-                </button>
-              ))}
-            </div>
-          </>
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            onDismiss={() => setMenu(null)}
+            items={[
+              { label: 'Copy', onSelect: () => { copySelection(); focusTerm(); }, disabled: !termRef.current?.getSelection() },
+              { label: 'Paste', onSelect: () => { void pasteClipboard(); focusTerm(); } },
+              { label: 'Select All', onSelect: () => { selectAll(); focusTerm(); } },
+            ]}
+          />
         )}
       </div>
     </MotherFrame>

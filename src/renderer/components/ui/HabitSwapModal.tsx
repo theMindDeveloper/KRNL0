@@ -9,6 +9,8 @@ import type { HabitSchedule, IsoDow } from '../nodes/HabitNode/types';
 import { HabitIcon } from '../nodes/HabitNode/HabitIcon';
 import { IconCalendarDay, IconRepeat, IconCheck } from './repeatIcons';
 import { RepeatEditor, describeRepeat, isRepeatValid, toSchedule, type RepeatValue } from './RepeatEditor';
+import { CloseButton } from './CloseButton';
+import { Z } from './layers';
 
 const DOW_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 
@@ -61,11 +63,12 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
     <div
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
       onPointerDown={stop} onPointerUp={stop} onMouseDown={stop} onMouseUp={stop} onContextMenu={stop}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(6,6,4,0.55)', zIndex: 250, display: 'grid', placeItems: 'center' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(6,6,4,0.55)', zIndex: Z.dialog, display: 'grid', placeItems: 'center' }}
     >
       <div
         data-testid="habit-swap-modal"
         role="dialog"
+        aria-modal="true"
         aria-label={`Repeat ${habitName}`}
         onClick={stop} onPointerDown={stop} onPointerUp={stop} onMouseDown={stop} onMouseUp={stop} onContextMenu={stop}
         style={{
@@ -89,9 +92,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
               Dropped on {dateLabel}{streakDays > 0 ? ` · ${streakDays}-day streak` : ''}
             </div>
           </div>
-          <button type="button" aria-label="Cancel" onClick={onCancel} style={iconBtn}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8" /></svg>
-          </button>
+          <CloseButton label="Cancel" onClick={onCancel} />
         </div>
 
         {/* Two quick picks */}
@@ -145,14 +146,10 @@ const pickTitle: React.CSSProperties = { display: 'inline-flex', alignItems: 'ce
 const pickSub: React.CSSProperties = { fontSize: 11.5, color: 'var(--ink-3)', paddingLeft: 21 };
 const primaryBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
-  height: 34, padding: '0 16px', borderRadius: 9, border: 'none', background: 'var(--acid)',
-  color: '#0a0908', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 650,
+  height: 34, padding: '0 16px', borderRadius: 9, border: 'none', background: 'var(--btn-primary-bg)',
+  color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 650,
 };
 const ghostBtn: React.CSSProperties = {
   height: 34, padding: '0 12px', borderRadius: 9, border: 'none', background: 'transparent',
   color: 'var(--ink-3)', fontFamily: 'var(--font-sans)', fontSize: 13, cursor: 'pointer',
-};
-const iconBtn: React.CSSProperties = {
-  width: 30, height: 30, flexShrink: 0, borderRadius: 8, border: 'none', background: 'transparent',
-  color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0,
 };

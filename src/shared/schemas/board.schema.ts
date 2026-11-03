@@ -50,6 +50,8 @@ export const BoardSchema = z.object({
           rowFraction: z.number(),
           columnFractions: z.array(z.number()),
           rightColumnSplit: z.number(),
+          canvasHidden: z.boolean().optional(),
+          bottomFractions: z.record(z.number()).optional(),
         })
         .optional(),
     })

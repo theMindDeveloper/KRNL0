@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import React from 'react';
 
 import { TextNode } from '../../../src/renderer/components/nodes/TextNode';
@@ -114,6 +114,28 @@ describe('TextNode — F4 escape cancels', () => {
     expect(onCommand).not.toHaveBeenCalled();
     expect(screen.getByText('before')).toBeTruthy();
   });
+
+  it('Escape after the autosave already fired restores the pre-edit text', () => {
+    vi.useFakeTimers();
+    try {
+      const onCommand = vi.fn();
+      const { rerender } = render(
+        <TextNode node={fixture({ text: 'before' })} selected={false} onCommand={onCommand} onSelect={noop} />,
+      );
+      fireEvent.click(screen.getByTestId('text-node-body'));
+      fireEvent.change(screen.getByTestId('text-node-textarea'), { target: { value: 'edited' } });
+      act(() => { vi.advanceTimersByTime(500); });
+      expect(onCommand).toHaveBeenCalledWith('text.setText', { text: 'edited' });
+      // The store applied the autosave.
+      rerender(<TextNode node={fixture({ text: 'edited' })} selected={false} onCommand={onCommand} onSelect={noop} />);
+      onCommand.mockClear();
+      fireEvent.keyDown(screen.getByTestId('text-node-textarea'), { key: 'Escape' });
+      expect(onCommand).toHaveBeenCalledTimes(1);
+      expect(onCommand).toHaveBeenCalledWith('text.setText', { text: 'before' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('TextNode — F5 resize dispatches text.setSize', () => {
@@ -191,5 +213,42 @@ describe('TextNode — F8 handles are connectable', () => {
     );
     expect(screen.getByTestId('rf-handle-target-left')).toBeTruthy();
     expect(screen.getByTestId('rf-handle-source-right')).toBeTruthy();
+  });
+});
+
+describe('TextNode — keyboard', () => {
+  it('Enter on the focused note opens it for editing', () => {
+    render(<TextNode node={fixture({ text: 'hello' })} selected={false} onCommand={noop} onSelect={noop} />);
+    const body = screen.getByTestId('text-node-body');
+    expect(body.tabIndex).toBe(0);
+    fireEvent.keyDown(body, { key: 'Enter' });
+    expect(screen.getByTestId('text-node-textarea')).toBeTruthy();
+  });
+});
+
+describe('TextNode — overflow', () => {
+  it('marks a note whose text is taller than its box, so the bottom fades', () => {
+    const sh = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    const ch = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 400 });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 120 });
+    try {
+      render(<TextNode node={fixture({ text: 'long\n'.repeat(30) })} selected={false} onCommand={noop} onSelect={noop} />);
+      expect(screen.getByTestId('text-node-body').dataset['overflowing']).toBe('true');
+    } finally {
+      if (sh) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', sh);
+      if (ch) Object.defineProperty(HTMLElement.prototype, 'clientHeight', ch);
+    }
+  });
+});
+
+describe('TextNode — Enter on the canvas', () => {
+  it('opens only the note the canvas asked for', async () => {
+    const { requestTextEdit } = await import('../../../src/renderer/components/nodes/TextNode/editEvent');
+    render(<TextNode node={fixture({ text: 'hello' })} selected onCommand={noop} onSelect={noop} />);
+    act(() => requestTextEdit('some-other-note'));
+    expect(screen.queryByTestId('text-node-textarea')).toBeNull();
+    act(() => requestTextEdit('text-1'));
+    expect(screen.getByTestId('text-node-textarea')).toBeTruthy();
   });
 });

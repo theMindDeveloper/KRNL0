@@ -85,3 +85,42 @@ describe('dateRange', () => {
     expect(parseYMD('2026-12-31').getFullYear()).toBe(2026);
   });
 });
+
+describe('splitting spans at local midnight', () => {
+  it('puts each day\u2019s minutes on that day and keeps the total', async () => {
+    const { splitByLocalDay, splitMinutesByLocalDay } = await import('../dateRange');
+    const start = new Date(2026, 10, 2, 23, 30).getTime();
+    const end = new Date(2026, 10, 3, 0, 30).getTime();
+    expect(splitByLocalDay(start, end)).toEqual([
+      { date: '2026-11-02', ms: 30 * 60_000 },
+      { date: '2026-11-03', ms: 30 * 60_000 },
+    ]);
+    const parts = splitMinutesByLocalDay(start, end, 61);
+    expect(parts.map((p) => p.date)).toEqual(['2026-11-02', '2026-11-03']);
+    expect(parts.reduce((a, p) => a + p.min, 0)).toBe(61);
+  });
+
+  it('a span inside one day is one part', async () => {
+    const { splitMinutesByLocalDay } = await import('../dateRange');
+    const start = new Date(2026, 10, 2, 9, 0).getTime();
+    expect(splitMinutesByLocalDay(start, start + 25 * 60_000, 25)).toEqual([{ date: '2026-11-02', min: 25, endMs: start + 25 * 60_000 - 1 }]);
+  });
+
+  it('a span ending exactly at midnight stays on the day before, timestamp included', async () => {
+    const { splitMinutesByLocalDay } = await import('../dateRange');
+    const start = new Date(2026, 10, 2, 22, 0).getTime();
+    const end = new Date(2026, 10, 3, 0, 0).getTime();
+    const [only] = splitMinutesByLocalDay(start, end, 120);
+    expect(only!.date).toBe('2026-11-02');
+    expect(new Date(only!.endMs).getDate()).toBe(2);
+  });
+
+  it('never hands a day negative minutes when the record is shorter than the wall time', async () => {
+    const { splitMinutesByLocalDay } = await import('../dateRange');
+    const start = new Date(2026, 4, 10, 0, 0).getTime();
+    const end = new Date(2026, 4, 14, 0, 0).getTime();
+    const parts = splitMinutesByLocalDay(start, end, 2);
+    expect(parts.every((p) => p.min >= 0)).toBe(true);
+    expect(parts.reduce((a, p) => a + p.min, 0)).toBe(2);
+  });
+});

@@ -8,6 +8,11 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { voicePlayer } from './VoicePlayer';
+import { CloseButton } from '../ui/CloseButton';
+import { Z } from '../ui/layers';
+import { normalizeStartInput } from '../../../shared/scheduleAt';
+
+export const MAX_COMMANDER_TASKS = 5;
 
 interface CommanderProps {
   onClose: () => void;
@@ -36,7 +41,12 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
   }, [onClose]);
 
   const lineCount = tasks.split(/\r?\n/).filter((s) => s.trim().length > 0).length;
-  const valid = label.trim().length > 0 && lineCount >= 1;
+  const tooMany = lineCount > MAX_COMMANDER_TASKS;
+  // Checked here, before launch: a bad time used to run the whole flow and
+  // only fail inside the terminal.
+  const start = startISO.trim() ? normalizeStartInput(startISO) : null;
+  const badStart = startISO.trim().length > 0 && start === null;
+  const valid = label.trim().length > 0 && lineCount >= 1 && !tooMany && !badStart;
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -44,7 +54,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
     onLaunch({
       label: label.trim(),
       tasks,
-      ...(startISO.trim() ? { startISO: startISO.trim() } : {}),
+      ...(start ? { startISO: start } : {}),
     });
   };
 
@@ -55,7 +65,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 300,
+        zIndex: Z.commander,
         background: 'rgba(0, 0, 0, 0.35)',
         backdropFilter: 'blur(2px)',
         display: 'flex',
@@ -66,6 +76,9 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
     >
       {/* Popup — same gradient/glass treatment as orb chat panel */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Commander — new session"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 460,
@@ -89,7 +102,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
         <div
           style={{
             height: 3,
-            background: 'linear-gradient(90deg, transparent 0%, var(--acid) 30%, var(--acid-glow) 50%, var(--acid) 70%, transparent 100%)',
+            background: 'linear-gradient(90deg, transparent 0%, var(--accent-on-dark) 30%, var(--accent-on-dark) 50%, var(--accent-on-dark) 70%, transparent 100%)',
             opacity: 0.7,
           }}
         />
@@ -105,28 +118,16 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             fontSize: 10.5,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: 'var(--ink-3)',
+            color: '#8a8270',
           }}
         >
           <span>
-            <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--acid-glow)' }}>
+            <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--accent-on-dark)' }}>
               ▸
             </span>
             commander · new session
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent', border: 0,
-              color: 'var(--ink-3)', cursor: 'pointer',
-              fontSize: 18, lineHeight: 1, padding: 0,
-              width: 22, height: 22,
-            }}
-            aria-label="Close commander"
-          >
-            ×
-          </button>
+          <CloseButton tone="dark" label="Close commander" onClick={onClose} />
         </div>
 
         <form onSubmit={onSubmit} style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -146,7 +147,10 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
           {/* Tasks list */}
           <Field
             label="TASKS"
-            hint={`${lineCount}/5 — one per line, in order`}
+            hint={tooMany
+              ? `${lineCount}/${MAX_COMMANDER_TASKS} — too many, remove ${lineCount - MAX_COMMANDER_TASKS}`
+              : `${lineCount}/${MAX_COMMANDER_TASKS} — one per line, in order`}
+            warn={tooMany}
           >
             <textarea
               value={tasks}
@@ -161,10 +165,12 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
           {/* Start time */}
           <Field
             label="START (OPTIONAL)"
-            hint="ISO local — leave empty for now+5min"
+            hint={badStart ? 'not a time — use 10:00 or 2026-05-15T10:00' : 'HH:MM today or YYYY-MM-DDTHH:MM — empty = in 5 min'}
+            warn={badStart}
           >
             <input
               value={startISO}
+              aria-invalid={badStart}
               onChange={(e) => setStartISO(e.target.value)}
               placeholder="2026-05-15T10:00"
               autoComplete="off"
@@ -178,7 +184,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             <button
               type="button"
               onClick={onClose}
-              style={{ ...btnStyle, color: 'var(--ink-3)', borderColor: 'rgba(201,241,88,0.15)' }}
+              style={{ ...btnStyle, color: '#8a8270', borderColor: 'rgba(201,241,88,0.15)' }}
             >
               cancel
             </button>
@@ -188,7 +194,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
               style={{
                 ...btnStyle,
                 flex: 1,
-                color: valid ? 'var(--accent-on-dark)' : 'var(--ink-4)',
+                color: valid ? 'var(--accent-on-dark)' : '#6b6354',
                 borderColor: valid ? 'rgba(201,241,88,0.5)' : 'rgba(201,241,88,0.15)',
                 background: valid ? 'rgba(201,241,88,0.08)' : 'transparent',
                 cursor: valid ? 'pointer' : 'not-allowed',
@@ -231,15 +237,16 @@ const btnStyle: React.CSSProperties = {
   transition: 'background 0.15s, color 0.15s, border-color 0.15s',
 };
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, warn = false, children }: { label: string; hint?: string; warn?: boolean; children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{
         display: 'flex', justifyContent: 'space-between',
-        fontSize: 9.5, letterSpacing: '0.12em', color: 'var(--ink-4)',
+        fontSize: 9.5, letterSpacing: '0.12em', color: '#6b6354',
       }}>
         <span>{label}</span>
-        {hint && <span style={{ color: 'var(--ink-4)', textTransform: 'lowercase' }}>{hint}</span>}
+        {/* The panel is always dark: the terminal's palette reads on it in every theme. */}
+        {hint && <span style={{ color: warn ? 'var(--term-rust)' : 'var(--term-dim)', textTransform: 'lowercase' }}>{hint}</span>}
       </div>
       {children}
     </div>

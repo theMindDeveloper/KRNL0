@@ -47,6 +47,7 @@ import { useFrameTheme } from '../../themes/useFrameTheme';
 import { SLOT_DEFAULTS } from './SlotResolver';
 import type { MotherNodeConfig, StationSlot } from '../../../shared/types';
 import type { Node } from '../../../shared/types/node';
+import { restoredSizes } from './restoredSizes';
 
 const PANEL_IDS = {
   outerTop:    'station-top-row',
@@ -139,27 +140,34 @@ export function StationLayout() {
 
   // ── Persistence callbacks ────────────────────────────────────────────────
   const onOuterLayoutChanged = useCallback((layout: Layout) => {
-    const rowFraction = (layout[PANEL_IDS.outerTop] ?? SLOT_DEFAULTS.rowPercent) / 100;
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
+    // Only a real split says something: with one row hidden the other is
+    // 100 %, which must not overwrite the height the user chose.
+    if (layout[PANEL_IDS.outerTop] === undefined || layout[PANEL_IDS.outerBottom] === undefined) return;
+    const rowFraction = layout[PANEL_IDS.outerTop]! / 100;
     setLayoutGeometry({
       station: {
         rowFraction,
         columnFractions: current?.columnFractions ?? [],
         rightColumnSplit: current?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
         ...(current?.canvasHidden !== undefined ? { canvasHidden: current.canvasHidden } : {}),
+        ...(current?.bottomFractions ? { bottomFractions: current.bottomFractions } : {}),
       },
     });
   }, [setLayoutGeometry]);
 
   const onTopLayoutChanged = useCallback((layout: Layout) => {
-    const columnFractions = TOP_ROW_DEFS.map((d) => (layout[d.panelId] ?? d.defaultSize) / 100);
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
+    // A hidden column keeps the width it had (it isn't in `layout`).
+    const columnFractions = TOP_ROW_DEFS.map((d, i) =>
+      layout[d.panelId] !== undefined ? layout[d.panelId]! / 100 : (current?.columnFractions[i] ?? d.defaultSize / 100));
     setLayoutGeometry({
       station: {
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
         columnFractions,
         rightColumnSplit: current?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
         ...(current?.canvasHidden !== undefined ? { canvasHidden: current.canvasHidden } : {}),
+        ...(current?.bottomFractions ? { bottomFractions: current.bottomFractions } : {}),
       },
     });
   }, [setLayoutGeometry]);
@@ -167,21 +175,39 @@ export function StationLayout() {
   const onBottomLayoutChanged = useCallback((layout: Layout) => {
     const rightColumnSplit = (layout[PANEL_IDS.bottomCanvas] ?? SLOT_DEFAULTS.bottom.canvas) / 100;
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
+    const bottomFractions: Record<string, number> = { ...(current?.bottomFractions ?? {}) };
+    for (const [id, size] of Object.entries(layout)) bottomFractions[id] = size / 100;
     setLayoutGeometry({
       station: {
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
         columnFractions: current?.columnFractions ?? [],
         rightColumnSplit,
+        bottomFractions,
         ...(current?.canvasHidden !== undefined ? { canvasHidden: current.canvasHidden } : {}),
       },
     });
   }, [setLayoutGeometry]);
+
+  // The mother-row height the user left, within the row minimums.
+  const savedRow = storedGeometry?.rowFraction;
+  const topRowPercent = typeof savedRow === 'number' && Number.isFinite(savedRow)
+    ? Math.min(100 - SLOT_DEFAULTS.minCanvas, Math.max(SLOT_DEFAULTS.minRow, savedRow * 100))
+    : SLOT_DEFAULTS.rowPercent;
 
   const def = DOCK_REGISTRY[dockStyle];
   const padding = def.stationPadding;
   const Chrome = def.Chrome;
 
   // Build the top-row panel list: visible panels with separators between.
+  const savedColumns: Record<string, number> | undefined = storedGeometry?.columnFractions.length === TOP_ROW_DEFS.length
+    ? Object.fromEntries(TOP_ROW_DEFS.map((d, i) => [d.panelId, storedGeometry.columnFractions[i]!]))
+    : undefined;
+  const topSizes = restoredSizes(
+    visibleTopDefs.map((d) => d.panelId),
+    visibleTopDefs.map((d) => d.defaultSize),
+    visibleTopDefs.map(() => SLOT_DEFAULTS.minColumn),
+    savedColumns,
+  );
   const topRowChildren: React.ReactNode[] = [];
   visibleTopDefs.forEach((d, i) => {
     if (i > 0) topRowChildren.push(<Separator key={`sep-${d.panelId}`} className="station-splitter" style={verticalHandleStyle} />);
@@ -189,7 +215,7 @@ export function StationLayout() {
       <Panel
         key={d.panelId}
         id={d.panelId}
-        defaultSize={d.defaultSize}
+        defaultSize={topSizes[i]}
         minSize={SLOT_DEFAULTS.minColumn}
       >
         <CellWrapper><StationCell slot={d.slot} /></CellWrapper>
@@ -216,6 +242,18 @@ export function StationLayout() {
     bottomVisible.analytics && { id: PANEL_IDS.bottomAnalytics, size: analyticsSize, min: SLOT_DEFAULTS.minColumn, node: <CellWrapper><StationCell slot="bottom-right-pre" /></CellWrapper> },
     bottomVisible.clock    && { id: PANEL_IDS.bottomClock,    size: clockSize,    min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="top-right-lower" /></CellWrapper> },
   ].filter(Boolean) as Array<{ id: string; size: number; min: number; node: React.ReactNode }>;
+  // The clock stays locked to the calendar column above (clockSize); the
+  // saved widths share out the rest of the row.
+  const flexItems = bottomItems.filter((it) => it.id !== PANEL_IDS.bottomClock);
+  const flexTotal = bottomVisible.clock ? 100 - clockSize : 100;
+  const flexSizes = restoredSizes(
+    flexItems.map((it) => it.id),
+    flexItems.map((it) => it.size),
+    flexItems.map((it) => it.min),
+    storedGeometry?.bottomFractions,
+    flexTotal,
+  );
+  flexItems.forEach((it, i) => { it.size = flexSizes[i]!; });
   bottomItems.forEach((it, i) => {
     if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} className="station-splitter" style={verticalHandleStyle} />);
     bottomRowChildren.push(
@@ -272,7 +310,7 @@ export function StationLayout() {
             {topRowVisible && (
               <Panel
                 id={PANEL_IDS.outerTop}
-                defaultSize={bottomRowVisible ? SLOT_DEFAULTS.rowPercent : 100}
+                defaultSize={bottomRowVisible ? topRowPercent : 100}
                 minSize={SLOT_DEFAULTS.minRow}
               >
                 <Group
@@ -293,7 +331,7 @@ export function StationLayout() {
             {bottomRowVisible && (
               <Panel
                 id={PANEL_IDS.outerBottom}
-                defaultSize={topRowVisible ? SLOT_DEFAULTS.canvasPercent : 100}
+                defaultSize={topRowVisible ? 100 - topRowPercent : 100}
                 minSize={SLOT_DEFAULTS.minCanvas}
               >
                 <Group

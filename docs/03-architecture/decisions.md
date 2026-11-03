@@ -2435,3 +2435,18 @@ The user wants several canvases for free-form content (images, drawings, text, m
 - `node list` and other CLI listings show nodes from all canvases.
 
 Requirements: [canvases.md](../06-requirements/canvases.md).
+---
+
+## Decision 34 — Concurrent writers: merge stale saves, one instance per data folder (2026-11-03)
+
+### Context
+The renderer saves the whole board, and the sys CLI (or the AI in the terminal) writes `board.json` directly. Until now a renderer save made from a board older than the file was refused and the renderer reloaded, so the user's edit survived only as an undo step. A transient read error (antivirus / OneDrive lock) was treated like corruption: the loader returned the seed and the next save wrote it over the real board. Two app instances on one board each had their own lost-update guard and kept reverting each other.
+
+### Decision
+- **Merge, don't refuse.** `board:save` remembers the board the renderer's next save is derived from. When the file changed since, main three-way merges (`src/shared/boardMerge.ts`) the save with the file on that base, writes the result and makes the renderer reload it. The merge recurses: objects merge field by field, arrays of items with an `id` / `taskId` (nodes, edges, strokes, canvases, completions, and inside a node's state the Todo rows, pomo spans, habits) merge item by item. A side that left a value as it was in base takes the other side's value. When both changed the very same value, **the file wins**: the CLI already reported success, and the user's version stays one undo step away (`reloadBoard` keeps it). Saves sent before the renderer reloaded merge against the renderer's own last save.
+- **Never seed over an unreadable file.** Reads retry briefly on lock errors, then throw `BoardUnreadableError`. Only an unparseable file whose backup copy succeeded falls back to the seed. The renderer shows "board not loaded — Try again". Failed writes throw instead of being logged and swallowed; temp files are unique per writer.
+- **One app instance per user-data folder** (`app.requestSingleInstanceLock()`); a second launch focuses the running window. `scripts/dev.mjs` gives each worktree its own folder, so worktrees still run side by side.
+
+### Also recorded here
+- **Time-model F2 overrides Decision 22's `secondsAccumulated` commit.** Finishing or deleting the task the pomo is on stops the pomo with `pomoStop` (the real span length, a break as a break) and writes nothing onto the task; tracked time is derived from the pomo history.
+- **Decision 10, `maxVisible`:** the cap now trims done rows only. Open rows are never hidden (the list pages its rows).

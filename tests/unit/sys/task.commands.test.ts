@@ -19,6 +19,9 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   taskAdd,
+  taskAddNext,
+  taskSchedule,
+  taskUnschedule,
   taskEdit,
   taskToggle,
   taskDelete,
@@ -206,6 +209,22 @@ describe('sys task add', () => {
 
 // ── taskEdit ───────────────────────────────────────────────────────────────────
 
+describe('sys task subtask — Todo parity', () => {
+  it('gives the subtask its own linked Todo row, like the canvas', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'Thesis');
+    const parentId = (addRes.data as { id: string }).id;
+    const res = await taskSubtask(ctx, parentId, 'write tests');
+    expect(res.ok).toBe(true);
+    const childId = (res.data as { id: string }).id;
+    const child = findTasks().find((t) => t.id === childId)!.state as TaskState;
+    const items = (findTodoMother().state as TodoState).items;
+    const row = items.find((i) => i.id === child.todoItemId);
+    expect(row?.text).toBe('write tests');
+    expect(row?.taskNodeId).toBe(childId);
+    expect(child.timeOpen).toBe(true);
+  });
+});
+
 describe('sys task edit', () => {
   it('updates the task text and persists it', async () => {
     const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'old text');
@@ -214,6 +233,15 @@ describe('sys task edit', () => {
     expect(editRes.ok).toBe(true);
     const task = findTasks().find((t) => t.id === taskId)!;
     expect((task.state as TaskState).text).toBe('new text');
+  });
+
+  it('renames the linked Todo row too, so the list and the card agree', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'Gym');
+    const taskId = (addRes.data as { id: string }).id;
+    await taskEdit(ctx, taskId, 'Gym + stretch');
+    const items = (findTodoMother().state as TodoState).items;
+    const ts = findTasks().find((t) => t.id === taskId)!.state as TaskState;
+    expect(items.find((i) => i.id === ts.todoItemId)!.text).toBe('Gym + stretch');
   });
 
   it('returns error when task id is missing', async () => {
@@ -339,6 +367,31 @@ describe('sys task delete', () => {
   });
 });
 
+// ── parity with the canvas: chains and the running pomo ────────────────────────
+
+describe('sys task — chain and pomo parity', () => {
+  it('unschedule on a chain successor takes the chain off via its anchor', async () => {
+    const a = (await taskAdd(ctx, TODO_MOTHER_ID, 'first', 30)).data as { id: string };
+    const b = (await taskAddNext(ctx, a.id, 'second', 30)).data as { id: string };
+    expect((await taskSchedule(ctx, a.id, '2026-11-03T09:00')).ok).toBe(true);
+    const res = await taskUnschedule(ctx, b.id);
+    expect(res.ok).toBe(true);
+    const anchor = findTasks().find((t) => t.id === a.id)!.state as TaskState;
+    expect(anchor.scheduledFor ?? null).toBeNull();
+  });
+
+  it('toggling the task the pomo is on done stops and untags the pomo', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'deep work', 45);
+    const taskId = (addRes.data as { id: string }).id;
+    await taskStartPomo(ctx, taskId);
+    await taskToggle(ctx, taskId);
+    const ps = findPomoMother().state as PomoState;
+    expect(ps.status).toBe('idle');
+    expect(ps.activeTaskId).toBeNull();
+    expect(ps.history.at(-1)?.taskId).toBe(taskId);
+  });
+});
+
 // ── taskStartPomo ──────────────────────────────────────────────────────────────
 
 describe('sys task startPomo', () => {
@@ -402,13 +455,13 @@ describe('sys task subtask', () => {
     expect(chainEdge).toBeDefined();
   });
 
-  it('subtask has no todoItemId (not directly linked to a TodoItem)', async () => {
+  it('subtask is linked to its own TodoItem (Decision 22.2 Fix 4 — same as the canvas)', async () => {
     const parentRes = await taskAdd(ctx, TODO_MOTHER_ID, 'parent');
     const parentId = (parentRes.data as { id: string }).id;
     const subRes = await taskSubtask(ctx, parentId, 'subtask');
     const childId = (subRes.data as { id: string }).id;
     const child = findTasks().find((t) => t.id === childId)!;
-    expect((child.state as TaskState).todoItemId).toBeNull();
+    expect((child.state as TaskState).todoItemId).not.toBeNull();
   });
 
   it('returns error when parent task id is missing', async () => {

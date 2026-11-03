@@ -87,7 +87,8 @@ export const sessionFromCommanderFlow: Flow = {
     // Verify it landed
     steps.push({
       kind: 'verify',
-      predicate: (snap) => snap.scheduledTaskCount >= 1,
+      // The head of THIS session got its time — not any task on the board.
+      predicate: (snap) => snap.scheduledTaskTexts.includes(tasks[0]!),
       onPass: [
         { kind: 'camera', x: vp.x - 200, y: vp.y, zoom: 0.85 },
         { kind: 'wait', ms: 700 },

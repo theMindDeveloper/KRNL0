@@ -197,8 +197,9 @@ describe('F1 — Header anatomy', () => {
     // LIVE badge text
     expect(html).toContain(LIVE_BADGE_TEXT);
 
-    // Acid background on the badge (var(--acid))
-    expect(html).toContain('var(--acid)');
+    // Accent background on the badge — the on-dark accent, since the terminal
+    // is dark in every theme (Macintosh light's --acid is near-black).
+    expect(html).toContain('var(--accent-on-dark)');
   });
 });
 
@@ -609,4 +610,76 @@ describe('F8 — React Flow Handles', () => {
       expect(true).toBe(true);
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// A shell that exits or fails to start never leaves a dead terminal
+// ---------------------------------------------------------------------------
+
+describe('shell exit and restart', () => {
+  it('after `exit`, Enter starts a new shell and input goes to it', async () => {
+    const { deps, term, krnl } = makeDeps();
+    const ids: Array<string | null> = [];
+    deps.setSessionId = (id) => { ids.push(id); };
+    await startTerminalSession(deps);
+    krnl.fireExit();
+    expect(term.writeCalls.join('')).toMatch(/Process exited\] Press Enter/);
+    expect(ids.at(-1)).toBeNull();
+    // Typing while dead is not sent anywhere; Enter restarts.
+    term.simulateInput('x');
+    expect(krnl.ptyWriteMock).not.toHaveBeenCalled();
+    krnl.ptyCreateMock.mockResolvedValueOnce({ sessionId: 'sid-2', motd: '' });
+    term.simulateInput('\r');
+    await vi.waitFor(() => expect(ids.at(-1)).toBe('sid-2'));
+    term.simulateInput('ls');
+    expect(krnl.ptyWriteMock).toHaveBeenCalledWith('sid-2', 'ls');
+  });
+
+  it('a shell that cannot start says why and retries on Enter', async () => {
+    const { deps, term, krnl } = makeDeps();
+    krnl.ptyCreateMock.mockRejectedValueOnce(new Error('pwsh.exe not found'));
+    const cleanup = await startTerminalSession(deps);
+    expect(term.writeCalls.join('')).toMatch(/could not start: pwsh\.exe not found/);
+    term.simulateInput('\r');
+    await vi.waitFor(() => expect(krnl.ptyCreateMock).toHaveBeenCalledTimes(2));
+    cleanup();
+  });
+
+  it('Ctrl+Shift+L is kept from the shell (it is the layout toggle)', async () => {
+    let handler: ((e: KeyboardEvent) => boolean) | null = null;
+    const { deps } = makeDeps();
+    (deps.term as { attachCustomKeyEventHandler?: (h: (e: KeyboardEvent) => boolean) => void }).attachCustomKeyEventHandler = (h) => { handler = h; };
+    await startTerminalSession(deps);
+    expect(handler!({ type: 'keydown', key: 'L', ctrlKey: true, shiftKey: true, metaKey: false, altKey: false } as KeyboardEvent)).toBe(false);
+  });
+});
+
+describe('paste goes through xterm', () => {
+  it('Ctrl+V hands the clipboard to term.paste (bracketed, one paste) instead of raw writes', async () => {
+    let handler: ((e: KeyboardEvent) => boolean) | null = null;
+    const { deps, krnl } = makeDeps();
+    const paste = vi.fn();
+    Object.assign(deps.term, {
+      paste,
+      attachCustomKeyEventHandler: (h: (e: KeyboardEvent) => boolean) => { handler = h; },
+    });
+    krnl.clipboardReadTextMock.mockResolvedValueOnce('line 1\nline 2');
+    await startTerminalSession(deps);
+    handler!({ type: 'keydown', key: 'v', ctrlKey: true, shiftKey: false, metaKey: false, altKey: false } as KeyboardEvent);
+    await vi.waitFor(() => expect(paste).toHaveBeenCalledWith('line 1\nline 2'));
+    expect(krnl.ptyWriteMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('copy keys', () => {
+  it('Cmd+C with nothing selected does not interrupt the shell; Ctrl+C does', async () => {
+    let handler: ((e: KeyboardEvent) => boolean) | null = null;
+    const { deps, krnl } = makeDeps();
+    Object.assign(deps.term, { getSelection: () => '', attachCustomKeyEventHandler: (h: (e: KeyboardEvent) => boolean) => { handler = h; } });
+    await startTerminalSession(deps);
+    handler!({ type: 'keydown', key: 'c', ctrlKey: false, metaKey: true, shiftKey: false, altKey: false } as KeyboardEvent);
+    expect(krnl.ptyWriteMock).not.toHaveBeenCalled();
+    handler!({ type: 'keydown', key: 'c', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false } as KeyboardEvent);
+    expect(krnl.ptyWriteMock).toHaveBeenCalledWith('sid-test', '\x03');
+  });
 });

@@ -8,10 +8,10 @@ import * as edgeCmd from './commands/edge';
 import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
-import { textAdd, textSet, textResize } from './commands/text';
-import { drawList, drawClear, drawDelete } from './commands/draw';
+import { textAdd, textSet, textResize, textLook } from './commands/text';
+import { drawList, drawClear, drawDelete, drawStroke } from './commands/draw';
 import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
-import { mediaAdd, mediaList } from './commands/media';
+import { mediaAdd, mediaList, mediaResize, mediaPage } from './commands/media';
 import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
 import {
   imageAdd,
@@ -34,6 +34,8 @@ import {
   analyticsTotals,
   analyticsStreaks,
   analyticsWindow,
+  analyticsCards,
+  analyticsClearHistory,
   analyticsSummary,
 } from './commands/analytics';
 import type { AnalyticsCtx } from './commands/analytics';
@@ -65,6 +67,8 @@ export interface SysFacadeDeps {
   onBoardChanged?: () => void;
   /** Phase 2: renderer-coupled dispatch for viewport/undo/redo/theme commands. */
   cliDispatch?: CliDispatchFn;
+  /** Content size of the open window, for placing new nodes at the visible centre. */
+  viewSize?: () => { width: number; height: number } | null;
 }
 
 function defaultBoardPath(): string {
@@ -98,6 +102,18 @@ export class SysFacade {
       ...(deps?.cliDispatch ? { cliDispatch: deps.cliDispatch } : {}),
     };
     this.version = readVersion();
+  }
+
+  /** light / dark as the open window shows it; undefined when headless.
+   *  Read commands must stay instant: a busy or reloading window gets
+   *  1.5 s, then the board's own field is reported instead. */
+  private async windowTheme(): Promise<string | undefined> {
+    if (!this.deps.cliDispatch) return undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), 1500); });
+    const r = await Promise.race([this.deps.cliDispatch('theme.get', {}), timeout]);
+    if (timer) clearTimeout(timer);
+    return r && r.ok && (r.message === 'light' || r.message === 'dark') ? r.message : undefined;
   }
 
   async run(argv: string[]): Promise<SysResult> {
@@ -152,10 +168,14 @@ export class SysFacade {
     // ── Info / settings / viewport reads ────────────────────────────────────
     if (command.kind === 'info') {
       const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
+      const theme = await this.windowTheme();
+      if (theme) iCtx.theme = theme;
       return infoCmd.infoShow(iCtx, command.json);
     }
     if (command.kind === 'settings' && command.sub === 'show') {
       const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
+      const theme = await this.windowTheme();
+      if (theme) iCtx.theme = theme;
       return infoCmd.settingsShow(iCtx, command.json);
     }
     if (command.kind === 'settings' && command.sub === 'mode') {
@@ -163,6 +183,12 @@ export class SysFacade {
         boardPath: this.deps.boardPath,
         ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
       }, command.mode);
+    }
+    if (command.kind === 'settings' && command.sub === 'layout') {
+      return infoCmd.settingsLayout({
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      }, command.layout);
     }
     if (command.kind === 'viewport' && command.sub === 'show') {
       const iCtx: infoCmd.InfoCtx = { boardPath: this.deps.boardPath, version: this.version };
@@ -304,19 +330,23 @@ export class SysFacade {
           const r = await this.deps.cliDispatch('theme.frame.get', {});
           if (r.ok) tCtx.frame = r.message;
         }
+        const theme = await this.windowTheme();
+        if (theme) tCtx.theme = theme;
         return themeShow(tCtx, command.json);
       }
       if (command.sub === 'frames') {
         return themeFrames(command.json);
       }
       if (command.sub === 'frame') {
-        if (!isFrameStyleId(command.value)) {
+        // "Paper" is the shown name of the 'classic' style.
+        const frameId = command.value?.toLowerCase() === 'paper' ? 'classic' : command.value;
+        if (!isFrameStyleId(frameId)) {
           return { ok: false, message: command.value ? `Unknown frame style: ${command.value}` : 'theme frame requires <id> (see: sys theme frames)' };
         }
         if (!this.deps.cliDispatch) {
           return { ok: false, message: 'theme frame requires an open renderer window', data: { exitCode: 2 } };
         }
-        return this.deps.cliDispatch('theme.frame', { value: command.value });
+        return this.deps.cliDispatch('theme.frame', { value: frameId });
       }
       if (command.sub === 'set') {
         if (!command.value || !['light', 'dark'].includes(command.value)) {
@@ -334,6 +364,7 @@ export class SysFacade {
       const fCtx: FrameCtx = {
         boardPath: this.deps.boardPath,
         ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+        ...(this.deps.viewSize ? { viewSize: this.deps.viewSize } : {}),
       };
       switch (command.sub) {
         case 'add': {
@@ -386,6 +417,21 @@ export class SysFacade {
             { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
             command.sub,
           );
+        case 'clear-history':
+          return analyticsClearHistory(
+            { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+            command.yes,
+          );
+        case 'cards':
+        case 'hide':
+        case 'unhide':
+        case 'reset-cards':
+          return analyticsCards(
+            { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+            command.sub,
+            command.sub === 'hide' || command.sub === 'unhide' ? command.card : undefined,
+            command.sub === 'cards' ? command.json : false,
+          );
       }
     }
 
@@ -417,10 +463,28 @@ export class SysFacade {
       if (command.sub === 'list') return this.deps.cliDispatch('sfx.list', {});
     }
 
+    if (command.kind === 'radio') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'radio requires an open renderer window', data: { exitCode: 2 } };
+      }
+      switch (command.sub) {
+        case 'play': return this.deps.cliDispatch('radio.play', command.preset !== undefined ? { preset: command.preset } : {});
+        case 'remove':
+          if (!command.preset) return { ok: false, message: 'radio remove requires <preset> (see: krnl radio list)' };
+          return this.deps.cliDispatch('radio.remove', { preset: command.preset });
+        case 'volume':
+          if (command.volume === undefined || command.volume < 0 || command.volume > 100) {
+            return { ok: false, message: 'radio volume requires a number from 0 to 100' };
+          }
+          return this.deps.cliDispatch('radio.volume', { volume: command.volume });
+        default: return this.deps.cliDispatch(`radio.${command.sub}`, {});
+      }
+    }
+
     if (command.kind === 'pomo') {
       switch (command.sub) {
         case 'start':  return pomoStart(command.label, command.minutes);
-        case 'stop':   return pomoStop();
+        case 'stop':   return pomoStop(command.at);
         case 'break':  return pomoBreak();
         case 'extend': return pomoExtend();
         case 'pause':  return pomoPause();
@@ -552,6 +616,12 @@ export class SysFacade {
       if (command.sub === 'show') {
         return calCmd.calShow(ctx, command.from, command.to, command.json);
       }
+      if (command.sub === 'zoom') {
+        return calCmd.calZoom(
+          { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+          command.zoom,
+        );
+      }
       if (command.sub === 'view') {
         return calCmd.calView(
           { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
@@ -561,6 +631,13 @@ export class SysFacade {
       }
     }
 
+    if (command.kind === 'media' && (command.sub === 'resize' || command.sub === 'page')) {
+      const res = command.sub === 'resize'
+        ? mediaResize(command.id, command.w, command.h)
+        : mediaPage(command.id, command.page);
+      if (res.ok) this.deps.onBoardChanged?.();
+      return res;
+    }
     if (command.kind === 'media') {
       const res = command.sub === 'add' ? mediaAdd(command.url, command.at) : mediaList(command.json);
       if (command.sub === 'add' && res.ok) this.deps.onBoardChanged?.();
@@ -576,6 +653,7 @@ export class SysFacade {
         case 'list':   return drawList(dCtx, command.json);
         case 'clear':  return drawClear(dCtx);
         case 'delete': return drawDelete(dCtx, command.id);
+        case 'stroke': return drawStroke(dCtx, { points: command.points, tool: command.tool, color: command.color, size: command.size });
       }
     }
 
@@ -602,6 +680,7 @@ export class SysFacade {
         case 'day':  return clockCmd.clockDay(ctx, command.arg);
         case 'show': return clockCmd.clockShow(ctx, command.json);
         case 'dial': return clockCmd.clockDial(ctx, command.arg);
+        case 'half': return clockCmd.clockHalf(ctx, command.arg);
       }
     }
 
@@ -613,6 +692,7 @@ export class SysFacade {
         case 'add':    return textAdd(command.text, command.at, command.near, command.look);
         case 'set':    return textSet(command.id, command.text);
         case 'resize': return textResize(command.id, command.w, command.h);
+        case 'look':   return textLook(command.id, command.look);
       }
     }
 

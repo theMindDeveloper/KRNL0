@@ -62,8 +62,9 @@ export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, M
         width: '100%', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column',
         background: 'linear-gradient(180deg, var(--paper-2) 0%, var(--paper) 100%)',
         border: `1px solid ${selected ? 'var(--acid)' : 'var(--paper-3)'}`,
-        borderRadius: 14, overflow: 'hidden',
-        boxShadow: selected ? '0 0 0 3px color-mix(in srgb, var(--acid) 25%, transparent), 0 14px 34px rgba(0,0,0,0.38)' : '0 14px 34px rgba(0,0,0,0.32)',
+        // A card like the others: the frame style's radius and warm shadow.
+        borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+        boxShadow: selected ? '0 0 0 3px color-mix(in srgb, var(--acid) 25%, transparent), var(--shadow-2)' : 'var(--shadow-2)',
         transition: 'box-shadow 160ms ease, border-color 160ms ease',
       }}
     >
@@ -102,7 +103,7 @@ export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, M
         onResizeEnd={(_e, p) => onCommand('media.setSize', { width: p.width, height: p.height })}
         style={{ background: 'transparent', border: 'none', width: 18, height: 18, right: 2, bottom: 2, zIndex: 3 }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" style={{ position: 'absolute', right: 2, bottom: 2, cursor: 'nwse-resize', color: '#7d848b', pointerEvents: 'none' }} aria-hidden>
+        <svg width="14" height="14" viewBox="0 0 14 14" style={{ position: 'absolute', right: 2, bottom: 2, cursor: 'nwse-resize', color: 'var(--ink-4)', pointerEvents: 'none' }} aria-hidden>
           <path d="M13 5L5 13M13 9L9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
       </NodeResizeControl>
@@ -125,8 +126,8 @@ function VideoPlayer({ url, onAspect }: { url: string; onAspect: (a: number) => 
       <Centered>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: '#e8ebee', textAlign: 'center', padding: 16, lineHeight: 1.45 }}>
           {isFile
-            ? <>This video's format can't play here (common with .mov from phones).<br /><a href={url} download style={{ color: 'var(--acid)' }}>Download it</a> or convert to MP4.</>
-            : <>This video can't be embedded here.<br /><a href={url} target="_blank" rel="noreferrer" style={{ color: 'var(--acid)' }}>Open it in the browser ↗</a></>}
+            ? <>This video's format can't play here (common with .mov from phones).<br /><a href={url} download style={{ color: 'var(--accent-on-dark)' }}>Download it</a> or convert to MP4.</>
+            : <>This video can't be embedded here.<br /><a href={url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-on-dark)' }}>Open it in the browser ↗</a></>}
         </span>
       </Centered>
     );
@@ -339,7 +340,7 @@ function PdfView({ url, page, onPage, onAspect }: { url: string; page: number; o
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
       <div ref={boxRef} style={{ flex: 1, minHeight: 0, display: 'grid', placeItems: 'center', background: 'repeating-linear-gradient(45deg, #2a2d31 0 8px, #2d3034 8px 16px)' }}>
         {error
-          ? <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--rust)', padding: 12, textAlign: 'center' }}>Couldn't open this PDF.</span>
+          ? <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--term-rust)', padding: 12, textAlign: 'center' }}>Couldn't open this PDF.</span>
           : pages === 0 ? <Spinner />
           : <canvas ref={canvasRef} style={{ maxWidth: 'calc(100% - 12px)', maxHeight: 'calc(100% - 12px)', borderRadius: 3, boxShadow: '0 6px 20px rgba(0,0,0,0.5)' }} />}
       </div>

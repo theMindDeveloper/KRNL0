@@ -6,23 +6,14 @@ import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
 import { useBoardStore } from '../../../store/boardStore';
+import { selectSchedule } from '../../../store/scheduleSelector';
 import { useShallow } from 'zustand/react/shallow';
 import { useTick } from '../../../hooks/useTick';
 import type { PomoState } from '../PomoNode/types';
 import { trackedSecondsForTask, planStatus, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
-
-/**
- * Decision 22 F16 — format seconds as `H:MM:SS` (≥1h) or `MM:SS` (<1h).
- */
-export function formatElapsed(totalSec: number): string {
-  const safe = Math.max(0, Math.floor(totalSec));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = safe % 60;
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
-  return `${pad(m)}:${pad(s)}`;
-}
+import { formatElapsed } from './format';
+import { saveBoard } from '../../../store/eventLog';
+import { undoable } from '../../../store/undoNotice';
 
 function fmtMin(totalMin: number): string {
   const m = Math.max(0, Math.round(totalMin));
@@ -38,27 +29,28 @@ function fmtMin(totalMin: number): string {
  * (store/trackedTime.ts); the bar fills tracked / planned and turns rust when
  * more time was spent than planned. Hidden until something was tracked.
  */
-function PlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean }) {
+function PlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean }) {
   // Only the card the pomo is running on ticks; every other card re-renders
   // just when the pomo node changes.
   return props.live ? <LivePlanTrackedBar {...props} /> : <PlanTrackedBarView {...props} nowMs={null} />;
 }
 
-function LivePlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean }) {
+function LivePlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean }) {
   const tick = useTick();
   return <PlanTrackedBarView {...props} nowMs={tick} />;
 }
 
-function PlanTrackedBarView({ taskId, plannedMin, live, nowMs }: { taskId: string; plannedMin: number; live: boolean; nowMs: number | null }) {
+function PlanTrackedBarView({ taskId, plannedMin, live, open = false, nowMs }: { taskId: string; plannedMin: number; live: boolean; open?: boolean; nowMs: number | null }) {
   const pomoNode = useBoardStore(selectPomoNode);
   const trackedSec = useMemo(
     () => trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now()),
     // nowMs only changes for the live card (tick), forcing a fresh total.
     [pomoNode, taskId, nowMs],
   );
-  const status = planStatus(trackedSec, plannedMin);
+  // An open-ended task has no plan to run over: show what was tracked only.
+  const status = open ? (trackedSec > 0 ? 'on-track' : 'untracked') : planStatus(trackedSec, plannedMin);
   if (status === 'untracked' && !live) return null;
-  const ratio = plannedMin > 0 ? trackedSec / (plannedMin * 60) : 0;
+  const ratio = open ? 0 : plannedMin > 0 ? trackedSec / (plannedMin * 60) : 0;
   const color = status === 'overrun' ? 'var(--rust)' : live ? 'var(--acid)' : 'var(--ink-3)';
   return (
     <div data-testid="task-plan-tracked" style={{ padding: '4px 10px 6px' }}>
@@ -73,7 +65,7 @@ function PlanTrackedBarView({ taskId, plannedMin, live, nowMs }: { taskId: strin
           marginBottom: 3,
         }}
       >
-        <span>PLAN {fmtMin(plannedMin)}</span>
+        <span>{open ? 'NO SET TIME' : `PLAN ${fmtMin(plannedMin)}`}</span>
         <span style={{ color }}>
           {status === 'overrun' ? '+' + fmtMin(trackedSec / 60 - plannedMin) + ' OVER · ' : ''}
           TRACKED {fmtMin(trackedSec / 60)}
@@ -100,7 +92,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const taskId = node.id;
 
   // B.2 — live ETA display: use plannedMin (writable) rather than the stale eta string
-  const etaDisplay = `~${state.plannedMin ?? state.durationMin} min`;
+  // An open-ended task (added without a duration) has no estimate to show —
+  // the calendar says "no set time" too.
+  const etaDisplay = state.timeOpen ? 'no set time' : `~${state.plannedMin ?? state.durationMin} min`;
 
   // Decision 22 F15 — subscribe to the pomo mother's runtime state. The
   // selector returns a fresh object every call, so we use `useShallow` to
@@ -238,14 +232,18 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const [etaValue, setEtaValue] = useState('');
 
   const startEtaEdit = () => {
-    setEtaValue(String(state.plannedMin ?? state.durationMin));
+    setEtaValue(state.timeOpen ? '' : String(state.plannedMin ?? state.durationMin));
     setIsEditingEta(true);
   };
 
   const commitEtaEdit = () => {
     const parsed = parseInt(etaValue, 10);
-    const clamped = Number.isFinite(parsed) ? Math.max(1, parsed) : (state.plannedMin ?? state.durationMin);
-    onCommand('task.setPlannedMin', { minutes: clamped });
+    const current = state.plannedMin ?? state.durationMin;
+    // Opening the field and leaving it unchanged (or empty) changes nothing —
+    // above all it must not turn an open-ended task into a fixed one.
+    if (Number.isFinite(parsed) && !(parsed === current && !state.timeOpen)) {
+      onCommand('task.setPlannedMin', { minutes: Math.max(1, parsed) });
+    }
     setIsEditingEta(false);
   };
 
@@ -293,6 +291,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     } else if (inlineMode === 'sibling') {
       // ADR 0004 §2 — internal mode 'sibling' / UI label "Add parallel task".
       useBoardStore.getState().insertSiblingTaskAfter(node.id, { text: name, ...dur });
+      // The store action doesn't persist; without this the new task vanished
+      // on the next CLI write (board reload) or on quit.
+      const board = useBoardStore.getState().board;
+      if (board) void saveBoard(board);
     } else if (inlineMode === 'next') {
       // ADR 0004 §2 — sequential successor at the same chain level.
       onCommand('task.addNext', { text: name, ...dur });
@@ -384,6 +386,11 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     setCtxMenu({ x: e.clientX, y: e.clientY });
   };
 
+  // Read when the menu is open only (a chain successor has no scheduledFor of
+  // its own but is on the calendar too).
+  const onCalendar = ctxMenu !== null
+    && (!!state.scheduledFor || selectSchedule(useBoardStore.getState().board).placements.has(taskId));
+
   const ctxItems = [
     {
       label: 'Edit text',
@@ -423,14 +430,14 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
       onSelect: startNoteEdit,
     },
-    // Only for tasks that are on the calendar.
-    ...(state.scheduledFor
+    // Only for tasks that are on the calendar (anchors and chain successors).
+    ...(onCalendar
       ? [{ label: 'Show on calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTaskOnCalendar(taskId)); } }]
       : []),
     {
       label: 'Delete',
       danger: true,
-      onSelect: () => onCommand('task.delete'),
+      onSelect: () => undoable(`Deleted "${state.text || 'task'}"`, () => onCommand('task.delete')),
     },
   ];
 
@@ -448,7 +455,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       ? 'var(--acid)'
       : 'var(--paper-3)';
   const boxShadow = isActiveRunning
-    ? '0 0 0 2px var(--acid), 0 0 24px rgba(201,241,88,0.45)'
+    ? '0 0 0 2px var(--acid), 0 0 24px color-mix(in srgb, var(--acid) 45%, transparent)'
     : isActivePaused
       ? '0 0 0 2px var(--acid)'
       : 'var(--shadow-1)';
@@ -494,7 +501,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             letterSpacing: '0.04em',
             pointerEvents: 'none',
             boxShadow: isActiveRunning
-              ? '0 0 6px rgba(201,241,88,0.4)'
+              ? '0 0 6px color-mix(in srgb, var(--acid) 40%, transparent)'
               : '0 0 0 1px var(--paper-2)',
             zIndex: 1,
           }}
@@ -836,6 +843,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         taskId={node.id}
         plannedMin={state.plannedMin ?? state.durationMin ?? 25}
         live={isActiveRunning}
+        open={state.timeOpen === true}
       />
     </div>
   );

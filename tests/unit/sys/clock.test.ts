@@ -166,6 +166,19 @@ describe('sys clock day', () => {
     expect(res.ok).toBe(false);
   });
 
+  it('rejects well-formed dates that are not real days', async () => {
+    seedBoard('2026-05-15');
+    expect((await clockDay(ctx, '2026-13-45')).ok).toBe(false);
+    expect((await clockDay(ctx, '2026-02-31')).ok).toBe(false);
+    expect((findClockMother().state as ClockState).selectedDate).toBe('2026-05-15');
+  });
+
+  it('clock show survives a bad stored day instead of throwing', async () => {
+    seedBoard('2026-13-45');
+    const res = await clockShow(ctx);
+    expect(res.ok).toBe(true);
+  });
+
   it('finds the clock mother even in a minimal board (migration injects one)', async () => {
     // loadBoardFrom runs migrateAddClockMother so a clock mother always exists.
     writeBoard({

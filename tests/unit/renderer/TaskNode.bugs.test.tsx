@@ -167,3 +167,32 @@ describe('B2 — Inline ETA edit', () => {
 
 // ── B3 — Corner timer shows frozen elapsed when pomo is not running ───────────
 
+
+describe('open-ended tasks (no duration)', () => {
+  it('the card says "no set time", not a made-up estimate', () => {
+    renderTaskNode(makeTaskState({ timeOpen: true, plannedMin: 25 }));
+    expect(document.querySelector('.task-eta')?.textContent).toBe('no set time');
+  });
+
+  it('opening the time field and leaving it changes nothing', () => {
+    const onCommand = vi.fn();
+    renderTaskNode(makeTaskState({ timeOpen: true, plannedMin: 25 }), onCommand);
+    fireEvent.doubleClick(document.querySelector('.task-eta')!);
+    const input = document.querySelector('input') as HTMLInputElement;
+    fireEvent.blur(input);
+    expect(onCommand).not.toHaveBeenCalledWith('task.setPlannedMin', expect.anything());
+  });
+
+  it('an unchanged fixed time is not re-written either; a new one is', () => {
+    const onCommand = vi.fn();
+    renderTaskNode(makeTaskState({ plannedMin: 40 }), onCommand);
+    fireEvent.doubleClick(document.querySelector('.task-eta')!);
+    fireEvent.blur(document.querySelector('input')!);
+    expect(onCommand).not.toHaveBeenCalledWith('task.setPlannedMin', expect.anything());
+    fireEvent.doubleClick(document.querySelector('.task-eta')!);
+    const input = document.querySelector('input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '55' } });
+    fireEvent.blur(input);
+    expect(onCommand).toHaveBeenCalledWith('task.setPlannedMin', { minutes: 55 });
+  });
+});

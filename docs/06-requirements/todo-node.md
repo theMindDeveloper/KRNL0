@@ -17,7 +17,7 @@
 | F7 | The node header shows the count of undone items as `"Todos (N)"` updating reactively |
 | F8 | An RF `<Handle type="target" position="left">` is rendered for receiving edge signals |
 | F9 | Right-clicking a todo row opens a context menu with three actions: "Edit text", "Delete", "Start pomo" |
-| F10 | Clicking the text body of a linked, undone row dispatches `todo.startPomoForItem` with the item id; no-op if item has no linked TaskNode or if the item is done |
+| F10 | ~~Clicking the text body of a linked, undone row dispatches `todo.startPomoForItem`~~ — retired 2026-11-03: a single click fires on the first half of every double-click (F5 edit), so it would start a pomo each time the user renames a row. `todo.startPomoForItem` is reached from the row context menu ("Start pomo", F9) and the CLI; the row text shows a text cursor |
 | F11 | "Delete" in the row context menu dispatches `todo.remove`; the dispatcher cascades to remove the linked TaskNode, all its descendants, and all referencing edges |
 | F12 | `todo.clearDone` cascades — every removed done item also removes its linked TaskNode, all descendants of that TaskNode, and all referencing edges |
 | F13 | `todo.toggle` mirrors done state to the linked TaskNode (if `taskNodeId !== null`); `task.toggle` mirrors done state back to the linked TodoItem (if `todoItemId !== null`) |

@@ -5,8 +5,9 @@ import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
-import { loadBoardFrom, saveBoardTo, seedBoard, RendererRevGuard } from '../persistence/board';
-import { notifyBoardChanged } from '../boardIo';
+import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard } from '../persistence/board';
+import { notifyBoardChanged, windowViewSize } from '../boardIo';
+import { mergeBoards } from '../../shared/boardMerge';
 import { renderMotd } from '../rpc/motd';
 import type { RpcServer } from '../rpc/server';
 
@@ -36,6 +37,34 @@ process.env['KRNL0_BOARD_PATH'] = BOARD_PATH;
 
 // Active PTY sessions keyed by sessionId
 const ptySessions = new Map<string, pty.IPty>();
+// Which renderer owns each session. A reload, navigation or renderer crash
+// never runs the old page's cleanup, so main kills that page's shells itself;
+// otherwise every reload leaves another shell running until the app quits.
+const ptyOwner = new Map<string, number>();
+const watchedSenders = new Set<number>();
+
+function killSessionsOf(senderId: number): void {
+  for (const [sid, owner] of ptyOwner) {
+    if (owner !== senderId) continue;
+    try { ptySessions.get(sid)?.kill(); } catch { /* already gone */ }
+    ptySessions.delete(sid);
+    ptyOwner.delete(sid);
+  }
+}
+
+function watchSender(sender: Electron.WebContents): void {
+  if (watchedSenders.has(sender.id)) return;
+  watchedSenders.add(sender.id);
+  const id = sender.id;
+  sender.on('did-start-navigation', (_e, _url, isInPlace, isMainFrame) => {
+    if (isMainFrame && !isInPlace) killSessionsOf(id);
+  });
+  sender.on('render-process-gone', () => killSessionsOf(id));
+  sender.once('destroyed', () => {
+    killSessionsOf(id);
+    watchedSenders.delete(id);
+  });
+}
 
 // Phase 2: renderer-coupled dispatch. Set by registerHandlers().
 // Used by SysFacade for viewport/undo/redo/theme commands.
@@ -58,6 +87,22 @@ function loadBoard() {
 // board loaded before a CLI write would revert that write. Track the revision
 // the renderer last saw; a stale save is refused and the renderer reloads.
 const rendererRev = new RendererRevGuard(BOARD_PATH);
+// The board the renderer's next save is derived from — the common ancestor
+// for a three-way merge when that save turns out to be stale. After a merge
+// it is the renderer's own last save until the renderer reloads, because
+// saves already in flight were made before it saw the merged board.
+let rendererBase: Record<string, unknown> | null = null;
+let awaitingReload = false;
+const asBoard = (b: unknown): Record<string, unknown> | null =>
+  typeof b === 'object' && b !== null && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
+/** A board in the shape loadBoard returns (migrations mutate, so on a copy). */
+const normalized = (b: unknown): unknown => {
+  try {
+    return migrateBoard(JSON.parse(JSON.stringify(b)) as unknown);
+  } catch {
+    return b; // merge what we have rather than refuse the save
+  }
+};
 
 function saveBoard(data: unknown) {
   saveBoardTo(BOARD_PATH, data);
@@ -71,18 +116,35 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   ipcMain.handle('board:load', async () => {
     const board = loadBoard();
     rendererRev.sync();
+    rendererBase = asBoard(board);
+    awaitingReload = false;
     return board;
   });
 
   ipcMain.handle('board:save', async (_event, data: unknown) => {
-    if (rendererRev.isStale()) {
-      // A newer write landed (sys CLI / Codex). Keep it and make the renderer
-      // reload; it re-reads through board:load, which re-syncs the revision.
+    if (rendererRev.isStale() || awaitingReload) {
+      // A newer write landed (sys CLI / the AI terminal) after the renderer's
+      // last load. Saving as-is would revert it, refusing would drop the
+      // user's edit: merge both onto the common base, then let the renderer
+      // reload the result (its board:load re-syncs the revision).
+      // All three in the loader's shape: board.json comes back migrated
+      // (defaults added, keys reordered), the renderer's copies do not, and
+      // the merge must not read that reshaping as somebody's edit.
+      const mine = asBoard(normalized(data));
+      const theirs = asBoard(loadBoard());
+      const base = rendererBase ? asBoard(normalized(rendererBase)) : null;
+      if (base && mine && theirs) {
+        saveBoard(mergeBoards(base, mine, theirs));
+        rendererRev.sync();
+        rendererBase = mine;
+        awaitingReload = true;
+      }
       notifyBoardChanged();
       return;
     }
     saveBoard(data);
     rendererRev.sync();
+    rendererBase = asBoard(data);
   });
 
   // Factory reset — overwrite board.json with a fresh canonical seed and return
@@ -92,11 +154,21 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     saveBoard(seedBoard());
     const board = loadBoard();
     rendererRev.sync();
+    rendererBase = asBoard(board);
+    awaitingReload = false;
     return board;
   });
 
   ipcMain.handle('board:saveViewport', async (_event, viewport: unknown) => {
-    const board = loadBoard();
+    // A pan is never worth risking the board: if it can't be read right now
+    // (locked by antivirus / sync), skip this viewport write.
+    let board: unknown;
+    try {
+      board = loadBoard();
+    } catch (err) {
+      console.warn('[board] viewport not saved:', err instanceof Error ? err.message : err);
+      return;
+    }
     const merged = typeof board === 'object' && board !== null
       ? { ...(board as Record<string, unknown>), viewport, savedAt: new Date().toISOString() }
       : { viewport, savedAt: new Date().toISOString() };
@@ -112,10 +184,15 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       boardPath: BOARD_PATH,
       hasOpenRenderer,
       onBoardChanged: notifyBoardChanged,
+      viewSize: windowViewSize,
       ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
     });
-    const result = await facade.run(argv);
-    return { ok: result.ok, message: result.message ?? '' };
+    try {
+      const result = await facade.run(argv);
+      return { ok: result.ok, message: result.message ?? '' };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   // cli:dispatch — main→renderer command dispatch for renderer-coupled commands.
@@ -199,7 +276,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   });
 
   // pty:create — spawn a real PTY-backed shell via node-pty (Decision 12 / Decision 18)
-  ipcMain.handle('pty:create', (event, cols: number, rows: number) => {
+  ipcMain.handle('pty:create', (event, cols: number, rows: number, shellPref?: unknown) => {
     const sessionId = randomUUID();
 
     // Default shell selection (Decision 12 §Default shell):
@@ -212,7 +289,13 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     //   Override — KRNL0_SHELL env var wins on every platform; set it to
     //              "cmd.exe", "pwsh.exe", "/bin/bash", etc. as needed.
     const isWin = process.platform === 'win32';
+    //   Then the terminal's saved shell (`krnl term setShell <shell>`;
+    //              'default' or empty = the OS default above).
+    const chosen = typeof shellPref === 'string' && shellPref.trim() && shellPref.trim() !== 'default'
+      ? shellPref.trim()
+      : undefined;
     const shell = process.env['KRNL0_SHELL']
+      ?? chosen
       ?? (isWin ? 'powershell.exe' : (process.env['SHELL'] ?? '/bin/zsh'));
 
     // Resolve where claude/CLAUDE.md lives BEFORE picking cwd — we want the
@@ -423,10 +506,13 @@ export function registerHandlers(rpcServer?: RpcServer): void {
 
     proc.onExit(() => {
       ptySessions.delete(sessionId);
+      ptyOwner.delete(sessionId);
       safeSend(`pty:exit:${sessionId}`);
     });
 
     ptySessions.set(sessionId, proc);
+    ptyOwner.set(sessionId, event.sender.id);
+    watchSender(event.sender);
 
     // T1–T6: build MOTD and include in the reply so the renderer writes it
     // synchronously before subscribing to pty:data (avoids any IPC race).
@@ -459,6 +545,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     if (proc) {
       proc.kill();
       ptySessions.delete(sessionId);
+      ptyOwner.delete(sessionId);
     }
   });
 

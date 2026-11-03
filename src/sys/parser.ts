@@ -6,7 +6,7 @@ export type SysCommand =
   | { kind: 'node'; sub: 'remove'; id: string | undefined; force: boolean }
   | { kind: 'node'; sub: 'set-position'; id: string | undefined; x: number | undefined; y: number | undefined }
   | { kind: 'node'; sub: 'add'; nodeKind: string | undefined; at: { x: number; y: number } | undefined }
-  | { kind: 'pomo'; sub: 'stop' | 'status' | 'break' | 'extend' | 'pause' | 'resume' | 'discard' }
+  | { kind: 'pomo'; sub: 'stop' | 'status' | 'break' | 'extend' | 'pause' | 'resume' | 'discard'; at?: string }
   | { kind: 'pomo'; sub: 'start'; label: string | undefined; minutes: number | undefined }
   | { kind: 'pomo'; sub: 'tag'; ref: string | undefined }
   | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined; text?: string | undefined; tag?: string | undefined }
@@ -38,9 +38,15 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'day'; arg: string | undefined }
   | { kind: 'clock'; sub: 'show'; json: boolean }
   | { kind: 'clock'; sub: 'dial'; arg: string | undefined }
+  | { kind: 'clock'; sub: 'half'; arg: string | undefined }
+  | { kind: 'cal'; sub: 'zoom'; zoom: number | undefined }
   | { kind: 'draw'; sub: 'list'; json: boolean }
   | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'media'; sub: 'list'; json: boolean }
+  | { kind: 'media'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
+  | { kind: 'media'; sub: 'page'; id: string | undefined; page: number | undefined }
+  | { kind: 'draw'; sub: 'stroke'; points: string | undefined; tool: string | undefined; color: string | undefined; size: number | undefined }
+  | { kind: 'analytics'; sub: 'clear-history'; yes: boolean }
   | { kind: 'draw'; sub: 'clear' }
   | { kind: 'canvas'; sub: 'list'; json: boolean }
   | { kind: 'canvas'; sub: 'add'; name: string | undefined }
@@ -59,9 +65,11 @@ export type SysCommand =
   | { kind: 'info'; json: boolean }
   | { kind: 'settings'; sub: 'show'; json: boolean }
   | { kind: 'settings'; sub: 'mode'; mode: string | undefined }
+  | { kind: 'settings'; sub: 'layout'; layout: string | undefined }
   | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
   | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
+  | { kind: 'text'; sub: 'look'; id: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'image'; sub: 'add'; path: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined }
   | { kind: 'image'; sub: 'replace'; id: string | undefined; path: string | undefined }
   | { kind: 'image'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
@@ -85,6 +93,10 @@ export type SysCommand =
   | { kind: 'sfx'; sub: 'play'; clipId: string | undefined }
   | { kind: 'sfx'; sub: 'stop' }
   | { kind: 'sfx'; sub: 'list' }
+  | { kind: 'radio'; sub: 'list' | 'status' | 'stop' }
+  | { kind: 'radio'; sub: 'play'; preset: string | undefined }
+  | { kind: 'radio'; sub: 'remove'; preset: string | undefined }
+  | { kind: 'radio'; sub: 'volume'; volume: number | undefined }
   | { kind: 'help'; group: string | undefined; sub: string | undefined }
   // Decision 29 — new commands
   | { kind: 'task'; sub: 'kind'; ref: string | undefined; taskKind: 'focus' | 'event' | undefined }
@@ -130,6 +142,9 @@ export type SysCommand =
   | { kind: 'analytics'; sub: 'streaks'; json: boolean }
   | { kind: 'analytics'; sub: 'open' | 'close' | 'toggle' }
   | { kind: 'analytics'; sub: 'summary'; range: number | undefined; json: boolean }
+  | { kind: 'analytics'; sub: 'cards'; json: boolean }
+  | { kind: 'analytics'; sub: 'hide' | 'unhide'; card: string | undefined }
+  | { kind: 'analytics'; sub: 'reset-cards' }
   | { kind: 'log'; sub: 'tail'; limit: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'stats'; json: boolean }
   | { kind: 'theme'; sub: 'show'; json: boolean }
@@ -141,7 +156,10 @@ export type SysCommand =
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
+  if (i < 0) return undefined;
+  const v = args[i + 1];
+  // `--label --minutes 5`: a flag with no value must not swallow the next flag.
+  return v !== undefined && v.startsWith('--') ? undefined : v;
 }
 
 function numFlag(args: string[], name: string): number | undefined {
@@ -214,7 +232,12 @@ export class SysParser {
   }
 
   private static parseStrict(argv: string[]): SysCommand | null {
-    const [cmd, sub, ...rawRest] = argv;
+    const [cmd, first, ...afterFirst] = argv;
+    // `krnl cal --from …`, `krnl clock --json`: a flag where the subcommand
+    // goes means "the default subcommand with these flags".
+    const flagFirst = first !== undefined && first.startsWith('--') && cmd !== 'say';
+    const sub = flagFirst ? undefined : first;
+    const rawRest = flagFirst ? [first, ...afterFirst] : afterFirst;
     const rest = hoistPositionals(rawRest);
 
     if (!cmd || cmd === 'help') return { kind: 'help', group: sub, sub: rest[0] };
@@ -277,10 +300,15 @@ export class SysParser {
         return { kind: 'settings', sub: 'show', json: hasFlag(rest, 'json') };
       }
       if (sub === 'mode') return { kind: 'settings', sub: 'mode', mode: rest[0] };
+      if (sub === 'layout') return { kind: 'settings', sub: 'layout', layout: rest[0] };
     }
 
     if (cmd === 'pomo') {
-      if (sub === 'stop' || sub === 'status' || sub === 'break' || sub === 'extend'
+      if (sub === 'stop') {
+        const at = flag(rest, 'at');
+        return at !== undefined ? { kind: 'pomo', sub, at } : { kind: 'pomo', sub };
+      }
+      if (sub === 'status' || sub === 'break' || sub === 'extend'
         || sub === 'pause' || sub === 'resume' || sub === 'discard')
         return { kind: 'pomo', sub };
       if (sub === 'tag') return { kind: 'pomo', sub: 'tag', ref: rest[0] };
@@ -437,6 +465,10 @@ export class SysParser {
 
     if (cmd === 'cal') {
       if (sub === 'view') return { kind: 'cal', sub: 'view', view: rest[0], date: flag(rest, 'date') };
+      if (sub === 'zoom') {
+        const z = rest[0] !== undefined ? Number(rest[0]) : NaN;
+        return { kind: 'cal', sub: 'zoom', zoom: Number.isFinite(z) ? z : undefined };
+      }
       if (sub === 'show' || sub === undefined) {
         return {
           kind: 'cal',
@@ -453,6 +485,7 @@ export class SysParser {
         return { kind: 'clock', sub: 'day', arg: rest[0] };
       }
       if (sub === 'dial') return { kind: 'clock', sub: 'dial', arg: rest[0] };
+      if (sub === 'half') return { kind: 'clock', sub: 'half', arg: rest[0] };
       if (sub === 'show' || sub === undefined) {
         return { kind: 'clock', sub: 'show', json: hasFlag(rest, 'json') };
       }
@@ -555,6 +588,11 @@ export class SysParser {
         return { kind: 'media', sub: 'add', url: rest[0], at: atStr ? parseAt(atStr) : undefined };
       }
       if (sub === 'list' || sub === undefined) return { kind: 'media', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'resize') return { kind: 'media', sub: 'resize', id: rest[0], w: numFlag(rest, 'w'), h: numFlag(rest, 'h') };
+      if (sub === 'page') {
+        const n = rest[1] !== undefined ? Number(rest[1]) : NaN;
+        return { kind: 'media', sub: 'page', id: rest[0], page: Number.isInteger(n) ? n : undefined };
+      }
     }
 
     // Pen tool drawings
@@ -562,6 +600,9 @@ export class SysParser {
       if (sub === 'list' || sub === undefined) return { kind: 'draw', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'clear') return { kind: 'draw', sub: 'clear' };
       if (sub === 'delete') return { kind: 'draw', sub: 'delete', id: rest[0] };
+      if (sub === 'stroke') {
+        return { kind: 'draw', sub: 'stroke', points: flag(rest, 'points'), tool: flag(rest, 'tool'), color: flag(rest, 'color'), size: numFlag(rest, 'size') };
+      }
     }
 
     // Free-content canvases (Decision 33). Names may contain spaces.
@@ -592,6 +633,21 @@ export class SysParser {
       }
       if (sub === 'set') {
         return { kind: 'text', sub: 'set', id: rest[0], text: flag(rest, 'text') };
+      }
+      // Change an existing node's look: --note | --sticky [--color c] | --shape … [--color c]
+      if (sub === 'look') {
+        const color = flag(rest, 'color');
+        const withColor = color ? { color } : {};
+        return {
+          kind: 'text', sub: 'look', id: rest[0],
+          look: hasFlag(rest, 'note')
+            ? { kind: 'note', ...withColor }
+            : hasFlag(rest, 'sticky')
+              ? { kind: 'sticky', ...withColor }
+              : flag(rest, 'shape')
+                ? { kind: flag(rest, 'shape')!, ...withColor }
+                : color ? { kind: '', color } : undefined,
+        };
       }
       if (sub === 'resize') {
         return {
@@ -750,6 +806,12 @@ export class SysParser {
       if (sub === 'summary') {
         return { kind: 'analytics', sub: 'summary', range: positiveNum(flag(rest, 'range'), '--range'), json: hasFlag(rest, 'json') };
       }
+      // The settings panel's card list, from the CLI.
+      if (sub === 'cards') return { kind: 'analytics', sub: 'cards', json: hasFlag(rest, 'json') };
+      if (sub === 'hide' || sub === 'unhide') return { kind: 'analytics', sub, card: rest[0] };
+      if (sub === 'reset-cards') return { kind: 'analytics', sub: 'reset-cards' };
+      // Wipes every pomo span and the completion ledger: needs --yes.
+      if (sub === 'clear-history') return { kind: 'analytics', sub: 'clear-history', yes: hasFlag(rest, 'yes') };
     }
 
     // Decision 29 — log reads (renderer-required)
@@ -766,6 +828,18 @@ export class SysParser {
       if (sub === 'play') return { kind: 'sfx', sub: 'play', clipId: rest[0] };
       if (sub === 'stop') return { kind: 'sfx', sub: 'stop' };
       if (sub === 'list') return { kind: 'sfx', sub: 'list' };
+    }
+
+    // Ambient Radio — the mix in the open window.
+    if (cmd === 'radio') {
+      if (sub === 'list' || sub === 'status' || sub === 'stop') return { kind: 'radio', sub };
+      if (sub === undefined) return { kind: 'radio', sub: 'status' };
+      if (sub === 'play') return { kind: 'radio', sub: 'play', preset: rest[0] };
+      if (sub === 'remove') return { kind: 'radio', sub: 'remove', preset: rest[0] };
+      if (sub === 'volume') {
+        const v = rest[0] !== undefined ? Number(rest[0]) : NaN;
+        return { kind: 'radio', sub: 'volume', volume: Number.isFinite(v) ? v : undefined };
+      }
     }
 
     return null;

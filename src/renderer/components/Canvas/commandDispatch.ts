@@ -51,8 +51,10 @@ import {
   collectDescendants,
   stampCompletedAt,
   completionTagFor,
+  renameTask,
 } from '../../../shared/dispatch/task';
 import type { BoardShape } from '../../../shared/dispatch/types';
+import type { CompletionRecord } from '../../../shared/types/board';
 
 // ── Pomo ──────────────────────────────────────────────────────────────
 import {
@@ -66,6 +68,7 @@ import {
   pomoBreak,
   pomoExtend,
   pomoStop,
+  pomoStopAt,
   pomoSetConfig,
   pomoSetFace,
   pomoClearActiveTask,
@@ -194,6 +197,7 @@ import {
   analyticsSetSettingsOpen,
   analyticsResetCardLayout,
 } from '../nodes/AnalyticsNode/commands';
+import { isValidYMD } from '../../../shared/ymd';
 
 // ── dispatch ──────────────────────────────────────────────────────────
 
@@ -247,12 +251,24 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         observeMode ? pomoDropBlips(s as unknown as PomoState, next) : next;
       switch (command) {
         case 'pomo.start': {
-          // Observe mode has no session length; leaving it restores the configured one.
-          const cur = s as unknown as PomoState;
-          const durationMin = observeMode
-            ? OBSERVE_SPAN_MIN
-            : cur.durationMin === OBSERVE_SPAN_MIN ? pomoCfg.sessionMin : undefined;
-          return { state: pomoStart(s as never, { ...(args as object), ...(durationMin !== undefined && args['durationMin'] === undefined ? { durationMin } : {}) }) };
+          // A fresh start runs at the pomo's own session length (time-model
+          // F3/F12), so a Session change in the gear takes effect on the next
+          // START. Observe mode has no session length.
+          const durationMin = startDurationMin(pomoCfg, observeMode);
+          // Easy mode never links a span (easy-mode D3/D13): a task or name
+          // left over from Advanced must not tag the spans recorded here.
+          const easyStart = isEasyBoard(useBoardStore.getState().board);
+          const started = pomoStart(s as never, {
+            ...(easyStart ? { activeTaskId: null, label: '' } : {}),
+            ...(args as object),
+            ...(args['durationMin'] === undefined ? { durationMin } : {}),
+          });
+          if (easyStart && started.tag !== undefined) {
+            const { tag: _tag, ...untagged } = started;
+            void _tag;
+            return { state: untagged as Node['state'] };
+          }
+          return { state: started };
         }
         case 'pomo.pause':    return { state: pomoPause(s as never) };
         case 'pomo.resume':   return { state: observeBlips(pomoResume(s as never)) };
@@ -276,8 +292,25 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         // Issue #166 — observer-model verbs.
         case 'pomo.break':    return { state: observeBlips(pomoBreak(s as never)) };
         case 'pomo.extend':   return { state: pomoExtend(s as never) };
-        case 'pomo.stop':     return { state: observeBlips(pomoStop(s as never)) };
-        case 'pomo.setConfig': return { config: pomoSetConfig(pomoCfg, args as never) };
+        case 'pomo.stop': {
+          // `atMs`: stop as of an earlier moment (the away prompt).
+          const atMs = args['atMs'];
+          const stopped = typeof atMs === 'number' && Number.isFinite(atMs)
+            ? pomoStopAt(s as never, { atMs })
+            : pomoStop(s as never);
+          return { state: observeBlips(stopped) };
+        }
+        case 'pomo.setConfig': {
+          const config = pomoSetConfig(pomoCfg, args as never);
+          // An idle timer shows its next session length; keep it in step.
+          const cur = s as unknown as PomoState;
+          const nextObserve = config.mode === 'observe' || isEasyBoard(useBoardStore.getState().board);
+          const idleMin = startDurationMin(config, nextObserve);
+          if ((cur.status === 'idle' || cur.status === 'done') && cur.durationMin !== idleMin) {
+            return { config, state: { ...cur, durationMin: idleMin } as unknown as Node['state'] };
+          }
+          return { config };
+        }
         case 'pomo.setFace':   return { config: pomoSetFace(pomoCfg, args as { face: TimerFace }) };
         case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never, pomoCfg) };
         case 'pomo.deleteSegment': return { state: pomoDeleteSegment(s as never, args as never) };
@@ -455,22 +488,22 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
       }
       break;
     }
-    case 'terminal': {
-      // T20: term.sessionStart / term.sessionEnd — update TermState.sessionId.
-      // T21: term.setTitle — update TermState.title.
-      // T22: term.setFontSize — update TermConfig.fontSize.
-      // T23: term.clear — side-effect written to PTY by the node's makeCommandHandler.
+    case 'term': {
+      // T20: term.sessionStart / term.sessionEnd are runtime-only: a PTY id
+      // means nothing after a restart, and persisting it would cost an undo
+      // step on every terminal start. termSessionStart/End stay as the pure
+      // contract for tests.
+      // T21: term.setTitle — update TermState.title (shown in the header).
+      // T22: term.setFontSize — update TermConfig.fontSize (applied live).
+      // T23: term.clear — handled in the renderer (TERM_CLEAR_EVENT); nothing persists.
       // T24: term.setShell — update TermConfig.shell.
       const termState = s as unknown as TermState;
       const termCfg = c as unknown as TermConfig;
       switch (command) {
-        case 'term.sessionStart': {
-          const res = termSessionStart(termState, args as { sessionId: string });
-          return { state: res.state as Node['state'] };
-        }
+        case 'term.sessionStart':
         case 'term.sessionEnd': {
-          const res = termSessionEnd(termState, args as { sessionId: string });
-          return { state: res.state as Node['state'] };
+          void termSessionStart; void termSessionEnd;
+          return null;
         }
         case 'term.setTitle': {
           const res = termSetTitle(termState, args as { title: string });
@@ -481,7 +514,6 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { config: res.config as Node['config'] };
         }
         case 'term.clear': {
-          // T23: ptyWrite side-effect — handled via cli:dispatch in Phase 2.
           void termClear;
           return null;
         }
@@ -658,7 +690,9 @@ function tagPomo(taskNodeId: string | null, opts: { start: boolean }): void {
   });
   if (opts.start && (next.status === 'idle' || next.status === 'done')) {
     const cfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
-    next = pomoStart(next, { durationMin: cfg.sessionMin });
+    // Observe / Easy mode has no session length: a 25-min threshold would
+    // flag an ordinary span as a completed pomodoro.
+    next = pomoStart(next, { durationMin: startDurationMin(cfg, cfg.mode === 'observe' || isEasyBoard(board)) });
     emit('pomo.start', `pomo started${taskNodeId ? ` on ${shortId(taskNodeId)}` : ''}`, taskNodeId ? { refId: taskNodeId } : {});
   }
   updateNode(pomoNode.id, { state: next });
@@ -689,6 +723,44 @@ function plannedTaskAt(board: Board, nowMs: number): string | null {
 /** Short id for log lines — keeps text under the 120-char cap. */
 function shortId(id: string): string {
   return id.startsWith('mother-') ? id : id.slice(0, 10);
+}
+
+/** Apply the shared renameTask to the store: one updateNode per changed node
+ *  (same tick → one undo step) and the ledger entry through recordCompletion. */
+function applyTaskRename(taskId: string, text: string): void {
+  const { board, updateNode, recordCompletion } = useBoardStore.getState();
+  if (!board) return;
+  const draft = { ...board, nodes: [...board.nodes] } as unknown as BoardShape;
+  if (!renameTask(draft, taskId, text)) return;
+  draft.nodes.forEach((n, i) => {
+    if (n !== (board.nodes[i] as unknown)) updateNode(n.id, { state: n.state as Node['state'] });
+  });
+  const entry = (draft['completions'] as CompletionRecord[] | undefined)?.find((c) => c.taskId === taskId);
+  if (entry && entry !== board.completions?.find((c) => c.taskId === taskId)) recordCompletion(entry);
+}
+
+/** Session length a fresh pomo START runs at. */
+function startDurationMin(cfg: PomoConfig, observe: boolean): number {
+  return observe ? OBSERVE_SPAN_MIN : cfg.sessionMin;
+}
+
+/**
+ * A task was ticked done (on its card, its Todo row or a Calendar/Clock popup)
+ * while the pomo is on it: stop the pomo and untag it. pomoStop records the
+ * span with its real length (a break is recorded as a break), so analytics
+ * get the minutes actually worked, never the session cap. No task fields are
+ * written: tracked time is derived from the pomo history (time-model F2).
+ */
+function stopPomoOnFinishedTask(taskId: string): void {
+  const { board, updateNode } = useBoardStore.getState();
+  const pomoNode = board?.nodes.find((n) => n.kind === 'pomo');
+  if (!pomoNode) return;
+  const ps = pomoNode.state as PomoState;
+  if (ps.activeTaskId !== taskId || ps.status === 'idle') return;
+  const pomoCfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
+  // Pass config so durationMin/breakMin snap back to user defaults
+  // (matches task-delete and task.loadIntoPomo toggle-off paths).
+  updateNode(pomoNode.id, { state: pomoClearActiveTask(pomoStop(ps), pomoCfg) });
 }
 
 export function makeCommandHandler(nodeId: string) {
@@ -1160,7 +1232,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         updateNode(nodeId, { state: sel.state });
       }
       const date = (args as { date?: unknown }).date;
-      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (isValidYMD(date)) {
         const fresh = useBoardStore.getState().board;
         if (fresh) {
           for (const cn of fresh.nodes) {
@@ -1465,6 +1537,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
               updateNode(prevItem.taskNodeId, { state: mirrored });
               // #169 — keep the completion ledger in sync with the mirrored node.
               syncCompletionLedger(prevItem.taskNodeId);
+              // Same as ticking the card: a finished task stops the pomo on it.
+              if (nextItem.done) stopPomoOnFinishedTask(prevItem.taskNodeId);
             }
           }
         }
@@ -1540,10 +1614,21 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const nextState = result.state as TodoState;
       updateNode(nodeId, { state: nextState });
       for (const item of nextState.items) {
-        if (!item.done || !item.taskNodeId) continue;
+        if (!item.taskNodeId) continue;
         const prev = prevItems.find((i) => i.id === item.id);
-        if (prev?.tag !== item.tag) syncCompletionLedger(item.taskNodeId);
+        // A renamed row renames its task card, calendar block and pomo label.
+        if (command === 'todo.edit' && prev && prev.text !== item.text) applyTaskRename(item.taskNodeId, item.text);
+        if (item.done && prev?.tag !== item.tag) syncCompletionLedger(item.taskNodeId);
       }
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+      return;
+    }
+
+    // ── task.edit: the card's rename reaches its Todo row, the pomo label and
+    //    the completion ledger too (shared with `krnl task edit`).
+    if (node.kind === 'todo.task' && command === 'task.edit') {
+      applyTaskRename(nodeId, String(args['text'] ?? ''));
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       return;
@@ -1580,54 +1665,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         }
       }
 
-      // Bug #3: if task is now done AND it's the active pomo task, cancel the session.
-      // We bypass the pomo.cancel dispatcher branch (which writes secondsAccumulated),
-      // so do the same commit inline so the in-flight elapsed time is not lost.
-      if (nextTask.done === true) {
-        const freshBoard = useBoardStore.getState().board;
-        const pomoNode = freshBoard?.nodes.find((n) => n.kind === 'pomo');
-        if (pomoNode) {
-          const ps = pomoNode.state as PomoState;
-          if (ps.activeTaskId === nodeId && ps.status !== 'idle') {
-            const pomoCfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
-            // pomoCancel covers running/paused; pomoSkipBreak covers break.
-            // Without skipBreak, marking a task done mid-break would orphan
-            // the break timer (status stays 'break' with no active task).
-            let cancelledState = ps;
-            if (ps.status === 'running' || ps.status === 'paused') {
-              cancelledState = pomoCancel(cancelledState);
-            } else if (ps.status === 'break') {
-              cancelledState = pomoSkipBreak(cancelledState);
-            }
-            // Pass config so durationMin/breakMin snap back to user defaults
-            // (matches task-delete and task.loadIntoPomo toggle-off paths).
-            cancelledState = pomoClearActiveTask(cancelledState, pomoCfg);
-            updateNode(pomoNode.id, { state: cancelledState });
-
-            // Commit the just-cancelled session's elapsed time into the task.
-            const newest = cancelledState.history[cancelledState.history.length - 1];
-            if (newest) {
-              const elapsedSec = Math.max(
-                0,
-                Math.floor((Date.parse(newest.endedAt) - Date.parse(newest.startedAt)) / 1000),
-              );
-              const freshTask = useBoardStore
-                .getState()
-                .board?.nodes.find((n) => n.id === nodeId);
-              if (freshTask && freshTask.kind === 'todo.task') {
-                const ts = freshTask.state as TaskState;
-                updateNode(nodeId, {
-                  state: {
-                    ...ts,
-                    secondsAccumulated: (ts.secondsAccumulated ?? 0) + elapsedSec,
-                    currentSessionElapsedSec: 0,
-                  },
-                });
-              }
-            }
-          }
-        }
-      }
+      // Bug #3: a task ticked done while the pomo is on it stops the pomo.
+      if (nextTask.done === true) stopPomoOnFinishedTask(nodeId);
 
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);

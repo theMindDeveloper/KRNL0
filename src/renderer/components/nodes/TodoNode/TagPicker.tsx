@@ -13,6 +13,7 @@ import type { TodoItem, TodoState } from './types';
 import { tagExamples, todoTagLibrary } from './commands';
 import { scoreTags } from '../../../../shared/tags/classify';
 import type { TagDef } from '../../../../shared/tags/classify';
+import { Z } from '../../ui/layers';
 
 export interface TagPickerProps {
   x: number;
@@ -118,7 +119,7 @@ export function TagPicker({ x, y, item, state, onPick, onDismiss }: TagPickerPro
         position: 'fixed',
         left,
         top,
-        zIndex: 9999,
+        zIndex: Z.contextMenu,
         width: W,
         maxHeight: H,
         display: 'flex',

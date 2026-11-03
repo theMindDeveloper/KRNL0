@@ -30,6 +30,7 @@
 | F20 | When an Observe work span ends untagged, a "Log this span" panel asks for a name + category (ADR 0016 library, with icons, guessed from the name, "+ new" adds one), or a task to link instead. Clock, Calendar and Time-by-tag colour and count named spans by category. CLI: `krnl pomo retag <seg> --text "…" [--tag <tag>]`. |
 | F21 | The ☰ button in the Pomo header opens a span log: every recorded work/break span of a day (‹ › to page days) with a delete button, so tiny spans are easy to remove. |
 | F22 | Analytics: Focus counts every recorded work span (not only spans that reached the session length); breaks are totalled; "sessions" counts full pomodoros only. Timer faces scale to the configured session length instead of a fixed 25. |
+| F23 | Away guard: when a running span or break was not seen live for 15 min or more (the machine slept, or the app was closed with the timer running), the Pomo asks "AWAY 18:02–09:14 · 15h 12m — count that time?" with COUNT IT or STOP AT 18:02 (records the span up to that moment and stops). The last-seen time is a per-window heartbeat, not board data. CLI: `krnl pomo stop --at HH:MM`. |
 
 ---
 

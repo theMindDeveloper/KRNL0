@@ -5,6 +5,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Z } from './layers';
 
 interface Props {
   anchor: HTMLElement | null;
@@ -35,7 +36,14 @@ export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
       if (ref.current?.contains(t) || anchor?.contains(t)) return;
       onClose();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // A field marked data-own-escape handles Escape itself (e.g. cancel an
+      // inline rename) instead of closing the whole popover.
+      if ((e.target as HTMLElement | null)?.closest?.('[data-own-escape]')) return;
+      e.stopPropagation();
+      onClose();
+    };
     window.addEventListener('pointerdown', onDown, true);
     window.addEventListener('keydown', onKey, true);
     return () => {
@@ -52,7 +60,7 @@ export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
       className="nodrag nowheel"
       onPointerDown={stop} onMouseDown={stop} onClick={stop} onWheel={stop} onContextMenu={stop}
       style={{
-        position: 'fixed', zIndex: 4000,
+        position: 'fixed', zIndex: Z.popover,
         left: pos?.left ?? -9999, top: pos?.top ?? -9999, minWidth: pos?.width,
         background: 'var(--paper)', color: 'var(--ink)',
         border: '1px solid var(--paper-3)', borderRadius: 10,

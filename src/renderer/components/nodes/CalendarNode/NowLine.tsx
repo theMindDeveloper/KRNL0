@@ -7,7 +7,9 @@ import { useEffect, useState } from 'react';
 import { toYMD } from '../HabitNode/types';
 
 export interface NowLineProps {
-  weekStartDate: string;        // YYYY-MM-DD (Mon of the rendered week)
+  weekStartDate: string;        // YYYY-MM-DD (first rendered day: Mon of the week, or the day in day view)
+  /** Number of day columns rendered (7 for a week, 1 for the day view). */
+  days?: number;
   hourRange: { start: number; end: number };
   rowHeight: number;
   columnWidth: number;
@@ -28,6 +30,7 @@ function addDays(ymd: string, n: number): string {
 
 export function NowLine({
   weekStartDate,
+  days = 7,
   hourRange,
   rowHeight,
   columnWidth,
@@ -40,13 +43,13 @@ export function NowLine({
     return () => clearInterval(id);
   }, []);
 
-  // Only render if today is within [weekStartDate, weekStartDate+7).
+  // Only render if today is within [weekStartDate, weekStartDate+days).
   const todayYMD = toYMD(now);
-  const weekEndDate = addDays(weekStartDate, 7);
+  const weekEndDate = addDays(weekStartDate, days);
   if (todayYMD < weekStartDate || todayYMD >= weekEndDate) return null;
 
-  // Compute today's column index (0=Mon, 6=Sun) from weekStartDate + todayYMD.
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStartDate, i));
+  // Today's column index among the rendered days.
+  const weekDays = Array.from({ length: days }, (_, i) => addDays(weekStartDate, i));
   const todayColumnIndex = weekDays.indexOf(todayYMD);
 
   // Only render if current hour is within hourRange.
@@ -65,7 +68,7 @@ export function NowLine({
   // while real columns were ~80px each).
   // Dot position uses a percentage across the 7-column area so it lands at
   // today's column center for any column width.
-  const dotLeftPct = ((todayColumnIndex + 0.5) * 100) / 7;
+  const dotLeftPct = ((todayColumnIndex + 0.5) * 100) / days;
   // Silence unused-param ESLint warning — columnWidth is no longer needed
   // but kept on the props interface for back-compat with callers.
   void columnWidth;

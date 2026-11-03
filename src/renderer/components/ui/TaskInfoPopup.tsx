@@ -3,12 +3,13 @@
 // planned time, time actually tracked on it, and quick actions. Mirrors the
 // tracked-span popup so tasks, habits and observed time behave the same on click.
 
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
 import { selectPomoReality } from '../../store/pomoReality';
 import { boardTagLibrary } from '../../store/spanTags';
-import { focusNode, startFocusOnTask, toggleHabitToday, toggleTaskDone, unscheduleTask } from '../../store/scheduleActions';
+import { focusNode, scheduleAnchorOf, startFocusOnTask, toggleHabitToday, toggleTaskDone, unscheduleTask } from '../../store/scheduleActions';
 import { tagDisplay } from '../../../shared/tags/classify';
 import { toneVarForTask } from '../../utils/taskColor';
 import type { TaskState } from '../nodes/TaskNode/types';
@@ -17,6 +18,7 @@ import { calcStreak } from '../nodes/HabitNode/commands';
 import { todayLocal, type HabitState } from '../nodes/HabitNode/types';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { useEasyMode } from '../../store/uiMode';
+import { Z } from './layers';
 
 export interface TaskInfoPopupProps {
   /** A task node id, or `habit-<habitId>` for a habit on the dial. */
@@ -45,16 +47,25 @@ export function TaskInfoPopup(props: TaskInfoPopupProps) {
 }
 
 function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () => void; children: React.ReactNode }) {
+  // Esc closes, like the Calendar's task popup.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return createPortal(
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
       <div
         data-testid="task-info-popup"
         style={{
           position: 'fixed',
           left: Math.min(x + 4, window.innerWidth - 270),
-          top: Math.min(y + 6, window.innerHeight - 170),
-          zIndex: 1999,
+          top: Math.max(8, Math.min(y + 6, window.innerHeight - 170)),
+          // A tall popup near the bottom scrolls instead of leaving the screen.
+          maxHeight: 'calc(100vh - 16px)',
+          overflowY: 'auto',
+          zIndex: Z.popup,
           width: 250,
           background: 'var(--paper)',
           border: '1px solid var(--paper-3)',
@@ -103,6 +114,8 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
   );
   if (!info) return null;
 
+  // The task whose time places this one (itself, or its chain's anchor).
+  const planAnchor = scheduleAnchorOf(taskId);
   const tone = toneVarForTask(taskId);
   const start = startMs ?? (info.scheduledFor ? new Date(info.scheduledFor).getTime() : undefined);
   const end = endMs ?? (start !== undefined && info.plannedMin ? start + info.plannedMin * 60_000 : undefined);
@@ -134,7 +147,8 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         {!info.done && !easy && <button type="button" data-testid="task-info-focus" style={btn} onClick={act(() => { void startFocusOnTask(taskId); })}>Focus</button>}
         <button type="button" data-testid="task-info-done" style={btn} onClick={act(() => { void toggleTaskDone(taskId); })}>{info.done ? 'Reopen' : 'Done'}</button>
         <button type="button" data-testid="task-info-show" style={btn} onClick={act(() => focusNode(taskId))}>Show</button>
-        {info.scheduledFor && <button type="button" data-testid="task-info-unschedule" style={{ ...btn, color: '#ff8e64', borderColor: '#ff8e64' }} onClick={act(() => unscheduleTask(taskId))}>Unplan</button>}
+        {/* A chain successor has no scheduledFor of its own but is planned too. */}
+        {planAnchor && <button type="button" data-testid="task-info-unschedule" title={planAnchor === taskId ? 'Remove from the calendar (keeps the task)' : 'Remove the whole chain from the calendar (keeps the tasks)'} style={{ ...btn, color: 'var(--rust)', borderColor: 'var(--rust)' }} onClick={act(() => { void unscheduleTask(taskId); })}>{planAnchor === taskId ? 'Unplan' : 'Unplan chain'}</button>}
       </div>
     </Shell>
   );

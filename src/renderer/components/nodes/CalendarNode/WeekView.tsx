@@ -4,7 +4,7 @@
 // rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
 // HabitSwapModal. NowLine is rendered as an overlay.
 
-import { CALENDAR_REVEAL_EVENT } from '../../../store/scheduleActions';
+import { CALENDAR_REVEAL_EVENT, unscheduleTask } from '../../../store/scheduleActions';
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -41,6 +41,9 @@ import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus
 import { PagedView } from '../../ui/PagedView';
 import { TaskPopup } from './TaskPopup';
 import { hourWindow, stepHourWindow } from './hourWindow';
+import { Z } from '../../ui/layers';
+import { screenScale } from './screenScale';
+import { useLocalDay } from '../../../hooks/useLocalDay';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -237,7 +240,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     return Array.from({ length: dayCount }, (_, i) => addDays(baseYMD, i));
   }, [baseYMD, dayCount]);
 
-  const today = todayYMD();
+  // useLocalDay re-renders at midnight, so today's column and every
+  // todayYMD() below move with the clock.
+  const today = useLocalDay();
 
   // Column index of today within the visible range, -1 if not shown.
   const todayColIndex = weekDays.indexOf(today);
@@ -292,10 +297,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     e.preventDefault();
     e.stopPropagation();
     const originY = e.clientY;
+    const scale = screenScale(e.currentTarget);
     const dayYMD = task.startISO.slice(0, 10);
     let last = { taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 };
     const onMove = (ev: MouseEvent) => {
-      const deltaMin = Math.round((((ev.clientY - originY) / rowHeight) * 60) / gran) * gran;
+      const deltaMin = Math.round((((ev.clientY - originY) / scale / rowHeight) * 60) / gran) * gran;
       if (edge === 'bottom') {
         last = { taskId: task.id, durationMin: Math.max(gran, origDurationMin + deltaMin), startMinDelta: 0 };
       } else {
@@ -498,9 +504,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // #7 — apply the typed exact time + duration to the task (bypasses the grid
   // snap entirely → solves the "only 15-min grid" complaint). #4 — unschedule
   // pulls the task off the calendar. Both dispatch to the TASK node.
-  const applyExactTime = (task: ScheduledTask) => {
+  const applyExactTime = (task: ScheduledTask, time: string = exactTime) => {
     const day = task.startISO.slice(0, 10);
-    const m = /^(\d{1,2}):(\d{2})$/.exec(exactTime.trim());
+    const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
     const h = m ? Math.min(23, Math.max(0, parseInt(m[1]!, 10))) : new Date(task.startISO).getHours();
     const min = m ? Math.min(59, Math.max(0, parseInt(m[2]!, 10))) : 0;
     const durN = Math.max(1, Math.round(Number(exactDur) || task.scheduledDurationMin));
@@ -508,9 +514,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     applyTaskState(task.id, (s) =>
       taskSetSchedule(taskSetPlannedMin(s, { minutes: durN }), { scheduledFor, scheduledDurationMin: durN }),
     );
-  };
-  const unscheduleTask = (taskId: string) => {
-    applyTaskState(taskId, (s) => taskSetSchedule(s, { scheduledFor: null }));
   };
 
   // #6 — info popup for a clicked tracked-reality (pomo) segment.
@@ -877,7 +880,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     e.preventDefault();
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const relY = Math.max(0, e.clientY - rect.top);
+    const relY = Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget);
     const minute = (relY / rowHeight) * 60;
 
     const items: LayerItem[] = [];
@@ -1045,7 +1048,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         // Band = the slot under the cursor, where the drop lands.
         const rect = e.currentTarget.getBoundingClientRect();
         const relY = Math.max(0, (Number.isFinite(e.clientY) ? e.clientY : 0) - (Number.isFinite(rect.top) ? rect.top : 0));
-        const abs = sliceStartMin + (relY / rowHeight) * 60;
+        const abs = sliceStartMin + (relY / screenScale(e.currentTarget) / rowHeight) * 60;
         const minute = Math.max(0, Math.min(1440 - gran, Math.floor(abs / gran) * gran));
         setSnapPreview((p) => (p && p.dayYMD === dayYMD && p.minute === minute ? p : { dayYMD, minute }));
       };
@@ -1074,7 +1077,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         const clientY = Number.isFinite(e.clientY) ? e.clientY : 0;
         const rectTop = Number.isFinite(rect.top) ? rect.top : 0;
         const relY = Math.max(0, clientY - rectTop);
-        const minutesIntoBlock = (relY / rowHeight) * 60;
+        const minutesIntoBlock = (relY / screenScale(e.currentTarget) / rowHeight) * 60;
         const absMinute = sliceStartMin + (Number.isFinite(minutesIntoBlock) ? minutesIntoBlock : 0);
         // Lands on the slot under the cursor. Another task dropped here also
         // leaves the chain that would push it behind this one (parallelWith),
@@ -2156,7 +2159,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           {/* NowLine overlay */}
           {todayColIndex >= 0 && (
             <NowLine
-              weekStartDate={mondayYMD}
+              weekStartDate={baseYMD}
+              days={dayCount}
               hourRange={hourRange}
               rowHeight={rowHeight}
               columnWidth={NOMINAL_COLUMN_WIDTH}
@@ -2223,10 +2227,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           duration={exactDur}
           onTime={setExactTime}
           onDuration={setExactDur}
-          onApply={() => { applyExactTime(taskPopup.task); setTaskPopup(null); }}
+          onApply={(t) => { applyExactTime(taskPopup.task, t); setTaskPopup(null); }}
           onActivate={() => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); setTaskPopup(null); }}
           onJump={() => { jumpToTaskNode(taskPopup.task.id); setTaskPopup(null); }}
-          onUnschedule={() => { unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
+          onUnschedule={() => { void unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
           onClose={() => setTaskPopup(null)}
         />
       )}
@@ -2239,7 +2243,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           cursor; the user picks which to inspect. */}
       {layerMenu && createPortal(
         <>
-          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 2098, pointerEvents: layerDragging ? 'none' : undefined }} />
+          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.layerMenuBackdrop, pointerEvents: layerDragging ? 'none' : undefined }} />
           <div
             data-testid="calendar-layer-menu"
             style={{
@@ -2248,7 +2252,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               position: 'fixed',
               left: Math.min(layerMenu.x + 4, window.innerWidth - 230),
               top: layerMenu.y + 4,
-              zIndex: 2099,
+              zIndex: Z.layerMenu,
               background: 'var(--paper)',
               border: '1px solid var(--paper-3)',
               borderRadius: 8,
@@ -2320,7 +2324,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           data-testid="calendar-push-notice"
           onClick={() => setPushNotice(null)}
           style={{
-            position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)', zIndex: 2100,
+            position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)', zIndex: Z.notice,
             background: 'var(--paper)', border: '1px solid var(--acid)', borderRadius: 6,
             padding: '8px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)',
             boxShadow: 'var(--shadow-1)', cursor: 'pointer', maxWidth: 520,
@@ -2334,14 +2338,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       {/* #6 — tracked-reality (pomo) segment info popup. */}
       {realityPopup && createPortal(
         <>
-          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
           <div
             data-testid="calendar-reality-popup"
             style={{
               position: 'fixed',
               left: Math.min(realityPopup.x + 4, window.innerWidth - 250),
               top: realityPopup.y + 6,
-              zIndex: 1999,
+              zIndex: Z.popup,
               background: 'var(--paper)',
               border: '1px solid var(--paper-3)',
               borderRadius: 8,
@@ -2421,9 +2425,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   fontFamily: 'var(--font-mono)',
                   fontSize: 9,
                   fontWeight: 600,
-                  color: '#ff8e64',
+                  color: 'var(--rust)',
                   background: 'transparent',
-                  border: '1px solid #ff8e64',
+                  border: '1px solid var(--rust)',
                   borderRadius: 4,
                   padding: '5px 8px',
                   cursor: 'pointer',

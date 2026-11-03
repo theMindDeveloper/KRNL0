@@ -235,8 +235,9 @@
   align-self: flex-end;
 }
 
-/* ── Calendar WeekView drop-target highlight ─────────────────────────────── */
-.krnl-calendar-cell[data-drop-target="true"] {
+/* ── Calendar week / month drop-target highlight ─────────────────────────── */
+.krnl-calendar-cell[data-drop-target="true"],
+.krnl-month-cell[data-drop-target="true"] {
   background: rgba(166, 255, 0, 0.10);
   box-shadow: inset 0 0 0 1px var(--acid);
   transform: scale(0.98);

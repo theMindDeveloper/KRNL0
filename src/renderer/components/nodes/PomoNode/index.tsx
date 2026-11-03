@@ -23,8 +23,22 @@ import { DoingPicker, type DoingChoice } from './DoingPicker';
 import { SpanLog } from './SpanLog';
 import { useEasyMode } from '../../../store/uiMode';
 import { ObserveDash } from './ObserveDash';
+import { useAwayGap } from './useAwayGap';
+import { Switch } from '../../ui/Switch';
+import { calcRemainingPct, primaryButtonLabel, primaryTooltip, pipState } from './display';
 
 const TICK_MS = 500;
+
+/** "18:02" — local wall-clock time of an epoch ms. */
+const clockHM = (ms: number): string => {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+/** "15h 12m" / "42m". */
+const spanText = (ms: number): string => {
+  const min = Math.round(ms / 60_000);
+  return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`;
+};
 
 function formatRemaining(ms: number): string {
   const safe = Math.max(0, ms);
@@ -32,50 +46,6 @@ function formatRemaining(ms: number): string {
   const mm = Math.floor(totalSec / 60);
   const ss = totalSec % 60;
   return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
-}
-
-/** Derive the pct of remaining time (0–100), used for liquid fill height (F1). */
-export function calcRemainingPct(
-  status: PomoState['status'],
-  remainingMs: number,
-  totalMs: number,
-): number {
-  if (status === 'running' || status === 'break' || status === 'paused') {
-    return Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
-  }
-  return status === 'idle' ? 100 : 0;
-}
-
-/** Label for the primary action button (F5). */
-export function primaryButtonLabel(status: PomoState['status']): string {
-  switch (status) {
-    case 'running': return 'PAUSE';
-    case 'paused':  return 'RESUME';
-    case 'break':   return 'END BREAK';
-    case 'done':    return 'START';
-    default:        return 'START'; // 'idle'
-  }
-}
-
-/** #6 — tooltip for the primary button, per status. */
-export function primaryTooltip(status: PomoState['status']): string {
-  switch (status) {
-    case 'running': return 'Pause — step away; away-time is excluded from the record';
-    case 'paused':  return 'Resume the session';
-    case 'break':   return 'End break — records the break up to now, ready for the next session';
-    default:        return 'Start a session';
-  }
-}
-
-/** Pip state for session pip at index i (F6 + Decision 22 derived plannedSessions). */
-export function pipState(
-  i: number,
-  completedDots: number,
-  status: PomoState['status'],
-): 'done' | 'active' | 'empty' {
-  if (i < completedDots) return 'done';
-  if (i === completedDots && status === 'running') return 'active';
-  return 'empty';
 }
 
 export function PomoNode({
@@ -136,7 +106,9 @@ export function PomoNode({
   // Easy mode is always Observe and never asks, names or links anything.
   const easy = useEasyMode();
   const observe = easy || config.mode === 'observe';
-  const promptDone = !observe && state.status === 'running' && liveWorkMs >= thresholdMs;
+  // Time the app couldn't see (sleep / closed app) is asked about, not booked.
+  const { gap: away, dismiss: dismissAway } = useAwayGap(state.status, state.startedAt);
+  const promptDone = !away && !observe && state.status === 'running' && liveWorkMs >= thresholdMs;
 
   // Issue #166 slice 5 — OS notification when threshold is first reached.
   // Fires once per transition false→true; uses Web Notification API (works
@@ -167,7 +139,9 @@ export function PomoNode({
   // totalMs kept for the face fill pct (work threshold; break shows full).
   const totalMs = thresholdMs;
 
-  const isTaskMode = state.activeTaskId !== null;
+  // Easy mode has no task links (easy-mode D3): a link left over from
+  // Advanced is not shown, and the next START drops it.
+  const isTaskMode = !easy && state.activeTaskId !== null;
 
   // Plan vs reality — pips count the pomo's own completed sessions within the
   // long-break cycle. The tagged task's estimate no longer sets a session
@@ -463,7 +437,7 @@ export function PomoNode({
           title={logOpen ? 'Back to the timer' : 'Recorded spans — see and delete them'}
           onClick={(e) => { e.stopPropagation(); setGearOpen(false); setLogOpen((o) => !o); }}
           onMouseDown={(e) => e.stopPropagation()}
-          style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid)', borderColor: 'var(--acid)' } : {}) }}
+          style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid-ink, var(--acid))', borderColor: 'var(--acid-ink, var(--acid))' } : {}) }}
         >
           {logOpen ? '✕' : '☰'}
         </button>
@@ -507,8 +481,9 @@ export function PomoNode({
             );
           })}
         </div>}
-        {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight */}
-        <button
+        {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight.
+            Observe (and Easy) has no session settings, so no gear there. */}
+        {!observe && <button
           type="button"
           className="pomo-gear-btn"
           data-testid="pomo-gear"
@@ -524,11 +499,11 @@ export function PomoNode({
           style={{ fontSize: 11 }}
         >
           {gearOpen ? '✕' : '⚙'}
-        </button>
+        </button>}
       </div>
 
       {/* Body — either settings panel OR vapor tube */}
-      {gearOpen ? (
+      {gearOpen && !observe ? (
         <div
           data-testid="pomo-settings-panel"
           style={{
@@ -572,22 +547,11 @@ export function PomoNode({
           {/* Does Stop record the session so far? (one Stop button either way) */}
           {!observe && <div className="pomo-settings-row">
             <span className="pomo-settings-label" title="On: Stop records the work so far. Off: Stop discards the session.">Count stopped sessions</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={config.countStopped !== false}
-              data-testid="pomo-settings-countStopped"
-              onClick={(e) => { e.stopPropagation(); onCommand('pomo.setConfig', { config: { countStopped: config.countStopped === false } }); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                width: 34, height: 20, borderRadius: 999, border: 'none', cursor: 'pointer', padding: 2,
-                background: config.countStopped !== false ? 'var(--acid)' : 'var(--paper-3)',
-                display: 'flex', justifyContent: config.countStopped !== false ? 'flex-end' : 'flex-start',
-                transition: 'background 120ms',
-              }}
-            >
-              <span style={{ width: 16, height: 16, borderRadius: 999, background: config.countStopped !== false ? '#0a0908' : 'var(--ink-3)' }} />
-            </button>
+            <Switch
+              checked={config.countStopped !== false}
+              testId="pomo-settings-countStopped"
+              onChange={(on) => onCommand('pomo.setConfig', { config: { countStopped: on } })}
+            />
           </div>}
 
           {!observe && (<>
@@ -771,7 +735,7 @@ export function PomoNode({
                     border: '1.5px solid',
                     borderColor: ps !== 'empty' ? 'var(--rust)' : 'var(--ink-4)',
                     background: ps === 'done' ? 'var(--rust)' : 'transparent',
-                    boxShadow: ps === 'active' ? '0 0 0 3px rgba(200, 85, 61, 0.16)' : 'none',
+                    boxShadow: ps === 'active' ? '0 0 0 3px color-mix(in srgb, var(--rust) 16%, transparent)' : 'none',
                     flexShrink: 0,
                   }}
                 />
@@ -899,7 +863,38 @@ export function PomoNode({
 
           {/* Observe mode: Start → (Break ⇄ Back to work) → Stop. Work and
               breaks are both recorded spans; there is no pause. */}
-          {observe && state.status !== 'paused' ? (
+          {away ? (
+            <div
+              data-testid="pomo-away"
+              className="pomo-controls"
+              style={{
+                display: 'flex', flexDirection: 'column', gap: 6, padding: '8px',
+                border: '1px solid var(--rust)', borderRadius: 6,
+                background: 'color-mix(in srgb, var(--rust) 8%, transparent)',
+              }}
+            >
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--ink)', textAlign: 'center', letterSpacing: '0.04em' }}>
+                AWAY {clockHM(away.fromMs)}–{clockHM(away.toMs)} · {spanText(away.toMs - away.fromMs)}
+              </span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'center' }}>
+                The {state.status === 'break' ? 'break' : 'timer'} kept running. Count that time?
+              </span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" data-testid="pomo-away-keep" onClick={dismissAway} style={ghostBtnStyle} title="Keep the whole span as recorded">
+                  COUNT IT
+                </button>
+                <button
+                  type="button"
+                  data-testid="pomo-away-stop"
+                  onClick={() => { onCommand('pomo.stop', { atMs: away.fromMs }); dismissAway(); }}
+                  style={primaryBtnStyle}
+                  title="Record the span up to when you left, and stop"
+                >
+                  STOP AT {clockHM(away.fromMs)}
+                </button>
+              </div>
+            </div>
+          ) : observe && state.status !== 'paused' ? (
             <div className="pomo-controls" style={{ display: 'flex', gap: 6 }}>
               {state.status === 'running' && (
                 <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={{ ...ghostBtnStyle, height: 38 }} title="Break — records the work so far, then times your break">
@@ -1066,11 +1061,11 @@ function CycleCounter({
         gap: 7,
         padding: '3px 8px',
         background: hasAny
-          ? 'linear-gradient(90deg, rgba(201,241,88,0.10), rgba(201,241,88,0.02) 60%)'
+          ? 'linear-gradient(90deg, color-mix(in srgb, var(--acid) 10%, transparent), color-mix(in srgb, var(--acid) 2%, transparent) 60%)'
           : 'var(--paper-2)',
-        border: `1px solid ${hasAny ? 'rgba(201,241,88,0.40)' : 'var(--paper-3)'}`,
+        border: `1px solid ${hasAny ? 'color-mix(in srgb, var(--acid) 40%, transparent)' : 'var(--paper-3)'}`,
         borderRadius: 4,
-        boxShadow: hasAny ? '0 0 8px rgba(201,241,88,0.14) inset' : 'none',
+        boxShadow: hasAny ? '0 0 8px color-mix(in srgb, var(--acid) 14%, transparent) inset' : 'none',
       }}
     >
       {/* Numeric badge */}
@@ -1094,7 +1089,7 @@ function CycleCounter({
             fontWeight: 700,
             lineHeight: 1,
             color: cellColor,
-            textShadow: hasAny ? '0 0 6px rgba(201,241,88,0.5)' : 'none',
+            textShadow: hasAny ? '0 0 6px color-mix(in srgb, var(--acid) 50%, transparent)' : 'none',
           }}
         >
           {cyclesToday}
@@ -1112,7 +1107,7 @@ function CycleCounter({
               height: 7,
               background: 'var(--acid)',
               transform: 'rotate(45deg)',
-              boxShadow: '0 0 5px rgba(201,241,88,0.5)',
+              boxShadow: '0 0 5px color-mix(in srgb, var(--acid) 50%, transparent)',
               flexShrink: 0,
             }}
           />

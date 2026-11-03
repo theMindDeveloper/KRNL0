@@ -12,6 +12,9 @@ import type { BoardShape } from '../../shared/dispatch/types';
 export interface InfoCtx {
   boardPath: string;
   version: string;
+  /** light / dark, when an open window reported it (the theme is a window
+   *  preference, not board data). */
+  theme?: string;
 }
 
 function loadBoard(ctx: InfoCtx): BoardShape {
@@ -35,7 +38,7 @@ export async function infoShow(ctx: InfoCtx, json = false): Promise<SysResult> {
   const info = {
     version: ctx.version,
     boardPath: ctx.boardPath,
-    theme: rawBoard.theme ?? 'unknown',
+    theme: ctx.theme ?? rawBoard.theme ?? 'unknown',
     viewport: rawBoard.viewport ?? null,
     nodeCount: board.nodes.length,
     edgeCount: board.edges.length,
@@ -72,7 +75,7 @@ export async function settingsShow(ctx: InfoCtx, json = false): Promise<SysResul
   const settings = {
     version: ctx.version,
     boardPath: ctx.boardPath,
-    theme: rawBoard.theme ?? 'unknown',
+    theme: ctx.theme ?? rawBoard.theme ?? 'unknown',
     viewport: rawBoard.viewport ?? null,
   };
   if (json) return { ok: true, message: JSON.stringify(settings), data: settings };
@@ -120,4 +123,27 @@ export function settingsMode(
   saveBoardTo(ctx.boardPath, { ...raw, uiMode: mode, savedAt: new Date().toISOString() });
   ctx.onBoardChanged?.();
   return { ok: true, message: `mode: ${mode}`, data: { mode } };
+}
+
+/**
+ * `krnl settings layout [station|canvas]` — show or set the layout (ADR 0008):
+ * Station docks the windows beside the terminal, Canvas is the free board.
+ * The top-bar pill and ⌘⇧L set the same board field.
+ */
+export function settingsLayout(
+  ctx: { boardPath: string; onBoardChanged?: () => void },
+  layout: string | undefined,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { layoutMode?: string }) | null;
+  if (!raw) return { ok: false, message: 'No board found' };
+  const current = raw.layoutMode === 'station' ? 'station' : 'canvas';
+  if (layout === undefined) return { ok: true, message: `layout: ${current}`, data: { layout: current } };
+  if (layout !== 'station' && layout !== 'canvas') {
+    return { ok: false, message: `settings layout: expected station or canvas, got "${layout}"` };
+  }
+  if (layout !== current) {
+    saveBoardTo(ctx.boardPath, { ...raw, layoutMode: layout, savedAt: new Date().toISOString() });
+    ctx.onBoardChanged?.();
+  }
+  return { ok: true, message: `layout: ${layout}`, data: { layout } };
 }

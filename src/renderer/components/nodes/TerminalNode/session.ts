@@ -14,6 +14,9 @@ export interface TermSurface {
   getSelection?(): string;
   clearSelection?(): void;
   scrollToTop?(): void;
+  /** xterm's paste: normalises line endings and wraps the text in bracketed-
+   *  paste markers when the shell asked for them, then emits it via onData. */
+  paste?(text: string): void;
 }
 
 /** Minimal FitAddon surface. */
@@ -23,7 +26,7 @@ export interface FitSurface {
 
 /** The krnl preload bridge surface (subset used by the terminal). */
 export interface KrnlBridge {
-  ptyCreate(cols: number, rows: number): Promise<{ sessionId: string; motd: string }>;
+  ptyCreate(cols: number, rows: number, shell?: string): Promise<{ sessionId: string; motd: string }>;
   ptyWrite(sessionId: string, data: string): void | Promise<void>;
   ptyResize(sessionId: string, cols: number, rows: number): void | Promise<void>;
   ptyKill(sessionId: string): void | Promise<void>;
@@ -43,6 +46,8 @@ export interface SessionDeps {
   setSessionId: (id: string | null) => void;
   /** Returns true if the session has been cancelled (unmounted). */
   isCancelled: () => boolean;
+  /** The terminal's saved shell, read at every (re)start; 'default' = OS default. */
+  shell?: () => string | undefined;
 }
 
 /**
@@ -81,25 +86,65 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
   // (MotdBanner.tsx) above the xterm body, because PowerShell + PSReadLine
   // emit screen-clearing escape sequences during init that wipe any
   // pre-written banner. The React banner is outside the shell's reach.
-  const { sessionId: sid } = await krnl.ptyCreate(cols, rows);
+  //
+  // The shell lives in a slot that can be refilled: when it exits (`exit`,
+  // a crash) or fails to start, the terminal says so and Enter starts a new
+  // one — the node never turns into a dead black box.
+  let sid: string | null = null;
+  let stopShell = (): void => undefined;
+  let finished = false;
+  let starting = false;
+
+  const spawn = async (spawnCols: number, spawnRows: number): Promise<void> => {
+    starting = true;
+    let created: { sessionId: string };
+    try {
+      const shell = deps.shell?.();
+      created = shell && shell !== 'default'
+        ? await krnl.ptyCreate(spawnCols, spawnRows, shell)
+        : await krnl.ptyCreate(spawnCols, spawnRows);
+    } catch (err) {
+      starting = false;
+      const msg = err instanceof Error ? err.message : String(err);
+      term.write(`\r\n\x1b[31mThe shell could not start: ${msg.replace(/\n/g, '\r\n')}\x1b[0m\r\nPress Enter to try again.\r\n`);
+      return;
+    }
+    starting = false;
+    const id = created.sessionId;
+    if (isCancelled() || finished) {
+      krnl.ptyKill(id);
+      return;
+    }
+    sid = id;
+    setSessionId(id);
+    onCommand('term.sessionStart', { sessionId: id });
+
+    // F5b: pty:data → xterm.write
+    const cleanupData = krnl.onPtyData(id, (data) => {
+      term.write(data);
+    });
+    let cleanupExit = (): void => undefined;
+    cleanupExit = krnl.onPtyExit(id, () => {
+      cleanupData();
+      cleanupExit();
+      if (sid === id) { sid = null; setSessionId(null); }
+      stopShell = () => undefined;
+      term.write('\r\n[Process exited] Press Enter to start a new shell.\r\n');
+      onCommand('term.sessionEnd', { sessionId: id });
+    });
+    stopShell = () => {
+      krnl.ptyKill(id);
+      cleanupData();
+      cleanupExit();
+    };
+  };
+
+  await spawn(cols, rows);
   void fitOk; // kept for future diagnostic logging
   if (isCancelled()) {
-    krnl.ptyKill(sid);
+    stopShell();
     return () => undefined;
   }
-
-  setSessionId(sid);
-  onCommand('term.sessionStart', { sessionId: sid });
-
-  // F5b: pty:data → xterm.write
-  const cleanupData = krnl.onPtyData(sid, (data) => {
-    term.write(data);
-  });
-
-  const cleanupExit = krnl.onPtyExit(sid, () => {
-    term.write('\r\n[Process exited]\r\n');
-    onCommand('term.sessionEnd', { sessionId: sid });
-  });
 
   // Custom key handling — must use attachCustomKeyEventHandler (not a
   // bubble-phase React onKeyDown) because xterm processes keydown internally
@@ -116,6 +161,9 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
 
     const k = event.key;
 
+    // Ctrl+Shift+L toggles Station / Canvas (LayoutModeToggle); not a ^L for the shell.
+    if (event.shiftKey && (k === 'l' || k === 'L')) return false;
+
     if (!event.shiftKey && (k === 'c' || k === 'C')) {
       const sel = term.getSelection?.() ?? '';
       if (sel) {
@@ -123,15 +171,24 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
         term.clearSelection?.();
         return false;
       }
-      void krnl.ptyWrite(sid, '\x03');
+      // Cmd+C (macOS) only ever copies; Ctrl+C without a selection interrupts.
+      if (sid && event.ctrlKey) void krnl.ptyWrite(sid, '\x03');
       return false;
     }
 
     if (k === 'v' || k === 'V') {
       // Prevent xterm from emitting ^V (0x16) to the pty, then paste.
+      // Returning false only stops xterm; preventDefault also stops the
+      // browser's own paste on xterm's textarea, which would paste a second
+      // time through xterm's paste listener.
+      event.preventDefault?.();
       void (async () => {
         const text = await krnl.clipboardReadText?.();
-        if (text) void krnl.ptyWrite(sid, text);
+        if (!text || !sid) return;
+        // Through xterm's paste, so a multi-line paste reaches the shell as
+        // one paste (bracketed) instead of running each line as typed.
+        if (term.paste) term.paste(text);
+        else void krnl.ptyWrite(sid, text);
       })();
       return false;
     }
@@ -143,8 +200,16 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
   // Pass keystrokes through unchanged. Backspace = 0x7f (DEL), which is the
   // POSIX/PowerShell convention. cmd.exe wants 0x08; users on cmd.exe must
   // set KRNL0_SHELL explicitly and accept this trade-off (issue #72).
+  // With no shell (exited / failed to start), Enter starts a new one.
   const { dispose: disposeOnData } = term.onData((data) => {
-    krnl.ptyWrite(sid, data);
+    if (sid) {
+      krnl.ptyWrite(sid, data);
+      return;
+    }
+    if (!starting && data.includes('\r')) {
+      try { fit.fit(); } catch { /* keep the last size */ }
+      void spawn(term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows);
+    }
   });
 
   // Focus immediately so the user can type
@@ -154,10 +219,9 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
   return () => {
     if (cleaned) return;
     cleaned = true;
+    finished = true;
     // F4b: pty:kill on unmount
-    krnl.ptyKill(sid);
-    cleanupData();
-    cleanupExit();
+    stopShell();
     disposeOnData();
     setSessionId(null);
   };

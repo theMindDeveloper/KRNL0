@@ -12,10 +12,13 @@ import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
 import type { Habit, HabitColor, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { calcStreak } from '../HabitNode/commands';
-import { HABIT_COLORS, todayLocal, toYMD } from '../HabitNode/types';
+import { HABIT_COLORS, isDayScheduled, toYMD } from '../HabitNode/types';
 import { useBoardStore } from '../../../store/boardStore';
+import { useLocalDay } from '../../../hooks/useLocalDay';
 import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
 import { HabitIcon } from '../HabitNode/HabitIcon';
+import { saveBoard } from '../../../store/eventLog';
+import { undoable } from '../../../store/undoNotice';
 
 const LANE_WIDTH = 280;
 
@@ -69,22 +72,12 @@ function cadenceFootText(schedule: HabitSchedule | null | undefined): string {
   return 'weekly';
 }
 
-// JS getDay() (Sun=0) → ISO (Mon=1..Sun=7)
-function jsDowToIso(d: number): IsoDow {
-  return (d === 0 ? 7 : d) as IsoDow;
-}
 
-function isHabitDay(schedule: HabitSchedule | null | undefined, ymd: string): boolean {
-  if (!schedule) return false;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
-  if (!m) return false;
-  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  const iso = jsDowToIso(dt.getDay());
-  if (schedule.kind === 'daily') return true;
-  if (schedule.kind === 'weekdays') return iso >= 1 && iso <= 5;
-  if (schedule.kind === 'weekly') return schedule.days.includes(iso);
-  return false;
-}
+// The 7-day strip uses the same rule as the tick button and the streak: no
+// schedule means every day (it used to dim every day of an unscheduled habit
+// while today stayed tickable).
+const isHabitDay = (schedule: HabitSchedule | null | undefined, ymd: string): boolean =>
+  isDayScheduled(schedule ?? undefined, ymd);
 
 export function HabitLaneNode({
   node,
@@ -98,13 +91,15 @@ export function HabitLaneNode({
     for (const n of board.nodes) {
       if (n.kind !== 'habit' || !n.isMother) continue;
       const s = n.state as { habits?: Habit[] } | null;
-      const h = s?.habits?.find((x) => x.id === node.state.habitId);
+      // An archived habit is no longer tracked: its lane goes like a deleted one's.
+      const h = s?.habits?.find((x) => x.id === node.state.habitId && !x.archived);
       if (h) return h;
     }
     return null;
   }, [board, node.state.habitId]);
 
-  const today = todayLocal();
+  // Re-renders at local midnight, so a lane left open overnight moves on.
+  const today = useLocalDay();
   const week = useMemo(() => lastSevenDays(today), [today]);
 
   const { getNodes } = useReactFlow();
@@ -120,12 +115,16 @@ export function HabitLaneNode({
   // it instead of showing a "habit removed — delete this lane" placeholder
   // the user has to dismiss by hand. The lane node is non-mother, so
   // removeNode in the board store will accept it.
-  const removeSelf = useBoardStore((s) => s.removeNode);
+  // Cleanup is not a user action: no undo slot (undoing to it re-created the
+  // orphan, which deleted itself again and cleared redo — a stuck undo), and
+  // it is saved so the orphan doesn't come back from board.json.
   useEffect(() => {
     if (!board) return; // wait until store hydrates
     if (habit) return;
-    removeSelf(node.id);
-  }, [board, habit, node.id, removeSelf]);
+    useBoardStore.setState((s) => (s.board ? { board: { ...s.board, nodes: s.board.nodes.filter((n) => n.id !== node.id) } } : s));
+    const next = useBoardStore.getState().board;
+    if (next) void saveBoard(next);
+  }, [board, habit, node.id]);
   if (!habit) {
     // Render nothing while the auto-cleanup useEffect fires on the next tick.
     return null;
@@ -134,6 +133,7 @@ export function HabitLaneNode({
   const color = habitColor(habit.color);
   const logSet = new Set(habit.log);
   const doneToday = logSet.has(today);
+  const scheduledToday = isDayScheduled((habit as { schedule?: HabitSchedule }).schedule, today);
   const cadence = (habit as { schedule?: HabitSchedule | null }).schedule ?? null;
   // Pass the schedule like HabitNode does, or a weekdays habit reads 0 on weekends.
   const streak = calcStreak(habit.log, today, cadence ?? undefined);
@@ -143,8 +143,10 @@ export function HabitLaneNode({
   // Pull the lane sequence number from the node id suffix if present —
   // labels like "#01" / "#02" in the header give the cards an identity
   // even when the names are short.
-  const seqMatch = /(\d+)$/.exec(node.id);
-  const seqLabel = seqMatch ? `#${seqMatch[1]!.padStart(2, '0')}` : '';
+  // Its place among the lanes (ids are uuids, whose trailing digits gave
+  // random numbers like "#4821").
+  const laneIndex = (board?.nodes ?? []).filter((n) => n.kind === 'habit.lane').findIndex((n) => n.id === node.id);
+  const seqLabel = laneIndex >= 0 ? `#${String(laneIndex + 1).padStart(2, '0')}` : '';
 
   return (
     <div
@@ -234,16 +236,20 @@ export function HabitLaneNode({
           type="button"
           aria-label={`${habit.name} today ${doneToday ? 'done' : 'not done'}`}
           aria-pressed={doneToday}
+          // Same rule as the Habit window: an unscheduled day can't be
+          // ticked (the streak ignores it); an existing tick can be removed.
+          disabled={!scheduledToday && !doneToday}
           onClick={() => onCommand('habit.lane.toggleToday')}
-          title={`click to ${doneToday ? 'unmark' : 'mark'} today`}
+          title={!scheduledToday && !doneToday ? 'not scheduled today' : `click to ${doneToday ? 'unmark' : 'mark'} today`}
           style={{
+            opacity: !scheduledToday && !doneToday ? 0.35 : 1,
             width: 22,
             height: 22,
             borderRadius: '50%',
             border: `1.5px solid var(--${color})`,
             background: doneToday ? `var(--${color})` : 'transparent',
             color: doneToday ? 'var(--ink)' : `var(--${color})`,
-            cursor: 'pointer',
+            cursor: !scheduledToday && !doneToday ? 'default' : 'pointer',
             display: 'grid',
             placeItems: 'center',
             fontFamily: 'var(--font-mono)',
@@ -342,7 +348,12 @@ export function HabitLaneNode({
           onSetColor={(c) => onCommand('habit.lane.setColor', { color: c })}
           onSetIcon={(icon) => onCommand('habit.lane.setIcon', { icon })}
           onSetNote={(note) => onCommand('habit.lane.setNote', { note })}
-          onDelete={() => onCommand('habit.lane.removeHabit')}
+          onDelete={() => undoable(`Deleted habit "${habit.name}"`, () => onCommand('habit.lane.removeHabit'))}
+          onUnpinLane={() => {
+            useBoardStore.getState().removeNode(node.id);
+            const next = useBoardStore.getState().board;
+            if (next) void saveBoard(next);
+          }}
           onClose={() => setMenuOpen(null)}
         />
       )}

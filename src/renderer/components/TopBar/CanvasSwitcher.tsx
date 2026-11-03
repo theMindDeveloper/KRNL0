@@ -3,11 +3,14 @@
 // confirm. Mother nodes and their data are shared, so deleting a canvas only
 // removes its free nodes and drawings. CLI twin: `krnl canvas …`.
 
-import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
 import { Popover } from '../ui/Popover';
 import { activeCanvasOf, DEFAULT_CANVAS_ID, DEFAULT_CANVAS_NAME, type CanvasMeta } from '../../../shared/canvas';
+
+/** How long a row click waits for a second click before closing the list. */
+const DBLCLICK_MS = 250;
 
 const FALLBACK: CanvasMeta[] = [{ id: DEFAULT_CANVAS_ID, name: DEFAULT_CANVAS_NAME }];
 
@@ -31,6 +34,8 @@ export function CanvasSwitcher() {
   const [draft, setDraft] = useState('');
   const [adding, setAdding] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
 
   const active = canvases.find((c) => c.id === activeId) ?? canvases[0];
   const close = () => { setOpen(false); setRenaming(null); setConfirmDel(null); setAdding(false); };
@@ -76,7 +81,7 @@ export function CanvasSwitcher() {
               return (
                 <div key={c.id} style={{ display: 'flex', gap: 4, padding: 3 }}>
                   <input
-                    autoFocus value={draft} style={input} aria-label="Canvas name"
+                    autoFocus value={draft} style={input} aria-label="Canvas name" data-own-escape
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={keys(commitRename, () => setRenaming(null))}
                     onBlur={commitRename}
@@ -90,7 +95,7 @@ export function CanvasSwitcher() {
                   <span style={{ flex: 1, color: 'var(--ink-3)', fontSize: 10.5 }}>Delete “{c.name}” and its content?</span>
                   <button
                     type="button" data-testid={`canvas-delete-confirm-${c.id}`}
-                    style={{ ...rowBtn, color: '#ff8e64', fontWeight: 700 }}
+                    style={{ ...rowBtn, color: 'var(--rust)', fontWeight: 700 }}
                     onClick={() => { store().deleteCanvas(c.id); setConfirmDel(null); }}
                   >Delete</button>
                   <button type="button" style={rowBtn} onClick={() => setConfirmDel(null)}>Cancel</button>
@@ -102,8 +107,19 @@ export function CanvasSwitcher() {
                 key={c.id}
                 data-testid={`canvas-row-${c.id}`}
                 className="krnl-canvas-row"
-                onClick={() => { store().switchCanvas(c.id); close(); }}
-                onDoubleClick={(e) => { e.stopPropagation(); setDraft(c.name); setRenaming(c.id); }}
+                // Switch at once; close a beat later so a double-click can
+                // still arrive and rename instead (canvases F5).
+                onClick={() => {
+                  store().switchCanvas(c.id);
+                  if (closeTimer.current) clearTimeout(closeTimer.current);
+                  closeTimer.current = setTimeout(close, DBLCLICK_MS);
+                }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+                  setDraft(c.name);
+                  setRenaming(c.id);
+                }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', borderRadius: 6, cursor: 'pointer',
                   background: isActive ? 'color-mix(in srgb, var(--acid) 12%, transparent)' : 'transparent',
@@ -129,7 +145,7 @@ export function CanvasSwitcher() {
           {adding ? (
             <div style={{ display: 'flex', gap: 4, padding: 3 }}>
               <input
-                autoFocus value={draft} placeholder="Canvas name" style={input} aria-label="New canvas name"
+                autoFocus value={draft} placeholder="Canvas name" style={input} aria-label="New canvas name" data-own-escape
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={keys(commitAdd, () => setAdding(false))}
               />

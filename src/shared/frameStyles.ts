@@ -15,8 +15,9 @@ export interface FrameStyleInfo {
 }
 
 export const FRAME_STYLES = [
-  { id: 'classic', label: 'Classic', sublabel: 'Default frame', modes: ['light', 'dark'] },
-  { id: 'pro', label: 'Pro', sublabel: 'Matte graphite', modes: ['dark'] },
+  // Shown as "Paper" (cream & lime); the id stays 'classic' so saved choices and scripts keep working.
+  { id: 'classic', label: 'Paper', sublabel: 'Cream & lime', modes: ['light', 'dark'] },
+  { id: 'pro', label: 'Pro', sublabel: 'Matte graphite', modes: ['light', 'dark'] },
   { id: 'synthesizer', label: 'Synthesizer', sublabel: 'Eurorack panel', modes: ['light', 'dark'] },
   { id: 'telemetry', label: 'Telemetry', sublabel: 'Mission control', modes: ['light', 'dark'] },
   { id: 'krnl-dock', label: 'KRNL Dock', sublabel: 'Rack chassis', modes: ['dark'] },

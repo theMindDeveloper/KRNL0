@@ -7,10 +7,10 @@
  */
 
 import { app, BrowserWindow } from 'electron';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { backupCorruptBoard, seedBoard, writeFileAtomic } from './persistence/board';
+import { backupCorruptBoard, BoardUnreadableError, readBoardText, seedBoard, writeFileAtomic } from './persistence/board';
 
 export const BOARD_DIR =
   process.env.KRNL0_BOARD_DIR ?? join(homedir(), 'Documents', app.getName());
@@ -26,16 +26,23 @@ export interface RawBoard {
   edges: Array<Record<string, unknown>>;
 }
 
+/**
+ * Read board.json. Null when it doesn't exist, or when it was unparseable and
+ * has been backed up. A locked file, or a corrupt one whose backup failed,
+ * throws BoardUnreadableError — callers must not seed over it.
+ */
 export function readBoardFile(): RawBoard | null {
+  const raw = existsSync(BOARD_PATH) ? readBoardText(BOARD_PATH) : null;
+  if (raw === null) return null;
   try {
-    if (!existsSync(BOARD_PATH)) return null;
-    const raw = readFileSync(BOARD_PATH, 'utf-8');
     const parsed = JSON.parse(raw) as RawBoard;
     if (!Array.isArray(parsed.nodes)) parsed.nodes = [];
     if (!Array.isArray(parsed.edges)) parsed.edges = [];
     return parsed;
   } catch (err) {
-    backupCorruptBoard(BOARD_PATH, err);
+    if (!backupCorruptBoard(BOARD_PATH, err)) {
+      throw new BoardUnreadableError('board.json is unreadable and could not be backed up; it was left untouched', err);
+    }
     return null;
   }
 }
@@ -43,6 +50,14 @@ export function readBoardFile(): RawBoard | null {
 export function writeBoardFile(board: RawBoard): void {
   board.savedAt = new Date().toISOString();
   writeFileAtomic(BOARD_PATH, JSON.stringify(board, null, 2));
+}
+
+/** Size of the open window's content area, so CLI placement can aim at the visible centre. */
+export function windowViewSize(): { width: number; height: number } | null {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed());
+  if (!w) return null;
+  const [width, height] = w.getContentSize();
+  return width && height ? { width, height } : null;
 }
 
 export function notifyBoardChanged(): void {

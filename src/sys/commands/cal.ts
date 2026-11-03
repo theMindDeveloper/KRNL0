@@ -9,6 +9,9 @@ import type { ScheduledTaskPlacement } from '../../renderer/store/scheduleSelect
 import type { Board } from '../../shared/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode } from '../../shared/dispatch/types';
+import { isValidYMD } from '../../shared/ymd';
+import { calendarSetZoom } from '../../renderer/components/nodes/CalendarNode/commands';
+import { CAL_ZOOM_MAX, CAL_ZOOM_MIN, granularityFor, type CalendarState } from '../../renderer/components/nodes/CalendarNode/types';
 
 export interface CalCtx {
   boardPath: string;
@@ -49,6 +52,10 @@ export async function calShow(
   to: string | undefined,
   json = false,
 ): Promise<SysResult> {
+  // Dates compare as strings: '2026-11-2' would silently drop every result.
+  for (const [flagName, v] of [['--from', from], ['--to', to]] as const) {
+    if (v !== undefined && !isValidYMD(v)) return { ok: false, message: `bad ${flagName} "${v}" (want a real YYYY-MM-DD date)` };
+  }
   const board = loadBoard(ctx);
   if (!board) return { ok: false, message: 'Board not found or empty.' };
 
@@ -104,6 +111,21 @@ export async function calShow(
 }
 
 /** `krnl cal view <day|week|month|year> [--date YYYY-MM-DD]` — switch the Calendar view. */
+/** `krnl cal zoom <1-6>` — the week / day view's hour height (and snap grid). */
+export function calZoom(ctx: CalCtx & { onBoardChanged?: () => void }, zoom: number | undefined): SysResult {
+  if (zoom === undefined || zoom < CAL_ZOOM_MIN || zoom > CAL_ZOOM_MAX) {
+    return { ok: false, message: `cal zoom requires a number from ${CAL_ZOOM_MIN} to ${CAL_ZOOM_MAX}` };
+  }
+  const board = loadBoard(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const cal = board.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return { ok: false, message: 'No calendar on the board' };
+  cal.state = calendarSetZoom(cal.state as CalendarState, { zoom });
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  return { ok: true, message: `calendar zoom ${zoom} (${granularityFor(zoom)}-minute grid)`, data: { zoom } };
+}
+
 export function calView(
   ctx: CalCtx & { onBoardChanged?: () => void },
   view: string | undefined,
@@ -111,7 +133,7 @@ export function calView(
 ): SysResult {
   const views = ['day', 'week', 'month', 'year'];
   if (!view || !views.includes(view)) return { ok: false, message: 'cal view requires <day|week|month|year>' };
-  if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, message: `bad --date "${date}"` };
+  if (date !== undefined && !isValidYMD(date)) return { ok: false, message: `bad --date "${date}" (want a real YYYY-MM-DD date)` };
   const board = loadBoard(ctx);
   if (!board) return { ok: false, message: 'No board found' };
   const cal = board.nodes.find((n) => n.kind === 'calendar' && n.isMother);

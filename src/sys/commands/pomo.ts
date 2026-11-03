@@ -4,6 +4,7 @@ import { OBSERVE_SPAN_MIN, TIMER_FACES } from '../../renderer/components/nodes/P
 import {
   pomoStart as fsmStart,
   pomoStop as fsmStop,
+  pomoStopAt as fsmStopAt,
   pomoBreak as fsmBreak,
   pomoExtend as fsmExtend,
   pomoPause as fsmPause,
@@ -20,6 +21,7 @@ import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
 import { selectPomoReality } from '../../renderer/store/pomoReality';
 import { spanTagFor } from '../../renderer/store/spanTags';
+import { isValidYMD } from '../../shared/ymd';
 
 const VALID_FACES: readonly TimerFace[] = TIMER_FACES;
 function isTimerFace(v: unknown): v is TimerFace {
@@ -64,12 +66,19 @@ export function pomoStart(label?: string, minutes?: number): SysResult {
       result = { ok: false, message: `pomo is already ${prev.status}` };
       return;
     }
+    if (prev.status !== 'idle' && prev.status !== 'done') {
+      // fsmStart only starts from idle/done; during a break it is a no-op too.
+      result = { ok: false, message: `pomo is on a ${prev.status} — run 'krnl pomo resume' to get back to work` };
+      return;
+    }
     const cfg = node['config'] ?? {};
     const easy = (board as { uiMode?: string }).uiMode === 'easy';
     const sessionMin = cfg['mode'] === 'observe' || easy
       ? OBSERVE_SPAN_MIN
       : minutes ?? (typeof cfg['sessionMin'] === 'number' ? cfg['sessionMin'] : 25);
     const startArgs: { label?: string; durationMin?: number; activeTaskId?: string | null } = { durationMin: sessionMin };
+    // Easy mode never links a span (easy-mode D13), same as the UI's START.
+    if (easy) { startArgs.activeTaskId = null; startArgs.label = ''; }
     if (label !== undefined) startArgs.label = label;
     // Same as the UI: an untagged start is tagged with the open task whose
     // planned block contains "now" (time-model F5).
@@ -135,23 +144,74 @@ export function pomoDiscard(): SysResult {
 }
 
 /** Issue #166 — record the in-flight segment before going idle. */
-export function pomoStop(): SysResult {
+/**
+ * `pomo stop [--at HH:MM|YYYY-MM-DDTHH:MM]` — record the in-flight span and go
+ * idle. `--at` ends it at an earlier moment (time the machine slept or the
+ * app was closed is then not counted).
+ */
+export function pomoStop(at?: string): SysResult {
+  let atMs: number | undefined;
+  if (at !== undefined) {
+    atMs = parseStopAt(at, Date.now());
+    if (atMs === undefined) return { ok: false, message: `bad --at "${at}" (want HH:MM today or YYYY-MM-DDTHH:MM)` };
+    if (atMs > Date.now()) return { ok: false, message: `--at ${at} is in the future` };
+  }
   let found = false;
+  let refused: string | null = null;
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);
     if (!node) return;
-    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
-    node['state'] = fsmStop(prev, {}, cliEnv());
     found = true;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    if (atMs !== undefined) {
+      refused = stopAtRefusal(prev, atMs, at ?? '');
+      if (refused === null) node['state'] = fsmStopAt(prev, { atMs }, cliEnv());
+      return;
+    }
+    node['state'] = fsmStop(prev, {}, cliEnv());
   });
   if (!found) return { ok: false, message: 'No Pomodoro node found on the board' };
-  return { ok: true, message: 'Pomodoro stopped' };
+  if (refused) return { ok: false, message: refused };
+  return { ok: true, message: at !== undefined ? `Pomodoro stopped as of ${at}` : 'Pomodoro stopped' };
+}
+
+/**
+ * Why `pomo stop --at` cannot apply to this state, or null when it can. It
+ * trims a live span only; a time it would ignore (paused, idle) or one before
+ * the span started (a 0-minute record) is an error, not a silent no-op.
+ */
+export function stopAtRefusal(prev: PomoState, atMs: number, at: string): string | null {
+  if ((prev.status !== 'running' && prev.status !== 'break') || prev.startedAt === null) {
+    return `--at needs a running span (pomo is ${prev.status}); use plain "pomo stop"`;
+  }
+  if (atMs < Date.parse(prev.startedAt)) {
+    const d = new Date(prev.startedAt);
+    return `--at ${at} is before this span started (${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')})`;
+  }
+  return null;
+}
+
+/** "HH:MM" (today, local) or "YYYY-MM-DDTHH:MM" (local) → epoch ms. */
+export function parseStopAt(at: string, nowMs: number): number | undefined {
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(at);
+  if (hm) {
+    const h = Number(hm[1]);
+    const m = Number(hm[2]);
+    if (h > 23 || m > 59) return undefined;
+    const d = new Date(nowMs);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+  }
+  const full = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(at);
+  if (!full) return undefined;
+  const [y, mo, d, h, mi] = full.slice(1).map(Number) as [number, number, number, number, number];
+  const t = new Date(y, mo - 1, d, h, mi);
+  return t.getMonth() === mo - 1 && t.getDate() === d && h < 24 && mi < 60 ? t.getTime() : undefined;
 }
 
 /** Issue #166 — transition running/paused → break, recording the work span. */
 export function pomoBreak(): SysResult {
   let found = false;
-  let msg = 'Switched to break';
+  let msg = 'No Pomodoro node found on the board';
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);
     if (!node) return;
@@ -161,6 +221,7 @@ export function pomoBreak(): SysResult {
       return;
     }
     node['state'] = fsmBreak(prev, {}, cliEnv());
+    msg = 'Switched to break';
     found = true;
   });
   if (!found) return { ok: false, message: msg };
@@ -252,12 +313,9 @@ export function pomoRetag(
     const spanTag = text ? spanTagFor(board as unknown as Board, text, free.tag ?? null) : null;
     if (text && free.tag && !spanTag) { result = { ok: false, message: `unknown tag "${free.tag}"` }; return; }
     const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
-    const matches = prev.history.filter((r) => r.id.startsWith(segmentId));
-    if (matches.length !== 1) {
-      result = { ok: false, message: matches.length === 0 ? `no segment "${segmentId}"` : `segment "${segmentId}" is ambiguous` };
-      return;
-    }
-    const id = matches[0]!.id;
+    const seg = resolveSegmentId(prev, segmentId);
+    if ('error' in seg) { result = { ok: false, message: seg.error }; return; }
+    const id = seg.id;
     node['state'] = {
       ...prev,
       history: fsmRetag(prev, { id, taskId: tag.taskId, label: tag.label, tag: spanTag }).history,
@@ -270,6 +328,11 @@ export function pomoRetag(
 
 /** Resolve a unique recorded segment id from a prefix. */
 function resolveSegmentId(state: PomoState, segmentId: string): { id: string } | { error: string } {
+  // Same rule as every other ref: the full id, or a prefix of 4+ characters
+  // (a 1-letter prefix would pick whichever span happened to match).
+  const exact = state.history.find((r) => r.id === segmentId);
+  if (exact) return { id: exact.id };
+  if (segmentId.length < 4) return { error: `segment ref "${segmentId}" is too short — use 4+ characters` };
   const matches = state.history.filter((r) => r.id.startsWith(segmentId));
   if (matches.length === 1) return { id: matches[0]!.id };
   return { error: matches.length === 0 ? `no segment "${segmentId}"` : `segment "${segmentId}" is ambiguous` };
@@ -305,9 +368,11 @@ export function pomoSegments(ctx: { boardPath: string }, opts: { date?: string; 
   const d = new Date();
   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const date = opts.date ?? today;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, message: `bad --date "${date}" (want YYYY-MM-DD)` };
+  if (!isValidYMD(date)) return { ok: false, message: `bad --date "${date}" (want YYYY-MM-DD)` };
   const dayStart = new Date(`${date}T00:00:00`).getTime();
-  const dayEnd = dayStart + 86_400_000;
+  // The next local midnight — a DST day is 23 or 25 hours long.
+  const [yy, mm, dd] = date.split('-').map(Number) as [number, number, number];
+  const dayEnd = new Date(yy, mm - 1, dd + 1).getTime();
   const hm = (ms: number) => { const t = new Date(ms); return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; };
   const segs = selectPomoReality(raw, Date.now())
     .filter((sg) => sg.endMs > dayStart && sg.startMs < dayEnd)
@@ -450,10 +515,10 @@ function _pomoConfigViaElectron(opts: Parameters<typeof pomoConfig>[0]): SysResu
     if (!node) return;
     const prev = (node['config'] ?? {}) as Partial<PomoConfig>;
     const next: Partial<PomoConfig> = { ...prev };
-    if (opts.session !== undefined && opts.session > 0) next.sessionMin = Math.round(opts.session);
-    if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.round(opts.short);
-    if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.round(opts.long);
-    if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.round(opts.every);
+    if (opts.session !== undefined && opts.session > 0) next.sessionMin = Math.max(1, Math.round(opts.session));
+    if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.max(1, Math.round(opts.short));
+    if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.max(1, Math.round(opts.long));
+    if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.max(1, Math.round(opts.every));
     if (opts.face === 'auto') delete next.face;
     else if (opts.face !== undefined) next.face = opts.face as TimerFace;
   if (opts.countStopped !== undefined) next.countStopped = opts.countStopped;
@@ -511,10 +576,10 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
 
   const prev = (node['config'] ?? {}) as Partial<PomoConfig>;
   const next: Partial<PomoConfig> = { ...prev };
-  if (opts.session !== undefined && opts.session > 0) next.sessionMin = Math.round(opts.session);
-  if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.round(opts.short);
-  if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.round(opts.long);
-  if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.round(opts.every);
+  if (opts.session !== undefined && opts.session > 0) next.sessionMin = Math.max(1, Math.round(opts.session));
+  if (opts.short !== undefined && opts.short > 0) next.shortBreakMin = Math.max(1, Math.round(opts.short));
+  if (opts.long !== undefined && opts.long > 0) next.longBreakMin = Math.max(1, Math.round(opts.long));
+  if (opts.every !== undefined && opts.every > 0) next.longBreakEvery = Math.max(1, Math.round(opts.every));
   if (opts.face === 'auto') delete next.face;
   else if (opts.face !== undefined) next.face = opts.face as TimerFace;
   if (opts.countStopped !== undefined) next.countStopped = opts.countStopped;

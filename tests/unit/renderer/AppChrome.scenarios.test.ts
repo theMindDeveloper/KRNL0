@@ -340,6 +340,20 @@ describe('F8 — Dock keyboard shortcuts fire onAddNode', () => {
     expect(onAddNode).toHaveBeenCalledWith({ kind: 'image' });
   });
 
+  it('does nothing behind an open modal (Settings, Commander)', () => {
+    const onAddNode = vi.fn();
+    renderWithWrapper(React.createElement(Dock, { onAddNode }));
+    const modal = document.createElement('div');
+    modal.setAttribute('aria-modal', 'true');
+    document.body.appendChild(modal);
+    try {
+      fireEvent.keyDown(window, { key: 'n' });
+      expect(onAddNode).not.toHaveBeenCalled();
+    } finally {
+      modal.remove();
+    }
+  });
+
   it('pressing "V" sets select tool, does not call onAddNode', () => {
     const onAddNode = vi.fn();
     const onToolChange = vi.fn();

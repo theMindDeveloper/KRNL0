@@ -12,6 +12,9 @@ import { summarizeAnalytics } from '../../renderer/analytics/summary';
 import { addDays } from '../../renderer/analytics/dateRange';
 import { computeTagBreakdown } from '../../renderer/analytics/tags';
 import type { Board } from '../../shared/types';
+import { ANALYTICS_CARD_LABELS, type AnalyticsCardId } from '../../renderer/components/nodes/AnalyticsNode/types';
+import { analyticsResetCardLayout, analyticsToggleCardHidden } from '../../renderer/components/nodes/AnalyticsNode/commands';
+import { defaultAnalyticsState } from '../../renderer/components/nodes/AnalyticsNode/types';
 
 // Register sources once — idempotent guard inside registerBuiltinSources.
 registerBuiltinSources();
@@ -228,4 +231,73 @@ export function analyticsWindow(
     ? (next ? ' (panel shown beside the terminal)' : ' (panel hidden)')
     : ' (canvas mode always shows it in the mother row; this applies in station mode)';
   return { ok: true, message: `analytics ${next ? 'opened' : 'closed'}${where}`, data: { shown: next } };
+}
+
+/**
+ * `analytics cards | hide <id> | unhide <id> | reset-cards` — which chart cards
+ * the Analytics window shows (the settings panel's list).
+ */
+export function analyticsCards(
+  ctx: AnalyticsWindowCtx,
+  action: 'cards' | 'hide' | 'unhide' | 'reset-cards',
+  card: string | undefined,
+  json: boolean,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath);
+  if (typeof raw !== 'object' || raw === null) return { ok: false, message: 'No board found' };
+  const board = raw as Record<string, unknown> & { nodes?: unknown[] };
+  const nodes = Array.isArray(board.nodes) ? (board.nodes as Array<Record<string, unknown>>) : [];
+  const mother = nodes.find((n) => n['kind'] === 'analytics' && n['isMother'] === true);
+  if (!mother) return { ok: false, message: 'No analytics window on the board' };
+  const state = { ...defaultAnalyticsState(), ...((mother['state'] ?? {}) as object) };
+  const ids = Object.keys(ANALYTICS_CARD_LABELS) as AnalyticsCardId[];
+  const hidden = new Set(state.hiddenCards ?? []);
+
+  if (action === 'cards') {
+    const rows = ids.map((id) => ({ id, label: ANALYTICS_CARD_LABELS[id], shown: !hidden.has(id) }));
+    if (json) return { ok: true, message: JSON.stringify(rows), data: rows };
+    return { ok: true, message: rows.map((r) => `  ${r.shown ? '●' : '○'} ${r.id.padEnd(22)} ${r.label}`).join('\n'), data: rows };
+  }
+
+  let next = state;
+  let message = 'every card is shown again';
+  if (action === 'reset-cards') {
+    next = analyticsResetCardLayout(state);
+  } else {
+    if (!card || !(ids as string[]).includes(card)) {
+      return { ok: false, message: `analytics ${action}: unknown card "${card ?? ''}" (see: krnl analytics cards)` };
+    }
+    const id = card as AnalyticsCardId;
+    const isHidden = hidden.has(id);
+    if ((action === 'hide') === isHidden) {
+      return { ok: true, message: `"${ANALYTICS_CARD_LABELS[id]}" is already ${isHidden ? 'hidden' : 'shown'}` };
+    }
+    next = analyticsToggleCardHidden(state, { cardId: id });
+    message = `${action === 'hide' ? 'hid' : 'showing'} "${ANALYTICS_CARD_LABELS[id]}"`;
+  }
+  mother['state'] = next;
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  return { ok: true, message };
+}
+
+/**
+ * `analytics clear-history --yes` — the settings panel's "Clear focus history":
+ * every pomo span and the completion ledger go. Not undoable, hence --yes.
+ */
+export function analyticsClearHistory(ctx: AnalyticsWindowCtx, yes: boolean): SysResult {
+  if (!yes) {
+    return { ok: false, message: 'analytics clear-history deletes every recorded pomo span and finished-task entry for good — run it again with --yes' };
+  }
+  const raw = loadBoardFrom(ctx.boardPath);
+  if (typeof raw !== 'object' || raw === null) return { ok: false, message: 'No board found' };
+  const board = raw as Record<string, unknown> & { nodes?: Array<Record<string, unknown>> };
+  const { completions: _drop, ...rest } = board;
+  void _drop;
+  const nodes = (board.nodes ?? []).map((n) =>
+    n['kind'] === 'pomo' ? { ...n, state: { ...((n['state'] ?? {}) as Record<string, unknown>), history: [] } } : n,
+  );
+  saveBoardTo(ctx.boardPath, { ...rest, nodes, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  return { ok: true, message: 'focus history cleared (pomo spans and the completion ledger)' };
 }

@@ -7,6 +7,8 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { TimeField } from '../../ui/TimeField';
+import { CloseButton } from '../../ui/CloseButton';
+import { Z } from '../../ui/layers';
 
 export interface TaskPopupTask {
   id: string;
@@ -25,7 +27,9 @@ interface Props {
   duration: string;
   onTime: (v: string) => void;
   onDuration: (v: string) => void;
-  onApply: () => void;
+  /** Save the edited time; `time` overrides the draft when the caller has a
+   *  fresher value than the last render (Enter in the time field). */
+  onApply: (time?: string) => void;
   onActivate: () => void;
   onJump: () => void;
   onUnschedule: () => void;
@@ -73,17 +77,18 @@ export function TaskPopup(p: Props) {
 
   return createPortal(
     <>
-      <div onClick={p.onClose} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+      <div onClick={p.onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
       <div
         data-testid="calendar-task-popup"
         role="dialog"
         aria-label={task.text}
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed', left, top, width: W, zIndex: 1999, boxSizing: 'border-box',
+          position: 'fixed', left, top, width: W, zIndex: Z.popup, boxSizing: 'border-box',
           background: 'var(--paper)', color: 'var(--ink)',
-          border: '1px solid var(--paper-3)', borderRadius: 14,
-          boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+          // Same shell as ui/Popover and the task info popup.
+          border: '1px solid var(--paper-3)', borderRadius: 'var(--radius-lg)',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
           overflow: 'hidden', fontFamily: 'var(--font-sans)',
           animation: 'krnl-pop-in 140ms ease-out',
         }}
@@ -101,9 +106,7 @@ export function TaskPopup(p: Props) {
               {day} · {task.timeOpen ? `${hm(startMs)} · no set length` : `${hm(startMs)}–${hm(endMs)} · ${fmtLen(task.scheduledDurationMin)}`}
             </div>
           </div>
-          <button type="button" aria-label="Close" onClick={p.onClose} style={iconBtn}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 2l8 8M10 2l-8 8" /></svg>
-          </button>
+          <CloseButton onClick={p.onClose} />
         </div>
 
         {/* Editor */}
@@ -111,7 +114,14 @@ export function TaskPopup(p: Props) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'end', gap: 8 }}>
             <div style={field}>
               <span style={fieldLabel}>Start</span>
-              <TimeField testId="task-popup-time" value={p.time} onChange={p.onTime} />
+              <TimeField
+                testId="task-popup-time"
+                value={p.time}
+                onChange={p.onTime}
+                // "Esc closes, Enter saves" also while typing in the field.
+                onEnter={(t) => { if ((t !== hm(startMs) || durChanged) && dur > 0) p.onApply(t); else p.onClose(); }}
+                onEscape={p.onClose}
+              />
             </div>
             <span aria-hidden style={{ color: 'var(--ink-4)', paddingBottom: 9, fontSize: 13 }}>→</span>
             <div style={field}>
@@ -142,7 +152,7 @@ export function TaskPopup(p: Props) {
             type="button"
             data-testid="task-popup-apply-time"
             disabled={!dirty}
-            onClick={p.onApply}
+            onClick={() => p.onApply()}
             style={{ ...primaryBtn, opacity: dirty ? 1 : 0.35, cursor: dirty ? 'pointer' : 'default' }}
           >
             {dirty ? 'Save time' : 'No changes'}
@@ -188,17 +198,14 @@ const seg = (on: boolean): React.CSSProperties => ({
   color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
   transition: 'background 120ms, color 120ms',
 });
+// The app's primary button (same tokens as the habit swap dialog and Settings).
 const primaryBtn: React.CSSProperties = {
-  height: 36, borderRadius: 9, border: 'none', background: 'var(--acid)',
-  color: 'var(--ink-on-bright, #111)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 650,
+  height: 36, borderRadius: 9, border: 'none', background: 'var(--btn-primary-bg)',
+  color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 650,
   transition: 'opacity 120ms',
 };
 const actionBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden',
   padding: '7px 6px', borderRadius: 8, border: '1px solid var(--paper-3)', background: 'var(--paper)',
   color: 'var(--ink)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 550,
-};
-const iconBtn: React.CSSProperties = {
-  width: 28, height: 28, flexShrink: 0, borderRadius: 8, border: 'none', background: 'transparent',
-  color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0,
 };

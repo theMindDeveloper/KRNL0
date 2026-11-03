@@ -17,7 +17,7 @@
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
@@ -70,6 +70,19 @@ import {
   ANALYTICS_VIEWS,
   defaultAnalyticsState,
 } from './types';
+import { useLocalDay } from '../../../hooks/useLocalDay';
+
+// The page each (older) view name opens: `krnl analytics show --view …` and
+// the saved view land on their page instead of always on Summary.
+const VIEW_PAGE: Record<AnalyticsView, PageId> = {
+  overview: 'summary',
+  calendar: 'year',
+  patterns: 'hours',
+  insights: 'insights',
+  estimates: 'estimates',
+  time: 'tags',
+  sources: 'habits',
+};
 
 const VIEW_LABELS: Record<AnalyticsView, string> = {
   overview: 'Overview',
@@ -100,6 +113,15 @@ const SOURCE_PALETTE: Record<string, string> = {
 };
 
 const FALLBACK_PALETTE = ['#8a7bff', '#5dd3c5', '#d18bff', '#f4d35e', 'var(--k-an-warm, #ff8e64)'];
+// Seven days, seven hues — the 5-colour palette repeated Mon/Sat and Tue/Sun.
+const WEEKDAY_PALETTE = [...FALLBACK_PALETTE, 'var(--cyan)', 'var(--acid)'];
+
+/** A source without a fixed hue keeps one by its id, not by its rank today. */
+function fallbackColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return FALLBACK_PALETTE[h % FALLBACK_PALETTE.length]!;
+}
 
 // Each view lists the cards it owns, in their default order. The settings
 // sidebar groups by view so the picker mirrors the user's mental model.
@@ -156,7 +178,7 @@ const titlebarStyle: React.CSSProperties = {
   gap: 10,
   padding: '10px 14px',
   background: 'linear-gradient(180deg, var(--k-an-bg-3, #1f2226) 0%, var(--k-an-bg-2, #16181a) 100%)',
-  borderBottom: '1px solid #0a0c0e',
+  borderBottom: '1px solid var(--k-an-line, #0a0c0e)',
   boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
   fontFamily: 'var(--font-mono)',
   fontSize: 10,
@@ -171,7 +193,7 @@ const dotStyle: React.CSSProperties = {
   height: 8,
   borderRadius: '50%',
   background: 'var(--acid, #c9f158)',
-  boxShadow: '0 0 6px rgba(201,241,88,0.7)',
+  boxShadow: '0 0 6px color-mix(in srgb, var(--acid) 70%, transparent)',
 };
 
 const summaryChipStyle: React.CSSProperties = {
@@ -291,7 +313,10 @@ function ChartCard({
   const [hostRef, hostSize] = useElementSize<HTMLDivElement>();
   const easy = useEasyMode();
 
-  if (hidden) return null;
+  // A hidden card keeps its grid cell as an empty placeholder: the pager cuts
+  // pages at card tops, so a missing top card shifted every later page by
+  // half, and the page jump lost its target.
+  if (hidden) return <div data-card-id={cardId} data-hidden-card aria-hidden style={{ ...cardPlacement(cardId, easy), minHeight: 0 }} />;
 
   const cardStyle: React.CSSProperties = {
     background: 'linear-gradient(180deg, var(--k-an-bg-2b, #1a1d20) 0%, var(--k-an-bg, #131517) 100%)',
@@ -336,30 +361,8 @@ function ChartCard({
         </span>
         <div style={{ flex: 1 }} />
         {toolbar}
-        {settingsOpen && (
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button
-              type="button"
-              data-testid={`analytics-card-pin-${cardId}`}
-              onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              title={pinned ? 'Unpin card' : 'Pin to top'}
-              style={cardActionBtn(pinned, 'var(--acid)')}
-            >
-              {pinned ? '★' : '☆'}
-            </button>
-            <button
-              type="button"
-              data-testid={`analytics-card-hide-${cardId}`}
-              onClick={(e) => { e.stopPropagation(); onToggleHidden(); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              title="Hide card"
-              style={cardActionBtn(false, 'var(--k-an-warm, #ff8e64)')}
-            >
-              −
-            </button>
-          </div>
-        )}
+        {/* Hiding cards lives in the settings panel; the old per-card ☆ / −
+            buttons only showed while that panel covered the cards. */}
       </div>
       <div
         ref={hostRef}
@@ -377,25 +380,6 @@ function ChartCard({
       </div>
     </div>
   );
-}
-
-function cardActionBtn(active: boolean, accent: string): React.CSSProperties {
-  return {
-    width: 22,
-    height: 22,
-    display: 'grid',
-    placeItems: 'center',
-    background: active ? accent : 'transparent',
-    color: active ? 'var(--k-an-on-accent, #0e1012)' : accent,
-    border: `1px solid ${accent}`,
-    borderRadius: 4,
-    cursor: 'pointer',
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    fontWeight: 700,
-    lineHeight: 1,
-    padding: 0,
-  };
 }
 
 // Most chart components still take width/height props. Pad the measured host
@@ -417,7 +401,10 @@ export function AnalyticsNode({
   const view = state.view;
   const analytics = useAnalytics();
 
-  const range = useMemo(() => lastNDays(state.rangeDays), [state.rangeDays]);
+  // Re-derive the ranges at local midnight; otherwise a window left open
+  // overnight keeps charting a range that ends yesterday.
+  const today = useLocalDay();
+  const range = useMemo(() => lastNDays(state.rangeDays), [state.rangeDays, today]); // eslint-disable-line react-hooks/exhaustive-deps
   const prevRange = useMemo(
     () => ({
       start: addDays(range.start, -state.rangeDays),
@@ -429,7 +416,7 @@ export function AnalyticsNode({
 
   const byDay = analytics.byDay(range);
   // The year heatmap always shows the last 365 days, whatever the range.
-  const yearRange = useMemo(() => lastNDays(365), []);
+  const yearRange = useMemo(() => lastNDays(365), [today]); // eslint-disable-line react-hooks/exhaustive-deps
   const yearByDay = analytics.byDay(yearRange);
 
   // One sequence of full-page cards (no tabs). The header names the card on
@@ -441,6 +428,17 @@ export function AnalyticsNode({
     setCurrentCard(item?.getAttribute('data-card-id') ?? (item ? 'summary' : null));
     setJumpTo(null);
   }, []);
+
+  // Open the saved / CLI-set view's page. Deferred a frame so the pager has
+  // measured its cards (and its first page report has passed).
+  const easyForJump = useEasyMode();
+  useEffect(() => {
+    const page = view ? VIEW_PAGE[view] : undefined;
+    // A page Easy mode hides: stay where we are.
+    if (!page || !pagesFor(easyForJump).some((p) => p.id === page)) return;
+    const id = requestAnimationFrame(() => setJumpTo(pageSelector(page)));
+    return () => cancelAnimationFrame(id);
+  }, [view, easyForJump]);
 
   // Plain-language summary on top of Overview (same text as `analytics summary`).
   const summary = summarizeAnalytics(analytics, range, prevRange, state.rangeDays);
@@ -507,9 +505,9 @@ export function AnalyticsNode({
     }
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
-      .map(([id, count], i) => {
+      .map(([id, count]) => {
         const src = sources.find((s) => s.id === id);
-        const color = SOURCE_PALETTE[id] ?? FALLBACK_PALETTE[i % FALLBACK_PALETTE.length]!;
+        const color = SOURCE_PALETTE[id] ?? fallbackColor(id);
         return { id, label: src?.label ?? id, value: count, color };
       });
   }, [events, range, sources]);
@@ -521,7 +519,7 @@ export function AnalyticsNode({
         id: `dow-${i}`,
         label: labels[i] ?? `Day ${i}`,
         value: Math.round(d.focusMin),
-        color: FALLBACK_PALETTE[i % FALLBACK_PALETTE.length]!,
+        color: WEEKDAY_PALETTE[i]!,
       }))
       .filter((s) => s.value > 0);
   }, [dow]);
@@ -572,8 +570,10 @@ export function AnalyticsNode({
 
   return (
     <div data-testid="analytics-node-root" style={rootStyle}>
-      {/* Titlebar */}
-      <div style={titlebarStyle}>
+      {/* Titlebar — the shared header class, so every frame style's header
+          skin (Macintosh title bar, Submarine module tag, …) reaches it as it
+          does the other mother windows. */}
+      <div className="krnl-node-header" style={titlebarStyle}>
         <span style={dotStyle} aria-hidden />
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
         <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
@@ -750,10 +750,10 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
   if (!est) return null;
   const k = est.kpis;
   const tile = (label: string, value: string, sub: string, testId: string) => (
-    <div data-testid={testId} style={{ minWidth: 0, padding: '12px 14px', border: '1px solid #2a2e33', borderRadius: 10, background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#aab0b7' }}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(20px, 4vh, 30px)', fontWeight: 700, color: '#eef0f2', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
-      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: '#aab0b7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
+    <div data-testid={testId} style={{ minWidth: 0, padding: '12px 14px', border: '1px solid var(--k-an-line, #2a2e33)', borderRadius: 10, background: 'var(--k-an-tile, rgba(255,255,255,0.02))', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #aab0b7)' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(20px, 4vh, 30px)', fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--k-an-ink-3, #aab0b7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
     </div>
   );
   const card = (id: AnalyticsCardId, title: string, span: number, contentHeight: number, body: (size: { width: number; height: number }) => React.ReactNode) => (
@@ -1457,12 +1457,12 @@ function ViewBody(props: ViewBodyProps) {
           </PagedView>
         )}
       </ChartCard>
-      {streaks.perHabit.length > 0 && (
+      {/* No habits yet: still a (placeholder) card, so the page grid holds. */}
         <ChartCard
           cardId="sources.streaks"
           title="Habit streaks"
           contentHeight={240}
-          hidden={isHidden('sources.streaks')}
+          hidden={isHidden('sources.streaks') || streaks.perHabit.length === 0}
           pinned={isPinned('sources.streaks')}
           settingsOpen={settingsOpen}
           onToggleHidden={() => toggleHidden('sources.streaks')}
@@ -1493,7 +1493,6 @@ function ViewBody(props: ViewBodyProps) {
             </PagedView>
           )}
         </ChartCard>
-      )}
     </div>
   );
 }

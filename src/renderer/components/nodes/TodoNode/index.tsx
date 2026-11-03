@@ -18,6 +18,7 @@ import type { PomoConfig } from '../PomoNode/types';
 import { defaultPomoConfig } from '../PomoNode/types';
 import { breakdownPomoTime } from '../../../store/pomoSchedule';
 import { toneVarForTask } from '../../../utils/taskColor';
+import { undoable } from '../../../store/undoNotice';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -71,6 +72,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   }, []);
 
   const buckets = todoBuckets(state, nowMs);
+  // One-click deletes say what went and offer UNDO (cascade included).
+  const removeItem = (id: string) => {
+    const text = state.items.find((i) => i.id === id)?.text ?? 'item';
+    undoable(`Deleted "${text}"`, () => onCommand('todo.remove', { id }));
+  };
   const tagLibrary = todoTagLibrary(state);
   // Easy mode: no tags and no pomo linking — just add, schedule, done.
   const easy = useEasyMode();
@@ -264,13 +270,17 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     }
   };
 
+  // Escape unmounts an edit input, and its blur would commit what was typed.
+  const editCancelledRef = useRef(false);
+
   const startEdit = (id: string, text: string) => {
+    editCancelledRef.current = false;
     setEditingId(id);
     setEditValue(text);
   };
 
   const commitEdit = () => {
-    if (editingId !== null) {
+    if (editingId !== null && !editCancelledRef.current) {
       const trimmed = editValue.trim();
       if (trimmed) {
         onCommand('todo.edit', { id: editingId, text: trimmed });
@@ -281,6 +291,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   const cancelEdit = () => {
+    editCancelledRef.current = true;
     setEditingId(null);
     setEditValue('');
   };
@@ -295,25 +306,30 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   const startTimeEdit = (itemId: string, taskNodeId: string) => {
     const current = taskPlannedMin.get(taskNodeId) ?? 25;
+    editCancelledRef.current = false;
     setEditingTimeId(itemId);
     setTimeValue(String(current));
     setTimeInvalid(false);
   };
 
-  const commitTimeEdit = () => {
-    if (editingTimeId === null) return;
-    const parsed = parseInt(timeValue, 10);
-    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 480) {
+  /** False when the value is invalid (the field stays open, marked red). */
+  const commitTimeEdit = (): boolean => {
+    if (editingTimeId === null || editCancelledRef.current) return true;
+    // Whole minutes only: "2.5" is rejected, not silently read as 2.
+    const parsed = Number(timeValue.trim());
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 480) {
       setTimeInvalid(true);
-      return;
+      return false;
     }
     onCommand('todo.setItemPlannedMin', { itemId: editingTimeId, minutes: parsed });
     setEditingTimeId(null);
     setTimeValue('');
     setTimeInvalid(false);
+    return true;
   };
 
   const cancelTimeEdit = () => {
+    editCancelledRef.current = true;
     setEditingTimeId(null);
     setTimeValue('');
     setTimeInvalid(false);
@@ -374,9 +390,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       {
         label: 'Delete',
         danger: true,
-        onSelect: () => {
-          onCommand('todo.remove', { id: itemId });
-        },
+        onSelect: () => removeItem(itemId),
       },
     ];
   };
@@ -462,31 +476,20 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           in dark mode, producing "green-on-white" mis-contrast. */}
       <button
         type="button"
-        className={`todo-check${item.done ? ' todo-check--done' : ''}`}
+        // Same checkbox as the task card (.task-check in tokens.css), which
+        // switches colours per mode — a fixed black fill hid the mark in
+        // every light theme.
+        className={`todo-check task-check${item.done ? ' todo-check--done task-check--done' : ''}`}
         onClick={(e) => {
           e.stopPropagation();
           onCommand('todo.toggle', { id: item.id });
         }}
-        style={{
-          flexShrink: 0,
-          width: 14,
-          height: 14,
-          border: `1px solid ${item.done ? 'var(--acid)' : 'var(--ink-4)'}`,
-          borderRadius: 3,
-          background: item.done ? '#0a0908' : 'transparent',
-          cursor: 'pointer',
-          display: 'grid',
-          placeItems: 'center',
-          padding: 0,
-          transition: 'all 0.12s',
-        }}
+        style={{ marginTop: 0 }}
         aria-label={archived ? 'Restore to list' : item.done ? 'Mark undone' : 'Mark done'}
         title={archived ? 'Restore to list' : undefined}
       >
         {item.done && (
-          <span style={{ fontSize: 9, color: 'var(--acid-ink, var(--acid))', fontWeight: 700, lineHeight: 1 }}>
-            ✓
-          </span>
+          <span className="task-check__mark">✓</span>
         )}
       </button>
 
@@ -527,7 +530,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            cursor: item.done ? 'default' : item.taskNodeId !== null ? 'pointer' : 'text',
+            // Text cursor: double-click edits. A single click does nothing (it
+            // would fire on every double-click); "Start pomo" is in the row menu.
+            cursor: item.done ? 'default' : 'text',
           }}
         >
           {item.text}
@@ -543,6 +548,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             type="number"
             min={1}
             max={480}
+            title={timeInvalid ? 'Whole minutes from 1 to 480' : 'Minutes (1–480)'}
+            aria-invalid={timeInvalid}
             value={timeValue}
             autoFocus
             onFocus={(e) => e.currentTarget.select()}
@@ -551,7 +558,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               setTimeInvalid(false);
             }}
             onKeyDown={handleTimeKeyDown}
-            onBlur={commitTimeEdit}
+            // Leaving an invalid value abandons the edit instead of leaving a
+            // red field open with nothing focused.
+            onBlur={() => { if (!commitTimeEdit()) cancelTimeEdit(); }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             style={{
@@ -651,7 +660,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          onCommand('todo.remove', { id: item.id });
+          removeItem(item.id);
         }}
         style={{
           flexShrink: 0,
@@ -788,7 +797,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 count={buckets.archived.length}
                 open={archiveOpen}
                 onToggle={() => setArchiveOpen((o) => !o)}
-                action={archiveOpen ? { label: 'CLEAR', testId: 'todo-clear-archive-btn', onSelect: () => onCommand('todo.clearArchived') } : undefined}
+                action={archiveOpen ? { label: 'CLEAR', testId: 'todo-clear-archive-btn', onSelect: () => undoable(`Cleared ${buckets.archived.length} archived`, () => onCommand('todo.clearArchived')) } : undefined}
               />
               {archiveOpen && buckets.archived.map((item, idx) => {
                 const day = item.completedAt ? isoToYMD(item.completedAt) : '';

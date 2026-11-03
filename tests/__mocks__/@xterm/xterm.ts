@@ -3,6 +3,7 @@
 export class Terminal {
   cols = 80;
   rows = 24;
+  options: Record<string, unknown> = {};
 
   private _dataHandlers: Array<(data: string) => void> = [];
 
@@ -10,6 +11,8 @@ export class Terminal {
   open(_el: unknown): void {}
   write(_data: string): void {}
   focus(): void {}
+  refresh(_start: number, _end: number): void {}
+  clear(): void {}
 
   onData(handler: (data: string) => void): { dispose: () => void } {
     this._dataHandlers.push(handler);

@@ -6,7 +6,7 @@
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { AnyNode, BoardShape } from '../../shared/dispatch/types';
-import { resolveNodeRef, resolutionError } from '../../shared/dispatch/resolveRef';
+import { resolveNodeRef, resolutionError, uniquePrefixes } from '../../shared/dispatch/resolveRef';
 import { deleteTaskCascade } from '../../shared/dispatch/task';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
@@ -110,8 +110,9 @@ export async function nodeList(
   if (nodes.length === 0) {
     return { ok: true, message: '(no nodes)', data: [] };
   }
+  const short = uniquePrefixes(nodes.map((n) => n.id), board.nodes.map((n) => n.id));
   const lines = nodes.map((n) => {
-    const id8 = n.id.slice(0, 8);
+    const id8 = short.get(n.id) ?? n.id;
     const kind = n.kind.padEnd(12);
     const mother = n.isMother === true ? '★' : ' ';
     return `${id8}  ${mother} ${kind}  ${summarize(n)}`;

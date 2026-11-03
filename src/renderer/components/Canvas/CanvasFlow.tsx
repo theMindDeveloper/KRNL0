@@ -54,7 +54,7 @@ import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
 import { ContextMenu } from '../ContextMenu';
-import { ingestImageFile, initialDisplaySize } from './dropImage';
+import { ingestImageFile, imageRejectReason, initialDisplaySize } from './dropImage';
 import { classifyFile, classifyUrl } from './dropMedia';
 import { ingestMediaFile } from './ingestMedia';
 import { MEDIA_SIZE, type MediaState } from '../nodes/MediaNode/types';
@@ -73,6 +73,11 @@ import type { FrameState } from '../nodes/FrameNode/types';
 import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 import { isStationHidden } from '../Station/stationVisibility';
+import { isStationShown, useStationViewportGate } from '../Station/useStationViewportGate';
+import { Z } from '../ui/layers';
+import { shortcutBlocked, isControlTarget } from '../../utils/keyboardTargets';
+import { requestTextEdit } from '../nodes/TextNode/editEvent';
+import { undoable } from '../../store/undoNotice';
 
 // Canvas-mode mother row: first slot x and the step between slots (540 wide +
 // 20 gap) — matches the seeded positions in main/persistence/board.ts.
@@ -323,7 +328,7 @@ const SwapButtonNode = memo(function SwapButtonNode({
         // Defensive pointer-events:none until the proximity tick switches
         // it to 'all' — keeps a hidden button from blocking canvas drags.
         pointerEvents: 'none',
-        zIndex: 100,
+        zIndex: Z.chrome,
         opacity: 0,
       }}
     >
@@ -516,8 +521,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const onEnsureVisible = (e: Event) => {
       const detail = (e as CustomEvent<{ x: number; y: number; width: number; height: number }>).detail;
       if (!detail) return;
-      const mode = useBoardStore.getState().board?.layoutMode;
-      if (mode === 'station') return;
+      if (isStationShown(useBoardStore.getState().board?.layoutMode)) return;
       ensureVisible(detail);
     };
     window.addEventListener('krnl:ensure-visible', onEnsureVisible);
@@ -767,35 +771,76 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const otherIds: string[] = [];
     const currentBoard = useBoardStore.getState().board;
     const strokeIds = ctxMenu.nodeIds.filter(isStrokeId).map((id) => id.slice(STROKE_NODE_PREFIX.length));
-    if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
     for (const id of ctxMenu.nodeIds) {
       if (isStrokeId(id)) continue;
       const node = currentBoard?.nodes.find((n) => n.id === id);
       if (node?.kind === 'todo.task') taskIds.push(id);
       else otherIds.push(id);
     }
-    if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
-    for (const id of otherIds) removeNode(id);
+    const count = ctxMenu.nodeIds.length;
+    undoable(`Deleted ${count} item${count === 1 ? '' : 's'}`, () => {
+      if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
+      if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
+      for (const id of otherIds) removeNode(id);
+    });
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
 
-  // Delete / Backspace removes selected drawings (other nodes delete from
-  // their right-click menu).
+  // Canvas keys act only while the user is on the canvas: focus on the canvas
+  // itself or on nothing in particular. In Station mode a selection survives
+  // a click on a Todo / Habit panel, and Backspace there must not delete it.
+  const onCanvas = (e: KeyboardEvent): boolean => {
+    const t = e.target;
+    return t === document.body || t === document.documentElement
+      || (t instanceof HTMLElement && !!t.closest('.react-flow'));
+  };
+
+  // Enter / F2 with exactly one note selected opens it for editing, as a
+  // click does (Tab-focused notes handle the key themselves).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.xterm'))) return;
-      const ids = getNodes().filter((n) => n.selected && isStrokeId(n.id)).map((n) => n.id.slice(STROKE_NODE_PREFIX.length));
-      if (!ids.length) return;
+      if ((e.key !== 'Enter' && e.key !== 'F2') || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (shortcutBlocked(e) || isControlTarget(e.target) || !onCanvas(e)) return;
+      const selected = getNodes().filter((n) => n.selected && !isStrokeId(n.id));
+      if (selected.length !== 1 || selected[0]!.type !== 'text') return;
       e.preventDefault();
-      useBoardStore.getState().removeStrokes(ids);
+      requestTextEdit(selected[0]!.id);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [getNodes]);
+
+  // Delete / Backspace removes what is selected: drawings and free nodes
+  // (tasks with their chain cascade, as from the right-click menu). Mother
+  // nodes are fixed and never deleted. Ctrl+Z brings it back.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (shortcutBlocked(e) || !onCanvas(e)) return;
+      const board = useBoardStore.getState().board;
+      const selected = getNodes().filter((n) => n.selected).map((n) => n.id);
+      const strokeIds = selected.filter(isStrokeId).map((id) => id.slice(STROKE_NODE_PREFIX.length));
+      const nodes = selected
+        .filter((id) => !isStrokeId(id))
+        .map((id) => board?.nodes.find((n) => n.id === id))
+        .filter((n): n is NonNullable<typeof n> => !!n && !n.isMother);
+      if (!strokeIds.length && !nodes.length) return;
+      e.preventDefault();
+      const count = strokeIds.length + nodes.length;
+      undoable(`Deleted ${count} item${count === 1 ? '' : 's'}`, () => {
+        if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
+        const taskIds = nodes.filter((n) => n.kind === 'todo.task').map((n) => n.id);
+        if (taskIds.length) deleteTaskNodesCascade(taskIds);
+        for (const n of nodes) if (n.kind !== 'todo.task') removeNode(n.id);
+      });
+      const updated = useBoardStore.getState().board;
+      if (updated && nodes.length) void saveBoard(updated);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [getNodes, removeNode]);
 
   // Global undo/redo: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z = redo.
   // Skipped when focus is on an editable surface so it doesn't fight inputs.
@@ -803,9 +848,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      if (shortcutBlocked(e)) return;
       const key = e.key.toLowerCase();
       if (key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -831,12 +874,27 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaPos = useRef<{ x: number; y: number } | null>(null);
 
+  // One notice line for files that could not be added (drop, paste, picker).
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fileNotice) return;
+    const t = setTimeout(() => setFileNotice(null), 4500);
+    return () => clearTimeout(t);
+  }, [fileNotice]);
+
   const spawnImageNodeFromFile = useCallback(async (
     file: File,
     pos: { x: number; y: number },
   ) => {
-    const result = await ingestImageFile(file);
-    if (!result) return;
+    const reason = imageRejectReason(file);
+    if (reason) { setFileNotice(`Couldn't add “${file.name}”: ${reason}`); return; }
+    let result: Awaited<ReturnType<typeof ingestImageFile>> = null;
+    try {
+      result = await ingestImageFile(file);
+    } catch (err) {
+      console.warn('[image] could not store', file.name, err);
+    }
+    if (!result) { setFileNotice(`Couldn't add “${file.name}”`); return; }
     const { width, height } = initialDisplaySize(
       result.naturalWidth,
       result.naturalHeight,
@@ -940,7 +998,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // mother row).
     if (args.kind === 'analytics') {
       const current = useBoardStore.getState().board;
-      if (current?.layoutMode === 'station') {
+      if (isStationShown(current?.layoutMode)) {
         toggleAnalyticsShown();
         return;
       }
@@ -1159,12 +1217,6 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   }, [addNode, ensureVisible]);
 
   // One path for every dropped / pasted / picked file.
-  const [fileNotice, setFileNotice] = useState<string | null>(null);
-  useEffect(() => {
-    if (!fileNotice) return;
-    const t = setTimeout(() => setFileNotice(null), 4500);
-    return () => clearTimeout(t);
-  }, [fileNotice]);
   const spawnFile = useCallback(async (file: File, pos: { x: number; y: number }) => {
     const kind = classifyFile(file);
     if (kind === 'image') { await spawnImageNodeFromFile(file, pos); return; }
@@ -1328,7 +1380,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // In station mode the mothers are rendered as station cells in
   // StationLayout — the embedded canvas must hide them (and their edges) so
   // they aren't drawn twice. ADR 0008 § 2.5.
-  const isStation = board?.layoutMode === 'station';
+  // The effective mode: below the station minimum size the window falls
+  // back to the canvas, and the mothers must be drawn here (ADR 0008 § 9.5).
+  const isStation = useStationViewportGate().effectiveMode === 'station';
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
@@ -1715,6 +1769,16 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
             updateNode(n.id, { state: { ...fs, childIds: [...cur, draggedId] } });
           }
         }
+        // A node shown on several canvases (tasks) has one position: moved
+        // here, it has left any frame on the other canvases too.
+        const shown = new Set(all.map((n) => n.id));
+        for (const f of useBoardStore.getState().board?.nodes ?? []) {
+          if (f.kind !== 'frame' || shown.has(f.id)) continue;
+          const fs = f.state as FrameState;
+          if (fs.childIds?.includes(draggedId)) {
+            updateNode(f.id, { state: { ...fs, childIds: fs.childIds.filter((id) => id !== draggedId) } });
+          }
+        }
       }
     }
 
@@ -1992,56 +2056,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         />
       )}
 
+      {/* The app's shared menu (same look as every other right-click menu). */}
       {ctxMenu && (
-        <div
-          data-testid="node-ctx-menu"
-          onContextMenu={(e) => e.preventDefault()}
-          style={{
-            position: 'fixed',
-            top: ctxMenu.y,
-            left: ctxMenu.x,
-            background: 'var(--node-bg, #18160f)',
-            border: '1px solid var(--paper-3)',
-            borderRadius: 6,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            padding: 4,
-            zIndex: 1000,
-            minWidth: 140,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}
-        >
-          <button
-            type="button"
-            data-testid="node-ctx-menu-delete"
-            onClick={deleteFromCtxMenu}
-            title="delete node"
-            style={{
-              display: 'block',
-              width: '100%',
-              textAlign: 'left',
-              padding: '6px 10px',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--rust)',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: 'inherit',
-              textTransform: 'inherit',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(200,85,61,0.12)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
-            {ctxMenu.nodeIds.length > 1 ? `delete (${ctxMenu.nodeIds.length})` : 'delete'}
-          </button>
-        </div>
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onDismiss={closeCtxMenu}
+          items={[{
+            label: ctxMenu.nodeIds.length > 1 ? `Delete ${ctxMenu.nodeIds.length} items` : 'Delete',
+            danger: true,
+            onSelect: deleteFromCtxMenu,
+          }]}
+        />
       )}
     </ReactFlow>
     </BoldSetContext.Provider>
@@ -2190,7 +2216,7 @@ function PaneNamePrompt({
         left: cx,
         top: cy,
         width: W,
-        zIndex: 10000,
+        zIndex: Z.topmost,
         background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
         borderRadius: 6,

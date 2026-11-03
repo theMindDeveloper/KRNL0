@@ -10,7 +10,7 @@ import * as crypto from 'crypto';
 import { BrowserWindow } from 'electron';
 import { SysFacade } from '../../sys/SysFacade';
 import type { CliDispatchFn } from '../../sys/SysFacade';
-import { notifyBoardChanged } from '../boardIo';
+import { notifyBoardChanged, windowViewSize } from '../boardIo';
 
 export interface RpcServer {
   socketPath: string;
@@ -39,6 +39,14 @@ function makeSockPath(): string {
     return `\\\\.\\pipe\\krnl0-${pid}`;
   }
   return `${os.tmpdir()}/krnl0-${pid}.sock`;
+}
+
+/** 0 on success; a command's own code (2 = needs an open window) else 1. */
+export function exitCodeOf(result: { ok: boolean; exitCode?: unknown; data?: unknown }): number {
+  if (result.ok) return 0;
+  if (typeof result.exitCode === 'number') return result.exitCode;
+  const data = result.data as { exitCode?: unknown } | undefined;
+  return typeof data?.exitCode === 'number' ? data.exitCode : 1;
 }
 
 function writeFrame(socket: net.Socket, frame: RpcFrame): void {
@@ -75,6 +83,9 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
           // malformed — ignore
           continue;
         }
+        // Valid JSON that isn't a request object ("null", "42") — ignore it
+        // rather than throwing inside the socket listener (crashes main).
+        if (typeof req !== 'object' || req === null) continue;
 
         // TNF9: token mismatch → single exit frame, close immediately
         if (req.token !== token) {
@@ -93,9 +104,10 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
             boardPath,
             hasOpenRenderer: () => BrowserWindow.getAllWindows().length > 0,
             onBoardChanged: notifyBoardChanged,
+            viewSize: windowViewSize,
             ...(dispatch ? { cliDispatch: dispatch } : {}),
           });
-          let result: { ok: boolean; message?: string };
+          let result: { ok: boolean; message?: string; exitCode?: unknown; data?: unknown };
           try {
             result = await facade.run(argv);
           } catch (err) {
@@ -109,7 +121,10 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
             const kind = result.ok ? 'stdout' : 'stderr';
             writeFrame(socket, { v: 1, id: reqId, kind, data: result.message });
           }
-          writeFrame(socket, { v: 1, id: reqId, kind: 'exit', code: result.ok ? 0 : 1 });
+          writeFrame(socket, { v: 1, id: reqId, kind: 'exit', code: exitCodeOf(result) });
+        }).catch((err: unknown) => {
+          // Keep the chain alive: a rejected link would skip every later request.
+          console.error('[rpc] request failed', err);
         });
       }
     });
@@ -119,6 +134,11 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
     });
   });
 
+  // A stale socket or a taken pipe name must not crash main; the app still
+  // works without the terminal CLI bridge.
+  server.on('error', (err) => {
+    console.error('[rpc] server error', err);
+  });
   server.listen(socketPath);
 
   return {

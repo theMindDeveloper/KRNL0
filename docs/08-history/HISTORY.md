@@ -916,3 +916,194 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `TMD/pomodoro-observer-mode-f9cfd3`  
 **Files changed:** `store/uiMode.ts` (new), board type/schema/seed, `TopBar` settings, Pomo/Clock/Calendar/Todo/Analytics gates, `scheduleMenus`, `TaskInfoPopup`, `CanvasFlow`, `sys` (`settings mode`), `tests/unit/easyMode.test.ts`, `docs/06-requirements/easy-mode.md`  
 **Summary:** A global Easy / Advanced switch in Settings. Easy hides the links between features and keeps the data identical: the Pomo is a stopwatch with breaks that never asks or names anything, recorded time is one colour, there are no tags or Focus buttons, and Analytics drops the plan-vs-actual and time-by-tag pages. Plan and reality are compared by time on the Clock and Calendar. New boards start in Easy and existing boards stay Advanced. CLI: `krnl settings mode [easy|advanced]`. Also fixed: Start no longer re-suggests a planned task over a continued name.
+
+---
+
+## [2026-11-03] — Autonomous bug-fix and polish pass (batch 1)
+
+**Type:** Bug Fix
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `ec341e5` … `4f9439b`
+**Files changed:** `main/{persistence/board,boardIo,index,ipc/handlers,rpc/server}.ts`, `renderer/App.tsx`, `store/{boardStore,useCliDispatch,scheduleActions,eventLog/boardSaveLogging}.ts`, `Canvas/{CanvasFlow,commandDispatch,dropImage,dropMedia}.ts*`, `PomoNode/commands.ts`, `shared/{dispatch/task,ymd}.ts`, `sys/commands/{clock,cal,pomo,habit}.ts`, Calendar / Clock / Analytics / TerminalNode / TextNode / TopBar / ui components, theme colour fixes, 12 test files
+**Summary:**
+- **Data safety:** a locked or unreadable `board.json` no longer comes back as the seed (which the next save or CLI command wrote over the real board). Reads retry, then the app shows a "board not loaded — Try again" screen. Failed writes are reported, temp files are unique per writer, and one app instance runs per data folder.
+- **Persistence:** content saves keep the current camera position; swapped mother windows keep their order after a reload; the RPC server ignores non-request JSON instead of crashing main.
+- **Pomo:** the gear's Session length applies on the next START. Ticking a task done (card, Todo row or popup) or deleting it mid-session records the real span instead of the session length (an Observe span was booked as 24 h), and writes nothing onto the task (time-model F2).
+- **CLI:** `krnl undo/redo` persist; `node move` takes short refs and refuses mothers; `term setTitle/setFontSize/clear` work (the dispatch switch matched a kind no node has); impossible dates are rejected and `clock show` survives a bad stored day; `pomo start` during a break says to resume; `pomo config` never saves 0 minutes.
+- **Calendar / Clock / Analytics:** drop, resize and right-click land on the right time at any canvas zoom; Unschedule and Show on calendar work for chain successors ("Unschedule chain"); Enter/Esc work in the task popup's time field; the Clock shows a task's real times and respects Easy mode in its menu; analytics ranges roll over at midnight.
+- **Canvas / UI:** text-note Escape restores the pre-edit text after autosave; refused image drops say why; double-click renames a canvas; light-theme contrast fixes (primary buttons, Orb/Commander, analytics tiles, danger red, pomo toggle) and no left-edge accent bars in the radio.
+
+**Tests:** see the batch report; new tests in `tests/unit/{main,sys,renderer}` and `tests/integration`.
+
+---
+
+## [2026-11-03] — Autonomous bug-fix pass (batch 2)
+
+**Type:** Bug Fix
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `753b7dc` … `84e1184`
+**Files changed:** `shared/boardMerge.ts` (new), `main/ipc/handlers.ts`, `shared/dispatch/task.ts`, `Canvas/commandDispatch.ts`, `PomoNode/index.tsx`, `TodoNode/commands.ts`, `HabitLaneNode/index.tsx`, `store/useCliDispatch.ts`, `sys/{parser,SysFacade}.ts`, `sys/commands/{task,pomo,info,theme}.ts`, tests
+**Summary:**
+- **Edits survive a CLI write (Decision 34):** a renderer save that arrives after the CLI / AI terminal changed `board.json` is three-way merged instead of being refused and thrown away on reload. The merge recurses into node state (Todo rows, pomo spans, habits by id); when both sides changed the very same value the file wins and the user's version stays one undo step away.
+- **One name everywhere:** renaming a Todo row renames its task card, calendar block, pomo label and ledger entry, and the other way round (`renameTask`, shared with `krnl task edit`).
+- **Easy mode:** START never links a span to a task left over from Advanced, and the header doesn't show one. Observe / Easy no longer shows a gear that opened an empty panel.
+- **Terminal:** a page reload, renderer crash or closed window kills that page's shells instead of leaking one per reload.
+- **CLI parity:** `task subtask` creates and links its Todo row; `task subtask` / `task addNext` without a duration are open-ended like the canvas; `krnl cal --from …`, `clock --json` etc. run the default subcommand; `theme show`, `info` and `settings show` report the window's real light/dark theme.
+- **Todo:** open items are never hidden by the 50-row cap. **Habit lane:** rolls over at midnight.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 3): away guard, CLI parity, shared UI, day attribution
+
+**Type:** Bug Fix / Feature / Refactor
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `d36e647` … `7685b2d`
+**Files changed:** `shared/boardMerge.ts`, `PomoNode/{useAwayGap.ts (new),commands.ts,index.tsx}`, `HabitLaneNode/index.tsx`, `sys/{parser,SysFacade}.ts`, `sys/commands/{pomo,task}.ts`, `main/rpc/server.ts`, `store/useCliDispatch.ts`, `ui/{Switch,CloseButton}.tsx (new)`, `ui/TaskInfoPopup.tsx`, `analytics/{dateRange,engine,summary,sources/pomoSource}.ts`, `CalendarNode/YearView.tsx`, `ClockNode/index.tsx`, `docs/03-architecture/decisions.md` (Decision 34), `docs/06-requirements/pomo-node.md` (F23), tests
+**Summary:**
+- **Merge safety:** the stale-save merge recurses into node state (Todo rows, pomo spans, habits by id), so a UI tick and a `krnl task add` both survive; a true same-value conflict keeps the file's value (Decision 34).
+- **Pomo away guard (F23):** time the window didn't see (sleep, app closed) is offered as "AWAY 18:02–09:14 — count that time?" with COUNT IT / STOP AT 18:02 instead of being booked as work. CLI: `pomo stop --at HH:MM`.
+- **CLI parity:** `task unschedule` on a chain successor clears the anchor; `task toggle` / `todo check` stop the pomo on that task; exit code 2 reaches the shell; `marquee --delete` deletes every non-mother node in the rect as documented; a value-less flag no longer swallows the next flag.
+- **Habit lane:** can't tick an unscheduled day.
+- **Shared UI:** `ui/Switch` (Pomo, Analytics settings) and `ui/CloseButton` (Settings, Orb, Commander, task popup, habit swap); the task info popup closes on Esc and scrolls when tall.
+- **Day attribution:** spans over midnight count their minutes on each day in Overview, heatmap, Year view and "today so far", as the week view always did; "active days" uses one rule. The Clock stays on the hour marks on DST days.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 4): theme accents, CLI refs, docs
+
+**Type:** Bug Fix / Docs
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `15afd11` … `d721973`
+**Files changed:** `ui/PieMenu.tsx`, `Canvas/PenWheel.tsx`, `CalendarNode/{NowLine,WeekView}.tsx`, `analytics/sources/habitSource.ts`, `shared/dispatch/resolveRef.ts`, `sys/commands/{node,edge,task,text,image,pomo,draw,cal}.ts`, `docs/04-visual-system/design-tokens.md`, tests
+**Summary:**
+- **Theme accents:** the pie menu and pen wheel use `--accent-on-dark` instead of a fixed lime, so Blueprint, Submarine and Macintosh show their own accent.
+- **Calendar:** the day view's now dot sits in the day's column.
+- **Analytics:** archiving a habit keeps its past check-ins in the totals.
+- **CLI refs:** listings print the shortest unique prefix (8+) so every printed id can be typed back; ambiguous task refs list their matches; `text` / `image` commands accept prefixes; resize rejects non-positive sizes; segment and stroke refs need 4+ characters; `cal show` rejects unpadded/impossible dates; `pomo segments` uses the real local day end on DST days.
+- **Docs:** the visual-system colour table is regenerated from `tokens.css` and documents the accent pairs, the shared `ui/` components and the no-left-edge-bar rule.
+- **Follow-ups to batches 2–3:** split midnight spans are timestamped inside their own day (hour / weekday charts), and the stale-save merge merges arrays of plain values (habit logs, keywords) as sets, so concurrent ticks from the UI and the CLI both survive.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 5): audit fixes, CLI parity, layering
+
+**Type:** Bug Fix / Feature / Refactor
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `2168dc3` … `941470b`
+**Files changed:** `main/persistence/board.ts` (`migrateBoard`), `main/ipc/handlers.ts`, `main/boardIo.ts`, `main/rpc/server.ts`, `shared/boardMerge.ts`, `PomoNode/useAwayGap.ts`, `analytics/{dateRange,sources/pomoSource}.ts`, `sys/{parser,SysFacade}.ts`, `sys/commands/{frame,pomo,info}.ts`, `shared/cli/commandRegistry.ts`, `store/useCliDispatch.ts`, `AmbientRadio/{index.tsx,radioControl.ts (new)}`, `ui/layers.ts` (new) + 17 overlay components, `docs/04-visual-system/design-tokens.md`, `docs/06-requirements/ai-full-visibility-cli.md`, tests
+**Summary:**
+- **Stale-save merge (second pass):** board.json comes back from the loader migrated (defaults added, keys reordered) while the renderer's copies don't; the merge read that reshaping as an edit by the file, so a node created and then deleted could come back after any CLI write. All three boards now go through the same `migrateBoard` first. A user's reorder of a list survives a CLI addition; lists with repeated values are no longer merged as sets.
+- **Pomo away prompt:** a prompt about a span the CLI ended (break / extend) is dropped instead of being applied to the next span. `pomo stop --at` refuses a time before the span started and a paused / idle pomo instead of recording 0 minutes or echoing a time it ignored.
+- **Analytics:** a span ending exactly at midnight stays on the day before (hour chart and session date included); proportional day splits round the running total, so no day gets negative minutes.
+- **CLI:** `frame add` without `--at` lands in the middle of the visible canvas, not at its top-left corner. New `settings layout [station|canvas]` and `radio list|status|play|remove|stop|volume` (hard rule 8).
+- **Layering:** one named stacking scale (`ui/layers.ts`) replaces the scattered z-index numbers; dropdowns and pickers now sit above full-window modals by rule, not by DOM order.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 6): UX audit fixes, keyboard, undo notice
+
+**Type:** Bug Fix / Feature / Refactor
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `2980b6f` … `ecc5007`
+**Files changed:** `TodoNode`, `FrameNode`, `HabitNode/{index,HabitContextMenu}.tsx`, `TextNode`, `ImageNode`, `Assistant/{Commander.tsx,types.ts,flows/sessionFromCommander.ts}`, `Orb/{index.tsx,freshBoard.ts}`, `Dock`, `TopBar` (Settings), `Canvas/CanvasFlow.tsx`, `ui/{LayoutModeToggle,HabitSwapModal,UndoNoticeBar}.tsx`, `store/undoNotice.ts`, `utils/keyboardTargets.ts`, `shared/scheduleAt.ts` (new, shared with `sys task schedule`), node helper modules (`PomoNode/display.ts`, `ClockNode/wallHours.ts`, `CalendarNode/{screenScale,yearActivity}.ts`, `TaskNode/format.ts`), `docs/06-requirements/todo-node.md` (F10 retired), tests
+**Summary:**
+- **Escape cancels:** in the Todo text and minutes edits, the frame label and the habit rename, Escape used to unmount the field and its blur saved what was typed anyway. The Todo minutes field rejects "2.5" instead of reading 2, and an invalid value no longer leaves a red field stuck open.
+- **Commander:** the start time and the 5-task limit are checked before launch (`HH:MM` means today); the "Session locked in" line needs this session's head task to have its time, not any task on the board.
+- **Keyboard:** Dock single-key shortcuts, canvas Delete and undo stand down while typing or behind a modal (Settings, Commander, habit swap); Space push-to-talk leaves focused buttons and radios alone; Settings closes on Escape; Delete removes selected free nodes (not only drawings); notes are reachable with Tab and open with Enter / F2.
+- **Undo notice:** one-click deletes (Todo ✕ and menu, Archive CLEAR, habit delete, canvas Delete and menu) show "Deleted … · UNDO" for a few seconds; UNDO takes back the whole cascade in one step and only while nothing else changed.
+- **Smaller:** selecting text in a note or frame label no longer drags the node; long notes scroll while editing; the habit add field clears on Escape and never drops a half-set repeat silently; a picked image that can't be used says why on the node; a brand-new board is greeted with an introduction and a pointer to the tour.
+- **Todo F10 retired:** a single click on a row's text was specified to start its pomo, but it would fire on the first half of every double-click (rename). "Start pomo" stays in the row menu; the misleading pointer cursor is gone.
+- **Dev:** pure helpers moved out of the Pomo, Clock, Task, Week and Year component files, so React Fast Refresh hot-swaps them instead of reloading the page. The stale-save merge is now also covered through the real `board:save` IPC handler.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 7): terminal that survives, Station sizes, notes
+
+**Type:** Bug Fix / Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `f32406c` … `a42f113`
+**Files changed:** `TerminalNode/{index.tsx,session.ts,liveTerminals.ts (new)}`, `main/{ipc/handlers.ts,preload.ts}`, `renderer/env.d.ts`, `store/useCliDispatch.ts`, `Station/{StationLayout.tsx,restoredSizes.ts (new),useStationViewportGate.ts}`, `Canvas/CanvasFlow.tsx`, `ui/LayoutModeToggle.tsx`, `TextNode/{index.tsx,editEvent.ts (new)}`, `shared/{types/board.ts,schemas/board.schema.ts}`, `docs/06-requirements/terminal-node.md` (F4 / F15 amended), tests (+ xterm mock `options` / `refresh`)
+**Summary:**
+- **Terminal survives remounts:** switching Station ↔ Canvas, hiding the terminal panel or swapping slots used to kill the shell (and whatever ran in it, the AI included) and wipe the output. The xterm and its PTY now live in a per-node registry; unmount detaches, the next mount re-attaches and refits. Shells still end with their window (main kills them on reload / navigation / crash / close). Spec F4 / F15 amended.
+- **Terminal never dead:** after `exit` (or a crash) the badge reads EXITED and Enter starts a new shell; a shell that cannot start prints why in red and retries on Enter (it used to be a blank black box). One catch-up resize after spawn, so the PTY never keeps stale columns. `krnl term setShell` is now used for the next shell (it was saved but never read). Ctrl+Shift+L works from inside the terminal. A short panel gets the one-line banner. The right-click menu is the shared ContextMenu (closes on outside click, not clipped by narrow panels).
+- **Station:** in the narrow-window fallback (below 1024 × 640) the canvas now draws the mother nodes, and Dock "A" / ensure-visible act as Canvas mode. Panel sizes (row split, top columns, every bottom panel) come back after a reload or a layout switch.
+- **Notes:** a note whose text runs past its box fades at the bottom; Enter or F2 opens the selected note for editing.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 8): paste, month view, analytics
+
+**Type:** Bug Fix
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `d71a7b2` … `9bb0c9c`
+**Files changed:** `TerminalNode/{session.ts,index.tsx}`, `CalendarNode/{MonthView,WeekView}.tsx`, `AnalyticsNode/index.tsx`, `analytics/summary.ts`, tests
+**Summary:**
+- **Terminal paste:** Ctrl+V and right-click Paste go through xterm's paste (bracketed when the shell asks for it), so a multi-line paste no longer runs line by line; Ctrl+V cancels the browser's own paste so text can only arrive once; Cmd+C with nothing selected no longer sends ^C on macOS. (`e01f22f` carried only its test; the code followed in `d1626e4`.)
+- **Month view:** up to six habit dots before "+N", and "+N" counts the hidden ones; no dots before a habit existed; the calendar's "show habits" setting is honoured; today's cell (month and week view) moves at midnight; a click also moves the anchor so Week / Day open on that day, a double-click opens it; chips are earliest first, so "+N" hides the latest.
+- **Analytics:** a hidden card keeps its grid cell — hiding a page's top card used to shift every later page by half and break the page jump; the headline says "the last 7 days" (the range is rolling); seven distinct weekday colours; extra sources keep their colour by id; the saved / CLI-set view opens its page.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 9): month drops, plan vs actual, review follow-ups
+
+**Type:** Bug Fix / Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `a104ecf` … `d8fa4a7`
+**Files changed:** `CalendarNode/MonthView.tsx`, `styles/reactflow-theme.css`, `analytics/charts/PlanVsActual.tsx`, `AnalyticsNode/index.tsx`, `Station/{StationLayout.tsx,restoredSizes.ts}`, `Canvas/CanvasFlow.tsx`, `TerminalNode/{index.tsx,liveTerminals.ts}`, `main/ipc/handlers.ts`, tests
+**Summary:**
+- **Month view drops (ADR 0001 §9):** day cells take Todo rows, canvas tasks and other month chips; a task keeps its time of day on the new date, a new one starts at 09:00. Month chips drag between days.
+- **Plan vs actual:** "+N more" when tasks don't fit (they were dropped silently).
+- **Analytics:** the per-card ☆ / − buttons are gone — they only appeared under the settings panel that covers the cards, and pinning never moved a card (each card has a fixed grid cell). Hiding stays in the settings panel.
+- **Review follow-ups (batches 5–8):** the mother-row height is saved only from a real two-row split; the clock stays locked to the calendar column when other bottom panels change; canvas Delete / Enter act only while focus is on the canvas (a selection left in the embedded canvas is safe while typing in a Station panel); EXITED survives a remount; a terminal's cleanup never removes a newer mount's host; the analytics view jump handles Summary and skips pages Easy mode hides; a stale save whose payload can't be normalised still merges.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 10): tasks, habit lanes, CLI parity
+
+**Type:** Bug Fix / Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `f6c9501` … `78a4c4b`
+**Files changed:** `TaskNode/index.tsx`, `HabitLaneNode/index.tsx`, `HabitNode/HabitContextMenu.tsx`, `Canvas/CanvasFlow.tsx`, `sys/{parser,SysFacade}.ts`, `sys/commands/{habit,task,text,analytics,clock,cal}.ts`, `shared/cli/commandRegistry.ts`, `docs/06-requirements/task-node.md` (F10 / F11), tests
+**Summary:**
+- **Task cards:** "Add parallel task" is saved (it lived only in memory, so the next CLI write or a quit lost it); an open-ended task shows "no set time" with no made-up estimate or overrun; opening "Edit time" and leaving it unchanged writes nothing (it used to turn an open-ended task into a fixed 25-minute one); the card's Delete offers UNDO.
+- **Habit lanes:** `krnl habit remove` / `archive` take the habit's lanes with them; an orphan lane's cleanup is saved and leaves no undo slot (undoing to it re-created the orphan, which deleted itself again — a stuck undo); an archived habit's lane goes away; new "Unpin lane (keep the habit)"; the lane's Delete offers UNDO; the 7-day strip follows the same schedule rule as the tick; lane numbers count lanes instead of reading uuid digits.
+- **Frames:** a task moved on one canvas also leaves frames on the other canvases.
+- **CLI parity (hard rule 8):** `text look <id> --note|--sticky|--shape …|--color`, `analytics cards | hide | unhide | reset-cards`, `clock half [am|pm]`, `cal zoom <1-6>`; `task addNext`'s placeholder estimate follows the source's plan as the canvas does.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 11): CLI gaps, theme readability
+
+**Type:** Bug Fix / Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `5f15d2b` … `5821e25`
+**Files changed:** `sys/{parser,SysFacade}.ts`, `sys/commands/{media,draw,analytics}.ts`, `shared/cli/commandRegistry.ts`, `TodoNode`, `MediaNode`, `Assistant/Commander.tsx`, `AnalyticsNode/{index,AnalyticsSettings,SummaryHero}.tsx`, `ui/Switch.tsx`, `TaskNode`, `PomoNode`, `FrameNode`, `ImageNode`, `TextNode`, `CalendarNode/TaskPopup.tsx`, `Canvas/CanvasFlow.tsx`, tests
+**Summary:**
+- **CLI parity (hard rule 8):** `media resize <id> --w --h`, `media page <id> <n>`, `draw stroke --points "x,y …" [--tool --color --size]`, `analytics clear-history --yes` (not undoable, so it asks for `--yes`). Factory reset stays UI-only on purpose (hold-to-confirm, wipes the board).
+- **Readable in every theme:** the Todo done checkbox is the task card's checkbox (a fixed black fill hid the mark in every light theme); Media error links and Commander hints use the always-dark palette (Macintosh light made them near-black on black); the Analytics tiles, off-switch knob and header line use the panel's own tokens.
+- **One accent:** task and pomo glows follow the frame style's accent instead of a fixed lime; resize grips use `--ink-4`; the calendar task popup's primary button uses the primary-button tokens; the canvas node menu is the shared ContextMenu.
+- **One shell:** the habit menu, the calendar task popup and media cards use the shared menu / popover / card radius and shadow tokens (`de8b2a1`).
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 12): assistant and chrome
+
+**Type:** Bug Fix
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `8ab6586` … HEAD
+**Files changed:** `Assistant/{ScriptRunner.ts,flows/tutorialPomoTodo.ts,flows/focusSession.ts}`, `main/preload.ts` (`sysRun`), `renderer/env.d.ts`, `dev/previewBridge.ts`, `Orb/index.tsx`, `Dock/index.tsx`, `StatusBar/index.tsx`, `AnalyticsNode/index.tsx`, tests
+**Summary:**
+- **Assistant commands:** flows run `krnl` commands in main through the CLI facade with their arguments intact. They used to be typed into a hidden shell: multi-word task names were cut to their first word (so Commander sessions always "went wrong") and every command waited out a 5 s timeout. Failures now show in the caption; a stopped flow can't resume when another starts; stopping a flow stops the radio.
+- **Tutorials:** the removed double-click "bind to Pomodoro" lesson is replaced by the current way (Start pomo on the Todo row; skipped in Easy mode); the "wait for you to do it" steps ignore tasks that were already on the board; the focus session says what starting really does and no longer promises a break announcement.
+- **Orb and chrome:** the chat panel and caption open toward free space and the orb can't park under the top bar; a chat message launches a flow only when it names it (typing "a" started a Pomodoro); quick actions stay after the first message; the placeholder names the real shortcut (hold Space). The Dock's shape button closes its own menu; the status bar counts sessions to the Pomo's real long break; the Analytics header gets each frame style's header skin.
+
+---
+
+## [2026-11-03] — Pro light mode, "Paper" style name
+
+**Type:** Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Files changed:** `themes/manifests.ts` (`PRO_LIGHT`), `shared/frameStyles.ts`, `ChassisLayer/dockRegistry.tsx`, `styles/chassis.css`, `sys/SysFacade.ts`, `docs/06-requirements/theme-engine.md` (F4), tests
+**Summary:**
+- **Pro light:** Pro was dark-only, so choosing Light switched the frame to the default style. Pro now has its own light palette — light-grey panels, graphite ink, the lime kept as a fill with dark text on it, deep green where it is text — with the same squared, matte frame. It passes the theme contrast checks.
+- **"Paper":** the default style (id `classic`) is shown as "Paper · Cream & lime" instead of "Classic · Default frame" (Pro is the default anyway). The id is unchanged, so saved choices and scripts keep working; `krnl theme frame paper` works too.

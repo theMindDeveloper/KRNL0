@@ -78,7 +78,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Control the Pomodoro timer',
     subcommands: [
       { name: 'start', usage: 'pomo start [--label "..."] [--minutes 25]', summary: 'Start a pomo session' },
-      { name: 'stop', usage: 'pomo stop', summary: 'Stop the timer and record the in-flight span' },
+      { name: 'stop', usage: 'pomo stop [--at HH:MM|YYYY-MM-DDTHH:MM]', summary: 'Stop the timer and record the in-flight span (--at: end it at an earlier moment, e.g. when you left)' },
       { name: 'pause', usage: 'pomo pause', summary: 'Pause a running session' },
       { name: 'resume', usage: 'pomo resume', summary: 'Resume a paused session, or go back to work from a break (records the break)' },
       { name: 'break', usage: 'pomo break', summary: 'Switch from work to an open-ended break' },
@@ -99,6 +99,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'add', usage: 'text add [--text "..."] [--at x,y] [--near <ref>] [--sticky] [--shape rect|ellipse|diamond] [--color <css>]', summary: 'Add a text node, a sticky note (--sticky) or a shape (--shape). --near positions at srcX + srcW + 24, srcY' },
       { name: 'set', usage: 'text set <id> --text "..."', summary: 'Update text node content' },
       { name: 'resize', usage: 'text resize <id> --w N --h N', summary: 'Resize a text node' },
+      { name: 'look', usage: 'text look <id> --note | --sticky [--color <css>] | --shape rect|ellipse|diamond [--color <css>] | --color <css>', summary: 'Turn a note into a sticky or a shape (or back), or recolour it' },
     ],
   },
   {
@@ -135,6 +136,11 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'open', usage: 'analytics open', summary: 'Show the Analytics window (station mode: its panel beside the terminal)' },
       { name: 'close', usage: 'analytics close', summary: 'Hide the Analytics window (station mode panel)' },
       { name: 'toggle', usage: 'analytics toggle', summary: 'Toggle the Analytics window' },
+      { name: 'cards', usage: 'analytics cards [--json]', summary: 'List the chart cards and whether each is shown' },
+      { name: 'hide', usage: 'analytics hide <card-id>', summary: 'Hide a chart card (same as the settings panel)' },
+      { name: 'unhide', usage: 'analytics unhide <card-id>', summary: 'Show a hidden chart card again' },
+      { name: 'reset-cards', usage: 'analytics reset-cards', summary: 'Show every chart card again' },
+      { name: 'clear-history', usage: 'analytics clear-history --yes', summary: 'Delete every recorded pomo span and the completion ledger (cannot be undone; same as the settings button)' },
     ],
   },
   {
@@ -184,6 +190,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'add', usage: 'media add <url> [--at x,y]', summary: 'YouTube/Vimeo/SoundCloud/… → embedded player; other URLs → link card' },
       { name: 'list', usage: 'media list [--json]', summary: 'List media nodes' },
+      { name: 'resize', usage: 'media resize <id> --w N --h N', summary: 'Resize a media node' },
+      { name: 'page', usage: 'media page <id> <n>', summary: 'Show page n of a PDF card' },
     ],
   },
   {
@@ -193,6 +201,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'list', usage: 'draw list [--json]', summary: 'List strokes (id, tool, colour, points)' },
       { name: 'delete', usage: 'draw delete <strokeId>', summary: 'Delete one stroke' },
       { name: 'clear', usage: 'draw clear', summary: 'Delete every stroke' },
+      { name: 'stroke', usage: 'draw stroke --points "x,y x,y …" [--tool pen|marker|highlighter|arrow] [--color <css>] [--size N]', summary: 'Draw a stroke through the given canvas points (arrow: first → last)' },
     ],
   },
   {
@@ -211,6 +220,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Calendar view of cascade-scheduled tasks (ADR 0003/0005)',
     subcommands: [
       { name: 'view', usage: 'cal view <day|week|month|year> [--date YYYY-MM-DD]', summary: 'Switch the Calendar view (year = 12 mini-months with focus heat)' },
+      { name: 'zoom', usage: 'cal zoom <1-6>', summary: 'Week / day view hour height (1 = hourly grid … 6 = 5-minute grid), as the zoom buttons'},
       { name: 'show', usage: 'cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]', summary: 'List all scheduled task placements, sorted by time' },
     ],
   },
@@ -220,6 +230,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'day', usage: 'clock day <YYYY-MM-DD|today|+1|-1>', summary: 'Set the clock selected date (absolute, today, or ±1 day)' },
       { name: 'dial', usage: 'clock dial [on|off]', summary: 'Dial-only view: the clock face as big as the window allows (toggles without an argument)' },
+      { name: 'half', usage: 'clock half [am|pm]', summary: 'Which half of the day the dial shows (toggles without an argument)' },
       { name: 'show', usage: 'clock show [--json]', summary: 'Show scheduled tasks for the clock\'s selected date and view window' },
     ],
   },
@@ -232,10 +243,23 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
   },
   {
     group: 'settings',
-    summary: 'Read app settings',
+    summary: 'Read and set app settings',
     subcommands: [
       { name: 'show', usage: 'settings show [--json]', summary: 'theme + viewport + boardPath + version' },
       { name: 'mode', usage: 'settings mode [easy|advanced]', summary: 'Show or set the UI mode (Easy hides links between features; data is the same)' },
+      { name: 'layout', usage: 'settings layout [station|canvas]', summary: 'Show or set the layout (Station docks windows beside the terminal; same as the top-bar pill / Ctrl+Shift+L)' },
+    ],
+  },
+  {
+    group: 'radio',
+    summary: 'Ambient Radio — the sound mix in the open window',
+    subcommands: [
+      { name: 'list', usage: 'radio list', summary: 'The presets you can mix (dark, rain, fire, synth, white, brown)' },
+      { name: 'status', usage: 'radio status', summary: 'Playing or paused, the layers in the mix, master volume' },
+      { name: 'play', usage: 'radio play [<preset>]', summary: 'Play (resume) the mix; with a preset, add that layer to it' },
+      { name: 'remove', usage: 'radio remove <preset>', summary: 'Take a layer out of the mix' },
+      { name: 'stop', usage: 'radio stop', summary: 'Pause the mix (it is kept for the next play)' },
+      { name: 'volume', usage: 'radio volume <0-100>', summary: 'Set the master volume' },
     ],
   },
   {
@@ -251,7 +275,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'marquee',
     summary: 'Select by rectangle (requires open renderer)',
     subcommands: [
-      { name: '--rect', usage: 'marquee --rect x1,y1,x2,y2 --delete', summary: 'Delete every node inside the rectangle. --delete is required; undoable with undo.' },
+      { name: '--rect', usage: 'marquee --rect x1,y1,x2,y2 --delete', summary: 'Delete every node on the current canvas whose top-left corner is inside the rectangle (mother windows excepted). --delete is required; undoable with undo.' },
     ],
   },
   {
