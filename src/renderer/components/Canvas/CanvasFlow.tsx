@@ -1769,6 +1769,16 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
             updateNode(n.id, { state: { ...fs, childIds: [...cur, draggedId] } });
           }
         }
+        // A node shown on several canvases (tasks) has one position: moved
+        // here, it has left any frame on the other canvases too.
+        const shown = new Set(all.map((n) => n.id));
+        for (const f of useBoardStore.getState().board?.nodes ?? []) {
+          if (f.kind !== 'frame' || shown.has(f.id)) continue;
+          const fs = f.state as FrameState;
+          if (fs.childIds?.includes(draggedId)) {
+            updateNode(f.id, { state: { ...fs, childIds: fs.childIds.filter((id) => id !== draggedId) } });
+          }
+        }
       }
     }
 
