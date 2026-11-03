@@ -58,7 +58,8 @@ export function summarizeAnalytics(
   const dow = engine.byDayOfWeek(range);
   const hours = engine.byHourOfDay(range);
 
-  const activeDays = days.filter((d) => d.taskCount + d.habitCount + d.sessions > 0).length;
+  // Same rule as the KPI tiles: any task, habit or tracked focus makes a day active.
+  const activeDays = days.filter((d) => d.taskCount > 0 || d.habitCount > 0 || d.focusMin > 0).length;
   const bestDow = [...dow].sort((a, b) => b.focusMin + b.tasks * 25 - (a.focusMin + a.tasks * 25))[0];
   const bestHour = [...hours].sort((a, b) => b.focusMin + b.tasks * 25 - (a.focusMin + a.tasks * 25))[0];
   const hasBestDow = !!bestDow && bestDow.focusMin + bestDow.tasks > 0;

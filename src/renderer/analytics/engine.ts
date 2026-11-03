@@ -18,7 +18,7 @@ import type {
 } from './types';
 import { collectAllEvents } from './registry';
 import { calcHabitStreak, listHabits } from './sources/habitSource';
-import { isoToYMD, todayLocal } from './dateRange';
+import { isoToYMD, splitMinutesByLocalDay, todayLocal } from './dateRange';
 import {
   byDay,
   byDayOfWeek,
@@ -33,6 +33,7 @@ interface TaskLike {
 }
 
 interface PomoSessionLike {
+  startedAt?: string;
   endedAt: string;
   durationMin: number;
   completed: boolean;
@@ -137,11 +138,15 @@ export function buildAnalytics(board: BoardLike): AnalyticsResult {
           const history = s.history ?? [];
           for (const rec of history) {
             if (!rec.endedAt || rec.kind === 'break') continue;
-            if (isoToYMD(rec.endedAt) === today) {
-              // Focus counts every work span; sessions only full pomodoros.
-              if (rec.completed) sessionsToday += 1;
-              focusMinToday += rec.durationMin ?? 0;
-            }
+            // Sessions count on the day they ended; focus counts today's part
+            // of every work span (a span over midnight splits, like the charts).
+            if (rec.completed && isoToYMD(rec.endedAt) === today) sessionsToday += 1;
+            const endMs = Date.parse(rec.endedAt);
+            const startMs = rec.startedAt ? Date.parse(rec.startedAt) : endMs;
+            const parts = Number.isFinite(startMs) && startMs < endMs
+              ? splitMinutesByLocalDay(startMs, endMs, rec.durationMin ?? 0)
+              : [{ date: isoToYMD(rec.endedAt), min: rec.durationMin ?? 0 }];
+            for (const p of parts) if (p.date === today) focusMinToday += p.min;
           }
         }
       }

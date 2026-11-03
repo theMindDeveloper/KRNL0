@@ -10,6 +10,7 @@ import { selectSchedule } from '../../../store/scheduleSelector';
 import { selectPomoReality } from '../../../store/pomoReality';
 import type { NodeProps } from '../types';
 import type { CalendarConfig, CalendarState } from './types';
+import { splitByLocalDay } from '../../../analytics/dateRange';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -28,9 +29,11 @@ export function yearActivity(board: Parameters<typeof selectSchedule>[0] | null,
   }
   for (const seg of selectPomoReality(board, nowMs)) {
     if (seg.kind !== 'work') continue;
-    const day = ymd(new Date(seg.startMs));
-    if (!day.startsWith(`${year}-`)) continue;
-    focus.set(day, (focus.get(day) ?? 0) + (seg.endMs - seg.startMs) / 60_000);
+    // Over midnight: each day gets its own minutes (same as the week view and analytics).
+    for (const part of splitByLocalDay(seg.startMs, seg.endMs)) {
+      if (!part.date.startsWith(`${year}-`)) continue;
+      focus.set(part.date, (focus.get(part.date) ?? 0) + part.ms / 60_000);
+    }
   }
   return { tasks, focus };
 }

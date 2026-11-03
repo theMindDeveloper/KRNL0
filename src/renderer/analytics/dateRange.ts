@@ -63,6 +63,40 @@ export function isoToYMD(iso: string): string {
   return toYMD(new Date(iso));
 }
 
+/**
+ * Split [startMs, endMs) at local midnights: one part per local day with the
+ * milliseconds that fell on it. A 23:30–00:30 span is 30 min on each day —
+ * the same split the Calendar's week view draws, so every surface puts a
+ * span's minutes on the same days.
+ */
+export function splitByLocalDay(startMs: number, endMs: number): Array<{ date: string; ms: number }> {
+  if (!(endMs > startMs)) return [{ date: toYMD(new Date(endMs)), ms: 0 }];
+  const out: Array<{ date: string; ms: number }> = [];
+  let cur = startMs;
+  while (cur < endMs) {
+    const d = new Date(cur);
+    const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+    const stop = Math.min(next, endMs);
+    out.push({ date: toYMD(d), ms: stop - cur });
+    cur = stop;
+  }
+  return out;
+}
+
+/** Split `minutes` across the days of [startMs, endMs) in proportion; whole
+ *  minutes, and the parts always add up to `minutes`. */
+export function splitMinutesByLocalDay(startMs: number, endMs: number, minutes: number): Array<{ date: string; min: number }> {
+  const parts = splitByLocalDay(startMs, endMs);
+  const total = parts.reduce((a, p) => a + p.ms, 0);
+  if (parts.length === 1 || total <= 0) return [{ date: parts[parts.length - 1]!.date, min: minutes }];
+  let left = minutes;
+  return parts.map((p, i) => {
+    const min = i === parts.length - 1 ? left : Math.round((minutes * p.ms) / total);
+    left -= min;
+    return { date: p.date, min };
+  });
+}
+
 export function yearOf(ymd: string): number {
   return parseYMD(ymd).getFullYear();
 }
