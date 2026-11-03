@@ -1028,3 +1028,16 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Terminal never dead:** after `exit` (or a crash) the badge reads EXITED and Enter starts a new shell; a shell that cannot start prints why in red and retries on Enter (it used to be a blank black box). One catch-up resize after spawn, so the PTY never keeps stale columns. `krnl term setShell` is now used for the next shell (it was saved but never read). Ctrl+Shift+L works from inside the terminal. A short panel gets the one-line banner. The right-click menu is the shared ContextMenu (closes on outside click, not clipped by narrow panels).
 - **Station:** in the narrow-window fallback (below 1024 × 640) the canvas now draws the mother nodes, and Dock "A" / ensure-visible act as Canvas mode. Panel sizes (row split, top columns, every bottom panel) come back after a reload or a layout switch.
 - **Notes:** a note whose text runs past its box fades at the bottom; Enter or F2 opens the selected note for editing.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 8): paste, month view, analytics
+
+**Type:** Bug Fix
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `d71a7b2` … `9bb0c9c`
+**Files changed:** `TerminalNode/{session.ts,index.tsx}`, `CalendarNode/{MonthView,WeekView}.tsx`, `AnalyticsNode/index.tsx`, `analytics/summary.ts`, tests
+**Summary:**
+- **Terminal paste:** Ctrl+V and right-click Paste go through xterm's paste (bracketed when the shell asks for it), so a multi-line paste no longer runs line by line; Ctrl+V cancels the browser's own paste so text can only arrive once; Cmd+C with nothing selected no longer sends ^C on macOS. (`e01f22f` carried only its test; the code followed in `d1626e4`.)
+- **Month view:** up to six habit dots before "+N", and "+N" counts the hidden ones; no dots before a habit existed; the calendar's "show habits" setting is honoured; today's cell (month and week view) moves at midnight; a click also moves the anchor so Week / Day open on that day, a double-click opens it; chips are earliest first, so "+N" hides the latest.
+- **Analytics:** a hidden card keeps its grid cell — hiding a page's top card used to shift every later page by half and break the page jump; the headline says "the last 7 days" (the range is rolling); seven distinct weekday colours; extra sources keep their colour by id; the saved / CLI-set view opens its page.
