@@ -120,7 +120,7 @@ function getBoardSnapshot(): BoardSnapshot {
     return {
       nodeCount: 0, taskCount: 0, habitCount: 0,
       hasPomo: false, hasTodo: false, hasCalendar: false, hasClock: false,
-      scheduledTaskCount: 0, chainedTaskCount: 0,
+      scheduledTaskCount: 0, scheduledTaskTexts: [], chainedTaskCount: 0,
       taskTexts: [], firstTaskText: null,
       viewport,
       nodePositions: {},
@@ -129,10 +129,12 @@ function getBoardSnapshot(): BoardSnapshot {
   const tasks  = board.nodes.filter((n) => n.kind === 'todo.task');
   const habits = board.nodes.filter((n) => n.kind === 'habit');
 
-  const scheduledTaskCount = tasks.filter((n) => {
+  const scheduledTasks = tasks.filter((n) => {
     const s = n.state as { scheduledFor?: unknown };
     return s.scheduledFor !== undefined && s.scheduledFor !== null;
-  }).length;
+  });
+  const scheduledTaskCount = scheduledTasks.length;
+  const scheduledTaskTexts = scheduledTasks.map((n) => (n.state as { text?: string }).text ?? '');
 
   const chainedTaskCount = new Set(
     board.edges
@@ -171,6 +173,7 @@ function getBoardSnapshot(): BoardSnapshot {
     hasClock: board.nodes.some((n) => n.kind === 'clock'),
     nodePositions,
     scheduledTaskCount,
+    scheduledTaskTexts,
     chainedTaskCount,
     taskTexts,
     firstTaskText: taskTexts[0] ?? null,

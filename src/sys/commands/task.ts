@@ -2,6 +2,7 @@
 // Operates on todo.task nodes linked to the todo mother node.
 
 import { randomUUID } from 'crypto';
+import { normalizeScheduleAt } from '../../shared/scheduleAt';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import {
@@ -686,25 +687,7 @@ export async function taskChain(ctx: TaskCtx, refs: string[]): Promise<SysResult
 
 // ── ADR 0003/0005 — taskSchedule / taskUnschedule ────────────────────────────
 
-/**
- * Normalize a `--at` value to the local "YYYY-MM-DDTHH:MM" shape the calendar
- * writes and the schedule selector compares lexicographically. Values with a
- * `Z` or offset are converted to local time; free text ("tomorrow") and
- * impossible dates return null.
- */
-export function normalizeScheduleAt(at: string): string | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/.exec(at.trim());
-  if (!m) return null;
-  const d = new Date(m[7] ? at.trim() : `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? '00'}`);
-  if (Number.isNaN(d.getTime())) return null;
-  if (!m[7]) {
-    // Local input: reject rollovers such as 2026-02-30 or 25:00.
-    if (d.getFullYear() !== Number(m[1]) || d.getMonth() + 1 !== Number(m[2]) || d.getDate() !== Number(m[3])
-      || d.getHours() !== Number(m[4]) || d.getMinutes() !== Number(m[5])) return null;
-  }
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+export { normalizeScheduleAt };
 
 /**
  * `krnl task schedule <ref> --at <ISO> [--duration <min>]`

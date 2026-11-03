@@ -10,6 +10,9 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { voicePlayer } from './VoicePlayer';
 import { CloseButton } from '../ui/CloseButton';
 import { Z } from '../ui/layers';
+import { normalizeStartInput } from '../../../shared/scheduleAt';
+
+export const MAX_COMMANDER_TASKS = 5;
 
 interface CommanderProps {
   onClose: () => void;
@@ -38,7 +41,12 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
   }, [onClose]);
 
   const lineCount = tasks.split(/\r?\n/).filter((s) => s.trim().length > 0).length;
-  const valid = label.trim().length > 0 && lineCount >= 1;
+  const tooMany = lineCount > MAX_COMMANDER_TASKS;
+  // Checked here, before launch: a bad time used to run the whole flow and
+  // only fail inside the terminal.
+  const start = startISO.trim() ? normalizeStartInput(startISO) : null;
+  const badStart = startISO.trim().length > 0 && start === null;
+  const valid = label.trim().length > 0 && lineCount >= 1 && !tooMany && !badStart;
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -46,7 +54,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
     onLaunch({
       label: label.trim(),
       tasks,
-      ...(startISO.trim() ? { startISO: startISO.trim() } : {}),
+      ...(start ? { startISO: start } : {}),
     });
   };
 
@@ -136,7 +144,10 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
           {/* Tasks list */}
           <Field
             label="TASKS"
-            hint={`${lineCount}/5 — one per line, in order`}
+            hint={tooMany
+              ? `${lineCount}/${MAX_COMMANDER_TASKS} — too many, remove ${lineCount - MAX_COMMANDER_TASKS}`
+              : `${lineCount}/${MAX_COMMANDER_TASKS} — one per line, in order`}
+            warn={tooMany}
           >
             <textarea
               value={tasks}
@@ -151,10 +162,12 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
           {/* Start time */}
           <Field
             label="START (OPTIONAL)"
-            hint="ISO local — leave empty for now+5min"
+            hint={badStart ? 'not a time — use 10:00 or 2026-05-15T10:00' : 'HH:MM today or YYYY-MM-DDTHH:MM — empty = in 5 min'}
+            warn={badStart}
           >
             <input
               value={startISO}
+              aria-invalid={badStart}
               onChange={(e) => setStartISO(e.target.value)}
               placeholder="2026-05-15T10:00"
               autoComplete="off"
@@ -221,7 +234,7 @@ const btnStyle: React.CSSProperties = {
   transition: 'background 0.15s, color 0.15s, border-color 0.15s',
 };
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, warn = false, children }: { label: string; hint?: string; warn?: boolean; children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{
@@ -229,7 +242,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         fontSize: 9.5, letterSpacing: '0.12em', color: '#6b6354',
       }}>
         <span>{label}</span>
-        {hint && <span style={{ color: '#6b6354', textTransform: 'lowercase' }}>{hint}</span>}
+        {hint && <span style={{ color: warn ? 'var(--rust)' : '#6b6354', textTransform: 'lowercase' }}>{hint}</span>}
       </div>
       {children}
     </div>

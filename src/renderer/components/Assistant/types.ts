@@ -62,6 +62,8 @@ export type BoardSnapshot = {
   hasCalendar: boolean;
   hasClock: boolean;
   scheduledTaskCount: number;
+  /** Texts of the tasks that have a calendar time — so a flow can check its own. */
+  scheduledTaskTexts: string[];
   chainedTaskCount: number;
   taskTexts: string[];
   firstTaskText: string | null;
