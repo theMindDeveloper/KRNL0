@@ -232,10 +232,11 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
   },
   {
     group: 'settings',
-    summary: 'Read app settings',
+    summary: 'Read and set app settings',
     subcommands: [
       { name: 'show', usage: 'settings show [--json]', summary: 'theme + viewport + boardPath + version' },
       { name: 'mode', usage: 'settings mode [easy|advanced]', summary: 'Show or set the UI mode (Easy hides links between features; data is the same)' },
+      { name: 'layout', usage: 'settings layout [station|canvas]', summary: 'Show or set the layout (Station docks windows beside the terminal; same as the top-bar pill / Ctrl+Shift+L)' },
     ],
   },
   {

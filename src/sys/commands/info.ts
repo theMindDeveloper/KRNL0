@@ -124,3 +124,26 @@ export function settingsMode(
   ctx.onBoardChanged?.();
   return { ok: true, message: `mode: ${mode}`, data: { mode } };
 }
+
+/**
+ * `krnl settings layout [station|canvas]` — show or set the layout (ADR 0008):
+ * Station docks the windows beside the terminal, Canvas is the free board.
+ * The top-bar pill and ⌘⇧L set the same board field.
+ */
+export function settingsLayout(
+  ctx: { boardPath: string; onBoardChanged?: () => void },
+  layout: string | undefined,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { layoutMode?: string }) | null;
+  if (!raw) return { ok: false, message: 'No board found' };
+  const current = raw.layoutMode === 'station' ? 'station' : 'canvas';
+  if (layout === undefined) return { ok: true, message: `layout: ${current}`, data: { layout: current } };
+  if (layout !== 'station' && layout !== 'canvas') {
+    return { ok: false, message: `settings layout: expected station or canvas, got "${layout}"` };
+  }
+  if (layout !== current) {
+    saveBoardTo(ctx.boardPath, { ...raw, layoutMode: layout, savedAt: new Date().toISOString() });
+    ctx.onBoardChanged?.();
+  }
+  return { ok: true, message: `layout: ${layout}`, data: { layout } };
+}
