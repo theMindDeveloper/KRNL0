@@ -85,15 +85,19 @@ export function splitByLocalDay(startMs: number, endMs: number): Array<{ date: s
 
 /** Split `minutes` across the days of [startMs, endMs) in proportion; whole
  *  minutes, and the parts always add up to `minutes`. */
-export function splitMinutesByLocalDay(startMs: number, endMs: number, minutes: number): Array<{ date: string; min: number }> {
+export function splitMinutesByLocalDay(startMs: number, endMs: number, minutes: number): Array<{ date: string; min: number; endMs: number }> {
   const parts = splitByLocalDay(startMs, endMs);
   const total = parts.reduce((a, p) => a + p.ms, 0);
-  if (parts.length === 1 || total <= 0) return [{ date: parts[parts.length - 1]!.date, min: minutes }];
+  if (parts.length === 1 || total <= 0) return [{ date: parts[parts.length - 1]!.date, min: minutes, endMs }];
   let left = minutes;
+  let cursor = startMs;
   return parts.map((p, i) => {
     const min = i === parts.length - 1 ? left : Math.round((minutes * p.ms) / total);
     left -= min;
-    return { date: p.date, min };
+    cursor += p.ms;
+    // `endMs` of a part: the last instant inside its own day, so an hour-of-
+    // day bucket puts it at 23:xx of that day, not at the next day's 00:00.
+    return { date: p.date, min, endMs: i === parts.length - 1 ? endMs : cursor - 1 };
   });
 }
 

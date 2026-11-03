@@ -103,6 +103,6 @@ describe('splitting spans at local midnight', () => {
   it('a span inside one day is one part', async () => {
     const { splitMinutesByLocalDay } = await import('../dateRange');
     const start = new Date(2026, 10, 2, 9, 0).getTime();
-    expect(splitMinutesByLocalDay(start, start + 25 * 60_000, 25)).toEqual([{ date: '2026-11-02', min: 25 }]);
+    expect(splitMinutesByLocalDay(start, start + 25 * 60_000, 25)).toEqual([{ date: '2026-11-02', min: 25, endMs: start + 25 * 60_000 }]);
   });
 });

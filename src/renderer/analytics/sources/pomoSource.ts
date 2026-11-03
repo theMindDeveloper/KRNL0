@@ -45,17 +45,19 @@ export const pomoSource: AnalyticsDataSource = {
         // A span over midnight counts its minutes on each day it covers.
         const parts = Number.isFinite(startMs) && startMs < endMs
           ? splitMinutesByLocalDay(startMs, endMs, rec.durationMin ?? 0)
-          : [{ date: isoToYMD(rec.endedAt), min: rec.durationMin ?? 0 }];
-        for (const part of parts) {
+          : [{ date: isoToYMD(rec.endedAt), min: rec.durationMin ?? 0, endMs }];
+        parts.forEach((part, i) => {
           out.push({
             source: 'pomo',
             type: recKind === 'work' ? 'pomo.work' : 'pomo.break',
             date: part.date,
-            isoTimestamp: rec.endedAt,
+            // Inside the part's own day, so hour / weekday charts agree with `date`.
+            isoTimestamp: parts.length === 1 ? rec.endedAt : new Date(part.endMs).toISOString(),
             durationMin: part.min,
-            metadata: meta,
+            // `part` > 0 marks the continuation of a span split at midnight.
+            metadata: parts.length === 1 ? meta : { ...meta, spanId: rec.id ?? null, part: i },
           });
-        }
+        });
         // pomo.session — one per threshold-reached span, on the day it ended.
         if (recKind === 'work' && rec.completed) {
           out.push({
