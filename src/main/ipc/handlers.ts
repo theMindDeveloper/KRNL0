@@ -5,7 +5,7 @@ import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
-import { loadBoardFrom, saveBoardTo, seedBoard, RendererRevGuard } from '../persistence/board';
+import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard } from '../persistence/board';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
 import { mergeBoards } from '../../shared/boardMerge';
 import { renderMotd } from '../rpc/motd';
@@ -95,6 +95,8 @@ let rendererBase: Record<string, unknown> | null = null;
 let awaitingReload = false;
 const asBoard = (b: unknown): Record<string, unknown> | null =>
   typeof b === 'object' && b !== null && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
+/** A board in the shape loadBoard returns (migrations mutate, so on a copy). */
+const normalized = (b: unknown): unknown => migrateBoard(JSON.parse(JSON.stringify(b)) as unknown);
 
 function saveBoard(data: unknown) {
   saveBoardTo(BOARD_PATH, data);
@@ -119,10 +121,14 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       // last load. Saving as-is would revert it, refusing would drop the
       // user's edit: merge both onto the common base, then let the renderer
       // reload the result (its board:load re-syncs the revision).
-      const mine = asBoard(data);
+      // All three in the loader's shape: board.json comes back migrated
+      // (defaults added, keys reordered), the renderer's copies do not, and
+      // the merge must not read that reshaping as somebody's edit.
+      const mine = asBoard(normalized(data));
       const theirs = asBoard(loadBoard());
-      if (rendererBase && mine && theirs) {
-        saveBoard(mergeBoards(rendererBase, mine, theirs));
+      const base = rendererBase ? asBoard(normalized(rendererBase)) : null;
+      if (base && mine && theirs) {
+        saveBoard(mergeBoards(base, mine, theirs));
         rendererRev.sync();
         rendererBase = mine;
         awaitingReload = true;

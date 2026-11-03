@@ -13,7 +13,10 @@
 // `krnl task add` appends one keeps both rows. Only when both sides changed
 // the very same value does board.json win: the CLI already reported success,
 // and the user's version stays one undo step away (reloadBoard keeps it).
-// Arrays of plain values (habit logs, keywords) merge as sets.
+// Arrays of plain values without repeats (habit logs, keywords) merge as sets.
+// The caller puts all three boards through the same load-time migrations
+// first, so a value the loader only reshaped (added defaults, key order)
+// never reads as an edit.
 
 type Json = unknown;
 
@@ -37,27 +40,38 @@ function byKey(list: Json, key: string): Map<string, Json> {
   return map;
 }
 
+/** Did the items both lists share with base change their relative order? */
+function reordered(list: Map<string, Json>, base: Map<string, Json>): boolean {
+  const a = [...list.keys()].filter((id) => base.has(id));
+  const b = [...base.keys()].filter((id) => list.has(id));
+  return a.some((id, i) => id !== b[i]);
+}
+
 function mergeList(base: Json, mine: Json[], theirs: Json[], key: string): Json[] {
   const b = byKey(base, key);
   const m = byKey(mine, key);
   const t = byKey(theirs, key);
+  // Order: board.json's, so the other writer's additions keep their place —
+  // unless only the user reordered (a drag in a list), then the user's.
+  const [first, second] = reordered(m, b) && !reordered(t, b) ? [m, t] : [t, m];
   const out: Json[] = [];
-  // board.json's order first, so the other writer's additions keep their place.
-  for (const [id, theirItem] of t) {
+  const seen = new Set<string>();
+  for (const id of [...first.keys(), ...second.keys()]) {
+    if (seen.has(id)) continue;
+    seen.add(id);
     const mineItem = m.get(id);
+    const theirItem = t.get(id);
     const baseItem = b.get(id);
-    if (mineItem === undefined) {
+    if (mineItem !== undefined && theirItem !== undefined) {
+      out.push(mergeValue(baseItem, mineItem, theirItem));
+    } else if (theirItem !== undefined) {
       // The user deleted it: gone, unless the file changed it meanwhile (a
       // conflict — the file wins). Not in base either: new from the file.
-      if (baseItem !== undefined && same(theirItem, baseItem)) continue;
-      out.push(theirItem);
-      continue;
+      if (baseItem === undefined || !same(theirItem, baseItem)) out.push(theirItem);
+    } else if (baseItem === undefined) {
+      // Only the user added it (an item the file deleted stays deleted).
+      out.push(mineItem);
     }
-    out.push(mergeValue(baseItem, mineItem, theirItem));
-  }
-  // Items only the user added (an item the file deleted stays deleted).
-  for (const [id, mineItem] of m) {
-    if (!t.has(id) && !b.has(id)) out.push(mineItem);
   }
   return out;
 }
@@ -101,7 +115,10 @@ export function mergeValue(base: Json, mine: Json, theirs: Json): Json {
     const key = idKey(mine, theirs, Array.isArray(base) ? base : []);
     if (key) return mergeList(base, mine, theirs, key);
     const b = Array.isArray(base) ? base : [];
-    if ([b, mine, theirs].every((l) => l.every(isPrimitive))) return mergeSet(b, mine, theirs);
+    // Only lists that are sets already: a list with repeats (coordinates, a
+    // sequence) has an order and multiplicity a set merge would destroy.
+    const isSet = (l: Json[]): boolean => l.every(isPrimitive) && new Set(l).size === l.length;
+    if ([b, mine, theirs].every(isSet)) return mergeSet(b, mine, theirs);
   }
   // The same value changed on both sides: board.json wins.
   return theirs;

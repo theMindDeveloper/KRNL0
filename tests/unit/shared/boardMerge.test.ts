@@ -99,3 +99,17 @@ describe('mergeBoards — arrays of plain values', () => {
     expect((out.nodes[0]!.state['habits'] as Array<{ log: string[] }>)[0]!.log.slice().sort()).toEqual(['a', 'c']);
   });
 });
+
+describe('mergeBoards — order and repeats', () => {
+  it("keeps the user's reorder when the file only added an item", () => {
+    const todo = (ids: string[]) => ({ id: 'mother-todo', kind: 'todo', state: { items: ids.map((id) => ({ id, text: id })) } });
+    const out = mergeBoards(board([todo(['a', 'b'])]), board([todo(['b', 'a'])]), board([todo(['a', 'b', 'c'])])) as unknown as Out;
+    expect((out.nodes[0]!.state['items'] as Array<{ id: string }>).map((i) => i.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('a value list with repeats is not merged as a set: the file wins the conflict', () => {
+    const pts = (p: number[]) => ({ id: 'n1', kind: 'text', state: { pts: p } });
+    const out = mergeBoards(board([pts([1, 2])]), board([pts([1, 2, 1])]), board([pts([1, 2, 3])])) as unknown as Out;
+    expect(out.nodes[0]!.state['pts']).toEqual([1, 2, 3]);
+  });
+});

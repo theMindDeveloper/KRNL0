@@ -723,71 +723,81 @@ export function readBoardText(boardPath: string): string | null {
   }
 }
 
-export function loadBoardFrom(boardPath: string): unknown {
-  try {
-    const raw = existsSync(boardPath) ? readBoardText(boardPath) : null;
-    if (raw !== null) {
-      const parsed: unknown = JSON.parse(raw);
-      // Migration order matters: shape-promoting migrations (pomo config rename,
-      // task plannedMin backfill from durationMin) must run BEFORE
-      // `migrateNodeStates` so the canonical fields exist when STATE/CONFIG
-      // DEFAULTS apply their baseline spread — otherwise the defaults clobber
-      // legacy-derived values.
-      // validateBoardInvariants runs last to heal any orphaned TodoItems before
-      // the board is handed to the renderer.
-      return validateBoardInvariants(
-        // Decision 33: canvas stamping runs after every node-level migration
-        // (including the analytics-mother adoption) so only settled free nodes
-        // are stamped.
-        migrateCanvases(
-        // #169: completion-ledger backfill runs outermost — it reads settled
-        // task node done/completedAt state (after all node migrations) and
-        // writes only the top-level `completions` array.
-        migrateCompletionLedger(
-        // ADR 0008: migrateLayoutMode + migrateStationSlot run outermost so
-        // schemaVersion and stationSlot are settled after all node-level
-        // migrations have already run. They read/write only top-level board
-        // fields (layoutMode, schemaVersion) and node.config.stationSlot —
-        // fields not touched by any earlier migration.
-        migrateStationSlot(
-          migrateLayoutMode(
-            migrateTodoItemFields(
-              migrateHabitFields(
-                migrateNodeStates(
-                  // Decision 24.2: migrateClockState strips legacy windowStartHour and
-                  // sets viewWindow BEFORE migrateNodeStates so STATE_DEFAULTS healing
-                  // doesn't re-add windowStartHour via the spread's right-operand win.
-                  migrateClockState(
-                    // ADR 0001: migrateAddCalendarMother runs before migrateNodeStates
-                    // so the injected calendar node gets STATE/CONFIG_DEFAULTS healing.
-                    // Decision 23.1: migrateAddClockMother runs immediately after
-                    // migrateAddCalendarMother (same reason — before migrateNodeStates).
-                    // Decision 32: analytics mother injected/adopted alongside the
-                    // other mother injections, before migrateNodeStates.
-                    migrateAddAnalyticsMother(
-                    migrateAddClockMother(
-                      migrateAddCalendarMother(
-                        // Decision 28: migrateTaskKind runs after migrateTaskPlannedMin
-                        // so both fields are settled before migrateNodeStates spreads.
-                        migrateTaskKind(
-                          migrateTaskPlannedMin(
-                            migratePomoConfig(
-                              migrateMotherPositions(parsed),
-                            ),
-                          ),
+/**
+ * Every load-time migration and invariant fix, in order, on an already
+ * parsed board. Idempotent: a settled board comes back unchanged in content.
+ * Also used to put boards from different sources into one shape before
+ * comparing them (the stale-save merge).
+ */
+export function migrateBoard(parsed: unknown): unknown {
+  // Migration order matters: shape-promoting migrations (pomo config rename,
+  // task plannedMin backfill from durationMin) must run BEFORE
+  // `migrateNodeStates` so the canonical fields exist when STATE/CONFIG
+  // DEFAULTS apply their baseline spread — otherwise the defaults clobber
+  // legacy-derived values.
+  // validateBoardInvariants runs last to heal any orphaned TodoItems before
+  // the board is handed to the renderer.
+  return validateBoardInvariants(
+    // Decision 33: canvas stamping runs after every node-level migration
+    // (including the analytics-mother adoption) so only settled free nodes
+    // are stamped.
+    migrateCanvases(
+    // #169: completion-ledger backfill runs outermost — it reads settled
+    // task node done/completedAt state (after all node migrations) and
+    // writes only the top-level `completions` array.
+    migrateCompletionLedger(
+    // ADR 0008: migrateLayoutMode + migrateStationSlot run outermost so
+    // schemaVersion and stationSlot are settled after all node-level
+    // migrations have already run. They read/write only top-level board
+    // fields (layoutMode, schemaVersion) and node.config.stationSlot —
+    // fields not touched by any earlier migration.
+    migrateStationSlot(
+      migrateLayoutMode(
+        migrateTodoItemFields(
+          migrateHabitFields(
+            migrateNodeStates(
+              // Decision 24.2: migrateClockState strips legacy windowStartHour and
+              // sets viewWindow BEFORE migrateNodeStates so STATE_DEFAULTS healing
+              // doesn't re-add windowStartHour via the spread's right-operand win.
+              migrateClockState(
+                // ADR 0001: migrateAddCalendarMother runs before migrateNodeStates
+                // so the injected calendar node gets STATE/CONFIG_DEFAULTS healing.
+                // Decision 23.1: migrateAddClockMother runs immediately after
+                // migrateAddCalendarMother (same reason — before migrateNodeStates).
+                // Decision 32: analytics mother injected/adopted alongside the
+                // other mother injections, before migrateNodeStates.
+                migrateAddAnalyticsMother(
+                migrateAddClockMother(
+                  migrateAddCalendarMother(
+                    // Decision 28: migrateTaskKind runs after migrateTaskPlannedMin
+                    // so both fields are settled before migrateNodeStates spreads.
+                    migrateTaskKind(
+                      migrateTaskPlannedMin(
+                        migratePomoConfig(
+                          migrateMotherPositions(parsed),
                         ),
                       ),
                     ),
-                    ),
                   ),
+                ),
                 ),
               ),
             ),
           ),
         ),
-        ),
-        ),
-      );
+      ),
+    ),
+    ),
+    ),
+  );
+}
+
+export function loadBoardFrom(boardPath: string): unknown {
+  try {
+    const raw = existsSync(boardPath) ? readBoardText(boardPath) : null;
+    if (raw !== null) {
+      const parsed: unknown = JSON.parse(raw);
+      return migrateBoard(parsed);
     }
   } catch (err) {
     if (err instanceof BoardUnreadableError) throw err;
