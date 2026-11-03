@@ -15,7 +15,7 @@ import {
   calcRemainingPct,
   primaryButtonLabel,
   pipState,
-} from '../../../src/renderer/components/nodes/PomoNode/index';
+} from '../../../src/renderer/components/nodes/PomoNode/display';
 import {
   pomoStart,
   pomoCancel,

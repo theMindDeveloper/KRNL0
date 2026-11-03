@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wallHoursFromDayStart, msAtWallHours } from '../../../src/renderer/components/nodes/ClockNode';
+import { wallHoursFromDayStart, msAtWallHours } from '../../../src/renderer/components/nodes/ClockNode/wallHours';
 
 describe('Clock wall-clock hours', () => {
   it('reads the local clock time, so DST days stay on the hour marks', () => {

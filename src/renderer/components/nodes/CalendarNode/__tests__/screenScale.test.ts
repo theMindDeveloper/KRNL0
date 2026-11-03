@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { screenScale } from '../WeekView';
+import { screenScale } from '../screenScale';
 
 function el(cssWidth: number, screenWidth: number): HTMLElement {
   const d = document.createElement('div');

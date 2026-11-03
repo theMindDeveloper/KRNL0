@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { COLORS } from '../../../src/renderer/store/timelineSelector';
-import { BREAK_TOKENS } from '../../../src/renderer/components/nodes/ClockNode';
+import { BREAK_TOKENS } from '../../../src/renderer/components/nodes/ClockNode/wallHours';
 
 describe('Decision 24.1 — color-token contract', () => {
   it('every COLORS entry has a matching CSS custom property in tokens.css', () => {

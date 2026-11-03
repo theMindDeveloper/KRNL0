@@ -11,19 +11,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTick } from '../../../hooks/useTick';
 import type { PomoState } from '../PomoNode/types';
 import { trackedSecondsForTask, planStatus, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
-
-/**
- * Decision 22 F16 — format seconds as `H:MM:SS` (≥1h) or `MM:SS` (<1h).
- */
-export function formatElapsed(totalSec: number): string {
-  const safe = Math.max(0, Math.floor(totalSec));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = safe % 60;
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
-  return `${pad(m)}:${pad(s)}`;
-}
+import { formatElapsed } from './format';
 
 function fmtMin(totalMin: number): string {
   const m = Math.max(0, Math.round(totalMin));
