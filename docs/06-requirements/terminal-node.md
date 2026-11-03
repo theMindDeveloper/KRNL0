@@ -11,7 +11,7 @@
 | F1 | The header (`.term-head`) renders three traffic-light dots (`.lights`: red, yellow, green), a label `"claude-code · ~/krnl0 · zsh"`, and a live badge `"● LIVE"` |
 | F2 | The terminal body (`.term-body`) hosts an `xterm.js` instance; the KRNL0 ASCII logo and a dim separator are rendered as the initial welcome output |
 | F3 | Clicking anywhere in the terminal body focuses the xterm input so the user can type immediately without a separate focus click |
-| F4 | On mount the component sends `pty:create` over IPC with `{ nodeId: node.id, cwd: '~/krnl0', shell: 'zsh' }`; on unmount it sends `pty:kill` |
+| F4 | On first mount the component sends `pty:create` over IPC (cols, rows and the saved `config.shell`). Amended 2026-11-03: a later unmount (Station ↔ Canvas switch, panel hidden, slot swap) **detaches** the terminal instead of killing it, and the next mount re-attaches the same shell and scrollback (ADR 0008: switching modes must not tear nodes down). A shell that exits or fails to start shows why, and Enter starts a new one |
 | F5 | User keystrokes are forwarded to main via `pty:write`; output from main via `pty:data` is written to the xterm instance |
 | F6 | Terminal resize (node resize or window resize) sends `pty:resize` with `{ cols, rows }` derived from the xterm `fit` addon |
 | F7 | The `sys` CLI is available inside the terminal; every GUI action documented in R4 has a `sys <command>` equivalent reachable from this node |
@@ -22,7 +22,7 @@
 | F12 | Arrow keys navigate command history (up / down) and cursor position within the current line (left / right) |
 | F13 | `pty:resize` updates the underlying PTY's `cols` / `rows` so the shell wraps and re-flows long output correctly (no longer a no-op) |
 | F14 | `claude` (Claude Code CLI) launches and runs interactively inside the terminal — closing the loop on Decision 3 |
-| F15 | Closing or unmounting the terminal node kills the PTY process cleanly (no orphaned shells in Task Manager / `ps`) |
+| F15 | No orphaned shells: the PTY lives as long as the window that owns it; main kills it when that window reloads, navigates, crashes or closes (amended 2026-11-03 — was "on unmount", which killed running commands on every layout switch) |
 | F16 | Backspace (xterm `0x7f`) is forwarded to the PTY unchanged; PowerShell, bash, and zsh all delete the previous character. cmd.exe is unsupported for Backspace (issue #72) |
 | F17 | The PTY spawns with `cwd = process.cwd()` by default — the project root in dev mode — so `claude` and similar tools can read `CLAUDE.md` and `board.json` immediately. `KRNL0_TERM_CWD` overrides; falls back to `USERPROFILE`/`HOME` if the chosen path doesn't exist (issue #74) |
 | F18 | Ctrl+C with **no** selection sends `0x03` (SIGINT/ETX) to the PTY, interrupting the running process. Ctrl+C **with** a selection copies the selection to the clipboard and clears it without sending `0x03` (issue #75) |
@@ -94,9 +94,9 @@ Feature: TerminalNode IPC-backed terminal
     When the component mounts
     Then ipcRenderer.send is called with "pty:create" and { nodeId: "term-1", cwd: "~/krnl0", shell: "zsh" }
 
-  Scenario: F4b — IPC pty:kill on unmount
-    When the component unmounts
-    Then ipcRenderer.send is called with "pty:kill" and { nodeId: "term-1" }
+  Scenario: F4b — unmount detaches, remount re-attaches (amended 2026-11-03)
+    When the component unmounts and mounts again
+    Then "pty:kill" is not invoked and "pty:create" ran only once
 
   Scenario: F5 — Keystrokes forwarded via pty:write
     Given the xterm instance has focus
@@ -157,10 +157,10 @@ Feature: TerminalNode IPC-backed terminal
     Then claude-code starts and renders its interactive prompt
     And keystrokes including Ctrl+C are forwarded correctly
 
-  Scenario: F15 — PTY killed on unmount
+  Scenario: F15 — PTY killed with its window (amended 2026-11-03)
     Given a pty session with pid P is alive
-    When the TerminalNode unmounts
-    Then "pty:kill" is invoked with the session's id
+    When the window that owns the session reloads, navigates, crashes or closes
+    Then main kills the session's PTY
     And process P is no longer listed by the OS process table within one second
 
   Scenario: F16 — Backspace deletes characters
