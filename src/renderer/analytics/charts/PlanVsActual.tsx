@@ -52,15 +52,21 @@ export function Legend({ items }: { items: Array<{ label: string; color: string;
 export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tasks: readonly TaskEstimate[]; width: number; height?: number; maxRows?: number }) {
   // Given a box height, rows grow to fill it (and as many rows fit as room allows).
   const fitRows = boxH ? Math.max(1, Math.floor(boxH / 26)) : maxRows;
-  const rows = tasks.slice(0, Math.min(fitRows, boxH ? 30 : maxRows));
+  const capacity = Math.min(fitRows, boxH ? 30 : maxRows);
+  // More tasks than rows: the last row becomes "+N more" instead of the
+  // extra tasks silently not being there.
+  const overflowing = tasks.length > capacity;
+  const rows = tasks.slice(0, overflowing ? Math.max(1, capacity - 1) : capacity);
+  const hiddenCount = tasks.length - rows.length;
+  const MORE_H = hiddenCount > 0 ? 18 : 0;
   const labelW = Math.min(150, Math.max(90, width * 0.32));
   const valueW = 92;
-  const rowH = boxH && rows.length > 0 ? Math.max(26, Math.min(64, (boxH - 4) / rows.length)) : 26;
+  const rowH = boxH && rows.length > 0 ? Math.max(26, Math.min(64, (boxH - 4 - MORE_H) / rows.length)) : 26;
   const barH = Math.max(8, Math.min(18, Math.round(rowH * 0.3)));
   const plotW = Math.max(40, width - labelW - valueW - 8);
   const max = Math.max(1, ...rows.map((t) => Math.max(t.plannedMin, t.trackedMin)));
   const x = (v: number) => (v / max) * plotW;
-  const height = rows.length * rowH + 4;
+  const height = rows.length * rowH + 4 + MORE_H;
   if (rows.length === 0) {
     return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: COLOR_AXIS, padding: 8 }}>No tracked or finished tasks in this range yet. Tag a pomo session with a task to start comparing.</div>;
   }
@@ -88,6 +94,12 @@ export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tas
           </g>
         );
       })}
+      {hiddenCount > 0 && (
+        <text data-testid="analytics-estimate-more" x={labelW - 6} y={rows.length * rowH + 4 + 12} textAnchor="end" fontSize={9.5} fill={COLOR_AXIS} fontFamily="var(--font-mono)">
+          +{hiddenCount} more
+          <title>{`${hiddenCount} more task${hiddenCount === 1 ? '' : 's'} — make the window taller, or: krnl analytics show --view estimates`}</title>
+        </text>
+      )}
     </svg>
   );
 }
