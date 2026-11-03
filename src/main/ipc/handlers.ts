@@ -96,7 +96,13 @@ let awaitingReload = false;
 const asBoard = (b: unknown): Record<string, unknown> | null =>
   typeof b === 'object' && b !== null && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
 /** A board in the shape loadBoard returns (migrations mutate, so on a copy). */
-const normalized = (b: unknown): unknown => migrateBoard(JSON.parse(JSON.stringify(b)) as unknown);
+const normalized = (b: unknown): unknown => {
+  try {
+    return migrateBoard(JSON.parse(JSON.stringify(b)) as unknown);
+  } catch {
+    return b; // merge what we have rather than refuse the save
+  }
+};
 
 function saveBoard(data: unknown) {
   saveBoardTo(BOARD_PATH, data);

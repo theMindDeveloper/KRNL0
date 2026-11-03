@@ -431,12 +431,14 @@ export function AnalyticsNode({
 
   // Open the saved / CLI-set view's page. Deferred a frame so the pager has
   // measured its cards (and its first page report has passed).
+  const easyForJump = useEasyMode();
   useEffect(() => {
     const page = view ? VIEW_PAGE[view] : undefined;
-    if (!page || page === 'summary') return;
+    // A page Easy mode hides: stay where we are.
+    if (!page || !pagesFor(easyForJump).some((p) => p.id === page)) return;
     const id = requestAnimationFrame(() => setJumpTo(pageSelector(page)));
     return () => cancelAnimationFrame(id);
-  }, [view]);
+  }, [view, easyForJump]);
 
   // Plain-language summary on top of Overview (same text as `analytics summary`).
   const summary = summarizeAnalytics(analytics, range, prevRange, state.rangeDays);

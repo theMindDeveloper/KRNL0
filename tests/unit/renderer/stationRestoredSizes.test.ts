@@ -23,3 +23,11 @@ describe('restoredSizes', () => {
     expect(restoredSizes(ids, defaults, mins, undefined)).toEqual(defaults);
   });
 });
+
+describe('restoredSizes — a fixed panel takes part of the row', () => {
+  it('scales the saved widths into what the locked clock leaves', () => {
+    const out = restoredSizes(['canvas', 'terminal'], [60, 15], [30, 14], { canvas: 0.6, terminal: 0.2, clock: 0.2 }, 75);
+    expect(out.map(Math.round)).toEqual([56, 19]);
+    expect(out.reduce((a, v) => a + v, 0)).toBeCloseTo(75);
+  });
+});

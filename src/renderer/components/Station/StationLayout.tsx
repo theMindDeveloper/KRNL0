@@ -140,8 +140,11 @@ export function StationLayout() {
 
   // ── Persistence callbacks ────────────────────────────────────────────────
   const onOuterLayoutChanged = useCallback((layout: Layout) => {
-    const rowFraction = (layout[PANEL_IDS.outerTop] ?? SLOT_DEFAULTS.rowPercent) / 100;
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
+    // Only a real split says something: with one row hidden the other is
+    // 100 %, which must not overwrite the height the user chose.
+    if (layout[PANEL_IDS.outerTop] === undefined || layout[PANEL_IDS.outerBottom] === undefined) return;
+    const rowFraction = layout[PANEL_IDS.outerTop]! / 100;
     setLayoutGeometry({
       station: {
         rowFraction,
@@ -239,13 +242,18 @@ export function StationLayout() {
     bottomVisible.analytics && { id: PANEL_IDS.bottomAnalytics, size: analyticsSize, min: SLOT_DEFAULTS.minColumn, node: <CellWrapper><StationCell slot="bottom-right-pre" /></CellWrapper> },
     bottomVisible.clock    && { id: PANEL_IDS.bottomClock,    size: clockSize,    min: SLOT_DEFAULTS.minColumn,  node: <CellWrapper><StationCell slot="top-right-lower" /></CellWrapper> },
   ].filter(Boolean) as Array<{ id: string; size: number; min: number; node: React.ReactNode }>;
-  const bottomSizes = restoredSizes(
-    bottomItems.map((it) => it.id),
-    bottomItems.map((it) => it.size),
-    bottomItems.map((it) => it.min),
+  // The clock stays locked to the calendar column above (clockSize); the
+  // saved widths share out the rest of the row.
+  const flexItems = bottomItems.filter((it) => it.id !== PANEL_IDS.bottomClock);
+  const flexTotal = bottomVisible.clock ? 100 - clockSize : 100;
+  const flexSizes = restoredSizes(
+    flexItems.map((it) => it.id),
+    flexItems.map((it) => it.size),
+    flexItems.map((it) => it.min),
     storedGeometry?.bottomFractions,
+    flexTotal,
   );
-  bottomItems.forEach((it, i) => { it.size = bottomSizes[i]!; });
+  flexItems.forEach((it, i) => { it.size = flexSizes[i]!; });
   bottomItems.forEach((it, i) => {
     if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} className="station-splitter" style={verticalHandleStyle} />);
     bottomRowChildren.push(

@@ -152,7 +152,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       host.style.width = '100%';
       host.style.height = '100%';
       container.appendChild(host);
-      const e: LiveTerminal = { term, fit, host, sessionId: null, onSession: null, onCommand, shell: () => undefined };
+      const e: LiveTerminal = { term, fit, host, sessionId: null, everStarted: false, onSession: null, onCommand, shell: () => undefined };
       setLiveTerminal(node.id, e);
       entry = e;
 
@@ -199,7 +199,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           fit,
           krnl: window.krnl,
           onCommand: (command, args) => e.onCommand(command, args),
-          setSessionId: (id) => { e.sessionId = id; e.onSession?.(id); },
+          setSessionId: (id) => { e.sessionId = id; if (id) e.everStarted = true; e.onSession?.(id); },
           // The session belongs to the board, not to this mount.
           isCancelled: () => false,
           // Read at every start, so `krnl term setShell` applies to the next shell.
@@ -214,6 +214,9 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     }
 
     const live = entry;
+    // EXITED survives a remount: the badge reads the terminal, not this mount.
+    hadSessionRef.current = live.everStarted;
+    setActiveSessionId(live.sessionId);
     live.onSession = bindSession;
     live.onCommand = onCommand;
     live.shell = () => shellRef.current;
@@ -238,7 +241,8 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       ro.disconnect();
       // Detach, don't kill: the next mount picks the terminal up again.
       if (live.onSession === bindSession) live.onSession = null;
-      live.host.remove();
+      // Only if it is still here: an overlapping newer mount may own it now.
+      if (live.host.parentElement === container) live.host.remove();
       termRef.current = null;
       fitRef.current = null;
       sessionIdRef.current = null;

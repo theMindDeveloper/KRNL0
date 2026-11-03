@@ -15,6 +15,8 @@ export interface LiveTerminal {
   /** The element xterm was opened in; moved between mounts. */
   host: HTMLDivElement;
   sessionId: string | null;
+  /** A shell has run in this terminal (so "no session" means it exited). */
+  everStarted: boolean;
   /** The mounted component's listener for session changes (null while detached). */
   onSession: ((id: string | null) => void) | null;
   /** The mounted component's command handler (session start / end events). */

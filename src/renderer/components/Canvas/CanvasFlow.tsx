@@ -788,12 +788,21 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
 
+  // Canvas keys act only while the user is on the canvas: focus on the canvas
+  // itself or on nothing in particular. In Station mode a selection survives
+  // a click on a Todo / Habit panel, and Backspace there must not delete it.
+  const onCanvas = (e: KeyboardEvent): boolean => {
+    const t = e.target;
+    return t === document.body || t === document.documentElement
+      || (t instanceof HTMLElement && !!t.closest('.react-flow'));
+  };
+
   // Enter / F2 with exactly one note selected opens it for editing, as a
   // click does (Tab-focused notes handle the key themselves).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.key !== 'Enter' && e.key !== 'F2') || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (shortcutBlocked(e) || isControlTarget(e.target)) return;
+      if (shortcutBlocked(e) || isControlTarget(e.target) || !onCanvas(e)) return;
       const selected = getNodes().filter((n) => n.selected && !isStrokeId(n.id));
       if (selected.length !== 1 || selected[0]!.type !== 'text') return;
       e.preventDefault();
@@ -809,7 +818,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-      if (shortcutBlocked(e)) return;
+      if (shortcutBlocked(e) || !onCanvas(e)) return;
       const board = useBoardStore.getState().board;
       const selected = getNodes().filter((n) => n.selected).map((n) => n.id);
       const strokeIds = selected.filter(isStrokeId).map((id) => id.slice(STROKE_NODE_PREFIX.length));
