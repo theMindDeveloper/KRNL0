@@ -171,7 +171,8 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
         term.clearSelection?.();
         return false;
       }
-      if (sid) void krnl.ptyWrite(sid, '\x03');
+      // Cmd+C (macOS) only ever copies; Ctrl+C without a selection interrupts.
+      if (sid && event.ctrlKey) void krnl.ptyWrite(sid, '\x03');
       return false;
     }
 
