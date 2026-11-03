@@ -78,3 +78,24 @@ describe('mergeBoards', () => {
     expect(st.history.map((h) => h.id)).toEqual(['s1', 's2']);
   });
 });
+
+describe('mergeBoards — arrays of plain values', () => {
+  it('a habit tick from the UI and one from the CLI on the same habit both survive', () => {
+    const habit = (log: string[]) => ({ id: 'mother-habit', kind: 'habit', state: { habits: [{ id: 'h1', name: 'gym', log }] } });
+    const b = board([habit(['2026-11-01'])]);
+    const mine = board([habit(['2026-11-01', '2026-11-03'])]);         // UI ticks today
+    const theirs = board([habit(['2026-11-01', '2026-11-02'])]);       // CLI ticks yesterday
+    const out = mergeBoards(b, mine, theirs) as unknown as Out;
+    const log = ((out.nodes[0]!.state['habits'] as Array<{ log: string[] }>)[0]!.log).slice().sort();
+    expect(log).toEqual(['2026-11-01', '2026-11-02', '2026-11-03']);
+  });
+
+  it('a removal on either side is kept', () => {
+    const habit = (log: string[]) => ({ id: 'mother-habit', kind: 'habit', state: { habits: [{ id: 'h1', name: 'gym', log }] } });
+    const b = board([habit(['a', 'b'])]);
+    const mine = board([habit(['a', 'b', 'c'])]);
+    const theirs = board([habit(['a'])]);
+    const out = mergeBoards(b, mine, theirs) as unknown as Out;
+    expect((out.nodes[0]!.state['habits'] as Array<{ log: string[] }>)[0]!.log.slice().sort()).toEqual(['a', 'c']);
+  });
+});

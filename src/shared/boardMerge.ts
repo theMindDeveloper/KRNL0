@@ -13,6 +13,7 @@
 // `krnl task add` appends one keeps both rows. Only when both sides changed
 // the very same value does board.json win: the CLI already reported success,
 // and the user's version stays one undo step away (reloadBoard keeps it).
+// Arrays of plain values (habit logs, keywords) merge as sets.
 
 type Json = unknown;
 
@@ -61,6 +62,28 @@ function mergeList(base: Json, mine: Json[], theirs: Json[], key: string): Json[
   return out;
 }
 
+const isPrimitive = (v: Json): boolean => v === null || ['string', 'number', 'boolean'].includes(typeof v);
+
+/**
+ * Arrays of plain values (a habit's log of dates, tag keywords) merge as
+ * sets: keep what neither side removed, add what either side added. A tick
+ * from the UI and one from `krnl habit done … --date` both survive.
+ */
+function mergeSet(base: Json[], mine: Json[], theirs: Json[]): Json[] {
+  const inBase = new Set(base);
+  const removed = new Set([
+    ...base.filter((v) => !mine.includes(v)),
+    ...base.filter((v) => !theirs.includes(v)),
+  ]);
+  const out: Json[] = [];
+  for (const v of [...theirs, ...mine]) {
+    if (out.includes(v)) continue;
+    if (inBase.has(v) && removed.has(v)) continue;
+    out.push(v);
+  }
+  return out;
+}
+
 export function mergeValue(base: Json, mine: Json, theirs: Json): Json {
   if (same(mine, base)) return theirs;
   if (same(theirs, base) || same(mine, theirs)) return mine;
@@ -77,6 +100,8 @@ export function mergeValue(base: Json, mine: Json, theirs: Json): Json {
   if (Array.isArray(mine) && Array.isArray(theirs)) {
     const key = idKey(mine, theirs, Array.isArray(base) ? base : []);
     if (key) return mergeList(base, mine, theirs, key);
+    const b = Array.isArray(base) ? base : [];
+    if ([b, mine, theirs].every((l) => l.every(isPrimitive))) return mergeSet(b, mine, theirs);
   }
   // The same value changed on both sides: board.json wins.
   return theirs;
