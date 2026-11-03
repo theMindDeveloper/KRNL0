@@ -1069,3 +1069,16 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Habit lanes:** `krnl habit remove` / `archive` take the habit's lanes with them; an orphan lane's cleanup is saved and leaves no undo slot (undoing to it re-created the orphan, which deleted itself again — a stuck undo); an archived habit's lane goes away; new "Unpin lane (keep the habit)"; the lane's Delete offers UNDO; the 7-day strip follows the same schedule rule as the tick; lane numbers count lanes instead of reading uuid digits.
 - **Frames:** a task moved on one canvas also leaves frames on the other canvases.
 - **CLI parity (hard rule 8):** `text look <id> --note|--sticky|--shape …|--color`, `analytics cards | hide | unhide | reset-cards`, `clock half [am|pm]`, `cal zoom <1-6>`; `task addNext`'s placeholder estimate follows the source's plan as the canvas does.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 11): CLI gaps, theme readability
+
+**Type:** Bug Fix / Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `5f15d2b` … `5821e25`
+**Files changed:** `sys/{parser,SysFacade}.ts`, `sys/commands/{media,draw,analytics}.ts`, `shared/cli/commandRegistry.ts`, `TodoNode`, `MediaNode`, `Assistant/Commander.tsx`, `AnalyticsNode/{index,AnalyticsSettings,SummaryHero}.tsx`, `ui/Switch.tsx`, `TaskNode`, `PomoNode`, `FrameNode`, `ImageNode`, `TextNode`, `CalendarNode/TaskPopup.tsx`, `Canvas/CanvasFlow.tsx`, tests
+**Summary:**
+- **CLI parity (hard rule 8):** `media resize <id> --w --h`, `media page <id> <n>`, `draw stroke --points "x,y …" [--tool --color --size]`, `analytics clear-history --yes` (not undoable, so it asks for `--yes`). Factory reset stays UI-only on purpose (hold-to-confirm, wipes the board).
+- **Readable in every theme:** the Todo done checkbox is the task card's checkbox (a fixed black fill hid the mark in every light theme); Media error links and Commander hints use the always-dark palette (Macintosh light made them near-black on black); the Analytics tiles, off-switch knob and header line use the panel's own tokens.
+- **One accent:** task and pomo glows follow the frame style's accent instead of a fixed lime; resize grips use `--ink-4`; the calendar task popup's primary button uses the primary-button tokens; the canvas node menu is the shared ContextMenu.
