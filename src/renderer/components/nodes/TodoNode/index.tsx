@@ -537,7 +537,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            cursor: item.done ? 'default' : item.taskNodeId !== null ? 'pointer' : 'text',
+            // Text cursor: double-click edits. A single click does nothing (it
+            // would fire on every double-click); "Start pomo" is in the row menu.
+            cursor: item.done ? 'default' : 'text',
           }}
         >
           {item.text}
