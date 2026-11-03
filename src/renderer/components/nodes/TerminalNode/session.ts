@@ -177,6 +177,10 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
 
     if (k === 'v' || k === 'V') {
       // Prevent xterm from emitting ^V (0x16) to the pty, then paste.
+      // Returning false only stops xterm; preventDefault also stops the
+      // browser's own paste on xterm's textarea, which would paste a second
+      // time through xterm's paste listener.
+      event.preventDefault?.();
       void (async () => {
         const text = await krnl.clipboardReadText?.();
         if (!text || !sid) return;
