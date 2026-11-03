@@ -180,8 +180,8 @@ export const DOCK_REGISTRY = defineRegistry({
   classic: {
     id: 'classic',
     manifest: MANIFESTS.classic,
-    label: 'Classic',
-    sublabel: 'Default frame',
+    label: 'Paper',
+    sublabel: 'Cream & lime',
     glyph: CLASSIC_GLYPH,
     stationPadding: { top: 0, bottom: 0 },
   },
@@ -192,7 +192,7 @@ export const DOCK_REGISTRY = defineRegistry({
     sublabel: 'Matte graphite',
     glyph: PRO_GLYPH,
     stationPadding: { top: 0, bottom: 0 },
-    theme: 'dark-only',
+    // Light and dark (PRO_LIGHT): choosing Light no longer swaps to Paper.
   },
   synthesizer: {
     id: 'synthesizer',

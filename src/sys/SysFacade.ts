@@ -338,13 +338,15 @@ export class SysFacade {
         return themeFrames(command.json);
       }
       if (command.sub === 'frame') {
-        if (!isFrameStyleId(command.value)) {
+        // "Paper" is the shown name of the 'classic' style.
+        const frameId = command.value?.toLowerCase() === 'paper' ? 'classic' : command.value;
+        if (!isFrameStyleId(frameId)) {
           return { ok: false, message: command.value ? `Unknown frame style: ${command.value}` : 'theme frame requires <id> (see: sys theme frames)' };
         }
         if (!this.deps.cliDispatch) {
           return { ok: false, message: 'theme frame requires an open renderer window', data: { exitCode: 2 } };
         }
-        return this.deps.cliDispatch('theme.frame', { value: command.value });
+        return this.deps.cliDispatch('theme.frame', { value: frameId });
       }
       if (command.sub === 'set') {
         if (!command.value || !['light', 'dark'].includes(command.value)) {

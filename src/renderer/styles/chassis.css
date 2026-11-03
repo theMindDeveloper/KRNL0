@@ -3659,6 +3659,17 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   border-radius: 3px !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
+/* Pro light: the same bezel and badge, in the light palette. */
+[data-theme="light"][data-dock="pro"] .mother-frame,
+:root:not([data-theme="dark"])[data-dock="pro"] .mother-frame {
+  border-color: #cfcfca !important;
+}
+[data-theme="light"][data-dock="pro"] .mother-frame__badge,
+:root:not([data-theme="dark"])[data-dock="pro"] .mother-frame__badge {
+  background: #e6e6e2 !important;
+  border-color: #cfcfca !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
 [data-dock="pro"] .mother-frame__corners {
   opacity: 0.45;
 }

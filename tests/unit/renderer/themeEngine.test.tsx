@@ -63,7 +63,12 @@ describe('F2 — tokens are written on <html>', () => {
   });
 
   it('a dark-only style falls back to its dark tokens in light mode', () => {
-    expect(tokensFor('pro', 'light')).toBe(MANIFESTS.pro.tokens.dark);
+    expect(tokensFor('submarine', 'light')).toBe(MANIFESTS.submarine.tokens.dark);
+  });
+
+  it('Pro has its own light tokens (light mode no longer swaps to another style)', () => {
+    expect(tokensFor('pro', 'light')).toBe(MANIFESTS.pro.tokens.light);
+    expect(tokensFor('pro', 'light')!['--node-bg']).not.toBe(MANIFESTS.pro.tokens.dark!['--node-bg']);
   });
 });
 
@@ -96,9 +101,9 @@ describe('F3 — Classic keeps the original look', () => {
 });
 
 describe('F4 — Pro frame style', () => {
-  it('exists, is dark-only and chromeless', () => {
+  it('exists, has light and dark, and is chromeless', () => {
     expect(DOCK_REGISTRY.pro.label).toBe('Pro');
-    expect(isDarkOnly('pro')).toBe(true);
+    expect(isDarkOnly('pro')).toBe(false);
     expect(DOCK_REGISTRY.pro.Chrome).toBeUndefined();
   });
 });
