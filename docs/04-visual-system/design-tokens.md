@@ -24,30 +24,74 @@ Applied by default (no `data-vibe` attribute). Warm paper tones, acid-green acce
 
 | Token | Light (`cyber`) | Dark (`cyber`) | Role |
 |---|---|---|---|
-| `--paper` | `#f5f1e8` | `#0e0d0b` | Canvas background |
-| `--paper-2` | `#ede7d6` | `#1a1814` | Subtle fills, node body |
-| `--paper-3` | `#e3dcc7` | `#2a2620` | Borders, dividers |
-| `--ink` | `#1a1814` | `#f0ebdd` | Primary text |
-| `--ink-2` | `#3d362b` | `#d4cfc0` | Secondary text — emphasized |
-| `--ink-3` | `#6b6354` | `#8a8270` | Secondary text — dim |
-| `--ink-4` | `#9a9180` | `#5a5244` | Tertiary text, placeholder |
+| `--paper` | `#ebe1c2` | `#131210` | Canvas background |
+| `--paper-2` | `#ddd0a7` | `#1f1d18` | Subtle fills, node body |
+| `--paper-3` | `#cbba85` | `#2f2b24` | Borders, dividers |
+| `--node-bg` | `#f6efd0` | `#1c1a13` | Node card background |
+| `--ink` | `#1a1612` | `#f4efe2` | Primary text |
+| `--ink-2` | `#38302a` | `#ddd6c6` | Secondary text — emphasized |
+| `--ink-3` | `#554b38` | `#b3aa94` | Secondary text — dim |
+| `--ink-4` | `#5f5541` | `#8f8572` | Tertiary text, placeholder |
 | `--acid` | `#c9f158` | `#c9f158` | Active connections, terminal cursor, listening |
 | `--acid-glow` | `#d8ff6e` | `#d8ff6e` | Hover/focus glow variant of acid |
-| `--spine` | `#5e7d1d` | `#6e8f25` | Fixed mother-node accent (deep green) |
-| `--spine-hot` | `#7ea22b` | `#9ac33c` | Hover/active spine variant |
-| `--rust` | `#c8553d` | `#e87a5f` | Pomodoro timer, warnings, live indicators |
-| `--rust-deep` | `#a83e2a` | `#c8553d` | Deep variant of rust |
+| `--acid-faint` | `rgba(201, 241, 88, 0.08)` | `rgba(201, 241, 88, 0.08)` | Faint acid wash (selection, hover fills) |
+| `--acid-ink` | `#3f5c0a` | `var(--acid)` | Acid used as text on paper (deep green in light mode) |
+| `--accent-on-dark` | `#c9f158` | `#c9f158` | Accent on a surface that is dark in every theme (wheels, Orb, terminal badge) |
+| `--spine` | `#5e7d1d` | `#7ea22b` | Fixed mother-node accent (deep green) |
+| `--spine-hot` | `#7ea22b` | `#a8d244` | Hover/active spine variant |
+| `--rust` | `#c8553d` | `#ee8466` | Pomodoro timer, warnings, live indicators |
+| `--rust-deep` | `#a83e2a` | `#d05f47` | Deep variant of rust |
 | `--plum` | `#6b4ea8` | `#6b4ea8` | Reserved accent |
-| `--cyan` | `#4ea8b0` | `#4ea8b0` | Task-flow edge color |
-| `--node-bg` | `#fdfaf2` | `#18160f` | Node card background |
+| `--cyan` | `#22d3ee` | `#22d3ee` | Task-flow edge color |
+| `--cyan-glow` | `#67e8f9` | `#67e8f9` | Glow variant of cyan |
+| `--purple` | `#a78bfa` | `#a78bfa` | Accent (plum family) |
+| `--amber` | `#d9a55a` | `#d9a55a` | Habit colour |
+| `--rose` | `#c87080` | `#c87080` | Habit colour |
+| `--teal` | `#5fa3a8` | `#5fa3a8` | Habit colour |
+| `--lilac` | `#9c8ec4` | `#9c8ec4` | Habit colour |
+| `--sand` | `#b8a17a` | `#b8a17a` | Habit colour |
+| `--moss` | `#7a8f5a` | `#7a8f5a` | Habit colour |
 | `--term-bg` | `#0c0a08` | `#05040a` | Terminal background (always dark) |
 | `--term-bg-2` | `#15110d` | `#0a0812` | Terminal header background |
 | `--term-fg` | `#d4cfc0` | `#d4cfc0` | Terminal foreground text |
 | `--term-dim` | `#6b6354` | `#6b6354` | Terminal dimmed text |
 | `--term-acid` | `#c9f158` | `#c9f158` | Terminal accent (cursor, prompt sigil) |
 | `--term-rust` | `#e87a5f` | `#e87a5f` | Terminal error / path color |
+| `--btn-primary-bg` | `#1a1612` | `var(--acid)` | Primary button fill |
+| `--btn-primary-bg-hover` | `#2a261e` | `var(--acid-glow)` | Primary button hover |
+| `--btn-primary-fg` | `var(--acid)` | `#1a1612` | Primary button text |
+| `--btn-primary-ring` | `rgba(201,241,88,0.45)` | `rgba(201,241,88,0.45)` | Primary button focus ring |
+| `--ink-on-bright` | `#0a0908` | `#0a0908` | Text / glyphs on an --acid fill |
 
-`--acid` is invariant across light and dark. It's a signal, not a shade — constant, high-voltage.
+_Generated from `src/renderer/styles/tokens.css` (`:root` / `[data-theme="dark"]`). Frame styles (ADR 0009, `themes/manifests.ts`) override these per style; the accent pairs below are what keeps every style readable._
+
+`--acid` is invariant across light and dark in the native style. Frame styles may change it (Macintosh light makes it near-black), so never pair it with a fixed colour — use the pairs below.
+
+#### Accent pairs — which token goes on which surface
+
+| Surface | Fill | Text / glyph on it |
+|---|---|---|
+| Primary button | `--btn-primary-bg` | `--btn-primary-fg` |
+| An `--acid` fill (badge, checked box, switch knob) | `--acid` | `--ink-on-bright` |
+| Accent text on paper / a node card | — | `--acid-ink` |
+| A surface that is dark in every theme (pie menu, pen wheel, Orb, Commander, terminal) | `--accent-on-dark` (active) | `#0e1012` on the accent; `#d4cfc0` / `#8a8270` (= `--term-fg` / `--term-dim`) for body text |
+| Danger text / outline (delete, unplan, factory reset) | — | `--rust` (never a hard-coded red) |
+
+`themeContrast.test.ts` checks the pairs in every frame style.
+
+#### Shared components
+
+Use these instead of hand-rolling (all in `src/renderer/components/ui/`):
+
+| Need | Component |
+|---|---|
+| Dropdown | `AppSelect` (never a native `<select>`) |
+| Time input | `TimeField` (never `<input type="time">`); `onEnter` / `onEscape` for host forms |
+| Floating menu / picker | `Popover` (Escape closes it; a field marked `data-own-escape` handles Escape itself) |
+| On/off toggle | `Switch` / `SwitchVisual` |
+| Close a dialog / popup / panel | `CloseButton` (`tone="dark"` on always-dark panels) |
+
+Active items show a filled / tinted background or a coloured icon — never a left-edge accent bar.
 
 `--term-bg` is always dark regardless of the host theme. The terminal is a portal to another layer.
 
