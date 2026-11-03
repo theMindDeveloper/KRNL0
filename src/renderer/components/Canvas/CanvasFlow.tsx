@@ -2056,56 +2056,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         />
       )}
 
+      {/* The app's shared menu (same look as every other right-click menu). */}
       {ctxMenu && (
-        <div
-          data-testid="node-ctx-menu"
-          onContextMenu={(e) => e.preventDefault()}
-          style={{
-            position: 'fixed',
-            top: ctxMenu.y,
-            left: ctxMenu.x,
-            background: 'var(--node-bg, #18160f)',
-            border: '1px solid var(--paper-3)',
-            borderRadius: 6,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            padding: 4,
-            zIndex: Z.nodeMenu,
-            minWidth: 140,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}
-        >
-          <button
-            type="button"
-            data-testid="node-ctx-menu-delete"
-            onClick={deleteFromCtxMenu}
-            title="delete node"
-            style={{
-              display: 'block',
-              width: '100%',
-              textAlign: 'left',
-              padding: '6px 10px',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--rust)',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: 'inherit',
-              textTransform: 'inherit',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(200,85,61,0.12)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
-            {ctxMenu.nodeIds.length > 1 ? `delete (${ctxMenu.nodeIds.length})` : 'delete'}
-          </button>
-        </div>
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onDismiss={closeCtxMenu}
+          items={[{
+            label: ctxMenu.nodeIds.length > 1 ? `Delete ${ctxMenu.nodeIds.length} items` : 'Delete',
+            danger: true,
+            onSelect: deleteFromCtxMenu,
+          }]}
+        />
       )}
     </ReactFlow>
     </BoldSetContext.Provider>
