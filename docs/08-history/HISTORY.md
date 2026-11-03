@@ -997,3 +997,20 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Analytics:** a span ending exactly at midnight stays on the day before (hour chart and session date included); proportional day splits round the running total, so no day gets negative minutes.
 - **CLI:** `frame add` without `--at` lands in the middle of the visible canvas, not at its top-left corner. New `settings layout [station|canvas]` and `radio list|status|play|remove|stop|volume` (hard rule 8).
 - **Layering:** one named stacking scale (`ui/layers.ts`) replaces the scattered z-index numbers; dropdowns and pickers now sit above full-window modals by rule, not by DOM order.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 6): UX audit fixes, keyboard, undo notice
+
+**Type:** Bug Fix / Feature / Refactor
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `2980b6f` … `ecc5007`
+**Files changed:** `TodoNode`, `FrameNode`, `HabitNode/{index,HabitContextMenu}.tsx`, `TextNode`, `ImageNode`, `Assistant/{Commander.tsx,types.ts,flows/sessionFromCommander.ts}`, `Orb/{index.tsx,freshBoard.ts}`, `Dock`, `TopBar` (Settings), `Canvas/CanvasFlow.tsx`, `ui/{LayoutModeToggle,HabitSwapModal,UndoNoticeBar}.tsx`, `store/undoNotice.ts`, `utils/keyboardTargets.ts`, `shared/scheduleAt.ts` (new, shared with `sys task schedule`), node helper modules (`PomoNode/display.ts`, `ClockNode/wallHours.ts`, `CalendarNode/{screenScale,yearActivity}.ts`, `TaskNode/format.ts`), `docs/06-requirements/todo-node.md` (F10 retired), tests
+**Summary:**
+- **Escape cancels:** in the Todo text and minutes edits, the frame label and the habit rename, Escape used to unmount the field and its blur saved what was typed anyway. The Todo minutes field rejects "2.5" instead of reading 2, and an invalid value no longer leaves a red field stuck open.
+- **Commander:** the start time and the 5-task limit are checked before launch (`HH:MM` means today); the "Session locked in" line needs this session's head task to have its time, not any task on the board.
+- **Keyboard:** Dock single-key shortcuts, canvas Delete and undo stand down while typing or behind a modal (Settings, Commander, habit swap); Space push-to-talk leaves focused buttons and radios alone; Settings closes on Escape; Delete removes selected free nodes (not only drawings); notes are reachable with Tab and open with Enter / F2.
+- **Undo notice:** one-click deletes (Todo ✕ and menu, Archive CLEAR, habit delete, canvas Delete and menu) show "Deleted … · UNDO" for a few seconds; UNDO takes back the whole cascade in one step and only while nothing else changed.
+- **Smaller:** selecting text in a note or frame label no longer drags the node; long notes scroll while editing; the habit add field clears on Escape and never drops a half-set repeat silently; a picked image that can't be used says why on the node; a brand-new board is greeted with an introduction and a pointer to the tour.
+- **Todo F10 retired:** a single click on a row's text was specified to start its pomo, but it would fire on the first half of every double-click (rename). "Start pomo" stays in the row menu; the misleading pointer cursor is gone.
+- **Dev:** pure helpers moved out of the Pomo, Clock, Task, Week and Year component files, so React Fast Refresh hot-swaps them instead of reloading the page. The stale-save merge is now also covered through the real `board:save` IPC handler.
