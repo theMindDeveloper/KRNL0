@@ -111,6 +111,11 @@ Each item says what you'll notice and, where it helps, how to try it.
 - **The quick-action buttons stay** after your first message.
 - **The chat hint names the real shortcut** (hold Space).
 
+## Themes: Pro light, and "Paper"
+
+- **Pro now has a light mode.** Pick Pro, switch to ☀ Light, and you stay on Pro: light-grey panels, dark graphite text, the same lime accent. It used to jump to the old default style.
+- **"Classic" is now called "Paper"** (cream & lime). It's the same look under a new name. Anything that saved "classic" still works.
+
 ## Looks the same in every theme
 
 *Try:* switch Settings → frame style to **Macintosh light**, **Blueprint** and **Submarine**, and look around.

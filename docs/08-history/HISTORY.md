@@ -1096,3 +1096,14 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Assistant commands:** flows run `krnl` commands in main through the CLI facade with their arguments intact. They used to be typed into a hidden shell: multi-word task names were cut to their first word (so Commander sessions always "went wrong") and every command waited out a 5 s timeout. Failures now show in the caption; a stopped flow can't resume when another starts; stopping a flow stops the radio.
 - **Tutorials:** the removed double-click "bind to Pomodoro" lesson is replaced by the current way (Start pomo on the Todo row; skipped in Easy mode); the "wait for you to do it" steps ignore tasks that were already on the board; the focus session says what starting really does and no longer promises a break announcement.
 - **Orb and chrome:** the chat panel and caption open toward free space and the orb can't park under the top bar; a chat message launches a flow only when it names it (typing "a" started a Pomodoro); quick actions stay after the first message; the placeholder names the real shortcut (hold Space). The Dock's shape button closes its own menu; the status bar counts sessions to the Pomo's real long break; the Analytics header gets each frame style's header skin.
+
+---
+
+## [2026-11-03] — Pro light mode, "Paper" style name
+
+**Type:** Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Files changed:** `themes/manifests.ts` (`PRO_LIGHT`), `shared/frameStyles.ts`, `ChassisLayer/dockRegistry.tsx`, `styles/chassis.css`, `sys/SysFacade.ts`, `docs/06-requirements/theme-engine.md` (F4), tests
+**Summary:**
+- **Pro light:** Pro was dark-only, so choosing Light switched the frame to the default style. Pro now has its own light palette — light-grey panels, graphite ink, the lime kept as a fill with dark text on it, deep green where it is text — with the same squared, matte frame. It passes the theme contrast checks.
+- **"Paper":** the default style (id `classic`) is shown as "Paper · Cream & lime" instead of "Classic · Default frame" (Pro is the default anyway). The id is unchanged, so saved choices and scripts keep working; `krnl theme frame paper` works too.
