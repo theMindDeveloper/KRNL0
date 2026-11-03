@@ -196,6 +196,7 @@ export function FrameNode({
         {editing ? (
           <input
             ref={inputRef}
+            className="nodrag"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}

@@ -14,7 +14,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { NodeResizeControl } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { ImageState, ImageConfig } from './types';
-import { ingestImageFile } from '../../Canvas/dropImage';
+import { ingestImageFile, imageRejectReason } from '../../Canvas/dropImage';
 import { useCornerProximity } from '../../../hooks/useCornerProximity';
 
 export function ImageNode({
@@ -27,6 +27,13 @@ export function ImageNode({
 
   const [hover, setHover] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  // Why a picked file was not used — shown on the node, as a canvas drop does.
+  const [pickError, setPickError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pickError) return;
+    const t = setTimeout(() => setPickError(null), 6000);
+    return () => clearTimeout(t);
+  }, [pickError]);
   const [shiftHeld, setShiftHeld] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -50,6 +57,12 @@ export function ImageNode({
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    const reason = imageRejectReason(file);
+    if (reason) {
+      setPickError(`Not added: ${reason}`);
+      return;
+    }
+    setPickError(null);
     try {
       const result = await ingestImageFile(file);
       if (result) {
@@ -64,6 +77,7 @@ export function ImageNode({
       }
     } catch (err) {
       console.warn('[image] replace failed:', err);
+      setPickError('Could not save that image');
     }
   };
 
@@ -204,6 +218,21 @@ export function ImageNode({
           >
             click to pick image
           </button>
+        )}
+        {pickError && (
+          <div
+            role="status"
+            data-testid="image-node-pick-error"
+            style={{
+              position: 'absolute', left: 8, right: 8, bottom: 8,
+              padding: '5px 8px', borderRadius: 6,
+              background: 'var(--paper-2)', border: '1px solid var(--rust)',
+              color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 10.5,
+              pointerEvents: 'none',
+            }}
+          >
+            {pickError}
+          </div>
         )}
 
       </div>

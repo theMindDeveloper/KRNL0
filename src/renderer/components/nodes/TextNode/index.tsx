@@ -225,7 +225,9 @@ export function TextNode({
         <div style={isShape ? { position: 'absolute', inset: 0, padding: shapePad, boxSizing: 'border-box', display: 'flex', alignItems: 'center' } : { width: '100%', height: '100%' }}>
         <textarea
           ref={taRef}
-          className="text-body"
+          // nodrag: selecting text with the mouse must not move the note;
+          // nowheel: the wheel scrolls a long note instead of zooming.
+          className="text-body nodrag nowheel"
           data-testid="text-node-textarea"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -252,7 +254,9 @@ export function TextNode({
             letterSpacing: '-0.005em',
             boxSizing: 'border-box',
             position: 'relative',
-            overflow: 'hidden',
+            // Shapes size to their lines; a long note scrolls while editing
+            // instead of hiding what is past the box.
+            overflow: isShape ? 'hidden' : 'auto',
             ...(isShape ? { height: `${Math.max(1, draft.split('\n').length) * 1.35}em`, maxHeight: '100%' } : {}),
           }}
         />

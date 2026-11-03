@@ -155,3 +155,15 @@ describe('ImageNode — F11 broken asset falls back to placeholder', () => {
     expect(screen.getByTestId('image-node-placeholder')).toBeTruthy();
   });
 });
+
+describe('ImageNode — a picked file it cannot use says why', () => {
+  it('shows the reason on the node instead of only logging it', async () => {
+    const onCommand = vi.fn();
+    render(<ImageNode node={fixture()} selected={false} onCommand={onCommand} onSelect={noop} />);
+    const input = screen.getByTestId('image-node-file-input') as HTMLInputElement;
+    const bmp = new File([new Uint8Array([1, 2, 3])], 'scan.bmp', { type: 'image/bmp' });
+    fireEvent.change(input, { target: { files: [bmp] } });
+    expect((await screen.findByTestId('image-node-pick-error')).textContent).toMatch(/PNG, JPEG/);
+    expect(onCommand).not.toHaveBeenCalled();
+  });
+});

@@ -136,12 +136,21 @@ export function HabitNode({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      // Same as the Todo add field: Escape abandons what was typed.
+      setNewName('');
+      setNewRepeat(null);
+      return;
+    }
     if (e.key === 'Enter') {
       const trimmed = newName.trim();
       if (!trimmed) return;
+      // A half-set repeat (weekly, no days) is never dropped silently: the
+      // hint below says what is missing and Enter waits for it.
+      if (newRepeat && !isRepeatValid(newRepeat)) return;
       onCommand('habit.add', {
         name: trimmed,
-        ...(newRepeat && isRepeatValid(newRepeat) ? { schedule: toSchedule(newRepeat) } : {}),
+        ...(newRepeat ? { schedule: toSchedule(newRepeat) } : {}),
       });
       setNewName('');
       setNewRepeat(null);
@@ -334,9 +343,15 @@ export function HabitNode({
             </button>
             </div>
             {newRepeat && !repeatAt && (
-              <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
-                {describeRepeat(newRepeat)} · press Enter to add
-              </div>
+              isRepeatValid(newRepeat) ? (
+                <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
+                  {describeRepeat(newRepeat)} · press Enter to add
+                </div>
+              ) : (
+                <div data-testid="habit-add-repeat-invalid" style={{ marginTop: 5, fontSize: 10.5, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
+                  Repeat isn't finished (days, time or minutes) — open it to fix, or Esc to clear
+                </div>
+              )
             )}
             {repeatAt && newRepeat && createPortal(
               <>
