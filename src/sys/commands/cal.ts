@@ -10,6 +10,8 @@ import type { Board } from '../../shared/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode } from '../../shared/dispatch/types';
 import { isValidYMD } from '../../shared/ymd';
+import { calendarSetZoom } from '../../renderer/components/nodes/CalendarNode/commands';
+import { CAL_ZOOM_MAX, CAL_ZOOM_MIN, granularityFor, type CalendarState } from '../../renderer/components/nodes/CalendarNode/types';
 
 export interface CalCtx {
   boardPath: string;
@@ -109,6 +111,21 @@ export async function calShow(
 }
 
 /** `krnl cal view <day|week|month|year> [--date YYYY-MM-DD]` — switch the Calendar view. */
+/** `krnl cal zoom <1-6>` — the week / day view's hour height (and snap grid). */
+export function calZoom(ctx: CalCtx & { onBoardChanged?: () => void }, zoom: number | undefined): SysResult {
+  if (zoom === undefined || zoom < CAL_ZOOM_MIN || zoom > CAL_ZOOM_MAX) {
+    return { ok: false, message: `cal zoom requires a number from ${CAL_ZOOM_MIN} to ${CAL_ZOOM_MAX}` };
+  }
+  const board = loadBoard(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const cal = board.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return { ok: false, message: 'No calendar on the board' };
+  cal.state = calendarSetZoom(cal.state as CalendarState, { zoom });
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  return { ok: true, message: `calendar zoom ${zoom} (${granularityFor(zoom)}-minute grid)`, data: { zoom } };
+}
+
 export function calView(
   ctx: CalCtx & { onBoardChanged?: () => void },
   view: string | undefined,

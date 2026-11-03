@@ -216,6 +216,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Calendar view of cascade-scheduled tasks (ADR 0003/0005)',
     subcommands: [
       { name: 'view', usage: 'cal view <day|week|month|year> [--date YYYY-MM-DD]', summary: 'Switch the Calendar view (year = 12 mini-months with focus heat)' },
+      { name: 'zoom', usage: 'cal zoom <1-6>', summary: 'Week / day view hour height (1 = hourly grid … 6 = 5-minute grid), as the zoom buttons'},
       { name: 'show', usage: 'cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]', summary: 'List all scheduled task placements, sorted by time' },
     ],
   },
@@ -225,6 +226,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'day', usage: 'clock day <YYYY-MM-DD|today|+1|-1>', summary: 'Set the clock selected date (absolute, today, or ±1 day)' },
       { name: 'dial', usage: 'clock dial [on|off]', summary: 'Dial-only view: the clock face as big as the window allows (toggles without an argument)' },
+      { name: 'half', usage: 'clock half [am|pm]', summary: 'Which half of the day the dial shows (toggles without an argument)' },
       { name: 'show', usage: 'clock show [--json]', summary: 'Show scheduled tasks for the clock\'s selected date and view window' },
     ],
   },

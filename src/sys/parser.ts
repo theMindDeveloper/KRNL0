@@ -38,6 +38,8 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'day'; arg: string | undefined }
   | { kind: 'clock'; sub: 'show'; json: boolean }
   | { kind: 'clock'; sub: 'dial'; arg: string | undefined }
+  | { kind: 'clock'; sub: 'half'; arg: string | undefined }
+  | { kind: 'cal'; sub: 'zoom'; zoom: number | undefined }
   | { kind: 'draw'; sub: 'list'; json: boolean }
   | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'media'; sub: 'list'; json: boolean }
@@ -459,6 +461,10 @@ export class SysParser {
 
     if (cmd === 'cal') {
       if (sub === 'view') return { kind: 'cal', sub: 'view', view: rest[0], date: flag(rest, 'date') };
+      if (sub === 'zoom') {
+        const z = rest[0] !== undefined ? Number(rest[0]) : NaN;
+        return { kind: 'cal', sub: 'zoom', zoom: Number.isFinite(z) ? z : undefined };
+      }
       if (sub === 'show' || sub === undefined) {
         return {
           kind: 'cal',
@@ -475,6 +481,7 @@ export class SysParser {
         return { kind: 'clock', sub: 'day', arg: rest[0] };
       }
       if (sub === 'dial') return { kind: 'clock', sub: 'dial', arg: rest[0] };
+      if (sub === 'half') return { kind: 'clock', sub: 'half', arg: rest[0] };
       if (sub === 'show' || sub === undefined) {
         return { kind: 'clock', sub: 'show', json: hasFlag(rest, 'json') };
       }

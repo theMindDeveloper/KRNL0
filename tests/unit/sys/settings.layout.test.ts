@@ -51,3 +51,30 @@ describe('settings mode', () => {
     expect((await facade().run(['settings', 'mode', 'nope'])).ok).toBe(false);
   });
 });
+
+describe('clock half / cal zoom', () => {
+  const seed = () => writeFileSync(boardPath, JSON.stringify({
+    version: 1, schemaVersion: 2, layoutMode: 'canvas', viewport: { x: 0, y: 0, zoom: 1 }, edges: [],
+    nodes: [
+      { id: 'mother-clock', kind: 'clock', isMother: true, position: { x: 0, y: 0 }, config: {}, state: { selectedDate: '2026-11-03', viewWindow: 0 } },
+      { id: 'mother-calendar', kind: 'calendar', isMother: true, position: { x: 0, y: 0 }, config: { view: 'week' }, state: { selectedDate: null, anchorDate: '2026-11-03' } },
+    ],
+  }), 'utf-8');
+  const node = (id: string) => (JSON.parse(readFileSync(boardPath, 'utf-8')) as { nodes: Array<{ id: string; state: Record<string, unknown> }> }).nodes.find((n) => n.id === id)!;
+
+  it('clock half sets AM / PM and toggles', async () => {
+    seed();
+    expect((await facade().run(['clock', 'half', 'pm'])).ok).toBe(true);
+    expect(node('mother-clock').state['viewWindow']).toBe(1);
+    await facade().run(['clock', 'half']);
+    expect(node('mother-clock').state['viewWindow']).toBe(0);
+    expect((await facade().run(['clock', 'half', 'noon'])).ok).toBe(false);
+  });
+
+  it('cal zoom sets the hour height within 1–6', async () => {
+    seed();
+    expect((await facade().run(['cal', 'zoom', '4'])).ok).toBe(true);
+    expect(node('mother-calendar').state['zoom']).toBe(4);
+    expect((await facade().run(['cal', 'zoom', '9'])).ok).toBe(false);
+  });
+});

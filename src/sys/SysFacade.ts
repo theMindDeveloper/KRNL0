@@ -608,6 +608,12 @@ export class SysFacade {
       if (command.sub === 'show') {
         return calCmd.calShow(ctx, command.from, command.to, command.json);
       }
+      if (command.sub === 'zoom') {
+        return calCmd.calZoom(
+          { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+          command.zoom,
+        );
+      }
       if (command.sub === 'view') {
         return calCmd.calView(
           { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
@@ -658,6 +664,7 @@ export class SysFacade {
         case 'day':  return clockCmd.clockDay(ctx, command.arg);
         case 'show': return clockCmd.clockShow(ctx, command.json);
         case 'dial': return clockCmd.clockDial(ctx, command.arg);
+        case 'half': return clockCmd.clockHalf(ctx, command.arg);
       }
     }
 
