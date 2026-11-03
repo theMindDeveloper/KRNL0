@@ -266,6 +266,16 @@ export function TextNode({
           className="text-body"
           data-testid="text-node-body"
           onClick={enterEdit}
+          // Keyboard: Tab to the note, Enter (or F2) to edit it.
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === 'F2') {
+              e.preventDefault();
+              e.stopPropagation();
+              enterEdit();
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',

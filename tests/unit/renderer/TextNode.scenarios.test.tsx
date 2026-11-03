@@ -215,3 +215,13 @@ describe('TextNode — F8 handles are connectable', () => {
     expect(screen.getByTestId('rf-handle-source-right')).toBeTruthy();
   });
 });
+
+describe('TextNode — keyboard', () => {
+  it('Enter on the focused note opens it for editing', () => {
+    render(<TextNode node={fixture({ text: 'hello' })} selected={false} onCommand={noop} onSelect={noop} />);
+    const body = screen.getByTestId('text-node-body');
+    expect(body.tabIndex).toBe(0);
+    fireEvent.keyDown(body, { key: 'Enter' });
+    expect(screen.getByTestId('text-node-textarea')).toBeTruthy();
+  });
+});
