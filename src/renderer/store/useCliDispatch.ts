@@ -80,6 +80,17 @@ export function useCliDispatch(): void {
             break;
           }
 
+          case 'term.setShell': {
+            const termNode = store.getState().board?.nodes.find((n) => n.kind === 'term');
+            if (!termNode) { message = 'No terminal on the board'; break; }
+            const shell = typeof args['shell'] === 'string' ? args['shell'].trim() : '';
+            if (!shell) { message = 'term setShell requires <shell> (e.g. pwsh.exe, /bin/bash, or default)'; break; }
+            makeCommandHandler(termNode.id)('term.setShell', { shell });
+            ok = true;
+            message = `Terminal shell set to ${shell} — used for the next shell (type exit, then Enter)`;
+            break;
+          }
+
           case 'term.setTitle':
           case 'term.setFontSize':
           case 'term.clear': {

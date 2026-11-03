@@ -461,3 +461,19 @@ describe('F15 — pty:kill', () => {
     expect(proc.kill).not.toHaveBeenCalled();
   });
 });
+
+describe('pty:create — the saved shell (krnl term setShell)', () => {
+  it('spawns the shell the terminal asks for; "default" falls back to the OS shell', async () => {
+    const { spawn } = await import('node-pty');
+    const prev = process.env['KRNL0_SHELL'];
+    delete process.env['KRNL0_SHELL'];
+    try {
+      await invoke('pty:create', makeEvent(), 80, 24, '/bin/bash');
+      expect((spawn as ReturnType<typeof vi.fn>).mock.calls.at(-1)![0]).toBe('/bin/bash');
+      await invoke('pty:create', makeEvent(), 80, 24, 'default');
+      expect((spawn as ReturnType<typeof vi.fn>).mock.calls.at(-1)![0]).not.toBe('default');
+    } finally {
+      if (prev !== undefined) process.env['KRNL0_SHELL'] = prev;
+    }
+  });
+});

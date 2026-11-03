@@ -270,7 +270,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   });
 
   // pty:create — spawn a real PTY-backed shell via node-pty (Decision 12 / Decision 18)
-  ipcMain.handle('pty:create', (event, cols: number, rows: number) => {
+  ipcMain.handle('pty:create', (event, cols: number, rows: number, shellPref?: unknown) => {
     const sessionId = randomUUID();
 
     // Default shell selection (Decision 12 §Default shell):
@@ -283,7 +283,13 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     //   Override — KRNL0_SHELL env var wins on every platform; set it to
     //              "cmd.exe", "pwsh.exe", "/bin/bash", etc. as needed.
     const isWin = process.platform === 'win32';
+    //   Then the terminal's saved shell (`krnl term setShell <shell>`;
+    //              'default' or empty = the OS default above).
+    const chosen = typeof shellPref === 'string' && shellPref.trim() && shellPref.trim() !== 'default'
+      ? shellPref.trim()
+      : undefined;
     const shell = process.env['KRNL0_SHELL']
+      ?? chosen
       ?? (isWin ? 'powershell.exe' : (process.env['SHELL'] ?? '/bin/zsh'));
 
     // Resolve where claude/CLAUDE.md lives BEFORE picking cwd — we want the

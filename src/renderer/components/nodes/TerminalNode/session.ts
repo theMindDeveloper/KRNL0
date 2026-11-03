@@ -23,7 +23,7 @@ export interface FitSurface {
 
 /** The krnl preload bridge surface (subset used by the terminal). */
 export interface KrnlBridge {
-  ptyCreate(cols: number, rows: number): Promise<{ sessionId: string; motd: string }>;
+  ptyCreate(cols: number, rows: number, shell?: string): Promise<{ sessionId: string; motd: string }>;
   ptyWrite(sessionId: string, data: string): void | Promise<void>;
   ptyResize(sessionId: string, cols: number, rows: number): void | Promise<void>;
   ptyKill(sessionId: string): void | Promise<void>;
@@ -43,6 +43,8 @@ export interface SessionDeps {
   setSessionId: (id: string | null) => void;
   /** Returns true if the session has been cancelled (unmounted). */
   isCancelled: () => boolean;
+  /** The terminal's saved shell, read at every (re)start; 'default' = OS default. */
+  shell?: () => string | undefined;
 }
 
 /**
@@ -94,7 +96,10 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
     starting = true;
     let created: { sessionId: string };
     try {
-      created = await krnl.ptyCreate(spawnCols, spawnRows);
+      const shell = deps.shell?.();
+      created = shell && shell !== 'default'
+        ? await krnl.ptyCreate(spawnCols, spawnRows, shell)
+        : await krnl.ptyCreate(spawnCols, spawnRows);
     } catch (err) {
       starting = false;
       const msg = err instanceof Error ? err.message : String(err);

@@ -25,7 +25,7 @@ interface KrnlBridge {
   boardSave: (data: unknown) => Promise<void>
   boardReset: () => Promise<unknown>
   boardSaveViewport: (viewport: { x: number; y: number; zoom: number }) => Promise<void>
-  ptyCreate: (cols: number, rows: number) => Promise<{ sessionId: string; motd: string }>
+  ptyCreate: (cols: number, rows: number, shell?: string) => Promise<{ sessionId: string; motd: string }>
   ptyWrite: (sessionId: string, data: string) => Promise<void>
   ptyResize: (sessionId: string, cols: number, rows: number) => Promise<void>
   ptyKill: (sessionId: string) => Promise<void>

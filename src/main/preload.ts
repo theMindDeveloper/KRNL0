@@ -9,8 +9,8 @@ contextBridge.exposeInMainWorld('krnl', {
     ipcRenderer.invoke('board:saveViewport', viewport),
 
   // Terminal
-  ptyCreate: (cols: number, rows: number) =>
-    ipcRenderer.invoke('pty:create', cols, rows),
+  ptyCreate: (cols: number, rows: number, shell?: string) =>
+    ipcRenderer.invoke('pty:create', cols, rows, shell),
   ptyWrite: (sessionId: string, data: string) =>
     ipcRenderer.invoke('pty:write', sessionId, data),
   ptyResize: (sessionId: string, cols: number, rows: number) =>

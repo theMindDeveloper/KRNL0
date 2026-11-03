@@ -34,6 +34,8 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
 
   // `krnl term setFontSize` — apply live, then refit so the PTY gets the new cols/rows.
   const fontSize = node.config?.fontSize;
+  const shellRef = useRef(node.config?.shell);
+  shellRef.current = node.config?.shell;
   useEffect(() => {
     const t = termRef.current;
     if (!t || fontSize === undefined || t.options.fontSize === fontSize) return;
@@ -160,6 +162,8 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           setActiveSessionId(id);
         },
         isCancelled: () => cancelled,
+        // Read at every start, so `krnl term setShell` applies to the next shell.
+        shell: () => shellRef.current,
       });
       if (cancelled) sessionCleanup?.();
     };
