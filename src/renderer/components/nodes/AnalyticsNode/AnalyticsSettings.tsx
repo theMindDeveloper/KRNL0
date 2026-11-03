@@ -71,7 +71,7 @@ export function AnalyticsSettings({ hiddenCards, onToggleHidden, onReset, onClos
                   <span style={{ flex: 1, minWidth: 0, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: on ? 'var(--k-an-ink-1, #eef1f4)' : 'var(--k-an-ink-4, #7d848b)' }}>
                     {ANALYTICS_CARD_LABELS[id]}
                   </span>
-                  <SwitchVisual on={on} offTrack="var(--k-an-line-2, #2a2e33)" />
+                  <SwitchVisual on={on} offTrack="var(--k-an-line-2, #2a2e33)" offKnob="var(--k-an-ink-3, #9aa1a8)" />
                 </button>
               );
             })}
@@ -98,7 +98,7 @@ export function AnalyticsSettings({ hiddenCards, onToggleHidden, onReset, onClos
 
 const pageCard: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0,
-  padding: '8px 10px 6px', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px solid var(--k-an-line, #23262a)',
+  padding: '8px 10px 6px', borderRadius: 10, background: 'var(--k-an-tile, rgba(255,255,255,0.025))', border: '1px solid var(--k-an-line, #23262a)',
 };
 const iconChip: React.CSSProperties = {
   width: 24, height: 24, flexShrink: 0, borderRadius: 7, display: 'grid', placeItems: 'center',

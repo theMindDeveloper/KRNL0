@@ -11,7 +11,8 @@ const SIZES = {
 } as const;
 
 /** The track + knob alone, for a row that is itself the switch button. */
-export function SwitchVisual({ on, size = 'sm', offTrack = 'var(--paper-3)' }: { on: boolean; size?: keyof typeof SIZES; offTrack?: string }) {
+/** `offTrack` / `offKnob`: the off colours, for a panel that keeps its own palette (Analytics). */
+export function SwitchVisual({ on, size = 'sm', offTrack = 'var(--paper-3)', offKnob = 'var(--ink-3)' }: { on: boolean; size?: keyof typeof SIZES; offTrack?: string; offKnob?: string }) {
   const s = SIZES[size];
   const pad = (s.h - s.knob) / 2;
   const track: CSSProperties = {
@@ -20,7 +21,7 @@ export function SwitchVisual({ on, size = 'sm', offTrack = 'var(--paper-3)' }: {
   };
   const knob: CSSProperties = {
     position: 'absolute', top: pad, left: on ? s.w - s.knob - pad : pad, width: s.knob, height: s.knob,
-    borderRadius: 999, background: on ? 'var(--ink-on-bright)' : 'var(--ink-3)', transition: 'left 120ms',
+    borderRadius: 999, background: on ? 'var(--ink-on-bright)' : offKnob, transition: 'left 120ms',
   };
   return <span aria-hidden style={track}><span style={knob} /></span>;
 }

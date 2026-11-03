@@ -125,8 +125,8 @@ function VideoPlayer({ url, onAspect }: { url: string; onAspect: (a: number) => 
       <Centered>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: '#e8ebee', textAlign: 'center', padding: 16, lineHeight: 1.45 }}>
           {isFile
-            ? <>This video's format can't play here (common with .mov from phones).<br /><a href={url} download style={{ color: 'var(--acid)' }}>Download it</a> or convert to MP4.</>
-            : <>This video can't be embedded here.<br /><a href={url} target="_blank" rel="noreferrer" style={{ color: 'var(--acid)' }}>Open it in the browser ↗</a></>}
+            ? <>This video's format can't play here (common with .mov from phones).<br /><a href={url} download style={{ color: 'var(--accent-on-dark)' }}>Download it</a> or convert to MP4.</>
+            : <>This video can't be embedded here.<br /><a href={url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-on-dark)' }}>Open it in the browser ↗</a></>}
         </span>
       </Centered>
     );
@@ -339,7 +339,7 @@ function PdfView({ url, page, onPage, onAspect }: { url: string; page: number; o
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
       <div ref={boxRef} style={{ flex: 1, minHeight: 0, display: 'grid', placeItems: 'center', background: 'repeating-linear-gradient(45deg, #2a2d31 0 8px, #2d3034 8px 16px)' }}>
         {error
-          ? <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--rust)', padding: 12, textAlign: 'center' }}>Couldn't open this PDF.</span>
+          ? <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--term-rust)', padding: 12, textAlign: 'center' }}>Couldn't open this PDF.</span>
           : pages === 0 ? <Spinner />
           : <canvas ref={canvasRef} style={{ maxWidth: 'calc(100% - 12px)', maxHeight: 'calc(100% - 12px)', borderRadius: 3, boxShadow: '0 6px 20px rgba(0,0,0,0.5)' }} />}
       </div>

@@ -476,31 +476,20 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           in dark mode, producing "green-on-white" mis-contrast. */}
       <button
         type="button"
-        className={`todo-check${item.done ? ' todo-check--done' : ''}`}
+        // Same checkbox as the task card (.task-check in tokens.css), which
+        // switches colours per mode — a fixed black fill hid the mark in
+        // every light theme.
+        className={`todo-check task-check${item.done ? ' todo-check--done task-check--done' : ''}`}
         onClick={(e) => {
           e.stopPropagation();
           onCommand('todo.toggle', { id: item.id });
         }}
-        style={{
-          flexShrink: 0,
-          width: 14,
-          height: 14,
-          border: `1px solid ${item.done ? 'var(--acid)' : 'var(--ink-4)'}`,
-          borderRadius: 3,
-          background: item.done ? '#0a0908' : 'transparent',
-          cursor: 'pointer',
-          display: 'grid',
-          placeItems: 'center',
-          padding: 0,
-          transition: 'all 0.12s',
-        }}
+        style={{ marginTop: 0 }}
         aria-label={archived ? 'Restore to list' : item.done ? 'Mark undone' : 'Mark done'}
         title={archived ? 'Restore to list' : undefined}
       >
         {item.done && (
-          <span style={{ fontSize: 9, color: 'var(--acid-ink, var(--acid))', fontWeight: 700, lineHeight: 1 }}>
-            ✓
-          </span>
+          <span className="task-check__mark">✓</span>
         )}
       </button>
 

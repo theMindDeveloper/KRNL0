@@ -245,7 +245,8 @@ function Field({ label, hint, warn = false, children }: { label: string; hint?: 
         fontSize: 9.5, letterSpacing: '0.12em', color: '#6b6354',
       }}>
         <span>{label}</span>
-        {hint && <span style={{ color: warn ? 'var(--rust)' : '#6b6354', textTransform: 'lowercase' }}>{hint}</span>}
+        {/* The panel is always dark: the terminal's palette reads on it in every theme. */}
+        {hint && <span style={{ color: warn ? 'var(--term-rust)' : 'var(--term-dim)', textTransform: 'lowercase' }}>{hint}</span>}
       </div>
       {children}
     </div>

@@ -178,7 +178,7 @@ const titlebarStyle: React.CSSProperties = {
   gap: 10,
   padding: '10px 14px',
   background: 'linear-gradient(180deg, var(--k-an-bg-3, #1f2226) 0%, var(--k-an-bg-2, #16181a) 100%)',
-  borderBottom: '1px solid #0a0c0e',
+  borderBottom: '1px solid var(--k-an-line, #0a0c0e)',
   boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
   fontFamily: 'var(--font-mono)',
   fontSize: 10,
