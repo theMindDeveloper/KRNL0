@@ -1041,3 +1041,17 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Terminal paste:** Ctrl+V and right-click Paste go through xterm's paste (bracketed when the shell asks for it), so a multi-line paste no longer runs line by line; Ctrl+V cancels the browser's own paste so text can only arrive once; Cmd+C with nothing selected no longer sends ^C on macOS. (`e01f22f` carried only its test; the code followed in `d1626e4`.)
 - **Month view:** up to six habit dots before "+N", and "+N" counts the hidden ones; no dots before a habit existed; the calendar's "show habits" setting is honoured; today's cell (month and week view) moves at midnight; a click also moves the anchor so Week / Day open on that day, a double-click opens it; chips are earliest first, so "+N" hides the latest.
 - **Analytics:** a hidden card keeps its grid cell — hiding a page's top card used to shift every later page by half and break the page jump; the headline says "the last 7 days" (the range is rolling); seven distinct weekday colours; extra sources keep their colour by id; the saved / CLI-set view opens its page.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 9): month drops, plan vs actual, review follow-ups
+
+**Type:** Bug Fix / Feature
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `a104ecf` … `d8fa4a7`
+**Files changed:** `CalendarNode/MonthView.tsx`, `styles/reactflow-theme.css`, `analytics/charts/PlanVsActual.tsx`, `AnalyticsNode/index.tsx`, `Station/{StationLayout.tsx,restoredSizes.ts}`, `Canvas/CanvasFlow.tsx`, `TerminalNode/{index.tsx,liveTerminals.ts}`, `main/ipc/handlers.ts`, tests
+**Summary:**
+- **Month view drops (ADR 0001 §9):** day cells take Todo rows, canvas tasks and other month chips; a task keeps its time of day on the new date, a new one starts at 09:00. Month chips drag between days.
+- **Plan vs actual:** "+N more" when tasks don't fit (they were dropped silently).
+- **Analytics:** the per-card ☆ / − buttons are gone — they only appeared under the settings panel that covers the cards, and pinning never moved a card (each card has a fixed grid cell). Hiding stays in the settings panel.
+- **Review follow-ups (batches 5–8):** the mother-row height is saved only from a real two-row split; the clock stays locked to the calendar column when other bottom panels change; canvas Delete / Enter act only while focus is on the canvas (a selection left in the embedded canvas is safe while typing in a Station panel); EXITED survives a remount; a terminal's cleanup never removes a newer mount's host; the analytics view jump handles Summary and skips pages Easy mode hides; a stale save whose payload can't be normalised still merges.
