@@ -132,6 +132,8 @@ These are read-only views — they do not mutate.
 - `krnl settings show [--json]` — `{ theme, viewport: {x, y, zoom}, boardPath, version }`.
 - `krnl theme show` — current theme.
 - `krnl viewport show [--json]` — current viewport.
+- `krnl settings mode [easy|advanced]` / `krnl settings layout [station|canvas]` — show or set the UI mode and the layout (the top-bar pills; headless, they write the board).
+- `krnl radio list|status|play [<preset>]|remove <preset>|stop|volume <0-100>` — the Ambient Radio mix in the open window (exit 2 without one). It drives the panel's own handlers, so the panel shows what the CLI did; YouTube needs a pasted link and stays UI-only.
 - All set commands (`theme set`, `viewport pan`, `viewport zoom`) already exist.
 
 ### 5.7 Self-introspection (for AI)

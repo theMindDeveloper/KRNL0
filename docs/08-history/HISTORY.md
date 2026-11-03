@@ -982,3 +982,18 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **CLI refs:** listings print the shortest unique prefix (8+) so every printed id can be typed back; ambiguous task refs list their matches; `text` / `image` commands accept prefixes; resize rejects non-positive sizes; segment and stroke refs need 4+ characters; `cal show` rejects unpadded/impossible dates; `pomo segments` uses the real local day end on DST days.
 - **Docs:** the visual-system colour table is regenerated from `tokens.css` and documents the accent pairs, the shared `ui/` components and the no-left-edge-bar rule.
 - **Follow-ups to batches 2–3:** split midnight spans are timestamped inside their own day (hour / weekday charts), and the stale-save merge merges arrays of plain values (habit logs, keywords) as sets, so concurrent ticks from the UI and the CLI both survive.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 5): audit fixes, CLI parity, layering
+
+**Type:** Bug Fix / Feature / Refactor
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `2168dc3` … `941470b`
+**Files changed:** `main/persistence/board.ts` (`migrateBoard`), `main/ipc/handlers.ts`, `main/boardIo.ts`, `main/rpc/server.ts`, `shared/boardMerge.ts`, `PomoNode/useAwayGap.ts`, `analytics/{dateRange,sources/pomoSource}.ts`, `sys/{parser,SysFacade}.ts`, `sys/commands/{frame,pomo,info}.ts`, `shared/cli/commandRegistry.ts`, `store/useCliDispatch.ts`, `AmbientRadio/{index.tsx,radioControl.ts (new)}`, `ui/layers.ts` (new) + 17 overlay components, `docs/04-visual-system/design-tokens.md`, `docs/06-requirements/ai-full-visibility-cli.md`, tests
+**Summary:**
+- **Stale-save merge (second pass):** board.json comes back from the loader migrated (defaults added, keys reordered) while the renderer's copies don't; the merge read that reshaping as an edit by the file, so a node created and then deleted could come back after any CLI write. All three boards now go through the same `migrateBoard` first. A user's reorder of a list survives a CLI addition; lists with repeated values are no longer merged as sets.
+- **Pomo away prompt:** a prompt about a span the CLI ended (break / extend) is dropped instead of being applied to the next span. `pomo stop --at` refuses a time before the span started and a paused / idle pomo instead of recording 0 minutes or echoing a time it ignored.
+- **Analytics:** a span ending exactly at midnight stays on the day before (hour chart and session date included); proportional day splits round the running total, so no day gets negative minutes.
+- **CLI:** `frame add` without `--at` lands in the middle of the visible canvas, not at its top-left corner. New `settings layout [station|canvas]` and `radio list|status|play|remove|stop|volume` (hard rule 8).
+- **Layering:** one named stacking scale (`ui/layers.ts`) replaces the scattered z-index numbers; dropdowns and pickers now sit above full-window modals by rule, not by DOM order.

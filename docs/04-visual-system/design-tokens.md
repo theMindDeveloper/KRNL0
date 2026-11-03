@@ -90,6 +90,7 @@ Use these instead of hand-rolling (all in `src/renderer/components/ui/`):
 | Floating menu / picker | `Popover` (Escape closes it; a field marked `data-own-escape` handles Escape itself) |
 | On/off toggle | `Switch` / `SwitchVisual` |
 | Close a dialog / popup / panel | `CloseButton` (`tone="dark"` on always-dark panels) |
+| Stacking order of anything floating | `Z` from `ui/layers.ts` — chrome < widget < dialog < commander < nodeMenu < popup < layerMenu < notice < radial < modal < popover < contextMenu < topmost. Pick a named layer, never a new number |
 
 Active items show a filled / tinted background or a coloured icon — never a left-edge accent bar.
 
