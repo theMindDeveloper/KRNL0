@@ -50,6 +50,10 @@ export async function calShow(
   to: string | undefined,
   json = false,
 ): Promise<SysResult> {
+  // Dates compare as strings: '2026-11-2' would silently drop every result.
+  for (const [flagName, v] of [['--from', from], ['--to', to]] as const) {
+    if (v !== undefined && !isValidYMD(v)) return { ok: false, message: `bad ${flagName} "${v}" (want a real YYYY-MM-DD date)` };
+  }
   const board = loadBoard(ctx);
   if (!board) return { ok: false, message: 'Board not found or empty.' };
 

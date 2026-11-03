@@ -154,6 +154,14 @@ describe('sys cal show', () => {
     expect(res.message).toMatch(/No scheduled tasks/);
   });
 
+  it('rejects an unpadded or impossible --from instead of silently returning nothing', async () => {
+    seedBoardWithScheduledTasks();
+    const res = await calShow(ctx, '2026-11-2', undefined, false);
+    expect(res.ok).toBe(false);
+    expect(res.message).toMatch(/--from/);
+    expect((await calShow(ctx, undefined, '2026-02-31', false)).ok).toBe(false);
+  });
+
   it('lists the anchor task placement', async () => {
     seedBoardWithScheduledTasks();
     const res = await calShow(ctx, undefined, undefined, false);

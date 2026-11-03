@@ -49,7 +49,9 @@ export function drawDelete(ctx: DrawCtx, id: string | undefined): SysResult {
   const board = load(ctx);
   if (!board) return { ok: false, message: 'No board found' };
   const all = board.drawings ?? [];
-  const hits = all.filter((d) => d.id.startsWith(id));
+  const exact = all.filter((d) => d.id === id);
+  if (exact.length === 0 && id.length < 4) return { ok: false, message: `stroke ref "${id}" is too short — use 4+ characters` };
+  const hits = exact.length > 0 ? exact : all.filter((d) => d.id.startsWith(id));
   if (hits.length !== 1) return { ok: false, message: hits.length === 0 ? `no stroke "${id}"` : `stroke "${id}" is ambiguous` };
   save(ctx, { ...board, drawings: all.filter((d) => d.id !== hits[0]!.id) });
   return { ok: true, message: `deleted ${hits[0]!.id}` };

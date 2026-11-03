@@ -290,12 +290,9 @@ export function pomoRetag(
     const spanTag = text ? spanTagFor(board as unknown as Board, text, free.tag ?? null) : null;
     if (text && free.tag && !spanTag) { result = { ok: false, message: `unknown tag "${free.tag}"` }; return; }
     const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
-    const matches = prev.history.filter((r) => r.id.startsWith(segmentId));
-    if (matches.length !== 1) {
-      result = { ok: false, message: matches.length === 0 ? `no segment "${segmentId}"` : `segment "${segmentId}" is ambiguous` };
-      return;
-    }
-    const id = matches[0]!.id;
+    const seg = resolveSegmentId(prev, segmentId);
+    if ('error' in seg) { result = { ok: false, message: seg.error }; return; }
+    const id = seg.id;
     node['state'] = {
       ...prev,
       history: fsmRetag(prev, { id, taskId: tag.taskId, label: tag.label, tag: spanTag }).history,
@@ -308,6 +305,11 @@ export function pomoRetag(
 
 /** Resolve a unique recorded segment id from a prefix. */
 function resolveSegmentId(state: PomoState, segmentId: string): { id: string } | { error: string } {
+  // Same rule as every other ref: the full id, or a prefix of 4+ characters
+  // (a 1-letter prefix would pick whichever span happened to match).
+  const exact = state.history.find((r) => r.id === segmentId);
+  if (exact) return { id: exact.id };
+  if (segmentId.length < 4) return { error: `segment ref "${segmentId}" is too short — use 4+ characters` };
   const matches = state.history.filter((r) => r.id.startsWith(segmentId));
   if (matches.length === 1) return { id: matches[0]!.id };
   return { error: matches.length === 0 ? `no segment "${segmentId}"` : `segment "${segmentId}" is ambiguous` };
@@ -345,7 +347,9 @@ export function pomoSegments(ctx: { boardPath: string }, opts: { date?: string; 
   const date = opts.date ?? today;
   if (!isValidYMD(date)) return { ok: false, message: `bad --date "${date}" (want YYYY-MM-DD)` };
   const dayStart = new Date(`${date}T00:00:00`).getTime();
-  const dayEnd = dayStart + 86_400_000;
+  // The next local midnight — a DST day is 23 or 25 hours long.
+  const [yy, mm, dd] = date.split('-').map(Number) as [number, number, number];
+  const dayEnd = new Date(yy, mm - 1, dd + 1).getTime();
   const hm = (ms: number) => { const t = new Date(ms); return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; };
   const segs = selectPomoReality(raw, Date.now())
     .filter((sg) => sg.endMs > dayStart && sg.startMs < dayEnd)
