@@ -51,12 +51,15 @@ export function FrameNode({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(state.label ?? '');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Escape unmounts the input, and its blur would commit the typed draft.
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     if (!editing) setDraft(state.label ?? '');
   }, [state.label, editing]);
 
   useEffect(() => {
+    if (editing) cancelledRef.current = false;
     if (editing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
@@ -64,6 +67,7 @@ export function FrameNode({
   }, [editing]);
 
   const commit = () => {
+    if (cancelledRef.current) return;
     if (draft !== state.label) onCommand('frame.setLabel', { label: draft });
     setEditing(false);
   };
@@ -200,6 +204,7 @@ export function FrameNode({
                 e.preventDefault();
                 commit();
               } else if (e.key === 'Escape') {
+                cancelledRef.current = true;
                 setDraft(state.label ?? '');
                 setEditing(false);
               }

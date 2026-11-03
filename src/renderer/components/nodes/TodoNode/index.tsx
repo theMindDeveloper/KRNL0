@@ -264,13 +264,17 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     }
   };
 
+  // Escape unmounts an edit input, and its blur would commit what was typed.
+  const editCancelledRef = useRef(false);
+
   const startEdit = (id: string, text: string) => {
+    editCancelledRef.current = false;
     setEditingId(id);
     setEditValue(text);
   };
 
   const commitEdit = () => {
-    if (editingId !== null) {
+    if (editingId !== null && !editCancelledRef.current) {
       const trimmed = editValue.trim();
       if (trimmed) {
         onCommand('todo.edit', { id: editingId, text: trimmed });
@@ -281,6 +285,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   const cancelEdit = () => {
+    editCancelledRef.current = true;
     setEditingId(null);
     setEditValue('');
   };
@@ -295,25 +300,30 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   const startTimeEdit = (itemId: string, taskNodeId: string) => {
     const current = taskPlannedMin.get(taskNodeId) ?? 25;
+    editCancelledRef.current = false;
     setEditingTimeId(itemId);
     setTimeValue(String(current));
     setTimeInvalid(false);
   };
 
-  const commitTimeEdit = () => {
-    if (editingTimeId === null) return;
-    const parsed = parseInt(timeValue, 10);
-    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 480) {
+  /** False when the value is invalid (the field stays open, marked red). */
+  const commitTimeEdit = (): boolean => {
+    if (editingTimeId === null || editCancelledRef.current) return true;
+    // Whole minutes only: "2.5" is rejected, not silently read as 2.
+    const parsed = Number(timeValue.trim());
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 480) {
       setTimeInvalid(true);
-      return;
+      return false;
     }
     onCommand('todo.setItemPlannedMin', { itemId: editingTimeId, minutes: parsed });
     setEditingTimeId(null);
     setTimeValue('');
     setTimeInvalid(false);
+    return true;
   };
 
   const cancelTimeEdit = () => {
+    editCancelledRef.current = true;
     setEditingTimeId(null);
     setTimeValue('');
     setTimeInvalid(false);
@@ -543,6 +553,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             type="number"
             min={1}
             max={480}
+            title={timeInvalid ? 'Whole minutes from 1 to 480' : 'Minutes (1–480)'}
+            aria-invalid={timeInvalid}
             value={timeValue}
             autoFocus
             onFocus={(e) => e.currentTarget.select()}
@@ -551,7 +563,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               setTimeInvalid(false);
             }}
             onKeyDown={handleTimeKeyDown}
-            onBlur={commitTimeEdit}
+            // Leaving an invalid value abandons the edit instead of leaving a
+            // red field open with nothing focused.
+            onBlur={() => { if (!commitTimeEdit()) cancelTimeEdit(); }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             style={{

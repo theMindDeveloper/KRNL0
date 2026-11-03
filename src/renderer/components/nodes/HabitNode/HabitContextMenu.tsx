@@ -48,6 +48,8 @@ export function HabitContextMenu({
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState(false);
+  // Escape unmounts the input, and its blur would commit the typed draft.
+  const cancelledRef = useRef(false);
   const [draft, setDraft] = useState(habit.name);
   const [pickerOpen, setPickerOpen] = useState<'color' | 'icon' | 'note' | null>(null);
   // Inline note draft — window.prompt() is blocked in Electron renderer.
@@ -91,6 +93,7 @@ export function HabitContextMenu({
   const clampedY = Math.round(Math.min(Math.max(0, anchor.y), Math.max(0, vh - estHeight)));
 
   const commitRename = () => {
+    if (cancelledRef.current) return;
     const trimmed = draft.trim();
     if (trimmed && trimmed !== habit.name) onRename(trimmed);
     setRenaming(false);
@@ -141,6 +144,7 @@ export function HabitContextMenu({
             onKeyDown={(e) => {
               if (e.key === 'Enter') commitRename();
               if (e.key === 'Escape') {
+                cancelledRef.current = true;
                 setDraft(habit.name);
                 setRenaming(false);
               }
@@ -180,6 +184,7 @@ export function HabitContextMenu({
         label="Rename"
         onClick={() => {
           setDraft(habit.name);
+          cancelledRef.current = false;
           setRenaming(true);
           setPickerOpen(null);
         }}
