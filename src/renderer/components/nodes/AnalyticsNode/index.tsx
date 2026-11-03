@@ -301,7 +301,10 @@ function ChartCard({
   const [hostRef, hostSize] = useElementSize<HTMLDivElement>();
   const easy = useEasyMode();
 
-  if (hidden) return null;
+  // A hidden card keeps its grid cell as an empty placeholder: the pager cuts
+  // pages at card tops, so a missing top card shifted every later page by
+  // half, and the page jump lost its target.
+  if (hidden) return <div data-card-id={cardId} data-hidden-card aria-hidden style={{ ...cardPlacement(cardId, easy), minHeight: 0 }} />;
 
   const cardStyle: React.CSSProperties = {
     background: 'linear-gradient(180deg, var(--k-an-bg-2b, #1a1d20) 0%, var(--k-an-bg, #131517) 100%)',
@@ -1470,12 +1473,12 @@ function ViewBody(props: ViewBodyProps) {
           </PagedView>
         )}
       </ChartCard>
-      {streaks.perHabit.length > 0 && (
+      {/* No habits yet: still a (placeholder) card, so the page grid holds. */}
         <ChartCard
           cardId="sources.streaks"
           title="Habit streaks"
           contentHeight={240}
-          hidden={isHidden('sources.streaks')}
+          hidden={isHidden('sources.streaks') || streaks.perHabit.length === 0}
           pinned={isPinned('sources.streaks')}
           settingsOpen={settingsOpen}
           onToggleHidden={() => toggleHidden('sources.streaks')}
@@ -1506,7 +1509,6 @@ function ViewBody(props: ViewBodyProps) {
             </PagedView>
           )}
         </ChartCard>
-      )}
     </div>
   );
 }
