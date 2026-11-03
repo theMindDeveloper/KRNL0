@@ -21,6 +21,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
 import { CanvasSwitcher } from './CanvasSwitcher';
 import { CloseButton } from '../ui/CloseButton';
+import { Z } from '../ui/layers';
 
 type Theme = 'light' | 'dark';
 
@@ -137,7 +138,7 @@ export function TopBar() {
         paddingLeft: IS_MAC ? MAC_TRAFFIC_LIGHT_INSET : 16,
         paddingRight: 158,
         flexShrink: 0,
-        zIndex: 100,
+        zIndex: Z.chrome,
         boxSizing: 'border-box',
         WebkitAppRegion: 'drag',
       } as React.CSSProperties}
@@ -239,7 +240,7 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 4000,
+        zIndex: Z.modal,
         background: 'rgba(0,0,0,0.55)',
         display: 'grid',
         placeItems: 'center',

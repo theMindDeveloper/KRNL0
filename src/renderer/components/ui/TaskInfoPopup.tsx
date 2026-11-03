@@ -18,6 +18,7 @@ import { calcStreak } from '../nodes/HabitNode/commands';
 import { todayLocal, type HabitState } from '../nodes/HabitNode/types';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { useEasyMode } from '../../store/uiMode';
+import { Z } from './layers';
 
 export interface TaskInfoPopupProps {
   /** A task node id, or `habit-<habitId>` for a habit on the dial. */
@@ -54,7 +55,7 @@ function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () 
   }, [onClose]);
   return createPortal(
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
       <div
         data-testid="task-info-popup"
         style={{
@@ -64,7 +65,7 @@ function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () 
           // A tall popup near the bottom scrolls instead of leaving the screen.
           maxHeight: 'calc(100vh - 16px)',
           overflowY: 'auto',
-          zIndex: 1999,
+          zIndex: Z.popup,
           width: 250,
           background: 'var(--paper)',
           border: '1px solid var(--paper-3)',

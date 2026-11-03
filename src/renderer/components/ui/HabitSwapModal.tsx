@@ -10,6 +10,7 @@ import { HabitIcon } from '../nodes/HabitNode/HabitIcon';
 import { IconCalendarDay, IconRepeat, IconCheck } from './repeatIcons';
 import { RepeatEditor, describeRepeat, isRepeatValid, toSchedule, type RepeatValue } from './RepeatEditor';
 import { CloseButton } from './CloseButton';
+import { Z } from './layers';
 
 const DOW_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 
@@ -62,7 +63,7 @@ export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
     <div
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
       onPointerDown={stop} onPointerUp={stop} onMouseDown={stop} onMouseUp={stop} onContextMenu={stop}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(6,6,4,0.55)', zIndex: 250, display: 'grid', placeItems: 'center' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(6,6,4,0.55)', zIndex: Z.dialog, display: 'grid', placeItems: 'center' }}
     >
       <div
         data-testid="habit-swap-modal"

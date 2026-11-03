@@ -19,6 +19,7 @@
 import { useStore } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
+import { Z } from '../ui/layers';
 
 // Injected from package.json at build time (electron.vite.config.ts).
 const BOARD_VERSION = `v${typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'}`;
@@ -86,7 +87,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
         fontSize: 10.5,
         letterSpacing: '0.04em',
         textTransform: 'uppercase' as const,
-        zIndex: 100,
+        zIndex: Z.chrome,
         boxSizing: 'border-box',
       }}
     >

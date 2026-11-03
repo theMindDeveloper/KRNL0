@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { TimeField } from '../../ui/TimeField';
 import { CloseButton } from '../../ui/CloseButton';
+import { Z } from '../../ui/layers';
 
 export interface TaskPopupTask {
   id: string;
@@ -76,14 +77,14 @@ export function TaskPopup(p: Props) {
 
   return createPortal(
     <>
-      <div onClick={p.onClose} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+      <div onClick={p.onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
       <div
         data-testid="calendar-task-popup"
         role="dialog"
         aria-label={task.text}
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed', left, top, width: W, zIndex: 1999, boxSizing: 'border-box',
+          position: 'fixed', left, top, width: W, zIndex: Z.popup, boxSizing: 'border-box',
           background: 'var(--paper)', color: 'var(--ink)',
           border: '1px solid var(--paper-3)', borderRadius: 14,
           boxShadow: '0 24px 60px rgba(0,0,0,0.5)',

@@ -73,6 +73,7 @@ import type { FrameState } from '../nodes/FrameNode/types';
 import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 import { isStationHidden } from '../Station/stationVisibility';
+import { Z } from '../ui/layers';
 
 // Canvas-mode mother row: first slot x and the step between slots (540 wide +
 // 20 gap) — matches the seeded positions in main/persistence/board.ts.
@@ -323,7 +324,7 @@ const SwapButtonNode = memo(function SwapButtonNode({
         // Defensive pointer-events:none until the proximity tick switches
         // it to 'all' — keeps a hidden button from blocking canvas drags.
         pointerEvents: 'none',
-        zIndex: 100,
+        zIndex: Z.chrome,
         opacity: 0,
       }}
     >
@@ -2016,7 +2017,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
             fontFamily: 'var(--font-mono)',
             fontSize: 11,
             padding: 4,
-            zIndex: 1000,
+            zIndex: Z.nodeMenu,
             minWidth: 140,
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
@@ -2199,7 +2200,7 @@ function PaneNamePrompt({
         left: cx,
         top: cy,
         width: W,
-        zIndex: 10000,
+        zIndex: Z.topmost,
         background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
         borderRadius: 6,

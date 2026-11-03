@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { voicePlayer } from './VoicePlayer';
 import { CloseButton } from '../ui/CloseButton';
+import { Z } from '../ui/layers';
 
 interface CommanderProps {
   onClose: () => void;
@@ -56,7 +57,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 300,
+        zIndex: Z.commander,
         background: 'rgba(0, 0, 0, 0.35)',
         backdropFilter: 'blur(2px)',
         display: 'flex',

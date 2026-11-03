@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../store/boardStore';
 import { useDrawStore, PEN_COLORS, type PenTool } from '../../store/drawStore';
+import { Z } from '../ui/layers';
 
 // Pie menu: every tool, size and colour is a whole ring slice, so the click
 // target is big even though the icons are small. Centre = done.
@@ -115,13 +116,13 @@ export function PenWheel({ x, y, onClose }: { x: number; y: number; onClose: () 
   return createPortal(
     <div data-testid="draw-wheel" onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
       <style>{WHEEL_CSS}</style>
-      <div onPointerDown={onClose} style={{ position: 'fixed', inset: 0, zIndex: 3000 }} />
+      <div onPointerDown={onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.radialBackdrop }} />
       <svg
         className="krnl-pie"
         width={R * 2}
         height={R * 2}
         viewBox={`${-R} ${-R} ${R * 2} ${R * 2}`}
-        style={{ position: 'fixed', left: cx - R, top: cy - R, zIndex: 3001, overflow: 'visible', filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.55))' }}
+        style={{ position: 'fixed', left: cx - R, top: cy - R, zIndex: Z.radial, overflow: 'visible', filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.55))' }}
       >
         <circle r={R - 2} fill="rgba(12,14,16,0.72)" />
         {ring(inner, R1[0], R1[1])}

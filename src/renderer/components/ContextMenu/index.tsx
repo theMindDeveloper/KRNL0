@@ -7,6 +7,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Z } from '../ui/layers';
 
 export interface ContextMenuItem {
   label: string;
@@ -65,7 +66,7 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
         position: 'fixed',
         left: pos.left,
         top: pos.top,
-        zIndex: 9999,
+        zIndex: Z.contextMenu,
         background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
         borderRadius: 6,

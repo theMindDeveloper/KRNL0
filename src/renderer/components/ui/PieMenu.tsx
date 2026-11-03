@@ -4,6 +4,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Z } from './layers';
 
 export interface PieItem {
   key: string;
@@ -71,14 +72,14 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
   return createPortal(
     <div data-testid={testId} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
       <style>{CSS}</style>
-      <div onPointerDown={onClose} style={{ position: 'fixed', inset: 0, zIndex: 3000 }} />
+      <div onPointerDown={onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.radialBackdrop }} />
       <svg
         key={stack.length}
         className="krnl-piemenu"
         width={R * 2}
         height={R * 2}
         viewBox={`${-R} ${-R} ${R * 2} ${R * 2}`}
-        style={{ position: 'fixed', left: cx - R, top: cy - R, zIndex: 3001, overflow: 'visible', filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.55))' }}
+        style={{ position: 'fixed', left: cx - R, top: cy - R, zIndex: Z.radial, overflow: 'visible', filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.55))' }}
       >
         <circle r={R - 2} fill="rgba(12,14,16,0.74)" />
         {level.map((it, i) => {

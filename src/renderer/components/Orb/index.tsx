@@ -34,6 +34,7 @@ import { CLICK_CLIPS } from '../Assistant/clipMap';
 import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
+import { Z } from '../ui/layers';
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'running';
 interface ChatMsg { role: 'user' | 'ai'; text: string }
@@ -509,7 +510,7 @@ export function Orb() {
         position: 'fixed',
         left: pos.x,
         top: pos.y,
-        zIndex: 200,
+        zIndex: Z.widget,
         fontFamily: 'var(--font-mono)',
         animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
       }}

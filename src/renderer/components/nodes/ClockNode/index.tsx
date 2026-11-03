@@ -18,6 +18,7 @@ import { selectPomoReality, pomoIsLive, type RealitySegment } from '../../../sto
 import type { TaskState, TaskKind } from '../TaskNode/types';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
+import { Z } from '../../ui/layers';
 
 // Kept for backward-compat — timelineSelector.colorTokens.test.ts imports this.
 // The new analog design no longer renders break arcs, but the tokens must still
@@ -1395,14 +1396,14 @@ export function ClockNode({
       )}
       {realityPopup && createPortal(
         <>
-          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
           <div
             data-testid="clock-reality-popup"
             style={{
               position: 'fixed',
               left: Math.min(realityPopup.x + 4, window.innerWidth - 250),
               top: realityPopup.y + 6,
-              zIndex: 1999,
+              zIndex: Z.popup,
               background: 'var(--paper)',
               border: '1px solid var(--paper-3)',
               borderRadius: 8,

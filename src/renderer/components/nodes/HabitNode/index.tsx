@@ -42,6 +42,7 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HabitPopover } from './HabitPopover';
 import { HabitContextMenu } from './HabitContextMenu';
 import { HabitIcon } from './HabitIcon';
+import { Z } from '../../ui/layers';
 
 function getISOWeek(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -339,14 +340,14 @@ export function HabitNode({
             )}
             {repeatAt && newRepeat && createPortal(
               <>
-                <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+                <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
                 <div
                   data-testid="habit-add-repeat-pop"
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                   style={{
-                    position: 'fixed', zIndex: 1999, width: 380, boxSizing: 'border-box',
+                    position: 'fixed', zIndex: Z.popup, width: 380, boxSizing: 'border-box',
                     left: Math.max(8, Math.min(repeatAt.x - 380, window.innerWidth - 388)),
                     top: Math.max(8, Math.min(repeatAt.y + 6, window.innerHeight - 330)),
                     padding: 16, borderRadius: 14, background: 'var(--paper)', color: 'var(--ink)',

@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import type { Habit, HabitColor } from './types';
 import { HABIT_COLORS } from './types';
 import { HabitIcon, HABIT_ICON_IDS, habitIconId } from './HabitIcon';
+import { Z } from '../../ui/layers';
 
 interface Props {
   habit: Habit;
@@ -111,7 +112,7 @@ export function HabitContextMenu({
         borderRadius: 6,
         boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
         padding: 8,
-        zIndex: 9999,
+        zIndex: Z.contextMenu,
         fontFamily: 'var(--font-sans)',
         maxHeight: `calc(100vh - ${clampedY + 16}px)`,
         overflowY: 'auto',

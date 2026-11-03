@@ -1,7 +1,7 @@
 /**
  * AmbientRadio — viewport-fixed ambient music / noise widget with layer mixing.
  *
- * Lives on the same overlay layer as the Orb (`position: fixed; zIndex: 200`).
+ * Lives on the same overlay layer as the Orb (`position: fixed; zIndex: Z.widget`).
  * Drag the header to move; release with the widget pulled at least 30px past
  * the left/right viewport edge to snap-collapse into a 14px peek tab.
  *
@@ -22,6 +22,7 @@
  */
 
 import { PagedView } from '../ui/PagedView';
+import { Z as LAYERS } from '../ui/layers';
 import {
   useState,
   useEffect,
@@ -124,7 +125,7 @@ const PARAMS_KEY = 'krnl0-ambient-radio-params';
 const STATE_KEY  = 'krnl0-ambient-radio-state';
 const FAVS_KEY   = 'krnl0-ambient-radio-yt-favs';
 const FAVS_MAX   = 50;
-const Z = 200;
+const Z = LAYERS.widget;
 const SNAP_PAST_EDGE = 30;
 const PEEK_PX = 14;
 

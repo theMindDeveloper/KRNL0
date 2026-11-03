@@ -41,6 +41,7 @@ import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus
 import { PagedView } from '../../ui/PagedView';
 import { TaskPopup } from './TaskPopup';
 import { hourWindow, stepHourWindow } from './hourWindow';
+import { Z } from '../../ui/layers';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -2248,7 +2249,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           cursor; the user picks which to inspect. */}
       {layerMenu && createPortal(
         <>
-          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 2098, pointerEvents: layerDragging ? 'none' : undefined }} />
+          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.layerMenuBackdrop, pointerEvents: layerDragging ? 'none' : undefined }} />
           <div
             data-testid="calendar-layer-menu"
             style={{
@@ -2257,7 +2258,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               position: 'fixed',
               left: Math.min(layerMenu.x + 4, window.innerWidth - 230),
               top: layerMenu.y + 4,
-              zIndex: 2099,
+              zIndex: Z.layerMenu,
               background: 'var(--paper)',
               border: '1px solid var(--paper-3)',
               borderRadius: 8,
@@ -2329,7 +2330,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           data-testid="calendar-push-notice"
           onClick={() => setPushNotice(null)}
           style={{
-            position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)', zIndex: 2100,
+            position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)', zIndex: Z.notice,
             background: 'var(--paper)', border: '1px solid var(--acid)', borderRadius: 6,
             padding: '8px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)',
             boxShadow: 'var(--shadow-1)', cursor: 'pointer', maxWidth: 520,
@@ -2343,14 +2344,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       {/* #6 — tracked-reality (pomo) segment info popup. */}
       {realityPopup && createPortal(
         <>
-          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+          <div onClick={() => setRealityPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
           <div
             data-testid="calendar-reality-popup"
             style={{
               position: 'fixed',
               left: Math.min(realityPopup.x + 4, window.innerWidth - 250),
               top: realityPopup.y + 6,
-              zIndex: 1999,
+              zIndex: Z.popup,
               background: 'var(--paper)',
               border: '1px solid var(--paper-3)',
               borderRadius: 8,

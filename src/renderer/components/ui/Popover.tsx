@@ -5,6 +5,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Z } from './layers';
 
 interface Props {
   anchor: HTMLElement | null;
@@ -59,7 +60,7 @@ export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
       className="nodrag nowheel"
       onPointerDown={stop} onMouseDown={stop} onClick={stop} onWheel={stop} onContextMenu={stop}
       style={{
-        position: 'fixed', zIndex: 4000,
+        position: 'fixed', zIndex: Z.popover,
         left: pos?.left ?? -9999, top: pos?.top ?? -9999, minWidth: pos?.width,
         background: 'var(--paper)', color: 'var(--ink)',
         border: '1px solid var(--paper-3)', borderRadius: 10,
