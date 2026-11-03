@@ -43,6 +43,9 @@ export interface StationGeometry {
   // Mother visibility is stored per-node on config.stationHidden; canvas isn't
   // a node so it lives on the geometry object instead.
   canvasHidden?: boolean;
+  // Bottom-row panel widths by panel id, as fractions — canvas, terminal,
+  // analytics and clock each keep the width the user dragged them to.
+  bottomFractions?: Record<string, number>;
 }
 
 // Structural mixin for mother-node config objects.
