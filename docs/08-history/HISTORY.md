@@ -1107,3 +1107,12 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Summary:**
 - **Pro light:** Pro was dark-only, so choosing Light switched the frame to the default style. Pro now has its own light palette — light-grey panels, graphite ink, the lime kept as a fill with dark text on it, deep green where it is text — with the same squared, matte frame. It passes the theme contrast checks.
 - **"Paper":** the default style (id `classic`) is shown as "Paper · Cream & lime" instead of "Classic · Default frame" (Pro is the default anyway). The id is unchanged, so saved choices and scripts keep working; `krnl theme frame paper` works too.
+
+---
+
+## [2026-11-03] — v0.10.0 re-release
+
+**Type:** Release
+**PRs:** #193 (quality pass), #194 (release notes)
+**Summary:** The v0.10.0 tag moves to the merged quality pass and CI rebuilds the installers (Windows .exe, macOS .dmg) in place of the first 0.10.0 build; `docs/releases/v0.10.0.md` gains an "Updated build (Nov 3)" section. Same version number, by the maintainer's choice.
+
