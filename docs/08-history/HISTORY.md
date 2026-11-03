@@ -1114,5 +1114,5 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 
 **Type:** Release
 **PRs:** #193 (quality pass), #194 (release notes)
-**Summary:** The v0.10.0 tag moves to the merged quality pass and CI rebuilds the installers (Windows .exe, macOS .dmg) in place of the first 0.10.0 build; `docs/releases/v0.10.0.md` gains an "Updated build (Nov 3)" section. Same version number, by the maintainer's choice.
+**Summary:** The v0.10.0 tag moves to the merged quality pass and the Windows installer is rebuilt in place of the first 0.10.0 build (built locally: the release workflow's Windows job can't build node-pty on the CI image — node-gyp finds no Visual Studio — and its macOS job failed on a platform-blind test, fixed in #195); `docs/releases/v0.10.0.md` gains an "Updated build (Nov 3)" section. Same version number, by the maintainer's choice.
 
