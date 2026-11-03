@@ -12,6 +12,8 @@ import { useTick } from '../../../hooks/useTick';
 import type { PomoState } from '../PomoNode/types';
 import { trackedSecondsForTask, planStatus, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { formatElapsed } from './format';
+import { saveBoard } from '../../../store/eventLog';
+import { undoable } from '../../../store/undoNotice';
 
 function fmtMin(totalMin: number): string {
   const m = Math.max(0, Math.round(totalMin));
@@ -27,27 +29,28 @@ function fmtMin(totalMin: number): string {
  * (store/trackedTime.ts); the bar fills tracked / planned and turns rust when
  * more time was spent than planned. Hidden until something was tracked.
  */
-function PlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean }) {
+function PlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean }) {
   // Only the card the pomo is running on ticks; every other card re-renders
   // just when the pomo node changes.
   return props.live ? <LivePlanTrackedBar {...props} /> : <PlanTrackedBarView {...props} nowMs={null} />;
 }
 
-function LivePlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean }) {
+function LivePlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean }) {
   const tick = useTick();
   return <PlanTrackedBarView {...props} nowMs={tick} />;
 }
 
-function PlanTrackedBarView({ taskId, plannedMin, live, nowMs }: { taskId: string; plannedMin: number; live: boolean; nowMs: number | null }) {
+function PlanTrackedBarView({ taskId, plannedMin, live, open = false, nowMs }: { taskId: string; plannedMin: number; live: boolean; open?: boolean; nowMs: number | null }) {
   const pomoNode = useBoardStore(selectPomoNode);
   const trackedSec = useMemo(
     () => trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now()),
     // nowMs only changes for the live card (tick), forcing a fresh total.
     [pomoNode, taskId, nowMs],
   );
-  const status = planStatus(trackedSec, plannedMin);
+  // An open-ended task has no plan to run over: show what was tracked only.
+  const status = open ? (trackedSec > 0 ? 'on-track' : 'untracked') : planStatus(trackedSec, plannedMin);
   if (status === 'untracked' && !live) return null;
-  const ratio = plannedMin > 0 ? trackedSec / (plannedMin * 60) : 0;
+  const ratio = open ? 0 : plannedMin > 0 ? trackedSec / (plannedMin * 60) : 0;
   const color = status === 'overrun' ? 'var(--rust)' : live ? 'var(--acid)' : 'var(--ink-3)';
   return (
     <div data-testid="task-plan-tracked" style={{ padding: '4px 10px 6px' }}>
@@ -62,7 +65,7 @@ function PlanTrackedBarView({ taskId, plannedMin, live, nowMs }: { taskId: strin
           marginBottom: 3,
         }}
       >
-        <span>PLAN {fmtMin(plannedMin)}</span>
+        <span>{open ? 'NO SET TIME' : `PLAN ${fmtMin(plannedMin)}`}</span>
         <span style={{ color }}>
           {status === 'overrun' ? '+' + fmtMin(trackedSec / 60 - plannedMin) + ' OVER · ' : ''}
           TRACKED {fmtMin(trackedSec / 60)}
@@ -89,7 +92,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const taskId = node.id;
 
   // B.2 — live ETA display: use plannedMin (writable) rather than the stale eta string
-  const etaDisplay = `~${state.plannedMin ?? state.durationMin} min`;
+  // An open-ended task (added without a duration) has no estimate to show —
+  // the calendar says "no set time" too.
+  const etaDisplay = state.timeOpen ? 'no set time' : `~${state.plannedMin ?? state.durationMin} min`;
 
   // Decision 22 F15 — subscribe to the pomo mother's runtime state. The
   // selector returns a fresh object every call, so we use `useShallow` to
@@ -227,14 +232,18 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const [etaValue, setEtaValue] = useState('');
 
   const startEtaEdit = () => {
-    setEtaValue(String(state.plannedMin ?? state.durationMin));
+    setEtaValue(state.timeOpen ? '' : String(state.plannedMin ?? state.durationMin));
     setIsEditingEta(true);
   };
 
   const commitEtaEdit = () => {
     const parsed = parseInt(etaValue, 10);
-    const clamped = Number.isFinite(parsed) ? Math.max(1, parsed) : (state.plannedMin ?? state.durationMin);
-    onCommand('task.setPlannedMin', { minutes: clamped });
+    const current = state.plannedMin ?? state.durationMin;
+    // Opening the field and leaving it unchanged (or empty) changes nothing —
+    // above all it must not turn an open-ended task into a fixed one.
+    if (Number.isFinite(parsed) && !(parsed === current && !state.timeOpen)) {
+      onCommand('task.setPlannedMin', { minutes: Math.max(1, parsed) });
+    }
     setIsEditingEta(false);
   };
 
@@ -282,6 +291,10 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     } else if (inlineMode === 'sibling') {
       // ADR 0004 §2 — internal mode 'sibling' / UI label "Add parallel task".
       useBoardStore.getState().insertSiblingTaskAfter(node.id, { text: name, ...dur });
+      // The store action doesn't persist; without this the new task vanished
+      // on the next CLI write (board reload) or on quit.
+      const board = useBoardStore.getState().board;
+      if (board) void saveBoard(board);
     } else if (inlineMode === 'next') {
       // ADR 0004 §2 — sequential successor at the same chain level.
       onCommand('task.addNext', { text: name, ...dur });
@@ -424,7 +437,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     {
       label: 'Delete',
       danger: true,
-      onSelect: () => onCommand('task.delete'),
+      onSelect: () => undoable(`Deleted "${state.text || 'task'}"`, () => onCommand('task.delete')),
     },
   ];
 
@@ -830,6 +843,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         taskId={node.id}
         plannedMin={state.plannedMin ?? state.durationMin ?? 25}
         live={isActiveRunning}
+        open={state.timeOpen === true}
       />
     </div>
   );
