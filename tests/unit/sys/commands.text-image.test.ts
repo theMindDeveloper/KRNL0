@@ -174,3 +174,43 @@ describe('sys image', () => {
     expect(state.assetId).toBeNull();
   });
 });
+
+describe('sys text look', () => {
+  it('turns a note into a sticky, a shape, and back', async () => {
+    const { SysFacade } = await import('../../../src/sys/SysFacade');
+    const facade = new SysFacade();
+    await facade.run(['text', 'add', '--text', 'idea', '--at', '0,0']);
+    const id = readBoard().nodes[0]!['id'] as string;
+    const look = () => (readBoard().nodes[0]!['state'] as { look?: { kind: string; color?: string } }).look;
+    expect((await facade.run(['text', 'look', id, '--sticky', '--color', '#ffb3c7'])).ok).toBe(true);
+    expect(look()).toEqual({ kind: 'sticky', color: '#ffb3c7' });
+    expect((await facade.run(['text', 'look', id, '--shape', 'ellipse'])).ok).toBe(true);
+    expect(look()?.kind).toBe('ellipse');
+    expect((await facade.run(['text', 'look', id, '--shape', 'hexagon'])).ok).toBe(false);
+    expect((await facade.run(['text', 'look', id])).ok).toBe(false);
+  });
+});
+
+describe('sys analytics cards', () => {
+  it('lists, hides, shows and resets chart cards', async () => {
+    writeFileSync(boardPath, JSON.stringify({
+      version: 1, schemaVersion: 2, viewport: { x: 0, y: 0, zoom: 1 }, edges: [],
+      nodes: [{ id: 'mother-analytics', kind: 'analytics', isMother: true, position: { x: 0, y: 0 }, state: {}, config: {} }],
+    }), 'utf-8');
+    const { SysFacade } = await import('../../../src/sys/SysFacade');
+    const facade = new SysFacade();
+    const list = await facade.run(['analytics', 'cards', '--json']);
+    const rows = list.data as Array<{ id: string; shown: boolean }>;
+    expect(rows.length).toBeGreaterThan(3);
+    const first = rows[0]!.id;
+    expect((await facade.run(['analytics', 'hide', first])).ok).toBe(true);
+    const hidden = () => (readBoard().nodes[0]!['state'] as { hiddenCards?: string[] }).hiddenCards ?? [];
+    expect(hidden()).toContain(first);
+    expect((await facade.run(['analytics', 'unhide', first])).ok).toBe(true);
+    expect(hidden()).not.toContain(first);
+    await facade.run(['analytics', 'hide', first]);
+    expect((await facade.run(['analytics', 'reset-cards'])).ok).toBe(true);
+    expect(hidden()).toEqual([]);
+    expect((await facade.run(['analytics', 'hide', 'no-such-card'])).ok).toBe(false);
+  });
+});

@@ -8,6 +8,8 @@
 
 import { mutateBoard, readBoardFile } from '../../main/boardIo';
 import type { SysResult } from '../SysFacade';
+import { textSetLook } from '../../renderer/components/nodes/TextNode/commands';
+import { LOOK_KINDS, type TextLook, type TextState } from '../../renderer/components/nodes/TextNode/types';
 import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
 import type { BoardShape } from '../../shared/dispatch/types';
 
@@ -101,6 +103,36 @@ export function textSet(
   });
   return found
     ? { ok: true, message: `text node ${id} updated` }
+    : { ok: false, message: `text node ${id} not found` };
+}
+
+/**
+ * `text look <id> --note | --sticky | --shape rect|ellipse|diamond [--color c]`
+ * — the look bar of a selected note, from the CLI.
+ */
+export function textLook(
+  id: string | undefined,
+  look: { kind: string; color?: string } | undefined,
+): SysResult {
+  if (!id) return { ok: false, message: 'text look requires <id>' };
+  if (!look) return { ok: false, message: 'text look requires --note, --sticky, --shape rect|ellipse|diamond or --color <css>' };
+  if (look.kind && !(LOOK_KINDS as readonly string[]).includes(look.kind)) {
+    return { ok: false, message: `text look: unknown look "${look.kind}" (${LOOK_KINDS.join(', ')})` };
+  }
+  const patch: Partial<TextLook> = {
+    ...(look.kind ? { kind: look.kind as TextLook['kind'] } : {}),
+    ...(look.color ? { color: look.color } : {}),
+  };
+  let found: string | null = null;
+  mutateBoard((board) => {
+    const target = refIn(board, id, 'text');
+    const n = target !== null ? board.nodes.find((x) => x['id'] === target && x['kind'] === 'text') : undefined;
+    if (!n) return;
+    n['state'] = textSetLook(((n['state'] as TextState | undefined) ?? { text: '' }), patch);
+    found = target;
+  });
+  return found
+    ? { ok: true, message: `text node ${id}: look ${look.kind || 'recoloured'}${look.color ? ` ${look.color}` : ''}`, data: { id: found } }
     : { ok: false, message: `text node ${id} not found` };
 }
 

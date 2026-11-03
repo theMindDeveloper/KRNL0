@@ -63,6 +63,7 @@ export type SysCommand =
   | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
   | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
+  | { kind: 'text'; sub: 'look'; id: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'image'; sub: 'add'; path: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined }
   | { kind: 'image'; sub: 'replace'; id: string | undefined; path: string | undefined }
   | { kind: 'image'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
@@ -135,6 +136,9 @@ export type SysCommand =
   | { kind: 'analytics'; sub: 'streaks'; json: boolean }
   | { kind: 'analytics'; sub: 'open' | 'close' | 'toggle' }
   | { kind: 'analytics'; sub: 'summary'; range: number | undefined; json: boolean }
+  | { kind: 'analytics'; sub: 'cards'; json: boolean }
+  | { kind: 'analytics'; sub: 'hide' | 'unhide'; card: string | undefined }
+  | { kind: 'analytics'; sub: 'reset-cards' }
   | { kind: 'log'; sub: 'tail'; limit: number | undefined; json: boolean }
   | { kind: 'log'; sub: 'stats'; json: boolean }
   | { kind: 'theme'; sub: 'show'; json: boolean }
@@ -611,6 +615,21 @@ export class SysParser {
       if (sub === 'set') {
         return { kind: 'text', sub: 'set', id: rest[0], text: flag(rest, 'text') };
       }
+      // Change an existing node's look: --note | --sticky [--color c] | --shape … [--color c]
+      if (sub === 'look') {
+        const color = flag(rest, 'color');
+        const withColor = color ? { color } : {};
+        return {
+          kind: 'text', sub: 'look', id: rest[0],
+          look: hasFlag(rest, 'note')
+            ? { kind: 'note', ...withColor }
+            : hasFlag(rest, 'sticky')
+              ? { kind: 'sticky', ...withColor }
+              : flag(rest, 'shape')
+                ? { kind: flag(rest, 'shape')!, ...withColor }
+                : color ? { kind: '', color } : undefined,
+        };
+      }
       if (sub === 'resize') {
         return {
           kind: 'text', sub: 'resize',
@@ -768,6 +787,10 @@ export class SysParser {
       if (sub === 'summary') {
         return { kind: 'analytics', sub: 'summary', range: positiveNum(flag(rest, 'range'), '--range'), json: hasFlag(rest, 'json') };
       }
+      // The settings panel's card list, from the CLI.
+      if (sub === 'cards') return { kind: 'analytics', sub: 'cards', json: hasFlag(rest, 'json') };
+      if (sub === 'hide' || sub === 'unhide') return { kind: 'analytics', sub, card: rest[0] };
+      if (sub === 'reset-cards') return { kind: 'analytics', sub: 'reset-cards' };
     }
 
     // Decision 29 — log reads (renderer-required)

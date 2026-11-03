@@ -99,6 +99,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'add', usage: 'text add [--text "..."] [--at x,y] [--near <ref>] [--sticky] [--shape rect|ellipse|diamond] [--color <css>]', summary: 'Add a text node, a sticky note (--sticky) or a shape (--shape). --near positions at srcX + srcW + 24, srcY' },
       { name: 'set', usage: 'text set <id> --text "..."', summary: 'Update text node content' },
       { name: 'resize', usage: 'text resize <id> --w N --h N', summary: 'Resize a text node' },
+      { name: 'look', usage: 'text look <id> --note | --sticky [--color <css>] | --shape rect|ellipse|diamond [--color <css>] | --color <css>', summary: 'Turn a note into a sticky or a shape (or back), or recolour it' },
     ],
   },
   {
@@ -135,6 +136,10 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'open', usage: 'analytics open', summary: 'Show the Analytics window (station mode: its panel beside the terminal)' },
       { name: 'close', usage: 'analytics close', summary: 'Hide the Analytics window (station mode panel)' },
       { name: 'toggle', usage: 'analytics toggle', summary: 'Toggle the Analytics window' },
+      { name: 'cards', usage: 'analytics cards [--json]', summary: 'List the chart cards and whether each is shown' },
+      { name: 'hide', usage: 'analytics hide <card-id>', summary: 'Hide a chart card (same as the settings panel)' },
+      { name: 'unhide', usage: 'analytics unhide <card-id>', summary: 'Show a hidden chart card again' },
+      { name: 'reset-cards', usage: 'analytics reset-cards', summary: 'Show every chart card again' },
     ],
   },
   {

@@ -8,7 +8,7 @@ import * as edgeCmd from './commands/edge';
 import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
-import { textAdd, textSet, textResize } from './commands/text';
+import { textAdd, textSet, textResize, textLook } from './commands/text';
 import { drawList, drawClear, drawDelete } from './commands/draw';
 import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
 import { mediaAdd, mediaList } from './commands/media';
@@ -34,6 +34,7 @@ import {
   analyticsTotals,
   analyticsStreaks,
   analyticsWindow,
+  analyticsCards,
   analyticsSummary,
 } from './commands/analytics';
 import type { AnalyticsCtx } from './commands/analytics';
@@ -413,6 +414,16 @@ export class SysFacade {
             { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
             command.sub,
           );
+        case 'cards':
+        case 'hide':
+        case 'unhide':
+        case 'reset-cards':
+          return analyticsCards(
+            { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+            command.sub,
+            command.sub === 'hide' || command.sub === 'unhide' ? command.card : undefined,
+            command.sub === 'cards' ? command.json : false,
+          );
       }
     }
 
@@ -658,6 +669,7 @@ export class SysFacade {
         case 'add':    return textAdd(command.text, command.at, command.near, command.look);
         case 'set':    return textSet(command.id, command.text);
         case 'resize': return textResize(command.id, command.w, command.h);
+        case 'look':   return textLook(command.id, command.look);
       }
     }
 
