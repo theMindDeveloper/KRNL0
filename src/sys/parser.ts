@@ -43,6 +43,10 @@ export type SysCommand =
   | { kind: 'draw'; sub: 'list'; json: boolean }
   | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'media'; sub: 'list'; json: boolean }
+  | { kind: 'media'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
+  | { kind: 'media'; sub: 'page'; id: string | undefined; page: number | undefined }
+  | { kind: 'draw'; sub: 'stroke'; points: string | undefined; tool: string | undefined; color: string | undefined; size: number | undefined }
+  | { kind: 'analytics'; sub: 'clear-history'; yes: boolean }
   | { kind: 'draw'; sub: 'clear' }
   | { kind: 'canvas'; sub: 'list'; json: boolean }
   | { kind: 'canvas'; sub: 'add'; name: string | undefined }
@@ -584,6 +588,11 @@ export class SysParser {
         return { kind: 'media', sub: 'add', url: rest[0], at: atStr ? parseAt(atStr) : undefined };
       }
       if (sub === 'list' || sub === undefined) return { kind: 'media', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'resize') return { kind: 'media', sub: 'resize', id: rest[0], w: numFlag(rest, 'w'), h: numFlag(rest, 'h') };
+      if (sub === 'page') {
+        const n = rest[1] !== undefined ? Number(rest[1]) : NaN;
+        return { kind: 'media', sub: 'page', id: rest[0], page: Number.isInteger(n) ? n : undefined };
+      }
     }
 
     // Pen tool drawings
@@ -591,6 +600,9 @@ export class SysParser {
       if (sub === 'list' || sub === undefined) return { kind: 'draw', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'clear') return { kind: 'draw', sub: 'clear' };
       if (sub === 'delete') return { kind: 'draw', sub: 'delete', id: rest[0] };
+      if (sub === 'stroke') {
+        return { kind: 'draw', sub: 'stroke', points: flag(rest, 'points'), tool: flag(rest, 'tool'), color: flag(rest, 'color'), size: numFlag(rest, 'size') };
+      }
     }
 
     // Free-content canvases (Decision 33). Names may contain spaces.
@@ -798,6 +810,8 @@ export class SysParser {
       if (sub === 'cards') return { kind: 'analytics', sub: 'cards', json: hasFlag(rest, 'json') };
       if (sub === 'hide' || sub === 'unhide') return { kind: 'analytics', sub, card: rest[0] };
       if (sub === 'reset-cards') return { kind: 'analytics', sub: 'reset-cards' };
+      // Wipes every pomo span and the completion ledger: needs --yes.
+      if (sub === 'clear-history') return { kind: 'analytics', sub: 'clear-history', yes: hasFlag(rest, 'yes') };
     }
 
     // Decision 29 — log reads (renderer-required)

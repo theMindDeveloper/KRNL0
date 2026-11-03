@@ -214,3 +214,48 @@ describe('sys analytics cards', () => {
     expect((await facade.run(['analytics', 'hide', 'no-such-card'])).ok).toBe(false);
   });
 });
+
+describe('sys media resize / page, draw stroke, analytics clear-history', () => {
+  const seedWith = (extra: Record<string, unknown>) => writeFileSync(boardPath, JSON.stringify({
+    version: 1, schemaVersion: 2, viewport: { x: 0, y: 0, zoom: 1 }, edges: [], nodes: [], ...extra,
+  }), 'utf-8');
+
+  it('media resize and page', async () => {
+    seedWith({ nodes: [{ id: 'node-pdf-1234', kind: 'media', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { media: 'pdf', src: 'x.pdf', title: 'x', width: 300, height: 400 } }] });
+    const { SysFacade } = await import('../../../src/sys/SysFacade');
+    const f = new SysFacade();
+    expect((await f.run(['media', 'resize', 'node-pdf', '--w', '500', '--h', '600'])).ok).toBe(true);
+    expect((await f.run(['media', 'page', 'node-pdf', '3'])).ok).toBe(true);
+    const st = readBoard().nodes[0]!['state'] as { width: number; height: number; page: number };
+    expect([st.width, st.height, st.page]).toEqual([500, 600, 3]);
+    expect((await f.run(['media', 'page', 'node-pdf', '0'])).ok).toBe(false);
+  });
+
+  it('draw stroke adds a stroke through the given points', async () => {
+    seedWith({});
+    const { SysFacade } = await import('../../../src/sys/SysFacade');
+    const f = new SysFacade();
+    const res = await f.run(['draw', 'stroke', '--points', '0,0 100,50 200,0', '--tool', 'arrow', '--color', '#ff5d8f']);
+    expect(res.ok).toBe(true);
+    const d = (readBoard() as unknown as { drawings: Array<{ tool: string; color: string; points: number[][] }> }).drawings;
+    expect(d).toHaveLength(1);
+    expect(d[0]).toMatchObject({ tool: 'arrow', color: '#ff5d8f' });
+    expect(d[0]!.points.map((p) => [p[0], p[1]])).toEqual([[0, 0], [100, 50], [200, 0]]);
+    expect((await f.run(['draw', 'stroke', '--points', '5,5'])).ok).toBe(false);
+  });
+
+  it('analytics clear-history needs --yes, then wipes spans and the ledger', async () => {
+    seedWith({
+      completions: [{ taskId: 't', text: 'a', plannedMin: 25, completedAt: '2026-11-01T10:00:00.000Z' }],
+      nodes: [{ id: 'mother-pomo', kind: 'pomo', isMother: true, position: { x: 0, y: 0 }, config: {}, state: { history: [{ id: 's1' }] } }],
+    });
+    const { SysFacade } = await import('../../../src/sys/SysFacade');
+    const f = new SysFacade();
+    expect((await f.run(['analytics', 'clear-history'])).ok).toBe(false);
+    expect(((readBoard().nodes[0]!['state']) as { history: unknown[] }).history).toHaveLength(1);
+    expect((await f.run(['analytics', 'clear-history', '--yes'])).ok).toBe(true);
+    const b = readBoard() as unknown as { completions?: unknown[]; nodes: Array<{ state: { history: unknown[] } }> };
+    expect(b.nodes[0]!.state.history).toEqual([]);
+    expect(b.completions ?? []).toEqual([]);
+  });
+});

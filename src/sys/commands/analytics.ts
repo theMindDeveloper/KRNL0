@@ -280,3 +280,24 @@ export function analyticsCards(
   ctx.onBoardChanged?.();
   return { ok: true, message };
 }
+
+/**
+ * `analytics clear-history --yes` — the settings panel's "Clear focus history":
+ * every pomo span and the completion ledger go. Not undoable, hence --yes.
+ */
+export function analyticsClearHistory(ctx: AnalyticsWindowCtx, yes: boolean): SysResult {
+  if (!yes) {
+    return { ok: false, message: 'analytics clear-history deletes every recorded pomo span and finished-task entry for good — run it again with --yes' };
+  }
+  const raw = loadBoardFrom(ctx.boardPath);
+  if (typeof raw !== 'object' || raw === null) return { ok: false, message: 'No board found' };
+  const board = raw as Record<string, unknown> & { nodes?: Array<Record<string, unknown>> };
+  const { completions: _drop, ...rest } = board;
+  void _drop;
+  const nodes = (board.nodes ?? []).map((n) =>
+    n['kind'] === 'pomo' ? { ...n, state: { ...((n['state'] ?? {}) as Record<string, unknown>), history: [] } } : n,
+  );
+  saveBoardTo(ctx.boardPath, { ...rest, nodes, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  return { ok: true, message: 'focus history cleared (pomo spans and the completion ledger)' };
+}

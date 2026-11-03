@@ -140,6 +140,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'hide', usage: 'analytics hide <card-id>', summary: 'Hide a chart card (same as the settings panel)' },
       { name: 'unhide', usage: 'analytics unhide <card-id>', summary: 'Show a hidden chart card again' },
       { name: 'reset-cards', usage: 'analytics reset-cards', summary: 'Show every chart card again' },
+      { name: 'clear-history', usage: 'analytics clear-history --yes', summary: 'Delete every recorded pomo span and the completion ledger (cannot be undone; same as the settings button)' },
     ],
   },
   {
@@ -189,6 +190,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'add', usage: 'media add <url> [--at x,y]', summary: 'YouTube/Vimeo/SoundCloud/… → embedded player; other URLs → link card' },
       { name: 'list', usage: 'media list [--json]', summary: 'List media nodes' },
+      { name: 'resize', usage: 'media resize <id> --w N --h N', summary: 'Resize a media node' },
+      { name: 'page', usage: 'media page <id> <n>', summary: 'Show page n of a PDF card' },
     ],
   },
   {
@@ -198,6 +201,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'list', usage: 'draw list [--json]', summary: 'List strokes (id, tool, colour, points)' },
       { name: 'delete', usage: 'draw delete <strokeId>', summary: 'Delete one stroke' },
       { name: 'clear', usage: 'draw clear', summary: 'Delete every stroke' },
+      { name: 'stroke', usage: 'draw stroke --points "x,y x,y …" [--tool pen|marker|highlighter|arrow] [--color <css>] [--size N]', summary: 'Draw a stroke through the given canvas points (arrow: first → last)' },
     ],
   },
   {

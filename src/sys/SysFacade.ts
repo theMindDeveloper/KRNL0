@@ -9,9 +9,9 @@ import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import { textAdd, textSet, textResize, textLook } from './commands/text';
-import { drawList, drawClear, drawDelete } from './commands/draw';
+import { drawList, drawClear, drawDelete, drawStroke } from './commands/draw';
 import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
-import { mediaAdd, mediaList } from './commands/media';
+import { mediaAdd, mediaList, mediaResize, mediaPage } from './commands/media';
 import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
 import {
   imageAdd,
@@ -35,6 +35,7 @@ import {
   analyticsStreaks,
   analyticsWindow,
   analyticsCards,
+  analyticsClearHistory,
   analyticsSummary,
 } from './commands/analytics';
 import type { AnalyticsCtx } from './commands/analytics';
@@ -414,6 +415,11 @@ export class SysFacade {
             { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
             command.sub,
           );
+        case 'clear-history':
+          return analyticsClearHistory(
+            { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+            command.yes,
+          );
         case 'cards':
         case 'hide':
         case 'unhide':
@@ -623,6 +629,13 @@ export class SysFacade {
       }
     }
 
+    if (command.kind === 'media' && (command.sub === 'resize' || command.sub === 'page')) {
+      const res = command.sub === 'resize'
+        ? mediaResize(command.id, command.w, command.h)
+        : mediaPage(command.id, command.page);
+      if (res.ok) this.deps.onBoardChanged?.();
+      return res;
+    }
     if (command.kind === 'media') {
       const res = command.sub === 'add' ? mediaAdd(command.url, command.at) : mediaList(command.json);
       if (command.sub === 'add' && res.ok) this.deps.onBoardChanged?.();
@@ -638,6 +651,7 @@ export class SysFacade {
         case 'list':   return drawList(dCtx, command.json);
         case 'clear':  return drawClear(dCtx);
         case 'delete': return drawDelete(dCtx, command.id);
+        case 'stroke': return drawStroke(dCtx, { points: command.points, tool: command.tool, color: command.color, size: command.size });
       }
     }
 
