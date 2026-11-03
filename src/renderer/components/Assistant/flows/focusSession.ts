@@ -1,9 +1,11 @@
 import type { Flow, FlowStep, BoardSnapshot } from '../types';
+import { useBoardStore } from '../../../store/boardStore';
+import { isEasyBoard } from '../../../store/uiMode';
 
 export const focusSessionFlow: Flow = {
   id: 'focus-session',
   label: 'Start a focus session',
-  description: 'Fires up a 25-minute Pomodoro timer',
+  description: 'Starts the Pomodoro',
   steps: (board: BoardSnapshot): FlowStep[] => {
     if (!board.hasPomo) {
       return [
@@ -25,6 +27,19 @@ export const focusSessionFlow: Flow = {
       ];
     }
 
+    // What the start really does: Easy / observe mode tracks time until you
+    // stop it; a timed pomo counts down its session length (not always 25).
+    const b = useBoardStore.getState().board;
+    const pomo = b?.nodes.find((n) => n.kind === 'pomo');
+    const cfg = (pomo?.config ?? {}) as { sessionMin?: number; mode?: string };
+    const tracking = isEasyBoard(b) || cfg.mode === 'observe';
+    const minutes = cfg.sessionMin ?? 25;
+    const startLine: FlowStep = tracking
+      ? { kind: 'speak', clip: 'focus_02_track', text: "I'm starting the Pomodoro. It tracks your time until you stop it." }
+      : minutes === 25
+        ? { kind: 'speak', clip: 'focus_02', text: 'I\'m starting a twenty-five minute focus timer.' }
+        : { kind: 'speak', clip: 'focus_02_n', text: `I'm starting a ${minutes}-minute focus timer.` };
+
     return [
       { kind: 'speak', clip: 'focus_01', text: 'Alright. Let\'s lock in.' },
       { kind: 'wait', ms: 300 },
@@ -32,11 +47,7 @@ export const focusSessionFlow: Flow = {
       // Pan to the actual Pomodoro node — resolved at runtime from the board.
       { kind: 'cameraToNode', nodeKind: 'pomo', zoom: 1.0 },
 
-      {
-        kind: 'speak',
-        clip: 'focus_02',
-        text: 'I\'m starting a twenty-five minute focus timer.',
-      },
+      startLine,
       { kind: 'wait', ms: 300 },
 
       { kind: 'runCommand', label: 'krnl pomo start', argv: ['pomo', 'start'] },
@@ -47,13 +58,7 @@ export const focusSessionFlow: Flow = {
         clip: 'focus_03',
         text: 'Close your other tabs. This is your time.',
       },
-      { kind: 'wait', ms: 300 },
-
-      {
-        kind: 'speak',
-        clip: 'focus_04',
-        text: 'The timer is running. I\'ll let you know when the break kicks in.',
-      },
+      // (The old closing line promised a break announcement nothing makes.)
     ];
   },
 };

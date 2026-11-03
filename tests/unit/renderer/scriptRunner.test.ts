@@ -61,3 +61,24 @@ describe('ScriptRunner', () => {
     expect(sysRun).not.toHaveBeenCalled();
   });
 });
+
+describe('tutorial waits', () => {
+  it('a task that was already on the board does not pass the step', async () => {
+    const mod = await import('../../../src/renderer/components/Assistant/flows/tutorialPomoTodo');
+    const flow = Object.values(mod).find((v) => typeof v === 'object' && v !== null && 'steps' in v) as Flow;
+    const snap = (texts: string[]) => ({ ...({} as BoardSnapshot), taskTexts: texts, scheduledTaskTexts: [], hasTodo: true, hasPomo: true, hasCalendar: true, hasClock: true, nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } } as unknown as BoardSnapshot);
+    const steps = flow.steps(snap(['learn machine learning (old)']));
+    type Step = { kind: string; caption?: string; predicate?: (s: BoardSnapshot) => boolean; onPass?: Step[] };
+    const find = (list: Step[]): Step | undefined => {
+      for (const s of list) {
+        if (s.kind === 'waitForBoard' && s.caption?.includes('learn machine learning')) return s;
+        const inner = s.onPass ? find(s.onPass) : undefined;
+        if (inner) return inner;
+      }
+      return undefined;
+    };
+    const wait = find(steps as unknown as Step[])!;
+    expect(wait.predicate!(snap(['learn machine learning (old)']))).toBe(false);
+    expect(wait.predicate!(snap(['learn machine learning (old)', 'learn machine learning']))).toBe(true);
+  });
+});

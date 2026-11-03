@@ -1,4 +1,6 @@
 import type { Flow, FlowStep, BoardSnapshot } from '../types';
+import { useBoardStore } from '../../../store/boardStore';
+import { isEasyBoard } from '../../../store/uiMode';
 
 // Tutorial 1 — Pomodoro & Tasks.
 // Walks the user through: Pomo settings → first task → bind to Pomo →
@@ -17,6 +19,11 @@ const TUTORIAL_YT_VOLUME = 75;
 const hasTaskWith = (snap: BoardSnapshot, needle: string): boolean =>
   snap.taskTexts.some((t) => t.toLowerCase().includes(needle.toLowerCase()));
 
+/** A task matching `needle` that wasn't on the board when the tutorial began
+ *  (an old "go for a walk" must not pass the step for the user). */
+const newTaskWith = (snap: BoardSnapshot, needle: string, before: ReadonlySet<string>): boolean =>
+  snap.taskTexts.some((t) => !before.has(t) && t.toLowerCase().includes(needle.toLowerCase()));
+
 const onTimeoutWait = {
   clip: 'tut1_wait_still_here',
   text: "Still here whenever you're ready.",
@@ -27,6 +34,10 @@ export const tutorialPomoTodoFlow: Flow = {
   label: 'Tutorial: Pomodoro & Tasks',
   description: 'Pomodoro, tasks, chain, calendar, clock — the whole flow.',
   steps: (board: BoardSnapshot): FlowStep[] => {
+    // Baselines at the start: the waits look for what the user does now.
+    const tasksBefore = new Set(board.taskTexts);
+    const scheduledBefore = new Set(board.scheduledTaskTexts ?? []);
+    const easy = isEasyBoard(useBoardStore.getState().board);
     if (!board.hasPomo || !board.hasTodo || !board.hasCalendar || !board.hasClock) {
       return [
         {
@@ -95,7 +106,7 @@ export const tutorialPomoTodoFlow: Flow = {
       {
         kind: 'waitForBoard',
         caption: `waiting for: "${TASK_1}"`,
-        predicate: (snap) => hasTaskWith(snap, 'learn'),
+        predicate: (snap) => newTaskWith(snap, 'learn', tasksBefore),
         timeoutMs: 120_000,
         onTimeout: onTimeoutWait,
       },
@@ -106,14 +117,16 @@ export const tutorialPomoTodoFlow: Flow = {
           { kind: 'speak', clip: 'tut1_15', text: 'Nice. Your task just spawned its own node.' },
           { kind: 'wait', ms: 500 },
 
-          // ── Bind to Pomodoro ──────────────────────────────────────────────
-          { kind: 'speak', clip: 'tut1_16', text: "Now — let's connect it to the Pomodoro." },
-          { kind: 'speak', clip: 'tut1_17', text: 'Double-click the task — either one works.' },
-          // No snapshot predicate for pomo-bind yet — give the user time
-          { kind: 'wait', ms: 4500 },
-          { kind: 'speak', clip: 'tut1_18', text: 'See? It turned green. The Pomodoro is bound.' },
-          { kind: 'speak', clip: 'tut1_19', text: 'KRNL0 just split your sixty minutes into Pomodoro sessions.' },
-          { kind: 'wait', ms: 500 },
+          // ── Pomodoro ──────────────────────────────────────────────────────
+          // The double-click "bind" gesture is gone (#180: the pomo tags the
+          // task it tracks, it never plans it), so its recorded lines are
+          // retired. Caption-only line (no clip) for the current way; Easy
+          // mode has no task links, so it skips this.
+          ...(easy ? [] : [
+            { kind: 'speak', clip: 'tut1_16', text: "Now — let's connect it to the Pomodoro." } as FlowStep,
+            { kind: 'speak', clip: 'tut1_pomo_tag', text: 'When you start on it, right-click its row in the Todo list and pick Start pomo. The time you track lands on this task.' } as FlowStep,
+            { kind: 'wait', ms: 500 } as FlowStep,
+          ]),
 
           // ── Second task ───────────────────────────────────────────────────
           { kind: 'speak', clip: 'tut1_20', text: "Let's make it more interesting." },
@@ -123,7 +136,7 @@ export const tutorialPomoTodoFlow: Flow = {
           {
             kind: 'waitForBoard',
             caption: `waiting for: "${TASK_2}"`,
-            predicate: (snap) => hasTaskWith(snap, 'walk'),
+            predicate: (snap) => newTaskWith(snap, 'walk', tasksBefore),
             timeoutMs: 120_000,
             onTimeout: onTimeoutWait,
           },
@@ -161,7 +174,8 @@ export const tutorialPomoTodoFlow: Flow = {
               {
                 kind: 'waitForBoard',
                 caption: 'waiting for the drop…',
-                predicate: (snap) => snap.scheduledTaskCount >= 1,
+                // This tutorial's task got a time — not any task on the board.
+                predicate: (snap) => (snap.scheduledTaskTexts ?? []).some((t) => !scheduledBefore.has(t) && t.toLowerCase().includes('learn')),
                 timeoutMs: 120_000,
                 onTimeout: onTimeoutWait,
               },
@@ -191,7 +205,7 @@ export const tutorialPomoTodoFlow: Flow = {
                   {
                     kind: 'waitForBoard',
                     caption: `waiting for: "${TASK_3}"`,
-                    predicate: (snap) => hasTaskWith(snap, 'music'),
+                    predicate: (snap) => newTaskWith(snap, 'music', tasksBefore),
                     timeoutMs: 120_000,
                     onTimeout: onTimeoutWait,
                   },
