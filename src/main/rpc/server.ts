@@ -41,6 +41,14 @@ function makeSockPath(): string {
   return `${os.tmpdir()}/krnl0-${pid}.sock`;
 }
 
+/** 0 on success; a command's own code (2 = needs an open window) else 1. */
+export function exitCodeOf(result: { ok: boolean; exitCode?: unknown; data?: unknown }): number {
+  if (result.ok) return 0;
+  if (typeof result.exitCode === 'number') return result.exitCode;
+  const data = result.data as { exitCode?: unknown } | undefined;
+  return typeof data?.exitCode === 'number' ? data.exitCode : 1;
+}
+
 function writeFrame(socket: net.Socket, frame: RpcFrame): void {
   if (!socket.destroyed) {
     socket.write(JSON.stringify(frame) + '\n');
@@ -98,7 +106,7 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
             onBoardChanged: notifyBoardChanged,
             ...(dispatch ? { cliDispatch: dispatch } : {}),
           });
-          let result: { ok: boolean; message?: string };
+          let result: { ok: boolean; message?: string; exitCode?: unknown; data?: unknown };
           try {
             result = await facade.run(argv);
           } catch (err) {
@@ -112,7 +120,7 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
             const kind = result.ok ? 'stdout' : 'stderr';
             writeFrame(socket, { v: 1, id: reqId, kind, data: result.message });
           }
-          writeFrame(socket, { v: 1, id: reqId, kind: 'exit', code: result.ok ? 0 : 1 });
+          writeFrame(socket, { v: 1, id: reqId, kind: 'exit', code: exitCodeOf(result) });
         }).catch((err: unknown) => {
           // Keep the chain alive: a rejected link would skip every later request.
           console.error('[rpc] request failed', err);

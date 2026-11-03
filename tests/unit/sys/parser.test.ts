@@ -294,3 +294,12 @@ describe('SysParser — flags where the subcommand goes', () => {
     expect(SysParser.parse(['task', '--json'])).toBeNull();
   });
 });
+
+describe('SysParser — flags without a value', () => {
+  it('a flag with no value does not swallow the next flag', () => {
+    expect(SysParser.parse(['cal', 'show', '--from', '--json'])).toMatchObject({ kind: 'cal', sub: 'show', from: undefined, json: true });
+  });
+  it('negative numbers still count as values', () => {
+    expect(SysParser.parse(['viewport', 'pan', '--dx', '-50', '--dy', '10'])).toMatchObject({ dx: -50, dy: 10 });
+  });
+});

@@ -306,3 +306,13 @@ describe('non-request JSON lines', () => {
     expect(frames.find((f) => f.kind === 'exit')?.code).toBe(0);
   });
 });
+
+describe('exit codes', () => {
+  it('passes the exit code a command sets (2 = needs an open window)', async () => {
+    const { exitCodeOf } = await import('../../../src/main/rpc/server');
+    expect(exitCodeOf({ ok: true })).toBe(0);
+    expect(exitCodeOf({ ok: false })).toBe(1);
+    expect(exitCodeOf({ ok: false, data: { exitCode: 2 } })).toBe(2);
+    expect(exitCodeOf({ ok: false, exitCode: 2 })).toBe(2);
+  });
+});

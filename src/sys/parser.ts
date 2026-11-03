@@ -141,7 +141,10 @@ export type SysCommand =
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
+  if (i < 0) return undefined;
+  const v = args[i + 1];
+  // `--label --minutes 5`: a flag with no value must not swallow the next flag.
+  return v !== undefined && v.startsWith('--') ? undefined : v;
 }
 
 function numFlag(args: string[], name: string): number | undefined {

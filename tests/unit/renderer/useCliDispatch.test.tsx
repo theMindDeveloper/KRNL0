@@ -104,3 +104,13 @@ describe('term commands', () => {
     expect(seen).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('marquee delete', () => {
+  it('deletes every non-mother node inside the rectangle, not only tasks', () => {
+    const res = run('marquee.delete', { x1: -100, y1: -100, x2: 100, y2: 100 });
+    expect(res.ok).toBe(true);
+    const ids = useBoardStore.getState().board!.nodes.map((n) => n.id);
+    expect(ids).toContain('mother-term'); // mother at (0,0) is kept
+    expect(ids).not.toContain(note.id);   // the text note at (10,10) is gone
+  });
+});

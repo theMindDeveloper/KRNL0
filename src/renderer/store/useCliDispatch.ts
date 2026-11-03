@@ -14,6 +14,7 @@ import { useBoardStore } from './boardStore';
 import { emit, saveBoard } from './eventLog';
 import { deleteTaskNodesCascade, makeCommandHandler } from '../components/Canvas/commandDispatch';
 import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
+import { activeCanvasOf, isOnCanvas } from '../../shared/canvas';
 import type { BoardShape } from '../../shared/dispatch/types';
 import { TERM_CLEAR_EVENT, TERM_FONT_MIN, TERM_FONT_MAX } from '../components/nodes/TerminalNode/constants';
 import { sfxEngine } from '../sfx/sfxEngine';
@@ -179,28 +180,29 @@ export function useCliDispatch(): void {
             const { board } = store.getState();
             if (!board) { message = 'No board loaded'; break; }
 
-            // Find task nodes in the rect
+            // Every node on the current canvas whose top-left corner is in the
+            // rect, as the help says — except the fixed mother windows.
             const minX = Math.min(x1, x2);
             const maxX = Math.max(x1, x2);
             const minY = Math.min(y1, y2);
             const maxY = Math.max(y1, y2);
+            const canvasId = activeCanvasOf(board);
+            const inside = board.nodes.filter((n) => {
+              if (n.isMother || !isOnCanvas(n, canvasId)) return false;
+              const { x, y } = n.position;
+              return x >= minX && x <= maxX && y >= minY && y <= maxY;
+            });
+            const taskIds = inside.filter((n) => n.kind === 'todo.task').map((n) => n.id);
+            const otherIds = inside.filter((n) => n.kind !== 'todo.task').map((n) => n.id);
 
-            const taskIds = board.nodes
-              .filter((n) => {
-                if (n.kind !== 'todo.task') return false;
-                const px = n.position.x;
-                const py = n.position.y;
-                return px >= minX && px <= maxX && py >= minY && py <= maxY;
-              })
-              .map((n) => n.id);
-
-            if (taskIds.length > 0) {
-              deleteTaskNodesCascade(taskIds);
+            if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
+            for (const id of otherIds) store.getState().removeNode(id);
+            if (inside.length > 0) {
               const updated = store.getState().board as Board | null;
               if (updated) void saveBoard(updated);
             }
             ok = true;
-            message = `Marquee deleted ${taskIds.length} task(s)`;
+            message = `Marquee deleted ${inside.length} node(s) (${taskIds.length} task(s))`;
             break;
           }
 
