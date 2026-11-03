@@ -343,3 +343,59 @@ describe('MonthView — task chips', () => {
     expect(cell?.textContent).toContain('+2 more');
   });
 });
+
+describe('MonthView — habit dots', () => {
+  const habitBoard = (n: number, createdAt = '2026-01-01T08:00:00.000Z') => {
+    useBoardStore.setState({
+      board: {
+        version: 1, schemaVersion: 2, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 }, edges: [], layoutMode: 'canvas',
+        nodes: [{
+          id: 'mother-habit', kind: 'habit', isMother: true, position: { x: 0, y: 0 }, config: {},
+          state: { habits: Array.from({ length: n }, (_, i) => ({
+            id: `h${i}`, name: `h${i}`, color: 'acid', log: [], archived: false, createdAt,
+            schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 25 },
+          })) },
+        }],
+      } as never,
+    });
+  };
+  const dots = (ymd: string) => document.querySelectorAll(`[data-testid^="month-habit-dot-"][data-testid$="-${ymd}"]`).length;
+  const dotText = (ymd: string) => document.querySelector(`[data-testid="month-habit-dots-${ymd}"]`)?.textContent ?? '';
+
+  it('six habits show six dots and no "+N"', () => {
+    habitBoard(6);
+    render(<MonthView state={makeState()} config={makeConfig()} onCommand={noop} />);
+    expect(dots('2026-05-12')).toBe(6);
+    expect(dotText('2026-05-12')).not.toMatch(/\+/);
+  });
+
+  it('seven habits show five dots and "+2" (the two that are hidden)', () => {
+    habitBoard(7);
+    render(<MonthView state={makeState()} config={makeConfig()} onCommand={noop} />);
+    expect(dots('2026-05-12')).toBe(5);
+    expect(dotText('2026-05-12')).toContain('+2');
+  });
+
+  it('no dots before the habit existed, and none when habits are switched off', () => {
+    habitBoard(1, new Date(2026, 4, 20, 12).toISOString());
+    const { unmount } = render(<MonthView state={makeState()} config={makeConfig()} onCommand={noop} />);
+    expect(dots('2026-05-19')).toBe(0);
+    expect(dots('2026-05-20')).toBe(1);
+    unmount();
+    render(<MonthView state={makeState()} config={makeConfig({ showHabits: false })} onCommand={noop} />);
+    expect(dots('2026-05-20')).toBe(0);
+  });
+});
+
+describe('MonthView — picking a day', () => {
+  beforeEach(() => setEmptyBoard());
+  it('a click moves the anchor too (week / day open on it); a double-click opens the day', () => {
+    const onCommand = vi.fn();
+    render(<MonthView state={makeState()} config={makeConfig()} onCommand={onCommand} />);
+    const cell = document.querySelector('[data-testid="month-cell-2026-05-10"]')!;
+    fireEvent.click(cell);
+    expect(onCommand).toHaveBeenCalledWith('calendar.setAnchor', { date: '2026-05-10' });
+    fireEvent.doubleClick(cell);
+    expect(onCommand).toHaveBeenCalledWith('calendar.setView', { view: 'day' });
+  });
+});

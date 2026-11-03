@@ -43,6 +43,7 @@ import { TaskPopup } from './TaskPopup';
 import { hourWindow, stepHourWindow } from './hourWindow';
 import { Z } from '../../ui/layers';
 import { screenScale } from './screenScale';
+import { useLocalDay } from '../../../hooks/useLocalDay';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -239,7 +240,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     return Array.from({ length: dayCount }, (_, i) => addDays(baseYMD, i));
   }, [baseYMD, dayCount]);
 
-  const today = todayYMD();
+  // useLocalDay re-renders at midnight, so today's column and every
+  // todayYMD() below move with the clock.
+  const today = useLocalDay();
 
   // Column index of today within the visible range, -1 if not shown.
   const todayColIndex = weekDays.indexOf(today);

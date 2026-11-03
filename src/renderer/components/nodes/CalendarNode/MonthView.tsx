@@ -11,7 +11,8 @@ import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
-import { getMonthDays, getMondayOf, toYMD, todayLocal } from '../HabitNode/types';
+import { getMonthDays, getMondayOf, toYMD } from '../HabitNode/types';
+import { useLocalDay } from '../../../hooks/useLocalDay';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 
 interface ScheduledTask {
@@ -25,6 +26,8 @@ interface ScheduledHabit {
   id: string;
   color: string; // habit color token name
   schedule: HabitSchedule;
+  /** Local day the habit was created — no dots before it. */
+  createdYMD: string;
 }
 
 // Convert JS getDay() (0=Sun..6=Sat) to ISO-8601 day-of-week (1=Mon..7=Sun).
@@ -123,9 +126,11 @@ function formatMonthLabel(anchor: Date): string {
   return anchor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
-export function MonthView({ state, config: _config, onCommand }: MonthViewProps) {
+export function MonthView({ state, config, onCommand }: MonthViewProps) {
   const anchor = parseAnchorDate(state.anchorDate);
-  const todayYMD = todayLocal();
+  // Re-renders at midnight, so the today cell moves with the clock.
+  const todayYMD = useLocalDay();
+  const showHabits = config?.showHabits !== false;
   const cells = useMemo(() => buildMonthGrid(anchor), [state.anchorDate]);
   const monthLabel = formatMonthLabel(anchor);
   // Determine which month's days belong to this calendar page.
@@ -191,7 +196,9 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
         if (!habitState?.habits) continue;
         for (const h of habitState.habits) {
           if (h.archived || !h.schedule) continue;
-          result.push({ id: h.id, color: h.color, schedule: h.schedule });
+          const created = h.createdAt ? new Date(h.createdAt) : null;
+          const createdYMD = created && !Number.isNaN(created.getTime()) ? toYMD(created) : '';
+          result.push({ id: h.id, color: h.color, schedule: h.schedule, createdYMD });
         }
       }
       result.sort((a, b) => a.id.localeCompare(b.id));
@@ -212,11 +219,20 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
         map.set(dayYMD, [task]);
       }
     }
+    // Earliest first, so "+N" hides the latest of the day, never the first.
+    for (const list of map.values()) list.sort((a, b) => a.startISO.localeCompare(b.startISO));
     return map;
   }, [scheduledTasks]);
 
+  // A click picks the day: the week and day views open on it too (they
+  // follow the anchor). A double-click opens that day, as in the year view.
   const handleCellClick = (ymd: string) => {
     onCommand('calendar.selectDate', { date: ymd });
+    onCommand('calendar.setAnchor', { date: ymd });
+  };
+  const handleCellDoubleClick = (ymd: string) => {
+    onCommand('calendar.setAnchor', { date: ymd });
+    onCommand('calendar.setView', { view: 'day' });
   };
 
   const handlePrev = () => {
@@ -416,10 +432,11 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
           // Compute habit dots for this cell.
           const cellDate = parseAnchorDate(ymd);
           const cellIsoDow = jsGetDayToIsoDow(cellDate.getDay());
-          const cellHabits = scheduledHabits.filter((h) =>
-            habitScheduledOnDow(h.schedule, cellIsoDow),
-          );
-          const visibleDots = cellHabits.slice(0, MAX_DOTS - 1);
+          const cellHabits = showHabits
+            ? scheduledHabits.filter((h) => ymd >= h.createdYMD && habitScheduledOnDow(h.schedule, cellIsoDow))
+            : [];
+          // Up to MAX_DOTS dots; past that, MAX_DOTS - 1 dots and "+N" for the rest.
+          const visibleDots = cellHabits.length <= MAX_DOTS ? cellHabits : cellHabits.slice(0, MAX_DOTS - 1);
           const dotOverflow = cellHabits.length - visibleDots.length;
 
           // PR7 — out-of-month cells render empty (no day number, no chips,
@@ -433,6 +450,7 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
               data-today={isToday ? 'true' : undefined}
               className={isToday ? 'krnl-month-cell--today' : undefined}
               onClick={inCurrentMonth ? () => handleCellClick(ymd) : undefined}
+              onDoubleClick={inCurrentMonth ? () => handleCellDoubleClick(ymd) : undefined}
               style={{
                 position: 'relative',
                 background: isSelected && !isToday ? 'var(--paper-2)' : 'transparent',
@@ -600,7 +618,7 @@ export function MonthView({ state, config: _config, onCommand }: MonthViewProps)
                         lineHeight: 1,
                       }}
                     >
-                      +{dotOverflow + 1}
+                      +{dotOverflow}
                     </span>
                   )}
                 </div>
