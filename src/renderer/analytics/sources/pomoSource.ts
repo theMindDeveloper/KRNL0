@@ -27,6 +27,8 @@ interface PomoStateLike {
   history?: PomoSessionLike[];
 }
 
+const isoAt = (ms: number, fallback: string): string => (Number.isFinite(ms) ? new Date(ms).toISOString() : fallback);
+
 export const pomoSource: AnalyticsDataSource = {
   id: 'pomo',
   label: 'Pomo',
@@ -52,19 +54,21 @@ export const pomoSource: AnalyticsDataSource = {
             type: recKind === 'work' ? 'pomo.work' : 'pomo.break',
             date: part.date,
             // Inside the part's own day, so hour / weekday charts agree with `date`.
-            isoTimestamp: parts.length === 1 ? rec.endedAt : new Date(part.endMs).toISOString(),
+            isoTimestamp: isoAt(part.endMs, rec.endedAt),
             durationMin: part.min,
             // `part` > 0 marks the continuation of a span split at midnight.
             metadata: parts.length === 1 ? meta : { ...meta, spanId: rec.id ?? null, part: i },
           });
         });
-        // pomo.session — one per threshold-reached span, on the day it ended.
+        // pomo.session — one per threshold-reached span, on the day it ended
+        // (its last part: a span ending at 00:00 ended the day before).
         if (recKind === 'work' && rec.completed) {
+          const last = parts[parts.length - 1]!;
           out.push({
             source: 'pomo',
             type: 'pomo.session',
-            date: isoToYMD(rec.endedAt),
-            isoTimestamp: rec.endedAt,
+            date: last.date,
+            isoTimestamp: isoAt(last.endMs, rec.endedAt),
             durationMin: rec.durationMin ?? 0,
             metadata: meta,
           });

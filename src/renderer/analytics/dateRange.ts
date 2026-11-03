@@ -88,16 +88,25 @@ export function splitByLocalDay(startMs: number, endMs: number): Array<{ date: s
 export function splitMinutesByLocalDay(startMs: number, endMs: number, minutes: number): Array<{ date: string; min: number; endMs: number }> {
   const parts = splitByLocalDay(startMs, endMs);
   const total = parts.reduce((a, p) => a + p.ms, 0);
-  if (parts.length === 1 || total <= 0) return [{ date: parts[parts.length - 1]!.date, min: minutes, endMs }];
-  let left = minutes;
+  // `endMs` of a part: the last instant inside its own day, so an hour-of-
+  // day bucket puts it at 23:xx of that day, not at the next day's 00:00
+  // (a span ending exactly at midnight belongs to the day before).
+  if (parts.length === 1 || total <= 0) {
+    const date = parts[parts.length - 1]!.date;
+    return [{ date, min: minutes, endMs: total > 0 ? endMs - 1 : endMs }];
+  }
+  // Round the running total, not each part: parts never go negative and
+  // always add up to `minutes`.
   let cursor = startMs;
-  return parts.map((p, i) => {
-    const min = i === parts.length - 1 ? left : Math.round((minutes * p.ms) / total);
-    left -= min;
+  let doneMs = 0;
+  let given = 0;
+  return parts.map((p) => {
+    doneMs += p.ms;
     cursor += p.ms;
-    // `endMs` of a part: the last instant inside its own day, so an hour-of-
-    // day bucket puts it at 23:xx of that day, not at the next day's 00:00.
-    return { date: p.date, min, endMs: i === parts.length - 1 ? endMs : cursor - 1 };
+    const upTo = Math.round((minutes * doneMs) / total);
+    const min = upTo - given;
+    given = upTo;
+    return { date: p.date, min, endMs: cursor - 1 };
   });
 }
 

@@ -5,7 +5,7 @@ import { renderHook, act } from '@testing-library/react';
 import { awayGapFor, useAwayGap, AWAY_MS } from '../../../src/renderer/components/nodes/PomoNode/useAwayGap';
 import { pomoStopAt } from '../../../src/renderer/components/nodes/PomoNode/commands';
 import { defaultPomoState } from '../../../src/renderer/components/nodes/PomoNode/types';
-import { parseStopAt } from '../../../src/sys/commands/pomo';
+import { parseStopAt, stopAtRefusal } from '../../../src/sys/commands/pomo';
 
 const T0 = Date.UTC(2026, 10, 2, 17, 0);
 afterEach(() => { vi.useRealTimers(); localStorage.clear(); });
@@ -26,6 +26,15 @@ describe('useAwayGap', () => {
     localStorage.setItem('krnl0-pomo-seen', String(T0 + 3_600_000));
     const { result } = renderHook(() => useAwayGap('running', new Date(T0).toISOString()));
     expect(result.current.gap).toEqual({ fromMs: T0 + 3_600_000, toMs: T0 + 16 * 3_600_000 });
+  });
+
+  it('drops the question when the span it was about is replaced (CLI break / extend)', () => {
+    vi.useFakeTimers({ now: T0 + 16 * 3_600_000 });
+    localStorage.setItem('krnl0-pomo-seen', String(T0 + 3_600_000));
+    const { result, rerender } = renderHook(({ s }) => useAwayGap('running', s), { initialProps: { s: new Date(T0).toISOString() } });
+    expect(result.current.gap).not.toBeNull();
+    rerender({ s: new Date(T0 + 16 * 3_600_000).toISOString() });
+    expect(result.current.gap).toBeNull();
   });
 
   it('does not ask while the window keeps seeing the span', () => {
@@ -53,5 +62,19 @@ describe('CLI pomo stop --at', () => {
     expect(parseStopAt('2026-11-02T18:02', now)).toBe(new Date(2026, 10, 2, 18, 2).getTime());
     expect(parseStopAt('25:00', now)).toBeUndefined();
     expect(parseStopAt('2026-02-31T10:00', now)).toBeUndefined();
+  });
+});
+
+describe('CLI pomo stop --at refuses what it cannot do', () => {
+  const running = { ...defaultPomoState(), status: 'running' as const, startedAt: new Date(T0).toISOString() };
+  it('a moment before the span started', () => {
+    expect(stopAtRefusal(running, T0 - 60_000, '17:59')).toMatch(/before this span started/);
+  });
+  it('a paused or idle pomo, instead of echoing a time it ignored', () => {
+    expect(stopAtRefusal({ ...running, status: 'paused' }, T0 + 60_000, 'x')).toMatch(/needs a running span/);
+    expect(stopAtRefusal(defaultPomoState(), T0 + 60_000, 'x')).toMatch(/needs a running span/);
+  });
+  it('a moment inside a live span is fine', () => {
+    expect(stopAtRefusal(running, T0 + 60_000, 'x')).toBeNull();
   });
 });

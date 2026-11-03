@@ -51,9 +51,10 @@ export function useAwayGap(status: string, startedAt: string | null): { gap: Awa
       return;
     }
     // On mount / a new span: was the app gone since it last saw this span?
+    // Always replace: a prompt about the previous span (ended meanwhile by
+    // the CLI, a break, an extend) must not be applied to this one.
     const now = Date.now();
-    const found = awayGapFor(startMs, readSeen(), now);
-    if (found) setGap(found);
+    setGap(awayGapFor(startMs, readSeen(), now));
     lastBeat.current = now;
     writeSeen(now);
     const id = setInterval(() => {

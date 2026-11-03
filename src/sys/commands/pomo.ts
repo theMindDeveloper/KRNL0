@@ -157,15 +157,38 @@ export function pomoStop(at?: string): SysResult {
     if (atMs > Date.now()) return { ok: false, message: `--at ${at} is in the future` };
   }
   let found = false;
+  let refused: string | null = null;
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);
     if (!node) return;
-    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
-    node['state'] = atMs !== undefined ? fsmStopAt(prev, { atMs }, cliEnv()) : fsmStop(prev, {}, cliEnv());
     found = true;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    if (atMs !== undefined) {
+      refused = stopAtRefusal(prev, atMs, at ?? '');
+      if (refused === null) node['state'] = fsmStopAt(prev, { atMs }, cliEnv());
+      return;
+    }
+    node['state'] = fsmStop(prev, {}, cliEnv());
   });
   if (!found) return { ok: false, message: 'No Pomodoro node found on the board' };
+  if (refused) return { ok: false, message: refused };
   return { ok: true, message: at !== undefined ? `Pomodoro stopped as of ${at}` : 'Pomodoro stopped' };
+}
+
+/**
+ * Why `pomo stop --at` cannot apply to this state, or null when it can. It
+ * trims a live span only; a time it would ignore (paused, idle) or one before
+ * the span started (a 0-minute record) is an error, not a silent no-op.
+ */
+export function stopAtRefusal(prev: PomoState, atMs: number, at: string): string | null {
+  if ((prev.status !== 'running' && prev.status !== 'break') || prev.startedAt === null) {
+    return `--at needs a running span (pomo is ${prev.status}); use plain "pomo stop"`;
+  }
+  if (atMs < Date.parse(prev.startedAt)) {
+    const d = new Date(prev.startedAt);
+    return `--at ${at} is before this span started (${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')})`;
+  }
+  return null;
 }
 
 /** "HH:MM" (today, local) or "YYYY-MM-DDTHH:MM" (local) → epoch ms. */
