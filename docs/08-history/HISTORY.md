@@ -950,3 +950,19 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Terminal:** a page reload, renderer crash or closed window kills that page's shells instead of leaking one per reload.
 - **CLI parity:** `task subtask` creates and links its Todo row; `task subtask` / `task addNext` without a duration are open-ended like the canvas; `krnl cal --from …`, `clock --json` etc. run the default subcommand; `theme show`, `info` and `settings show` report the window's real light/dark theme.
 - **Todo:** open items are never hidden by the 50-row cap. **Habit lane:** rolls over at midnight.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 3): away guard, CLI parity, shared UI, day attribution
+
+**Type:** Bug Fix / Feature / Refactor
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `d36e647` … `7685b2d`
+**Files changed:** `shared/boardMerge.ts`, `PomoNode/{useAwayGap.ts (new),commands.ts,index.tsx}`, `HabitLaneNode/index.tsx`, `sys/{parser,SysFacade}.ts`, `sys/commands/{pomo,task}.ts`, `main/rpc/server.ts`, `store/useCliDispatch.ts`, `ui/{Switch,CloseButton}.tsx (new)`, `ui/TaskInfoPopup.tsx`, `analytics/{dateRange,engine,summary,sources/pomoSource}.ts`, `CalendarNode/YearView.tsx`, `ClockNode/index.tsx`, `docs/03-architecture/decisions.md` (Decision 34), `docs/06-requirements/pomo-node.md` (F23), tests
+**Summary:**
+- **Merge safety:** the stale-save merge recurses into node state (Todo rows, pomo spans, habits by id), so a UI tick and a `krnl task add` both survive; a true same-value conflict keeps the file's value (Decision 34).
+- **Pomo away guard (F23):** time the window didn't see (sleep, app closed) is offered as "AWAY 18:02–09:14 — count that time?" with COUNT IT / STOP AT 18:02 instead of being booked as work. CLI: `pomo stop --at HH:MM`.
+- **CLI parity:** `task unschedule` on a chain successor clears the anchor; `task toggle` / `todo check` stop the pomo on that task; exit code 2 reaches the shell; `marquee --delete` deletes every non-mother node in the rect as documented; a value-less flag no longer swallows the next flag.
+- **Habit lane:** can't tick an unscheduled day.
+- **Shared UI:** `ui/Switch` (Pomo, Analytics settings) and `ui/CloseButton` (Settings, Orb, Commander, task popup, habit swap); the task info popup closes on Esc and scrolls when tall.
+- **Day attribution:** spans over midnight count their minutes on each day in Overview, heatmap, Year view and "today so far", as the week view always did; "active days" uses one rule. The Clock stays on the hour marks on DST days.
