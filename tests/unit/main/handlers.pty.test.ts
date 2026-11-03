@@ -198,7 +198,9 @@ describe('F4 — pty:create', () => {
 
       expect(spawn).toHaveBeenCalled();
       const spawnCall = (spawn as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(spawnCall[1]).toEqual([]);
+      // POSIX hosts start zsh as a login shell (-l, so PATH matches a real
+      // terminal); on Windows a POSIX path gets no extra flags.
+      expect(spawnCall[1]).toEqual(process.platform === 'win32' ? [] : ['-l']);
       // cols / rows forwarded
       expect(spawnCall[2]).toMatchObject({ cols: 80, rows: 24 });
 
