@@ -670,3 +670,16 @@ describe('paste goes through xterm', () => {
     expect(krnl.ptyWriteMock).not.toHaveBeenCalled();
   });
 });
+
+describe('copy keys', () => {
+  it('Cmd+C with nothing selected does not interrupt the shell; Ctrl+C does', async () => {
+    let handler: ((e: KeyboardEvent) => boolean) | null = null;
+    const { deps, krnl } = makeDeps();
+    Object.assign(deps.term, { getSelection: () => '', attachCustomKeyEventHandler: (h: (e: KeyboardEvent) => boolean) => { handler = h; } });
+    await startTerminalSession(deps);
+    handler!({ type: 'keydown', key: 'c', ctrlKey: false, metaKey: true, shiftKey: false, altKey: false } as KeyboardEvent);
+    expect(krnl.ptyWriteMock).not.toHaveBeenCalled();
+    handler!({ type: 'keydown', key: 'c', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false } as KeyboardEvent);
+    expect(krnl.ptyWriteMock).toHaveBeenCalledWith('sid-test', '\x03');
+  });
+});
