@@ -75,6 +75,7 @@ import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { shortcutBlocked } from '../../utils/keyboardTargets';
+import { undoable } from '../../store/undoNotice';
 
 // Canvas-mode mother row: first slot x and the step between slots (540 wide +
 // 20 gap) — matches the seeded positions in main/persistence/board.ts.
@@ -769,15 +770,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const otherIds: string[] = [];
     const currentBoard = useBoardStore.getState().board;
     const strokeIds = ctxMenu.nodeIds.filter(isStrokeId).map((id) => id.slice(STROKE_NODE_PREFIX.length));
-    if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
     for (const id of ctxMenu.nodeIds) {
       if (isStrokeId(id)) continue;
       const node = currentBoard?.nodes.find((n) => n.id === id);
       if (node?.kind === 'todo.task') taskIds.push(id);
       else otherIds.push(id);
     }
-    if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
-    for (const id of otherIds) removeNode(id);
+    const count = ctxMenu.nodeIds.length;
+    undoable(`Deleted ${count} item${count === 1 ? '' : 's'}`, () => {
+      if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
+      if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
+      for (const id of otherIds) removeNode(id);
+    });
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
     closeCtxMenu();
@@ -799,10 +803,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         .filter((n): n is NonNullable<typeof n> => !!n && !n.isMother);
       if (!strokeIds.length && !nodes.length) return;
       e.preventDefault();
-      if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
-      const taskIds = nodes.filter((n) => n.kind === 'todo.task').map((n) => n.id);
-      if (taskIds.length) deleteTaskNodesCascade(taskIds);
-      for (const n of nodes) if (n.kind !== 'todo.task') removeNode(n.id);
+      const count = strokeIds.length + nodes.length;
+      undoable(`Deleted ${count} item${count === 1 ? '' : 's'}`, () => {
+        if (strokeIds.length) useBoardStore.getState().removeStrokes(strokeIds);
+        const taskIds = nodes.filter((n) => n.kind === 'todo.task').map((n) => n.id);
+        if (taskIds.length) deleteTaskNodesCascade(taskIds);
+        for (const n of nodes) if (n.kind !== 'todo.task') removeNode(n.id);
+      });
       const updated = useBoardStore.getState().board;
       if (updated && nodes.length) void saveBoard(updated);
     };

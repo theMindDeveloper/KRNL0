@@ -22,6 +22,7 @@ import { useBoardStore } from './store/boardStore';
 import { useBoardChannel } from './store/useBoardChannel';
 import { RadialChooserHost } from './components/ui/RadialChooser';
 import { useCliDispatch } from './store/useCliDispatch';
+import { UndoNoticeBar } from './components/ui/UndoNoticeBar';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
 // This is the only code path that satisfies "before first paint" for F6b.
@@ -135,6 +136,7 @@ function AppInner() {
       </div>
       <StatusBar fallbackNotice={isFallingBack} />
       <RadialChooserHost />
+      <UndoNoticeBar />
     </div>
   );
 }

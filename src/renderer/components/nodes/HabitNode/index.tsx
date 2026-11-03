@@ -43,6 +43,7 @@ import { HabitPopover } from './HabitPopover';
 import { HabitContextMenu } from './HabitContextMenu';
 import { HabitIcon } from './HabitIcon';
 import { Z } from '../../ui/layers';
+import { undoable } from '../../../store/undoNotice';
 
 function getISOWeek(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -394,7 +395,10 @@ export function HabitNode({
               onSetColor={(color) => onCommand('habit.setColor', { id: menu.habitId, color })}
               onSetIcon={(icon) => onCommand('habit.setIcon', { id: menu.habitId, icon })}
               onSetNote={(note) => onCommand('habit.setNote', { id: menu.habitId, note })}
-              onDelete={() => onCommand('habit.remove', { id: menu.habitId })}
+              onDelete={() => {
+                const name = state.habits.find((h) => h.id === menu.habitId)?.name ?? 'habit';
+                undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id: menu.habitId }));
+              }}
               onPinAsLane={() => onCommand('habit.spawnLane', { habitId: menu.habitId })}
               laneExists={pinnedHabitIds.has(menu.habitId)}
               onClose={() => setMenu(null)}

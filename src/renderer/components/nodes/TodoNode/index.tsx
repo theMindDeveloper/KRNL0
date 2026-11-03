@@ -18,6 +18,7 @@ import type { PomoConfig } from '../PomoNode/types';
 import { defaultPomoConfig } from '../PomoNode/types';
 import { breakdownPomoTime } from '../../../store/pomoSchedule';
 import { toneVarForTask } from '../../../utils/taskColor';
+import { undoable } from '../../../store/undoNotice';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -71,6 +72,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   }, []);
 
   const buckets = todoBuckets(state, nowMs);
+  // One-click deletes say what went and offer UNDO (cascade included).
+  const removeItem = (id: string) => {
+    const text = state.items.find((i) => i.id === id)?.text ?? 'item';
+    undoable(`Deleted "${text}"`, () => onCommand('todo.remove', { id }));
+  };
   const tagLibrary = todoTagLibrary(state);
   // Easy mode: no tags and no pomo linking — just add, schedule, done.
   const easy = useEasyMode();
@@ -384,9 +390,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       {
         label: 'Delete',
         danger: true,
-        onSelect: () => {
-          onCommand('todo.remove', { id: itemId });
-        },
+        onSelect: () => removeItem(itemId),
       },
     ];
   };
@@ -667,7 +671,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          onCommand('todo.remove', { id: item.id });
+          removeItem(item.id);
         }}
         style={{
           flexShrink: 0,
@@ -804,7 +808,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 count={buckets.archived.length}
                 open={archiveOpen}
                 onToggle={() => setArchiveOpen((o) => !o)}
-                action={archiveOpen ? { label: 'CLEAR', testId: 'todo-clear-archive-btn', onSelect: () => onCommand('todo.clearArchived') } : undefined}
+                action={archiveOpen ? { label: 'CLEAR', testId: 'todo-clear-archive-btn', onSelect: () => undoable(`Cleared ${buckets.archived.length} archived`, () => onCommand('todo.clearArchived')) } : undefined}
               />
               {archiveOpen && buckets.archived.map((item, idx) => {
                 const day = item.completedAt ? isoToYMD(item.completedAt) : '';
