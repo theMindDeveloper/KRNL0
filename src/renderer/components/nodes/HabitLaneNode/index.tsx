@@ -12,7 +12,7 @@ import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
 import type { Habit, HabitColor, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { calcStreak } from '../HabitNode/commands';
-import { HABIT_COLORS, toYMD } from '../HabitNode/types';
+import { HABIT_COLORS, isDayScheduled, toYMD } from '../HabitNode/types';
 import { useBoardStore } from '../../../store/boardStore';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
@@ -136,6 +136,7 @@ export function HabitLaneNode({
   const color = habitColor(habit.color);
   const logSet = new Set(habit.log);
   const doneToday = logSet.has(today);
+  const scheduledToday = isDayScheduled((habit as { schedule?: HabitSchedule }).schedule, today);
   const cadence = (habit as { schedule?: HabitSchedule | null }).schedule ?? null;
   // Pass the schedule like HabitNode does, or a weekdays habit reads 0 on weekends.
   const streak = calcStreak(habit.log, today, cadence ?? undefined);
@@ -236,16 +237,20 @@ export function HabitLaneNode({
           type="button"
           aria-label={`${habit.name} today ${doneToday ? 'done' : 'not done'}`}
           aria-pressed={doneToday}
+          // Same rule as the Habit window: an unscheduled day can't be
+          // ticked (the streak ignores it); an existing tick can be removed.
+          disabled={!scheduledToday && !doneToday}
           onClick={() => onCommand('habit.lane.toggleToday')}
-          title={`click to ${doneToday ? 'unmark' : 'mark'} today`}
+          title={!scheduledToday && !doneToday ? 'not scheduled today' : `click to ${doneToday ? 'unmark' : 'mark'} today`}
           style={{
+            opacity: !scheduledToday && !doneToday ? 0.35 : 1,
             width: 22,
             height: 22,
             borderRadius: '50%',
             border: `1.5px solid var(--${color})`,
             background: doneToday ? `var(--${color})` : 'transparent',
             color: doneToday ? 'var(--ink)' : `var(--${color})`,
-            cursor: 'pointer',
+            cursor: !scheduledToday && !doneToday ? 'default' : 'pointer',
             display: 'grid',
             placeItems: 'center',
             fontFamily: 'var(--font-mono)',
