@@ -812,6 +812,9 @@ export async function taskAddNext(
 
   const sourceTs = sourceNode.state as TaskState;
   const effectiveDuration = durationMin ?? sourceTs.durationMin;
+  // The placeholder estimate follows the source's plan, as the canvas
+  // "Add next task" does (durationMin is the pomo session length, not the plan).
+  const effectivePlanned = durationMin ?? sourceTs.plannedMin ?? sourceTs.durationMin;
 
   const env = {
     uuid: () => randomUUID(),
@@ -853,7 +856,7 @@ export async function taskAddNext(
     parentTaskId: sourceTs.parentTaskId,
     todoItemId: addedItem.id,
     pomoSessionsCompleted: 0,
-    plannedMin: effectiveDuration,
+    plannedMin: effectivePlanned,
     // No time given → open-ended, like the canvas 'Add next task'.
     ...(durationMin === undefined ? { timeOpen: true } : {}),
     secondsAccumulated: 0,
