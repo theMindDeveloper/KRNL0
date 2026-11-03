@@ -136,6 +136,22 @@ function isoHoursFromDayStart(iso: string, referenceDate: string): number | null
   return dayOffset * 24 + hh + mm / 60;
 }
 
+/** Wall-clock hours of epoch `ms` counted from the start of `dayYMD` (local).
+ *  Unlike (ms - midnight) / 1h this stays on the dial's hour marks on DST
+ *  change days, matching the plan arcs (isoHoursFromDayStart). */
+export function wallHoursFromDayStart(ms: number, dayYMD: string): number {
+  const d = new Date(ms);
+  const [y, mo, da] = dayYMD.split('-').map(Number) as [number, number, number];
+  const dayOffset = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - new Date(y, mo - 1, da).getTime()) / 86_400_000);
+  return dayOffset * 24 + d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600 + d.getMilliseconds() / 3_600_000;
+}
+
+/** Epoch ms of `hours` wall-clock hours into `dayYMD` (inverse of the above). */
+export function msAtWallHours(dayYMD: string, hours: number): number {
+  const [y, mo, da] = dayYMD.split('-').map(Number) as [number, number, number];
+  return new Date(y, mo - 1, da, 0, 0, 0, Math.round(hours * 3_600_000)).getTime();
+}
+
 // Numerals 1–12. 12 at index 0 so hourToRad(12)=top.
 const NUMERALS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
 
@@ -296,7 +312,6 @@ export function ClockNode({
     e.preventDefault();
     e.stopPropagation();
     const ts = node.state as TaskState;
-    const dayStart = new Date(selectedDate + 'T00:00:00').getTime();
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
@@ -305,11 +320,11 @@ export function ClockNode({
           id: taskId,
           text: ts.text,
           done: ts.done,
-          startMs: dayStart + startH * 3_600_000,
-          endMs: dayStart + endH * 3_600_000,
+          startMs: msAtWallHours(selectedDate, startH),
+          endMs: msAtWallHours(selectedDate, endH),
         },
         // Same menu as the Calendar: Easy mode has no focus linking.
-        { easy, onDetails: () => setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: dayStart + startH * 3_600_000, endMs: dayStart + endH * 3_600_000 }) },
+        { easy, onDetails: () => setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: msAtWallHours(selectedDate, startH), endMs: msAtWallHours(selectedDate, endH) }) },
       ),
     });
   };
@@ -320,8 +335,7 @@ export function ClockNode({
     const node = useBoardStore.getState().board?.nodes.find((n) => n.id === taskId);
     if (!taskId.startsWith('habit-') && (!node || node.kind !== 'todo.task')) return;
     e.stopPropagation();
-    const dayStart = new Date(selectedDate + 'T00:00:00').getTime();
-    setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: dayStart + startH * 3_600_000, endMs: dayStart + endH * 3_600_000 });
+    setTaskPopup({ taskId, x: e.clientX, y: e.clientY, startMs: msAtWallHours(selectedDate, startH), endMs: msAtWallHours(selectedDate, endH) });
   };
   const fmtClockHM = (ms: number) => {
     const d = new Date(ms);
@@ -497,13 +511,12 @@ export function ClockNode({
   const realitySegments = useMemo(() => {
     const segs = selectPomoReality(board0, liveMs);
     if (segs.length === 0) return [] as Array<RealitySegment & { startH: number; endH: number }>;
-    const dayStartMs = new Date(selectedDate + 'T00:00:00').getTime();
     const winLo = viewWindow === 1 ? 12 : 0;
     const winHi = viewWindow === 1 ? 24 : 12;
     const out: Array<RealitySegment & { startH: number; endH: number }> = [];
     for (const seg of segs) {
-      const startH = (seg.startMs - dayStartMs) / 3_600_000;
-      const endH = (seg.endMs - dayStartMs) / 3_600_000;
+      const startH = wallHoursFromDayStart(seg.startMs, selectedDate);
+      const endH = wallHoursFromDayStart(seg.endMs, selectedDate);
       if (!(endH > startH)) continue;
       if (endH <= 0 || startH >= 24) continue;
       if (endH <= winLo || startH >= winHi) continue;
