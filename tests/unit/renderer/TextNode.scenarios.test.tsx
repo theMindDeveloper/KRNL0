@@ -241,3 +241,14 @@ describe('TextNode — overflow', () => {
     }
   });
 });
+
+describe('TextNode — Enter on the canvas', () => {
+  it('opens only the note the canvas asked for', async () => {
+    const { requestTextEdit } = await import('../../../src/renderer/components/nodes/TextNode/editEvent');
+    render(<TextNode node={fixture({ text: 'hello' })} selected onCommand={noop} onSelect={noop} />);
+    act(() => requestTextEdit('some-other-note'));
+    expect(screen.queryByTestId('text-node-textarea')).toBeNull();
+    act(() => requestTextEdit('text-1'));
+    expect(screen.getByTestId('text-node-textarea')).toBeTruthy();
+  });
+});

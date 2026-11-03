@@ -74,7 +74,8 @@ import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types'
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
-import { shortcutBlocked } from '../../utils/keyboardTargets';
+import { shortcutBlocked, isControlTarget } from '../../utils/keyboardTargets';
+import { requestTextEdit } from '../nodes/TextNode/editEvent';
 import { undoable } from '../../store/undoNotice';
 
 // Canvas-mode mother row: first slot x and the step between slots (540 wide +
@@ -786,6 +787,21 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (updated) void saveBoard(updated);
     closeCtxMenu();
   }, [ctxMenu, removeNode, closeCtxMenu]);
+
+  // Enter / F2 with exactly one note selected opens it for editing, as a
+  // click does (Tab-focused notes handle the key themselves).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key !== 'Enter' && e.key !== 'F2') || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (shortcutBlocked(e) || isControlTarget(e.target)) return;
+      const selected = getNodes().filter((n) => n.selected && !isStrokeId(n.id));
+      if (selected.length !== 1 || selected[0]!.type !== 'text') return;
+      e.preventDefault();
+      requestTextEdit(selected[0]!.id);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [getNodes]);
 
   // Delete / Backspace removes what is selected: drawings and free nodes
   // (tasks with their chain cascade, as from the right-click menu). Mother

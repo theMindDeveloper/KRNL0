@@ -16,6 +16,7 @@ import type { TextState, TextConfig } from './types';
 import { useCornerProximity } from '../../../hooks/useCornerProximity';
 import { LookBar } from './LookBar';
 import { STICKY_COLORS, type TextLook } from './types';
+import { TEXT_EDIT_EVENT } from './editEvent';
 
 // Sticky notes are handwritten (Caveat, via Fontsource — loaded on demand).
 const STICKY_FONT = "'Caveat', 'Segoe Print', 'Comic Sans MS', cursive";
@@ -104,6 +105,17 @@ export function TextNode({
     setDraft(text);
     setEditing(true);
   };
+
+  // Enter / F2 on the canvas with this note selected (CanvasFlow).
+  const enterEditRef = useRef(enterEdit);
+  enterEditRef.current = enterEdit;
+  useEffect(() => {
+    const onEdit = (e: Event) => {
+      if ((e as CustomEvent<{ nodeId: string }>).detail?.nodeId === node.id) enterEditRef.current();
+    };
+    window.addEventListener(TEXT_EDIT_EVENT, onEdit);
+    return () => window.removeEventListener(TEXT_EDIT_EVENT, onEdit);
+  }, [node.id]);
 
   const commit = () => {
     // The textarea blurs as it unmounts after Escape; that blur must not
