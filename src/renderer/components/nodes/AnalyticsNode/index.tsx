@@ -101,6 +101,15 @@ const SOURCE_PALETTE: Record<string, string> = {
 };
 
 const FALLBACK_PALETTE = ['#8a7bff', '#5dd3c5', '#d18bff', '#f4d35e', 'var(--k-an-warm, #ff8e64)'];
+// Seven days, seven hues — the 5-colour palette repeated Mon/Sat and Tue/Sun.
+const WEEKDAY_PALETTE = [...FALLBACK_PALETTE, 'var(--cyan)', 'var(--acid)'];
+
+/** A source without a fixed hue keeps one by its id, not by its rank today. */
+function fallbackColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return FALLBACK_PALETTE[h % FALLBACK_PALETTE.length]!;
+}
 
 // Each view lists the cards it owns, in their default order. The settings
 // sidebar groups by view so the picker mirrors the user's mental model.
@@ -511,9 +520,9 @@ export function AnalyticsNode({
     }
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
-      .map(([id, count], i) => {
+      .map(([id, count]) => {
         const src = sources.find((s) => s.id === id);
-        const color = SOURCE_PALETTE[id] ?? FALLBACK_PALETTE[i % FALLBACK_PALETTE.length]!;
+        const color = SOURCE_PALETTE[id] ?? fallbackColor(id);
         return { id, label: src?.label ?? id, value: count, color };
       });
   }, [events, range, sources]);
@@ -525,7 +534,7 @@ export function AnalyticsNode({
         id: `dow-${i}`,
         label: labels[i] ?? `Day ${i}`,
         value: Math.round(d.focusMin),
-        color: FALLBACK_PALETTE[i % FALLBACK_PALETTE.length]!,
+        color: WEEKDAY_PALETTE[i]!,
       }))
       .filter((s) => s.value > 0);
   }, [dow]);

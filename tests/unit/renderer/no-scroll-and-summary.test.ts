@@ -73,7 +73,7 @@ describe('summarizeAnalytics — the text on top of Overview', () => {
   });
   it('says so when nothing is tracked', () => {
     const s = summarizeAnalytics(engine({ tasks: 0, focus: 0 }), r, p, 7);
-    expect(s.headline).toBe('Nothing tracked in this week yet.');
+    expect(s.headline).toBe('Nothing tracked in the last 7 days yet.');
   });
   it('formats minutes', () => {
     expect(fmtMinutes(45)).toBe('45m');

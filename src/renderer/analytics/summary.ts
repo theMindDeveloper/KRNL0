@@ -69,7 +69,8 @@ export function summarizeAnalytics(
   const focusDelta = pct(tot.focusMin, prev.focusMin);
   const nothing = tot.tasksDone + tot.focusMin + tot.habitCheckins === 0;
 
-  const period = rangeDays === 7 ? 'this week' : `the last ${rangeDays} days`;
+  // The range is rolling (lastNDays), not a calendar week.
+  const period = `the last ${rangeDays} days`;
   const headline = nothing
     ? `Nothing tracked in ${period} yet.`
     : `In ${period} you finished ${tot.tasksDone} task${tot.tasksDone === 1 ? '' : 's'} and focused ${fmtMinutes(tot.focusMin)}.`;
