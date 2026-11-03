@@ -966,3 +966,18 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Habit lane:** can't tick an unscheduled day.
 - **Shared UI:** `ui/Switch` (Pomo, Analytics settings) and `ui/CloseButton` (Settings, Orb, Commander, task popup, habit swap); the task info popup closes on Esc and scrolls when tall.
 - **Day attribution:** spans over midnight count their minutes on each day in Overview, heatmap, Year view and "today so far", as the week view always did; "active days" uses one rule. The Clock stays on the hour marks on DST days.
+
+---
+
+## [2026-11-03] — Autonomous pass (batch 4): theme accents, CLI refs, docs
+
+**Type:** Bug Fix / Docs
+**Branch:** `TMD/autonomous-app-improvement-5e64b2`
+**Commits:** `15afd11` … `d3c3881`
+**Files changed:** `ui/PieMenu.tsx`, `Canvas/PenWheel.tsx`, `CalendarNode/{NowLine,WeekView}.tsx`, `analytics/sources/habitSource.ts`, `shared/dispatch/resolveRef.ts`, `sys/commands/{node,edge,task,text,image,pomo,draw,cal}.ts`, `docs/04-visual-system/design-tokens.md`, tests
+**Summary:**
+- **Theme accents:** the pie menu and pen wheel use `--accent-on-dark` instead of a fixed lime, so Blueprint, Submarine and Macintosh show their own accent.
+- **Calendar:** the day view's now dot sits in the day's column.
+- **Analytics:** archiving a habit keeps its past check-ins in the totals.
+- **CLI refs:** listings print the shortest unique prefix (8+) so every printed id can be typed back; ambiguous task refs list their matches; `text` / `image` commands accept prefixes; resize rejects non-positive sizes; segment and stroke refs need 4+ characters; `cal show` rejects unpadded/impossible dates; `pomo segments` uses the real local day end on DST days.
+- **Docs:** the visual-system colour table is regenerated from `tokens.css` and documents the accent pairs, the shared `ui/` components and the no-left-edge-bar rule.
