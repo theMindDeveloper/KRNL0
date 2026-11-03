@@ -86,8 +86,9 @@ export function TaskPopup(p: Props) {
         style={{
           position: 'fixed', left, top, width: W, zIndex: Z.popup, boxSizing: 'border-box',
           background: 'var(--paper)', color: 'var(--ink)',
-          border: '1px solid var(--paper-3)', borderRadius: 14,
-          boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+          // Same shell as ui/Popover and the task info popup.
+          border: '1px solid var(--paper-3)', borderRadius: 'var(--radius-lg)',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
           overflow: 'hidden', fontFamily: 'var(--font-sans)',
           animation: 'krnl-pop-in 140ms ease-out',
         }}

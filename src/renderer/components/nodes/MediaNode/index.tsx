@@ -62,8 +62,9 @@ export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, M
         width: '100%', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column',
         background: 'linear-gradient(180deg, var(--paper-2) 0%, var(--paper) 100%)',
         border: `1px solid ${selected ? 'var(--acid)' : 'var(--paper-3)'}`,
-        borderRadius: 14, overflow: 'hidden',
-        boxShadow: selected ? '0 0 0 3px color-mix(in srgb, var(--acid) 25%, transparent), 0 14px 34px rgba(0,0,0,0.38)' : '0 14px 34px rgba(0,0,0,0.32)',
+        // A card like the others: the frame style's radius and warm shadow.
+        borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+        boxShadow: selected ? '0 0 0 3px color-mix(in srgb, var(--acid) 25%, transparent), var(--shadow-2)' : 'var(--shadow-2)',
         transition: 'box-shadow 160ms ease, border-color 160ms ease',
       }}
     >

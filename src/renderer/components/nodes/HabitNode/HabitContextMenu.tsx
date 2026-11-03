@@ -113,10 +113,11 @@ export function HabitContextMenu({
         left: clampedX,
         top: clampedY,
         width: MENU_WIDTH,
-        background: 'var(--node-bg)',
+        // Same shell as the shared ContextMenu.
+        background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
         borderRadius: 6,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        boxShadow: 'var(--shadow-1)',
         padding: 8,
         zIndex: Z.contextMenu,
         fontFamily: 'var(--font-sans)',
