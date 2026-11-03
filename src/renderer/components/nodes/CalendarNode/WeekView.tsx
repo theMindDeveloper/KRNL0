@@ -2164,7 +2164,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           {/* NowLine overlay */}
           {todayColIndex >= 0 && (
             <NowLine
-              weekStartDate={mondayYMD}
+              weekStartDate={baseYMD}
+              days={dayCount}
               hourRange={hourRange}
               rowHeight={rowHeight}
               columnWidth={NOMINAL_COLUMN_WIDTH}
