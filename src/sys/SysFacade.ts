@@ -65,6 +65,8 @@ export interface SysFacadeDeps {
   onBoardChanged?: () => void;
   /** Phase 2: renderer-coupled dispatch for viewport/undo/redo/theme commands. */
   cliDispatch?: CliDispatchFn;
+  /** Content size of the open window, for placing new nodes at the visible centre. */
+  viewSize?: () => { width: number; height: number } | null;
 }
 
 function defaultBoardPath(): string {
@@ -352,6 +354,7 @@ export class SysFacade {
       const fCtx: FrameCtx = {
         boardPath: this.deps.boardPath,
         ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+        ...(this.deps.viewSize ? { viewSize: this.deps.viewSize } : {}),
       };
       switch (command.sub) {
         case 'add': {

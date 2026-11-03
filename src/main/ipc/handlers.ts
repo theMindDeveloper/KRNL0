@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
 import { loadBoardFrom, saveBoardTo, seedBoard, RendererRevGuard } from '../persistence/board';
-import { notifyBoardChanged } from '../boardIo';
+import { notifyBoardChanged, windowViewSize } from '../boardIo';
 import { mergeBoards } from '../../shared/boardMerge';
 import { renderMotd } from '../rpc/motd';
 import type { RpcServer } from '../rpc/server';
@@ -172,6 +172,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       boardPath: BOARD_PATH,
       hasOpenRenderer,
       onBoardChanged: notifyBoardChanged,
+      viewSize: windowViewSize,
       ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
     });
     try {

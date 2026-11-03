@@ -10,7 +10,7 @@ import * as crypto from 'crypto';
 import { BrowserWindow } from 'electron';
 import { SysFacade } from '../../sys/SysFacade';
 import type { CliDispatchFn } from '../../sys/SysFacade';
-import { notifyBoardChanged } from '../boardIo';
+import { notifyBoardChanged, windowViewSize } from '../boardIo';
 
 export interface RpcServer {
   socketPath: string;
@@ -104,6 +104,7 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
             boardPath,
             hasOpenRenderer: () => BrowserWindow.getAllWindows().length > 0,
             onBoardChanged: notifyBoardChanged,
+            viewSize: windowViewSize,
             ...(dispatch ? { cliDispatch: dispatch } : {}),
           });
           let result: { ok: boolean; message?: string; exitCode?: unknown; data?: unknown };

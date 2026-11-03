@@ -106,6 +106,15 @@ describe('frame add', () => {
     expect(frames[0]!.position!.y).toBe(300 - 120);
   });
 
+  it('with an open window, lands in the middle of what the user sees', async () => {
+    // viewport {x:-500, y:-300, zoom:1} + a 1200×800 window → visible centre (1100, 700)
+    const res = await frameAdd({ ...ctx, viewSize: () => ({ width: 1200, height: 800 }) }, {});
+    expect(res.ok).toBe(true);
+    const frames = getFrames();
+    expect(frames[0]!.position!.x).toBe(1100 - 180);
+    expect(frames[0]!.position!.y).toBe(700 - 120);
+  });
+
   it('--near centers frame on source node, auto-sizes to fit + padding, seeds childIds', async () => {
     // source-node: position={x:100, y:200}, w=200, h=80
     // srcCenter = (100 + 100, 200 + 40) = (200, 240)

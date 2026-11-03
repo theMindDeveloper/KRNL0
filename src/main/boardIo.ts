@@ -52,6 +52,14 @@ export function writeBoardFile(board: RawBoard): void {
   writeFileAtomic(BOARD_PATH, JSON.stringify(board, null, 2));
 }
 
+/** Size of the open window's content area, so CLI placement can aim at the visible centre. */
+export function windowViewSize(): { width: number; height: number } | null {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed());
+  if (!w) return null;
+  const [width, height] = w.getContentSize();
+  return width && height ? { width, height } : null;
+}
+
 export function notifyBoardChanged(): void {
   for (const w of BrowserWindow.getAllWindows()) {
     if (!w.isDestroyed()) w.webContents.send('board:changed');
