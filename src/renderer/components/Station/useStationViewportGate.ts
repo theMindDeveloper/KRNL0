@@ -31,6 +31,15 @@ interface ViewportGateResult {
   isFallingBack: boolean;
 }
 
+/**
+ * Station is what the window shows right now: saved as station AND the
+ * viewport is big enough. Event handlers read this instead of
+ * board.layoutMode, which stays 'station' during the narrow fallback.
+ */
+export function isStationShown(layoutMode: LayoutMode | undefined): boolean {
+  return layoutMode === 'station' && viewportMeetsMinimum();
+}
+
 export function useStationViewportGate(): ViewportGateResult {
   const savedMode = useBoardStore((s) => s.board?.layoutMode ?? 'canvas');
   const [meetsMinimum, setMeetsMinimum] = useState<boolean>(() => viewportMeetsMinimum());

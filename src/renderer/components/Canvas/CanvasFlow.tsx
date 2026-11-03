@@ -73,6 +73,7 @@ import type { FrameState } from '../nodes/FrameNode/types';
 import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types';
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 import { isStationHidden } from '../Station/stationVisibility';
+import { isStationShown, useStationViewportGate } from '../Station/useStationViewportGate';
 import { Z } from '../ui/layers';
 import { shortcutBlocked, isControlTarget } from '../../utils/keyboardTargets';
 import { requestTextEdit } from '../nodes/TextNode/editEvent';
@@ -520,8 +521,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const onEnsureVisible = (e: Event) => {
       const detail = (e as CustomEvent<{ x: number; y: number; width: number; height: number }>).detail;
       if (!detail) return;
-      const mode = useBoardStore.getState().board?.layoutMode;
-      if (mode === 'station') return;
+      if (isStationShown(useBoardStore.getState().board?.layoutMode)) return;
       ensureVisible(detail);
     };
     window.addEventListener('krnl:ensure-visible', onEnsureVisible);
@@ -989,7 +989,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // mother row).
     if (args.kind === 'analytics') {
       const current = useBoardStore.getState().board;
-      if (current?.layoutMode === 'station') {
+      if (isStationShown(current?.layoutMode)) {
         toggleAnalyticsShown();
         return;
       }
@@ -1371,7 +1371,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // In station mode the mothers are rendered as station cells in
   // StationLayout — the embedded canvas must hide them (and their edges) so
   // they aren't drawn twice. ADR 0008 § 2.5.
-  const isStation = board?.layoutMode === 'station';
+  // The effective mode: below the station minimum size the window falls
+  // back to the canvas, and the mothers must be drawn here (ADR 0008 § 9.5).
+  const isStation = useStationViewportGate().effectiveMode === 'station';
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
