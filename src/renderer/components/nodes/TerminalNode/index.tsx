@@ -6,6 +6,7 @@ import type { TermState, TermConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HEADER_LABEL, LIVE_BADGE_TEXT, TERM_CLEAR_EVENT } from './constants';
 import { startTerminalSession } from './session';
+import { getLiveTerminal, setLiveTerminal, type LiveTerminal } from './liveTerminals';
 import { MotdBanner } from './MotdBanner';
 import pkg from '../../../../../package.json';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
@@ -76,121 +77,148 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
   const selectAll = () => termRef.current?.selectAll();
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const term = new Terminal({
-      fontSize: node.config?.fontSize ?? 11.5,
-      fontFamily: "'JetBrains Mono', monospace",
-      theme: { ...(xtermColorsRef.current ?? {
-        background: '#05040a',
-        foreground: '#d4cfc0',
-        cursor: '#c9f158',
-        cursorAccent: '#0e0d0b',
-      }) },
-      cursorBlink: true,
-      scrollback: 5000,
-      // No smoothScrollDuration — the animation feels heavy on macOS
-      // trackpads because each flick queues an easing tail that delays the
-      // next gesture's response. Instant jumps match iTerm2 / Ghostty.
-      // Larger per-tick line counts make a small two-finger swipe move the
-      // buffer visibly (1 = stock = sluggish for trackpads, 3 = snappy).
-      scrollSensitivity: 3,
-      fastScrollSensitivity: 8,
-      allowProposedApi: true,
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-
-    // Renderer choice. The DOM renderer thrashes layout under heavy TUI
-    // ANSI traffic so we want a GPU-backed renderer (issue #73). The
-    // earlier implementation loaded WebGL *after* term.open() and *after*
-    // the initial fit(), which introduced a cols/rows drift that broke
-    // TUIs:
-    //
-    //   1. DOM-renderer fit measures the container → cols = N₁
-    //   2. PTY is spawned at cols = N₁
-    //   3. WebGL addon loads ~50-100ms later, re-fits against subtly
-    //      different WebGL cell metrics → cols = N₂
-    //   4. ptyResize is sent. PTY now thinks cols = N₂. claude reads N₂
-    //      from TIOCGWINSZ and renders assuming N₂ columns.
-    //   5. Visible xterm rendering drifts a column away from what claude
-    //      writes — text wraps in the middle of words ("specifically
-    //      running" → "running\ns Claude"), input boxes shift, table
-    //      borders collapse. (User report 2026-05-17.)
-    //
-    // Fix: load the renderer addon *before* term.open() and *before*
-    // startTerminalSession's first fit + ptyCreate runs. One measure, one
-    // PTY spawn, no drift. We use dynamic import (kept jsdom-safe — these
-    // modules touch `self` at module-load and crash in node test envs) and
-    // gate term.open() + session start behind the same async boundary.
-    //
-    // Canvas renderer is the default — fast enough for TUIs, stable under
-    // Electron's BrowserView paint pipeline, avoids GL-context lifetime
-    // issues when nodes go offscreen. WebGL was the prior choice but its
-    // async load created the cols/rows drift this commit fixes; if it's
-    // ever re-introduced as an opt-in, do it via a preload bridge flag
-    // (window.krnl.config), NOT process.env — `process` is undefined in
-    // the renderer context and crashes the init promise (user report
-    // 2026-05-17: "process is not defined", terminal renders as black).
-
-    let cancelled = false;
-    let sessionCleanup: (() => void) | null = null;
-
-    const init = async () => {
-      try {
-        const { CanvasAddon } = await import('@xterm/addon-canvas');
-        term.loadAddon(new CanvasAddon());
-      } catch { /* fall through to DOM */ }
-
-      if (cancelled || !containerRef.current) return;
-      term.open(containerRef.current);
-
-      sessionCleanup = await startTerminalSession({
-        term,
-        fit,
-        krnl: window.krnl,
-        onCommand,
-        setSessionId: (id) => {
-          sessionIdRef.current = id;
-          if (id) {
-            hadSessionRef.current = true;
-            // Resizes during the spawn were dropped (no id yet): catch up once.
-            try { fitRef.current?.fit(); } catch { /* ignore */ }
-            const t = termRef.current;
-            if (t) window.krnl?.ptyResize(id, t.cols, t.rows);
-          }
-          setActiveSessionId(id);
-        },
-        isCancelled: () => cancelled,
-        // Read at every start, so `krnl term setShell` applies to the next shell.
-        shell: () => shellRef.current,
-      });
-      if (cancelled) sessionCleanup?.();
+    // Session changes reach whichever component is mounted right now.
+    const bindSession = (id: string | null) => {
+      sessionIdRef.current = id;
+      if (id) {
+        hadSessionRef.current = true;
+        // Resizes during the spawn were dropped (no id yet): catch up once.
+        try { fitRef.current?.fit(); } catch { /* ignore */ }
+        const t = termRef.current;
+        if (t) window.krnl?.ptyResize(id, t.cols, t.rows);
+      }
+      setActiveSessionId(id);
     };
 
-    termRef.current = term;
-    fitRef.current = fit;
+    let entry = getLiveTerminal(node.id);
+    let reattachRaf = 0;
+    if (entry) {
+      // Remount (layout switch, panel shown again, slot swap): the same shell
+      // and scrollback come back — re-attach and refit to the new size.
+      container.appendChild(entry.host);
+      const e = entry;
+      reattachRaf = requestAnimationFrame(() => {
+        try { e.fit.fit(); } catch { /* not measured yet */ }
+        if (e.sessionId) window.krnl?.ptyResize(e.sessionId, e.term.cols, e.term.rows);
+        e.term.refresh(0, e.term.rows - 1);
+      });
+    } else {
+      const term = new Terminal({
+        fontSize: node.config?.fontSize ?? 11.5,
+        fontFamily: "'JetBrains Mono', monospace",
+        theme: { ...(xtermColorsRef.current ?? {
+          background: '#05040a',
+          foreground: '#d4cfc0',
+          cursor: '#c9f158',
+          cursorAccent: '#0e0d0b',
+        }) },
+        cursorBlink: true,
+        scrollback: 5000,
+        // No smoothScrollDuration — the animation feels heavy on macOS
+        // trackpads because each flick queues an easing tail that delays the
+        // next gesture's response. Instant jumps match iTerm2 / Ghostty.
+        // Larger per-tick line counts make a small two-finger swipe move the
+        // buffer visibly (1 = stock = sluggish for trackpads, 3 = snappy).
+        scrollSensitivity: 3,
+        fastScrollSensitivity: 8,
+        allowProposedApi: true,
+      });
+      const fit = new FitAddon();
+      term.loadAddon(fit);
+      const host = document.createElement('div');
+      host.style.width = '100%';
+      host.style.height = '100%';
+      container.appendChild(host);
+      const e: LiveTerminal = { term, fit, host, sessionId: null, onSession: null, onCommand, shell: () => undefined };
+      setLiveTerminal(node.id, e);
+      entry = e;
 
-    // Defer the renderer-load → open → session-start sequence to the next
-    // animation frame so the container has real dimensions before the
-    // first fit() runs (absolute-positioned nodes may not be measured
-    // synchronously).
-    const raf = requestAnimationFrame(() => { void init(); });
+      // Renderer choice. The DOM renderer thrashes layout under heavy TUI
+      // ANSI traffic so we want a GPU-backed renderer (issue #73). The
+      // earlier implementation loaded WebGL *after* term.open() and *after*
+      // the initial fit(), which introduced a cols/rows drift that broke
+      // TUIs:
+      //
+      //   1. DOM-renderer fit measures the container → cols = N₁
+      //   2. PTY is spawned at cols = N₁
+      //   3. WebGL addon loads ~50-100ms later, re-fits against subtly
+      //      different WebGL cell metrics → cols = N₂
+      //   4. ptyResize is sent. PTY now thinks cols = N₂. claude reads N₂
+      //      from TIOCGWINSZ and renders assuming N₂ columns.
+      //   5. Visible xterm rendering drifts a column away from what claude
+      //      writes — text wraps in the middle of words ("specifically
+      //      running" → "running\ns Claude"), input boxes shift, table
+      //      borders collapse. (User report 2026-05-17.)
+      //
+      // Fix: load the renderer addon *before* term.open() and *before*
+      // startTerminalSession's first fit + ptyCreate runs. One measure, one
+      // PTY spawn, no drift. We use dynamic import (kept jsdom-safe — these
+      // modules touch `self` at module-load and crash in node test envs) and
+      // gate term.open() + session start behind the same async boundary.
+      //
+      // Canvas renderer is the default — fast enough for TUIs, stable under
+      // Electron's BrowserView paint pipeline, avoids GL-context lifetime
+      // issues when nodes go offscreen. WebGL was the prior choice but its
+      // async load created the cols/rows drift this commit fixes; if it's
+      // ever re-introduced as an opt-in, do it via a preload bridge flag
+      // (window.krnl.config), NOT process.env — `process` is undefined in
+      // the renderer context and crashes the init promise (user report
+      // 2026-05-17: "process is not defined", terminal renders as black).
+
+      const init = async () => {
+        try {
+          const { CanvasAddon } = await import('@xterm/addon-canvas');
+          term.loadAddon(new CanvasAddon());
+        } catch { /* fall through to DOM */ }
+        term.open(host);
+        await startTerminalSession({
+          term,
+          fit,
+          krnl: window.krnl,
+          onCommand: (command, args) => e.onCommand(command, args),
+          setSessionId: (id) => { e.sessionId = id; e.onSession?.(id); },
+          // The session belongs to the board, not to this mount.
+          isCancelled: () => false,
+          // Read at every start, so `krnl term setShell` applies to the next shell.
+          shell: () => e.shell(),
+        });
+      };
+      // Defer the renderer-load → open → session-start sequence to the next
+      // animation frame so the container has real dimensions before the
+      // first fit() runs. Not cancelled on unmount: under StrictMode the
+      // remount has re-attached the host by the time this fires.
+      requestAnimationFrame(() => { void init(); });
+    }
+
+    const live = entry;
+    live.onSession = bindSession;
+    live.onCommand = onCommand;
+    live.shell = () => shellRef.current;
+    termRef.current = live.term;
+    fitRef.current = live.fit;
+    // Theme / font changes made while detached (those effects ran first).
+    if (xtermColorsRef.current) live.term.options.theme = { ...xtermColorsRef.current };
+    const size = node.config?.fontSize;
+    if (size !== undefined && live.term.options.fontSize !== size) live.term.options.fontSize = size;
+    if (live.sessionId) bindSession(live.sessionId);
 
     const ro = new ResizeObserver(() => {
       try { fitRef.current?.fit(); } catch { /* ignore */ }
       const t = termRef.current;
-      const s = sessionIdRef.current;
-      if (t && s) window.krnl?.ptyResize(s, t.cols, t.rows);
+      const sid = sessionIdRef.current;
+      if (t && sid) window.krnl?.ptyResize(sid, t.cols, t.rows);
     });
-    ro.observe(containerRef.current);
+    ro.observe(container);
 
     return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-      sessionCleanup?.();
+      cancelAnimationFrame(reattachRaf);
       ro.disconnect();
-      term.dispose();
+      // Detach, don't kill: the next mount picks the terminal up again.
+      if (live.onSession === bindSession) live.onSession = null;
+      live.host.remove();
       termRef.current = null;
       fitRef.current = null;
       sessionIdRef.current = null;
