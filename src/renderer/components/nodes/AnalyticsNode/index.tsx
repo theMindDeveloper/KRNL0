@@ -193,7 +193,7 @@ const dotStyle: React.CSSProperties = {
   height: 8,
   borderRadius: '50%',
   background: 'var(--acid, #c9f158)',
-  boxShadow: '0 0 6px rgba(201,241,88,0.7)',
+  boxShadow: '0 0 6px color-mix(in srgb, var(--acid) 70%, transparent)',
 };
 
 const summaryChipStyle: React.CSSProperties = {
@@ -570,8 +570,10 @@ export function AnalyticsNode({
 
   return (
     <div data-testid="analytics-node-root" style={rootStyle}>
-      {/* Titlebar */}
-      <div style={titlebarStyle}>
+      {/* Titlebar — the shared header class, so every frame style's header
+          skin (Macintosh title bar, Submarine module tag, …) reaches it as it
+          does the other mother windows. */}
+      <div className="krnl-node-header" style={titlebarStyle}>
         <span style={dotStyle} aria-hidden />
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
         <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
