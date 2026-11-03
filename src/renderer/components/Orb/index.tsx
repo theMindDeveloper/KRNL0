@@ -80,10 +80,18 @@ function defaultPos(): OrbPos {
   return { x: 120, y: window.innerHeight - ORB_SIZE - 24 };
 }
 
+// The top bar (44px) is the window's drag strip: an orb parked there can't
+// be clicked or dragged, so it never goes above it.
+const TOP_CLEAR = 44 + ORB_MARGIN;
+// Chat panel and caption size, to open them toward the free side.
+const PANEL_W = 340;
+const PANEL_H = 480;
+const CAPTION_W = 280;
+
 function clampPos(pos: OrbPos): OrbPos {
   return {
     x: Math.max(ORB_MARGIN, Math.min(window.innerWidth - ORB_SIZE - ORB_MARGIN, pos.x)),
-    y: Math.max(ORB_MARGIN, Math.min(window.innerHeight - ORB_SIZE - ORB_MARGIN, pos.y)),
+    y: Math.max(TOP_CLEAR, Math.min(window.innerHeight - ORB_SIZE - ORB_MARGIN, pos.y)),
   };
 }
 
@@ -429,10 +437,12 @@ export function Orb() {
     setInput('');
     setThinking(true);
 
-    // Check if the text matches a flow.
+    // A flow runs only when the message names it — its label or its id as
+    // words ("focus session"). Matching any fragment of a label made "a" or
+    // "start" launch a real Pomodoro.
+    const said = text.toLowerCase().trim();
     const matchingFlow = FLOWS.find((f) =>
-      f.label.toLowerCase().includes(text.toLowerCase()) ||
-      text.toLowerCase().includes(f.id.replace('-', ' '))
+      said.includes(f.label.toLowerCase()) || said.includes(f.id.replace(/-/g, ' '))
     );
 
     window.setTimeout(() => {
@@ -489,6 +499,11 @@ export function Orb() {
 
   // Caption panel position — anchored relative to orb.
   const captionAboveOrb = pos.y > 120;
+  // Open the panel / caption toward the room: right-aligned to the orb near
+  // the right edge, below it near the top (they used to leave the window).
+  const panelAlignRight = pos.x + PANEL_W > window.innerWidth - ORB_MARGIN;
+  const panelBelow = pos.y < PANEL_H + 80;
+  const captionAlignRight = pos.x + CAPTION_W > window.innerWidth - ORB_MARGIN;
 
   // Commander launch handler — closes popup, runs sessionFromCommanderFlow with params.
   const onCommanderLaunch = useCallback((params: { label: string; tasks: string; startISO?: string }) => {
@@ -525,9 +540,9 @@ export function Orb() {
         <div
           style={{
             position: 'absolute',
-            left: 0,
+            ...(captionAlignRight ? { right: 0 } : { left: 0 }),
             [captionAboveOrb ? 'bottom' : 'top']: 76,
-            width: 280,
+            width: CAPTION_W,
             background: isRunning
               ? 'rgba(14,13,11,0.96)'
               : 'rgba(14,13,11,0.94)',
@@ -557,10 +572,10 @@ export function Orb() {
           data-testid="orb-chat-panel"
           style={{
             position: 'absolute',
-            left: 0,
-            bottom: 80,
-            width: 340,
-            maxHeight: 480,
+            ...(panelAlignRight ? { right: 0 } : { left: 0 }),
+            ...(panelBelow ? { top: 80 } : { bottom: 80 }),
+            width: PANEL_W,
+            maxHeight: PANEL_H,
             background: 'rgba(14, 13, 11, 0.94)',
             backdropFilter: 'blur(18px) saturate(140%)',
             border: '1px solid rgba(201, 241, 88, 0.22)',
@@ -610,7 +625,9 @@ export function Orb() {
               lineHeight: 1.5,
             }}
           >
-            {history.length === 0 && !thinking && (
+            {/* Quick actions stay after the first message (they used to vanish
+                until a reload). */}
+            {!thinking && (
               <div style={{ color: '#8a8270' }}>
                 <div style={{ marginBottom: 8 }}>how can i help?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -703,7 +720,7 @@ export function Orb() {
               data-testid="orb-chat-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={thinking ? 'thinking…' : 'ask anything · ⌘+J to listen'}
+              placeholder={thinking ? 'thinking…' : 'ask anything · hold Space to talk'}
               disabled={thinking}
               autoComplete="off"
               spellCheck={false}

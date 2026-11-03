@@ -41,18 +41,21 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
   // Pomo summary — wrapped in useShallow so the returned object identity is
   // compared field-by-field, not by reference. Only re-renders on state
   // changes (idle/running/paused/break) or session-count bump, not 1Hz tick.
-  const { pomoStatus, pomoSessions } = useBoardStore(
-    useShallow((s): { pomoStatus: string; pomoSessions: number } => {
-      if (!s.board) return { pomoStatus: 'idle', pomoSessions: 0 };
+  const { pomoStatus, pomoSessions, pomoEvery } = useBoardStore(
+    useShallow((s): { pomoStatus: string; pomoSessions: number; pomoEvery: number } => {
+      if (!s.board) return { pomoStatus: 'idle', pomoSessions: 0, pomoEvery: 4 };
       const pomo = s.board.nodes.find(
         (n) => (n as { kind?: string; isMother?: boolean }).kind === 'pomo'
           && (n as { kind?: string; isMother?: boolean }).isMother === true
       );
-      if (!pomo) return { pomoStatus: 'idle', pomoSessions: 0 };
+      if (!pomo) return { pomoStatus: 'idle', pomoSessions: 0, pomoEvery: 4 };
       const state = (pomo as { state?: { status?: string; sessionsCompleted?: number } }).state ?? {};
+      // Sessions until the long break: the Pomo's own setting, not always 4.
+      const every = (pomo as { config?: { longBreakEvery?: number } }).config?.longBreakEvery;
       return {
         pomoStatus: state.status ?? 'idle',
         pomoSessions: state.sessionsCompleted ?? 0,
+        pomoEvery: typeof every === 'number' && every > 0 ? every : 4,
       };
     })
   );
@@ -66,7 +69,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
     .toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
     .toUpperCase();
 
-  const pomoText = `${pomoSessions}/4 · ${pomoStatus}`;
+  const pomoText = `${pomoSessions}/${pomoEvery} · ${pomoStatus}`;
 
   return (
     <div

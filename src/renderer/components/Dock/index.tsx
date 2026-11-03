@@ -378,6 +378,9 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
           title="Shape [R]"
           aria-label="Choose a shape (R)"
           aria-expanded={shapeMenuOpen}
+          // Not an outside click: without this the window listener closed the
+          // menu on mousedown and the click opened it again.
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={() => setShapeMenuOpen((o) => !o)}
           style={shapeMenuOpen ? activeToolBtn : btnBase}
         >
