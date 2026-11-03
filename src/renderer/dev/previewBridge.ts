@@ -208,6 +208,7 @@ export function installPreviewBridge(): void {
     onBoardChanged: () => () => {},
     clipboardReadText: async () => '',
     clipboardWriteText: noop,
+    sysRun: async () => ({ ok: false, message: 'preview mode — no krnl' }),
   };
   window.krnl = bridge as unknown as KrnlBridge;
 }

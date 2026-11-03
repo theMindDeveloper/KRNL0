@@ -70,5 +70,7 @@ contextBridge.exposeInMainWorld('krnl', {
   // Electron (silent fails on permission/focus quirks). main has Electron's
   // clipboard module which works unconditionally.
   clipboardReadText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText'),
+  // Run one krnl command in main (the CLI's facade), argv as given — no shell.
+  sysRun: (argv: string[]): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('sys:run', argv),
   clipboardWriteText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:writeText', text),
 })

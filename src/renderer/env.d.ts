@@ -44,6 +44,7 @@ interface KrnlBridge {
   // Clipboard via main (replaces navigator.clipboard in TerminalNode)
   clipboardReadText: () => Promise<string>
   clipboardWriteText: (text: string) => Promise<void>
+  sysRun?: (argv: string[]) => Promise<{ ok: boolean; message: string }>
 }
 
 interface Window {
