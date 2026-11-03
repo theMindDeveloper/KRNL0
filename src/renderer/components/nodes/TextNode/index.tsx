@@ -57,6 +57,20 @@ export function TextNode({
   // written part of the edit, so Escape restores this, not the live text.
   const originalRef = useRef(text);
   const cancellingRef = useRef(false);
+  // Text taller than the box fades out at the bottom, so "there is more" is
+  // visible without opening the note.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || editing) return;
+    const check = () => setOverflowing(el.scrollHeight > el.clientHeight + 1);
+    check();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, editing]);
 
   // Keep draft in sync if the upstream state.text changes while NOT editing.
   useEffect(() => {
@@ -264,7 +278,9 @@ export function TextNode({
       ) : (
         <div
           className="text-body"
+          ref={bodyRef}
           data-testid="text-node-body"
+          data-overflowing={overflowing || undefined}
           onClick={enterEdit}
           // Keyboard: Tab to the note, Enter (or F2) to edit it.
           role="button"
@@ -293,6 +309,10 @@ export function TextNode({
             boxSizing: 'border-box',
             position: 'relative',
             ...(isShape ? { display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' } : {}),
+            ...(overflowing ? {
+              maskImage: 'linear-gradient(to bottom, #000 calc(100% - 28px), transparent)',
+              WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 28px), transparent)',
+            } : {}),
           }}
         >
           {text || (

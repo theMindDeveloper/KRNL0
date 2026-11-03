@@ -225,3 +225,19 @@ describe('TextNode — keyboard', () => {
     expect(screen.getByTestId('text-node-textarea')).toBeTruthy();
   });
 });
+
+describe('TextNode — overflow', () => {
+  it('marks a note whose text is taller than its box, so the bottom fades', () => {
+    const sh = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    const ch = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 400 });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 120 });
+    try {
+      render(<TextNode node={fixture({ text: 'long\n'.repeat(30) })} selected={false} onCommand={noop} onSelect={noop} />);
+      expect(screen.getByTestId('text-node-body').dataset['overflowing']).toBe('true');
+    } finally {
+      if (sh) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', sh);
+      if (ch) Object.defineProperty(HTMLElement.prototype, 'clientHeight', ch);
+    }
+  });
+});
