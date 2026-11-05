@@ -1211,5 +1211,5 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 
 **Type:** Chore (UI copy)
 **Branch:** `TMD/auto-update-launcher-github-59d480`
-**Files changed:** `src/shared/frameStyles.ts`, `src/renderer/components/ChassisLayer/dockRegistry.tsx`, `src/sys/SysFacade.ts`, `tests/unit/sys/theme.frame.test.ts`, `docs/06-requirements/theme-engine.md`, `docs/04-visual-system/chassis-cookbook.md`
-**Summary:** The frame style shown as "KRNL Dock" is now **Nuclear** in the style picker and `krnl theme frames`. The id stays `krnl-dock`, so saved choices and scripts keep working. `krnl theme frame` now accepts a style's id or its shown name in any case (`nuclear`, `Paper`).
+**Files changed:** `src/shared/frameStyles.ts`, `src/renderer/components/ChassisLayer/dockRegistry.tsx`, `KrnlDockChrome.tsx`, `src/sys/SysFacade.ts`, `tests/unit/sys/theme.frame.test.ts`, `docs/06-requirements/theme-engine.md`, `docs/04-visual-system/chassis-cookbook.md`
+**Summary:** The frame style shown as "KRNL Dock" is now **Nuclear** in the style picker, on the frame's own nameplate (`NUCLEAR · A1`, log caption `nuclear · /var/log`) and in `krnl theme frames`. The id stays `krnl-dock`, so saved choices and scripts keep working. `krnl theme frame` now accepts a style's id or its shown name in any case (`nuclear`, `Paper`).
