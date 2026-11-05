@@ -18,8 +18,12 @@ describe('appMarkersFrom', () => {
       e(iso(5, 9), { type: 'app.opened' }),
       e(iso(4, 9), { type: 'app.opened' }),
       span('s', 5, 10, 11, null, 'x'),
-    ], '2026-11-05', '2026-11-05');
+    ], '2026-11-05', '2026-11-05', new Date(2026, 10, 6, 9).getTime());
     expect(m.map((x) => x.kind)).toEqual(['open', 'close']);
+    // While that day is still today, only the first start shows.
+    const today = appMarkersFrom([e(iso(5, 9), { type: 'app.opened' }), e(iso(5, 12), { type: 'app.closed' }), e(iso(5, 13), { type: 'app.opened' })],
+      '2026-11-05', '2026-11-05', new Date(2026, 10, 5, 15).getTime());
+    expect(today.map((x) => x.kind)).toEqual(['open']);
   });
 });
 

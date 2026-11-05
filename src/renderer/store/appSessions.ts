@@ -9,7 +9,7 @@ import { queryTimeLog } from './timeLog';
 export interface AppMarker { ms: number; kind: 'open' | 'close' }
 
 /** Pure: open/close markers whose time falls on local days [from, to]. */
-export function appMarkersFrom(entries: readonly TimeLogEntry[], fromYMD: string, toYMD: string): AppMarker[] {
+export function appMarkersFrom(entries: readonly TimeLogEntry[], fromYMD: string, toYMD: string, nowMs: number = Date.now()): AppMarker[] {
   const out: AppMarker[] = [];
   for (const e of entries) {
     if (e.type !== 'app.opened' && e.type !== 'app.closed') continue;
@@ -29,8 +29,13 @@ export function appMarkersFrom(entries: readonly TimeLogEntry[], fromYMD: string
     else v.close = v.close === undefined ? m.ms : Math.max(v.close, m.ms);
     byDay.set(k, v);
   }
+  // Today the app is open (you are looking at it), so today has no "closed"
+  // marker — a day gets its last shutdown only once it is over.
+  const n = new Date(nowMs);
+  const todayKey = `${n.getFullYear()}-${n.getMonth()}-${n.getDate()}`;
   const res: AppMarker[] = [];
-  for (const v of byDay.values()) {
+  for (const [k, v] of byDay) {
+    if (k === todayKey) { if (v.open !== undefined) res.push({ ms: v.open, kind: 'open' }); continue; }
     if (v.open !== undefined) res.push({ ms: v.open, kind: 'open' });
     // A shutdown before the day's first start (overnight) or a close while the
     // app is open again later still reads as that day's last shutdown.
