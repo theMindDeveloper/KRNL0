@@ -20,7 +20,8 @@ export const MOTHER_DRAG_MIME = 'application/x-krnl0-mother';
 
 const PICKUP_PX = 4;          // movement before a press becomes a pick-up
 const HOLD_MAX_W = 520;       // a held window is at most this wide on screen
-const FLY_MS = 560;
+const FLY_MS = 260;          // the drop: quick, eases out (no wind-up)
+const FADE_MS = 110;
 const PERSPECTIVE = 900;
 
 interface Box { left: number; top: number; width: number; height: number }
@@ -126,26 +127,27 @@ function layerFor(frame: HTMLElement): Layer {
   };
 }
 
-/** Fly a picture from one box to another (both in the layer's coordinates). */
-function fly(ghost: HTMLElement, from: Box, to: Box, over: boolean, startTilt = ''): Animation {
+/** Fly a picture from one box to another (both in the layer's coordinates).
+ *  One smooth ease-out move: it starts at full speed from where you let go
+ *  and settles into place; a lifted picture's shadow sinks as it lands. */
+function fly(ghost: HTMLElement, from: Box, to: Box, lifted: boolean, startTilt = ''): Animation {
   const dx = to.left + to.width / 2 - (from.left + from.width / 2);
   const dy = to.top + to.height / 2 - (from.top + from.height / 2);
   const sx = to.width / from.width;
   const sy = to.height / from.height;
-  const mid = over ? 1.05 : 0.95;
-  const arc = (over ? -0.06 : 0.04) * Math.max(from.height, to.height); // over rises, under dips
   ghost.style.transformOrigin = 'center';
   return ghost.animate(
     [
-      { transform: `perspective(${PERSPECTIVE}px) translate(0px, 0px) ${startTilt || 'rotateX(0deg) rotateY(0deg)'} scale(1, 1)`, boxShadow: over ? '0 30px 70px rgba(0,0,0,0.5)' : '0 0 0 rgba(0,0,0,0)' },
       {
-        transform: `perspective(${PERSPECTIVE}px) translate(${dx / 2}px, ${dy / 2 + arc}px) rotateX(0deg) rotateY(0deg) scale(${((1 + sx) / 2) * mid}, ${((1 + sy) / 2) * mid})`,
-        boxShadow: over ? '0 34px 80px rgba(0,0,0,0.5)' : '0 12px 28px rgba(0,0,0,0.3)',
-        offset: 0.5,
+        transform: `perspective(${PERSPECTIVE}px) translate(0px, 0px) ${startTilt || 'rotateX(0deg) rotateY(0deg)'} scale(1, 1)`,
+        boxShadow: lifted ? '0 22px 46px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)' : '0 6px 16px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.2)',
       },
-      { transform: `perspective(${PERSPECTIVE}px) translate(${dx}px, ${dy}px) rotateX(0deg) rotateY(0deg) scale(${sx}, ${sy})`, boxShadow: '0 0 0 rgba(0,0,0,0)' },
+      {
+        transform: `perspective(${PERSPECTIVE}px) translate(${dx}px, ${dy}px) rotateX(0deg) rotateY(0deg) scale(${sx}, ${sy})`,
+        boxShadow: '0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0)',
+      },
     ],
-    { duration: FLY_MS, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'forwards' },
+    { duration: FLY_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' },
   );
 }
 
@@ -153,14 +155,14 @@ function fly(ghost: HTMLElement, from: Box, to: Box, over: boolean, startTilt = 
 function land(frames: HTMLElement[], ghosts: HTMLElement[]): void {
   for (const f of frames) {
     f.style.opacity = '';
-    if (typeof f.animate === 'function') f.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+    if (typeof f.animate === 'function') f.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_MS, easing: 'ease-out' });
   }
   for (const g of ghosts) {
     if (typeof g.animate === 'function') {
-      const out = g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'ease-out', fill: 'forwards' });
+      const out = g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: 'ease-out', fill: 'forwards' });
       out.onfinish = () => g.remove();
     }
-    setTimeout(() => g.remove(), 400);
+    setTimeout(() => g.remove(), FADE_MS + 200);
   }
 }
 
@@ -190,7 +192,9 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
   // set at pick-up
   let source: HTMLElement | null = null;
   let ghost: HTMLElement | null = null;
+  let shadow: HTMLElement | null = null; // a soft shadow on the surface below it
   let origin: Box | null = null;
+  let gx = 0; let gy = 0;           // grab point inside the window
   let s = 1; let sTarget = 1;       // hold scale
   let rx = 0; let ry = 0;           // tilt
   let lastX = startX; let lastY = startY;
@@ -206,8 +210,15 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     rx += (clamp(-vy * 1.4, -22, 22) - rx) * 0.18;
     ry += (clamp(vx * 1.4, -22, 22) - ry) * 0.18;
     s += (sTarget - s) * 0.22;
+    const dx = px - startX;
+    const dy = py - startY;
     ghost.style.transform =
-      `translate3d(${px - startX}px, ${py - startY}px, 0) perspective(${PERSPECTIVE}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
+      `translate3d(${dx}px, ${dy}px, 0) perspective(${PERSPECTIVE}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
+    // The shadow lies below and a little behind the tilt, like a card held
+    // above a desk. Only its transform changes (the blur is drawn once).
+    if (shadow) {
+      shadow.style.transform = `translate3d(${dx - ry * 1.2}px, ${dy + 24 + rx * 0.6}px, 0) scale(${s * 0.96})`;
+    }
     raf = requestAnimationFrame(frameLoop);
   };
 
@@ -217,13 +228,23 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     picked = true;
     holding = true;
     origin = boxOf(source);
-    const gx = startX - origin.left; // grab point inside the window
-    const gy = startY - origin.top;
+    gx = startX - origin.left;
+    gy = startY - origin.top;
     sTarget = Math.min(1.03, Math.max(0.35, HOLD_MAX_W / origin.width));
+    shadow = document.createElement('div');
+    shadow.className = 'krnl-swap-shadow';
+    Object.assign(shadow.style, {
+      position: 'fixed', left: `${origin.left}px`, top: `${origin.top}px`,
+      width: `${origin.width}px`, height: `${origin.height}px`, zIndex: '9000',
+      borderRadius: '12px', background: 'rgba(0,0,0,0.55)', filter: 'blur(22px)',
+      pointerEvents: 'none', transformOrigin: `${gx}px ${gy}px`, willChange: 'transform',
+    } satisfies Partial<CSSStyleDeclaration>);
+    document.body.appendChild(shadow);
+    if (typeof shadow.animate === 'function') shadow.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
     ghost = ghostOf(source, origin, 9001, 'fixed');
     Object.assign(ghost.style, {
       transformOrigin: `${gx}px ${gy}px`, // tilts and shrinks around your hand
-      boxShadow: '0 30px 70px rgba(0,0,0,0.5), 0 0 0 2px var(--acid)',
+      boxShadow: '0 2px 6px rgba(0,0,0,0.3)', // contact edge; the soft shadow is the element below
     });
     document.body.appendChild(ghost);
     source.dataset.motherDragging = 'true';
@@ -255,10 +276,24 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     if (!picked || !ghost || !source || !origin) return;
     const held = ghost;
     const src = source;
+    const from0 = origin;
     const tilt = `rotateX(${rx}deg) rotateY(${ry}deg)`;
-    const heldBox = boxOf(held); // where it is on screen now
+    // Where the held window is, without its tilt (the tilt is carried into the
+    // flight), so nothing jumps when you let go.
+    const dx = px - startX;
+    const dy = py - startY;
+    const heldBox: Box = {
+      left: from0.left + dx + gx * (1 - s), top: from0.top + dy + gy * (1 - s),
+      width: from0.width * s, height: from0.height * s,
+    };
     const layer = layerFor(src);
     endMotherDrag();
+    if (shadow) {
+      const sh = shadow;
+      if (typeof sh.animate === 'function') sh.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: 'ease-out', fill: 'forwards' }).onfinish = () => sh.remove();
+      setTimeout(() => sh.remove(), 300);
+      shadow = null;
+    }
 
     // Re-seat the held picture in the flight layer, at the same place.
     held.style.transform = 'none';
@@ -269,37 +304,44 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     setBox(held, heldLocal);
 
     const still = reducedMotion() || typeof held.animate !== 'function';
-    if (!targetId || still) {
+    const other = targetId ? frameOf(targetId) : null;
+    if (!targetId || !other || still) {
       if (targetId) swapInStore(nodeId, targetId);
       // Back to its own slot (or, without motion, just gone).
-      const back = still ? null : fly(held, heldLocal, layer.local(origin), true, tilt);
+      const back = still || targetId ? null : fly(held, heldLocal, layer.local(from0), true, tilt);
       const done = (): void => land([src], [held]);
       if (back) back.finished.then(done, done); else done();
       return;
     }
 
-    const other = frameOf(targetId);
-    if (!other) { swapInStore(nodeId, targetId); land([src], [held]); return; }
-    const otherFrom = layer.local(boxOf(other));
+    // A swap trades slots, so each window lands where the other one is now —
+    // known before the swap, so both fly the moment you let go.
+    const otherScreen = boxOf(other);
+    const otherFrom = layer.local(otherScreen);
+    const toA = otherFrom;              // the held one → the other's slot
+    const toB = layer.local(from0);     // the other → the slot you emptied
     const otherGhost = ghostOf(other, otherFrom, 9000, layer.position);
     layer.host.insertBefore(otherGhost, held); // under the held one
+    const flights = [fly(held, heldLocal, toA, true, tilt), fly(otherGhost, otherFrom, toB, false)];
     swapInStore(nodeId, targetId);
 
-    // Wait for the swapped layout, then fly both to their new places.
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    // Keep the real windows hidden under the pictures until they land.
+    let landed = false;
+    const hide = (): void => {
+      if (landed) return;
+      for (const id of [nodeId, targetId]) { const f = frameOf(id); if (f) f.style.opacity = '0'; }
+    };
+    hide();
+    requestAnimationFrame(hide); // after React has drawn the swap
+    const finish = (): void => {
+      if (landed) return;
+      landed = true;
       const na = frameOf(nodeId);
       const nb = frameOf(targetId);
-      if (!na || !nb) { held.remove(); otherGhost.remove(); return; }
-      const toA = layer.local(boxOf(na));
-      const toB = layer.local(boxOf(nb));
-      na.style.opacity = '0';
-      nb.style.opacity = '0';
-      const flights = [fly(held, heldLocal, toA, true, tilt), fly(otherGhost, otherFrom, toB, false)];
-      let done = false;
-      const finish = (): void => { if (done) return; done = true; land([na, nb], [held, otherGhost]); };
-      Promise.all(flights.map((f) => f.finished)).then(finish, finish);
-      setTimeout(finish, FLY_MS + 250); // never leave a window hidden
-    }));
+      land([na, nb].filter((f): f is HTMLElement => !!f), [held, otherGhost]);
+    };
+    Promise.all(flights.map((f) => f.finished)).then(finish, finish);
+    setTimeout(finish, FLY_MS + 200); // never leave a window hidden
   }
 
   function onMove(ev: PointerEvent): void {
