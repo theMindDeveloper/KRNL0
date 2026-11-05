@@ -167,23 +167,33 @@ function swapInStore(a: string, b: string): void {
 }
 
 // ── cast shadow ────────────────────────────────────────────────────────────
-// The held window casts its shadow on what is under it, lit from above the
-// middle of the screen. Two surfaces at two depths: the window you are over
-// is close (a sharper, nearer shadow, clipped to that window) and the
-// background is far (a softer shadow that sits further out, with a hole
-// where the window is). Moving the held window shifts the two by different
-// amounts — the parallax that reads as depth.
+// The held window casts its shadow on what is under it. The shadow is the
+// window's own silhouette with the same 3D tilt — so when you swing the
+// window left or right, the shadow's shape swings with it — pushed out from
+// under the window opposite to the way you move it (it trails behind, as if
+// the light is above and in front), and a little away from the middle of the
+// screen.
+//
+// Two surfaces at two depths give the parallax: the window you are over is
+// close (a darker, sharper shadow that trails less, clipped to that window),
+// the background is far (softer, trails more, with a hole where the hovered
+// window is).
 //
 // Cost: each shadow is a plain blurred box drawn once (will-change:
 // transform); per frame only their transforms change, which the compositor
-// handles. The clip shapes change only when the window under you changes.
+// handles. Clip shapes and positions change only when the window under you
+// changes.
 
-interface CastShadow { root: HTMLElement; far: HTMLElement; nearClip: HTMLElement; near: HTMLElement; farClip: HTMLElement; surface: Box | null }
+interface CastShadow {
+  root: HTMLElement; farClip: HTMLElement; far: HTMLElement; nearClip: HTMLElement; near: HTMLElement;
+  origin: Box; surface: Box | null;
+}
 
-const FAR = { k: 1.0, inset: 0.94, blur: 26, alpha: 0.34 };
-const NEAR = { k: 0.5, inset: 0.97, blur: 9, alpha: 0.5 };
+/** k: how far it trails; tilt: how strongly its shape follows the tilt. */
+const FAR = { k: 1.0, tilt: 1.35, inset: 0.93, blur: 18, alpha: 0.5 };
+const NEAR = { k: 0.6, tilt: 1.15, inset: 0.97, blur: 7, alpha: 0.62 };
 
-function makeCastShadow(base: Box): CastShadow {
+function makeCastShadow(origin: Box, gx: number, gy: number): CastShadow {
   const layer = (z: number): HTMLElement => {
     const el = document.createElement('div');
     Object.assign(el.style, { position: 'fixed', left: '0', top: '0', width: '100vw', height: '100vh', zIndex: String(z), pointerEvents: 'none', overflow: 'hidden' } satisfies Partial<CSSStyleDeclaration>);
@@ -192,9 +202,10 @@ function makeCastShadow(base: Box): CastShadow {
   const blob = (blur: number, alpha: number): HTMLElement => {
     const el = document.createElement('div');
     Object.assign(el.style, {
-      position: 'absolute', left: '0', top: '0', width: `${base.width}px`, height: `${base.height}px`,
-      borderRadius: '14px', background: `rgba(0,0,0,${alpha})`, filter: `blur(${blur}px)`,
-      transformOrigin: '0 0', willChange: 'transform',
+      position: 'absolute', left: `${origin.left}px`, top: `${origin.top}px`,
+      width: `${origin.width}px`, height: `${origin.height}px`,
+      borderRadius: '12px', background: `rgba(0,0,0,${alpha})`, filter: `blur(${blur}px)`,
+      transformOrigin: `${gx}px ${gy}px`, willChange: 'transform', // same pivot as the held window
     } satisfies Partial<CSSStyleDeclaration>);
     return el;
   };
@@ -211,7 +222,7 @@ function makeCastShadow(base: Box): CastShadow {
   root.append(farClip, nearClip);
   document.body.appendChild(root);
   if (typeof root.animate === 'function') root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
-  return { root, far, near, nearClip, farClip, surface: null };
+  return { root, farClip, far, nearClip, near, origin, surface: null };
 }
 
 /** The window under the held one (or none): the near shadow falls on it,
@@ -224,30 +235,28 @@ function setShadowSurface(cs: CastShadow, r: Box | null): void {
     return;
   }
   Object.assign(cs.nearClip.style, { display: 'block', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  // inside the clip, the shadow is placed relative to the clip's corner
+  cs.near.style.left = `${cs.origin.left - r.left}px`;
+  cs.near.style.top = `${cs.origin.top - r.top}px`;
   const L = r.left; const T = r.top; const R = r.left + r.width; const B = r.top + r.height;
   cs.farClip.style.clipPath =
     `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${L}px ${T}px, ${R}px ${T}px, ${R}px ${B}px, ${L}px ${B}px, ${L}px ${T}px)`;
 }
 
-/** Place both shadows for the held window's box `hb` (untilted, on screen),
- *  its scale `s` against the base size and its tilt. */
-function placeShadow(cs: CastShadow, hb: Box, s: number, rx: number, ry: number): void {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const cx = hb.left + hb.width / 2;
-  const cy = hb.top + hb.height / 2;
-  // Light above the middle of the screen: the shadow falls away from it,
-  // further the further out you carry the window; the tilt leans it too.
-  const ox = (cx - vw / 2) * 0.05 - ry * 1.2;
-  const oy = 34 + (cy - vh * 0.3) * 0.04 + rx * 0.8;
-  const put = (el: HTMLElement, d: { k: number; inset: number }, originX: number, originY: number): void => {
-    const sc = s * d.inset;
-    const x = hb.left + (hb.width - hb.width * d.inset) / 2 + ox * d.k - originX;
-    const y = hb.top + (hb.height - hb.height * d.inset) / 2 + oy * d.k - originY;
-    el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${sc})`;
+/** Follow the held window: (dx, dy) its move from the pick-up point, `s` its
+ *  scale, (rx, ry) its tilt, (cx, cy) where your hand is on screen. */
+function placeShadow(cs: CastShadow, dx: number, dy: number, s: number, rx: number, ry: number, cx: number, cy: number): void {
+  // Trails behind the movement (the tilt is the movement), drops below, and
+  // drifts away from the middle of the screen.
+  const ox = -ry * 3.2 + (cx - window.innerWidth / 2) * 0.04;
+  const oy = 40 + rx * 2.2 + (cy - window.innerHeight * 0.3) * 0.03;
+  const put = (el: HTMLElement, d: typeof FAR): void => {
+    el.style.transform =
+      `translate3d(${dx + ox * d.k}px, ${dy + oy * d.k}px, 0) perspective(${PERSPECTIVE}px) ` +
+      `rotateX(${rx * d.tilt}deg) rotateY(${ry * d.tilt}deg) scale(${s * d.inset})`;
   };
-  put(cs.far, FAR, 0, 0);
-  if (cs.surface) put(cs.near, NEAR, cs.surface.left, cs.surface.top);
+  put(cs.far, FAR);
+  if (cs.surface) put(cs.near, NEAR);
 }
 
 function dropShadow(cs: CastShadow): void {
@@ -301,13 +310,7 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     const dy = py - startY;
     ghost.style.transform =
       `translate3d(${dx}px, ${dy}px, 0) perspective(${PERSPECTIVE}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
-    if (shadow && origin) {
-      const hb: Box = {
-        left: origin.left + dx + gx * (1 - s), top: origin.top + dy + gy * (1 - s),
-        width: origin.width * s, height: origin.height * s,
-      };
-      placeShadow(shadow, hb, s, rx, ry);
-    }
+    if (shadow) placeShadow(shadow, dx, dy, s, rx, ry, px, py);
     raf = requestAnimationFrame(frameLoop);
   };
 
@@ -320,7 +323,7 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     gx = startX - origin.left;
     gy = startY - origin.top;
     sTarget = Math.min(1.03, Math.max(0.35, HOLD_MAX_W / origin.width));
-    shadow = makeCastShadow(origin);
+    shadow = makeCastShadow(origin, gx, gy);
     ghost = ghostOf(source, origin, 9001, 'fixed');
     ghost.style.transformOrigin = `${gx}px ${gy}px`; // tilts and shrinks around your hand
     document.body.appendChild(ghost);
