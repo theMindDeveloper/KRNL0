@@ -1,11 +1,10 @@
-// #207 / time-log F7, F7b — the two corrections people need at the Pomo:
-//   running → "stopped earlier?"  (forgot to press Stop: stop at the real time)
-//   idle    → "+ log past time"   (forgot to press Start: add the session)
-// Small text links under the controls, so they never compete with START/STOP.
+// #207 / time-log F7b — "+ log past time" under the Pomo when it is idle
+// (forgot to press Start: add the session). Fixing where a session really
+// ended is done on the session itself (double-click its end time).
 
-import { useState, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
 import type { PomoState } from './types';
-import { SpanTimeEditor, openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
+import { openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
 
 const link: CSSProperties = {
   background: 'none', border: 'none', padding: 0, cursor: 'pointer',
@@ -14,31 +13,6 @@ const link: CSSProperties = {
 };
 
 export function PomoTimeLinks({ state }: { state: PomoState }): JSX.Element | null {
-  const [stopOpen, setStopOpen] = useState(false);
-  const live = (state.status === 'running' || state.status === 'break') && state.startedAt !== null;
-
-  if (live && state.startedAt) {
-    const startMs = Date.parse(state.startedAt);
-    return (
-      <div className="nodrag" style={{ marginTop: 6 }}>
-        {stopOpen ? (
-          <SpanTimeEditor
-            testIdPrefix="pomo-stop-at"
-            seg={{ id: 'live', startMs, endMs: Date.now(), live: true, kind: state.status === 'break' ? 'break' : 'work' }}
-            autoEdit="end"
-            onSaved={() => setStopOpen(false)}
-            onCancel={() => setStopOpen(false)}
-          />
-        ) : (
-          <button type="button" data-testid="pomo-stopped-earlier" style={link} onClick={() => setStopOpen(true)}
-            title="Forgot to press Stop? End this session at the time you really stopped">
-            stopped earlier?
-          </button>
-        )}
-      </div>
-    );
-  }
-
   if (state.status === 'idle' || state.status === 'done') {
     return (
       <div className="nodrag" style={{ marginTop: 6 }}>

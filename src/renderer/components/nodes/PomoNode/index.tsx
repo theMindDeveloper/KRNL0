@@ -19,6 +19,7 @@ import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { AppSelect } from '../../ui/AppSelect';
 import { boardTagLibrary, spanTagFor } from '../../../store/spanTags';
 import { PomoTimeLinks } from './PomoTimeLinks';
+import { DiscardButton } from './DiscardButton';
 import { PlannedNowChip } from './PlannedNowChip';
 import { SpanLabeler } from './SpanLabeler';
 import { decodeTargets, encodeTargets, spanTaskTargets, startOfLocalDayMs } from './taskTargets';
@@ -830,7 +831,8 @@ export function PomoNode({
                 ...(state.activeTaskId !== null && !tagOptions.some((o) => o.id === state.activeTaskId)
                   ? [{ value: state.activeTaskId, label: state.label || 'task' }]
                   : []),
-                ...tagOptions.map((o) => ({ value: o.id, label: `${o.done ? '✓ ' : ''}${truncate(o.text, 28)}` })),
+                // The running session can only be on an open task (a done one is reopened first).
+                ...tagOptions.filter((o) => !o.done).map((o) => ({ value: o.id, label: truncate(o.text, 28) })),
               ]}
               style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 10.5, padding: '2px 0' }}
             />
@@ -961,6 +963,9 @@ export function PomoNode({
                     : 'STOP'}
                 </span>
               </button>
+              {(state.status === 'running' || state.status === 'break') && (
+                <DiscardButton onDiscard={() => onCommand('pomo.discard')} />
+              )}
             </div>
           ) : promptDone ? (
             <div

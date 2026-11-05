@@ -50,6 +50,8 @@ type Item =
 export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCategory, onClose, testIdPrefix = 'picker' }: TaskTagPickerProps): JSX.Element {
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
+  // Done tasks stay out of the way; a toggle (or typing) shows them.
+  const [showDone, setShowDone] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { input.current?.focus(); }, []);
 
@@ -63,13 +65,13 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
   const items: Item[] = useMemo(() => {
     const out: Item[] = [];
     for (const t of open.slice(0, MAX_OPEN)) out.push({ key: `t-${t.id}`, kind: 'task', id: t.id, label: t.text, done: false });
-    for (const t of done.slice(0, MAX_DONE)) out.push({ key: `t-${t.id}`, kind: 'task', id: t.id, label: t.text, done: true });
+    if (showDone || needle) for (const t of done.slice(0, MAX_DONE)) out.push({ key: `t-${t.id}`, kind: 'task', id: t.id, label: t.text, done: true });
     for (const t of tags) out.push({ key: `g-${t.id}`, kind: 'tag', id: t.id, label: t.label, tag: t });
     if (canAdd) out.push({ key: 'add', kind: 'add', label: `+ Add category "${q.trim()}"`, value: q.trim() });
     if (onUntag && !needle) out.push({ key: 'untag', kind: 'untag', label: 'untagged' });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needle, tasks, library, canAdd, onUntag]);
+  }, [needle, tasks, library, canAdd, onUntag, showDone]);
   useEffect(() => { setActive(0); }, [needle]);
 
   const choose = (it: Item): void => {
@@ -160,7 +162,12 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
       ))}
       {moreOpen > 0 && <span style={{ ...caption, textTransform: 'none', letterSpacing: 0 }}>+{moreOpen} more — keep typing</span>}
 
-      {taskItems.some((t) => t.done) && <span style={caption}>Done</span>}
+      {done.length > 0 && !needle && (
+        <button type="button" data-testid={`${testIdPrefix}-show-done`} onClick={() => setShowDone((v) => !v)}
+          style={{ ...caption, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+          {showDone ? 'Hide done' : `Show done (${done.length})`}
+        </button>
+      )}
       {taskItems.filter((t) => t.done).map((it) => (
         <button key={it.key} type="button" data-testid={`${testIdPrefix}-task-${it.id}`} style={{ ...rowStyle(it), color: 'var(--ink-3)' }} onMouseEnter={() => setActive(idx(it))} onClick={() => choose(it)}>
           <span aria-hidden style={{ width: 10, color: 'var(--acid-ink, var(--acid))' }}>✓</span>
@@ -169,7 +176,7 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
         </button>
       ))}
 
-      {library && (tagItems.length > 0 || canAdd) && <span style={caption}>Category</span>}
+      {library && (tagItems.length > 0 || canAdd) && <span style={caption}>Or track a category</span>}
       {tagItems.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4, padding: '2px 4px' }}>
           {tagItems.map((it) => (

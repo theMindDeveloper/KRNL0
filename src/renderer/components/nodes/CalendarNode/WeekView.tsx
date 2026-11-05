@@ -1640,8 +1640,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // faint neutral hatch. A pause is a gap. The bands take no pointer events so
   // drops reach the hour cells; right-click is resolved by the column's
   // hit-test (handleColumnContextMenu) → retag / delete menu.
-  // When KRNL0 was first opened / last closed that day: a short line on the
-  // column's left edge, no words (the time is in the tooltip).
+  // When KRNL0 was first opened / last closed that day: a thin dashed line
+  // across the column, no words (the time is in the tooltip).
   function renderAppMarkers(dayYMD: string) {
     const list = appMarkers.filter((m) => toYMD(new Date(m.ms)) === dayYMD);
     if (list.length === 0) return null;
@@ -1654,9 +1654,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           data-testid={`calendar-app-${m.kind}`}
           title={`KRNL0 ${m.kind === 'open' ? 'first opened' : 'last closed'} ${fmtMinOfDay(min)}`}
           style={{
-            position: 'absolute', left: 0, width: 12, top: (min / 60) * rowHeight - 1, height: 2, borderRadius: 1,
-            background: m.kind === 'open' ? 'var(--cyan, var(--ink-3))' : 'var(--ink-3)',
-            pointerEvents: 'none', zIndex: 2,
+            // A thin dashed line across the whole day, no words (time in the tooltip).
+            position: 'absolute', left: 0, right: 0, top: (min / 60) * rowHeight, height: 0,
+            borderTop: `1px dashed ${m.kind === 'open' ? 'var(--cyan, var(--ink-3))' : 'var(--ink-3)'}`,
+            opacity: 0.75, pointerEvents: 'none', zIndex: 2,
           }}
         />
       );
@@ -1675,7 +1676,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // #204 — name what the time counted toward (task, else the span's own
       // name) so a tagged span never looks untagged. Faint, top-right, behind
       // the plan blocks; hidden on slivers.
-      const name = isWork && !easy ? spanTaskName(seg) ?? (seg.label || null) : null;
+      const name = isWork && !easy ? spanTaskName(seg) ?? (seg.label || (seg.tag ? (tagLibrary.find((t) => t.id === seg.tag)?.label ?? null) : null)) : null;
       return (
         <div
           key={`reality-${seg.id}-${i}`}
@@ -2517,6 +2518,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 segId={realityPopup.seg.id}
                 taskId={realityPopup.seg.taskId ?? null}
                 taskName={spanTaskName(realityPopup.seg)}
+                categoryTag={realityPopup.seg.tag ?? null}
                 onChanged={(taskId) => setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } })}
               />
             )}

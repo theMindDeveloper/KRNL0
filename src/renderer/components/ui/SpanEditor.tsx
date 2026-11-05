@@ -22,9 +22,11 @@ import { TimeField, parseTime } from './TimeField';
 import { AppSelect } from './AppSelect';
 import { Z } from './layers';
 import { TaskTagPicker } from './TaskTagPicker';
-import { LogTimeDial, LogTimeQuickFill } from './LogTimeDial';
+import { LogTimeDayPicker, LogTimeBar, LogTimeQuickFill } from './LogTimeDial';
 import { SPACE, popupColumn } from './spacing';
 import { toneVarForTask } from '../../utils/taskColor';
+import { boardTagLibrary } from '../../store/spanTags';
+import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { Popover } from './Popover';
 import { retagSegment } from '../../store/scheduleActions';
 
@@ -40,6 +42,7 @@ const btn = (primary: boolean, disabled = false): CSSProperties => ({
   border: `1px solid ${primary ? 'var(--ink)' : 'var(--paper-3)'}`,
   background: primary ? 'var(--ink)' : 'transparent', color: primary ? 'var(--paper)' : 'var(--ink-2)',
 });
+const toMinutes = (hm: string): number => { const [h, m] = hm.split(':').map(Number) as [number, number]; return h * 60 + m; };
 const durLabel = (ms: number): string => {
   const m = Math.max(0, Math.round(ms / 60_000));
   const h = Math.floor(m / 60);
@@ -102,7 +105,15 @@ export function SpanTimeEditor({ seg, onSaved, testIdPrefix = 'span', autoEdit, 
     if (!seg.live && times.startMs === seg.startMs && Math.abs(times.endMs - seg.endMs) < 60_000) { cancel(); return; }
     let err: string | null;
     if (seg.live) {
-      err = times.endMs > Date.now() ? 'That time is in the future' : stopSessionAt(times.endMs);
+      // The typed time is on the session's own day; only a session that really
+      // ran past midnight puts an earlier time on the next day.
+      const [yy, mo, dd] = ymdOf(seg.startMs).split('-').map(Number) as [number, number, number];
+      let endMs = new Date(yy, mo - 1, dd, Math.floor(toMinutes(hmv) / 60), toMinutes(hmv) % 60).getTime();
+      if (endMs <= seg.startMs && ymdOf(Date.now()) !== ymdOf(seg.startMs)) endMs += 86_400_000;
+      err = endMs <= seg.startMs ? 'That is before the session started'
+        : endMs > Date.now() ? 'That time is in the future'
+        : stopSessionAt(endMs);
+      if (!err) { skipBlur.current = true; setEditing(null); setError(null); onSaved?.(seg.startMs, endMs); return; }
     } else {
       err = pomo ? spanProblem(pomo, times, Date.now(), { exceptId: seg.id, kind: seg.kind }) : null;
       if (!err) err = editSegmentTimes(seg.id, times.startMs, times.endMs);
@@ -171,8 +182,10 @@ export function SpanTimeEditor({ seg, onSaved, testIdPrefix = 'span', autoEdit, 
 // ── Task picker button (Log time, Counts toward) ───────────────────────────
 
 /** A select-like button that opens the compact searchable task picker. */
-export function TaskPickButton({ value, onChange, testId, emptyLabel = 'untagged', deletedName }: {
+export function TaskPickButton({ value, onChange, testId, emptyLabel = 'untagged', deletedName, categoryTag }: {
   value: string | null;
+  /** No task, but tracked as a category (Observe "Code") — shown instead of "untagged". */
+  categoryTag?: string | null;
   onChange: (taskId: string | null) => void;
   testId: string;
   emptyLabel?: string;
@@ -184,7 +197,14 @@ export function TaskPickButton({ value, onChange, testId, emptyLabel = 'untagged
   const nodes = useBoardStore((s) => s.board?.nodes);
   const targets = useMemo(() => spanTaskTargets(nodes), [nodes]);
   const current = value ? targets.find((t) => t.id === value) : undefined;
-  const label = !value ? emptyLabel : current ? `${current.done ? '✓ ' : ''}${current.text}` : `${deletedName ?? 'task'} (deleted)`;
+  const todoNode = useBoardStore((st) => st.board?.nodes.find((n) => n.kind === 'todo' && n.isMother));
+  const category = useMemo(() => {
+    if (value || !categoryTag) return null;
+    return boardTagLibrary(todoNode ? { nodes: [todoNode] } : null).find((t) => t.id === categoryTag) ?? null;
+  }, [value, categoryTag, todoNode]);
+  const label = !value
+    ? (category ? `${category.label} · category` : emptyLabel)
+    : current ? `${current.done ? '✓ ' : ''}${current.text}` : `${deletedName ?? 'task'} (deleted)`;
   return (
     <>
       <button
@@ -199,6 +219,7 @@ export function TaskPickButton({ value, onChange, testId, emptyLabel = 'untagged
         }}
       >
         {value && <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(value) }} />}
+        {category && <CategoryIcon id={category.id} color={category.color} size={11} />}
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
         <span aria-hidden style={{ opacity: 0.6, fontSize: 8 }}>▾</span>
       </button>
@@ -254,15 +275,14 @@ export function LogTimeHost(): JSX.Element | null {
   const [startHM, setStartHM] = useState('');
   const [endHM, setEndHM] = useState('');
   const [taskId, setTaskId] = useState('');
+  const [day, setDay] = useState('');
   const [error, setError] = useState<string | null>(null);
   const pomo = usePomoState();
-  const nodes = useBoardStore((s) => s.board?.nodes);
-  const targets = useMemo(() => spanTaskTargets(nodes), [nodes]);
 
   useEffect(() => {
     const on = (e: Event): void => {
       const d = (e as CustomEvent<LogTimeRequest>).detail;
-      setReq(d); setStartHM(d.startHM); setEndHM(d.endHM); setTaskId(d.taskId ?? ''); setError(null);
+      setReq(d); setDay(d.dayYMD); setStartHM(d.startHM); setEndHM(d.endHM); setTaskId(d.taskId ?? ''); setError(null);
     };
     window.addEventListener(LOG_TIME_EVENT, on);
     return () => window.removeEventListener(LOG_TIME_EVENT, on);
@@ -275,7 +295,9 @@ export function LogTimeHost(): JSX.Element | null {
   }, [req]);
 
   if (!req) return null;
-  const times = timesFromFields(req.dayYMD, startHM, endHM);
+  const times = timesFromFields(day, startHM, endHM);
+  const crossesMidnight = !!times && ymdOf(times.endMs) !== day;
+  const setRange = (a2: string, b2: string): void => { setStartHM(a2); setEndHM(b2); setError(null); };
   const problem = !times ? 'Enter times as HH:MM' : pomo ? spanProblem(pomo, times, Date.now()) : 'No Pomodoro on the board';
   const save = (): void => {
     if (!times || problem) return;
@@ -283,9 +305,7 @@ export function LogTimeHost(): JSX.Element | null {
     if (err) { setError(err); return; }
     setReq(null);
   };
-  const [y, m, d] = req.dayYMD.split('-').map(Number) as [number, number, number];
-  const date = new Date(y, m - 1, d);
-  const W = 300;
+  const W = 340;
 
   return createPortal(
     <>
@@ -304,18 +324,19 @@ export function LogTimeHost(): JSX.Element | null {
       >
         <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.inline }}>
           <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>Log time</span>
-          <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>{`${DOW[date.getDay()]}, ${MON[date.getMonth()]} ${date.getDate()}`}</span>
           <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>forgot to record</span>
+          <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>work you didn't record</span>
         </div>
-        {/* #207 — the whole day on a ring: drag the ends, or draw a new stretch. */}
-        <LogTimeDial dayYMD={req.dayYMD} startHM={startHM} endHM={endHM} onChange={(a2, b2) => { setStartHM(a2); setEndHM(b2); setError(null); }} />
-        <LogTimeQuickFill dayYMD={req.dayYMD} onChange={(a2, b2) => { setStartHM(a2); setEndHM(b2); setError(null); }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: SPACE.inline }}>
-          <TimeField testId="log-time-start" value={startHM} onChange={setStartHM} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
+        {/* #207 — day, then the time: a strip of the day you can drag on, or type. */}
+        <LogTimeDayPicker dayYMD={day} onChange={(d2) => { setDay(d2); setError(null); }} />
+        <LogTimeBar dayYMD={day} startHM={startHM} endHM={endHM} onChange={setRange} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline }}>
+          <TimeField testId="log-time-start" value={startHM} onChange={(v) => { setStartHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
           <span style={{ color: 'var(--ink-4)' }}>→</span>
-          <TimeField testId="log-time-end" value={endHM} onChange={setEndHM} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
+          <TimeField testId="log-time-end" value={endHM} onChange={(v) => { setEndHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
+          {times && <span style={{ fontSize: 10, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{durLabel(times.endMs - times.startMs)}{crossesMidnight ? ' · +1 day' : ''}</span>}
         </div>
+        <LogTimeQuickFill dayYMD={day} startHM={startHM} onChange={setRange} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.caption }}>
           <span style={{ fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Counts toward</span>
           <TaskPickButton testId="log-time-task" value={taskId || null} onChange={(id) => setTaskId(id ?? '')} />
@@ -384,9 +405,11 @@ export function RetagPickerHost(): JSX.Element | null {
 // ── "Counts toward" in the recorded-span popup ─────────────────────────────
 
 /** The task a recorded span counts toward; click to change it with the compact picker. */
-export function CountsToward({ segId, taskId, taskName, onChanged, testId = 'span-counts-toward' }: {
+export function CountsToward({ segId, taskId, taskName, onChanged, testId = 'span-counts-toward', categoryTag }: {
   segId: string;
   taskId: string | null;
+  /** The span's category when it was tracked as one (no task). */
+  categoryTag?: string | null;
   /** Name shown for the current task (also for a deleted one). */
   taskName: string | null;
   onChanged?: (taskId: string | null) => void;
@@ -399,6 +422,7 @@ export function CountsToward({ segId, taskId, taskName, onChanged, testId = 'spa
         testId={testId}
         value={taskId}
         deletedName={taskName}
+        categoryTag={categoryTag ?? null}
         onChange={(id) => { retagSegment(segId, id); onChanged?.(id); }}
       />
     </div>

@@ -47,13 +47,14 @@ describe('buildWeek', () => {
 });
 
 describe('ClockWeek', () => {
-  it('draws static rings (no animation) and opens a day on click', () => {
+  it('draws copies of the clock; only today has moving hands; a click opens the day', () => {
     const onPick = vi.fn();
     const week = buildWeek('2026-11-05', [seg('a', at('2026-11-05', 9), at('2026-11-05', 11))], null, new Map(), [], [], false);
     const { getByTestId, container } = render(<ClockWeek week={week} nowH={12} onPick={onPick} />);
     expect(getByTestId('clock-week-total').textContent).toContain('2h');
-    expect(container.querySelectorAll('[data-testid=clock-week-now]').length).toBe(1);
-    expect(container.innerHTML).not.toMatch(/animation/);
+    // Only today's clock has a second hand (the one animated element).
+    expect(container.querySelectorAll('[data-testid=clock-week-second]').length).toBe(1);
+    expect((container.innerHTML.match(/clock-sec-sweep/g) ?? []).length).toBe(1);
     fireEvent.click(getByTestId('clock-week-day-2026-11-03'));
     expect(onPick).toHaveBeenCalledWith('2026-11-03');
   });

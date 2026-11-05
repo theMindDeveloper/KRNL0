@@ -1304,6 +1304,7 @@ export function ClockNode({
                 segId={realityPopup.seg.id}
                 taskId={realityPopup.seg.taskId ?? null}
                 taskName={spanTaskName(useBoardStore.getState().board?.nodes, realityPopup.seg)}
+                categoryTag={realityPopup.seg.tag ?? null}
                 onChanged={(taskId) => setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } })}
               />
             )}

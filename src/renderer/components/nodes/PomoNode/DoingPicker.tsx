@@ -10,6 +10,7 @@ import { CategoryIcon } from './CategoryIcon';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import { toneVarForTask } from '../../../utils/taskColor';
+import { toggleTaskDone } from '../../../store/scheduleActions';
 
 export interface DoingChoice {
   label: string;
@@ -39,7 +40,10 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
   const q = typed.trim().toLowerCase();
   const hit = (t: { text: string }): boolean => !q || t.text.toLowerCase().includes(q);
   const openTasks = tasks.filter((t) => !t.done && hit(t));
-  const doneTasks = tasks.filter((t) => t.done && hit(t)).slice(0, 4);
+  // Done tasks are hidden; to work on one it is reopened first (#207).
+  const [showDone, setShowDone] = useState(false);
+  const doneAll = tasks.filter((t) => t.done && hit(t));
+  const doneTasks = showDone || q ? doneAll.slice(0, 4) : [];
   const cat = (tag: string | null) => (tag ? library.find((t) => t.id === tag) : undefined);
   const curCat = current && !current.taskId ? cat(current.tag) : undefined;
 
@@ -163,9 +167,23 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
           {shownOpen.length > 0 && <span style={{ ...mono, padding: '8px 8px 2px' }}>Tasks</span>}
           {shownOpen.map((t) => row(`t-${t.id}`, { label: t.text, tag: null, taskId: t.id }, `pomo-now-task-${t.id}`))}
           {openTasks.length > shownOpen.length && <span style={{ ...mono, textTransform: 'none', letterSpacing: 0, padding: '0 8px' }}>+{openTasks.length - shownOpen.length} more — keep typing</span>}
-          {doneTasks.length > 0 && <span style={{ ...mono, padding: '8px 8px 2px' }}>Done</span>}
-          {doneTasks.map((t) => row(`t-${t.id}`, { label: t.text, tag: null, taskId: t.id }, `pomo-now-task-${t.id}`, true))}
-          {cats.length > 0 && <span style={{ ...mono, padding: '8px 8px 4px' }}>{q ? `"${typed.trim()}" as category` : 'Category'}</span>}
+          {doneAll.length > 0 && !q && (
+            <button type="button" data-testid="pomo-now-show-done" onClick={() => setShowDone((v) => !v)}
+              style={{ ...mono, padding: '8px 8px 2px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+              {showDone ? 'Hide done' : `Show done (${doneAll.length})`}
+            </button>
+          )}
+          {doneTasks.map((t) => (
+            <button key={`d-${t.id}`} type="button" data-testid={`pomo-now-reopen-${t.id}`}
+              title={`"${t.text}" is done — reopen it to work on it`}
+              onClick={() => { void toggleTaskDone(t.id).then(() => pick({ label: t.text, tag: null, taskId: t.id })); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+              <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(t.id), opacity: 0.5 }} />
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'line-through' }}>{t.text}</span>
+              <span style={{ fontSize: 9, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>↺ reopen &amp; track</span>
+            </button>
+          ))}
+          {cats.length > 0 && <span style={{ ...mono, padding: '8px 8px 4px' }}>{q ? `"${typed.trim()}" as category` : 'Or track a category'}</span>}
           {cats.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4, padding: '0 4px 4px' }}>
               {cats.map((t) => (

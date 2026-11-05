@@ -1,5 +1,5 @@
 // #207 / time-log F11 — the Clock's Week view: the last 7 days as small
-// static 24-hour rings (midnight at the top, recorded work as a coloured
+// copies of the main clock face (morning inside, afternoon in the ring) (midnight at the top, recorded work as a coloured
 // band, the day's total in the middle). Drawn once per render from the recorded spans and the
 // plan; no hover handlers, no second hand, no CSS animation (frame budget,
 // #197). Only today's ring carries a "now" tick, refreshed by the Clock's
@@ -15,13 +15,12 @@ import {
 import type { ScheduledTaskPlacement } from '../../../store/scheduleSelector';
 import { wallHoursFromDayStart } from './wallHours';
 import { useElementSize } from '../../../analytics/useElementSize';
+import { CX, CY, R_FACE, pt, sectorPath } from './dialGeometry';
+import { ClockBezel } from './ClockBezel';
+import { useFrameTheme } from '../../../themes/useFrameTheme';
+import type { ClockSkin } from '../../../themes/types';
 
-const C = 50;          // ring centre (viewBox 0 0 100 100)
-const R_RIM = 47;      // outer edge of the face
-const R_PLAN = 45;     // planned blocks: thin arc just inside the rim
-const R_BAND = 37;     // recorded work: a thick band around the day
-const BAND_W = 10;
-const R_NUM = 25;      // 0 / 6 / 12 / 18 — inside the band, never on a tick
+const C = 50;          // 24-h ring helpers (wedge24 / arc24) — viewBox 0 0 100 100
 
 /** 0h at the top, clockwise, a whole day around the ring. */
 function rad24(h: number): number {
@@ -126,6 +125,91 @@ export function bestWeekGrid(width: number, height: number, n = 7): { cols: numb
   return best;
 }
 
+// ── A small copy of the main Clock face ─────────────────────────────────────
+// Same bezel, 60 ticks, numerals 1–12 (12 in rust), hands and hub as the main
+// dial (and the same frame-style tokens). A day has 24 h but the face 12, so
+// the morning fills the inner disc and the afternoon the outer ring.
+
+const R_TICK_OUT = 84;
+const R_TICK_IN = 76;
+const R_TICK_IN_MAJ = 72;
+const R_NUM = 60;
+const R_AM = 46;            // morning: inner disc
+const R_PM_IN = 49;         // afternoon: ring between the disc and the ticks
+const R_PM_OUT = 70;
+const NUMERALS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
+
+/** Ring sector between two hours of a 12-h face, from radius rIn to rOut. */
+export function ringSector(startH: number, endH: number, rIn: number, rOut: number): string {
+  const span = Math.max(0.05, Math.min(11.99, endH - startH));
+  const large = span > 6 ? 1 : 0;
+  const o1 = pt(startH, rOut); const o2 = pt(startH + span, rOut);
+  const i2 = pt(startH + span, rIn); const i1 = pt(startH, rIn);
+  return `M ${o1.x} ${o1.y} A ${rOut} ${rOut} 0 ${large} 1 ${o2.x} ${o2.y} L ${i2.x} ${i2.y} A ${rIn} ${rIn} 0 ${large} 0 ${i1.x} ${i1.y} Z`;
+}
+
+function MiniHand({ kind, back, len, width }: { kind: 'line' | 'sword' | 'block'; back: number; len: number; width: number }): JSX.Element {
+  const color = 'var(--k-clock-hand, var(--ink))';
+  if (kind === 'sword') {
+    const w = width * 1.4;
+    return <path d={`M ${CX - back} ${CY} L ${CX} ${CY - w} L ${CX + len} ${CY} L ${CX} ${CY + w} Z`} fill={color} />;
+  }
+  return <line x1={CX - back} y1={CY} x2={CX + len} y2={CY} stroke={color} strokeWidth={kind === 'block' ? width * 2 : width} strokeLinecap={kind === 'block' ? 'butt' : 'round'} />;
+}
+
+function MiniClock({ day, size, live, skin }: { day: WeekDayModel; size: number; live: boolean; skin: ClockSkin }): JSX.Element {
+  const now = new Date();
+  const hourAng = ((now.getHours() % 12) + now.getMinutes() / 60) * 30;
+  const minAng = now.getMinutes() * 6 + now.getSeconds() * 0.1;
+  return (
+    <svg viewBox="0 0 240 240" style={{ width: size, height: size, maxWidth: '100%', display: 'block', margin: '0 auto', overflow: 'visible' }}
+      aria-label={`${day.label}: ${fmtMinutes(day.focusMin)} recorded`}>
+      <title>{`${day.label} — inner: morning (0–12) · outer ring: afternoon (12–24)`}</title>
+      <ClockBezel kind={skin.bezel} outerR={R_FACE + 2} />
+      <circle cx={CX} cy={CY} r={R_FACE} fill="var(--k-clock-face, var(--node-bg))" stroke="var(--k-clock-tick-minor, var(--paper-3))" strokeWidth={0.8} />
+      {/* recorded work — morning inside, afternoon in the ring */}
+      {day.spans.flatMap((sp) => {
+        const parts: JSX.Element[] = [];
+        const op = sp.isBreak ? 0.25 : 0.7;
+        if (sp.startH < 12) parts.push(<path key={`${sp.id}-am`} d={sectorPath(sp.startH, Math.min(12, sp.endH), R_AM)} fill={sp.tone} fillOpacity={op} />);
+        if (sp.endH > 12) parts.push(<path key={`${sp.id}-pm`} d={ringSector(Math.max(12, sp.startH) - 12, sp.endH - 12, R_PM_IN, R_PM_OUT)} fill={sp.tone} fillOpacity={op} />);
+        return parts;
+      })}
+      <circle cx={CX} cy={CY} r={(R_AM + R_PM_IN) / 2} fill="none" stroke="var(--k-clock-tick-minor, var(--paper-3))" strokeWidth={0.6} strokeDasharray="2 3" />
+      {Array.from({ length: 60 }).map((_, i) => {
+        const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
+        const isHour = i % 5 === 0;
+        const r1 = isHour ? R_TICK_IN_MAJ : R_TICK_IN;
+        return <line key={i} x1={CX + r1 * Math.cos(a)} y1={CY + r1 * Math.sin(a)} x2={CX + R_TICK_OUT * Math.cos(a)} y2={CY + R_TICK_OUT * Math.sin(a)}
+          stroke={isHour ? 'var(--k-clock-tick-major, var(--ink-2))' : 'var(--k-clock-tick-minor, var(--ink-3))'} strokeWidth={isHour ? 1.5 : 0.8} />;
+      })}
+      {NUMERALS.map((n) => {
+        const q = pt(n, R_NUM);
+        return <text key={n} x={q.x} y={q.y} textAnchor="middle" dominantBaseline="central" fontFamily="var(--k-clock-font, var(--font-mono))"
+          fontSize={13} fontWeight={n === 12 ? 700 : 600} fill={n === 12 ? 'var(--rust)' : 'var(--k-clock-num, var(--ink-2))'}>{n}</text>;
+      })}
+      {/* readout window: the day's focus total */}
+      {skin.readoutWindow && <rect x={CX - 26} y={CY + 22} width={52} height={15} rx={2} fill="var(--k-clock-face, var(--node-bg))" stroke="var(--k-clock-tick-minor, var(--paper-3))" strokeWidth={0.8} />}
+      <text x={CX} y={CY + 30} textAnchor="middle" dominantBaseline="central" fontFamily="var(--k-clock-font, var(--font-mono))" fontSize={10} letterSpacing="0.8"
+        fill={day.focusMin > 0 ? 'var(--k-clock-readout, var(--ink-2))' : 'var(--ink-4)'}>
+        {day.focusMin > 0 ? fmtMinutes(day.focusMin) : '—'}
+      </text>
+      {live && (
+        <>
+          <g transform={`rotate(${hourAng - 90} ${CX} ${CY})`}><MiniHand kind={skin.hand} back={8} len={38} width={3.2} /></g>
+          <g transform={`rotate(${minAng - 90} ${CX} ${CY})`}><MiniHand kind={skin.hand} back={10} len={56} width={2} /></g>
+          <g data-testid="clock-week-second" style={{ transformOrigin: `${CX}px ${CY}px`, animation: 'clock-sec-sweep 60s linear infinite', animationDelay: `-${now.getSeconds()}s` }}>
+            <line x1={CX - 14} y1={CY} x2={CX + 62} y2={CY} stroke="var(--rust)" strokeWidth={1} strokeLinecap="round" opacity={0.9} />
+            <circle cx={CX + 60} cy={CY} r={2} fill="var(--rust)" />
+          </g>
+        </>
+      )}
+      <circle cx={CX} cy={CY} r={live ? 5 : 3} fill="var(--k-clock-hand, var(--ink))" />
+      {live && <circle cx={CX} cy={CY} r={1.6} fill="var(--acid)" />}
+    </svg>
+  );
+}
+
 interface Props {
   week: readonly WeekDayModel[];
   /** Day hours of "now" (only drawn on today's ring). */
@@ -133,7 +217,9 @@ interface Props {
   onPick: (ymd: string) => void;
 }
 
-export function ClockWeek({ week, nowH, onPick }: Props): JSX.Element {
+export function ClockWeek({ week, nowH: _nowH, onPick }: Props): JSX.Element {
+  // The same frame style as the main dial (bezel, hands, colours).
+  const skin = useFrameTheme().manifest.components.clock;
   const weekTotal = week.reduce((s, d) => s + d.focusMin, 0);
   // Fill the panel: pick the column count that gives the biggest rings.
   const [gridRef, size] = useElementSize<HTMLDivElement>();
@@ -176,40 +262,7 @@ export function ClockWeek({ week, nowH, onPick }: Props): JSX.Element {
             <span style={{ fontSize: grid.ring > 120 ? 11.5 : 10.5, letterSpacing: '0.04em', color: d.isToday ? 'var(--ink)' : 'var(--ink-2)', fontWeight: d.isToday ? 600 : 400, whiteSpace: 'nowrap' }}>
               {d.isToday ? 'Today' : d.label}
             </span>
-            <svg viewBox="0 0 100 100" style={{ width: grid.ring, height: grid.ring, maxWidth: '100%', display: 'block', margin: '0 auto', flexShrink: 1, minHeight: 0 }} aria-label={`${d.label}: ${fmtMinutes(d.focusMin)} recorded`}>
-              {/* face + the empty day band */}
-              <circle cx={C} cy={C} r={R_RIM} fill="var(--paper-2)" stroke="var(--paper-3)" strokeWidth={0.8} />
-              <circle cx={C} cy={C} r={R_BAND} fill="none" stroke="var(--paper-3)" strokeOpacity={0.6} strokeWidth={BAND_W} />
-              {/* hour ticks: every hour short, every 6 h longer — outside the band */}
-              {Array.from({ length: 24 }).map((_, h) => {
-                const a = at24(h, R_RIM - 0.5);
-                const b = at24(h, R_RIM - (h % 6 === 0 ? 4 : 2));
-                return <line key={h} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--ink-4)" strokeWidth={h % 6 === 0 ? 1 : 0.6} />;
-              })}
-              {/* recorded work: task-coloured stretches of the band */}
-              {d.spans.map((s) => (
-                <path key={s.id} d={arc24(s.startH, s.endH, R_BAND)} fill="none" stroke={s.tone} strokeOpacity={s.isBreak ? 0.3 : 0.95} strokeWidth={BAND_W} strokeLinecap="butt" />
-              ))}
-              {/* plans: thin arc just inside the rim */}
-              {d.plans.map((p) => (
-                <path key={p.id} d={arc24(p.startH, p.endH, R_PLAN)} fill="none" stroke={p.tone} strokeWidth={1.6} strokeLinecap="round" opacity={0.85} />
-              ))}
-              {/* 0 / 6 / 12 / 18 inside the band */}
-              {[0, 6, 12, 18].map((h) => {
-                const q = at24(h, R_NUM);
-                return <text key={h} x={q.x} y={q.y + 2.4} textAnchor="middle" fontSize={6.5} fill="var(--ink-4)" fontFamily="var(--font-mono)">{h}</text>;
-              })}
-              {/* now: a short rust tick across the band (today only) */}
-              {d.isToday && (() => {
-                const a = at24(nowH, R_RIM);
-                const b = at24(nowH, R_BAND - BAND_W / 2 - 1);
-                return <line data-testid="clock-week-now" x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--rust, var(--ink))" strokeWidth={1.6} strokeLinecap="round" />;
-              })()}
-              {/* the day's focus total in the middle */}
-              <text x={C} y={C + 3.5} textAnchor="middle" fontSize={d.focusMin > 0 ? 10 : 9} fontWeight={600} fill={d.focusMin > 0 ? 'var(--ink)' : 'var(--ink-4)'} fontFamily="var(--font-mono)">
-                {d.focusMin > 0 ? fmtMinutes(d.focusMin) : '—'}
-              </text>
-            </svg>
+            <MiniClock day={d} size={grid.ring} live={d.isToday} skin={skin} />
             <span
               title={d.top ? `${d.top.name} · ${fmtMinutes(d.top.min)}` : undefined}
               style={{ fontSize: 10, color: d.top ? 'var(--ink-2)' : 'var(--ink-4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 5 }}
