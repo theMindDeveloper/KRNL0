@@ -193,7 +193,7 @@ AOS/LOS, transmission log strip.
 | Spec | Value |
 |---|---|
 | `id` | `'krnl-dock'` |
-| `label` / `sublabel` | `KRNL Dock` / `Rack chassis` |
+| `label` / `sublabel` | `Nuclear` / `Rack chassis` (id stays `krnl-dock`) |
 | `Chrome` | `KrnlDockChrome` |
 | `canvasBounds` | `fit-mothers` · `{ topOffset: -102, height: 744, sidePad: 10, minWidth: 600 }` |
 | `stationPadding` | `{ top: 102, bottom: 102 }` |

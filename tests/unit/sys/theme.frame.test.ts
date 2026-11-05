@@ -47,6 +47,22 @@ describe('sys theme frame <id>', () => {
     expect(cliDispatch).toHaveBeenCalledWith('theme.frame', { value: 'pro' });
   });
 
+  it('accepts a style by its shown name: Nuclear is krnl-dock, Paper is classic', async () => {
+    const { SysFacade } = await import('../../../src/sys/SysFacade');
+    const { FRAME_STYLES } = await import('../../../src/shared/frameStyles');
+    expect(FRAME_STYLES.find((f) => f.id === 'krnl-dock')?.label).toBe('Nuclear');
+    const cliDispatch = vi.fn(async () => ({ ok: true, message: '' }));
+    const facade = new SysFacade({ boardPath, cliDispatch });
+    await facade.run(['theme', 'frame', 'Nuclear']);
+    await facade.run(['theme', 'frame', 'krnl-dock']);
+    await facade.run(['theme', 'frame', 'paper']);
+    expect(cliDispatch.mock.calls).toEqual([
+      ['theme.frame', { value: 'krnl-dock' }],
+      ['theme.frame', { value: 'krnl-dock' }],
+      ['theme.frame', { value: 'classic' }],
+    ]);
+  });
+
   it('rejects unknown ids without dispatching', async () => {
     const { SysFacade } = await import('../../../src/sys/SysFacade');
     const cliDispatch = vi.fn(async () => ({ ok: true, message: '' }));

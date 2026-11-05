@@ -20,7 +20,8 @@ export const FRAME_STYLES = [
   { id: 'pro', label: 'Pro', sublabel: 'Matte graphite', modes: ['light', 'dark'] },
   { id: 'synthesizer', label: 'Synthesizer', sublabel: 'Eurorack panel', modes: ['light', 'dark'] },
   { id: 'telemetry', label: 'Telemetry', sublabel: 'Mission control', modes: ['light', 'dark'] },
-  { id: 'krnl-dock', label: 'KRNL Dock', sublabel: 'Rack chassis', modes: ['dark'] },
+  // Shown as "Nuclear"; the id stays 'krnl-dock' for the same reason.
+  { id: 'krnl-dock', label: 'Nuclear', sublabel: 'Rack chassis', modes: ['dark'] },
   { id: 'blueprint', label: 'Blueprint', sublabel: 'Drafting table', modes: ['light', 'dark'] },
   { id: 'macintosh', label: 'Macintosh', sublabel: '1984 hardware', modes: ['light', 'dark'] },
   { id: 'submarine', label: 'Submarine', sublabel: 'Periscope console', modes: ['dark'] },
@@ -32,4 +33,11 @@ export const FRAME_STYLE_IDS: readonly FrameStyleId[] = FRAME_STYLES.map((f) => 
 
 export function isFrameStyleId(v: unknown): v is FrameStyleId {
   return typeof v === 'string' && (FRAME_STYLE_IDS as readonly string[]).includes(v);
+}
+
+/** A frame style by id or by its shown name, any case ("Paper" → classic, "nuclear" → krnl-dock). */
+export function resolveFrameStyleId(v: unknown): FrameStyleId | undefined {
+  if (typeof v !== 'string') return undefined;
+  const q = v.trim().toLowerCase();
+  return FRAME_STYLES.find((f) => f.id === q || f.label.toLowerCase() === q)?.id;
 }

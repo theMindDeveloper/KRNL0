@@ -1204,3 +1204,12 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Release process written down** (AGENTS.md rule 11, docs/releases/RELEASING.md): patch for fixes, minor for feature releases, never reuse a version or move a published tag, Publish on the draft is the switch that ships it.
 - **Also fixed:** `SysFacade` dropped its `viewSize` dependency, so CLI-added nodes never used the visible-centre placement.
 - **Verified:** local `electron-builder --win` writes `latest.yml` (url = `KRNL0-Setup-0.10.0.exe`), `resources/app-update.yml` (github, theMindDeveloper/KRNL0) and bundles `electron-updater`. Typecheck 0 errors; 195 files / 2098 tests green. Not yet verified: a real update end to end. Apps on v0.10.0 have no updater, so the first updater-enabled release is installed by hand once; automatic updates can be seen from the release after it.
+
+---
+
+## [2026-11-05] — Frame style "KRNL Dock" renamed to "Nuclear"
+
+**Type:** Chore (UI copy)
+**Branch:** `TMD/auto-update-launcher-github-59d480`
+**Files changed:** `src/shared/frameStyles.ts`, `src/renderer/components/ChassisLayer/dockRegistry.tsx`, `src/sys/SysFacade.ts`, `tests/unit/sys/theme.frame.test.ts`, `docs/06-requirements/theme-engine.md`, `docs/04-visual-system/chassis-cookbook.md`
+**Summary:** The frame style shown as "KRNL Dock" is now **Nuclear** in the style picker and `krnl theme frames`. The id stays `krnl-dock`, so saved choices and scripts keep working. `krnl theme frame` now accepts a style's id or its shown name in any case (`nuclear`, `Paper`).

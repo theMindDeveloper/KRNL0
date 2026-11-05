@@ -52,7 +52,7 @@ import {
 import type { AnalyticsCtx } from './commands/analytics';
 import { logTail, logStats, requiresRenderer as logRequiresRenderer } from './commands/log';
 import { themeShow, themeFrames } from './commands/theme';
-import { isFrameStyleId } from '../shared/frameStyles';
+import { resolveFrameStyleId } from '../shared/frameStyles';
 import type { ThemeCtx } from './commands/theme';
 import {
   generateHelp,
@@ -426,9 +426,9 @@ export class SysFacade {
         return themeFrames(command.json);
       }
       if (command.sub === 'frame') {
-        // "Paper" is the shown name of the 'classic' style.
-        const frameId = command.value?.toLowerCase() === 'paper' ? 'classic' : command.value;
-        if (!isFrameStyleId(frameId)) {
+        // Id or shown name: "Paper" is 'classic', "Nuclear" is 'krnl-dock'.
+        const frameId = resolveFrameStyleId(command.value);
+        if (!frameId) {
           return { ok: false, message: command.value ? `Unknown frame style: ${command.value}` : 'theme frame requires <id> (see: sys theme frames)' };
         }
         if (!this.deps.cliDispatch) {
