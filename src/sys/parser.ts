@@ -39,6 +39,7 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'show'; json: boolean }
   | { kind: 'clock'; sub: 'dial'; arg: string | undefined }
   | { kind: 'clock'; sub: 'half'; arg: string | undefined }
+  | { kind: 'clock'; sub: 'now' }
   | { kind: 'cal'; sub: 'zoom'; zoom: number | undefined }
   | { kind: 'draw'; sub: 'list'; json: boolean }
   | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
@@ -78,6 +79,7 @@ export type SysCommand =
   | { kind: 'term'; sub: 'setFontSize'; fontSize: number | undefined }
   | { kind: 'term'; sub: 'clear' }
   | { kind: 'term'; sub: 'setShell'; shell: string | undefined }
+  | { kind: 'term'; sub: 'claude'; bypass: boolean }
   | { kind: 'node'; sub: 'move'; id: string | undefined; to: { x: number; y: number } | undefined }
   | { kind: 'viewport'; sub: 'pan'; dx: number | undefined; dy: number | undefined }
   | { kind: 'viewport'; sub: 'zoom'; factor: number | undefined }
@@ -486,6 +488,7 @@ export class SysParser {
       }
       if (sub === 'dial') return { kind: 'clock', sub: 'dial', arg: rest[0] };
       if (sub === 'half') return { kind: 'clock', sub: 'half', arg: rest[0] };
+      if (sub === 'now') return { kind: 'clock', sub: 'now' };
       if (sub === 'show' || sub === undefined) {
         return { kind: 'clock', sub: 'show', json: hasFlag(rest, 'json') };
       }
@@ -693,6 +696,7 @@ export class SysParser {
       }
       if (sub === 'clear') return { kind: 'term', sub: 'clear' };
       if (sub === 'setShell') return { kind: 'term', sub: 'setShell', shell: rest[0] };
+      if (sub === 'claude') return { kind: 'term', sub: 'claude', bypass: rest.includes('--bypass') };
     }
 
     if (cmd === 'viewport') {

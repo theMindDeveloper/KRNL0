@@ -7,6 +7,7 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HEADER_LABEL, LIVE_BADGE_TEXT, TERM_CLEAR_EVENT } from './constants';
 import { startTerminalSession } from './session';
 import { getLiveTerminal, setLiveTerminal, type LiveTerminal } from './liveTerminals';
+import { fitAndSyncPty } from './fitGuard';
 import { MotdBanner } from './MotdBanner';
 import { ContextMenu } from '../../ContextMenu';
 import pkg from '../../../../../package.json';
@@ -16,8 +17,23 @@ import { xtermFor } from '../../../themes/applyFrameTheme';
 export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHER_TOTAL }: NodeProps<TermState, TermConfig>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  // The live terminal this mount shows (null while detached).
+  const liveRef = useRef<LiveTerminal | null>(null);
+
+  // The one way this component sizes xterm and the PTY (#200): fit only a
+  // container big enough to be real, resize the PTY only when its size changed.
+  const syncSize = () => {
+    const live = liveRef.current;
+    if (!live) return;
+    live.ptySize = fitAndSyncPty({
+      fit: live.fit,
+      term: live.term,
+      sessionId: live.sessionId,
+      last: live.ptySize,
+      resize: (id, cols, rows) => { void window.krnl?.ptyResize(id, cols, rows); },
+    });
+  };
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -42,10 +58,8 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     const t = termRef.current;
     if (!t || fontSize === undefined || t.options.fontSize === fontSize) return;
     t.options.fontSize = fontSize;
-    try { fitRef.current?.fit(); } catch { /* not measured yet */ }
-    const sid = sessionIdRef.current;
-    if (sid) window.krnl?.ptyResize(sid, t.cols, t.rows);
-  }, [fontSize]);
+    syncSize();
+  }, [fontSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Height of the column that holds banner + xterm: a short panel gets the
   // one-line banner, not the 9-row logo. Measured on the column (not the
@@ -101,14 +115,16 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     if (!container) return;
 
     // Session changes reach whichever component is mounted right now.
+    // No fit here: this also runs while the panel is still mid-layout (a few
+    // pixels wide), which fitted the PTY to 2 columns (#200). Resizes during
+    // the spawn were dropped (no id yet), so catch up on the next frame.
+    let bindRaf = 0;
     const bindSession = (id: string | null) => {
       sessionIdRef.current = id;
       if (id) {
         hadSessionRef.current = true;
-        // Resizes during the spawn were dropped (no id yet): catch up once.
-        try { fitRef.current?.fit(); } catch { /* ignore */ }
-        const t = termRef.current;
-        if (t) window.krnl?.ptyResize(id, t.cols, t.rows);
+        cancelAnimationFrame(bindRaf);
+        bindRaf = requestAnimationFrame(syncSize);
       }
       setActiveSessionId(id);
     };
@@ -121,8 +137,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       container.appendChild(entry.host);
       const e = entry;
       reattachRaf = requestAnimationFrame(() => {
-        try { e.fit.fit(); } catch { /* not measured yet */ }
-        if (e.sessionId) window.krnl?.ptyResize(e.sessionId, e.term.cols, e.term.rows);
+        syncSize();
         e.term.refresh(0, e.term.rows - 1);
       });
     } else {
@@ -152,7 +167,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       host.style.width = '100%';
       host.style.height = '100%';
       container.appendChild(host);
-      const e: LiveTerminal = { term, fit, host, sessionId: null, everStarted: false, onSession: null, onCommand, shell: () => undefined };
+      const e: LiveTerminal = { term, fit, host, sessionId: null, ptySize: null, everStarted: false, onSession: null, onCommand, shell: () => undefined };
       setLiveTerminal(node.id, e);
       entry = e;
 
@@ -199,7 +214,12 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           fit,
           krnl: window.krnl,
           onCommand: (command, args) => e.onCommand(command, args),
-          setSessionId: (id) => { e.sessionId = id; if (id) e.everStarted = true; e.onSession?.(id); },
+          setSessionId: (id, size) => {
+            e.sessionId = id;
+            e.ptySize = id && size ? { sessionId: id, ...size } : null;
+            if (id) e.everStarted = true;
+            e.onSession?.(id);
+          },
           // The session belongs to the board, not to this mount.
           isCancelled: () => false,
           // Read at every start, so `krnl term setShell` applies to the next shell.
@@ -220,31 +240,27 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
     live.onSession = bindSession;
     live.onCommand = onCommand;
     live.shell = () => shellRef.current;
+    liveRef.current = live;
     termRef.current = live.term;
-    fitRef.current = live.fit;
     // Theme / font changes made while detached (those effects ran first).
     if (xtermColorsRef.current) live.term.options.theme = { ...xtermColorsRef.current };
     const size = node.config?.fontSize;
     if (size !== undefined && live.term.options.fontSize !== size) live.term.options.fontSize = size;
     if (live.sessionId) bindSession(live.sessionId);
 
-    const ro = new ResizeObserver(() => {
-      try { fitRef.current?.fit(); } catch { /* ignore */ }
-      const t = termRef.current;
-      const sid = sessionIdRef.current;
-      if (t && sid) window.krnl?.ptyResize(sid, t.cols, t.rows);
-    });
+    const ro = new ResizeObserver(() => syncSize());
     ro.observe(container);
 
     return () => {
       cancelAnimationFrame(reattachRaf);
+      cancelAnimationFrame(bindRaf);
       ro.disconnect();
       // Detach, don't kill: the next mount picks the terminal up again.
       if (live.onSession === bindSession) live.onSession = null;
       // Only if it is still here: an overlapping newer mount may own it now.
       if (live.host.parentElement === container) live.host.remove();
+      liveRef.current = null;
       termRef.current = null;
-      fitRef.current = null;
       sessionIdRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

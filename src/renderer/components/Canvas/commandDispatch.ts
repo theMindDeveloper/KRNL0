@@ -1474,7 +1474,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         config: { showDuration: true },
       };
 
-      const { addNode, addEdge } = useBoardStore.getState();
+      const { addNode } = useBoardStore.getState();
       addNode(taskNode);
 
       // Set taskNodeId on the TodoItem (bidirectional link)
@@ -1490,19 +1490,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         }
       }
 
-      // Chain edge from the previous sibling
-      if (siblingTaskNodes.length > 0) {
-        const previousTask = siblingTaskNodes[siblingTaskNodes.length - 1];
-        if (previousTask) {
-          const edge: Edge = {
-            id: `edge-${crypto.randomUUID()}`,
-            from: { nodeId: previousTask.id, event: 'task.next' },
-            to: { nodeId: taskNode.id, command: 'task.activate' },
-            enabled: true,
-          };
-          addEdge(edge);
-        }
-      }
+      // Adding a task never chains it (todo-node F25): the user wires chains
+      // by hand (Add next task, `task chain`, `edge add`).
 
       const finalBoard = useBoardStore.getState().board;
       if (finalBoard) void saveBoard(finalBoard);

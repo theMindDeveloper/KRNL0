@@ -6,7 +6,7 @@ import type { SysResult } from '../SysFacade';
 import {
   clockSetSelectedDate,
   clockAdvanceDay,
-  clockGoToday, clockSetDialOnly, clockSetViewWindow,
+  clockGoToday, clockGoNow, clockSetDialOnly, clockSetViewWindow,
 } from '../../renderer/components/nodes/ClockNode/commands';
 import type { ClockState } from '../../renderer/components/nodes/ClockNode/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
@@ -107,6 +107,21 @@ export async function clockDay(
     ok: true,
     message: `Clock day set to ${nextState.selectedDate}.`,
     data: { selectedDate: nextState.selectedDate },
+  };
+}
+
+/** `krnl clock now` — today and the 12-hour half that contains now (#201). */
+export async function clockNow(ctx: ClockCtx): Promise<SysResult> {
+  const board = loadBoard(ctx);
+  const clockNode = findClockMother(board);
+  if (!clockNode) return { ok: false, message: 'No clock mother node found in board.' };
+  const nextState = clockGoNow(clockNode.state as ClockState);
+  updateNode(board, clockNode.id, { ...clockNode, state: nextState });
+  saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: `Clock set to now (${nextState.selectedDate}, ${nextState.viewWindow === 1 ? 'PM' : 'AM'}).`,
+    data: { selectedDate: nextState.selectedDate, viewWindow: nextState.viewWindow },
   };
 }
 

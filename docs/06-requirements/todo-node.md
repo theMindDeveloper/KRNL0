@@ -33,6 +33,7 @@
 | F23 | Users can create custom tags by typing a new name in the picker (or `todo.addTag`), optionally with keywords. Custom tags can be removed (`todo.removeTag`). Built-ins cannot |
 | F24 | Every completion-ledger entry records the tag the task was completed under (`CompletionRecord.tag`). Re-tagging a done item updates its entry. The Analytics node's **Time** view shows minutes by tag (pomo-tracked minutes, else planned): a donut, a ranked list and a stacked bar per day |
 | F25 | CLI parity: `todo list [--done\|--archived\|--all]`, `todo tag <ref> <tag\|auto>`, `todo tags [list\|add\|remove]`, `todo archive`, `todo clear-archive`, `analytics show --view tags` |
+| F26 | **Adding a task creates no edge** (#205). `todo.add` (UI), `krnl todo add` and `krnl task add` spawn the TaskNode unchained, so a new task is never pushed after the previous one on the Calendar. The user chains tasks by hand: TaskNode "Add next task", `krnl task chain <a> <b> …`, `krnl task addNext`, `krnl edge add` |
 
 ---
 
@@ -263,6 +264,13 @@ Feature: TodoNode task list
     Then the item has tag "planning" and tagSource "user"
     When the user runs "todo tag <ref> auto"
     Then the item is auto-classified again
+
+  Scenario: F26 — adding tasks never chains them
+    Given the todo list has the task "task 1"
+    When the user adds "task 2" (from the Todo row, "todo add" or "task add")
+    Then the board has no task.next edge from "task 1" to "task 2"
+    When the user runs "task chain <task 1> <task 2>"
+    Then "task 2" follows "task 1"
 ```
 
 ---

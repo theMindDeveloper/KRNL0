@@ -35,6 +35,8 @@ import { CLICK_CLIPS } from '../Assistant/clipMap';
 import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
+import { launchClaudeInTerminal } from '../../store/claudeLaunch';
+import { emit } from '../../store/eventLog';
 import { Z } from '../ui/layers';
 import { isTypingTarget, isControlTarget, isModalOpen } from '../../utils/keyboardTargets';
 
@@ -651,6 +653,31 @@ export function Orb() {
                     }}
                   >
                     {'▸ commander · plan a session'}
+                  </button>
+                  {/* Claude Code in the board terminal, permission prompts off (#206). */}
+                  <button
+                    type="button"
+                    data-testid="orb-claude-bypass"
+                    title="Shows the terminal and runs: claude --dangerously-skip-permissions"
+                    onClick={() => {
+                      setOpen(false);
+                      void launchClaudeInTerminal(true).then((r) => { if (!r.ok) emit('sys.error', `Claude Code: ${r.message}`, { severity: 'warn' }); });
+                    }}
+                    style={{
+                      textAlign: 'left',
+                      background: 'rgba(201, 241, 88, 0.06)',
+                      border: '1px solid rgba(201, 241, 88, 0.30)',
+                      color: 'var(--accent-on-dark)',
+                      padding: '6px 8px',
+                      borderRadius: 4,
+                      fontFamily: 'inherit',
+                      fontSize: 11.5,
+                      cursor: 'pointer',
+                      letterSpacing: '0.02em',
+                      marginBottom: 4,
+                    }}
+                  >
+                    {'▸ claude code · bypass permissions'}
                   </button>
                   {FLOWS.map((flow) => (
                     <button

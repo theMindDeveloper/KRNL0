@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
@@ -19,6 +19,7 @@ import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { AppSelect } from '../../ui/AppSelect';
 import { boardTagLibrary, spanTagFor } from '../../../store/spanTags';
 import { SpanLabeler } from './SpanLabeler';
+import { decodeTargets, encodeTargets, spanTaskTargets, startOfLocalDayMs } from './taskTargets';
 import { DoingPicker, type DoingChoice } from './DoingPicker';
 import { SpanLog } from './SpanLog';
 import { useEasyMode } from '../../../store/uiMode';
@@ -150,17 +151,15 @@ export function PomoNode({
   const sessionsForDisplay = state.sessionsCompleted;
   const completedDots = sessionsForDisplay % pipCount;
 
-  // Open tasks the session can be tagged with (what was this time spent on?).
-  const tagOptions = useBoardStore(
-    useShallow((s) =>
-      (s.board?.nodes ?? [])
-        .filter((n) => n.kind === 'todo.task' && !(n.state as TaskState).done && (n.state as TaskState).parentTaskId === null)
-        .map((n) => `${n.id}\u0000${(n.state as TaskState).text}`),
-    ),
-  ).map((pair) => {
-    const [id, text] = pair.split('\u0000') as [string, string];
-    return { id, text };
-  });
+  // Tasks the session can be tagged with (what was this time spent on?):
+  // open tasks, then tasks done today (#204 — ticking a task done must not
+  // make it impossible to keep counting time toward it). Same list builder
+  // as the Calendar's retag list.
+  const todayStartMs = startOfLocalDayMs(Date.now());
+  const tagOptionKeys = useBoardStore(
+    useShallow((s) => encodeTargets(spanTaskTargets(s.board?.nodes, { doneSinceMs: todayStartMs }))),
+  );
+  const tagOptions = useMemo(() => decodeTargets(tagOptionKeys), [tagOptionKeys]);
 
   // Today's pomo cycle counter — counts COMPLETED sessions whose endedAt
   // falls on the local date today. A full cycle = `longBreakEvery` sessions
@@ -828,7 +827,7 @@ export function PomoNode({
                 ...(state.activeTaskId !== null && !tagOptions.some((o) => o.id === state.activeTaskId)
                   ? [{ value: state.activeTaskId, label: state.label || 'task' }]
                   : []),
-                ...tagOptions.map((o) => ({ value: o.id, label: truncate(o.text, 28) })),
+                ...tagOptions.map((o) => ({ value: o.id, label: `${o.done ? '✓ ' : ''}${truncate(o.text, 28)}` })),
               ]}
               style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 10.5, padding: '2px 0' }}
             />

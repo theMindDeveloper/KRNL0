@@ -2,6 +2,8 @@
 // All side-effects (pty calls, terminal writes) are injected via deps.
 // MOTD is now emitted by main via pty:data before the shell prompt renders (T1).
 
+import { safeFit, type GuardedFitSurface } from './fitGuard';
+
 /** Minimal Terminal surface needed by startTerminalSession. */
 export interface TermSurface {
   cols: number;
@@ -19,10 +21,8 @@ export interface TermSurface {
   paste?(text: string): void;
 }
 
-/** Minimal FitAddon surface. */
-export interface FitSurface {
-  fit(): void;
-}
+/** Minimal FitAddon surface (proposeDimensions lets fits be guarded, #200). */
+export type FitSurface = GuardedFitSurface;
 
 /** The krnl preload bridge surface (subset used by the terminal). */
 export interface KrnlBridge {
@@ -42,8 +42,9 @@ export interface SessionDeps {
   fit: FitSurface;
   krnl: KrnlBridge | undefined;
   onCommand: (command: string, args?: Record<string, unknown>) => void;
-  /** Set to the created session ID; callers may read this ref for resize. */
-  setSessionId: (id: string | null) => void;
+  /** Set to the created session ID; callers may read this ref for resize.
+   *  `size` is what the PTY was spawned at, so callers skip a no-op resize. */
+  setSessionId: (id: string | null, size?: { cols: number; rows: number }) => void;
   /** Returns true if the session has been cancelled (unmounted). */
   isCancelled: () => boolean;
   /** The terminal's saved shell, read at every (re)start; 'default' = OS default. */
@@ -66,18 +67,14 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
   // has real dimensions. Without this, term.cols/rows default to 80×24 even
   // when the actual viewport is ~50×14, and main generates a 9-row MOTD that
   // immediately scrolls into scrollback once the shell prompt arrives.
-  let fitOk = false;
-  try {
-    fit.fit();
-    fitOk = true;
-  } catch {
-    // container not yet sized — fall through with conservative defaults
-  }
+  // Guarded (#200): a container still a few pixels wide mid-layout would fit
+  // to 2 columns and the shell would draw its prompt two characters a line.
+  const fitOk = safeFit(fit, term);
 
   // Use measured size when fit succeeded; otherwise use a small default that
   // forces renderMotd into its compact one-line form (T5).
-  const cols = fitOk && term.cols > 0 ? term.cols : 40;
-  const rows = fitOk && term.rows > 0 ? term.rows : 12;
+  const cols = fitOk ? term.cols : 40;
+  const rows = fitOk ? term.rows : 12;
 
   if (!krnl) return () => undefined;
 
@@ -116,7 +113,7 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
       return;
     }
     sid = id;
-    setSessionId(id);
+    setSessionId(id, { cols: spawnCols, rows: spawnRows });
     onCommand('term.sessionStart', { sessionId: id });
 
     // F5b: pty:data → xterm.write
@@ -207,8 +204,8 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
       return;
     }
     if (!starting && data.includes('\r')) {
-      try { fit.fit(); } catch { /* keep the last size */ }
-      void spawn(term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows);
+      const ok = safeFit(fit, term); // too small → keep the last size
+      void spawn(ok ? term.cols : cols, ok ? term.rows : rows);
     }
   });
 

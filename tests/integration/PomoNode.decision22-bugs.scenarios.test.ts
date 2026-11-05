@@ -326,6 +326,9 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(ps.activeTaskId).toBeNull();
       expect(ps.history).toHaveLength(1);
       expect(ps.history[0]!.durationMin).toBe(2);
+      // #204 — the recorded span keeps counting toward the finished task.
+      expect(ps.history[0]!.taskId).toBe('task-a');
+      expect(ps.history[0]!.label).toBe('Task A');
     });
 
   });

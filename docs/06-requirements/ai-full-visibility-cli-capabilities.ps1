@@ -50,7 +50,7 @@ foreach ($cmd in "task","todo","habit","edge","node") {
 }
 
 # ── 3. Pair creation — Decision 20 invariant 1 ──────────────────────────────
-section "3. todo add creates a paired TaskNode + chain edge"
+section "3. todo add creates a paired TaskNode (no chain edge — todo-node F26)"
 & krnl todo add "$MARK alpha" --tag t1 | Out-Null
 & krnl todo add "$MARK beta"  --tag t1 | Out-Null
 
@@ -69,9 +69,7 @@ check ($alphaTask.todoItemId -eq ($items | Where-Object { $_.text -eq "$MARK alp
 $chain = (k-json edge list) | Where-Object {
   $_.from.nodeId -eq $alphaTaskId -and $_.to.nodeId -eq $betaTaskId
 }
-check ($null -ne $chain)                                               "auto-chain edge alpha → beta exists"
-check ($chain.from.event -eq "task.next")                              "chain edge uses task.next"
-check ($chain.to.command -eq "task.activate")                          "chain edge targets task.activate"
+check ($null -eq $chain)                                               "no auto-chain edge alpha → beta (#205)"
 
 # ── 4. Prefix and text resolution ───────────────────────────────────────────
 section "4. Prefix and text resolution"

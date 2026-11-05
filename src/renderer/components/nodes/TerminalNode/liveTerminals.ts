@@ -8,6 +8,7 @@
 
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
+import type { PtySize } from './fitGuard';
 
 export interface LiveTerminal {
   term: Terminal;
@@ -15,6 +16,8 @@ export interface LiveTerminal {
   /** The element xterm was opened in; moved between mounts. */
   host: HTMLDivElement;
   sessionId: string | null;
+  /** The size the PTY was last given — a resize only goes out on a real change (#200). */
+  ptySize: PtySize | null;
   /** A shell has run in this terminal (so "no session" means it exited). */
   everStarted: boolean;
   /** The mounted component's listener for session changes (null while detached). */

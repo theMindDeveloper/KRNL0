@@ -26,6 +26,7 @@ import type { TaskState } from '../components/nodes/TaskNode/types';
 import { getDockStyle, setDockStyle } from '../components/ChassisLayer/useDockStyle';
 import { isFrameStyleId } from '../../shared/frameStyles';
 import { radioControl } from '../components/AmbientRadio/radioControl';
+import { launchClaudeInTerminal } from './claudeLaunch';
 
 export function useCliDispatch(): void {
   const store = useBoardStore;
@@ -35,6 +36,13 @@ export function useCliDispatch(): void {
     if (!bridge?.onCliDispatch || !bridge?.cliDispatchReply) return;
 
     const unsubscribe = bridge.onCliDispatch((id, command, args) => {
+      // Async: waits for the terminal's shell before typing into it (#206).
+      if (command === 'term.claude') {
+        void launchClaudeInTerminal(args['bypass'] === true)
+          .then((r) => bridge.cliDispatchReply!(id, r.ok, r.message))
+          .catch((e: unknown) => bridge.cliDispatchReply!(id, false, e instanceof Error ? e.message : String(e)));
+        return;
+      }
       let ok = false;
       let message = `Unknown cli:dispatch command: ${command}`;
 

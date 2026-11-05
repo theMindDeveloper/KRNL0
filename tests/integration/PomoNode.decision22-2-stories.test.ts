@@ -519,6 +519,34 @@ describe('Story 3 — Trailing-suffix minutes parser (Decision 22.2 Fix 3)', () 
     expect(ts.plannedMin).toBe(15);
   });
 
+  it('todo-node F25: adding two todos from the UI creates no chain edge', () => {
+    const cleanBoard: Board = {
+      version: 1,
+      schemaVersion: 1,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        {
+          id: 'todo-mother',
+          kind: 'todo',
+          position: { x: 0, y: 0 },
+          isMother: true,
+          state: { items: [] } as TodoState,
+          config: { showCompleted: true, maxVisible: 50 },
+        },
+      ],
+      edges: [],
+      savedAt: '2026-05-13T10:00:00.000Z',
+    };
+    useBoardStore.getState().setBoard(cleanBoard);
+
+    makeCommandHandler('todo-mother')('todo.add', { text: 'first' });
+    makeCommandHandler('todo-mother')('todo.add', { text: 'second' });
+
+    const finalBoard = useBoardStore.getState().board!;
+    expect(finalBoard.nodes.filter((n) => n.kind === 'todo.task')).toHaveLength(2);
+    expect(finalBoard.edges).toHaveLength(0);
+  });
+
 });
 
 // ── Story 4 — "Adding subtask doesn't show on parent TodoList." ───────────────

@@ -155,7 +155,7 @@ krnl task toggle $taskId
 
 ### 7.2 Task chain auto-advances
 
-Given an existing `task.next` edge between siblings (auto-created by `task add`):
+Given an existing `task.next` edge between siblings (wired by hand with `krnl task chain <a> <b>` — `task add` no longer chains, todo-node F26):
 
 ```
 krnl task toggle <task-1-prefix>
