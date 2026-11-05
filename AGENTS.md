@@ -26,6 +26,7 @@ KRNL0 is an Electron + Vite + React + TypeScript infinite-canvas productivity ap
 8. Every fucntionality in the software should have a cli sys command too for Codex terminal to be able to interact with the app fully. for more read PRD6.0
 9. **Journal every hard problem you solve into [docs/Challenges.md](docs/Challenges.md).** Trigger: a non-trivial bug or design problem has been solved AND the user has personally verified the fix works. Do not journal failed attempts, in-progress debugging, trivial typos, or fixes the user hasn't confirmed. Use the entry template at the top of the file (Symptom → Wrong guesses → Real cause → Fix → Lesson) and write in plain language — assume the reader is a future engineer who has never seen this code. Include the analogy you used to explain the bug to the user; that's often the most valuable part.
 10. EACH WORK TREE SHOULD HAVE ITS OWN ENV, BOARD ETC, SO NO CONFLICT SHOULD APEAR WHEN BUILDING MULTIPLE FEATURES ON MUTLIPLE BRANCHES/WORKTREES LOCALLY, Make sure this happend as default with no additional commands
+11. **Every release goes through the update pipeline — no exceptions.** Installed apps update themselves from GitHub Releases (Decision 36) by comparing version numbers. So: every release bumps `package.json` (**patch** `0.10.x` for fixes, **minor** `0.x.0` for feature releases), is tagged `vX.Y.Z` on `main`, built by `.github/workflows/release.yml`, and shipped by clicking **Publish** on the draft. **Never** reuse a version, move a published tag, or hand-upload an installer — users would never receive it. Full steps: [docs/releases/RELEASING.md](docs/releases/RELEASING.md) and "Releases & updates" below.
 
 ---
 
@@ -106,6 +107,28 @@ Skip the entire multi-agent loop. **One agent (usually `backend-dev`) fixes the 
 - Typecheck and tests still must be green.
 
 If you're unsure which workflow applies, ask. Default to A.
+
+---
+
+## Releases & updates
+
+KRNL0 ships updates through **GitHub Releases** (free, public repo). Windows installs update themselves (download in the background, "Restart to update", or install on quit). macOS/Linux show "KRNL0 X.Y.Z is out — Download". Dev builds and worktrees never update. Code: `src/main/updater/`, requirements: [docs/06-requirements/app-updates.md](docs/06-requirements/app-updates.md).
+
+**When to cut a release**
+
+| Kind | When | Version |
+|---|---|---|
+| **Patch** | A batch of bug fixes / polish is merged and verified | `0.10.0 → 0.10.1` |
+| **Feature release** ("big patch") | New features, a node kind, visible redesigns, board-schema changes | `0.10.x → 0.11.0` |
+
+**How (always this, in this order)**: details in [docs/releases/RELEASING.md](docs/releases/RELEASING.md).
+
+1. Release PR on `chore/release-vX.Y.Z`: `npm version <patch|minor> --no-git-tag-version`, `CHANGELOG.md`, `docs/releases/vX.Y.Z.md` (user-facing notes, becomes the GitHub release body), HISTORY entry. Typecheck + tests green. Merge.
+2. `git checkout main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. CI checks the tag equals `package.json`, builds, and creates a **draft** release with the installers **and `latest.yml`**.
+4. Check the draft (assets include `latest.yml`), then **Publish**. That click is what ships the update to every install.
+
+Never: reuse a version number, move a tag after publishing, hand-upload an `.exe` without its `latest.yml` + `.blockmap`, or merge a board-schema change without a migration (an update must open every older `board.json`).
 
 ---
 

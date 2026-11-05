@@ -2471,3 +2471,28 @@ Decision 31 made recorded pomo spans the only source of "time spent", and that r
 - A second store means two writers per action; tests assert both for each mutation path (F3).
 - Trimming old pomo history from `board.json` is possible later once every reader uses the log; not part of this decision.
 - Each worktree's data folder has its own `timelog/` (scripts/dev.mjs isolation unchanged).
+
+---
+
+## Decision 36 — Updates ship through GitHub Releases; the app updates itself (2026-11-05)
+
+**Status:** Accepted (maintainer, 2026-11-05). Requirements: docs/06-requirements/app-updates.md. Release process: docs/releases/RELEASING.md.
+
+### Context
+Every new version meant: open GitHub, download the installer, uninstall, reinstall. The release workflow already built on a `v*` tag, but its Windows job had been failing since the `windows-latest` runner moved to Visual Studio 2026 (node-gyp in `@electron/rebuild` rejects VS "18" while rebuilding node-pty), so installers were built by hand and v0.10.0 was re-released three times under the same version. Assets uploaded through `softprops/action-gh-release` also lost their spaces (`KRNL0 Setup 0.10.0.exe` → `KRNL0.Setup.0.10.0.exe`), which would break any update metadata that names the file.
+
+### Decision
+- **GitHub Releases is the update server.** `electron-builder.json` gets a `publish: github` block, so every build writes `app-update.yml` into the app and `latest.yml` / `latest-mac.yml` next to the installers. The workflow uploads those files with the installers and blockmaps. Artifact names have no spaces (`KRNL0-Setup-<v>.exe`, `KRNL0-<v>-<arch>.dmg|zip`).
+- **Windows auto-installs** with `electron-updater` (NSIS): check → background download (differential via blockmap, sha512-verified) → "Restart to update"; otherwise installs on quit. No code signing is required for this; a certificate later only removes the SmartScreen prompt on first install.
+- **macOS and Linux notify only.** Squirrel.Mac refuses to install an update into an app without an Apple Developer ID signature (ad-hoc signing is not enough), so those builds read GitHub's `releases/latest` API, compare SemVer, and open the release page. Switching macOS to full auto-update later = Apple Developer account + notarisation secrets + swapping the backend; the state machine and UI stay as they are.
+- **One state machine in main** (`UpdateService`) with a pluggable backend (`auto` / `notify`). Main pushes the state to the window over `update:state`; the window pulls it on mount. The CLI (`krnl update …`) uses the same service through a port injected into `SysFacade`.
+- **Publishing is the switch.** CI creates a *draft* release; `electron-updater` and `releases/latest` ignore drafts, so nobody is offered a build until the maintainer clicks Publish.
+- **A version is never reused.** A tag must equal `package.json`'s version (CI fails otherwise). Re-releasing under the same number would never reach installed apps, because they compare versions, not files.
+- **CI pins `windows-2022`** (Visual Studio 2022) until node-gyp supports VS 2026.
+- **Off in development and isolated worktrees** (`app.isPackaged`, `KRNL0_USER_DATA`), so a dev build never downloads or installs anything (AGENTS.md rule 10).
+
+### Consequences
+- Users on v0.10.0 have no updater; they install the first updater-enabled version by hand once.
+- Every release is a version bump: patch (`0.10.x`) for fixes, minor (`0.x.0`) for feature releases (RELEASING.md).
+- A newer app must keep opening an older `board.json`; the board migrations already guarantee that and stay mandatory for every schema change.
+- The update can't be proven end to end until two updater-enabled releases are published.

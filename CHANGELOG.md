@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- App updates (#211, Decision 36): Windows installs download in the background and install on restart (or on quit); macOS/Linux show a download link. Status bar, Settings → Updates and `krnl update status|check|install|open`. Release workflow uploads `latest.yml` and builds Windows on `windows-2022`.
 - Terminal node: `krnl` CLI bridge — full UI parity from inside the PTY's shell, named-pipe/UDS transport with per-launch token auth (#108)
 - Terminal MOTD banner with ASCII KRNL0 logo, dynamic version, compact-form fallback for narrow terminals (#108)
 - Generated `krnl help` command from a single command registry (`src/shared/cli/commandRegistry.ts`) — new commands auto-document (#108)
