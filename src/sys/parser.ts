@@ -70,6 +70,8 @@ export type SysCommand =
   | { kind: 'edge'; sub: 'add'; from: string | undefined; to: string | undefined }
   | { kind: 'edge'; sub: 'enable' | 'disable'; id: string | undefined }
   | { kind: 'info'; json: boolean }
+  | { kind: 'update'; sub: 'status' | 'check'; json: boolean }
+  | { kind: 'update'; sub: 'install' | 'open' }
   | { kind: 'settings'; sub: 'show'; json: boolean }
   | { kind: 'settings'; sub: 'mode'; mode: string | undefined }
   | { kind: 'settings'; sub: 'layout'; layout: string | undefined }
@@ -303,6 +305,16 @@ export class SysParser {
 
     if (cmd === 'info') {
       return { kind: 'info', json: hasFlag([sub ?? '', ...rest], 'json') };
+    }
+
+    // Decision 36 — app updates. Bare `update` (or `update --json`) = status.
+    if (cmd === 'update') {
+      if (sub === undefined || sub.startsWith('--')) {
+        return { kind: 'update', sub: 'status', json: hasFlag([sub ?? '', ...rest], 'json') };
+      }
+      if (sub === 'status' || sub === 'check') return { kind: 'update', sub, json: hasFlag(rest, 'json') };
+      if (sub === 'install' || sub === 'open') return { kind: 'update', sub };
+      return { kind: 'invalid', message: `Unknown subcommand: update ${sub}. Try: update status | check | install | open` };
     }
 
     if (cmd === 'settings') {

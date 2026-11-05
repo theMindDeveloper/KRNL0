@@ -17,6 +17,8 @@ import * as edgeCmd from './commands/edge';
 import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
+import * as updateCmd from './commands/update';
+import type { UpdaterPort } from '../shared/update';
 import { textAdd, textSet, textResize, textLook } from './commands/text';
 import { drawList, drawClear, drawDelete, drawStroke } from './commands/draw';
 import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
@@ -78,6 +80,8 @@ export interface SysFacadeDeps {
   cliDispatch?: CliDispatchFn;
   /** Content size of the open window, for placing new nodes at the visible centre. */
   viewSize?: () => { width: number; height: number } | null;
+  /** Decision 36: the app's updater (main only; absent in tests / headless). */
+  updater?: UpdaterPort;
 }
 
 function defaultBoardPath(): string {
@@ -122,6 +126,8 @@ export class SysFacade {
       hasOpenRenderer: deps?.hasOpenRenderer ?? (() => false),
       ...(deps?.onBoardChanged ? { onBoardChanged: deps.onBoardChanged } : {}),
       ...(deps?.cliDispatch ? { cliDispatch: deps.cliDispatch } : {}),
+      ...(deps?.viewSize ? { viewSize: deps.viewSize } : {}),
+      ...(deps?.updater ? { updater: deps.updater } : {}),
     };
     this.version = readVersion();
   }
@@ -279,6 +285,20 @@ export class SysFacade {
         case 'remove':  return edgeCmd.edgeRemove(eCtx, command.id);
         case 'enable':  return edgeCmd.edgeEnable(eCtx, command.id, true);
         case 'disable': return edgeCmd.edgeEnable(eCtx, command.id, false);
+      }
+    }
+
+    // ── App updates (Decision 36) ───────────────────────────────────────────
+    if (command.kind === 'update') {
+      const updater = this.deps.updater;
+      if (!updater) {
+        return { ok: false, message: 'Updates are handled by the running KRNL0 app — run this in its terminal.', data: { exitCode: 2 } };
+      }
+      switch (command.sub) {
+        case 'status':  return updateCmd.updateStatus(updater, command.json);
+        case 'check':   return updateCmd.updateCheck(updater, command.json);
+        case 'install': return updateCmd.updateInstall(updater);
+        case 'open':    return updateCmd.updateOpen(updater);
       }
     }
 

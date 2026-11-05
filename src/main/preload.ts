@@ -79,4 +79,16 @@ contextBridge.exposeInMainWorld('krnl', {
     ipcRenderer.invoke('timelog:append', entries),
   timelogQuery: (fromYMD: string, toYMD: string): Promise<unknown[]> =>
     ipcRenderer.invoke('timelog:query', fromYMD, toYMD),
+
+  // Decision 36 — app updates. Main owns the state; the window pulls it on
+  // mount and gets every change pushed (renderer/store/updateStore.ts).
+  updateGetState: (): Promise<unknown> => ipcRenderer.invoke('update:get'),
+  updateCheck: (): Promise<unknown> => ipcRenderer.invoke('update:check'),
+  updateInstall: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('update:install'),
+  updateOpenRelease: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('update:open'),
+  onUpdateState: (callback: (state: unknown) => void) => {
+    const listener = (_event: unknown, state: unknown) => callback(state)
+    ipcRenderer.on('update:state', listener)
+    return () => { ipcRenderer.removeListener('update:state', listener) }
+  },
 })

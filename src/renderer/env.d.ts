@@ -49,6 +49,12 @@ interface KrnlBridge {
   // (logTime / queryTimeLog), not these directly.
   timelogAppend?: (entries: unknown[]) => Promise<{ ok: boolean; written: number }>
   timelogQuery?: (fromYMD: string, toYMD: string) => Promise<unknown[]>
+  // Decision 36 — app updates. Use renderer/store/updateStore.ts, not these directly.
+  updateGetState?: () => Promise<unknown>
+  updateCheck?: () => Promise<unknown>
+  updateInstall?: () => Promise<{ ok: boolean; message: string }>
+  updateOpenRelease?: () => Promise<{ ok: boolean; message: string }>
+  onUpdateState?: (callback: (state: unknown) => void) => () => void
 }
 
 interface Window {

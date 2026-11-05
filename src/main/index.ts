@@ -11,6 +11,7 @@ import {
 } from './ipc/assets';
 import { createRpcServer } from './rpc/server';
 import type { RpcServer } from './rpc/server';
+import { initUpdater } from './updater';
 
 // Force canonical display name. package.json's `name` stays lowercase per
 // npm convention; this is what shows in the taskbar, window title, About
@@ -289,6 +290,9 @@ app.whenReady().then(async () => {
   logAppSession('app.opened');
   registerAssetHandlers();
   registerAssetProtocol();
+  // Decision 36: update checks + IPC. Before the window, so its first
+  // update:get is answered; off in dev and isolated worktrees.
+  initUpdater(getCliDispatch);
 
   // Only the packaged path needs the local renderer server; dev uses Vite.
   if (process.env['NODE_ENV'] !== 'development') {

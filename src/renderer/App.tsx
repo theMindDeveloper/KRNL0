@@ -26,6 +26,8 @@ import { TourHost } from './components/Tour/TourHost';
 import { useCliDispatch } from './store/useCliDispatch';
 import { installTimeLogWriter } from './store/timeLog';
 import { UndoNoticeBar } from './components/ui/UndoNoticeBar';
+import { UpdateNoticeBar } from './components/ui/UpdateNoticeBar';
+import { useUpdateBridge } from './store/updateStore';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
 // This is the only code path that satisfies "before first paint" for F6b.
@@ -143,6 +145,7 @@ function AppInner() {
       <RetagPickerHost />
       <TourHost />
       <UndoNoticeBar />
+      <UpdateNoticeBar />
     </div>
   );
 }
@@ -190,6 +193,7 @@ export function App() {
   const [attempt, setAttempt] = useState(0);
   useBoardChannel();
   useCliDispatch();
+  useUpdateBridge();
   // Decision 35 — log every board change of this window to the time log.
   useEffect(() => installTimeLogWriter(), []);
 

@@ -275,6 +275,16 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'update',
+    summary: 'App updates from GitHub Releases (Windows installs on restart; macOS/Linux link the download)',
+    subcommands: [
+      { name: 'status', usage: 'update status [--json]', summary: 'Current version and update state (default when no subcommand)' },
+      { name: 'check', usage: 'update check [--json]', summary: 'Check GitHub now; on Windows a newer version starts downloading' },
+      { name: 'install', usage: 'update install', summary: 'Restart into the downloaded update (Windows) or open the download page (macOS/Linux)' },
+      { name: 'open', usage: 'update open', summary: 'Open the release page (what\'s new) in the browser' },
+    ],
+  },
+  {
     group: 'tour',
     summary: 'Guided tutorials — one per part of the app',
     subcommands: [

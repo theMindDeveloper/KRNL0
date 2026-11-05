@@ -5,6 +5,7 @@ import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
+import { getUpdater } from '../updater';
 import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard } from '../persistence/board';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
 import { mergeBoards } from '../../shared/boardMerge';
@@ -215,12 +216,14 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   });
 
   ipcMain.handle('sys:run', async (_event, argv: string[]) => {
+    const updater = getUpdater();
     const facade = new SysFacade({
       boardPath: BOARD_PATH,
       hasOpenRenderer,
       onBoardChanged: notifyBoardChanged,
       viewSize: windowViewSize,
       ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
+      ...(updater ? { updater } : {}),
     });
     try {
       const result = await facade.run(argv);
