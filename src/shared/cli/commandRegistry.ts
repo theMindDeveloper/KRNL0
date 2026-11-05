@@ -275,6 +275,14 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'tour',
+    summary: 'Guided tutorials — one per part of the app',
+    subcommands: [
+      { name: 'list', usage: 'tour list', summary: 'List the tutorials' },
+      { name: 'start', usage: 'tour start <id>', summary: 'Start a tutorial in the KRNL0 window (welcome, pomo, todo, calendar, clock, habits, analytics, terminal)' },
+    ],
+  },
+  {
     group: 'term',
     summary: 'Control the active TerminalNode session',
     subcommands: [

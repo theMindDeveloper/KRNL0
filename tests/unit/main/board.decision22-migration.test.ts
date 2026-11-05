@@ -315,13 +315,14 @@ describe('Decision 22 — board migration', () => {
       .find((n) => n.id === 'mother-clock');
     expect(clock).toBeDefined();
     expect(clock!.kind).toBe('clock');
-    expect(clock!.position).toEqual({ x: 840, y: 0 });
+    // #207 — first start: Pomo, Todo, Calendar, Clock, Habits, Analytics.
+    expect(clock!.position).toEqual({ x: 280, y: 0 });
     expect(clock!.isMother).toBe(true);
     // ADR 0004 §3 — selectedDate defaults to today (local) in the seed.
     expect(clock!.state).toMatchObject({ linkedTodoId: null, viewWindow: 0 });
     expect((clock!.state as { selectedDate?: string }).selectedDate).toMatch(
       /^\d{4}-\d{2}-\d{2}$/,
     );
-    expect(clock!.config).toEqual({ stationSlot: 'top-right-lower' });
+    expect(clock!.config).toEqual({ stationSlot: 'top-right-upper' });
   });
 });

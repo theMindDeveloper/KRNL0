@@ -243,9 +243,11 @@ describe('ADR 0008 — station-mode migration', () => {
 
     expect(slotFor('pomo')).toBe('top-left');
     expect(slotFor('todo')).toBe('top-center');
-    expect(slotFor('habit')).toBe('top-right-pre');
-    expect(slotFor('calendar')).toBe('top-right-upper');
-    expect(slotFor('clock')).toBe('top-right-lower');
+    // #207 — top row Pomo, Todo, Calendar, Clock; bottom row Habits, Analytics.
+    expect(slotFor('habit')).toBe('bottom-right-pre');
+    expect(slotFor('calendar')).toBe('top-right-pre');
+    expect(slotFor('clock')).toBe('top-right-upper');
+    expect(slotFor('analytics')).toBe('top-right-lower');
     expect(slotFor('term')).toBe('bottom-strip');
   });
 

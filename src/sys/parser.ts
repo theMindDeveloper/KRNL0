@@ -86,6 +86,8 @@ export type SysCommand =
   | { kind: 'term'; sub: 'clear' }
   | { kind: 'term'; sub: 'setShell'; shell: string | undefined }
   | { kind: 'term'; sub: 'claude'; bypass: boolean }
+  | { kind: 'tour'; sub: 'list' }
+  | { kind: 'tour'; sub: 'start'; id: string | undefined }
   | { kind: 'node'; sub: 'move'; id: string | undefined; to: { x: number; y: number } | undefined }
   | { kind: 'viewport'; sub: 'pan'; dx: number | undefined; dy: number | undefined }
   | { kind: 'viewport'; sub: 'zoom'; factor: number | undefined }
@@ -706,6 +708,11 @@ export class SysParser {
       if (sub === 'clear') {
         return { kind: 'image', sub: 'clear', id: rest[0] };
       }
+    }
+
+    if (cmd === 'tour') {
+      if (sub === 'start') return { kind: 'tour', sub: 'start', id: rest[0] };
+      if (sub === 'list' || sub === undefined) return { kind: 'tour', sub: 'list' };
     }
 
     if (cmd === 'term') {

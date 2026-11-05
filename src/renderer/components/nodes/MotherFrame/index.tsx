@@ -171,6 +171,7 @@ export function MotherFrame({
     <div
       ref={frameRef}
       className="mother-frame"
+      data-tour={nodeId}
       onMouseEnter={() => setHoveredNodeId(nodeId)}
       onMouseLeave={() => setHoveredNodeId(null)}
       onDragOver={onDragOver}

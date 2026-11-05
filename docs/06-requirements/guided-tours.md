@@ -1,0 +1,30 @@
+# Guided tours and first-start layout
+
+Follow-up to #207. Code: `src/renderer/components/Tour/` (`tours.ts`, `TourHost.tsx`).
+
+## Functional Requirements
+
+| # | Requirement |
+|---|---|
+| F1 | **First-start layout.** A new board opens with Pomo, Todo, Calendar, Clock in the Station's top row and Habits, Analytics beside the canvas in the bottom row; the Terminal starts hidden. Canvas mode orders the window row the same way (Terminal last). Existing boards keep their layout. |
+| F2 | **One short tour per part of the app:** Welcome, Pomo, Todo, Calendar, Clock, Habits, Analytics, Terminal & AI. Each is a few plain-language steps. |
+| F3 | **Each step points at what it talks about:** the screen dims and the element is ringed (spotlight); the app stays usable underneath. A step can first bring a window into view (canvas: camera moves to it; Station: its panel is shown if hidden). |
+| F4 | **Steps wait for the user.** Either Next (button, Enter or →; Back with ←) or the real action — a click on a given control, or a board change (a task added, the Pomo started / stopped, a habit added, a task scheduled) — then the tour moves on by itself. Waiting steps show what they wait for and offer Skip. Esc or "End tour" stops. |
+| F5 | **Where to start them:** the Orb chat's "Tutorials" list, and `krnl tour list` / `krnl tour start <id>`. |
+
+## Gherkin
+
+```gherkin
+Feature: Guided tours
+
+  Scenario: F4 — a step waits for the real action
+    Given the Clock tour is on "Press WEEK to see your last 7 days"
+    When the user clicks the WEEK button
+    Then the tour shows the next step by itself
+
+  Scenario: F1 — first start
+    Given a new board
+    Then the Station top row is Pomo, Todo, Calendar, Clock
+    And the bottom row is the canvas, Habits, Analytics
+    And the Terminal is hidden
+```

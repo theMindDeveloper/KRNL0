@@ -164,8 +164,8 @@ const rootStyle: React.CSSProperties = {
   background: 'linear-gradient(180deg, var(--k-an-bg-2, #16181a) 0%, var(--k-an-bg, #0e1012) 100%)',
   border: '1px solid var(--k-an-line-2, #2a2e33)',
   borderRadius: 10,
-  boxShadow:
-    '0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)',
+  // No soft drop shadow (it read as a blur around the window) — a flat border.
+  boxShadow: 'none',
   display: 'flex',
   flexDirection: 'column',
   boxSizing: 'border-box',
@@ -194,7 +194,6 @@ const dotStyle: React.CSSProperties = {
   height: 8,
   borderRadius: '50%',
   background: 'var(--acid, #c9f158)',
-  boxShadow: '0 0 6px color-mix(in srgb, var(--acid) 70%, transparent)',
 };
 
 const summaryChipStyle: React.CSSProperties = {
@@ -322,9 +321,8 @@ function ChartCard({
   const cardStyle: React.CSSProperties = {
     background: 'linear-gradient(180deg, var(--k-an-bg-2b, #1a1d20) 0%, var(--k-an-bg, #131517) 100%)',
     border: `1px solid ${pinned ? 'rgba(201,241,88,0.45)' : 'var(--k-an-line, #23262a)'}`,
-    boxShadow: pinned
-      ? '0 0 0 1px rgba(201,241,88,0.18) inset, 0 6px 20px rgba(0,0,0,0.35)'
-      : 'inset 0 1px 0 rgba(255,255,255,0.02), 0 4px 14px rgba(0,0,0,0.25)',
+    // Flat cards: no blurred drop shadow.
+    boxShadow: pinned ? '0 0 0 1px rgba(201,241,88,0.18) inset' : 'none',
     borderRadius: 8,
     padding: '10px 12px 12px',
     display: 'flex',
@@ -751,9 +749,10 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
   if (!est) return null;
   const k = est.kpis;
   const tile = (label: string, value: string, sub: string, testId: string) => (
-    <div data-testid={testId} style={{ minWidth: 0, padding: '12px 14px', border: '1px solid var(--k-an-line, #2a2e33)', borderRadius: 10, background: 'var(--k-an-tile, rgba(255,255,255,0.02))', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #aab0b7)' }}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(20px, 4vh, 30px)', fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
+    // containerType lets the number scale with the tile's own width (cqi), so it never spills out.
+    <div data-testid={testId} style={{ minWidth: 0, minHeight: 0, padding: '10px 12px', border: '1px solid var(--k-an-line, #2a2e33)', borderRadius: 10, background: 'var(--k-an-tile, rgba(255,255,255,0.02))', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden', containerType: 'inline-size' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(16px, 17cqi, 28px)', fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
       <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--k-an-ink-3, #aab0b7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
     </div>
   );
@@ -782,7 +781,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
             {tile('Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy')}
             {tile('Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned')}
             {tile('Tracked', fmtMinutes(k.trackedMin), `${k.overCount} over · ${k.underCount} within plan`, 'estimates-kpi-tracked')}
-            {tile('Tagged focus', k.taggedShare === null ? '—' : `${Math.round(k.taggedShare * 100)}%`, 'of pomo work linked to a task', 'estimates-kpi-tagged')}
+            {tile('On a task', k.taggedShare === null ? '—' : `${Math.round(k.taggedShare * 100)}%`, 'of pomo work linked to a task', 'estimates-kpi-tagged')}
           </div>
         )),
       },

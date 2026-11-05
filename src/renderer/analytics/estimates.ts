@@ -140,7 +140,8 @@ export function computeEstimates(board: Board, range: RangeArg, nowMs: number): 
     const node = nodeById.get(id);
     const ts = node && node.kind === 'todo.task' ? (node.state as TaskState) : null;
     const led = ledgerById.get(id);
-    const plannedMin = ts?.plannedMin ?? ts?.durationMin ?? led?.plannedMin ?? 0;
+    // #207 — a task with no set time (estimate 0) has no estimate to compare.
+    const plannedMin = ts?.timeOpen ? 0 : ts?.plannedMin ?? ts?.durationMin ?? led?.plannedMin ?? 0;
     const trackedMin = trackedByTask.get(id) ?? 0;
     tasks.push({
       taskId: id,

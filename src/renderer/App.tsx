@@ -22,6 +22,7 @@ import { useBoardStore } from './store/boardStore';
 import { useBoardChannel } from './store/useBoardChannel';
 import { RadialChooserHost } from './components/ui/RadialChooser';
 import { LogTimeHost, RetagPickerHost } from './components/ui/SpanEditor';
+import { TourHost } from './components/Tour/TourHost';
 import { useCliDispatch } from './store/useCliDispatch';
 import { installTimeLogWriter } from './store/timeLog';
 import { UndoNoticeBar } from './components/ui/UndoNoticeBar';
@@ -140,6 +141,7 @@ function AppInner() {
       <RadialChooserHost />
       <LogTimeHost />
       <RetagPickerHost />
+      <TourHost />
       <UndoNoticeBar />
     </div>
   );

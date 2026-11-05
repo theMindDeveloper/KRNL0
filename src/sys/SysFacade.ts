@@ -3,6 +3,10 @@ import { SysParser } from './parser';
 import type { SysCommand } from './parser';
 import { loadBoardFrom } from '../main/persistence/board';
 import { logBoardChange, appendTimeLog } from '../main/persistence/timelog';
+import { TOURS } from '../renderer/components/Tour/tours';
+
+/** Line break for multi-line CLI messages. */
+const EOL = String.fromCharCode(10);
 import { timeLog, timeReport } from './commands/time';
 import * as habit from './commands/habit';
 import * as todo from './commands/todo';
@@ -290,6 +294,23 @@ export class SysFacade {
           `pid    : ${pid}`,
         ].join('\n'),
       };
+    }
+
+    // Guided tours (#207): list is headless, start needs the window.
+    if (command.kind === 'tour') {
+      if (command.sub === 'list') {
+        return {
+          ok: true,
+          message: TOURS.map((t) => `${t.id.padEnd(10)} ${t.title} — ${t.summary}`).join(EOL),
+          data: { tours: TOURS.map((t) => ({ id: t.id, title: t.title, summary: t.summary, steps: t.steps.length })) },
+        };
+      }
+      if (!command.id) return { ok: false, message: 'tour start requires <id> (see: krnl tour list)' };
+      if (!TOURS.some((t) => t.id === command.id)) return { ok: false, message: `no tour "${command.id}" (see: krnl tour list)` };
+      if (!this.deps.hasOpenRenderer() || !this.deps.cliDispatch) {
+        return { ok: false, message: 'tour start requires an open KRNL0 window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('tour.start', { id: command.id });
     }
 
     if (command.kind === 'term') {
