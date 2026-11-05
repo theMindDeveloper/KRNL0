@@ -12,6 +12,7 @@ Follow-up to #207. Code: `src/renderer/components/Tour/` (`tours.ts`, `TourHost.
 | F4 | **Steps wait for the user.** Either Next (button, Enter or →; Back with ←) or the real action — a click on a given control, or a board change (a task added, the Pomo started / stopped, a habit added, a task scheduled) — then the tour moves on by itself. Waiting steps show what they wait for and offer Skip. Esc or "End tour" stops. |
 | F5 | **Where to start them:** the Orb chat's "Tutorials" list, and `krnl tour list` / `krnl tour start <id>`. |
 | F6 | **The spotlight never slides.** The ring is drawn only once its target has stopped moving and is on screen, and it does not animate its position. The tour sits above modals (it can point into Settings). |
+| F7 | **Tours show, not just tell.** The ring carries a short label (PRESS, TICK TODAY, NEW IN ADVANCED). Steps ask for the real action where one exists (start / break / stop the Pomo, add and tick a task, add and tick a habit, open a page). Steps for controls that exist only in one mode are skipped in the other. The Easy and Advanced tour switches the app's mode live and rings what appears; the user's own mode comes back on End unless they pick one on the last step. The card stays put while the next target settles. |
 
 ## Gherkin
 

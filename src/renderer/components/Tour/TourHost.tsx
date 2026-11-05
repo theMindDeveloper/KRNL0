@@ -13,7 +13,7 @@ import { focusNode } from '../../store/scheduleActions';
 import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { SPACE } from '../ui/spacing';
-import { tourById, type Tour } from './tours';
+import { stepsFor, tourById, type Tour } from './tours';
 
 export const TOUR_EVENT = 'krnl:tour';
 
@@ -48,8 +48,26 @@ export function TourHost(): JSX.Element | null {
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const startBoard = useRef<Board | null>(null);
+  // The user's own mode, put back when a tour that switched modes ends
+  // without the user choosing one.
+  const ownMode = useRef<'easy' | 'advanced' | null>(null);
+  const modeChosen = useRef(false);
+  // Last card position: the card stays where it is while the next target
+  // settles, instead of jumping to the centre and back.
+  const cardPos = useRef<{ left: number; top: number } | null>(null);
 
-  const end = (): void => { setTour(null); setI(0); setRect(null); };
+  const end = (): void => {
+    if (ownMode.current && !modeChosen.current) useBoardStore.getState().setUiMode(ownMode.current);
+    ownMode.current = null;
+    modeChosen.current = false;
+    cardPos.current = null;
+    setTour(null); setI(0); setRect(null);
+  };
+  const choose = (mode: 'easy' | 'advanced'): void => {
+    modeChosen.current = true;
+    useBoardStore.getState().setUiMode(mode);
+    end();
+  };
   const step = tour?.steps[i];
   const last = !!tour && i === tour.steps.length - 1;
   const next = (): void => { if (!tour) return; if (last) end(); else setI(i + 1); };
@@ -58,7 +76,11 @@ export function TourHost(): JSX.Element | null {
   useEffect(() => {
     const on = (e: Event): void => {
       const t = tourById((e as CustomEvent<{ id: string }>).detail.id);
-      if (t) { setTour(t); setI(0); }
+      if (!t) return;
+      // Only the steps that exist in the user's mode (no ring on a hidden control).
+      const mode = useBoardStore.getState().board?.uiMode === 'easy' ? 'easy' : 'advanced';
+      setTour({ ...t, steps: stepsFor(t, mode) });
+      setI(0);
     };
     window.addEventListener(TOUR_EVENT, on);
     return () => window.removeEventListener(TOUR_EVENT, on);
@@ -67,6 +89,12 @@ export function TourHost(): JSX.Element | null {
   // entering a step: bring its window into view, remember the board
   useEffect(() => {
     if (!step) return;
+    const st = useBoardStore.getState();
+    if (step.mode) {
+      const cur = st.board?.uiMode === 'easy' ? 'easy' : 'advanced';
+      if (ownMode.current === null) ownMode.current = cur;
+      if (cur !== step.mode) st.setUiMode(step.mode);
+    }
     startBoard.current = useBoardStore.getState().board;
     if (step.node) bringIntoView(step.node);
   }, [tour, i]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,15 +110,19 @@ export function TourHost(): JSX.Element | null {
     const same = (a: Rect | null, b: Rect | null): boolean =>
       !!a && !!b && Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1;
     const measure = (): void => {
-      const el = step.target ? document.querySelector(step.target) : null;
+      // The target, or (when it isn't on screen, e.g. no tasks to show a tag
+      // on) the window the step is about.
+      const el = (step.target ? document.querySelector(step.target) : null)
+        ?? (step.node ? document.querySelector(`[data-tour="${step.node}"]`) : null);
       const r = el?.getBoundingClientRect();
       const now: Rect | null = r && r.width > 0 && r.height > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height } : null;
       const onScreen = !!now && now.left < window.innerWidth && now.top < window.innerHeight && now.left + now.width > 0 && now.top + now.height > 0;
-      const settled = onScreen && same(now, prev);
+      const still = same(now, prev);
       prev = now;
-      setRect((cur) => (settled ? (same(cur, now) ? cur : now) : null));
+      // Same place as the ring already shows (Next on the same target): keep
+      // it, no blink. Somewhere new: wait until it stops moving.
+      setRect((cur) => (!onScreen ? null : same(cur, now) ? cur : still ? now : null));
     };
-    setRect(null);
     measure();
     const id = setInterval(measure, 120);
     return () => clearInterval(id);
@@ -120,7 +152,7 @@ export function TourHost(): JSX.Element | null {
       if (e.key === 'Escape') { end(); return; }
       const typing = e.target instanceof HTMLElement && (e.target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(e.target.tagName));
       if (typing) return;
-      if ((e.key === 'Enter' || e.key === 'ArrowRight') && !step?.waitFor) { e.preventDefault(); next(); }
+      if ((e.key === 'Enter' || e.key === 'ArrowRight') && !step?.waitFor && !step?.choices) { e.preventDefault(); next(); }
       if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); setI(i - 1); }
     };
     window.addEventListener('keydown', on);
@@ -129,14 +161,20 @@ export function TourHost(): JSX.Element | null {
 
   if (!tour || !step) return null;
 
-  // card: under the target if there is room, else above, else centred
+  // card: under the target if there is room, else above; centred when the
+  // step points at nothing; kept where it was while a new target settles.
   const W = 320;
   const pad = 8;
+  const pointsAt = !!(step.target || step.node);
   let cardLeft = window.innerWidth / 2 - W / 2;
   let cardTop = window.innerHeight / 2 - 80;
   if (rect) {
     cardLeft = Math.max(12, Math.min(rect.left, window.innerWidth - W - 12));
-    cardTop = rect.top + rect.height + 14 + 170 < window.innerHeight ? rect.top + rect.height + 14 : Math.max(12, rect.top - 14 - 170);
+    cardTop = rect.top + rect.height + 14 + 200 < window.innerHeight ? rect.top + rect.height + 14 : Math.max(12, rect.top - 14 - 200);
+    cardPos.current = { left: cardLeft, top: cardTop };
+  } else if (pointsAt && cardPos.current) {
+    cardLeft = cardPos.current.left;
+    cardTop = cardPos.current.top;
   }
   const btn = (primary: boolean): React.CSSProperties => ({
     fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.06em', padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
@@ -145,13 +183,24 @@ export function TourHost(): JSX.Element | null {
 
   return createPortal(
     <>
+      {/* The ring fades in where it is; it never slides (UI rule 8). */}
+      <style>{'@keyframes krnl-tour-in { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }'}</style>
       {/* spotlight: a ring around the target, the rest dimmed (no pointer events) */}
       {rect ? (
-        <div data-testid="tour-spotlight" aria-hidden style={{
+        <div key={`${tour.id}-${step.target ?? step.node ?? ''}`} data-testid="tour-spotlight" aria-hidden style={{
           position: 'fixed', left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2,
-          borderRadius: 10, border: '2px solid var(--acid)', boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)',
-          pointerEvents: 'none', zIndex: Z.tourBackdrop,
-        }} />
+          borderRadius: 10, border: '2px solid var(--acid)',
+          boxShadow: '0 0 0 9999px rgba(0,0,0,0.45), 0 0 18px color-mix(in srgb, var(--acid) 45%, transparent)',
+          pointerEvents: 'none', zIndex: Z.tourBackdrop, animation: 'krnl-tour-in 180ms ease-out',
+        }}>
+          {step.badge && (
+            <span data-testid="tour-badge" style={{
+              position: 'absolute', left: -2, top: -22, padding: '2px 7px', borderRadius: 4,
+              background: 'var(--acid)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 9.5,
+              fontWeight: 700, letterSpacing: '0.08em', whiteSpace: 'nowrap',
+            }}>{step.badge}</span>
+          )}
+        </div>
       ) : (
         <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', pointerEvents: 'none', zIndex: Z.tourBackdrop }} />
       )}
@@ -176,7 +225,11 @@ export function TourHost(): JSX.Element | null {
           <button type="button" data-testid="tour-end" style={{ ...btn(false), border: 'none', padding: '6px 0', color: 'var(--ink-4)' }} onClick={end}>End tour</button>
           <span style={{ flex: 1 }} />
           {i > 0 && <button type="button" data-testid="tour-back" style={btn(false)} onClick={() => setI(i - 1)}>Back</button>}
-          {step.waitFor
+          {step.choices
+            ? step.choices.map((c, k) => (
+              <button key={c.mode} type="button" data-testid={`tour-choose-${c.mode}`} style={btn(k === 0)} onClick={() => choose(c.mode)}>{c.label}</button>
+            ))
+            : step.waitFor
             ? <button type="button" data-testid="tour-skip" style={btn(false)} onClick={next}>Skip</button>
             : <button type="button" data-testid="tour-next" style={btn(true)} onClick={next}>{last ? 'Done' : 'Next'}</button>}
         </div>
