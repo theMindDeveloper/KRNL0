@@ -21,7 +21,9 @@ import { StatusBar } from './components/StatusBar';
 import { useBoardStore } from './store/boardStore';
 import { useBoardChannel } from './store/useBoardChannel';
 import { RadialChooserHost } from './components/ui/RadialChooser';
+import { LogTimeHost, RetagPickerHost } from './components/ui/SpanEditor';
 import { useCliDispatch } from './store/useCliDispatch';
+import { installTimeLogWriter } from './store/timeLog';
 import { UndoNoticeBar } from './components/ui/UndoNoticeBar';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
@@ -136,6 +138,8 @@ function AppInner() {
       </div>
       <StatusBar fallbackNotice={isFallingBack} />
       <RadialChooserHost />
+      <LogTimeHost />
+      <RetagPickerHost />
       <UndoNoticeBar />
     </div>
   );
@@ -184,6 +188,8 @@ export function App() {
   const [attempt, setAttempt] = useState(0);
   useBoardChannel();
   useCliDispatch();
+  // Decision 35 — log every board change of this window to the time log.
+  useEffect(() => installTimeLogWriter(), []);
 
   useEffect(() => {
     // window.krnl?.boardLoad() returns undefined when krnl bridge is absent;

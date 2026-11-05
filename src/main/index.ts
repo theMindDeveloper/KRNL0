@@ -4,7 +4,7 @@ import { mkdirSync, copyFileSync, existsSync, chmodSync } from 'fs';
 import { readFile, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { createServer, type Server } from 'http';
-import { registerHandlers, getCliDispatch } from './ipc/handlers';
+import { registerHandlers, getCliDispatch, backfillTimeLogAtStartup, logAppSession } from './ipc/handlers';
 import {
   registerAssetHandlers,
   registerAssetProtocol,
@@ -283,6 +283,10 @@ app.whenReady().then(async () => {
   rpcServer = createRpcServer(boardPath, getCliDispatch);
 
   registerHandlers(rpcServer);
+  // Decision 35 / time-log F4: one-time backfill of the time log from the
+  // board, before the window (and so any renderer append) exists.
+  backfillTimeLogAtStartup();
+  logAppSession('app.opened');
   registerAssetHandlers();
   registerAssetProtocol();
 
@@ -309,6 +313,7 @@ app.on('window-all-closed', () => {
 
 // TNF1: teardown on quit
 app.on('before-quit', () => {
+  logAppSession('app.closed');
   rpcServer?.close();
   rendererServer?.close();
 });

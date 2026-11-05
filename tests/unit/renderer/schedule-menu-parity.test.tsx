@@ -102,12 +102,19 @@ describe('Calendar ↔ Clock right-click parity', () => {
     expect(clock).toEqual(cal);
   });
 
-  it('a tracked focus segment offers the same actions on both surfaces', () => {
+  it('right-click on recorded time opens the same popup as left-click, on both surfaces', () => {
     seed();
-    const cal = calendarMenuAt(10.2);
-    const clock = clockMenu('[data-testid="clock-reality-arc"]');
-    expect(cal).toEqual(['Tag → Physics', 'Untag', 'Details…', 'Delete segment']);
-    expect(clock).toEqual(cal);
+    let view = render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
+    const col = document.querySelector(`[data-testid="week-col-${TODAY}"]`) as HTMLElement;
+    fireEvent.contextMenu(col, { clientY: 10.2 * 28, clientX: 60 });
+    expect(document.querySelector('[data-testid="calendar-reality-popup"]')).toBeTruthy();
+    // No separate right-click menu for recorded time any more.
+    expect(menuLabels()).not.toContain('Untag');
+    view.unmount();
+    view = render(<ClockNode node={clockNode()} selected={false} onCommand={() => {}} onSelect={() => {}} />);
+    fireEvent.contextMenu(document.querySelector('[data-testid="clock-reality-arc"]') as Element, { clientX: 60, clientY: 60 });
+    expect(document.querySelector('[data-testid="clock-reality-popup"]')).toBeTruthy();
+    view.unmount();
   });
 
   it('menu actions change the board (retag, delete, unschedule)', async () => {
@@ -117,11 +124,11 @@ describe('Calendar ↔ Clock right-click parity', () => {
     const pomo = () => useBoardStore.getState().board!.nodes.find((n) => n.kind === 'pomo')!.state as { history: Array<{ taskId: string | null }> };
 
     fireEvent.contextMenu(col, { clientY: 10.2 * 28, clientX: 60 });
-    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Tag → Physics' })); });
+    act(() => { fireEvent.click(screen.getByTestId('calendar-reality-retag')); });
+    act(() => { fireEvent.click(screen.getByTestId('calendar-reality-retag-picker-task-t-phys')); });
     expect(pomo().history[0]!.taskId).toBe('t-phys');
 
-    fireEvent.contextMenu(col, { clientY: 10.2 * 28, clientX: 60 });
-    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Delete segment' })); });
+    act(() => { fireEvent.click(screen.getByTestId('calendar-reality-delete')); });
     expect(pomo().history).toEqual([]);
 
     fireEvent.contextMenu(col, { clientY: 8.5 * 28, clientX: 60 });

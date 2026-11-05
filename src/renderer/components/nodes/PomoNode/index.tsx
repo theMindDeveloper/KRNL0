@@ -18,6 +18,8 @@ import { Mac } from './variants/Mac';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { AppSelect } from '../../ui/AppSelect';
 import { boardTagLibrary, spanTagFor } from '../../../store/spanTags';
+import { PomoTimeLinks } from './PomoTimeLinks';
+import { PlannedNowChip } from './PlannedNowChip';
 import { SpanLabeler } from './SpanLabeler';
 import { decodeTargets, encodeTargets, spanTaskTargets, startOfLocalDayMs } from './taskTargets';
 import { DoingPicker, type DoingChoice } from './DoingPicker';
@@ -155,9 +157,10 @@ export function PomoNode({
   // open tasks, then tasks done today (#204 — ticking a task done must not
   // make it impossible to keep counting time toward it). Same list builder
   // as the Calendar's retag list.
-  const todayStartMs = startOfLocalDayMs(Date.now());
   const tagOptionKeys = useBoardStore(
-    useShallow((s) => encodeTargets(spanTaskTargets(s.board?.nodes, { doneSinceMs: todayStartMs }))),
+    // #207 — any done task can still collect time (pickers show the newest
+    // few and search finds the rest).
+    useShallow((s) => encodeTargets(spanTaskTargets(s.board?.nodes))),
   );
   const tagOptions = useMemo(() => decodeTargets(tagOptionKeys), [tagOptionKeys]);
 
@@ -860,6 +863,9 @@ export function PomoNode({
             />
           )}
 
+          {/* time-model F5 (#207): suggest the task planned for now; one click, never silent. */}
+          {!away && <PlannedNowChip state={state} easy={easy} onCommand={onCommand} />}
+
           {/* Observe mode: Start → (Break ⇄ Back to work) → Stop. Work and
               breaks are both recorded spans; there is no pause. */}
           {away ? (
@@ -1012,6 +1018,8 @@ export function PomoNode({
               </button>
             </div>
           )}
+          {/* #207 — fix recorded time where it happens: stop at the real time, or add forgotten time. */}
+          <PomoTimeLinks state={state} />
 
         </div>
       )}

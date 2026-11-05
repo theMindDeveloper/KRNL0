@@ -658,16 +658,16 @@ export function Orb() {
                   <button
                     type="button"
                     data-testid="orb-claude-bypass"
-                    title="Shows the terminal and runs: claude --dangerously-skip-permissions"
+                    title="Opens the terminal and starts Claude Code with permission prompts off (claude --dangerously-skip-permissions)"
                     onClick={() => {
                       setOpen(false);
                       void launchClaudeInTerminal(true).then((r) => { if (!r.ok) emit('sys.error', `Claude Code: ${r.message}`, { severity: 'warn' }); });
                     }}
                     style={{
                       textAlign: 'left',
-                      background: 'rgba(201, 241, 88, 0.06)',
-                      border: '1px solid rgba(201, 241, 88, 0.30)',
-                      color: 'var(--accent-on-dark)',
+                      background: 'linear-gradient(90deg, rgba(217,119,87,0.24) 0%, rgba(217,119,87,0.08) 60%, rgba(217,119,87,0.14) 100%)',
+                      border: '1px solid rgba(217, 119, 87, 0.65)',
+                      color: '#e8916f',
                       padding: '6px 8px',
                       borderRadius: 4,
                       fontFamily: 'inherit',
@@ -675,9 +675,12 @@ export function Orb() {
                       cursor: 'pointer',
                       letterSpacing: '0.02em',
                       marginBottom: 4,
+                      // Claude orange glow — static (no animation, frame budget #197).
+                      textShadow: '0 0 6px rgba(217,119,87,0.55)',
+                      boxShadow: '0 0 10px rgba(217,119,87,0.35), inset 0 0 8px rgba(217,119,87,0.12)',
                     }}
                   >
-                    {'▸ claude code · bypass permissions'}
+                    {'▸ claude code'}
                   </button>
                   {FLOWS.map((flow) => (
                     <button

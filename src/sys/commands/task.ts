@@ -449,8 +449,8 @@ export async function taskDuration(
   minutes: number | undefined,
 ): Promise<SysResult> {
   if (!taskId) return { ok: false, message: 'task duration requires a <taskId>' };
-  if (minutes === undefined || isNaN(minutes) || minutes <= 0) {
-    return { ok: false, message: 'task duration requires a positive <minutes> number' };
+  if (minutes === undefined || isNaN(minutes) || minutes < 0) {
+    return { ok: false, message: 'task duration requires <minutes> (0 = no set time)' };
   }
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
@@ -476,8 +476,10 @@ export async function taskDuration(
   saveBoard(ctx, board);
   return {
     ok: true,
-    message: `Task "${taskId.slice(0, 8)}" duration set to ${nextState.durationMin} min.`,
-    data: { id: taskId, durationMin: nextState.durationMin },
+    message: nextState.timeOpen
+      ? `Task "${taskId.slice(0, 8)}" has no set time now.`
+      : `Task "${taskId.slice(0, 8)}" duration set to ${nextState.durationMin} min.`,
+    data: { id: taskId, durationMin: nextState.durationMin, timeOpen: !!nextState.timeOpen },
   };
 }
 

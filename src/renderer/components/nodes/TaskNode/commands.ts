@@ -62,6 +62,9 @@ export const taskSetPlannedMin = (
   args: { minutes: number },
 ): TaskState => {
   if (typeof args.minutes !== 'number' || !Number.isFinite(args.minutes)) return state;
+  // #207 — 0 means "no set time": the task becomes open-ended (Calendar /
+  // Clock draw it fading out). plannedMin stays as the layout placeholder.
+  if (Math.round(args.minutes) <= 0) return { ...state, timeOpen: true };
   const plannedMin = Math.max(1, Math.round(args.minutes));
   // Keep the calendar block in sync. When a task is anchored on the calendar,
   // its block height is driven by scheduledDurationMin (the per-placement
@@ -104,6 +107,7 @@ export const taskSetDuration = (
   state: TaskState,
   args: { durationMin: number },
 ): TaskState => {
+  if (Math.round(args.durationMin) <= 0) return taskSetPlannedMin(state, { minutes: 0 });
   const min = Math.max(1, Math.min(480, Math.round(args.durationMin)));
   return taskSetPlannedMin({ ...state, durationMin: min, eta: `~${min} min` }, { minutes: min });
 };

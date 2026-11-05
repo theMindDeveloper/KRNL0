@@ -5,6 +5,7 @@ import type { DrawStroke } from '../../shared/types/board';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TodoItem, TodoState } from '../components/nodes/TodoNode/types';
 import { recordCompletion as recordCompletionLedger, clearCompletion as clearCompletionLedger } from './completionLedger';
+import { withoutTimeLog } from './timeLogPause';
 import {
   activeCanvasOf,
   isSharedNode,
@@ -173,9 +174,11 @@ export const useBoardStore = create<BoardStore>((set) => ({
   selectNode: (id) => set({ selectedNodeId: id }),
   setHoveredNodeId: (id) => set({ hoveredNodeId: id }),
 
-  setBoard: (board) => set({ board, viewport: board.viewport, history: [], future: [] }),
+  // Decision 35: adopting a loaded board is not a change to time-log.
+  setBoard: (board) => withoutTimeLog(() => set({ board, viewport: board.viewport, history: [], future: [] })),
 
-  reloadBoard: (board) =>
+  // A reload adopts a CLI write main has already time-logged.
+  reloadBoard: (board) => withoutTimeLog(() =>
     set((s) => {
       if (!s.board) return { board, viewport: board.viewport, history: [], future: [] };
       const same =
@@ -187,7 +190,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
         history: [...s.history, s.board].slice(-HISTORY_CAP),
         future: [],
       };
-    }),
+    })),
 
   updateNode: (id, patch, opts) =>
     set((s) => {
@@ -419,8 +422,10 @@ export const useBoardStore = create<BoardStore>((set) => ({
       };
     }),
 
+  // Not time-logged (a wipe, not a correction) — see Decision 35 notes in
+  // docs/06-requirements/time-log.md.
   clearFocusHistory: () => {
-    set((s) => {
+    withoutTimeLog(() => set((s) => {
       if (!s.board) return s;
       const { completions: _drop, ...rest } = s.board;
       void _drop;
@@ -436,13 +441,16 @@ export const useBoardStore = create<BoardStore>((set) => ({
       // Non-undoable: drop both stacks so a stale snapshot can't restore the
       // wiped history.
       return { board: cleared, history: [], future: [] };
-    });
+    }));
+    // Decision 35 — the log keeps history, so record the wipe (views drop
+    // everything before it). Lazy import: timeLog imports this store.
+    void import('./timeLog').then((m) => m.logTime({ type: 'history.cleared' }));
   },
 
   factoryReset: async () => {
     const fresh = (await window.krnl?.boardReset?.()) as Board | undefined;
     if (!fresh) return;
-    set({ board: fresh, viewport: fresh.viewport, history: [], future: [] });
+    withoutTimeLog(() => set({ board: fresh, viewport: fresh.viewport, history: [], future: [] }));
   },
 
   // ADR 0008 § 2.1 / § 4.1 — setLayoutMode persists through the same boardSave

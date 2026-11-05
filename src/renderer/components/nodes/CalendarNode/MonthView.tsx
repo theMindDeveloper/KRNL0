@@ -13,6 +13,8 @@ import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMonthDays, getMondayOf, toYMD } from '../HabitNode/types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
+import { selectPomoReality } from '../../../store/pomoReality';
+import { fmtMinutes } from '../ClockNode/dayModel';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 
 interface ScheduledTask {
@@ -130,6 +132,25 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
   const anchor = parseAnchorDate(state.anchorDate);
   // Re-renders at midnight, so the today cell moves with the clock.
   const todayYMD = useLocalDay();
+  // #207 / time-log F10 — recorded work minutes per local day (split at midnight).
+  const pomoNode = useBoardStore((st) => st.board?.nodes.find((n) => n.kind === 'pomo'));
+  const focusByDay = useMemo(() => {
+    const out = new Map<string, number>();
+    const board = useBoardStore.getState().board;
+    for (const seg of selectPomoReality(board, Date.now())) {
+      if (seg.kind !== 'work') continue;
+      let cursor = seg.startMs;
+      for (let guard = 0; guard < 14 && cursor < seg.endMs; guard++) {
+        const d = new Date(cursor);
+        const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+        const end = Math.min(seg.endMs, dayEnd);
+        const key = toYMD(d);
+        out.set(key, (out.get(key) ?? 0) + (end - cursor) / 60_000);
+        cursor = end;
+      }
+    }
+    return out;
+  }, [pomoNode, todayYMD]);
   const showHabits = config?.showHabits !== false;
   const cells = useMemo(() => buildMonthGrid(anchor), [state.anchorDate]);
   const monthLabel = formatMonthLabel(anchor);
@@ -533,6 +554,16 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                 />
               )}
 
+              {/* #207 / time-log F10 — recorded hours that day (top-left). */}
+              {inCurrentMonth && (focusByDay.get(ymd) ?? 0) > 0 && (
+                <span
+                  data-testid={`month-hours-${ymd}`}
+                  title="Recorded work this day"
+                  style={{ position: 'absolute', top: 3, left: 4, zIndex: 1, fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}
+                >
+                  {fmtMinutes(focusByDay.get(ymd) ?? 0)}
+                </span>
+              )}
               {/* PR7.1 — Day number ALWAYS shows (faded for out-of-month,
                   per the LifeOS reference). Chips and habit dots only
                   render for current-month cells. */}

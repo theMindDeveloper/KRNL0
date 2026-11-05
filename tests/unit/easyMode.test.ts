@@ -42,8 +42,9 @@ describe('Easy mode UI rules', () => {
 
   it('D7: Easy span menu has no retag items', () => {
     const labels = (easy: boolean) => segmentMenuItems(seg, { targets: [{ id: 'x', text: 'Other' }], easy }).map((i) => i.label);
-    expect(labels(false).some((l) => l.startsWith('Tag →') || l === 'Untag')).toBe(true);
-    expect(labels(true).some((l) => l.startsWith('Tag →') || l === 'Untag')).toBe(false);
+    const retag = (l: string) => l.endsWith('task…') || l === 'Untag';
+    expect(labels(false).some(retag)).toBe(true);
+    expect(labels(true).some(retag)).toBe(false);
     expect(labels(true)).toContain('Delete segment');
   });
 
@@ -60,7 +61,9 @@ describe('Easy mode UI rules', () => {
     expect(ids).not.toContain('tags');
     expect(pagesFor(false).length - ids.length).toBe(2);
     expect(cardPlacement('estimates.kpis', true)).toEqual({ display: 'none' });
-    // 'insights' follows 'hours' directly in Easy: page index 4 → grid row 9
-    expect(cardPlacement('insights.radar', true).gridRow).toBe('9 / span 1');
+    // Easy keeps the Time log page (#207 — no task links needed): summary,
+    // activity, year, hours, log, insights → 'insights' is page index 5 → grid row 11
+    expect(pagesFor(true).map((p) => p.id)).toContain('log');
+    expect(cardPlacement('insights.radar', true).gridRow).toBe('11 / span 1');
   });
 });

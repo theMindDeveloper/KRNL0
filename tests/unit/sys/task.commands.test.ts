@@ -504,11 +504,19 @@ describe('sys task duration', () => {
     expect(res.ok).toBe(false);
   });
 
-  it('returns error when minutes is zero or negative', async () => {
+  it('returns error when minutes is negative', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'task');
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskDuration(ctx, taskId, -5);
+    expect(res.ok).toBe(false);
+  });
+
+  it('0 minutes = no set time (#207)', async () => {
     const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'task');
     const taskId = (addRes.data as { id: string }).id;
     const res = await taskDuration(ctx, taskId, 0);
-    expect(res.ok).toBe(false);
+    expect(res.ok).toBe(true);
+    expect((res.data as { timeOpen: boolean }).timeOpen).toBe(true);
   });
 
   it('returns error when task id is unknown', async () => {

@@ -16,6 +16,7 @@ import {
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import { resolveNodeRef, resolutionError } from '../../shared/dispatch/resolveRef';
+import { pomoEditSegment as fsmEditSegment, pomoAddSegment as fsmAddSegment, spanProblem, hmOf, ymdOf } from '../../renderer/components/nodes/PomoNode/spanEdit';
 import type { BoardShape } from '../../shared/dispatch/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
@@ -81,15 +82,17 @@ export function pomoStart(label?: string, minutes?: number): SysResult {
     // Easy mode never links a span (easy-mode D13), same as the UI's START.
     if (easy) { startArgs.activeTaskId = null; startArgs.label = ''; }
     if (label !== undefined) startArgs.label = label;
-    // Same as the UI: an untagged start is tagged with the open task whose
-    // planned block contains "now" (time-model F5).
+    // time-model F5 (revised #207): an untagged start stays untagged; name the
+    // task planned for now so the user can accept it in one command.
     const suggested = label === undefined && prev.activeTaskId === null && !prev.label && !easy ? plannedTaskNow(board) : null;
-    if (suggested) {
-      startArgs.activeTaskId = suggested.id;
-      startArgs.label = suggested.text;
-    }
     node['state'] = fsmStart(prev, startArgs, cliEnv());
-    result = { ok: true, message: suggested ? `Pomodoro started on "${suggested.text}"` : 'Pomodoro started' };
+    result = {
+      ok: true,
+      message: suggested
+        ? `Pomodoro started (planned now: "${suggested.text}" — track it with: krnl pomo tag "${suggested.text}")`
+        : 'Pomodoro started',
+      ...(suggested ? { data: { plannedNow: suggested } } : {}),
+    };
   });
   return result;
 }
@@ -325,6 +328,74 @@ export function pomoRetag(
     result = { ok: true, message: `segment ${id.slice(0, 8)} → ${shown}` };
   });
   return result;
+}
+
+/**
+ * `pomo segment <id> [--start T] [--end T]` — move a recorded span (#207 F7).
+ * T is HH:MM on the span's own day (an end not after the start is the next
+ * morning) or YYYY-MM-DDTHH:MM.
+ */
+export function pomoEditSegmentCmd(ctx: PomoTagCtx, segmentId: string | undefined, start: string | undefined, end: string | undefined): SysResult {
+  if (!segmentId || (start === undefined && end === undefined)) return { ok: false, message: 'pomo segment requires <segmentId> --start HH:MM and/or --end HH:MM' };
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  mutatePomoBoard(ctx, (board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    const seg = resolveSegmentId(prev, segmentId);
+    if ('error' in seg) { result = { ok: false, message: seg.error }; return; }
+    const rec = prev.history.find((r) => r.id === seg.id);
+    if (!rec) return;
+    const day = ymdOf(Date.parse(rec.startedAt));
+    const startMs = start === undefined ? Date.parse(rec.startedAt) : parseOnDay(start, day);
+    let endMs = end === undefined ? Date.parse(rec.endedAt) : parseOnDay(end, day);
+    if (startMs === undefined || endMs === undefined) { result = { ok: false, message: 'times are HH:MM or YYYY-MM-DDTHH:MM' }; return; }
+    if (end !== undefined && HM_RE.test(end) && endMs <= startMs) endMs += 86_400_000;
+    const problem = spanProblem(prev, { startMs, endMs }, Date.now(), { exceptId: seg.id, kind: rec.kind });
+    if (problem) { result = { ok: false, message: problem }; return; }
+    node['state'] = { ...prev, history: fsmEditSegment(prev, { id: seg.id, startMs, endMs }).history };
+    result = { ok: true, message: `segment ${seg.id.slice(0, 8)} → ${hmOf(startMs)}–${hmOf(endMs)}` };
+  });
+  return result;
+}
+
+/**
+ * `pomo add --start T --end T [--task <ref>] [--text "what"]` — record time
+ * that wasn't recorded (#207 F7b). T as in `pomo segment`; HH:MM is today.
+ */
+export function pomoAddSegmentCmd(ctx: PomoTagCtx, start: string | undefined, end: string | undefined, ref: string | undefined, text: string | undefined): SysResult {
+  if (!start || !end) return { ok: false, message: 'pomo add requires --start HH:MM --end HH:MM [--task <ref>] [--text "what"]' };
+  const day = start.includes('T') ? start.slice(0, 10) : ymdOf(Date.now());
+  const startMs = parseOnDay(start, day);
+  let endMs = parseOnDay(end, day);
+  if (startMs === undefined || endMs === undefined) return { ok: false, message: 'times are HH:MM or YYYY-MM-DDTHH:MM' };
+  if (HM_RE.test(end) && endMs <= startMs) endMs += 86_400_000;
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  mutatePomoBoard(ctx, (board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const tag = ref ? resolveTag(board as unknown as BoardShape, ref) : { taskId: null, label: (text ?? '').trim() };
+    if ('error' in tag) { result = { ok: false, message: tag.error }; return; }
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    const problem = spanProblem(prev, { startMs, endMs }, Date.now());
+    if (problem) { result = { ok: false, message: problem }; return; }
+    const spanTag = !tag.taskId && tag.label ? spanTagFor(board as unknown as Board, tag.label, null) : null;
+    const id = cliEnv().uuid();
+    node['state'] = { ...prev, history: fsmAddSegment(prev, { id, startMs, endMs, taskId: tag.taskId, label: tag.label, tag: spanTag }).history };
+    result = { ok: true, message: `added ${hmOf(startMs)}–${hmOf(endMs)}${tag.label ? ` "${tag.label}"` : ''} (segment ${id.slice(0, 8)})`, data: { id } };
+  });
+  return result;
+}
+
+const HM_RE = /^\d{1,2}:\d{2}$/;
+
+/** HH:MM on `day` (local) or a full YYYY-MM-DDTHH:MM → epoch ms. */
+function parseOnDay(t: string, day: string): number | undefined {
+  if (t.includes('T')) return parseStopAt(t, Date.now());
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return undefined;
+  const [y, mo, d] = day.split('-').map(Number) as [number, number, number];
+  return new Date(y, mo - 1, d, Number(m[1]), Number(m[2])).getTime();
 }
 
 /** Resolve a unique recorded segment id from a prefix. */

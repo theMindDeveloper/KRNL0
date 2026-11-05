@@ -47,7 +47,7 @@ import { useFrameTheme } from '../../themes/useFrameTheme';
 import { SLOT_DEFAULTS } from './SlotResolver';
 import type { MotherNodeConfig, StationSlot } from '../../../shared/types';
 import type { Node } from '../../../shared/types/node';
-import { restoredSizes } from './restoredSizes';
+import { restoredSizes, restoredSizesAround } from './restoredSizes';
 import { bottomUnchanged, columnsUnchanged, rowUnchanged, useSnapshot } from './layoutGeometry';
 
 const PANEL_IDS = {
@@ -261,7 +261,11 @@ export function StationLayout() {
   // saved widths share out the rest of the row.
   const flexItems = bottomItems.filter((it) => it.id !== PANEL_IDS.bottomClock);
   const flexTotal = bottomVisible.clock ? 100 - clockSize : 100;
-  const flexSizes = useSnapshot(`${bottomItems.map((it) => it.id).join(',')}|${hasSaved}`, () => restoredSizes(
+  // Terminal and analytics come back at the width the user last gave them
+  // (the canvas filled their space while they were hidden); the canvas takes
+  // what is left.
+  const flexSizes = useSnapshot(`${bottomItems.map((it) => it.id).join(',')}|${hasSaved}`, () => restoredSizesAround(
+    PANEL_IDS.bottomCanvas,
     flexItems.map((it) => it.id),
     flexItems.map((it) => it.size),
     flexItems.map((it) => it.min),

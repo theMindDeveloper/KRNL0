@@ -10,6 +10,7 @@
 //   Unschedule        → task unschedule <ref>
 // "Details…" and "Show on canvas" only open UI / move the camera.
 
+import { openRetagPicker } from '../ui/SpanEditor';
 import type { ContextMenuItem } from './index';
 import {
   deleteSegment,
@@ -63,7 +64,7 @@ function clip(text: string): string {
 
 export function segmentMenuItems(
   seg: MenuSegment,
-  opts: { targets: readonly RetagTarget[]; onDetails?: () => void; easy?: boolean },
+  opts: { targets: readonly RetagTarget[]; onDetails?: () => void; easy?: boolean; at?: { x: number; y: number } },
 ): ContextMenuItem[] {
   const isWork = seg.kind === 'work';
   const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
@@ -82,9 +83,15 @@ export function segmentMenuItems(
   // Only finished focus spans carry a tag; the live span is tagged from the Pomo.
   // Easy mode never links spans to tasks.
   if (isWork && !seg.live && !opts.easy) {
-    for (const t of opts.targets.filter((x) => x.id !== seg.taskId).slice(0, MAX_RETAG_TARGETS)) {
-      items.push({ label: `Tag → ${clip(t.text)}`, onSelect: () => retagSegment(seg.id, t.id) });
-    }
+    // #207 UX — one entry that opens a searchable picker, instead of a
+    // "Tag → <task>" line per task (the menu grew with every task).
+    items.push({
+      label: seg.taskId ? 'Change task…' : 'Count toward a task…',
+      onSelect: () => {
+        const at = opts.at ?? { x: Math.round(window.innerWidth / 2), y: Math.round(window.innerHeight / 3) };
+        openRetagPicker({ segId: seg.id, taskId: seg.taskId ?? null, x: at.x, y: at.y });
+      },
+    });
     if (seg.taskId) items.push({ label: 'Untag', onSelect: () => retagSegment(seg.id, null) });
   }
   if (opts.onDetails) items.push({ label: 'Details…', onSelect: opts.onDetails });

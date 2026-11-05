@@ -45,6 +45,10 @@ interface KrnlBridge {
   clipboardReadText: () => Promise<string>
   clipboardWriteText: (text: string) => Promise<void>
   sysRun?: (argv: string[]) => Promise<{ ok: boolean; message: string }>
+  // Decision 35 — durable time log. Use renderer/store/timeLog.ts
+  // (logTime / queryTimeLog), not these directly.
+  timelogAppend?: (entries: unknown[]) => Promise<{ ok: boolean; written: number }>
+  timelogQuery?: (fromYMD: string, toYMD: string) => Promise<unknown[]>
 }
 
 interface Window {

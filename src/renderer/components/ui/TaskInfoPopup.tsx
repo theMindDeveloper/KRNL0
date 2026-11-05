@@ -19,6 +19,7 @@ import { todayLocal, type HabitState } from '../nodes/HabitNode/types';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { useEasyMode } from '../../store/uiMode';
 import { Z } from './layers';
+import { TaskTimeline } from './TaskTimeline';
 
 export interface TaskInfoPopupProps {
   /** A task node id, or `habit-<habitId>` for a habit on the dial. */
@@ -143,6 +144,8 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         <span>plan {info.plannedMin ? fmtMin(info.plannedMin) : '—'}</span>
         <span style={{ color: info.trackedMin > 0 ? 'var(--ink)' : 'var(--ink-4)' }}>tracked {fmtMin(info.trackedMin)}</span>
       </div>}
+      {/* #207 — the task's story from the time log (per-day work, plan moves, completions). */}
+      {!easy && <TaskTimeline taskId={taskId} />}
       <div style={{ display: 'flex', gap: 4 }}>
         {!info.done && !easy && <button type="button" data-testid="task-info-focus" style={btn} onClick={act(() => { void startFocusOnTask(taskId); })}>Focus</button>}
         <button type="button" data-testid="task-info-done" style={btn} onClick={act(() => { void toggleTaskDone(taskId); })}>{info.done ? 'Reopen' : 'Done'}</button>

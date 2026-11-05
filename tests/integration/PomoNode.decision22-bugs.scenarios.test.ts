@@ -488,14 +488,14 @@ describe('Pomodoro v2 — user-reported bug scenarios (Decision 22.1)', () => {
       expect(ps.activeTaskId).toBe('task-a');
     });
 
-    it('E3: Given a task with plannedMin=25, when task.setPlannedMin dispatched with minutes=0, then plannedMin is clamped to 1 (never goes below 1)', () => {
-      // taskSetPlannedMin uses Math.max(1, round(minutes)) — 0 clamps to 1.
+    it('E3 (revised #207): minutes=0 means "no set time" — the task becomes open-ended, the estimate stays as placeholder', () => {
       const board = makeBoardWithTasks({ taskA: { plannedMin: 25 } });
       useBoardStore.getState().setBoard(board);
 
       makeCommandHandler('task-a')('task.setPlannedMin', { minutes: 0 });
 
-      expect(getTaskState('task-a').plannedMin).toBe(1);
+      expect((getTaskState('task-a') as { timeOpen?: boolean }).timeOpen).toBe(true);
+      expect(getTaskState('task-a').plannedMin).toBe(25);
     });
 
   });

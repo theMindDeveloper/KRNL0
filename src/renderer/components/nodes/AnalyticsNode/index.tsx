@@ -17,6 +17,7 @@
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
 
+import { TimeLogHeatmap } from './TimeLogHeatmap';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
@@ -151,7 +152,7 @@ const CARDS_BY_VIEW: Record<AnalyticsView, readonly AnalyticsCardId[]> = {
     'insights.histogramTasks',
   ],
   estimates: ['estimates.kpis', 'estimates.perTask', 'estimates.daily', 'estimates.mix'],
-  time: ['time.donut', 'time.list', 'time.daily'],
+  time: ['time.donut', 'time.list', 'time.daily', 'time.log'],
   sources: ['sources.list', 'sources.streaks'],
 };
 
@@ -862,6 +863,12 @@ function TimeView(props: ViewBodyProps & { cardGridStyle: React.CSSProperties })
         cardId: 'time.list' as const,
         render: () => card('time.list', 'Tags ranked · time · share · tasks', 2, 260, (size) => (
           <TagList tags={res.tags} width={chartWidth(size.width, 420)} />
+        )),
+      },
+      {
+        cardId: 'time.log' as const,
+        render: () => card('time.log', 'Time log · tasks × days', 3, 420, (size) => (
+          <TimeLogHeatmap width={chartWidth(size.width, 900)} height={Math.max(160, size.height)} />
         )),
       },
       {

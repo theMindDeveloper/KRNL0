@@ -6,7 +6,7 @@ import type { SysResult } from '../SysFacade';
 import {
   clockSetSelectedDate,
   clockAdvanceDay,
-  clockGoToday, clockGoNow, clockSetDialOnly, clockSetViewWindow,
+  clockGoToday, clockGoNow, clockSetDialOnly, clockSetViewWindow, clockSetWeekView,
 } from '../../renderer/components/nodes/ClockNode/commands';
 import type { ClockState } from '../../renderer/components/nodes/ClockNode/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
@@ -123,6 +123,18 @@ export async function clockNow(ctx: ClockCtx): Promise<SysResult> {
     message: `Clock set to now (${nextState.selectedDate}, ${nextState.viewWindow === 1 ? 'PM' : 'AM'}).`,
     data: { selectedDate: nextState.selectedDate, viewWindow: nextState.viewWindow },
   };
+}
+
+/** `krnl clock week [on|off]` — the last 7 days as small dials (toggles without an argument). */
+export async function clockWeek(ctx: ClockCtx, arg: string | undefined): Promise<SysResult> {
+  if (arg !== undefined && arg !== 'on' && arg !== 'off') return { ok: false, message: 'clock week takes on|off (or nothing to toggle)' };
+  const board = loadBoard(ctx);
+  const clockNode = findClockMother(board);
+  if (!clockNode) return { ok: false, message: 'No clock mother node found in board.' };
+  const nextState = clockSetWeekView(clockNode.state as ClockState, arg === undefined ? {} : { on: arg === 'on' });
+  updateNode(board, clockNode.id, { ...clockNode, state: nextState });
+  saveBoard(ctx, board);
+  return { ok: true, message: `Clock week view ${nextState.weekView ? 'on' : 'off'}.`, data: { weekView: !!nextState.weekView } };
 }
 
 /** `krnl clock dial [on|off]` — dial-only view (toggles without an argument). */

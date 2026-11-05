@@ -6,8 +6,8 @@
 
 import { useRef, useState } from 'react';
 import type { TagDef } from '../../../../shared/tags/classify';
-import { slugifyTag } from '../../../../shared/tags/classify';
 import { Popover } from '../../ui/Popover';
+import { TaskTagPicker } from '../../ui/TaskTagPicker';
 import { CategoryIcon } from './CategoryIcon';
 
 export interface SpanLabelerProps {
@@ -24,6 +24,7 @@ export interface SpanLabelerProps {
 }
 
 type Pick = { kind: 'tag'; id: string } | { kind: 'task'; id: string } | null;
+// The dropdown is the shared TaskTagPicker (search, tasks first, category chips).
 
 const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' };
 
@@ -31,7 +32,6 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
   const [text, setText] = useState(initialText);
   const [pick, setPick] = useState<Pick>(null);
   const [open, setOpen] = useState(false);
-  const [newCat, setNewCat] = useState('');
   const anchor = useRef<HTMLButtonElement>(null);
 
   const guessed = text.trim() ? guess(text) : null;
@@ -45,32 +45,8 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
     onSave(task ? { taskId: task.id } : { text: text.trim(), tag: tagId });
   };
   const choose = (p: Pick) => { setPick(p); setOpen(false); };
-  const addCategory = () => {
-    const label = newCat.trim();
-    if (!label) return;
-    onAddCategory(label);
-    choose({ kind: 'tag', id: slugifyTag(label) });
-    setNewCat('');
-  };
 
-  const row = (key: string, on: boolean, onClick: () => void, icon: React.ReactNode, label: string, testId: string) => (
-    <button
-      key={key}
-      type="button"
-      data-testid={testId}
-      onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer',
-        padding: '5px 8px', borderRadius: 5, border: 'none',
-        background: on ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
-        color: on ? 'var(--ink)' : 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 11,
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-      }}
-    >
-      {icon}
-      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-    </button>
-  );
+
 
   return (
     <div
@@ -143,23 +119,17 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
         </button>
       </div>
 
-      <Popover anchor={anchor.current} open={open} onClose={() => setOpen(false)} minWidth={190}>
-        <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <span style={{ ...mono, padding: '4px 8px 2px' }}>Category</span>
-          {library.map((t) => row(t.id, t.id === tagId && !task, () => choose({ kind: 'tag', id: t.id }), <CategoryIcon id={t.id} color={t.color} size={12} />, t.label, `pomo-ask-tag-${t.id}`))}
-          <input
-            data-testid="pomo-ask-newcat-input"
-            value={newCat}
-            placeholder="+ new category"
-            onChange={(e) => setNewCat(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addCategory(); }}
-            style={{ margin: '2px 4px', padding: '4px 6px', background: 'transparent', border: '1px dashed var(--ink-4)', borderRadius: 5, color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 10, outline: 'none' }}
-          />
-          {tasks.some((t) => !t.done) && <span style={{ ...mono, padding: '8px 8px 2px' }}>Or count toward a task</span>}
-          {tasks.filter((t) => !t.done).map((t) => row(`task-${t.id}`, task?.id === t.id, () => choose({ kind: 'task', id: t.id }), <span aria-hidden style={{ color: 'var(--ink-3)' }}>☐</span>, t.text, `pomo-ask-task-${t.id}`))}
-          {tasks.some((t) => t.done) && <span style={{ ...mono, padding: '8px 8px 2px' }}>Done today</span>}
-          {tasks.filter((t) => t.done).map((t) => row(`task-${t.id}`, task?.id === t.id, () => choose({ kind: 'task', id: t.id }), <span aria-hidden style={{ color: 'var(--ink-3)' }}>✓</span>, t.text, `pomo-ask-task-${t.id}`))}
-        </div>
+      <Popover anchor={anchor.current} open={open} onClose={() => setOpen(false)} minWidth={250}>
+        {/* #207 UX — one compact searchable picker: tasks first, categories as chips. */}
+        <TaskTagPicker
+          testIdPrefix="pomo-ask"
+          tasks={tasks}
+          library={library}
+          value={task ? { kind: 'task', id: task.id } : tagId ? { kind: 'tag', id: tagId } : null}
+          onPick={(v) => choose(v)}
+          onAddCategory={onAddCategory}
+          onClose={() => setOpen(false)}
+        />
       </Popover>
     </div>
   );
