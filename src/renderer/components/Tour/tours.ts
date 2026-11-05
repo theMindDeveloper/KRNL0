@@ -50,6 +50,7 @@ const HABIT = '[data-tour="mother-habit"]';
 const ANALYTICS = '[data-tour="mother-analytics"]';
 const TERM = '[data-tour="mother-term"]';
 const ORB = '[aria-label^="AI assistant"]';
+const MODE = '[role="radiogroup"][aria-label="Easy or Advanced"]';
 
 export const TOURS: readonly Tour[] = [
   {
@@ -121,20 +122,34 @@ export const TOURS: readonly Tour[] = [
     summary: 'Add a habit, tick it off',
     steps: [
       { node: 'mother-habit', target: HABIT, text: 'Habits are things you want to do regularly — reading, exercise, a weekly review.' },
-      { target: `${HABIT} input[placeholder^="+ add habit"]`, text: 'Type a habit here and press Enter.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
+      { target: '[data-testid="habit-add-input"]', text: 'Click "add habit" at the bottom, type a habit and press Enter.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
       { target: HABIT, text: 'Click today\'s square to tick it off. Your streak grows each day you do it.' },
     ],
   },
   {
     id: 'analytics',
     title: 'Analytics — where the time went',
-    summary: 'Pages, the time log, tags, plan vs actual',
+    summary: 'Pages, time per task, planned vs spent',
     steps: [
       { node: 'mother-analytics', target: ANALYTICS, text: 'Analytics turns your recorded time into answers.' },
-      { target: '[data-testid="analytics-page-nav"]', text: 'Each icon is a page: summary, activity, hours, plan vs actual, time by tag, time log…' },
-      { target: '[data-testid="analytics-page-log"]', text: 'Open the Time log page.', waitFor: { click: '[data-testid="analytics-page-log"]' }, hint: 'Waiting for the Time log icon…' },
-      { target: '[data-testid="time-log-heatmap"]', text: 'Every row is a task, every square a day — darker means more time. On the right: worked / planned. Below: time per tag.' },
-      { target: '[data-testid="analytics-page-estimates"]', text: '"Plan vs actual" compares your estimates with the time you really spent.' },
+      { target: '[data-testid="analytics-page-nav"]', text: 'Each icon is a page: summary, activity, hours, time per task — and in Advanced mode, planned vs spent and time by tag.' },
+      { target: '[data-testid="analytics-page-log"]', text: 'Open the "Time per task" page.', waitFor: { click: '[data-testid="analytics-page-log"]' }, hint: 'Waiting for the Time per task icon…' },
+      { target: '[data-testid="time-log-heatmap"]', text: 'Every row is a task in its own colour, every square a day with the minutes in it. On the right: worked / planned. Below: time per tag.' },
+      { target: '[data-testid="analytics-page-estimates"]', text: '"Planned vs spent" (Advanced mode) compares each task’s estimate with the time you really spent.' },
+    ],
+  },
+  {
+    id: 'modes',
+    title: 'Easy and Advanced',
+    summary: 'What each mode shows, and what Advanced adds',
+    steps: [
+      { text: 'KRNL0 has two modes: Easy and Advanced. They use the same board and the same data — only what is shown changes, so you can switch back and forth and lose nothing.' },
+      { target: '[data-testid="topbar-settings"]', text: 'The mode lives in Settings. Click the gear.', waitFor: { click: '[data-testid="topbar-settings"]' }, hint: 'Waiting for the gear…' },
+      { target: MODE, text: 'Easy: plan your day on the Clock and Calendar; the Pomo is a stopwatch — Start, Break, Stop. You compare plan and reality by time: the planned block and the recorded time sit at the same hour.' },
+      { target: MODE, text: 'Advanced links the parts together. Pomo: the POMO / OBSERVE switch (classic 25-minute sessions), "what am I doing" to pick a task or category, and naming each recorded span.' },
+      { target: MODE, text: 'Todo: tags (Code, Study…) and "Start pomo" / Focus on a task. Clock and Calendar: recorded time in each task’s colour, "tracked" and "+30m over" on planned blocks, and "Counts toward" to move time to another task.' },
+      { target: MODE, text: 'Analytics: the "Planned vs spent" and "Time by tag" pages, plus categories in Settings. Easy shows the overview: planned, worked, breaks, tasks done, habits.' },
+      { target: MODE, text: 'Pick a mode now — you can change it any time.', waitFor: { click: '[data-testid^="settings-mode-"]' }, hint: 'Waiting for Easy or Advanced…' },
     ],
   },
   {

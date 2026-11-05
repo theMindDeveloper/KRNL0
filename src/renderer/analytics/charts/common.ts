@@ -133,3 +133,31 @@ export const MONTH_LABELS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ] as const;
+
+// ── Readability rules (docs/04-visual-system — "Charts") ─────────────────────
+
+/**
+ * Axis ticks for a count axis: whole numbers only, each shown once. With a
+ * small peak (≤ n) every integer 1…peak; otherwise ~n evenly spaced integers.
+ * Never "0 1 1 1" from rounding fractional steps.
+ */
+export function countTicks(peak: number, n = 4): number[] {
+  const p = Math.max(1, Math.ceil(peak));
+  if (p <= n) return Array.from({ length: p }, (_, i) => i + 1);
+  const step = Math.ceil(p / n);
+  const out: number[] = [];
+  for (let v = step; v < p; v += step) out.push(v);
+  out.push(p);
+  return [...new Set(out)];
+}
+
+/**
+ * Keep a text label inside [minX, maxX]: returns the x and anchor to use so
+ * the whole label is visible (it slides inward instead of being clipped).
+ */
+export function clampLabelX(x: number, text: string, fontSize: number, minX: number, maxX: number): { x: number; anchor: 'start' | 'middle' | 'end' } {
+  const half = textWidth(text, fontSize) / 2;
+  if (x - half < minX) return { x: minX, anchor: 'start' };
+  if (x + half > maxX) return { x: maxX, anchor: 'end' };
+  return { x, anchor: 'middle' };
+}

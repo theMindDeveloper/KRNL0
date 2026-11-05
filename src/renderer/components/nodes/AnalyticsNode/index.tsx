@@ -90,7 +90,7 @@ const VIEW_LABELS: Record<AnalyticsView, string> = {
   calendar: 'Calendar',
   patterns: 'Patterns',
   insights: 'Insights',
-  estimates: 'Plan vs actual',
+  estimates: 'Planned vs spent',
   time: 'Time',
   sources: 'Sources',
 };
@@ -349,12 +349,17 @@ function ChartCard({
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             fontWeight: pinned ? 700 : 500,
-            whiteSpace: 'nowrap',
+            // Charts rule: a title is read in full — it wraps to a second
+            // line (and only then clips), never "TASKS × FOCUS · PE…".
+            lineHeight: 1.35,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
             minWidth: 0,
             flexShrink: 1,
           }}
+          title={title}
         >
           {pinned ? '★ ' : ''}{title}
         </span>
@@ -866,7 +871,7 @@ function TimeView(props: ViewBodyProps & { cardGridStyle: React.CSSProperties })
       },
       {
         cardId: 'time.log' as const,
-        render: () => card('time.log', 'Time log · tasks × days', 3, 420, (size) => (
+        render: () => card('time.log', 'Time per task · per day', 3, 420, (size) => (
           <TimeLogHeatmap width={chartWidth(size.width, 900)} height={Math.max(160, size.height)} />
         )),
       },
@@ -1309,7 +1314,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="insights.donutSessionsByDay"
-              title="Focus by weekday (donut)"
+              title="Focus by weekday"
               contentHeight={260}
               hidden={isHidden('insights.donutSessionsByDay')}
               pinned={isPinned('insights.donutSessionsByDay')}
@@ -1325,8 +1330,10 @@ function ViewBody(props: ViewBodyProps) {
                     data={sessionsByDowSlices}
                     innerRatio={0.55}
                     size={side}
-                    centerPrimary={String(total)}
-                    centerSecondary="focus min"
+                    // A number with its unit ("8h 27m"), not a bare "507".
+                    centerPrimary={fmtMinutes(total)}
+                    centerSecondary="focus"
+                    formatValue={fmtMinutes}
                   />
                 );
               }}

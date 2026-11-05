@@ -74,14 +74,25 @@ export function TourHost(): JSX.Element | null {
   // follow the target (it moves with the camera / layout)
   useEffect(() => {
     if (!step) return;
+    // The ring is only drawn once the target has stopped moving (the camera
+    // may still be gliding to it) and is on screen. It never animates its
+    // position: a sliding ring starts from wherever the last target was —
+    // often the far edge — and looks like it is pointing at the wrong thing.
+    let prev: Rect | null = null;
+    const same = (a: Rect | null, b: Rect | null): boolean =>
+      !!a && !!b && Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1;
     const measure = (): void => {
       const el = step.target ? document.querySelector(step.target) : null;
-      if (!el) { setRect(null); return; }
-      const r = el.getBoundingClientRect();
-      setRect(r.width > 0 && r.height > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height } : null);
+      const r = el?.getBoundingClientRect();
+      const now: Rect | null = r && r.width > 0 && r.height > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height } : null;
+      const onScreen = !!now && now.left < window.innerWidth && now.top < window.innerHeight && now.left + now.width > 0 && now.top + now.height > 0;
+      const settled = onScreen && same(now, prev);
+      prev = now;
+      setRect((cur) => (settled ? (same(cur, now) ? cur : now) : null));
     };
+    setRect(null);
     measure();
-    const id = setInterval(measure, 300);
+    const id = setInterval(measure, 120);
     return () => clearInterval(id);
   }, [step]);
 
@@ -139,17 +150,17 @@ export function TourHost(): JSX.Element | null {
         <div data-testid="tour-spotlight" aria-hidden style={{
           position: 'fixed', left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2,
           borderRadius: 10, border: '2px solid var(--acid)', boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)',
-          pointerEvents: 'none', zIndex: Z.popupBackdrop, transition: 'left 200ms, top 200ms, width 200ms, height 200ms',
+          pointerEvents: 'none', zIndex: Z.tourBackdrop,
         }} />
       ) : (
-        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', pointerEvents: 'none', zIndex: Z.popupBackdrop }} />
+        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', pointerEvents: 'none', zIndex: Z.tourBackdrop }} />
       )}
       <div
         data-testid="tour-card"
         role="dialog"
         aria-label={tour.title}
         style={{
-          position: 'fixed', left: cardLeft, top: cardTop, width: W, zIndex: Z.popup,
+          position: 'fixed', left: cardLeft, top: cardTop, width: W, zIndex: Z.tour,
           background: 'var(--paper)', border: '1px solid var(--paper-3)', borderRadius: 10, padding: SPACE.panelPad,
           display: 'flex', flexDirection: 'column', gap: SPACE.section, fontFamily: 'var(--font-mono)', color: 'var(--ink)',
         }}

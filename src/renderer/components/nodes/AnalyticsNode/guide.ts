@@ -17,9 +17,9 @@ export const PAGES: readonly AnalyticsPage[] = [
   { id: 'activity',  label: 'Activity' },
   { id: 'year',      label: 'Year' },
   { id: 'hours',     label: 'Hours' },
-  { id: 'estimates', label: 'Plan vs actual' },
+  { id: 'estimates', label: 'Planned vs spent' },
   { id: 'tags',      label: 'Time by tag' },
-  { id: 'log',       label: 'Time log' },
+  { id: 'log',       label: 'Time per task' },
   { id: 'insights',  label: 'Insights' },
   { id: 'habits',    label: 'Habits' },
 ];

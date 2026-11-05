@@ -233,6 +233,32 @@ Sections must never sit cramped against each other (maintainer, 2026-11-05). One
 
 Rules: sections get no `marginTop` / `marginBottom` of their own — the column gap spaces them. A caption sits **above** its control, not squeezed beside it. Destructive actions (Delete) are the last section.
 
+## UI rules — charts, lists, motion, modes
+
+Written after a review found overlapping chart text, a "0 1 1 1" axis and a sliding tour ring (maintainer, 2026-11-05). Check every new or changed view against them.
+
+**Charts** (`src/renderer/analytics/charts/`)
+
+1. **Axis ticks are whole, distinct numbers.** Count axes use `countTicks(peak)` from `charts/common.ts`, so a small peak never prints as "0 1 1 1". Time axes print units ("8h 27m"), never bare minutes.
+2. **No text leaves the plot.** Labels near an edge go through `clampLabelX` (anchor flips to start / end), and a value label is dropped when it would sit on the title or another label.
+3. **Card titles wrap to two lines, then ellipsis** (full title on hover). A title is never cut mid-word on one line.
+4. **KPI tiles size their numbers to the tile** (`container-type: inline-size` + `clamp()`); the label is one line with an ellipsis.
+5. **No blurred shadows on dashboard windows or cards.** Separation is a 1 px border; a pinned card gets an inset ring.
+6. **A centre or total label carries its unit** (a donut centre reads "8h 27m focus", not "507").
+
+**Lists**
+
+7. **The "add" row is the list's last row, pinned to the bottom of the window** — Todo "add task", Habits "add habit". Same look everywhere: dashed top rule, mono 12 px in `--ink-4`, the ↵ hint on the right, no "+" prefix. The list above it scrolls; the add row never moves.
+
+**Motion**
+
+8. **Pointers and highlights never animate their position.** A ring, spotlight or marker that moves between targets appears in place once the target is still (tween from the old spot reads as pointing at the wrong thing). Animate opacity or scale, not left / top.
+
+**Modes and overlays**
+
+9. **When Easy mode hides something, the docs and tours say so.** A control that exists only in Advanced (easy-mode.md D1–D16) is named as Advanced in any tour step or help text that mentions it.
+10. **Overlays use the named layers in `ui/layers.ts`** (`Z.*`), never a raw number. A tour sits above modals (`Z.tour`); pickers still open above it (`Z.popover`).
+
 ## Component — Node anatomy
 
 ### Mother nodes (fixed)

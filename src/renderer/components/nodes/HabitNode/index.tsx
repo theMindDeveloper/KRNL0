@@ -192,7 +192,7 @@ export function HabitNode({
       width={MOTHER_WIDTH}
       position={node.position}
     >
-      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, flex: 1 }}>
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* Header */}
         <div className="krnl-node-header"
           style={{
@@ -235,7 +235,7 @@ export function HabitNode({
         </div>
 
         {/* Body */}
-        <div ref={bodyRef} style={{ padding: '14px 16px', position: 'relative' }}>
+        <div ref={bodyRef} style={{ padding: '14px 16px', position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {view === 'week' && (
             <WeekView
               habits={visibleHabits}
@@ -280,19 +280,46 @@ export function HabitNode({
             </div>
           )}
 
-          {/* Add habit input */}
-          <div
-            style={{
-              marginTop: 10,
-              borderTop: '1px solid var(--paper-3)',
-              paddingTop: 10,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {menu && menuHabit && (
+            <HabitContextMenu
+              habit={menuHabit}
+              anchor={menu.anchor}
+              onRename={(name) => onCommand('habit.rename', { id: menu.habitId, name })}
+              onSetColor={(color) => onCommand('habit.setColor', { id: menu.habitId, color })}
+              onSetIcon={(icon) => onCommand('habit.setIcon', { id: menu.habitId, icon })}
+              onSetNote={(note) => onCommand('habit.setNote', { id: menu.habitId, note })}
+              onDelete={() => {
+                const name = state.habits.find((h) => h.id === menu.habitId)?.name ?? 'habit';
+                undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id: menu.habitId }));
+              }}
+              onPinAsLane={() => onCommand('habit.spawnLane', { habitId: menu.habitId })}
+              laneExists={pinnedHabitIds.has(menu.habitId)}
+              onClose={() => setMenu(null)}
+            />
+          )}
+        </div>
+
+        {/* Add row — pinned to the bottom of the window, same look as the
+            Todo's "add task" row (UI rule: the add row of a list is always its
+            last row, dashed top rule, mono text, ↵ hint). */}
+        <div
+          className="habit-add"
+          style={{
+            flexShrink: 0,
+            padding: '8px 14px',
+            borderTop: '1px dashed var(--paper-3)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            color: 'var(--ink-4)',
+          }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <input
               type="text"
-              placeholder="+ add habit or recurring event"
+              placeholder="add habit"
+              aria-label="Add a habit or recurring event"
               data-habit-add
+              data-testid="habit-add-input"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -305,17 +332,16 @@ export function HabitNode({
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
-                width: '100%',
-                padding: '4px 0',
+                flex: 1,
+                padding: 0,
                 background: 'transparent',
                 border: 'none',
-                borderBottom: '1px solid var(--paper-3)',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                color: 'var(--ink-3)',
+                fontSize: 12,
+                color: 'var(--ink)',
+                caretColor: 'var(--acid)',
                 outline: 'none',
                 minWidth: 0,
-                boxSizing: 'border-box',
               }}
             />
             <button
@@ -342,6 +368,15 @@ export function HabitNode({
             >
               <IconRepeat />{newRepeat ? 'Repeats' : 'Repeat'}
             </button>
+            <span
+              aria-hidden
+              style={{
+                fontSize: 10, color: 'var(--ink-4)', background: 'var(--paper-2)',
+                border: '1px solid var(--paper-3)', padding: '1px 4px', borderRadius: 3, flexShrink: 0,
+              }}
+            >
+              ↵
+            </span>
             </div>
             {newRepeat && !repeatAt && (
               isRepeatValid(newRepeat) ? (
@@ -387,24 +422,6 @@ export function HabitNode({
             )}
           </div>
 
-          {menu && menuHabit && (
-            <HabitContextMenu
-              habit={menuHabit}
-              anchor={menu.anchor}
-              onRename={(name) => onCommand('habit.rename', { id: menu.habitId, name })}
-              onSetColor={(color) => onCommand('habit.setColor', { id: menu.habitId, color })}
-              onSetIcon={(icon) => onCommand('habit.setIcon', { id: menu.habitId, icon })}
-              onSetNote={(note) => onCommand('habit.setNote', { id: menu.habitId, note })}
-              onDelete={() => {
-                const name = state.habits.find((h) => h.id === menu.habitId)?.name ?? 'habit';
-                undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id: menu.habitId }));
-              }}
-              onPinAsLane={() => onCommand('habit.spawnLane', { habitId: menu.habitId })}
-              laneExists={pinnedHabitIds.has(menu.habitId)}
-              onClose={() => setMenu(null)}
-            />
-          )}
-        </div>
 
         {settingsOpen && (
           <HabitPopover

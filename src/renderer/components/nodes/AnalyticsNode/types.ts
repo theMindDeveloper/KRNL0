@@ -95,7 +95,7 @@ export const ANALYTICS_CARD_LABELS: Record<AnalyticsCardId, string> = {
   'estimates.mix':                'Where the time went',
   'time.donut':                   'Time by tag (donut)',
   'time.list':                    'Tags ranked',
-  'time.log':                     'Tasks × days (time log)',
+  'time.log':                     'Time per task · per day',
   'time.daily':                   'Daily mix by tag',
   'sources.list':                 'Registered sources',
   'sources.streaks':              'Habit streaks',

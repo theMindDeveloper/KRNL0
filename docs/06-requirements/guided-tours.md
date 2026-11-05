@@ -7,10 +7,11 @@ Follow-up to #207. Code: `src/renderer/components/Tour/` (`tours.ts`, `TourHost.
 | # | Requirement |
 |---|---|
 | F1 | **First-start layout.** A new board opens with Pomo, Todo, Calendar, Clock in the Station's top row and Habits, Analytics beside the canvas in the bottom row; the Terminal starts hidden. Canvas mode orders the window row the same way (Terminal last). Existing boards keep their layout. |
-| F2 | **One short tour per part of the app:** Welcome, Pomo, Todo, Calendar, Clock, Habits, Analytics, Terminal & AI. Each is a few plain-language steps. |
+| F2 | **One short tour per part of the app:** Welcome, Pomo, Todo, Calendar, Clock, Habits, Analytics, Easy and Advanced, Terminal & AI. Each is a few plain-language steps. The Easy and Advanced tour opens Settings and says what Advanced adds (easy-mode.md D1–D16). |
 | F3 | **Each step points at what it talks about:** the screen dims and the element is ringed (spotlight); the app stays usable underneath. A step can first bring a window into view (canvas: camera moves to it; Station: its panel is shown if hidden). |
 | F4 | **Steps wait for the user.** Either Next (button, Enter or →; Back with ←) or the real action — a click on a given control, or a board change (a task added, the Pomo started / stopped, a habit added, a task scheduled) — then the tour moves on by itself. Waiting steps show what they wait for and offer Skip. Esc or "End tour" stops. |
 | F5 | **Where to start them:** the Orb chat's "Tutorials" list, and `krnl tour list` / `krnl tour start <id>`. |
+| F6 | **The spotlight never slides.** The ring is drawn only once its target has stopped moving and is on screen, and it does not animate its position. The tour sits above modals (it can point into Settings). |
 
 ## Gherkin
 

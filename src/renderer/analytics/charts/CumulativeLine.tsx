@@ -12,8 +12,7 @@ import {
   COLOR_GRID,
   COLOR_HABIT,
   COLOR_LABEL,
-  COLOR_TASK,
-} from './common';
+  COLOR_TASK, countTicks } from './common';
 
 export interface CumulativeLineProps {
   data: readonly DayBucket[];
@@ -87,7 +86,8 @@ export function CumulativeLine({
   };
 
   // Gridlines + tick labels
-  const gridY = [0.25, 0.5, 0.75, 1].map((t) => ({ t, y: pad.top + innerH * (1 - t) }));
+  // Whole-number ticks, each once (charts rule) — no repeated rounded labels.
+  const gridY = countTicks(peak).map((v) => ({ v, t: v / Math.max(1, Math.ceil(peak)), y: pad.top + innerH * (1 - v / Math.max(1, Math.ceil(peak))) }));
 
   const dateLabel = (i: number) => data[i]!.date.slice(5);
 
@@ -119,7 +119,7 @@ export function CumulativeLine({
             fill={COLOR_LABEL}
             fontFamily="var(--font-mono)"
           >
-            {Math.round(peak * g.t)}
+            {g.v}
           </text>
         </g>
       ))}
@@ -149,7 +149,8 @@ export function CumulativeLine({
           {/* End-of-line value tag */}
           <text
             x={xAt(data.length - 1) - 2}
-            y={yAt(s.cum[s.cum.length - 1] ?? 0) - 4}
+            // never above the plot (it ran into the legend)
+            y={Math.max(pad.top + 9, yAt(s.cum[s.cum.length - 1] ?? 0) - 4)}
             fontSize={8.5}
             textAnchor="end"
             fill={s.color}

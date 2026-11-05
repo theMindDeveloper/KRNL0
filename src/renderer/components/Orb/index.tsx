@@ -37,6 +37,9 @@ import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
 import { launchClaudeInTerminal } from '../../store/claudeLaunch';
 import { TOURS } from '../Tour/tours';
+
+/** Voice flows not offered in the chat for now. */
+const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
 import { startTour } from '../Tour/TourHost';
 import { emit } from '../../store/eventLog';
 import { Z } from '../ui/layers';
@@ -684,7 +687,9 @@ export function Orb() {
                   >
                     {'▸ claude code'}
                   </button>
-                  {FLOWS.map((flow) => (
+                  {/* Voice flows are hidden until proper voice tutorials exist — the
+                      text Tutorials below replace them (maintainer, 2026-11-05). */}
+                  {FLOWS.filter((f) => !HIDDEN_FLOW_IDS.has(f.id)).map((flow) => (
                     <button
                       key={flow.id}
                       type="button"

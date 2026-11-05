@@ -4,7 +4,7 @@
 // shape rather than magnitude — complements the trend lines.
 
 import { useMemo } from 'react';
-import { COLOR_AXIS, COLOR_GRID, COLOR_LABEL } from './common';
+import { COLOR_AXIS, COLOR_GRID, COLOR_LABEL, countTicks, clampLabelX } from './common';
 
 export interface HistogramProps {
   values: readonly number[];
@@ -103,7 +103,7 @@ export function Histogram({
             >
               <title>{`${edges[i]?.toFixed(0)}–${edges[i + 1]?.toFixed(0)} · ${count} days`}</title>
             </rect>
-            {count > 0 && h > 12 && (
+            {count > 0 && h > 12 && y - 3 > pad.top + 10 && (
               <text
                 x={x + barW / 2}
                 y={y - 3}
@@ -129,17 +129,15 @@ export function Histogram({
         strokeWidth={1}
         strokeDasharray="3 3"
       />
-      <text
-        x={xAt(mean)}
-        y={pad.top + 8}
-        fontSize={8}
-        textAnchor="middle"
-        fill="var(--acid)"
-        fontFamily="var(--font-mono)"
-        fontWeight={700}
-      >
-        μ {mean.toFixed(0)}
-      </text>
+      {(() => {
+        const t = `μ ${mean.toFixed(0)}`;
+        const c = clampLabelX(xAt(mean), t, 8, pad.left, pad.left + innerW);
+        return (
+          <text x={c.x} y={pad.top - 3} fontSize={8} textAnchor={c.anchor} fill="var(--acid)" fontFamily="var(--font-mono)" fontWeight={700}>
+            {t}
+          </text>
+        );
+      })()}
 
       {/* Median tick — below the bars */}
       <line
@@ -150,16 +148,15 @@ export function Histogram({
         stroke="#8a7bff"
         strokeWidth={1.4}
       />
-      <text
-        x={xAt(median)}
-        y={pad.top + innerH + 14}
-        fontSize={8}
-        textAnchor="middle"
-        fill="#8a7bff"
-        fontFamily="var(--font-mono)"
-      >
-        med {median.toFixed(0)}
-      </text>
+      {(() => {
+        const t = `med ${median.toFixed(0)}`;
+        const c = clampLabelX(xAt(median), t, 8, pad.left, pad.left + innerW);
+        return (
+          <text x={c.x} y={pad.top + innerH + 14} fontSize={8} textAnchor={c.anchor} fill="#8a7bff" fontFamily="var(--font-mono)">
+            {t}
+          </text>
+        );
+      })()}
 
       {/* X-axis range labels */}
       <text
@@ -199,10 +196,11 @@ export function Histogram({
       )}
 
       {/* Right-side gridline ticks */}
-      {[0.25, 0.5, 0.75, 1].map((t) => {
+      {countTicks(yPeak).map((v) => {
+        const t = v / yPeak;
         const y = pad.top + innerH * (1 - t);
         return (
-          <g key={t}>
+          <g key={v}>
             <line
               x1={pad.left}
               x2={pad.left + innerW}
@@ -221,7 +219,7 @@ export function Histogram({
               fill={COLOR_LABEL}
               fontFamily="var(--font-mono)"
             >
-              {Math.round(yPeak * t)}
+              {v}
             </text>
           </g>
         );
