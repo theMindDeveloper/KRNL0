@@ -5,6 +5,19 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] — 2026-11-05
+
+### Added
+- **App updates** (#211, Decision 36): Windows downloads new versions in the background and installs them on restart (or when you quit); macOS shows a download link. Status bar version item, Settings → Updates, `krnl update status|check|install|open`.
+- Release workflow uploads `latest.yml` with the installer, builds Windows on `windows-2022`, checks the tag against `package.json`, and uses `docs/releases/<tag>.md` as the release notes.
+
+### Changed
+- Frame style "KRNL Dock" is now shown as **Nuclear** (id `krnl-dock` unchanged); `krnl theme frame` accepts a style's shown name.
+
+### Fixed
+- Nodes added from the CLI are placed at the centre of the visible canvas again (`SysFacade` dropped `viewSize`).
+- A time-log CLI test could miscount on fast machines (same-millisecond window).
+
 ## [0.10.0] — 2026-11-02
 
 ### Added
@@ -35,7 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- App updates (#211, Decision 36): Windows installs download in the background and install on restart (or on quit); macOS/Linux show a download link. Status bar, Settings → Updates and `krnl update status|check|install|open`. Release workflow uploads `latest.yml` and builds Windows on `windows-2022`.
 - Terminal node: `krnl` CLI bridge — full UI parity from inside the PTY's shell, named-pipe/UDS transport with per-launch token auth (#108)
 - Terminal MOTD banner with ASCII KRNL0 logo, dynamic version, compact-form fallback for narrow terminals (#108)
 - Generated `krnl help` command from a single command registry (`src/shared/cli/commandRegistry.ts`) — new commands auto-document (#108)

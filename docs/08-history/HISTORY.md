@@ -1214,3 +1214,11 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `TMD/auto-update-launcher-github-59d480`
 **Files changed:** `src/shared/frameStyles.ts`, `src/renderer/components/ChassisLayer/dockRegistry.tsx`, `KrnlDockChrome.tsx`, `src/sys/SysFacade.ts`, `tests/unit/sys/theme.frame.test.ts`, `docs/06-requirements/theme-engine.md`, `docs/04-visual-system/chassis-cookbook.md`
 **Summary:** The frame style shown as "KRNL Dock" is now **Nuclear** in the style picker, on the frame's own nameplate (`NUCLEAR · A1`, log caption `nuclear · /var/log`) and in `krnl theme frames`. The id stays `krnl-dock`, so saved choices and scripts keep working. `krnl theme frame` now accepts a style's id or its shown name in any case (`nuclear`, `Paper`).
+
+---
+
+## [2026-11-05] — v0.10.1 release: the first self-updating build
+
+**Type:** Release
+**PRs:** #212 (app updates, Nuclear rename), this release PR
+**Summary:** Version 0.10.1 (`npm version patch`), `CHANGELOG.md` and `docs/releases/v0.10.1.md`. First release made through the update pipeline (docs/releases/RELEASING.md): tag `v0.10.1` on `main`, CI builds the draft with `KRNL0-Setup-0.10.1.exe`, its blockmap and `latest.yml` (plus the macOS DMG), then Publish. Installs of 0.10.0 or older have no updater and install this one by hand once; from here on releases arrive by themselves.
