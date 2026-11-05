@@ -17,7 +17,6 @@
 import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoardStore } from '../../../store/boardStore';
-import { saveBoard } from '../../../store/eventLog';
 import { scheduleBatch } from '../../../utils/rafBatcher';
 import { rfToScreen, getZoom } from '../../../utils/viewportBus';
 
@@ -26,7 +25,7 @@ import { rfToScreen, getZoom } from '../../../utils/viewportBus';
 // target in the other (when both happen to be live during a layout-mode
 // transition). The string is namespaced so it doesn't collide with stray
 // drag payloads from other apps or the canvas image-drop path.
-import { MOTHER_DRAG_MIME, startMotherDrag, endMotherDrag, markDropTarget, leaveDropTarget, animateSwap } from './motherDrag';
+import { MOTHER_DRAG_MIME, beginHold } from './motherDrag';
 export { MOTHER_DRAG_MIME };
 
 // Station mode mounts mother nodes inside resizable panels (ADR 0008). Each
@@ -85,7 +84,6 @@ export function MotherFrame({
   const inStation = useContext(MotherFrameStationContext);
   const variant: 'canvas' | 'station' = inStation ? 'station' : variantProp;
   const setHoveredNodeId = useBoardStore((s) => s.setHoveredNodeId);
-  const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
   const idx = String(slotIndex).padStart(2, '0');
   const total = String(slotTotal).padStart(2, '0');
 
@@ -99,33 +97,8 @@ export function MotherFrame({
     setPortalTarget((frameRef.current?.closest('.react-flow') as HTMLElement | null) ?? document.body);
   }, []);
 
-  // Drop target — accepts a mother-drag payload and swaps slots with the
-  // dragged source. Both variants opt in: canvas uses it for the new drag
-  // handle (replacing the inter-mother swap button); station uses it from
-  // its existing handle. Guards on the MIME so unrelated drags (image files,
-  // text selections) pass through.
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes(MOTHER_DRAG_MIME)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    markDropTarget(e.currentTarget as HTMLElement);
-  }, []);
-  const onDragLeave = useCallback((e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes(MOTHER_DRAG_MIME)) return;
-    leaveDropTarget(e.currentTarget as HTMLElement, e.relatedTarget);
-  }, []);
-  const onDrop = useCallback((e: React.DragEvent) => {
-    const sourceId = e.dataTransfer.getData(MOTHER_DRAG_MIME);
-    if (!sourceId || sourceId === nodeId) { endMotherDrag(); return; }
-    e.preventDefault();
-    e.stopPropagation();
-    // The two windows fly to each other's place.
-    animateSwap(sourceId, nodeId, () => {
-      swapMotherSlots(sourceId, nodeId);
-      const updated = useBoardStore.getState().board;
-      if (updated) void saveBoard(updated);
-    });
-  }, [nodeId, swapMotherSlots]);
+  // Swapping windows is a pointer "hold and carry" (motherDrag.ts): the grip
+  // picks the window up, the drop target is found under the pointer.
 
   // Badge position tracking (canvas variant only) — pure arithmetic, no DOM reads.
   // Badge anchor: left:14px, top:-11px relative to panel's RF top-left corner
@@ -183,9 +156,6 @@ export function MotherFrame({
       data-tour={nodeId}
       onMouseEnter={() => setHoveredNodeId(nodeId)}
       onMouseLeave={() => setHoveredNodeId(null)}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
       style={{
         position: 'relative',
         // Canvas: fixed 540×540 (RF flow coords). Station: fill the resizable
@@ -290,32 +260,16 @@ export function MotherFrame({
 // no longer needs the inter-mother swap button. Pointer events stop
 // propagating so RF doesn't start a pan / marquee when the user grabs it.
 function MotherDragHandle({ nodeId }: { nodeId: string }) {
-  const onDragStart = useCallback(
-    (e: React.DragEvent) => {
-      e.stopPropagation();
-      (e.currentTarget as HTMLDivElement).dataset.dragging = 'true';
-      startMotherDrag(e, nodeId);
-    },
-    [nodeId],
-  );
-  const onDragEnd = useCallback((e: React.DragEvent) => {
-    delete (e.currentTarget as HTMLDivElement).dataset.dragging;
-    endMotherDrag();
-  }, []);
-  const stop = useCallback((e: React.PointerEvent | React.MouseEvent) => {
-    // RF reads unhandled pointerdown / mousedown as the start of a pan or
-    // marquee. Without these, grabbing the handle would also drag the canvas.
-    e.stopPropagation();
-  }, []);
+  // Press and move to pick the window up (it follows you, tilting in 3D).
+  // Stops propagation so RF doesn't start a pan or marquee.
+  const onPointerDown = useCallback((e: React.PointerEvent) => beginHold(e, nodeId), [nodeId]);
+  const stop = useCallback((e: React.MouseEvent) => { e.stopPropagation(); }, []);
   return (
     <div
-      draggable
       role="button"
       aria-label="Drag to swap with another mother"
       className="station-drag-handle"
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onPointerDown={stop}
+      onPointerDown={onPointerDown}
       onMouseDown={stop}
     >
       <svg

@@ -2269,15 +2269,14 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 
 /* ============================================================
-   Window swap by drag (motherDrag.ts) — the picked-up window dims,
-   the one under the pointer lights up with "Swap here", and after the
-   drop the two windows fly to each other's place (pictures above
-   everything, then the real windows fade in). Transform / opacity only.
+   Window swap by hold-and-carry (motherDrag.ts) — you hold the window
+   (it follows the pointer, tilting in 3D), its slot stays as an empty
+   outline, the window under the pointer lights up with "Swap here", and
+   on drop both fly to their new places. Transform / opacity only.
    ============================================================ */
 .mother-frame[data-mother-dragging='true'] {
-  opacity: 0.4;
-  transform: scale(0.97);
-  outline: 2px dashed color-mix(in srgb, var(--acid) 70%, transparent);
+  opacity: 0.18;
+  outline: 2px dashed color-mix(in srgb, var(--acid) 80%, transparent);
   outline-offset: -2px;
 }
 .mother-frame[data-drop-target='true'] {
@@ -2307,7 +2306,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 @media (prefers-reduced-motion: no-preference) {
   .mother-frame[data-mother-dragging='true'] {
-    transition: opacity 160ms ease, transform 160ms ease;
+    transition: opacity 160ms ease;
   }
   .krnl-swap-label {
     animation: krnl-swap-pop 180ms cubic-bezier(0.22, 1, 0.36, 1);
