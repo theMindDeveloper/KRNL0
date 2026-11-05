@@ -2450,3 +2450,24 @@ The renderer saves the whole board, and the sys CLI (or the AI in the terminal) 
 ### Also recorded here
 - **Time-model F2 overrides Decision 22's `secondsAccumulated` commit.** Finishing or deleting the task the pomo is on stops the pomo with `pomoStop` (the real span length, a break as a break) and writes nothing onto the task; tracked time is derived from the pomo history.
 - **Decision 10, `maxVisible`:** the cap now trims done rows only. Open rows are never hidden (the list pages its rows).
+
+---
+
+## Decision 35 — Durable time log beside the board (2026-11-05)
+
+**Status:** Accepted (maintainer, 2026-11-05). Issue #207. Requirements: docs/06-requirements/time-log.md. Builds on Decision 31.
+
+### Context
+Decision 31 made recorded pomo spans the only source of "time spent", and that rule stays (the maintainer confirmed it: the plan is what you intended, recorded time is what happened; scheduling is optional). But everything lives in `board.json` as *current state*: moving a plan overwrites it, deleting a task drops its plan, the completion ledger keeps one record per task, and nothing records corrections. Looking back over a month needs history, and `board.json` (saved whole, merged by Decision 34) is the wrong place to grow it forever.
+
+### Decision
+- **An append-only time log per month**: `<boardDir>/timelog/YYYY-MM.jsonl`, owned by main. Entries are events (`span.closed/edited/retagged/deleted`, `plan.set/cleared`, `task.created/renamed/completed/reopened`) with a text/tag snapshot. Lines are never rewritten; a correction is a new line.
+- **The board stays the working set.** Pomo `history`, task plans and the completion ledger keep working exactly as today (Decision 31/34 unchanged). The log is written *beside* every mutation (renderer through IPC `timelog:append`, CLI in-process) and is what month views read. A failed append never blocks the user action.
+- **Backfill once** from the board (marker file), so existing users start with their history.
+- **Reads fold the log** into per-day summaries (spans with edits/retags/deletes, split at local midnight). Time per tag is booked on the days worked.
+- **Sessions are never auto-stopped.** The user corrects where they really stopped (span start/end edit; "stop at" for a running session); corrections are logged.
+
+### Consequences
+- A second store means two writers per action; tests assert both for each mutation path (F3).
+- Trimming old pomo history from `board.json` is possible later once every reader uses the log; not part of this decision.
+- Each worktree's data folder has its own `timelog/` (scripts/dev.mjs isolation unchanged).

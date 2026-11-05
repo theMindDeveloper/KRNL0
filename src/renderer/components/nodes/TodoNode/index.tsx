@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TodoConfig, TodoItem, TodoState } from './types';
@@ -17,6 +17,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { PomoConfig } from '../PomoNode/types';
 import { defaultPomoConfig } from '../PomoNode/types';
 import { breakdownPomoTime } from '../../../store/pomoSchedule';
+import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { undoable } from '../../../store/undoNotice';
 
@@ -94,6 +95,20 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       }
       return map;
     }),
+  );
+
+  // #207 / time-log F12 — tracked work per task (sum of tagged spans).
+  const pomoForTracked = useBoardStore(selectPomoNode);
+  const trackedSecByTask = useMemo(
+    () => trackedSecondsByTask(pomoOnlyBoard(pomoForTracked), Date.now()),
+    [pomoForTracked],
+  );
+
+  // #207 — tasks with no set time (estimate 0): the row reads "open".
+  const taskOpenKeys = useBoardStore(
+    useShallow((s): string[] => (s.board?.nodes ?? [])
+      .filter((n) => n.kind === 'todo.task' && (n.state as { timeOpen?: boolean }).timeOpen === true)
+      .map((n) => n.id)),
   );
 
   // Build a map from taskNodeId → kind for the three-numbers display.
@@ -317,7 +332,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     if (editingTimeId === null || editCancelledRef.current) return true;
     // Whole minutes only: "2.5" is rejected, not silently read as 2.
     const parsed = Number(timeValue.trim());
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 480) {
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 480) {
       setTimeInvalid(true);
       return false;
     }
@@ -546,9 +561,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         editingTimeId === item.id ? (
           <input
             type="number"
-            min={1}
+            min={0}
             max={480}
-            title={timeInvalid ? 'Whole minutes from 1 to 480' : 'Minutes (1–480)'}
+            title={timeInvalid ? 'Whole minutes from 0 to 480 (0 = no set time)' : 'Minutes (0 = no set time)'}
             aria-invalid={timeInvalid}
             value={timeValue}
             autoFocus
@@ -579,6 +594,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           />
         ) : (() => {
           const planned = taskPlannedMin.get(item.taskNodeId) ?? 25;
+          const trackedMin = Math.round((trackedSecByTask.get(item.taskNodeId) ?? 0) / 60);
+          const openTime = taskOpenKeys.includes(item.taskNodeId);
           const kind = taskKindMap.get(item.taskNodeId) ?? 'focus';
           const bd = kind === 'event'
             ? { workMin: planned, breakMin: 0, effectiveMin: planned }
@@ -586,8 +603,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           return (
             <span
               data-testid="todo-item-breakdown"
-              title={`work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m`}
+              title={`${trackedMin > 0 ? `tracked ${fmtTodoMin(trackedMin)} · ` : ''}planned: work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m${item.done ? '' : ' · click to change the estimate'}`}
+              onClick={item.done || item.taskNodeId === null ? undefined : (e) => { e.stopPropagation(); startTimeEdit(item.id, item.taskNodeId as string); }}
+              onMouseDown={(e) => e.stopPropagation()}
               style={{
+                cursor: item.done ? 'default' : 'pointer',
                 flexShrink: 0,
                 fontFamily: 'var(--font-mono)',
                 fontSize: 9,
@@ -596,11 +616,15 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 whiteSpace: 'nowrap',
               }}
             >
-              <span style={{ color: 'var(--ink-3)' }}>{bd.workMin}</span>
-              <span style={{ opacity: 0.5 }}>·</span>
-              <span style={{ color: 'var(--ink-3)' }}>{bd.breakMin}</span>
-              <span style={{ opacity: 0.5 }}>·</span>
-              <span style={{ color: 'var(--acid-ink, var(--acid))' }}>{bd.effectiveMin}m</span>
+              {/* #207 — one readable figure: tracked / planned once anything is tracked. */}
+              {trackedMin > 0 && (
+                <span data-testid="todo-item-tracked" style={{ color: !openTime && trackedMin > bd.effectiveMin ? 'var(--rust)' : 'var(--ink-2)' }}>
+                  ⏱ {fmtTodoMin(trackedMin)}{!openTime && <span style={{ opacity: 0.5 }}> / </span>}
+                </span>
+              )}
+              {openTime
+                ? (trackedMin > 0 ? null : <span style={{ color: 'var(--ink-4)' }}>open</span>)
+                : <span style={{ color: trackedMin > 0 ? 'var(--ink-4)' : 'var(--ink-3)' }}>{fmtTodoMin(bd.effectiveMin)}</span>}
             </span>
           );
         })()
@@ -1029,4 +1053,13 @@ function SectionToggle({
       )}
     </div>
   );
+}
+
+/** "45m" / "1h20" — compact for the Todo row. */
+function fmtTodoMin(min: number): string {
+  const m = Math.max(0, Math.round(min));
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r ? `${h}h${String(r).padStart(2, '0')}` : `${h}h`;
 }

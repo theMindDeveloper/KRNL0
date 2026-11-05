@@ -11,6 +11,8 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'tag'; ref: string | undefined }
   | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined; text?: string | undefined; tag?: string | undefined }
   | { kind: 'pomo'; sub: 'delete-segment'; segmentId: string | undefined }
+  | { kind: 'pomo'; sub: 'segment'; segmentId: string | undefined; start: string | undefined; end: string | undefined }
+  | { kind: 'pomo'; sub: 'add'; start: string | undefined; end: string | undefined; ref: string | undefined; text: string | undefined }
   | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
   | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
@@ -40,7 +42,11 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'dial'; arg: string | undefined }
   | { kind: 'clock'; sub: 'half'; arg: string | undefined }
   | { kind: 'clock'; sub: 'now' }
+  | { kind: 'clock'; sub: 'week'; arg: string | undefined }
   | { kind: 'cal'; sub: 'zoom'; zoom: number | undefined }
+  // Decision 35 — durable time log reads (time-log F13)
+  | { kind: 'time'; sub: 'log'; from: string | undefined; to: string | undefined; json: boolean }
+  | { kind: 'time'; sub: 'report'; month: string | undefined; by: string | undefined; json: boolean }
   | { kind: 'draw'; sub: 'list'; json: boolean }
   | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'media'; sub: 'list'; json: boolean }
@@ -80,6 +86,8 @@ export type SysCommand =
   | { kind: 'term'; sub: 'clear' }
   | { kind: 'term'; sub: 'setShell'; shell: string | undefined }
   | { kind: 'term'; sub: 'claude'; bypass: boolean }
+  | { kind: 'tour'; sub: 'list' }
+  | { kind: 'tour'; sub: 'start'; id: string | undefined }
   | { kind: 'node'; sub: 'move'; id: string | undefined; to: { x: number; y: number } | undefined }
   | { kind: 'viewport'; sub: 'pan'; dx: number | undefined; dy: number | undefined }
   | { kind: 'viewport'; sub: 'zoom'; factor: number | undefined }
@@ -317,6 +325,8 @@ export class SysParser {
       // retag <seg> <taskRef|none> | retag <seg> --text "emails" [--tag admin]
       if (sub === 'retag') return { kind: 'pomo', sub: 'retag', segmentId: rest[0], ref: rest[1]?.startsWith('--') ? undefined : rest[1], text: flag(rest, 'text'), tag: flag(rest, 'tag') };
       if (sub === 'delete-segment') return { kind: 'pomo', sub: 'delete-segment', segmentId: rest[0] };
+      if (sub === 'segment') return { kind: 'pomo', sub: 'segment', segmentId: rest[0]?.startsWith('--') ? undefined : rest[0], start: flag(rest, 'start'), end: flag(rest, 'end') };
+      if (sub === 'add') return { kind: 'pomo', sub: 'add', start: flag(rest, 'start'), end: flag(rest, 'end'), ref: flag(rest, 'task'), text: flag(rest, 'text') };
       if (sub === 'segments') return { kind: 'pomo', sub: 'segments', date: flag(rest, 'date'), json: hasFlag(rest, 'json') };
       if (sub === 'start') {
         const minutesRaw = flag(rest, 'minutes');
@@ -416,7 +426,8 @@ export class SysParser {
           kind: 'task',
           sub: 'duration',
           id: rest[0],
-          minutes: positiveNum(rest[1], 'minutes'),
+          // 0 = no set time (#207)
+          minutes: rest[1] === '0' ? 0 : positiveNum(rest[1], 'minutes'),
         };
       }
       if (sub === 'sibling') {
@@ -482,6 +493,16 @@ export class SysParser {
       }
     }
 
+    // Decision 35 — durable time log (time-log F13)
+    if (cmd === 'time') {
+      if (sub === 'log') {
+        return { kind: 'time', sub: 'log', from: flag(rest, 'from'), to: flag(rest, 'to'), json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'report' || sub === undefined) {
+        return { kind: 'time', sub: 'report', month: flag(rest, 'month'), by: flag(rest, 'by'), json: hasFlag(rest, 'json') };
+      }
+    }
+
     if (cmd === 'clock') {
       if (sub === 'day') {
         return { kind: 'clock', sub: 'day', arg: rest[0] };
@@ -489,6 +510,7 @@ export class SysParser {
       if (sub === 'dial') return { kind: 'clock', sub: 'dial', arg: rest[0] };
       if (sub === 'half') return { kind: 'clock', sub: 'half', arg: rest[0] };
       if (sub === 'now') return { kind: 'clock', sub: 'now' };
+      if (sub === 'week') return { kind: 'clock', sub: 'week', arg: rest[0] };
       if (sub === 'show' || sub === undefined) {
         return { kind: 'clock', sub: 'show', json: hasFlag(rest, 'json') };
       }
@@ -686,6 +708,11 @@ export class SysParser {
       if (sub === 'clear') {
         return { kind: 'image', sub: 'clear', id: rest[0] };
       }
+    }
+
+    if (cmd === 'tour') {
+      if (sub === 'start') return { kind: 'tour', sub: 'start', id: rest[0] };
+      if (sub === 'list' || sub === undefined) return { kind: 'tour', sub: 'list' };
     }
 
     if (cmd === 'term') {

@@ -14,7 +14,7 @@ const node = { id: 'mother-habit', kind: 'habit', isMother: true, position: { x:
 function setup() {
   const onCommand = vi.fn();
   render(<HabitNode node={node} selected={false} onCommand={onCommand} onSelect={() => undefined} />);
-  const input = screen.getByPlaceholderText('+ add habit or recurring event') as HTMLInputElement;
+  const input = screen.getByPlaceholderText('add habit') as HTMLInputElement;
   return { onCommand, input };
 }
 

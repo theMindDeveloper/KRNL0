@@ -146,7 +146,7 @@ describe('ledger + Done/Archive', () => {
 });
 
 describe('analytics show --view tags', () => {
-  it('groups completed minutes by tag', async () => {
+  it('counts finished tasks per tag; time comes only from recorded work (#207)', async () => {
     await todoAdd(ctx, 'Fix login bug');
     await todoAdd(ctx, 'Gym');
     await todoCheck(ctx, 'Fix login bug');
@@ -155,7 +155,8 @@ describe('analytics show --view tags', () => {
     const data = res.data as { tags: Array<{ id: string; count: number; minutes: number }>; totalCount: number };
     expect(data.totalCount).toBe(2);
     expect(data.tags.map((t) => t.id).sort()).toEqual(['code', 'health']);
-    expect(data.tags.every((t) => t.count === 1 && t.minutes > 0)).toBe(true);
+    // Nothing was recorded, so no time — an estimate is not time spent.
+    expect(data.tags.every((t) => t.count === 1 && t.minutes === 0)).toBe(true);
   });
 
   it('classifies legacy ledger entries that predate tags', async () => {
@@ -164,6 +165,7 @@ describe('analytics show --view tags', () => {
     writeFileSync(boardPath, JSON.stringify(board), 'utf-8');
     const res = await analyticsShow({ boardPath }, { view: 'tags', json: true });
     const data = res.data as { tags: Array<{ id: string; minutes: number }> };
-    expect(data.tags).toEqual([expect.objectContaining({ id: 'meetings', minutes: 15 })]);
+    // Classified from its text; counted as done, no recorded time (#207).
+    expect(data.tags).toEqual([expect.objectContaining({ id: 'meetings', count: 1, minutes: 0 })]);
   });
 });

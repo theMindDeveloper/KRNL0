@@ -18,6 +18,9 @@ import { Mac } from './variants/Mac';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { AppSelect } from '../../ui/AppSelect';
 import { boardTagLibrary, spanTagFor } from '../../../store/spanTags';
+import { PomoTimeLinks } from './PomoTimeLinks';
+import { DiscardButton } from './DiscardButton';
+import { PlannedNowChip } from './PlannedNowChip';
 import { SpanLabeler } from './SpanLabeler';
 import { decodeTargets, encodeTargets, spanTaskTargets, startOfLocalDayMs } from './taskTargets';
 import { DoingPicker, type DoingChoice } from './DoingPicker';
@@ -155,9 +158,10 @@ export function PomoNode({
   // open tasks, then tasks done today (#204 — ticking a task done must not
   // make it impossible to keep counting time toward it). Same list builder
   // as the Calendar's retag list.
-  const todayStartMs = startOfLocalDayMs(Date.now());
   const tagOptionKeys = useBoardStore(
-    useShallow((s) => encodeTargets(spanTaskTargets(s.board?.nodes, { doneSinceMs: todayStartMs }))),
+    // #207 — any done task can still collect time (pickers show the newest
+    // few and search finds the rest).
+    useShallow((s) => encodeTargets(spanTaskTargets(s.board?.nodes))),
   );
   const tagOptions = useMemo(() => decodeTargets(tagOptionKeys), [tagOptionKeys]);
 
@@ -827,7 +831,8 @@ export function PomoNode({
                 ...(state.activeTaskId !== null && !tagOptions.some((o) => o.id === state.activeTaskId)
                   ? [{ value: state.activeTaskId, label: state.label || 'task' }]
                   : []),
-                ...tagOptions.map((o) => ({ value: o.id, label: `${o.done ? '✓ ' : ''}${truncate(o.text, 28)}` })),
+                // The running session can only be on an open task (a done one is reopened first).
+                ...tagOptions.filter((o) => !o.done).map((o) => ({ value: o.id, label: truncate(o.text, 28) })),
               ]}
               style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 10.5, padding: '2px 0' }}
             />
@@ -859,6 +864,9 @@ export function PomoNode({
               onAddCategory={(label) => onCommand('pomo.addCategory', { label })}
             />
           )}
+
+          {/* time-model F5 (#207): suggest the task planned for now; one click, never silent. */}
+          {!away && <PlannedNowChip state={state} easy={easy} onCommand={onCommand} />}
 
           {/* Observe mode: Start → (Break ⇄ Back to work) → Stop. Work and
               breaks are both recorded spans; there is no pause. */}
@@ -955,6 +963,9 @@ export function PomoNode({
                     : 'STOP'}
                 </span>
               </button>
+              {(state.status === 'running' || state.status === 'break') && (
+                <DiscardButton onDiscard={() => onCommand('pomo.discard')} />
+              )}
             </div>
           ) : promptDone ? (
             <div
@@ -1012,6 +1023,8 @@ export function PomoNode({
               </button>
             </div>
           )}
+          {/* #207 — fix recorded time where it happens: stop at the real time, or add forgotten time. */}
+          <PomoTimeLinks state={state} />
 
         </div>
       )}

@@ -56,6 +56,13 @@ export const clockSetDialOnly = (s: ClockState, args: { on?: boolean }): ClockSt
   dialOnly: args?.on === undefined ? !s.dialOnly : !!args.on,
 });
 
+/** #207 — Week view: the last 7 days as small static dials (toggles without
+ *  `on`). Opening it leaves dial-only so the week fits the panel. */
+export const clockSetWeekView = (s: ClockState, args: { on?: boolean }): ClockState => {
+  const on = args?.on === undefined ? !s.weekView : !!args.on;
+  return on ? { ...s, weekView: true, dialOnly: false } : { ...s, weekView: false };
+};
+
 /** Reset the clock's selected day to today (local). */
 export const clockGoToday = (s: ClockState): ClockState => ({
   ...s,

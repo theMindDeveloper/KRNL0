@@ -2,6 +2,7 @@
  * Plan vs reality (#180 follow-up): the pomo is an observer. Tasks only TAG
  * what it records; tracked time per task is derived from tagged work spans.
  */
+import { plannedTaskAt } from '../../../src/renderer/store/plannedNow';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
 import { makeCommandHandler } from '../../../src/renderer/components/Canvas/commandDispatch';
@@ -103,8 +104,8 @@ describe('tasks tag the pomo, they never control it', () => {
   });
 });
 
-describe('starting the pomo suggests the task planned for now', () => {
-  it('tags the session with the open task whose planned block contains now', () => {
+describe('starting the pomo suggests the task planned for now (never silently)', () => {
+  it('starts untagged; plannedTaskAt names the open task whose block contains now', () => {
     const start = new Date(Date.now() - 15 * 60_000);
     useBoardStore.getState().setBoard(board(pomoState(), [
       task('a'),
@@ -112,6 +113,15 @@ describe('starting the pomo suggests the task planned for now', () => {
     ]));
     makeCommandHandler('pomo')('pomo.start', {});
     expect(pomo().status).toBe('running');
+    expect(pomo().activeTaskId).toBeNull();
+    expect(plannedTaskAt(useBoardStore.getState().board, Date.now())?.id).toBe('b');
+  });
+
+  it('accepting the suggestion tags the running session', () => {
+    const start = new Date(Date.now() - 15 * 60_000);
+    useBoardStore.getState().setBoard(board(pomoState(), [task('b', { scheduledFor: localISO(start), scheduledDurationMin: 60 })]));
+    makeCommandHandler('pomo')('pomo.start', {});
+    makeCommandHandler('pomo')('pomo.tag', { taskId: 'b' });
     expect(pomo().activeTaskId).toBe('b');
   });
 

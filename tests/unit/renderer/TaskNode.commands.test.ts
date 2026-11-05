@@ -55,8 +55,9 @@ describe('taskSetPlannedMin', () => {
     expect(taskSetPlannedMin(s, { minutes: 60 }).plannedMin).toBe(60);
   });
 
-  it('floors at 1 and rounds', () => {
-    expect(taskSetPlannedMin(makeTaskState(), { minutes: 0 }).plannedMin).toBe(1);
+  it('0 = no set time (#207), otherwise floors at 1 and rounds', () => {
+    expect(taskSetPlannedMin(makeTaskState(), { minutes: 0 }).timeOpen).toBe(true);
+    expect(taskSetPlannedMin(makeTaskState(), { minutes: 0.4 }).timeOpen).toBe(true);
     expect(taskSetPlannedMin(makeTaskState(), { minutes: 40.6 }).plannedMin).toBe(41);
   });
 
@@ -295,10 +296,10 @@ describe('taskSetDuration', () => {
     expect(next.scheduledDurationMin).toBe(60);
   });
 
-  it('clamps minimum to 1', () => {
+  it('0 or less = no set time (#207)', () => {
     const s = makeTaskState({ durationMin: 20 });
-    expect(taskSetDuration(s, { durationMin: 0 }).durationMin).toBe(1);
-    expect(taskSetDuration(s, { durationMin: -5 }).durationMin).toBe(1);
+    expect(taskSetDuration(s, { durationMin: 0 }).timeOpen).toBe(true);
+    expect(taskSetDuration(s, { durationMin: -5 }).timeOpen).toBe(true);
   });
 
   it('clamps maximum to 480', () => {

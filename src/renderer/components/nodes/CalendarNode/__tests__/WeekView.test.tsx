@@ -792,9 +792,8 @@ describe('WeekView — overlap disambiguation (#6/#7)', () => {
     render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
-    // Single hit → the segment's right-click menu; "Details…" opens the popup.
+    // Right-click on recorded time opens the same popup as a left click (#207).
     fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
-    fireEvent.click(screen.getByRole('button', { name: 'Details…' }));
 
     const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
     expect(popup).toBeTruthy();
@@ -890,13 +889,8 @@ describe('WeekView — tagged span shows its task (#204)', () => {
     expect(band?.getAttribute('data-reality-task')).toBe('Task task-a');
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    // One popup for left and right click (#207): title and "Counts toward" name the task.
     fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
-    expect(screen.getByText('Tagged: Task task-a')).toBeTruthy();
-    // The finished task is still offered as a retag target.
-    expect(screen.queryByRole('button', { name: /Tag → ✓ Task task-a/ })).toBeNull(); // it is the current tag
-    expect(screen.getByRole('button', { name: 'Untag' })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Details…' }));
     const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
     expect(popup?.textContent).toMatch(/Task task-a/);
     expect(document.querySelector('[data-testid="calendar-reality-retag"]')?.textContent).toMatch(/Task task-a/);

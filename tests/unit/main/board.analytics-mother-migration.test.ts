@@ -36,13 +36,13 @@ describe('Decision 32 — analytics mother', () => {
     return loadBoardFrom(boardPath) as B;
   };
 
-  it('F1: seed includes mother-analytics in the bottom-right-pre slot, right of the terminal', () => {
+  it('F1 (revised #207): a new board puts Analytics after Habits — bottom row, rightmost', () => {
     const m = (seedBoard().nodes as N[]).find((n) => n.id === 'mother-analytics');
     expect(m).toBeDefined();
     expect(m!.kind).toBe('analytics');
     expect(m!.isMother).toBe(true);
-    expect(m!.position).toEqual({ x: 1960, y: 0 });
-    expect(m!.config).toMatchObject({ stationSlot: 'bottom-right-pre' });
+    expect(m!.position).toEqual({ x: 1400, y: 0 });
+    expect(m!.config).toMatchObject({ stationSlot: 'top-right-lower' });
   });
 
   it('F2: injects mother-analytics into a board that predates it', () => {

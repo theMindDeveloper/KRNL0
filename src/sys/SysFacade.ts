@@ -1,4 +1,13 @@
+import { dirname } from 'path';
 import { SysParser } from './parser';
+import type { SysCommand } from './parser';
+import { loadBoardFrom } from '../main/persistence/board';
+import { logBoardChange, appendTimeLog } from '../main/persistence/timelog';
+import { TOURS } from '../renderer/components/Tour/tours';
+
+/** Line break for multi-line CLI messages. */
+const EOL = String.fromCharCode(10);
+import { timeLog, timeReport } from './commands/time';
 import * as habit from './commands/habit';
 import * as todo from './commands/todo';
 import * as task from './commands/task';
@@ -12,7 +21,7 @@ import { textAdd, textSet, textResize, textLook } from './commands/text';
 import { drawList, drawClear, drawDelete, drawStroke } from './commands/draw';
 import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
 import { mediaAdd, mediaList, mediaResize, mediaPage } from './commands/media';
-import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments } from './commands/pomo';
+import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments, pomoEditSegmentCmd, pomoAddSegmentCmd } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
@@ -78,6 +87,19 @@ function defaultBoardPath(): string {
   return `${dir}/board.json`;
 }
 
+/** Read-only verbs of the time-relevant groups: no board snapshots needed. */
+const TIME_READS = new Set(['pomo status', 'pomo segments', 'pomo config', 'task list', 'todo list', 'todo tags']);
+
+/**
+ * Commands whose board change can matter to the time log. Analytics
+ * `clear-history` and `board load` are left out on purpose (a wipe / a whole
+ * board swap is not a history of corrections).
+ */
+function changesTime(command: SysCommand): boolean {
+  if (command.kind !== 'pomo' && command.kind !== 'task' && command.kind !== 'todo') return false;
+  return !TIME_READS.has(`${command.kind} ${command.sub}`);
+}
+
 function readVersion(): string {
   try {
     // SysFacade is used both from main process (compiled) and from tests.
@@ -116,7 +138,36 @@ export class SysFacade {
     return r && r.ok && (r.message === 'light' || r.message === 'dark') ? r.message : undefined;
   }
 
+  /**
+   * Decision 35 (time-log F3) — the CLI writer. Board snapshots taken around
+   * a pomo / task / todo command are diffed into time-log entries
+   * (span.closed/edited/retagged/deleted, plan.set/cleared,
+   * task.created/renamed/completed/reopened). Nothing awaits between the two
+   * snapshots except the command itself, which writes board.json
+   * synchronously, so a renderer save cannot slip in between.
+   */
   async run(argv: string[]): Promise<SysResult> {
+    const parsed = argv.length > 0 ? SysParser.parse(argv) : null;
+    if (!parsed || !changesTime(parsed)) return this.runCommand(argv);
+    const before = this.boardSnapshot();
+    const result = await this.runCommand(argv);
+    if (before !== undefined) {
+      const after = this.boardSnapshot();
+      if (after !== undefined) logBoardChange(dirname(this.deps.boardPath), before, after);
+    }
+    return result;
+  }
+
+  /** The board as the command sees it; undefined when it can't be read (no logging then). */
+  private boardSnapshot(): unknown {
+    try {
+      return loadBoardFrom(this.deps.boardPath);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async runCommand(argv: string[]): Promise<SysResult> {
     if (argv.length === 0) {
       return { ok: true, message: generateHelp(this.version) };
     }
@@ -243,6 +294,23 @@ export class SysFacade {
           `pid    : ${pid}`,
         ].join('\n'),
       };
+    }
+
+    // Guided tours (#207): list is headless, start needs the window.
+    if (command.kind === 'tour') {
+      if (command.sub === 'list') {
+        return {
+          ok: true,
+          message: TOURS.map((t) => `${t.id.padEnd(10)} ${t.title} — ${t.summary}`).join(EOL),
+          data: { tours: TOURS.map((t) => ({ id: t.id, title: t.title, summary: t.summary, steps: t.steps.length })) },
+        };
+      }
+      if (!command.id) return { ok: false, message: 'tour start requires <id> (see: krnl tour list)' };
+      if (!TOURS.some((t) => t.id === command.id)) return { ok: false, message: `no tour "${command.id}" (see: krnl tour list)` };
+      if (!this.deps.hasOpenRenderer() || !this.deps.cliDispatch) {
+        return { ok: false, message: 'tour start requires an open KRNL0 window', data: { exitCode: 2 } };
+      }
+      return this.deps.cliDispatch('tour.start', { id: command.id });
     }
 
     if (command.kind === 'term') {
@@ -417,11 +485,17 @@ export class SysFacade {
             { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
             command.sub,
           );
-        case 'clear-history':
-          return analyticsClearHistory(
+        case 'clear-history': {
+          const cleared = analyticsClearHistory(
             { ...aCtx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
             command.yes,
           );
+          // Decision 35 — record the wipe so log-based views drop older time.
+          if (cleared.ok) {
+            try { appendTimeLog(dirname(this.deps.boardPath), [{ type: 'history.cleared' }]); } catch { /* logging never blocks */ }
+          }
+          return cleared;
+        }
         case 'cards':
         case 'hide':
         case 'unhide':
@@ -506,6 +580,16 @@ export class SysFacade {
             ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
           };
           return pomoDeleteSegmentCmd(segCtx, command.segmentId);
+        }
+        case 'segment':
+        case 'add': {
+          const editCtx = {
+            boardPath: this.deps.boardPath,
+            ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+          };
+          return command.sub === 'segment'
+            ? pomoEditSegmentCmd(editCtx, command.segmentId, command.start, command.end)
+            : pomoAddSegmentCmd(editCtx, command.start, command.end, command.ref, command.text);
         }
         case 'segments': {
           const segOpts: Parameters<typeof pomoSegments>[1] = { json: command.json };
@@ -671,6 +755,14 @@ export class SysFacade {
       }
     }
 
+    // ── Decision 35 — durable time log reads (time-log F13) ──────────────────
+    if (command.kind === 'time') {
+      const tCtx = { boardPath: this.deps.boardPath };
+      return command.sub === 'log'
+        ? timeLog(tCtx, { from: command.from, to: command.to, json: command.json })
+        : timeReport(tCtx, { month: command.month, by: command.by, json: command.json });
+    }
+
     if (command.kind === 'clock') {
       const ctx: clockCmd.ClockCtx = {
         boardPath: this.deps.boardPath,
@@ -682,6 +774,7 @@ export class SysFacade {
         case 'dial': return clockCmd.clockDial(ctx, command.arg);
         case 'half': return clockCmd.clockHalf(ctx, command.arg);
         case 'now':  return clockCmd.clockNow(ctx);
+        case 'week': return clockCmd.clockWeek(ctx, command.arg);
       }
     }
 

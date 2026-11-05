@@ -790,3 +790,48 @@ select option { background: var(--paper); color: var(--ink); }
   outline: 2px solid var(--acid);
   outline-offset: 1px;
 }
+
+/* ── Task colours (#207) ─────────────────────────────────────────────────
+   One per task you still have (utils/taskColor.ts assigns them so no two
+   current tasks share one). 18 hues, interleaved so neighbouring slots are
+   far apart on the colour wheel; lighter on dark, deeper on light. */
+:root {
+  --task-1: oklch(0.60 0.15 12);
+  --task-2: oklch(0.60 0.15 152);
+  --task-3: oklch(0.60 0.15 292);
+  --task-4: oklch(0.60 0.15 72);
+  --task-5: oklch(0.60 0.15 212);
+  --task-6: oklch(0.60 0.15 352);
+  --task-7: oklch(0.60 0.15 132);
+  --task-8: oklch(0.60 0.15 272);
+  --task-9: oklch(0.60 0.15 52);
+  --task-10: oklch(0.60 0.15 192);
+  --task-11: oklch(0.60 0.15 332);
+  --task-12: oklch(0.60 0.15 112);
+  --task-13: oklch(0.60 0.15 252);
+  --task-14: oklch(0.60 0.15 32);
+  --task-15: oklch(0.60 0.15 172);
+  --task-16: oklch(0.60 0.15 312);
+  --task-17: oklch(0.60 0.15 92);
+  --task-18: oklch(0.60 0.15 232);
+}
+[data-theme="dark"] {
+  --task-1: oklch(0.75 0.13 12);
+  --task-2: oklch(0.75 0.13 152);
+  --task-3: oklch(0.75 0.13 292);
+  --task-4: oklch(0.75 0.13 72);
+  --task-5: oklch(0.75 0.13 212);
+  --task-6: oklch(0.75 0.13 352);
+  --task-7: oklch(0.75 0.13 132);
+  --task-8: oklch(0.75 0.13 272);
+  --task-9: oklch(0.75 0.13 52);
+  --task-10: oklch(0.75 0.13 192);
+  --task-11: oklch(0.75 0.13 332);
+  --task-12: oklch(0.75 0.13 112);
+  --task-13: oklch(0.75 0.13 252);
+  --task-14: oklch(0.75 0.13 32);
+  --task-15: oklch(0.75 0.13 172);
+  --task-16: oklch(0.75 0.13 312);
+  --task-17: oklch(0.75 0.13 92);
+  --task-18: oklch(0.75 0.13 232);
+}

@@ -87,6 +87,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'tag', usage: 'pomo tag <taskRef|none>', summary: 'Label what the pomo is observing (only tags recorded time, never changes the timer)' },
       { name: 'retag', usage: 'pomo retag <segmentId> <taskRef|none>', summary: 'Change which task a recorded span counts toward' },
       { name: 'segments', usage: 'pomo segments [--date YYYY-MM-DD] [--json]', summary: 'List tracked focus/break spans for a day (ids for retag / delete-segment)' },
+      { name: 'segment', usage: 'pomo segment <segmentId> [--start HH:MM] [--end HH:MM]', summary: 'Move a recorded session (e.g. to where you really stopped)' },
+      { name: 'add', usage: 'pomo add --start HH:MM --end HH:MM [--task <ref>] [--text "what"]', summary: 'Record time you did not record (HH:MM = today, or YYYY-MM-DDTHH:MM)' },
       { name: 'delete-segment', usage: 'pomo delete-segment <segmentId>', summary: 'Delete a recorded focus/break span (Calendar/Clock right-click → Delete segment)' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
       { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor] [--count-stopped on|off]', summary: 'Update board-scoped PomoConfig on the mother PomoNode (count-stopped: does Stop record the session so far)' },
@@ -231,8 +233,17 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'day', usage: 'clock day <YYYY-MM-DD|today|+1|-1>', summary: 'Set the clock selected date (absolute, today, or ±1 day)' },
       { name: 'dial', usage: 'clock dial [on|off]', summary: 'Dial-only view: the clock face as big as the window allows (toggles without an argument)' },
       { name: 'half', usage: 'clock half [am|pm]', summary: 'Which half of the day the dial shows (toggles without an argument)' },
+      { name: 'week', usage: 'clock week [on|off]', summary: 'Last 7 days as small clock faces (toggles without an argument)' },
       { name: 'now', usage: 'clock now', summary: 'Show today and the 12-hour half that contains now' },
       { name: 'show', usage: 'clock show [--json]', summary: 'Show scheduled tasks for the clock\'s selected date and view window' },
+    ],
+  },
+  {
+    group: 'time',
+    summary: 'Durable time log: what you did, when, on what (Decision 35)',
+    subcommands: [
+      { name: 'log', usage: 'time log --from YYYY-MM-DD --to YYYY-MM-DD [--json]', summary: 'Raw time-log entries logged on those days (spans, plans, completions, corrections)' },
+      { name: 'report', usage: 'time report --month YYYY-MM [--by task|tag|day] [--json]', summary: 'Month folded from the log: minutes per task (plan vs actual), per tag (on the days worked) or per day' },
     ],
   },
   {
@@ -261,6 +272,14 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'remove', usage: 'radio remove <preset>', summary: 'Take a layer out of the mix' },
       { name: 'stop', usage: 'radio stop', summary: 'Pause the mix (it is kept for the next play)' },
       { name: 'volume', usage: 'radio volume <0-100>', summary: 'Set the master volume' },
+    ],
+  },
+  {
+    group: 'tour',
+    summary: 'Guided tutorials — one per part of the app',
+    subcommands: [
+      { name: 'list', usage: 'tour list', summary: 'List the tutorials' },
+      { name: 'start', usage: 'tour start <id>', summary: 'Start a tutorial in the KRNL0 window (welcome, pomo, todo, calendar, clock, habits, analytics, terminal)' },
     ],
   },
   {

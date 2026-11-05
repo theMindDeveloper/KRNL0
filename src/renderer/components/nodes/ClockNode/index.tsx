@@ -15,76 +15,35 @@ import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } fr
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import { selectPomoReality, pomoIsLive, type RealitySegment } from '../../../store/pomoReality';
-import type { TaskState, TaskKind } from '../TaskNode/types';
-import type { PomoBreakdown } from '../../../store/pomoSchedule';
-import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
+import type { TaskState } from '../TaskNode/types';
 import { Z } from '../../ui/layers';
 
-// Shared palette across Clock, Calendar, Todo. See src/renderer/utils/taskColor.ts.
-import { colorForTask as colorFor, TASK_TONE_VAR as TONE_VAR } from '../../../utils/taskColor';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { ClockBezel } from './ClockBezel';
+import { ClockWeek, buildWeek } from './ClockWeek';
+import { useAppMarkers } from '../../../store/appSessions';
 import { PagedView } from '../../ui/PagedView';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { spanTaskName, spanTaskTargets } from '../PomoNode/taskTargets';
 import { AppSelect } from '../../ui/AppSelect';
-import { wallHoursFromDayStart, msAtWallHours } from './wallHours';
+import { SpanTimeEditor, CountsToward, openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
+import { SPACE, popupColumn } from '../../ui/spacing';
+import { msAtWallHours } from './wallHours';
 import { localYMD } from '../../../../shared/ymd';
+import { CX, CY, R_FACE, pt, arcPath, sectorPath } from './dialGeometry';
+import {
+  planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, type TaskEntry,
+} from './dayModel';
 import { halfOf, startupFollow, rolloverFollow, claimStartup, type ClockNowMark } from './follow';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
-const CX = 120;
-const CY = 120;
-const R_ARC = 102;
-const R_FACE = 86;
+// CX / CY / R_FACE and the arc helpers live in dialGeometry.ts (shared with
+// the Week view's small dials).
 const R_TICK_OUT = 84;
 const R_TICK_IN = 76;
 const R_TICK_IN_MAJ = 72;
 const R_NUM = 60;
-
-// ── Geometry helpers ───────────────────────────────────────────────────────────
-
-/** Map an hour 0–24 onto its angle on a 12-hour face. 12 sits at top. */
-function hourToRad(h: number): number {
-  return ((h % 12) / 12) * Math.PI * 2 - Math.PI / 2;
-}
-
-function pt(h: number, r: number): { x: number; y: number } {
-  const a = hourToRad(h);
-  return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) };
-}
-
-/** SVG arc path from startH to endH on the 12-h face at radius r. */
-function arcPath(startH: number, endH: number, r: number): string {
-  const span = Math.max(0.05, endH - startH);
-  const a1 = hourToRad(startH);
-  const a2 = hourToRad(startH + span);
-  const x1 = CX + r * Math.cos(a1);
-  const y1 = CY + r * Math.sin(a1);
-  const x2 = CX + r * Math.cos(a2);
-  const y2 = CY + r * Math.sin(a2);
-  const large = span > 6 ? 1 : 0;
-  return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
-}
-
-/**
- * #180 — filled pie sector from the dial centre out to radius r, spanning
- * [startH, endH]. Used to draw tracked-reality as an ambient background WASH
- * on the dial face (behind the ticks/numbers/event lanes), distinct from the
- * thin outlined event arcs on the outer track lanes.
- */
-function sectorPath(startH: number, endH: number, r: number): string {
-  const span = Math.max(0.05, endH - startH);
-  const a1 = hourToRad(startH);
-  const a2 = hourToRad(startH + span);
-  const x1 = CX + r * Math.cos(a1);
-  const y1 = CY + r * Math.sin(a1);
-  const x2 = CX + r * Math.cos(a2);
-  const y2 = CY + r * Math.sin(a2);
-  const large = span > 6 ? 1 : 0;
-  return `M ${CX} ${CY} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-}
 
 /** Format hour-float as "9:30am". */
 function fmtTime(h: number): string {
@@ -110,73 +69,8 @@ function fmtDur(h: number): string {
   return `${total}m`;
 }
 
-/** Parse a "YYYY-MM-DDTHH:MM" local-ISO into hour-float (0–24, ignores date). */
-function isoToHourFloat(iso: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
-  if (!m) return null;
-  const hh = Number.parseInt(m[4]!, 10);
-  const mm = Number.parseInt(m[5]!, 10);
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-  return hh + mm / 60;
-}
-
-/**
- * Return hours elapsed since midnight of referenceDate (YYYY-MM-DD).
- * Cross-midnight tasks get negative startH (started yesterday) or endH > 24 (ends tomorrow).
- */
-function isoHoursFromDayStart(iso: string, referenceDate: string): number | null {
-  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(iso);
-  if (!m) return null;
-  const isoDate = m[1]!;
-  const hh = Number.parseInt(m[2]!, 10);
-  const mm = Number.parseInt(m[3]!, 10);
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-  const dayOffsetMs = new Date(isoDate).getTime() - new Date(referenceDate).getTime();
-  const dayOffset = Math.round(dayOffsetMs / 86400000);
-  return dayOffset * 24 + hh + mm / 60;
-}
-
 // Numerals 1–12. 12 at index 0 so hourToRad(12)=top.
 const NUMERALS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
-
-// ── Flattened task type for display ───────────────────────────────────────────
-// Entries can come from two sources: scheduled tasks (from the schedule
-// selector) and habits dropped on the calendar (from habit mothers). Both
-// render as arcs in the clock; habits behave like events (no breakdown).
-interface TaskEntry {
-  id: string;
-  start: number;   // hour-float, e.g. 9.5 = 9:30 AM — clipped to the 12-hour window (drawing)
-  end: number;
-  /** The real start / end (hours from the day start), unclipped — for the
-   *  times the list, menus and popups show and for "ended" (F5). */
-  realStart: number;
-  realEnd: number;
-  name: string;
-  /** Resolved CSS color (a `var(--token)` string). Tasks use their tone,
-   *  habits use their habit color. Single source of truth — render code
-   *  reads `colorVar` directly and never re-maps from a tone token. */
-  colorVar: string;
-  plannedMin: number;
-  /** Decision 28: null for event tasks AND habits, non-null for focus tasks. */
-  breakdown: PomoBreakdown | null;
-  /** Parallel group id; null if this task is sequential or a habit. */
-  parallelGroupId: string | null;
-  /** 0-based branch index within the parallel group; null if sequential. */
-  parallelBranchIndex: number | null;
-  /** 'task' or 'habit' — for future styling differentiation. */
-  source: 'task' | 'habit';
-  /** No duration set — the arc fades out toward its end. */
-  timeOpen?: boolean;
-}
-
-/** Check if a habit schedule fires on a given ISO day-of-week. */
-function habitOnDow(schedule: HabitSchedule, isoDow: IsoDow): boolean {
-  switch (schedule.kind) {
-    case 'daily': return true;
-    case 'weekly': return schedule.days.includes(isoDow);
-    case 'weekdays': return isoDow >= 1 && isoDow <= 5;
-  }
-}
 
 /**
  * Hour/minute hand, drawn pointing along +x (the parent <g> rotates it).
@@ -216,6 +110,7 @@ export function ClockNode({
   // page through other days without touching the wall-clock hands.
   const { viewWindow, selectedDate } = node.state;
   const dialOnly = node.state.dialOnly === true;
+  const weekView = node.state.weekView === true;
   // ADR 0009 F6 — the frame style only restyles the dial; every feature stays.
   const clockSkin = useFrameTheme().manifest.components.clock;
 
@@ -279,21 +174,11 @@ export function ClockNode({
   // Right-click menus — the same builders as the Calendar, so a task or a
   // pomo segment offers the same actions on both surfaces.
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  // Recorded time: right-click opens the same popup as left-click (one place).
   const openSegmentMenu = (seg: RealitySegment, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // #204 — same task list (open, then done ✓) and task name as the Calendar.
-    const nodes = useBoardStore.getState().board?.nodes ?? [];
-    const targets = spanTaskTargets(nodes).map((t) => ({ id: t.id, text: t.done ? `✓ ${t.text}` : t.text }));
-    const x = e.clientX;
-    const y = e.clientY;
-    setCtxMenu({
-      x, y,
-      items: segmentMenuItems(
-        { ...seg, taskName: spanTaskName(nodes, seg) },
-        { targets, easy, onDetails: () => setRealityPopup({ seg, x, y }) },
-      ),
-    });
+    setRealityPopup({ seg, x: e.clientX, y: e.clientY });
   };
   const openTaskMenu = (taskId: string, startH: number, endH: number, e: React.MouseEvent) => {
     const node = useBoardStore.getState().board?.nodes.find((n) => n.id === taskId);
@@ -360,44 +245,9 @@ export function ClockNode({
     return selectSchedule(board).placements;
   }, [board]);
 
-  // Task info — includes text now.
-  const taskInfo = useMemo(() => {
-    const m = new Map<string, { done: boolean; plannedMin: number; parentTodoId: string; text: string; kind: TaskKind; timeOpen: boolean }>();
-    if (!board) return m;
-    for (const n of board.nodes) {
-      if (n.kind !== 'todo.task') continue;
-      const ts = n.state as TaskState;
-      m.set(n.id, {
-        done: ts.done,
-        plannedMin: ts.plannedMin ?? ts.durationMin,
-        parentTodoId: ts.parentTodoId,
-        text: ts.text,
-        kind: ts.kind ?? 'focus',
-        timeOpen: ts.timeOpen === true,
-      });
-    }
-    return m;
-  }, [board?.nodes]);
-
-  // Scheduled habits — same source the WeekView consumes (ADR 0002 §6).
-  // A habit is "scheduled" once the user drops it on the calendar; the drop
-  // writes `schedule: { kind, timeOfDay, durationMin }` onto the habit record.
-  // The clock visualizes these the same way it visualizes event tasks:
-  // single arc, no break overlays, habit color.
-  const scheduledHabits = useMemo(() => {
-    const out: Array<{ id: string; name: string; color: string; schedule: HabitSchedule }> = [];
-    if (!board) return out;
-    for (const n of board.nodes) {
-      if (n.kind !== 'habit') continue;
-      const hs = n.state as { habits?: Habit[] } | null;
-      if (!hs?.habits) continue;
-      for (const h of hs.habits) {
-        if (h.archived || !h.schedule) continue;
-        out.push({ id: h.id, name: h.name, color: h.color ?? 'acid', schedule: h.schedule });
-      }
-    }
-    return out;
-  }, [board?.nodes]);
+  // Task facts + scheduled habits for the day model (dayModel.ts).
+  const taskInfo = useMemo(() => collectTaskInfo(board), [board?.nodes]);
+  const scheduledHabits = useMemo(() => collectScheduledHabits(board), [board?.nodes]);
 
   // Today (real wall-clock day) — used to decide whether `now`-derived UI
   // (now-pointer, active task, now-playing strip) is meaningful for the
@@ -436,103 +286,32 @@ export function ClockNode({
     );
   }, [selectedDate]);
 
-  // Selected day's ISO day-of-week (1=Mon..7=Sun) — habits fire based on the
-  // selected day, not "today", so the user sees a habit on Sunday when
-  // viewing a Sunday in the future.
-  const selectedIsoDow: IsoDow = (() => {
-    const jsDay = selectedDateObj.getDay(); // 0=Sun..6=Sat
-    return (jsDay === 0 ? 7 : jsDay) as IsoDow;
-  })();
-
   // Flatten placements + scheduled habits → TaskEntry[].
   // Filter by selected day and 12-hour viewWindow.
-  const tasks: TaskEntry[] = useMemo(() => {
-    if (!placementsMap) return [];
-    const winLo = viewWindow === 1 ? 12 : 0;
-    const winHi = viewWindow === 1 ? 24 : 12;
-    const out: TaskEntry[] = [];
-
-    // 1) Scheduled tasks from the selector.
-    // Use day-relative hours so cross-midnight tasks (startH<0 or endH>24) are handled correctly.
-    for (const p of placementsMap.values()) {
-      const info = taskInfo.get(p.taskId);
-      if (!info || info.kind !== 'event') continue;
-      const startH = isoHoursFromDayStart(p.startISO, selectedDate);
-      if (startH === null) continue;
-      const endHRaw = isoHoursFromDayStart(p.endISO, selectedDate);
-      const endH = endHRaw !== null ? endHRaw : startH + info.plannedMin / 60;
-      if (endH <= startH) continue;
-      // Skip if the task doesn't overlap this day at all (0–24).
-      if (endH <= 0 || startH >= 24) continue;
-      if (endH <= winLo || startH >= winHi) continue;
-      out.push({
-        id: p.taskId,
-        start: Math.max(startH, winLo),
-        end: Math.min(endH, winHi),
-        realStart: startH,
-        realEnd: endH,
-        name: info.text,
-        colorVar: TONE_VAR[colorFor(p.taskId)],
-        plannedMin: info.plannedMin,
-        breakdown: p.breakdown,
-        parallelGroupId: p.parallelGroupId,
-        parallelBranchIndex: p.parallelBranchIndex,
-        source: 'task',
-        timeOpen: info.timeOpen,
-      });
-    }
-
-    // 2) Scheduled habits that fire on the selected day.
-    for (const h of scheduledHabits) {
-      if (!habitOnDow(h.schedule, selectedIsoDow)) continue;
-      const [hhStr, mmStr] = h.schedule.timeOfDay.split(':');
-      const hh = Number.parseInt(hhStr ?? '0', 10);
-      const mm = Number.parseInt(mmStr ?? '0', 10);
-      if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
-      const durMin = h.schedule.durationMin && h.schedule.durationMin > 0 ? h.schedule.durationMin : 30;
-      const startH = hh + mm / 60;
-      const endH = startH + durMin / 60;
-      if (endH <= winLo || startH >= winHi) continue;
-      out.push({
-        id: `habit-${h.id}`,
-        start: Math.max(startH, winLo),
-        end: Math.min(endH, winHi),
-        realStart: startH,
-        realEnd: endH,
-        name: h.name,
-        colorVar: `var(--${h.color})`,
-        plannedMin: durMin,
-        breakdown: null, // habits = single block (event-like)
-        parallelGroupId: null,
-        parallelBranchIndex: null,
-        source: 'habit',
-      });
-    }
-
-    // Sort by start time
-    out.sort((a, b) => a.start - b.start);
-    return out;
-  }, [placementsMap, taskInfo, viewWindow, scheduledHabits, selectedIsoDow, selectedDate]);
+  const tasks: TaskEntry[] = useMemo(
+    () => (placementsMap ? planForDay(placementsMap.values(), taskInfo, scheduledHabits, selectedDate, viewWindow) : []),
+    [placementsMap, taskInfo, viewWindow, scheduledHabits, selectedDate],
+  );
 
   // Issue #166 — tracked REALITY segments for the selected day, clipped to the
   // 12-hour window. These are the filled "what actually happened" arcs (work +
   // break), distinct from the hollow scheduled-event plan arcs above.
-  const realitySegments = useMemo(() => {
-    const segs = selectPomoReality(board0, liveMs);
-    if (segs.length === 0) return [] as Array<RealitySegment & { startH: number; endH: number }>;
-    const winLo = viewWindow === 1 ? 12 : 0;
-    const winHi = viewWindow === 1 ? 24 : 12;
-    const out: Array<RealitySegment & { startH: number; endH: number }> = [];
-    for (const seg of segs) {
-      const startH = wallHoursFromDayStart(seg.startMs, selectedDate);
-      const endH = wallHoursFromDayStart(seg.endMs, selectedDate);
-      if (!(endH > startH)) continue;
-      if (endH <= 0 || startH >= 24) continue;
-      if (endH <= winLo || startH >= winHi) continue;
-      out.push({ ...seg, startH: Math.max(startH, winLo), endH: Math.min(endH, winHi) });
-    }
-    return out;
-  }, [board0, liveMs, selectedDate, viewWindow]);
+  const realitySegments = useMemo(
+    () => realityForDay(selectPomoReality(board0, liveMs), selectedDate, viewWindow),
+    [board0, liveMs, selectedDate, viewWindow],
+  );
+
+  // #207 follow-up — app open / close markers for the shown day.
+  const appMarkers = useAppMarkers(selectedDate, selectedDate);
+
+  // #207 — Week view model (built only while the week is shown).
+  const week = useMemo(
+    () => (weekView
+      ? buildWeek(todayLocalYMD(), selectPomoReality(board0, liveMs), placementsMap ? placementsMap.values() : null, taskInfo, scheduledHabits, tagLibrary, easy)
+      : []),
+    // `now` re-buckets the days after midnight.
+    [weekView, board0, liveMs, placementsMap, taskInfo, scheduledHabits, tagLibrary, easy, now],
+  );
 
   // Active-task / now-pointer concepts only apply when the user is viewing
   // today. On any other day, `now` has no meaning relative to the day being
@@ -614,10 +393,28 @@ export function ClockNode({
             <span style={{ color: isToday ? 'var(--cyan)' : 'var(--ink-4)', fontSize: 9 }}>◉</span>
             {isToday ? 'Today · Schedule' : 'Day · Schedule'}
           </span>
+          <span style={{ display: 'flex', gap: 6 }}>
+          <button
+            type="button"
+            data-testid="clock-week-toggle"
+            aria-pressed={weekView}
+            title={weekView ? 'Back to the day' : 'Last 7 days at a glance'}
+            onClick={(e) => { e.stopPropagation(); onCommand('clock.setWeekView', {}); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: weekView ? 'var(--acid)' : 'transparent',
+              color: weekView ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
+              border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
+              fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
+            }}
+          >
+            {weekView ? '◷ DAY' : '▦ WEEK'}
+          </button>
           <button
             type="button"
             data-testid="clock-dial-only"
             aria-pressed={dialOnly}
+            hidden={weekView}
             title={dialOnly ? 'Show schedule' : 'Big clock — dial only'}
             onClick={(e) => { e.stopPropagation(); onCommand('clock.setDialOnly', {}); }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -630,7 +427,18 @@ export function ClockNode({
           >
             {dialOnly ? '☰ SCHEDULE' : '⤢ BIG CLOCK'}
           </button>
+          </span>
         </div>
+        {/* #207 — Week view replaces the day view; the day view stays mounted
+            (display: contents keeps its flex layout) so switching back is instant. */}
+        {weekView && (
+          <ClockWeek
+            week={week}
+            nowH={now.getHours() + now.getMinutes() / 60}
+            onPick={(ymd) => { onCommand('clock.setSelectedDate', { date: ymd }); onCommand('clock.setWeekView', { on: false }); }}
+          />
+        )}
+        <div style={{ display: weekView ? 'none' : 'contents' }}>
 
         {/* Day selector — ADR 0004 §3.3. Lets the user page through days
             (← / →), jump to any date via native picker (covers month/year),
@@ -810,6 +618,27 @@ export function ClockNode({
           }}
         >
           <svg
+            // #207 F7b — right-click an empty part of the dial: log time that
+            // wasn't recorded at that hour (arcs and wedges stop their own).
+            onContextMenu={(ev) => {
+              ev.preventDefault();
+              const r = ev.currentTarget.getBoundingClientRect();
+              const a = Math.atan2(ev.clientY - (r.top + r.height / 2), ev.clientX - (r.left + r.width / 2));
+              const h12 = ((((a + Math.PI / 2) / (Math.PI * 2)) * 12) % 12 + 12) % 12;
+              const [yy, mm, dd] = selectedDate.split('-').map(Number) as [number, number, number];
+              const clickMs = new Date(yy, mm - 1, dd, 0, Math.floor((viewWindow * 12 + h12) * 60)).getTime();
+              const x = ev.clientX;
+              const y = ev.clientY;
+              const future = clickMs > Date.now();
+              setCtxMenu({
+                x, y,
+                items: [{
+                  label: future ? 'Log time… (only past time)' : `Log time at ${fmtClockHM(clickMs)}…`,
+                  disabled: future,
+                  onSelect: () => openLogTime({ ...logTimeDefaults(clickMs), x, y }),
+                }],
+              });
+            }}
             viewBox={(() => {
               // Grow the drawing area with the plan lanes so many parallel
               // tasks are never clipped by the panel (240 = the base dial).
@@ -1102,6 +931,26 @@ export function ClockNode({
                 second hand passing under a still cursor) "leaves" the wedge
                 and the hover flickers / the click misses. */}
             <g data-testid="clock-face-overlay" pointerEvents="none">
+            {/* #207 follow-up — when KRNL0 was opened / closed (small rim ticks). */}
+            {appMarkers.map((m) => {
+              const d = new Date(m.ms);
+              const h = d.getHours() + d.getMinutes() / 60;
+              if (h < viewWindow * 12 || h >= viewWindow * 12 + 12) return null;
+              const a = pt(h, R_FACE + 2);
+              const b = pt(h, R_FACE - 4);
+              return (
+                <line
+                  key={`app-${m.kind}-${m.ms}`}
+                  data-testid={`clock-app-${m.kind}`}
+                  x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  stroke={m.kind === 'open' ? 'var(--cyan, var(--ink-3))' : 'var(--ink-4)'}
+                  strokeWidth={1.6}
+                  strokeLinecap="round"
+                >
+                  <title>{`KRNL0 ${m.kind === 'open' ? 'opened' : 'closed'} ${fmtClockHM(m.ms)}`}</title>
+                </line>
+              );
+            })}
             {/* 60 tick marks */}
             {Array.from({ length: 60 }).map((_, i) => {
               const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
@@ -1400,6 +1249,7 @@ export function ClockNode({
             );
           })}
         </PagedView>
+        </div>
       </div>
 
       {/* #6/#12 — tracked-reality info + delete popup (right-click an arc). */}
@@ -1422,50 +1272,41 @@ export function ClockNode({
               background: 'var(--paper)',
               border: '1px solid var(--paper-3)',
               borderRadius: 8,
-              padding: '12px 14px',
+              padding: SPACE.panelPad,
+              ...popupColumn,
               fontFamily: 'var(--font-mono)',
               color: 'var(--ink)',
               minWidth: 210,
               boxShadow: 'var(--shadow-1)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: spanTone(tagLibrary, realityPopup.seg, easy) }} />
               <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? (!easy && !realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}</span>
               {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>◆ LIVE</span>}
             </div>
-            <div style={{ color: 'var(--ink-3)', fontSize: 10, marginBottom: 10, letterSpacing: '0.04em' }}>
-              {fmtClockHM(realityPopup.seg.startMs)} {realityPopup.seg.live ? '→ now' : `– ${fmtClockHM(realityPopup.seg.endMs)}`}
-              {' · '}{Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
+            {/* #207 — click a time to change it; a running session's "now" becomes "Stop at". */}
+            <SpanTimeEditor
+              testIdPrefix="clock-reality-time"
+              seg={realityPopup.seg}
+              onSaved={(startMs, endMs) => {
+                if (realityPopup.seg.live) setRealityPopup(null);
+                else setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, startMs, endMs } });
+              }}
+            />
+            <div style={{ color: 'var(--ink-3)', fontSize: 10, letterSpacing: '0.04em' }}>
+              {realityPopup.seg.live ? 'So far · ' : 'Duration · '}
+              {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
             </div>
             {!easy && realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                Counts toward
-                <AppSelect
-                  testId="clock-reality-retag"
-                  value={realityPopup.seg.taskId ?? ''}
-                  options={(() => {
-                    const targets = (board0?.nodes ?? [])
-                      .filter((n) => n.kind === 'todo.task' && (n.state as { parentTaskId: string | null }).parentTaskId === null)
-                      .map((n) => ({ value: n.id, label: (n.state as { text: string }).text }));
-                    // #204 — a span still tagged with a task that is gone (or
-                    // is a subtask) keeps its own option, named by the span's
-                    // label, so the select shows what it counts toward
-                    // instead of a blank value (same as the Pomo tag select).
-                    const tagged = realityPopup.seg.taskId;
-                    const orphan = tagged !== null && !targets.some((o) => o.value === tagged)
-                      ? [{ value: tagged, label: realityPopup.seg.label || 'task' }]
-                      : [];
-                    return [{ value: '', label: 'untagged' }, ...orphan, ...targets];
-                  })()}
-                  onChange={(v) => {
-                    const taskId = v === '' ? null : v;
-                    retagClockSegment(realityPopup.seg.id, taskId);
-                    setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } });
-                  }}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-              </label>
+              <CountsToward
+                testId="clock-reality-retag"
+                segId={realityPopup.seg.id}
+                taskId={realityPopup.seg.taskId ?? null}
+                taskName={spanTaskName(useBoardStore.getState().board?.nodes, realityPopup.seg)}
+                categoryTag={realityPopup.seg.tag ?? null}
+                onChanged={(taskId) => setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } })}
+              />
             )}
             {!realityPopup.seg.live && (
               <button

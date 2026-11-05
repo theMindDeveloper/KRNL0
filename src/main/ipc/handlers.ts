@@ -9,6 +9,14 @@ import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard }
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
 import { mergeBoards } from '../../shared/boardMerge';
 import { renderMotd } from '../rpc/motd';
+import {
+  appendTimeLog,
+  asBackfillBoard,
+  ensureTimeLogBackfilled,
+  queryTimeLog,
+} from '../persistence/timelog';
+import { TimeLogInputSchema, type TimeLogEntry, type TimeLogInput } from '../../shared/timelog';
+import { isValidYMD } from '../../shared/ymd';
 import type { RpcServer } from '../rpc/server';
 
 // Read version once at module load (package.json is bundled into resources).
@@ -106,6 +114,33 @@ const normalized = (b: unknown): unknown => {
 
 function saveBoard(data: unknown) {
   saveBoardTo(BOARD_PATH, data);
+}
+
+/**
+ * Decision 35 / time-log F4 — the one-time backfill from board.json into
+ * <boardDir>/timelog/. Run at startup before the window opens, so no renderer
+ * append can race it; a no-op once the marker file exists. An unreadable
+ * board leaves no marker (retried next start). Never throws.
+ */
+/** App session markers (#207): one line when the app starts, one when it quits. */
+let appSessionOpen = false;
+export function logAppSession(type: 'app.opened' | 'app.closed'): void {
+  // A second launch that hands over to the running window quits without ever
+  // opening — don't log a close for it (or a second close on a repeat quit).
+  if (type === 'app.closed' && !appSessionOpen) return;
+  appSessionOpen = type === 'app.opened';
+  try { appendTimeLog(BOARD_DIR, [{ type }]); } catch (err) {
+    console.warn('[timelog] app session not logged:', err instanceof Error ? err.message : err);
+  }
+}
+
+export function backfillTimeLogAtStartup(): number {
+  try {
+    return ensureTimeLogBackfilled(BOARD_DIR, () => asBackfillBoard(loadBoard()));
+  } catch (err) {
+    console.warn('[timelog] startup backfill skipped:', err instanceof Error ? err.message : err);
+    return 0;
+  }
 }
 
 function hasOpenRenderer(): boolean {
@@ -249,6 +284,35 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   // Expose cliDispatch on the facade so sys:run can use it for Phase 2 commands.
   // We attach it to the ipcMain context via a module-level variable.
   cliDispatchFn = cliDispatch;
+
+  // Decision 35 — durable time log. The renderer appends (fire-and-forget,
+  // validated here) and queries the entries a fold of [from, to] needs.
+  ipcMain.handle('timelog:append', (_event, raw: unknown) => {
+    const list = Array.isArray(raw) ? raw : [raw];
+    const inputs: TimeLogInput[] = [];
+    for (const item of list) {
+      const parsed = TimeLogInputSchema.safeParse(item);
+      if (parsed.success) inputs.push(parsed.data);
+    }
+    if (inputs.length === 0) return { ok: list.length === 0, written: 0 };
+    try {
+      ensureTimeLogBackfilled(BOARD_DIR, () => asBackfillBoard(loadBoard()));
+    } catch { /* the append below still records the action */ }
+    try {
+      return { ok: inputs.length === list.length, written: appendTimeLog(BOARD_DIR, inputs).length };
+    } catch (err) {
+      console.warn('[timelog] append failed:', err instanceof Error ? err.message : err);
+      return { ok: false, written: 0 };
+    }
+  });
+
+  ipcMain.handle('timelog:query', (_event, fromYMD: unknown, toYMD: unknown): TimeLogEntry[] => {
+    if (!isValidYMD(fromYMD) || !isValidYMD(toYMD)) throw new Error('timelog:query needs two YYYY-MM-DD dates');
+    try {
+      ensureTimeLogBackfilled(BOARD_DIR, () => asBackfillBoard(loadBoard()));
+    } catch { /* answer from what the log holds */ }
+    return queryTimeLog(BOARD_DIR, fromYMD, toYMD);
+  });
 
   ipcMain.handle('clipboard:readText', () => clipboard.readText());
   ipcMain.handle('clipboard:writeText', (_event, text: string) => {

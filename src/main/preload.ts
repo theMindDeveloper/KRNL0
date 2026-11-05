@@ -73,4 +73,10 @@ contextBridge.exposeInMainWorld('krnl', {
   // Run one krnl command in main (the CLI's facade), argv as given — no shell.
   sysRun: (argv: string[]): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('sys:run', argv),
   clipboardWriteText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:writeText', text),
+
+  // Decision 35 — durable time log (renderer/store/timeLog.ts wraps these).
+  timelogAppend: (entries: unknown[]): Promise<{ ok: boolean; written: number }> =>
+    ipcRenderer.invoke('timelog:append', entries),
+  timelogQuery: (fromYMD: string, toYMD: string): Promise<unknown[]> =>
+    ipcRenderer.invoke('timelog:query', fromYMD, toYMD),
 })

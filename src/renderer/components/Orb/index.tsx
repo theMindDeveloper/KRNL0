@@ -36,6 +36,11 @@ import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
 import { launchClaudeInTerminal } from '../../store/claudeLaunch';
+import { TOURS } from '../Tour/tours';
+
+/** Voice flows not offered in the chat for now. */
+const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
+import { startTour } from '../Tour/TourHost';
 import { emit } from '../../store/eventLog';
 import { Z } from '../ui/layers';
 import { isTypingTarget, isControlTarget, isModalOpen } from '../../utils/keyboardTargets';
@@ -658,16 +663,16 @@ export function Orb() {
                   <button
                     type="button"
                     data-testid="orb-claude-bypass"
-                    title="Shows the terminal and runs: claude --dangerously-skip-permissions"
+                    title="Opens the terminal and starts Claude Code with permission prompts off (claude --dangerously-skip-permissions)"
                     onClick={() => {
                       setOpen(false);
                       void launchClaudeInTerminal(true).then((r) => { if (!r.ok) emit('sys.error', `Claude Code: ${r.message}`, { severity: 'warn' }); });
                     }}
                     style={{
                       textAlign: 'left',
-                      background: 'rgba(201, 241, 88, 0.06)',
-                      border: '1px solid rgba(201, 241, 88, 0.30)',
-                      color: 'var(--accent-on-dark)',
+                      background: 'linear-gradient(90deg, rgba(217,119,87,0.24) 0%, rgba(217,119,87,0.08) 60%, rgba(217,119,87,0.14) 100%)',
+                      border: '1px solid rgba(217, 119, 87, 0.65)',
+                      color: '#e8916f',
                       padding: '6px 8px',
                       borderRadius: 4,
                       fontFamily: 'inherit',
@@ -675,11 +680,16 @@ export function Orb() {
                       cursor: 'pointer',
                       letterSpacing: '0.02em',
                       marginBottom: 4,
+                      // Claude orange glow — static (no animation, frame budget #197).
+                      textShadow: '0 0 6px rgba(217,119,87,0.55)',
+                      boxShadow: '0 0 10px rgba(217,119,87,0.35), inset 0 0 8px rgba(217,119,87,0.12)',
                     }}
                   >
-                    {'▸ claude code · bypass permissions'}
+                    {'▸ claude code'}
                   </button>
-                  {FLOWS.map((flow) => (
+                  {/* Voice flows are hidden until proper voice tutorials exist — the
+                      text Tutorials below replace them (maintainer, 2026-11-05). */}
+                  {FLOWS.filter((f) => !HIDDEN_FLOW_IDS.has(f.id)).map((flow) => (
                     <button
                       key={flow.id}
                       type="button"
@@ -699,6 +709,26 @@ export function Orb() {
                       {`› ${flow.label}`}
                     </button>
                   ))}
+                  {/* Guided tours — one short text tutorial per part of the app. */}
+                  <div style={{ marginTop: 8, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8270' }}>Tutorials</div>
+                  <div data-testid="orb-tours" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4 }}>
+                    {TOURS.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        data-testid={`orb-tour-${t.id}`}
+                        title={t.summary}
+                        onClick={() => { setOpen(false); startTour(t.id); }}
+                        style={{
+                          textAlign: 'left', background: 'transparent', border: '1px solid rgba(201, 241, 88, 0.15)', color: '#d4cfc0',
+                          padding: '5px 8px', borderRadius: 4, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {t.title.split(' — ')[0]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

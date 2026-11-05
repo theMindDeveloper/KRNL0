@@ -7,6 +7,8 @@ export interface ClockState {
   selectedDate: string;
   /** Show only the dial, as big as the window allows (hides bars and list). */
   dialOnly?: boolean;
+  /** #207 — show the last 7 days as small static dials instead of one day. */
+  weekView?: boolean;
 }
 
 export type ClockConfig = Record<string, never>;

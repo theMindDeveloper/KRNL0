@@ -28,6 +28,10 @@ export const Z = {
   radial: 3001,
   /** Full-window modals (Settings). */
   modal: 4000,
+  /** Guided-tour spotlight and card — above modals (a tour step can point
+   *  into Settings), below dropdowns the user opens while following it. */
+  tourBackdrop: 4050,
+  tour: 4051,
   /** Dropdowns and pickers — always above whatever opened them, modals included. */
   popover: 4100,
   /** Generic right-click menus (habit, tag picker, list rows). */

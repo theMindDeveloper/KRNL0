@@ -27,6 +27,7 @@ import { getDockStyle, setDockStyle } from '../components/ChassisLayer/useDockSt
 import { isFrameStyleId } from '../../shared/frameStyles';
 import { radioControl } from '../components/AmbientRadio/radioControl';
 import { launchClaudeInTerminal } from './claudeLaunch';
+import { startTour } from '../components/Tour/TourHost';
 
 export function useCliDispatch(): void {
   const store = useBoardStore;
@@ -36,6 +37,11 @@ export function useCliDispatch(): void {
     if (!bridge?.onCliDispatch || !bridge?.cliDispatchReply) return;
 
     const unsubscribe = bridge.onCliDispatch((id, command, args) => {
+      if (command === 'tour.start') {
+        const ok = startTour(String(args['id'] ?? ''));
+        bridge.cliDispatchReply!(id, ok, ok ? `Tour "${String(args['id'])}" started` : `No tour "${String(args['id'])}"`);
+        return;
+      }
       // Async: waits for the terminal's shell before typing into it (#206).
       if (command === 'term.claude') {
         void launchClaudeInTerminal(args['bypass'] === true)

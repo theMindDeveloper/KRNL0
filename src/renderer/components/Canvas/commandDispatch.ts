@@ -81,6 +81,7 @@ import {
   pomoSetLiveLabel,
   pomoDiscard,
 } from '../nodes/PomoNode/commands';
+import { pomoEditSegment, pomoAddSegment } from '../nodes/PomoNode/spanEdit';
 import type { PomoConfig, PomoState, TimerFace } from '../nodes/PomoNode/types';
 import { defaultPomoConfig, OBSERVE_SPAN_MIN } from '../nodes/PomoNode/types';
 
@@ -148,7 +149,7 @@ import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types'
 // ── Clock ─────────────────────────────────────────────────────────────
 import {
   clockLinkTodo,
-  clockSetViewWindow, clockSetDialOnly,
+  clockSetViewWindow, clockSetDialOnly, clockSetWeekView,
   clockSetSelectedDate,
   clockAdvanceDay,
   clockGoToday,
@@ -314,6 +315,25 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.setFace':   return { config: pomoSetFace(pomoCfg, args as { face: TimerFace }) };
         case 'pomo.clearActiveTask': return { state: pomoClearActiveTask(s as never, pomoCfg) };
         case 'pomo.deleteSegment': return { state: pomoDeleteSegment(s as never, args as never) };
+        // #207 — corrections: move a recorded span, or add one after the fact.
+        case 'pomo.editSegment': {
+          const { id, startMs, endMs } = args as { id?: unknown; startMs?: unknown; endMs?: unknown };
+          if (typeof id !== 'string' || typeof startMs !== 'number' || typeof endMs !== 'number') return null;
+          return { state: pomoEditSegment(s as never, { id, startMs, endMs }) };
+        }
+        case 'pomo.addSegment': {
+          const { startMs, endMs, taskId, label, tag } = args as { startMs?: unknown; endMs?: unknown; taskId?: unknown; label?: unknown; tag?: unknown };
+          if (typeof startMs !== 'number' || typeof endMs !== 'number') return null;
+          const tid = typeof taskId === 'string' ? taskId : null;
+          const tnode = tid ? useBoardStore.getState().board?.nodes.find((n) => n.id === tid) : undefined;
+          const text = typeof label === 'string' ? label : (tnode ? String((tnode.state as { text?: string }).text ?? '') : '');
+          return {
+            state: pomoAddSegment(s as never, {
+              id: typeof args['id'] === 'string' ? args['id'] : crypto.randomUUID(),
+              startMs, endMs, taskId: tid, label: text, tag: typeof tag === 'string' ? tag : null,
+            }),
+          };
+        }
         case 'pomo.retagSegment': {
           const taskId = typeof args['taskId'] === 'string' ? args['taskId'] : null;
           const b = useBoardStore.getState().board;
@@ -426,6 +446,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: clockSetViewWindow(clockState, args as never) };
         case 'clock.setDialOnly':
           return { state: clockSetDialOnly(clockState, args as never) };
+        case 'clock.setWeekView':
+          return { state: clockSetWeekView(clockState, args as never) };
         // ADR 0004 §3.2 — day-selector commands.
         case 'clock.setSelectedDate':
           return { state: clockSetSelectedDate(clockState, args as never) };
@@ -698,20 +720,6 @@ function tagPomo(taskNodeId: string | null, opts: { start: boolean }): void {
   updateNode(pomoNode.id, { state: next });
   const updated = useBoardStore.getState().board;
   if (updated) void saveBoard(updated);
-}
-
-/** The open scheduled task whose planned block contains `nowMs`, if any. */
-function plannedTaskAt(board: Board, nowMs: number): string | null {
-  const { placements } = selectSchedule(board);
-  for (const p of placements.values()) {
-    const start = new Date(p.startISO).getTime();
-    const end = new Date(p.endISO).getTime();
-    if (start <= nowMs && nowMs < end) {
-      const t = board.nodes.find((n) => n.id === p.taskId);
-      if (t && !(t.state as TaskState).done) return p.taskId;
-    }
-  }
-  return null;
 }
 
 // ── makeCommandHandler ─────────────────────────────────────────────────────────
@@ -1712,19 +1720,9 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       return;
     }
 
-    // ── pomo.start without a tag: suggest the task planned for right now.
-    //    The tag shows on the pomo and can be changed or cleared at once.
-    if (command === 'pomo.start' && node.kind === 'pomo' && result.state !== undefined) {
-      const started = result.state as PomoState;
-      // Only when nothing is named (a continued free-text name wins) and never in Easy mode.
-      if (started.status === 'running' && started.activeTaskId === null && !started.label && args['activeTaskId'] === undefined && !isEasyBoard(board)) {
-        const suggested = plannedTaskAt(board, Date.now());
-        if (suggested) {
-          const t = board.nodes.find((n) => n.id === suggested)!;
-          result.state = pomoSetTag(started, { taskId: suggested, label: (t.state as TaskState).text });
-        }
-      }
-    }
+    // time-model F5 (revised #207): an untagged start stays untagged. The Pomo
+    // shows "Planned now: X" and the user accepts with one click
+    // (PlannedNowChip) — nothing is tagged silently.
 
     // ── Generic per-command emits for commands handled via the simple
     //    applyCommand fall-through. Keeps log coverage broad without

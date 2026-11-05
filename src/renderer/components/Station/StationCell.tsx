@@ -20,7 +20,8 @@
 import { useCallback } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { NODE_REGISTRY } from '../nodes/registry';
-import { MotherFrameStationContext, MOTHER_TOTAL, MOTHER_DRAG_MIME } from '../nodes/MotherFrame';
+import { MotherFrameStationContext, MOTHER_TOTAL } from '../nodes/MotherFrame';
+import { beginHold } from '../nodes/MotherFrame/motherDrag';
 import { makeCommandHandler } from '../Canvas/commandDispatch';
 import { resolveStationSlot, SLOT_INDEX } from './SlotResolver';
 import type { StationSlot } from '../../../shared/types';
@@ -29,10 +30,6 @@ interface Props {
   slot: StationSlot;
 }
 
-// MIME shared with the canvas-mode handle on MotherFrame so a drag from
-// either view drops on the other's compatible target. Defined in MotherFrame.
-const DRAG_MIME = MOTHER_DRAG_MIME;
-
 export function StationCell({ slot }: Props) {
   const node = useBoardStore((s) =>
     s.board?.nodes.find(
@@ -40,7 +37,6 @@ export function StationCell({ slot }: Props) {
     ) ?? null
   );
   const selectNode = useBoardStore((s) => s.selectNode);
-  const swapMotherSlots = useBoardStore((s) => s.swapMotherSlots);
 
   const onSelect = useCallback(() => {
     if (node) selectNode(node.id);
@@ -54,26 +50,9 @@ export function StationCell({ slot }: Props) {
   const onCommand = makeCommandHandler(node.id);
   const slotIndex = SLOT_INDEX[slot] ?? 1;
 
-  const onDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes(DRAG_MIME)) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    }
-  };
-  const onDrop = (e: React.DragEvent) => {
-    const sourceId = e.dataTransfer.getData(DRAG_MIME);
-    if (!sourceId || sourceId === node.id) return;
-    e.preventDefault();
-    swapMotherSlots(sourceId, node.id);
-  };
-
   return (
     <MotherFrameStationContext.Provider value={true}>
-      <div
-        style={{ position: 'relative', width: '100%', height: '100%' }}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-      >
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
         <DragHandle nodeId={node.id} />
         <Component
           node={node}
@@ -89,23 +68,14 @@ export function StationCell({ slot }: Props) {
 }
 
 function DragHandle({ nodeId }: { nodeId: string }) {
-  const onDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData(DRAG_MIME, nodeId);
-    (e.currentTarget as HTMLDivElement).dataset.dragging = 'true';
-  };
-  const onDragEnd = (e: React.DragEvent) => {
-    delete (e.currentTarget as HTMLDivElement).dataset.dragging;
-  };
-
+  // Press and move to pick the panel up: you hold it (it follows you,
+  // tilting in 3D) and drop it on another panel to swap them.
   return (
     <div
-      draggable
       role="button"
       aria-label="Drag to swap with another panel"
       className="station-drag-handle"
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      onPointerDown={(e) => beginHold(e, nodeId)}
     >
       <svg
         aria-hidden

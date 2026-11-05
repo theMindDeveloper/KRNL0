@@ -20,6 +20,9 @@ import { selectScheduledTasksForRange, selectSchedule } from '../../../store/sch
 import { packLanes } from '../../../store/laneLayout';
 import { layoutDayBlocks, BLOCK_TEXT_INSET } from './dayBlockLayout';
 import { AppSelect } from '../../ui/AppSelect';
+import { SpanTimeEditor, CountsToward, openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
+import { SPACE, popupColumn } from '../../ui/spacing';
+import { useAppMarkers } from '../../../store/appSessions';
 import { HabitIcon } from '../HabitNode/HabitIcon';
 import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
@@ -240,6 +243,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   const weekDays = useMemo<string[]>(() => {
     return Array.from({ length: dayCount }, (_, i) => addDays(baseYMD, i));
   }, [baseYMD, dayCount]);
+  // #207 follow-up — app open / close markers for the shown days.
+  const appMarkers = useAppMarkers(weekDays[0] ?? '', weekDays[weekDays.length - 1] ?? '');
 
   // useLocalDay re-renders at midnight, so today's column and every
   // todayYMD() below move with the clock.
@@ -559,17 +564,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         ),
       });
     } else {
-      setCtxMenu({
-        x, y,
-        items: segmentMenuItems(
-          { ...item.seg, taskName: spanTaskName(item.seg) },
-          {
-            targets: retagTargets.map((t) => ({ id: t.id, text: t.done ? `✓ ${t.text}` : t.text })),
-            easy,
-            onDetails: () => setRealityPopup({ seg: item.seg, x, y }),
-          },
-        ),
-      });
+      // Recorded time: right-click opens the same popup as left-click — one
+      // place with the task, the times (double-click to change) and delete.
+      setRealityPopup({ seg: item.seg, x, y });
     }
   };
   // #203 — what a left click opens: a span's details popup, a task's popup.
@@ -926,7 +923,25 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     e.preventDefault();
     e.stopPropagation();
     const items = layersAt(dayYMD, e);
-    if (items.length === 0) return;
+    // #207 F7b — empty time: offer to log time that wasn't recorded.
+    if (items.length === 0) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
+      const [yy, mm, dd] = dayYMD.split('-').map(Number) as [number, number, number];
+      const clickMs = new Date(yy, mm - 1, dd, 0, Math.floor(minute)).getTime();
+      const x = e.clientX;
+      const y = e.clientY;
+      const future = clickMs > Date.now();
+      setCtxMenu({
+        x, y,
+        items: [{
+          label: future ? 'Log time here… (only past time)' : 'Log time here…',
+          disabled: future,
+          onSelect: () => openLogTime({ ...logTimeDefaults(clickMs), x, y }),
+        }],
+      });
+      return;
+    }
 
     // Single hit → its right-click menu directly, no picker noise.
     if (items.length === 1) {
@@ -1061,6 +1076,20 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         ? effStartMin
         : taskStartDate.getHours() * 60 + taskStartDate.getMinutes();
       const blockEndMin = blockStartMin + (draft ? effLenMin : task.scheduledDurationMin);
+      // #207 storyboard B — when real work on this task began vs the plan:
+      // the first work span tagged with it that touches the planned window
+      // (±3h) on the plan's day. |delta| < 5 min reads as on time.
+      const planStartMs = taskStartDate.getTime();
+      let firstWorkMs: number | null = null;
+      for (const seg of realityByDay.get(dayYMD) ?? []) {
+        if (seg.kind !== 'work' || seg.taskId !== task.id) continue;
+        if (Math.abs(seg.startMs - planStartMs) > 3 * 3_600_000) continue;
+        if (firstWorkMs === null || seg.startMs < firstWorkMs) firstWorkMs = seg.startMs;
+      }
+      const startDeltaMin = firstWorkMs === null ? null : Math.round((firstWorkMs - planStartMs) / 60_000);
+      const startNote = startDeltaMin === null || task.timeOpen || Math.abs(startDeltaMin) < 5
+        ? (startDeltaMin === null || task.timeOpen ? '' : ' · on time')
+        : ` · started ${fmtDur(Math.abs(startDeltaMin))} ${startDeltaMin > 0 ? 'late' : 'early'}`;
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
         setTaskPopup(null);
@@ -1370,6 +1399,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           {detail === 'full' && (
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
               {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : `${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)}`}
+              {startNote && <span data-testid={`task-start-delta-${task.id}`}>{startNote}</span>}
               {overrunMin > 0
                 ? <span data-testid={`task-overrun-${task.id}`} style={{ color: 'var(--rust)', fontWeight: 700 }}> · +{fmtDur(overrunMin)} over</span>
                 : trackedMin > 0 ? ` · ${fmtDur(trackedMin)} tracked` : ''}
@@ -1610,6 +1640,30 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // faint neutral hatch. A pause is a gap. The bands take no pointer events so
   // drops reach the hour cells; right-click is resolved by the column's
   // hit-test (handleColumnContextMenu) → retag / delete menu.
+  // When KRNL0 was first opened / last closed that day: a thin dashed line
+  // across the column, no words (the time is in the tooltip).
+  function renderAppMarkers(dayYMD: string) {
+    const list = appMarkers.filter((m) => toYMD(new Date(m.ms)) === dayYMD);
+    if (list.length === 0) return null;
+    return list.map((m) => {
+      const d = new Date(m.ms);
+      const min = d.getHours() * 60 + d.getMinutes();
+      return (
+        <div
+          key={`${m.kind}-${m.ms}`}
+          data-testid={`calendar-app-${m.kind}`}
+          title={`KRNL0 ${m.kind === 'open' ? 'first opened' : 'last closed'} ${fmtMinOfDay(min)}`}
+          style={{
+            // A thin dashed line across the whole day, no words (time in the tooltip).
+            position: 'absolute', left: 0, right: 0, top: (min / 60) * rowHeight, height: 0,
+            borderTop: `1px dashed ${m.kind === 'open' ? 'var(--cyan, var(--ink-3))' : 'var(--ink-3)'}`,
+            opacity: 0.75, pointerEvents: 'none', zIndex: 2,
+          }}
+        />
+      );
+    });
+  }
+
   function renderRealityBlocks(dayYMD: string) {
     const segs = realityByDay.get(dayYMD);
     if (!segs || segs.length === 0) return null;
@@ -1622,7 +1676,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // #204 — name what the time counted toward (task, else the span's own
       // name) so a tagged span never looks untagged. Faint, top-right, behind
       // the plan blocks; hidden on slivers.
-      const name = isWork && !easy ? spanTaskName(seg) ?? (seg.label || null) : null;
+      const name = isWork && !easy ? spanTaskName(seg) ?? (seg.label || (seg.tag ? (tagLibrary.find((t) => t.id === seg.tag)?.label ?? null) : null)) : null;
       return (
         <div
           key={`reality-${seg.id}-${i}`}
@@ -2174,6 +2228,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                     (zIndex 0, no pointer events — behind habits and tasks) */}
                 {renderRealityBlocks(dayYMD)}
 
+                {/* App open / close markers (thin dashed lines). */}
+                {renderAppMarkers(dayYMD)}
+
                 {/* Habit blocks (zIndex: 1 — behind tasks) */}
                 {renderHabitBlocks(dayYMD)}
 
@@ -2414,14 +2471,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               background: 'var(--paper)',
               border: '1px solid var(--paper-3)',
               borderRadius: 8,
-              padding: '12px 14px',
+              padding: SPACE.panelPad,
+              ...popupColumn,
               fontFamily: 'var(--font-mono)',
               color: 'var(--ink)',
               minWidth: 220,
               boxShadow: 'var(--shadow-1)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 aria-hidden
                 style={{
@@ -2438,17 +2496,16 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>tracked reality</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-on-bright)', background: 'var(--rust)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
-                {fmtHM(realityPopup.seg.startMs)}
-              </span>
-              <div style={{ flex: 1, height: 2, borderRadius: 1, background: 'var(--paper-3)' }} />
-              {/* #3 — a live (in-flight) span reads "→ now" so it's obvious it's
-                  still recording, not a fixed end time. */}
-              <span style={{ fontSize: 15, fontWeight: 700, color: realityPopup.seg.live ? 'var(--acid-ink, var(--acid))' : 'var(--ink)', background: 'var(--paper-2)', padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
-                {realityPopup.seg.live ? 'now' : fmtHM(realityPopup.seg.endMs)}
-              </span>
-            </div>
+            {/* #207 — click a time to change it (where I really stopped); a
+                running session's "now" becomes "Stop at". */}
+            <SpanTimeEditor
+              testIdPrefix="calendar-reality-time"
+              seg={realityPopup.seg}
+              onSaved={(startMs, endMs) => {
+                if (realityPopup.seg.live) setRealityPopup(null);
+                else setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, startMs, endMs } });
+              }}
+            />
             <div style={{ color: 'var(--ink-3)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               {realityPopup.seg.live ? 'So far · ' : 'Duration · '}
               {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
@@ -2456,28 +2513,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             {/* Plan vs reality — which task this time counts toward. Only work
                 spans carry a tag; the live span is retagged from the Pomo. */}
             {!easy && realityPopup.seg.kind === 'work' && !realityPopup.seg.live && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                Counts toward
-                <AppSelect
-                  testId="calendar-reality-retag"
-                  value={realityPopup.seg.taskId ?? ''}
-                  options={[
-                    { value: '', label: 'untagged' },
-                    // #204 — a span tagged with a task that is gone (cleared /
-                    // deleted) still names it instead of reading blank.
-                    ...(realityPopup.seg.taskId && !retagTargets.some((t) => t.id === realityPopup.seg.taskId)
-                      ? [{ value: realityPopup.seg.taskId, label: `${spanTaskName(realityPopup.seg) ?? 'task'} (deleted)` }]
-                      : []),
-                    ...retagTargets.map((t) => ({ value: t.id, label: t.done ? `✓ ${t.text}` : t.text })),
-                  ]}
-                  onChange={(v) => {
-                    const taskId = v === '' ? null : v;
-                    retagRealitySegment(realityPopup.seg.id, taskId);
-                    setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } });
-                  }}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-              </label>
+              <CountsToward
+                testId="calendar-reality-retag"
+                segId={realityPopup.seg.id}
+                taskId={realityPopup.seg.taskId ?? null}
+                taskName={spanTaskName(realityPopup.seg)}
+                categoryTag={realityPopup.seg.tag ?? null}
+                onChanged={(taskId) => setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } })}
+              />
             )}
             {/* #12 — delete a recorded segment (removes it from analytics too).
                 The live in-flight span can't be deleted; stop it first. */}
@@ -2487,7 +2530,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 data-testid="calendar-reality-delete"
                 onClick={() => { deleteRealitySegment(realityPopup.seg.id); setRealityPopup(null); }}
                 style={{
-                  marginTop: 12,
                   width: '100%',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 9,

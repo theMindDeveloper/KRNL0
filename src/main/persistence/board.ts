@@ -74,6 +74,8 @@ export function seedBoard(): PartialBoard {
         config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, stationSlot: 'top-left' } /* no face: the frame style picks it (ADR 0009 F7) */,
       },
       {
+        // #207 — first start: Pomo, Todo, Calendar, Clock (top row), then Habits,
+        // Analytics (bottom row, beside the canvas); the Terminal starts hidden.
         id: 'mother-todo',
         kind: 'todo',
         position: { x: -840, y: 0 },
@@ -85,17 +87,17 @@ export function seedBoard(): PartialBoard {
       {
         id: 'mother-habit',
         kind: 'habit',
-        position: { x: -280, y: 0 },
+        position: { x: 840, y: 0 },
         isMother: true,
         state: { habits: [] },
         // ADR 0008 § 4.2 / § 9.1 OQ-1.A decision A: Habit gets its own column
-        config: { maxHabits: 5, weekStartsOn: 'monday', view: 'week', stationSlot: 'top-right-pre' },
+        config: { maxHabits: 5, weekStartsOn: 'monday', view: 'week', stationSlot: 'bottom-right-pre' },
       },
       // ADR 0001 — fourth mother: Calendar (terminal moved to rightmost slot)
       {
         id: 'mother-calendar',
         kind: 'calendar',
-        position: { x: 280, y: 0 },
+        position: { x: -280, y: 0 },
         isMother: true,
         state: { selectedDate: null, anchorDate: todayLocalYMD() },
         // ADR 0008 § 4.2
@@ -105,25 +107,25 @@ export function seedBoard(): PartialBoard {
           showHabits: true,
           showPomoHeatmap: true,
           hourRange: { start: 6, end: 23 },
-          stationSlot: 'top-right-upper',
+          stationSlot: 'top-right-pre',
         },
       },
       // Decision 24.2 — fifth mother: Clock (12-hour visualization, viewWindow replaces windowStartHour)
       {
         id: 'mother-clock',
         kind: 'clock',
-        position: { x: 840, y: 0 },
+        position: { x: 280, y: 0 },
         isMother: true,
         state: { linkedTodoId: null, viewWindow: 0, selectedDate: todayLocalYMD() },
         // ADR 0008 § 4.2
-        config: { stationSlot: 'top-right-lower' },
+        config: { stationSlot: 'top-right-upper' },
       },
       // Terminal — rightmost (Wave-D default): the shell lives at the tight
       // edge of the rack so it doesn't sit between data mothers.
       {
         id: 'mother-term',
         kind: 'term',
-        position: { x: 1400, y: 0 },
+        position: { x: 1960, y: 0 },
         isMother: true,
         state: { sessionId: null, title: 'Terminal' },
         // ADR 0008 § 4.2
@@ -132,7 +134,8 @@ export function seedBoard(): PartialBoard {
       // Decision 32 — seventh mother: Analytics. Fixed window right of the
       // terminal in canvas mode; its own panel beside the terminal in station
       // mode.
-      analyticsMotherSeed(),
+      // #207 — on a new board Analytics sits after Habits (bottom row, right).
+      { ...analyticsMotherSeed(), position: { x: 1400, y: 0 }, config: { stationSlot: 'top-right-lower' } },
     ],
     edges: [],
   };
