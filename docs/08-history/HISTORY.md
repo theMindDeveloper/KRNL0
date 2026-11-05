@@ -1222,3 +1222,11 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Type:** Release
 **PRs:** #212 (app updates, Nuclear rename), this release PR
 **Summary:** Version 0.10.1 (`npm version patch`), `CHANGELOG.md` and `docs/releases/v0.10.1.md`. First release made through the update pipeline (docs/releases/RELEASING.md): tag `v0.10.1` on `main`, CI builds the draft with `KRNL0-Setup-0.10.1.exe`, its blockmap and `latest.yml` (plus the macOS DMG), then Publish. Installs of 0.10.0 or older have no updater and install this one by hand once; from here on releases arrive by themselves.
+
+---
+
+## [2026-11-05] — CI: macOS release build moves to macos-15
+
+**Type:** Bug Fix (CI)
+**Files changed:** `.github/workflows/release.yml`, `docs/08-history/HISTORY.md`
+**Summary:** GitHub refused to start the `macos-14` runner on the `v0.10.1` tag build ("configuration 'macos-14-arm64-us-default' is not supported", the image is being retired), so the run was cancelled before anything was published. The macOS job now runs on `macos-15` (arm64); the unpublished `v0.10.1` tag is moved to this commit and rebuilt.

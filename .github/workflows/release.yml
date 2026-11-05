@@ -28,7 +28,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          # macos-14 is being retired: GitHub refused it ("configuration
+          # 'macos-14-arm64-us-default' is not supported") on the v0.10.1 tag.
+          - os: macos-15
             label: macOS (arm64)
             artifact: krnl0-macos-arm64
             ebuild_args: --mac --arm64
