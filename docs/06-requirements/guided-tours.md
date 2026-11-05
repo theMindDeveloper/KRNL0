@@ -13,6 +13,7 @@ Follow-up to #207. Code: `src/renderer/components/Tour/` (`tours.ts`, `TourHost.
 | F5 | **Where to start them:** the Orb chat's "Tutorials" list, and `krnl tour list` / `krnl tour start <id>`. |
 | F6 | **The spotlight never slides.** The ring is drawn only once its target has stopped moving and is on screen, and it does not animate its position. The tour sits above modals (it can point into Settings). |
 | F7 | **Tours show, not just tell.** The ring carries a short label (PRESS, TICK TODAY, NEW IN ADVANCED). Steps ask for the real action where one exists (start / break / stop the Pomo, add and tick a task, add and tick a habit, open a page). Steps for controls that exist only in one mode are skipped in the other. The Easy and Advanced tour switches the app's mode live and rings what appears; the user's own mode comes back on End unless they pick one on the last step. The card stays put while the next target settles. |
+| F8 | **A guide you can follow.** The card (420 px, 15.5 px text) carries a small glowing orb — the guide — and glides from step to step; the new words fade in once it has arrived, so text never changes before the card moves. Key words are highlighted (`**word**` in the step text), a progress bar shows how far along you are. A step can open what it talks about (`press`: the guide opens Settings to show **Settings → Mode**) and closes it on the next step. `{mode}` names the user's own mode, so an Easy user is told they are in Easy and shown where to switch. |
 
 ## Gherkin
 

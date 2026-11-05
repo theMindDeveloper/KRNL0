@@ -252,12 +252,13 @@ Written after a review found overlapping chart text, a "0 1 1 1" axis and a slid
 
 **Motion**
 
-8. **Pointers and highlights never animate their position.** A ring, spotlight or marker that moves between targets appears in place once the target is still (tween from the old spot reads as pointing at the wrong thing). Animate opacity or scale, not left / top.
+8. **A highlight never slides; the guide may glide.** A ring, spotlight or marker appears in place (fade / scale) once its target has stopped moving: a tween from an unsettled spot reads as pointing at the wrong thing. A card that carries words (the tour guide) may glide between two settled positions (~460 ms, ease-out), and its new words fade in as it arrives, never before it moves. Honour `prefers-reduced-motion`.
 
 **Modes and overlays**
 
 9. **When Easy mode hides something, the docs and tours say so.** A control that exists only in Advanced (easy-mode.md D1–D16) is named as Advanced in any tour step or help text that mentions it.
 10. **Overlays use the named layers in `ui/layers.ts`** (`Z.*`), never a raw number. A tour sits above modals (`Z.tour`); pickers still open above it (`Z.popover`).
+11. **Teaching text is readable at a glance.** Guide / tutorial text is at least 15 px sans, line-height 1.6, on a card at least 400 px wide; the key words (what to look at or press) are highlighted, one or two per sentence.
 
 ## Component — Node anatomy
 

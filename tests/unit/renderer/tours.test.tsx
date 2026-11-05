@@ -24,6 +24,11 @@ describe('Easy and Advanced tour — a live demo', () => {
     seed();
     render(<TourHost />);
     act(() => { startTour('modes'); });
+    // the intro names the user's own mode, highlighted
+    expect(screen.getByTestId('tour-text').querySelector('mark')?.textContent).toBe('two modes');
+    expect(screen.getByTestId('tour-text').textContent).toContain('Easy mode right now');
+    act(() => { fireEvent.click(screen.getByTestId('tour-next')); }); // where to switch (Settings → Mode)
+    expect(screen.getByTestId('tour-text').textContent).toContain('Settings → Mode');
     act(() => { fireEvent.click(screen.getByTestId('tour-next')); }); // Easy step
     expect(mode()).toBe('easy');
     act(() => { fireEvent.click(screen.getByTestId('tour-next')); }); // the Pomo switch appears
