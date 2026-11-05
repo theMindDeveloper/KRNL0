@@ -1135,3 +1135,18 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **No auto-chain (#205):** adding tasks (Todo UI, `todo add`, `task add`) no longer links them; users chain manually.
 - **Orb → Claude Code (#206):** a quick action shows the terminal and runs `claude --dangerously-skip-permissions`; CLI `krnl term claude [--bypass]`.
 - **Verified in the real app** (isolated copy of the maintainer's board): clock moved from Nov 4 to today on start, numerals pass the pointer through, left-click opens "filmgenie" details, right-click shows "Tagged: filmgenie" and "✓ cluster build", terminal opened with no error and no staircase.
+
+---
+
+## [2026-11-05] — Time log: what you did, when, on what
+
+**Type:** Feature + UX
+**Issue:** #207 · Decision 35 · docs/06-requirements/time-log.md
+**Branch:** `TMD/time-log`
+**Summary:**
+- **Durable time log** (Decision 35): main keeps `<boardDir>/timelog/YYYY-MM.jsonl`, append-only. One choke point per side diffs the board before/after each change (renderer store subscription; CLI around write verbs) and logs span closed/edited/retagged/deleted, plan set/cleared, task created/renamed/completed/reopened — every completion kept, plan moves kept, history survives task deletion. One-time backfill from the board. `krnl time log`, `krnl time report`. "Clear focus history" logs `history.cleared`.
+- **Correcting time:** double-click a time in the recorded-span popup to change it in place; on a running session "now" becomes "Stop at" (Pomo: "stopped earlier?"). **Log time** you didn't record: right-click empty Calendar/Clock time or "+ log past time" on the Pomo; the popover has a small clock to drag the range on, plus quick fill (last 30m / 1h, gaps between sessions). `krnl pomo segment <id> --start/--end`, `krnl pomo add`.
+- **Plan-first, never silent:** START no longer tags itself; the Pomo shows "Planned now: X — Start on it / Track it". Planned blocks read "started 20m late / early / on time".
+- **Overviews:** Analytics **Time log** page (task × day heatmap, week/month, worked / plan, by tag on the days worked); Clock **▦ WEEK** (7 static 24-h rings sized to the panel; `krnl clock week`); Calendar month cells show hours; Todo rows "⏱ 1h20 / 30m"; task details show a timeline (per-day work, plan moves, completions).
+- **UX:** one popup for left and right click on recorded time (no duplicate menu); one compact searchable task/category picker (tasks first, categories as chips) for "name this span" and Counts toward; any done task can still collect time; estimate **0 = no set time** (row reads "open", `krnl task duration <ref> 0`); click the estimate to edit it; app open/close markers on Calendar and Clock; Orb "claude code" button in Claude orange.
+- **Verified in the real app** on a copy of the maintainer's board (week view, edit end time, log time here, + log past time, todo tracked figure, open marker, backfill).

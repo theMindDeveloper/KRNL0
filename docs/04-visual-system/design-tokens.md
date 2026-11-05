@@ -220,6 +220,19 @@ Camera centers on `(0, 160)` at startup — all four are visible.
 
 ---
 
+## Spacing rule — popups and small panels
+
+Sections must never sit cramped against each other (maintainer, 2026-11-05). One rhythm, in code as `src/renderer/components/ui/spacing.ts` (`SPACE`, `popupColumn`):
+
+| Space | Value | Where |
+|---|---|---|
+| Panel padding | 14 px × 16 px | every popup / popover / small panel |
+| Between sections | 12 px | header · times · task · actions — the panel is a flex column with `gap: 12` |
+| Inside a row | 8 px | chips, the two time fields, buttons |
+| Caption → control | 6 px | "COUNTS TOWARD" above its picker |
+
+Rules: sections get no `marginTop` / `marginBottom` of their own — the column gap spaces them. A caption sits **above** its control, not squeezed beside it. Destructive actions (Delete) are the last section.
+
 ## Component — Node anatomy
 
 ### Mother nodes (fixed)

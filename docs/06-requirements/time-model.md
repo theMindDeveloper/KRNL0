@@ -22,7 +22,7 @@ The Pomodoro is an **observer**. A task can only **tag** what it records: `PomoS
 | F2 | No pomo action writes `secondsAccumulated`, `pomoSessionsCompleted` or `currentSessionElapsedSec` onto a task. |
 | F3 | "Start pomo" on a task, from the todo row menu, `task.startPomo` or `krnl task pomo`, tags the pomo with that task. It starts the pomo at the pomo's own `sessionMin` if idle. It never cancels or resets a running session. |
 | F4 | Changing the tag of a running or paused session keeps the timer running. The in-flight span is attributed to the new tag when it closes. |
-| F5 | Pressing START with no tag tags the session with the open task whose planned block contains "now", if there is one. Otherwise the session stays untagged. |
+| F5 | **Suggest, never tag silently** (revised #207, maintainer 2026-11-05). When the Pomo is on no task and an open task's planned block contains "now", the Pomo shows **Planned now: <task>** with one button: **Start on it** (idle) or **Track it** (running untagged); × hides it for that task. START itself never tags. CLI: `pomo start` prints the planned task and the `pomo tag` command to accept it. |
 | F6 | The Pomo node shows a tag selector ("● ON <task>") listing open root tasks plus "untagged". Choosing an option dispatches `pomo.tag`. |
 | F7 | A recorded span can be retagged (`pomo.retagSegment`, `krnl pomo retag <segmentId> <taskRef|none>`). Its minutes move to the new task. |
 | F8 | A single click on a todo row does not touch the pomo. |
@@ -42,7 +42,7 @@ The Pomodoro is an **observer**. A task can only **tag** what it records: `PomoS
 
 ## Use Cases
 
-- **UC-T1 Plan and observe.** The user writes "Study math, about 4h" and drags it to 09:00. At 09:10 they press START, and the session is tagged "Study math" (F5). They pause for a call (gap), take a break (break span), and stop at 12:30. The card shows "PLAN 4h · TRACKED 2h50".
+- **UC-T1 Plan and observe.** The user writes "Study math, about 4h" and drags it to 09:00. At 09:10 the Pomo shows "Planned now: Study math"; they click **Start on it** and the session is tagged (F5). They pause for a call (gap), take a break (break span), and stop at 12:30. The card shows "PLAN 4h · TRACKED 2h50".
 - **UC-T2 Fix attribution later.** A 30-minute span was really spent on Physics. The user retags it from the calendar or with `krnl pomo retag`, and the minutes move (F7).
 - **UC-T3 Switch mid-session.** While running on Math, the user picks "Physics" in the tag selector. The timer keeps running, and the current span counts toward Physics (F4).
 
@@ -58,9 +58,12 @@ Feature: The pomodoro observes; tasks only tag it
     And it is tagged "Physics"
     And no history record was written
 
-  Scenario: F5 — START suggests the planned task
+  Scenario: F5 — the Pomo suggests the planned task, the user accepts
     Given "Study math" is planned from 09:00 to 13:00 and it is 09:10
     When the user presses START on an untagged pomo
+    Then the session is untagged
+    And the Pomo shows "Planned now: Study math" with "Track it"
+    When the user clicks "Track it"
     Then the session is tagged "Study math"
 
   Scenario: F1/F7 — tracked time follows the tag

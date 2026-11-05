@@ -34,6 +34,7 @@
 | F24 | Every completion-ledger entry records the tag the task was completed under (`CompletionRecord.tag`). Re-tagging a done item updates its entry. The Analytics node's **Time** view shows minutes by tag (pomo-tracked minutes, else planned): a donut, a ranked list and a stacked bar per day |
 | F25 | CLI parity: `todo list [--done\|--archived\|--all]`, `todo tag <ref> <tag\|auto>`, `todo tags [list\|add\|remove]`, `todo archive`, `todo clear-archive`, `analytics show --view tags` |
 | F26 | **Adding a task creates no edge** (#205). `todo.add` (UI), `krnl todo add` and `krnl task add` spawn the TaskNode unchained, so a new task is never pushed after the previous one on the Calendar. The user chains tasks by hand: TaskNode "Add next task", `krnl task chain <a> <b> …`, `krnl task addNext`, `krnl edge add` |
+| F27 | **Estimate on the row** (#207): one readable figure — "30m", or "⏱ 1h20 / 30m" once time is tracked (rust when over); the work/break/total breakdown is in the tooltip. Clicking it edits the estimate (also in the row menu). **0 = no set time**: the task becomes open-ended (Calendar/Clock draw it fading out), the row reads "open". CLI: `krnl task duration <ref> 0`. |
 
 ---
 
