@@ -62,6 +62,14 @@ const run = (argv: string[]) => new SysFacade({ boardPath }).run(argv);
 /** Entries this test's commands logged (not the one-time backfill). */
 const logged = (since: number): TimeLogEntry[] => readTimeLog(dir).filter((e) => Date.parse(e.at) >= since);
 const typesSince = (since: number): string[] => logged(since).map((e) => e.type);
+/**
+ * Position in the log, and the entries appended after it. A timestamp window
+ * is not enough: on a fast machine the entry written just before
+ * `Date.now()` can carry the very same millisecond and slip into the window.
+ * readTimeLog keeps log order (stable sort by time), so new entries are last.
+ */
+const mark = (): number => readTimeLog(dir).length;
+const loggedAfter = (n: number): TimeLogEntry[] => readTimeLog(dir).slice(n);
 
 describe('CLI writers (F3)', () => {
   let t0 = 0;
@@ -73,28 +81,28 @@ describe('CLI writers (F3)', () => {
   it('todo add → task.created; task edit → task.renamed', async () => {
     expect((await run(['todo', 'add', 'Math homework'])).ok).toBe(true);
     expect(logged(t0)).toEqual([expect.objectContaining({ type: 'task.created', taskText: 'Math homework' })]);
-    const t1 = Date.now();
+    const m1 = mark();
     expect((await run(['task', 'edit', 'Math homework', 'Physics homework'])).ok).toBe(true);
-    expect(logged(t1)).toEqual([expect.objectContaining({ type: 'task.renamed', taskText: 'Physics homework' })]);
+    expect(loggedAfter(m1)).toEqual([expect.objectContaining({ type: 'task.renamed', taskText: 'Physics homework' })]);
   });
 
   it('task toggle → task.completed, again → task.reopened, again → a second task.completed (F5)', async () => {
     await run(['todo', 'add', 'Deploy']);
-    const t1 = Date.now();
+    const m1 = mark();
     await run(['task', 'toggle', 'Deploy']);
     await run(['task', 'toggle', 'Deploy']);
     await run(['task', 'toggle', 'Deploy']);
-    expect(typesSince(t1)).toEqual(['task.completed', 'task.reopened', 'task.completed']);
-    expect(logged(t1)[0]).toMatchObject({ taskText: 'Deploy' });
+    expect(loggedAfter(m1).map((e) => e.type)).toEqual(['task.completed', 'task.reopened', 'task.completed']);
+    expect(loggedAfter(m1)[0]).toMatchObject({ taskText: 'Deploy' });
   });
 
   it('task schedule → plan.set, moved → plan.set, unschedule → plan.cleared', async () => {
     await run(['todo', 'add', 'Deploy']);
-    const t1 = Date.now();
+    const m1 = mark();
     expect((await run(['task', 'schedule', 'Deploy', '--at', '2026-11-09T10:00', '--duration', '45'])).ok).toBe(true);
     expect((await run(['task', 'schedule', 'Deploy', '--at', '2026-11-11T10:00'])).ok).toBe(true);
     expect((await run(['task', 'unschedule', 'Deploy'])).ok).toBe(true);
-    const plans = logged(t1);
+    const plans = loggedAfter(m1);
     expect(plans.map((e) => e.type)).toEqual(['plan.set', 'plan.set', 'plan.cleared']);
     expect(plans[0]).toMatchObject({ start: '2026-11-09T10:00', durationMin: 45, taskText: 'Deploy' });
     expect(plans[1]).toMatchObject({ start: '2026-11-11T10:00' });
@@ -109,15 +117,17 @@ describe('CLI writers (F3)', () => {
     const taskId = b.nodes.find((n) => n['kind'] === 'todo.task')!['id'] as string;
     pomoNode(b)['state'] = { ...defaultPomoState(), status: 'running', startedAt: new Date(Date.now() - 30 * 60_000).toISOString(), activeTaskId: taskId, label: 'Reading' };
     writeBoard(b);
-    const t1 = Date.now();
+    const m1 = mark();
     expect((await run(['task', 'toggle', 'Reading'])).ok).toBe(true);
-    const out = logged(t1);
+    const out = loggedAfter(m1);
     expect(out.map((e) => e.type).sort()).toEqual(['span.closed', 'task.completed']);
     expect(out.find((e) => e.type === 'span.closed')).toMatchObject({ kind: 'work', taskId, taskText: 'Reading' });
   });
 
   it('pomo retag → span.retagged; pomo delete-segment → span.deleted', async () => {
     reset([SEG('seg-aaaa1111'), SEG('seg-bbbb2222')]);
+    // Time window, not mark(): span entries sort by the span's own time. No
+    // logging command runs just before t1, so the same-millisecond slip can't happen.
     const t1 = Date.now();
     expect((await run(['pomo', 'retag', 'seg-aaaa1111', '--text', 'emails'])).ok).toBe(true);
     expect((await run(['pomo', 'delete-segment', 'seg-bbbb2222'])).ok).toBe(true);

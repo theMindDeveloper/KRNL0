@@ -1203,6 +1203,7 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Release pipeline fixed:** the Windows job failed on `windows-latest` (VS 2026 / node-gyp can't build node-pty), now pinned to `windows-2022`; `latest.yml` ships with the installer; asset names have no spaces (`KRNL0-Setup-X.Y.Z.exe` — GitHub had turned spaces into dots); CI fails when the tag isn't `package.json`'s version; `docs/releases/vX.Y.Z.md` becomes the release body.
 - **Release process written down** (AGENTS.md rule 11, docs/releases/RELEASING.md): patch for fixes, minor for feature releases, never reuse a version or move a published tag, Publish on the draft is the switch that ships it.
 - **Also fixed:** `SysFacade` dropped its `viewSize` dependency, so CLI-added nodes never used the visible-centre placement.
+- **Flaky test fixed (macOS CI):** `time.cli.test.ts` read "entries since `Date.now()`" right after a logging command; on a fast runner that command's `task.created` carried the same millisecond and was counted. Those windows now start at a position in the log instead of a timestamp.
 - **Verified:** local `electron-builder --win` writes `latest.yml` (url = `KRNL0-Setup-0.10.0.exe`), `resources/app-update.yml` (github, theMindDeveloper/KRNL0) and bundles `electron-updater`. Typecheck 0 errors; 195 files / 2098 tests green. Not yet verified: a real update end to end. Apps on v0.10.0 have no updater, so the first updater-enabled release is installed by hand once; automatic updates can be seen from the release after it.
 
 ---
