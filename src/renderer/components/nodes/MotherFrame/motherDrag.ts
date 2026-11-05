@@ -3,7 +3,7 @@
 //
 // Press the grip and move: the window lifts off its slot and you hold it —
 // it follows the pointer and tilts in 3D with the way you move it, while its
-// slot stays behind as an empty outline. The window under the pointer lights
+// slot stays behind as an empty outline (no cast shadow: tried, dropped). The window under the pointer lights
 // up with "Swap here". Let go on it and the held window flies into that slot
 // while the other one flies over into the slot you emptied. Let go anywhere
 // else (or press Esc) and it flies back.
@@ -177,127 +177,6 @@ function swapInStore(a: string, b: string): void {
   if (board) void saveBoard(board);
 }
 
-// ── cast shadow ────────────────────────────────────────────────────────────
-// The held window casts a real shadow — its own outline, with the same 3D
-// tilt, offset by how you move it — onto what is under it:
-//   - on the window you are over: a tight contact shadow (sharp, close),
-//   - on the background: a small soft shadow a little further out.
-// The two shift by different amounts as you move (parallax).
-//
-// How dark it is comes from the surface it falls on, measured, not guessed:
-// a dark surface needs a strong shadow to show at all, a light one a gentle
-// one — so it reads on the light and dark themes and every window frame.
-//
-// Cost: each shadow is a plain blurred box drawn once (will-change:
-// transform); per frame only their transforms change (compositor). Clip
-// shapes, positions and strength change only when the window under you does.
-
-interface CastShadow {
-  root: HTMLElement; farClip: HTMLElement; far: HTMLElement; nearClip: HTMLElement; near: HTMLElement;
-  origin: Box; surface: Box | null;
-}
-
-/** k: how far it trails; tilt: how strongly its shape follows the tilt. */
-const FAR = { k: 1.0, tilt: 1.3, blur: 10 };
-const NEAR = { k: 0.55, tilt: 1.15, blur: 4 };
-
-/** 0 (black) … 1 (white): the brightness of an element's own background,
- *  or of the first ancestor that has one. */
-function surfaceLightness(el: Element | null): number {
-  for (let e: Element | null = el; e; e = e.parentElement) {
-    const m = getComputedStyle(e).backgroundColor.match(/[\d.]+/g);
-    if (!m) continue;
-    const [r, g, b, a = '1'] = m;
-    if (Number(a) < 0.5) continue; // see-through: look further up
-    return (0.2126 * Number(r) + 0.7152 * Number(g) + 0.0722 * Number(b)) / 255;
-  }
-  return 1;
-}
-
-/** Shadow strength for a surface: strong on dark, gentle on light. */
-const alphaFor = (lightness: number, near: boolean): number => {
-  const a = near ? 0.92 - 0.62 * lightness : 0.8 - 0.62 * lightness; // dark ~0.9 / ~0.78, white ~0.3 / ~0.18
-  return Math.max(0.12, Math.min(0.92, a));
-};
-
-function makeCastShadow(origin: Box, gx: number, gy: number, background: number): CastShadow {
-  const layer = (z: number): HTMLElement => {
-    const el = document.createElement('div');
-    Object.assign(el.style, { position: 'fixed', left: '0', top: '0', width: '100vw', height: '100vh', zIndex: String(z), pointerEvents: 'none', overflow: 'hidden' } satisfies Partial<CSSStyleDeclaration>);
-    return el;
-  };
-  const blob = (blur: number, alpha: number): HTMLElement => {
-    const el = document.createElement('div');
-    Object.assign(el.style, {
-      position: 'absolute', left: `${origin.left}px`, top: `${origin.top}px`,
-      width: `${origin.width}px`, height: `${origin.height}px`,
-      borderRadius: '10px', background: `rgba(0,0,0,${alpha})`, filter: `blur(${blur}px)`,
-      transformOrigin: `${gx}px ${gy}px`, willChange: 'transform', // same pivot as the held window
-    } satisfies Partial<CSSStyleDeclaration>);
-    return el;
-  };
-  const root = document.createElement('div');
-  root.className = 'krnl-cast-shadow';
-  const farClip = layer(8999);
-  const far = blob(FAR.blur, alphaFor(background, false));
-  farClip.appendChild(far);
-  const nearClip = layer(9000);
-  nearClip.style.display = 'none';
-  nearClip.style.borderRadius = '8px';
-  const near = blob(NEAR.blur, 0.5);
-  nearClip.appendChild(near);
-  root.append(farClip, nearClip);
-  document.body.appendChild(root);
-  if (typeof root.animate === 'function') root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' });
-  return { root, farClip, far, nearClip, near, origin, surface: null };
-}
-
-/** The window under the held one (or none): the near shadow falls on it,
- *  the far one everywhere else. */
-function setShadowSurface(cs: CastShadow, el: HTMLElement | null): void {
-  const r = el ? boxOf(el) : null;
-  cs.surface = r;
-  if (!r || !el) {
-    cs.nearClip.style.display = 'none';
-    cs.farClip.style.clipPath = '';
-    return;
-  }
-  Object.assign(cs.nearClip.style, { display: 'block', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
-  // inside the clip, the shadow is placed relative to the clip's corner
-  cs.near.style.left = `${cs.origin.left - r.left}px`;
-  cs.near.style.top = `${cs.origin.top - r.top}px`;
-  cs.near.style.background = `rgba(0,0,0,${alphaFor(surfaceLightness(el), true)})`;
-  const L = r.left; const T = r.top; const R = r.left + r.width; const B = r.top + r.height;
-  cs.farClip.style.clipPath =
-    `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${L}px ${T}px, ${R}px ${T}px, ${R}px ${B}px, ${L}px ${B}px, ${L}px ${T}px)`;
-}
-
-/** Follow the held window: (dx, dy) its move from the pick-up point, `s` its
- *  scale, (rx, ry) its tilt, (cx, cy) its centre on screen. */
-function placeShadow(cs: CastShadow, dx: number, dy: number, s: number, rx: number, ry: number, cx: number, cy: number): void {
-  // Drops below (further for a bigger window — it is held higher), trails
-  // behind the movement (the tilt is the movement), and drifts a little away
-  // from the middle of the screen (light from above the middle).
-  const h = cs.origin.height * s;
-  const ox = -ry * 4 + (cx - window.innerWidth / 2) * 0.03;
-  const oy = 14 + h * 0.06 + rx * 2.5 + (cy - window.innerHeight * 0.3) * 0.02;
-  const put = (el: HTMLElement, d: typeof FAR): void => {
-    el.style.transform =
-      `translate3d(${dx + ox * d.k}px, ${dy + oy * d.k}px, 0) perspective(${PERSPECTIVE}px) ` +
-      `rotateX(${rx * d.tilt}deg) rotateY(${ry * d.tilt}deg) scale(${s})`;
-  };
-  put(cs.far, FAR);
-  if (cs.surface) put(cs.near, NEAR);
-}
-
-function dropShadow(cs: CastShadow): void {
-  const root = cs.root;
-  if (typeof root.animate === 'function') {
-    root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'ease-out', fill: 'forwards' }).onfinish = () => root.remove();
-  }
-  setTimeout(() => root.remove(), 300);
-}
-
 // ── holding a window ───────────────────────────────────────────────────────
 let holding = false;
 
@@ -318,7 +197,6 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
   // set at pick-up
   let source: HTMLElement | null = null;
   let ghost: HTMLElement | null = null;
-  let shadow: CastShadow | null = null; // cast on what is under the held window
   let origin: Box | null = null;
   let gx = 0; let gy = 0;           // grab point inside the window
   let s = 1; let sTarget = 1;       // hold scale
@@ -326,7 +204,6 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
   let lastX = startX; let lastY = startY;
   let raf = 0;
   let prevCursor = '';
-  let lastSurfaceEl: HTMLElement | null = null;
 
   const frameLoop = (): void => {
     if (!ghost) return;
@@ -341,11 +218,6 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     const dy = py - startY;
     ghost.style.transform =
       `translate3d(${dx}px, ${dy}px, 0) perspective(${PERSPECTIVE}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
-    if (shadow && origin) {
-      const cx = origin.left + dx + gx * (1 - s) + (origin.width * s) / 2;
-      const cy = origin.top + dy + gy * (1 - s) + (origin.height * s) / 2;
-      placeShadow(shadow, dx, dy, s, rx, ry, cx, cy);
-    }
     raf = requestAnimationFrame(frameLoop);
   };
 
@@ -358,8 +230,6 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     gx = startX - origin.left;
     gy = startY - origin.top;
     sTarget = Math.min(1.03, Math.max(0.35, HOLD_MAX_W / origin.width));
-    // the background's brightness, measured once (it doesn't change mid-drag)
-    shadow = makeCastShadow(origin, gx, gy, surfaceLightness(source.parentElement));
     ghost = ghostOf(source, origin, 9001, 'fixed');
     ghost.style.transformOrigin = `${gx}px ${gy}px`; // tilts and shrinks around your hand
     document.body.appendChild(ghost);
@@ -375,11 +245,6 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     const frame = under?.closest<HTMLElement>('.mother-frame[data-tour]') ?? null;
     if (frame && frame !== source) markDropTarget(frame);
     else if (currentTarget) { unmark(currentTarget); currentTarget = null; }
-    // Only when the window under you changes (cheap the rest of the time).
-    if (shadow && lastSurfaceEl !== currentTarget) {
-      setShadowSurface(shadow, currentTarget);
-      lastSurfaceEl = currentTarget;
-    }
   };
 
   function cleanup(): void {
@@ -409,7 +274,6 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     };
     const layer = layerFor(src);
     endMotherDrag();
-    if (shadow) { dropShadow(shadow); shadow = null; }
 
     // Re-seat the held picture in the flight layer, at the same place.
     held.style.transform = 'none';
