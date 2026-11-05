@@ -1230,3 +1230,11 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Type:** Bug Fix (CI)
 **Files changed:** `.github/workflows/release.yml`, `docs/08-history/HISTORY.md`
 **Summary:** GitHub refused to start the `macos-14` runner on the `v0.10.1` tag build ("configuration 'macos-14-arm64-us-default' is not supported", the image is being retired), so the run was cancelled before anything was published. The macOS job now runs on `macos-15` (arm64); the unpublished `v0.10.1` tag is moved to this commit and rebuilt.
+
+---
+
+## [2026-11-05] — CI: release builds Windows only; macOS built by hand
+
+**Type:** Chore (CI)
+**Files changed:** `.github/workflows/release.yml`, `docs/releases/RELEASING.md`, `docs/releases/v0.10.1.md`, `docs/08-history/HISTORY.md`
+**Summary:** The `macos-15` job of the v0.10.1 tag build sat queued for a shared GitHub Mac runner. By the maintainer's choice the release workflow now builds Windows only (the macOS entry is kept as a comment to restore). The maintainer builds the `.dmg` on a Mac from the same tag and attaches it with `gh release upload` (RELEASING.md → "macOS build"); macOS is notify-only, so no metadata file has to match. The unpublished `v0.10.1` tag moves to this commit.

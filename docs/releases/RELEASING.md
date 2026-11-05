@@ -51,9 +51,9 @@ git push origin vX.Y.Z
 
 `.github/workflows/release.yml` then:
 - fails at once if the tag isn't `v` + `package.json`'s version;
-- typechecks, tests, builds Windows (NSIS, on `windows-2022`) and macOS (arm64 DMG);
+- typechecks, tests and builds Windows (NSIS, on `windows-2022`). macOS is built by hand, see "macOS build" below;
 - creates a **draft** release `vX.Y.Z` with `KRNL0-Setup-X.Y.Z.exe`, its `.blockmap`,
-  `latest.yml`, the `.dmg` and its blockmap, and the notes from `docs/releases/vX.Y.Z.md`.
+  `latest.yml` and the notes from `docs/releases/vX.Y.Z.md`.
 
 Watch it with `gh run watch` (or the Actions tab). A red build means nothing was published.
 Fix it on `main`, then delete the tag (`git push --delete origin vX.Y.Z && git tag -d vX.Y.Z`)
@@ -75,6 +75,26 @@ being offered it at once. Apps that already downloaded it will still install it,
 the fix as the next patch quickly. Never "fix" it under the same version.
 
 ---
+
+## macOS build (by hand, on a Mac)
+
+CI builds Windows only. GitHub's shared macOS runners queued for too long on v0.10.1.
+macOS installs are notify-only: they read GitHub's latest release and open its page, so the
+`.dmg` can be attached any time after publishing, with no metadata file to match.
+
+On a Mac, from a checkout of the **same tag**:
+
+```bash
+git checkout vX.Y.Z
+npm ci
+npm run build
+npx electron-builder --mac --arm64 --publish never
+gh release upload vX.Y.Z release/KRNL0-X.Y.Z-arm64.dmg release/KRNL0-X.Y.Z-arm64.dmg.blockmap
+```
+
+Until the `.dmg` is attached, Mac users who click **Download** land on a release page with
+Windows files only. Say so in the notes, or attach the `.dmg` before publishing. To build macOS
+in CI again, restore the commented `macos-15` entry in `release.yml`.
 
 ## First release with the updater
 
