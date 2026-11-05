@@ -1146,3 +1146,11 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Frame budget:** every infinite CSS animation gets effect-level `steps()` timing (~30 updates/s) and its start time snapped to one shared 30 fps beat, so Chromium skips the frames where nothing changes and all animations change in the same frame. Keyframes, curves and durations are untouched; transitions, one-shot animations and `data-frame-budget="off"` subtrees keep full refresh.
 - **Radio:** draws once per state change while silent; while playing it draws on a ~60 fps timer (the speed its per-frame particle motion was tuned for) instead of the monitor rate.
 - **Result:** idle ~190-220% of a core -> ~27-30% (~3.5% in Task Manager), with every animation still moving.
+
+---
+
+## [2026-11-05] — v0.10.0 re-release (Nov 5 build)
+
+**Type:** Release
+**PRs:** #198 (idle CPU frame budget), #208 (bug batch), this release-notes PR
+**Summary:** The v0.10.0 tag moves to main with #198 and #208 merged, and the Windows installer is rebuilt locally in place of the Nov 3 build (same reason as Nov 3: the release workflow's Windows job can't build node-pty on the CI image). `docs/releases/v0.10.0.md` and the GitHub release gain an "Updated build (Nov 5)" section. Same version number, by the maintainer's choice.
