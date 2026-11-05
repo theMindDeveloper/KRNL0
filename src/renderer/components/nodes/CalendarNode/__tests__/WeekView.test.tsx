@@ -822,3 +822,94 @@ describe('WeekView — delete tracked-reality segment (#12)', () => {
     expect((pomo.state as { history: unknown[] }).history).toEqual([]);
   });
 });
+
+// ── #203 — left-click a recorded span opens its details ───────────────────────
+
+describe('WeekView — left-click on a recorded span (#203)', () => {
+  it('a left click on a tracked span opens the details popup', () => {
+    boardWith([
+      makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
+    ]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    fireEvent.click(col, { clientY: 252, clientX: 100 });
+
+    const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
+    expect(popup).toBeTruthy();
+    expect(popup?.textContent).toMatch(/09:25/);
+  });
+
+  it('a left click on empty grid opens nothing', () => {
+    boardWith([
+      makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
+    ]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    fireEvent.click(col, { clientY: 28 * 14, clientX: 100 }); // 14:00 — nothing there
+    expect(document.querySelector('[data-testid="calendar-reality-popup"]')).toBeNull();
+  });
+
+  it('a left click where two spans overlap opens the picker, and a row opens its details', () => {
+    const pomo = makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00');
+    (pomo.state.history as unknown[]).push(
+      { id: 'seg-2', startedAt: '2026-05-11T09:05:00', endedAt: '2026-05-11T09:20:00', durationMin: 15, completed: false, kind: 'work', label: '' },
+    );
+    boardWith([pomo]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    fireEvent.click(col, { clientY: 252 + 5, clientX: 100 }); // ≈ 09:10
+    const rows = document.querySelectorAll('[data-testid="calendar-layer-item-reality"]');
+    expect(rows.length).toBe(2);
+    fireEvent.click(rows[0]!);
+    expect(document.querySelector('[data-testid="calendar-reality-popup"]')).toBeTruthy();
+  });
+});
+
+// ── #204 — a tagged span names its task everywhere ────────────────────────────
+
+describe('WeekView — tagged span shows its task (#204)', () => {
+  function taggedPomo(taskId: string, label: string) {
+    const pomo = makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00');
+    const rec = pomo.state.history[0] as Record<string, unknown>;
+    rec['taskId'] = taskId;
+    rec['label'] = label;
+    return pomo;
+  }
+
+  it('the band, the popup title and the menu header name the task — even once it is done', () => {
+    const task = makeTask('task-a', '2026-05-12T09:00', 25);
+    (task.state as Record<string, unknown>)['done'] = true;
+    (task.state as Record<string, unknown>)['completedAt'] = '2026-05-11T09:25:00';
+    boardWith([task, taggedPomo('task-a', 'Task task-a')]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const band = document.querySelector('[data-testid="calendar-reality-block"]');
+    expect(band?.getAttribute('data-reality-task')).toBe('Task task-a');
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+    expect(screen.getByText('Tagged: Task task-a')).toBeTruthy();
+    // The finished task is still offered as a retag target.
+    expect(screen.queryByRole('button', { name: /Tag → ✓ Task task-a/ })).toBeNull(); // it is the current tag
+    expect(screen.getByRole('button', { name: 'Untag' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Details…' }));
+    const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
+    expect(popup?.textContent).toMatch(/Task task-a/);
+    expect(document.querySelector('[data-testid="calendar-reality-retag"]')?.textContent).toMatch(/Task task-a/);
+  });
+
+  it('a span whose task was deleted still names it (orphan option)', () => {
+    boardWith([taggedPomo('task-gone', 'build cluster')]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    fireEvent.click(col, { clientY: 252, clientX: 100 });
+    const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
+    expect(popup?.textContent).toMatch(/build cluster/);
+    expect(document.querySelector('[data-testid="calendar-reality-retag"]')?.textContent).toMatch(/build cluster \(deleted\)/);
+  });
+});

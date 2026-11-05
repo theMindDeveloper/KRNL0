@@ -231,6 +231,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'day', usage: 'clock day <YYYY-MM-DD|today|+1|-1>', summary: 'Set the clock selected date (absolute, today, or ±1 day)' },
       { name: 'dial', usage: 'clock dial [on|off]', summary: 'Dial-only view: the clock face as big as the window allows (toggles without an argument)' },
       { name: 'half', usage: 'clock half [am|pm]', summary: 'Which half of the day the dial shows (toggles without an argument)' },
+      { name: 'now', usage: 'clock now', summary: 'Show today and the 12-hour half that contains now' },
       { name: 'show', usage: 'clock show [--json]', summary: 'Show scheduled tasks for the clock\'s selected date and view window' },
     ],
   },
@@ -269,6 +270,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'setTitle', usage: 'term setTitle "<title>"', summary: 'Update terminal window title' },
       { name: 'setFontSize', usage: 'term setFontSize <N>', summary: 'Set terminal font size' },
       { name: 'clear', usage: 'term clear', summary: 'Clear the terminal screen' },
+      { name: 'claude', usage: 'term claude [--bypass]', summary: 'Show the terminal and start Claude Code in it (--bypass skips permission prompts)' },
     ],
   },
   {

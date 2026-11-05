@@ -27,8 +27,11 @@ import { ClockBezel } from './ClockBezel';
 import { PagedView } from '../../ui/PagedView';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
+import { spanTaskName, spanTaskTargets } from '../PomoNode/taskTargets';
 import { AppSelect } from '../../ui/AppSelect';
 import { wallHoursFromDayStart, msAtWallHours } from './wallHours';
+import { localYMD } from '../../../../shared/ymd';
+import { halfOf, startupFollow, rolloverFollow, claimStartup, type ClockNowMark } from './follow';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 const CX = 120;
@@ -279,12 +282,18 @@ export function ClockNode({
   const openSegmentMenu = (seg: RealitySegment, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const targets = (useBoardStore.getState().board?.nodes ?? [])
-      .filter((n) => n.kind === 'todo.task' && (n.state as TaskState).parentTaskId === null)
-      .map((n) => ({ id: n.id, text: (n.state as TaskState).text }));
+    // #204 — same task list (open, then done ✓) and task name as the Calendar.
+    const nodes = useBoardStore.getState().board?.nodes ?? [];
+    const targets = spanTaskTargets(nodes).map((t) => ({ id: t.id, text: t.done ? `✓ ${t.text}` : t.text }));
     const x = e.clientX;
     const y = e.clientY;
-    setCtxMenu({ x, y, items: segmentMenuItems(seg, { targets, easy, onDetails: () => setRealityPopup({ seg, x, y }) }) });
+    setCtxMenu({
+      x, y,
+      items: segmentMenuItems(
+        { ...seg, taskName: spanTaskName(nodes, seg) },
+        { targets, easy, onDetails: () => setRealityPopup({ seg, x, y }) },
+      ),
+    });
   };
   const openTaskMenu = (taskId: string, startH: number, endH: number, e: React.MouseEvent) => {
     const node = useBoardStore.getState().board?.nodes.find((n) => n.id === taskId);
@@ -395,6 +404,25 @@ export function ClockNode({
   // currently selected day.
   const today = todayLocalYMD();
   const isToday = selectedDate === today;
+
+  // #201 — follow now by default (rules in follow.ts). Runs on mount (app
+  // start, once per clock) and whenever the 30-second tick crosses midnight
+  // or noon; it never fires on a ‹ › browse, so a browsed day is left alone.
+  // Day and half both come from the same `now` sample so they flip together.
+  const nowDay = localYMD(now);
+  const nowHalf = halfOf(now);
+  const nowMarkRef = useRef<ClockNowMark | null>(null);
+  useEffect(() => {
+    const next: ClockNowMark = { today: nowDay, half: nowHalf };
+    const prev = nowMarkRef.current;
+    nowMarkRef.current = next;
+    const view = { selectedDate, viewWindow };
+    const cmd = prev === null
+      ? (claimStartup(node.id) ? startupFollow(view, next) : null)
+      : rolloverFollow(prev, next, view);
+    if (cmd) onCommand(cmd.command, cmd.args);
+    // Deliberately keyed on the real time only — a browse must not trigger it.
+  }, [nowDay, nowHalf]);
 
   // Parse the selected date once. Used both for the ISO DoW (habit matching)
   // and for the day-selector header label.
@@ -1068,6 +1096,12 @@ export function ClockNode({
               );
             })}
 
+            {/* #202 — everything painted over the wedges (ticks, numerals,
+                readout, hands, sweeping second hand, hub) is decoration: it
+                must never take the pointer, or hovering a numeral (or the
+                second hand passing under a still cursor) "leaves" the wedge
+                and the hover flickers / the click misses. */}
+            <g data-testid="clock-face-overlay" pointerEvents="none">
             {/* 60 tick marks */}
             {Array.from({ length: 60 }).map((_, i) => {
               const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
@@ -1169,6 +1203,7 @@ export function ClockNode({
             {/* Hub */}
             <circle cx={CX} cy={CY} r={5} fill="var(--k-clock-hand, var(--ink))" />
             <circle cx={CX} cy={CY} r={1.6} fill="var(--acid)" />
+            </g>
           </svg>
 
           {/* HH:MM digital readout moved into the SVG (above) so it
@@ -1409,12 +1444,20 @@ export function ClockNode({
                 <AppSelect
                   testId="clock-reality-retag"
                   value={realityPopup.seg.taskId ?? ''}
-                  options={[
-                    { value: '', label: 'untagged' },
-                    ...(board0?.nodes ?? [])
+                  options={(() => {
+                    const targets = (board0?.nodes ?? [])
                       .filter((n) => n.kind === 'todo.task' && (n.state as { parentTaskId: string | null }).parentTaskId === null)
-                      .map((n) => ({ value: n.id, label: (n.state as { text: string }).text })),
-                  ]}
+                      .map((n) => ({ value: n.id, label: (n.state as { text: string }).text }));
+                    // #204 — a span still tagged with a task that is gone (or
+                    // is a subtask) keeps its own option, named by the span's
+                    // label, so the select shows what it counts toward
+                    // instead of a blank value (same as the Pomo tag select).
+                    const tagged = realityPopup.seg.taskId;
+                    const orphan = tagged !== null && !targets.some((o) => o.value === tagged)
+                      ? [{ value: tagged, label: realityPopup.seg.label || 'task' }]
+                      : [];
+                    return [{ value: '', label: 'untagged' }, ...orphan, ...targets];
+                  })()}
                   onChange={(v) => {
                     const taskId = v === '' ? null : v;
                     retagClockSegment(realityPopup.seg.id, taskId);

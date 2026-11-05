@@ -13,6 +13,7 @@ import { useBoardStore } from '../../../store/boardStore';
 import { taskSetPlannedMin, taskSetSchedule } from '../TaskNode/commands';
 import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
 import type { PomoState } from '../PomoNode/types';
+import { decodeTargets, encodeTargets, spanTaskName as spanTaskNameOf, spanTaskTargets } from '../PomoNode/taskTargets';
 import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange, selectSchedule } from '../../../store/scheduleSelector';
@@ -450,14 +451,21 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     [easy, pomoNodeForTracked, liveMs],
   );
 
-  // Open root tasks a reality span can be retagged to.
-  const retagOptions = useBoardStore(
-    useShallow((s) =>
-      (s.board?.nodes ?? [])
-        .filter((n) => n.kind === 'todo.task' && (n.state as TaskState).parentTaskId === null)
-        .map((n) => `${n.id}\u0000${(n.state as TaskState).text}`),
-    ),
-  );
+  // Root tasks a reality span can be retagged to: open first, then done
+  // (#204 — the same list the Pomo offers, so a finished task stays taggable).
+  const retagKeys = useBoardStore(useShallow((s) => encodeTargets(spanTaskTargets(s.board?.nodes))));
+  const retagTargets = useMemo(() => decodeTargets(retagKeys), [retagKeys]);
+  // #204 — the name of the task a span counts toward (falls back to the span's
+  // own label when the task node is gone).
+  const spanTaskName = (seg: { taskId: string | null; label: string }): string | null =>
+    spanTaskNameOf(useBoardStore.getState().board?.nodes, seg);
+  // Title of a span: Break, the task it counts toward, its own name, else
+  // `fallback`. Easy mode never links spans to tasks.
+  const spanTitle = (seg: { kind: 'work' | 'break'; taskId: string | null; label: string }, fallback: string): string => {
+    if (seg.kind !== 'work') return 'Break';
+    if (easy) return (!seg.taskId && seg.label) || fallback;
+    return spanTaskName(seg) ?? (seg.label || fallback);
+  };
 
   // #168/#172 — when a drop lands later than requested (the chain pushes a
   // task after its predecessor), say so instead of silently moving it.
@@ -518,13 +526,22 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
   // #6 — info popup for a clicked tracked-reality (pomo) segment.
   const [realityPopup, setRealityPopup] = useState<{ seg: RealitySeg; x: number; y: number } | null>(null);
+  // Escape closes the span details popup (it used to close only on an outside click).
+  useEffect(() => {
+    if (!realityPopup) return;
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setRealityPopup(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [realityPopup]);
   // #7 — overlap disambiguation. A right-click enumerates EVERY layer under the
   // cursor (scheduled task blocks + tracked-reality segments) into one picker so
   // the user can choose which to act on even when they cover the same minute.
   type LayerItem =
     | { kind: 'task'; task: ScheduledTask }
     | { kind: 'reality'; seg: RealitySeg };
-  const [layerMenu, setLayerMenu] = useState<{ x: number; y: number; items: LayerItem[] } | null>(null);
+  // `open`: what picking a row does — its right-click menu, or (left click on
+  // overlapping spans, #203) its details popup.
+  const [layerMenu, setLayerMenu] = useState<{ x: number; y: number; items: LayerItem[]; open?: 'menu' | 'details' } | null>(null);
   // A task row dragged out of the layer picker: the picker goes see-through so
   // the drop reaches the grid underneath, and closes when the drag ends.
   const [layerDragging, setLayerDragging] = useState(false);
@@ -542,15 +559,23 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         ),
       });
     } else {
-      const targets = retagOptions.map((pair) => {
-        const [id, text] = pair.split('\u0000') as [string, string];
-        return { id, text };
-      });
       setCtxMenu({
         x, y,
-        items: segmentMenuItems(item.seg, { targets, easy, onDetails: () => setRealityPopup({ seg: item.seg, x, y }) }),
+        items: segmentMenuItems(
+          { ...item.seg, taskName: spanTaskName(item.seg) },
+          {
+            targets: retagTargets.map((t) => ({ id: t.id, text: t.done ? `✓ ${t.text}` : t.text })),
+            easy,
+            onDetails: () => setRealityPopup({ seg: item.seg, x, y }),
+          },
+        ),
       });
     }
+  };
+  // #203 — what a left click opens: a span's details popup, a task's popup.
+  const openItemDetails = (item: LayerItem, x: number, y: number) => {
+    if (item.kind === 'task') setTaskPopup({ task: item.task, x, y });
+    else setRealityPopup({ seg: item.seg, x, y });
   };
 
   // ADR 0003 §4 — read placements from the cascade selector, not raw
@@ -876,9 +901,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // and "a task and a pomo section overlap, how do I select one" (#7) with one
   // interaction, instead of fighting z-index. Left-click on a task block keeps
   // its existing direct-open behaviour.
-  function handleColumnContextMenu(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
-    e.preventDefault();
-    e.stopPropagation();
+  function layersAt(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>): LayerItem[] {
     const rect = e.currentTarget.getBoundingClientRect();
     const relY = Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget);
     const minute = (relY / rowHeight) * 60;
@@ -896,6 +919,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         items.push({ kind: 'reality', seg });
       }
     }
+    return items;
+  }
+
+  function handleColumnContextMenu(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    const items = layersAt(dayYMD, e);
     if (items.length === 0) return;
 
     // Single hit → its right-click menu directly, no picker noise.
@@ -903,7 +933,21 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       openItemMenu(items[0]!, e.clientX, e.clientY);
       return;
     }
-    setLayerMenu({ x: e.clientX, y: e.clientY, items });
+    setLayerMenu({ x: e.clientX, y: e.clientY, items, open: 'menu' });
+  }
+
+  // #203 — a LEFT click on a recorded (pomo) span opens its details popup.
+  // The bands take no pointer events (F16), so the column hit-tests. A task
+  // block stops its own click, so only reality spans are hit here; several
+  // overlapping spans open the picker, which then opens the details.
+  function handleColumnClick(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
+    const items = layersAt(dayYMD, e).filter((it) => it.kind === 'reality');
+    if (items.length === 0) return;
+    if (items.length === 1) {
+      openItemDetails(items[0]!, e.clientX, e.clientY);
+      return;
+    }
+    setLayerMenu({ x: e.clientX, y: e.clientY, items, open: 'details' });
   }
 
   // ── Task block renderer ─────────────────────────────────────────────────────
@@ -1575,16 +1619,21 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const isWork = seg.kind === 'work';
       const tone = spanTone(tagLibrary, seg, easy);
       const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
+      // #204 — name what the time counted toward (task, else the span's own
+      // name) so a tagged span never looks untagged. Faint, top-right, behind
+      // the plan blocks; hidden on slivers.
+      const name = isWork && !easy ? spanTaskName(seg) ?? (seg.label || null) : null;
       return (
         <div
           key={`reality-${seg.id}-${i}`}
           data-testid="calendar-reality-block"
           data-reality-kind={seg.kind}
           data-reality-live={seg.live ? 'true' : undefined}
+          data-reality-task={isWork && !easy ? spanTaskName(seg) ?? undefined : undefined}
           aria-label={
             seg.live
-              ? `${isWork ? (!seg.taskId && seg.label) || 'Focus' : 'Break'} ${fmtHM(seg.startMs)} to now (recording)`
-              : `${isWork ? (!seg.taskId && seg.label) || 'Focus' : 'Break'} ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)}, ${minutes} minutes`
+              ? `${spanTitle(seg, 'Focus')} ${fmtHM(seg.startMs)} to now (recording)`
+              : `${spanTitle(seg, 'Focus')} ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)}, ${minutes} minutes`
           }
           style={{
             position: 'absolute',
@@ -1599,7 +1648,21 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 22%, transparent) 0 1px, transparent 1px 7px)`,
             borderRadius: 3,
           }}
-        />
+        >
+          {name && heightPx >= 14 && (
+            <span
+              data-testid="calendar-reality-name"
+              style={{
+                position: 'absolute', top: 1, right: 4, maxWidth: '70%',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.04em',
+                color: `color-mix(in srgb, ${tone} 70%, var(--ink-3))`,
+              }}
+            >
+              {name}
+            </span>
+          )}
+        </div>
       );
     });
   }
@@ -2069,6 +2132,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 key={dayYMD}
                 data-testid={`week-col-${dayYMD}`}
                 onContextMenu={(e) => handleColumnContextMenu(dayYMD, e)}
+                onClick={(e) => handleColumnClick(dayYMD, e)}
                 style={{
                   flex: 1,
                   position: 'relative',
@@ -2270,7 +2334,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               const tone = isTask ? toneVarForTask(item.task.id) : spanTone(tagLibrary, item.seg, easy);
               const label = isTask
                 ? item.task.text || 'Untitled task'
-                : `Tracked · ${item.seg.kind === 'work' ? 'focus' : 'break'} ${fmtHM(item.seg.startMs)}–${fmtHM(item.seg.endMs)}`;
+                : `Tracked · ${item.seg.kind === 'work' ? spanTitle(item.seg, 'focus') : 'break'} ${fmtHM(item.seg.startMs)}–${fmtHM(item.seg.endMs)}`;
               return (
                 <button
                   key={i}
@@ -2284,7 +2348,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   } : undefined}
                   onDragEnd={isTask ? () => { setLayerDragging(false); setLayerMenu(null); } : undefined}
                   onClick={() => {
-                    openItemMenu(item, layerMenu.x, layerMenu.y);
+                    if (layerMenu.open === 'details') openItemDetails(item, layerMenu.x, layerMenu.y);
+                    else openItemMenu(item, layerMenu.x, layerMenu.y);
                     setLayerMenu(null);
                   }}
                   style={{
@@ -2365,7 +2430,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 }}
               />
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>
-                {realityPopup.seg.kind === 'work' ? (!easy && !realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}
+                {spanTitle(realityPopup.seg, 'Focus session')}
               </span>
               {realityPopup.seg.live && (
                 <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em' }}>◆ LIVE</span>
@@ -2398,10 +2463,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   value={realityPopup.seg.taskId ?? ''}
                   options={[
                     { value: '', label: 'untagged' },
-                    ...retagOptions.map((pair) => {
-                      const [id, text] = pair.split('\u0000') as [string, string];
-                      return { value: id, label: text };
-                    }),
+                    // #204 — a span tagged with a task that is gone (cleared /
+                    // deleted) still names it instead of reading blank.
+                    ...(realityPopup.seg.taskId && !retagTargets.some((t) => t.id === realityPopup.seg.taskId)
+                      ? [{ value: realityPopup.seg.taskId, label: `${spanTaskName(realityPopup.seg) ?? 'task'} (deleted)` }]
+                      : []),
+                    ...retagTargets.map((t) => ({ value: t.id, label: t.done ? `✓ ${t.text}` : t.text })),
                   ]}
                   onChange={(v) => {
                     const taskId = v === '' ? null : v;

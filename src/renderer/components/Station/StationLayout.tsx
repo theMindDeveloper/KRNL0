@@ -48,6 +48,7 @@ import { SLOT_DEFAULTS } from './SlotResolver';
 import type { MotherNodeConfig, StationSlot } from '../../../shared/types';
 import type { Node } from '../../../shared/types/node';
 import { restoredSizes } from './restoredSizes';
+import { bottomUnchanged, columnsUnchanged, rowUnchanged, useSnapshot } from './layoutGeometry';
 
 const PANEL_IDS = {
   outerTop:    'station-top-row',
@@ -145,6 +146,8 @@ export function StationLayout() {
     // 100 %, which must not overwrite the height the user chose.
     if (layout[PANEL_IDS.outerTop] === undefined || layout[PANEL_IDS.outerBottom] === undefined) return;
     const rowFraction = layout[PANEL_IDS.outerTop]! / 100;
+    // Already saved (within rounding): writing again would only re-render (#199).
+    if (rowUnchanged(current, rowFraction)) return;
     setLayoutGeometry({
       station: {
         rowFraction,
@@ -161,6 +164,7 @@ export function StationLayout() {
     // A hidden column keeps the width it had (it isn't in `layout`).
     const columnFractions = TOP_ROW_DEFS.map((d, i) =>
       layout[d.panelId] !== undefined ? layout[d.panelId]! / 100 : (current?.columnFractions[i] ?? d.defaultSize / 100));
+    if (columnsUnchanged(current, columnFractions)) return;
     setLayoutGeometry({
       station: {
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
@@ -175,6 +179,7 @@ export function StationLayout() {
   const onBottomLayoutChanged = useCallback((layout: Layout) => {
     const rightColumnSplit = (layout[PANEL_IDS.bottomCanvas] ?? SLOT_DEFAULTS.bottom.canvas) / 100;
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
+    if (bottomUnchanged(current, layout, rightColumnSplit)) return;
     const bottomFractions: Record<string, number> = { ...(current?.bottomFractions ?? {}) };
     for (const [id, size] of Object.entries(layout)) bottomFractions[id] = size / 100;
     setLayoutGeometry({
@@ -188,26 +193,36 @@ export function StationLayout() {
     });
   }, [setLayoutGeometry]);
 
+  // Panel `defaultSize`s are snapshots: taken when the set of visible panels
+  // changes (or the saved geometry first appears), never from a layout we
+  // just saved. Feeding every save back into `defaultSize` re-registered the
+  // panels on each save and looped until React gave up (#185, issue #199).
+  const hasSaved = storedGeometry ? 'saved' : 'none';
+
   // The mother-row height the user left, within the row minimums.
-  const savedRow = storedGeometry?.rowFraction;
-  const topRowPercent = typeof savedRow === 'number' && Number.isFinite(savedRow)
-    ? Math.min(100 - SLOT_DEFAULTS.minCanvas, Math.max(SLOT_DEFAULTS.minRow, savedRow * 100))
-    : SLOT_DEFAULTS.rowPercent;
+  const topRowPercent = useSnapshot(`${topRowVisible}|${bottomRowVisible}|${hasSaved}`, () => {
+    const savedRow = storedGeometry?.rowFraction;
+    return typeof savedRow === 'number' && Number.isFinite(savedRow)
+      ? Math.min(100 - SLOT_DEFAULTS.minCanvas, Math.max(SLOT_DEFAULTS.minRow, savedRow * 100))
+      : SLOT_DEFAULTS.rowPercent;
+  });
 
   const def = DOCK_REGISTRY[dockStyle];
   const padding = def.stationPadding;
   const Chrome = def.Chrome;
 
   // Build the top-row panel list: visible panels with separators between.
-  const savedColumns: Record<string, number> | undefined = storedGeometry?.columnFractions.length === TOP_ROW_DEFS.length
-    ? Object.fromEntries(TOP_ROW_DEFS.map((d, i) => [d.panelId, storedGeometry.columnFractions[i]!]))
-    : undefined;
-  const topSizes = restoredSizes(
-    visibleTopDefs.map((d) => d.panelId),
-    visibleTopDefs.map((d) => d.defaultSize),
-    visibleTopDefs.map(() => SLOT_DEFAULTS.minColumn),
-    savedColumns,
-  );
+  const topSizes = useSnapshot(`${visibleTopDefs.map((d) => d.panelId).join(',')}|${hasSaved}`, () => {
+    const savedColumns: Record<string, number> | undefined = storedGeometry?.columnFractions.length === TOP_ROW_DEFS.length
+      ? Object.fromEntries(TOP_ROW_DEFS.map((d, i) => [d.panelId, storedGeometry.columnFractions[i]!]))
+      : undefined;
+    return restoredSizes(
+      visibleTopDefs.map((d) => d.panelId),
+      visibleTopDefs.map((d) => d.defaultSize),
+      visibleTopDefs.map(() => SLOT_DEFAULTS.minColumn),
+      savedColumns,
+    );
+  });
   const topRowChildren: React.ReactNode[] = [];
   visibleTopDefs.forEach((d, i) => {
     if (i > 0) topRowChildren.push(<Separator key={`sep-${d.panelId}`} className="station-splitter" style={verticalHandleStyle} />);
@@ -246,13 +261,13 @@ export function StationLayout() {
   // saved widths share out the rest of the row.
   const flexItems = bottomItems.filter((it) => it.id !== PANEL_IDS.bottomClock);
   const flexTotal = bottomVisible.clock ? 100 - clockSize : 100;
-  const flexSizes = restoredSizes(
+  const flexSizes = useSnapshot(`${bottomItems.map((it) => it.id).join(',')}|${hasSaved}`, () => restoredSizes(
     flexItems.map((it) => it.id),
     flexItems.map((it) => it.size),
     flexItems.map((it) => it.min),
     storedGeometry?.bottomFractions,
     flexTotal,
-  );
+  ));
   flexItems.forEach((it, i) => { it.size = flexSizes[i]!; });
   bottomItems.forEach((it, i) => {
     if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} className="station-splitter" style={verticalHandleStyle} />);

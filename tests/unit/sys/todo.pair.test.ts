@@ -97,15 +97,14 @@ describe('todo add — pair creation (issue #117 §4)', () => {
     expect(data.taskNodeId.startsWith('task-')).toBe(true);
   });
 
-  it('chains a task.next edge from the previous task on the 2nd add', async () => {
+  it('todo-node F25 — the 2nd add creates no chain edge (the user chains by hand)', async () => {
     await todoAdd(ctx, 'first');
     await todoAdd(ctx, 'second');
     const board = readBoard();
-    expect(board.edges.length).toBeGreaterThanOrEqual(1);
     const chain = board.edges.find(
       (e) => e.from.event === 'task.next' && e.to.command === 'task.activate',
     );
-    expect(chain).toBeDefined();
+    expect(chain).toBeUndefined();
   });
 
   it('passes the tag through to both the TodoItem and the TaskNode', async () => {

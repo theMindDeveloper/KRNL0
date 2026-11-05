@@ -20,7 +20,7 @@ Companion to [ai-full-visibility-cli.md](ai-full-visibility-cli.md). Documents w
 | File | Purpose |
 |---|---|
 | `src/shared/dispatch/resolveRef.ts` | One rule for `<ref>` resolution: full id, prefix (≥4 chars), or text/name match. Exports `resolveNodeRef`, `resolveTodoItemRef`, `resolveHabitRef`, `resolveEdgeRef`, `resolutionError`. |
-| `src/shared/dispatch/todo.ts` | Pure `createTodoTaskPair(board, args, ctx)` that creates the TodoItem + TaskNode pair, sets the bidirectional link, positions the new task by sequence, and chains the previous sibling. |
+| `src/shared/dispatch/todo.ts` | Pure `createTodoTaskPair(board, args, ctx)` that creates the TodoItem + TaskNode pair, sets the bidirectional link, and positions the new task by sequence. It creates no chain edge — adding never chains (todo-node F26, #205). |
 | `src/sys/commands/node.ts` | Real `node list`, `node read`, `node remove` (cascades for tasks; refuses mothers without `--force`), `node set-position`. |
 | `src/sys/commands/info.ts` | `info`, `settings show`, `viewport show` — single-call snapshots for AI bootstrapping. |
 | `tests/unit/sys/resolveRef.test.ts` | Exact, prefix, ambiguous, name-fallback coverage for the resolver. |
@@ -80,7 +80,7 @@ The renderer's `commandDispatch.ts:985–1117` does much more than the new share
 - text-suffix parsing (`"thing 25m"` → `plannedMin: 25`)
 - Zustand store wiring (`addNode`, `addEdge`)
 - IPC save (`window.krnl?.boardSave`)
-- store-mutation ordering (add task, then `todoLinkTask`, then chain edge — sequential because `useBoardStore.getState().board` between calls reflects the prior write)
+- store-mutation ordering (add task, then `todoLinkTask` — no chain edge since #205; sequential because `useBoardStore.getState().board` between calls reflects the prior write)
 
 Extracting `createTodoTaskPair` and wiring the renderer through it is the correct ADR-0014 §11 parity fix, but it's a **separate refactor** that touches store internals. Doing it in this PR would either bloat the diff or risk subtle ordering changes in the React render path. The requirements doc and PR description both call this out as the explicit follow-up.
 

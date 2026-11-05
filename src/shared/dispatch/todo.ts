@@ -16,7 +16,7 @@ import {
 import type { TodoState } from '../../renderer/components/nodes/TodoNode/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { PomoConfig } from '../../renderer/components/nodes/PomoNode/types';
-import type { AnyNode, AnyEdge, BoardShape, DispatchCtx } from './types';
+import type { AnyNode, BoardShape, DispatchCtx } from './types';
 
 export interface CreateTodoTaskPairArgs {
   /** Optional TodoNode id. If omitted, uses the first mother TodoNode. */
@@ -45,8 +45,8 @@ function findPomoNode(board: BoardShape): AnyNode | null {
 }
 
 /**
- * Create a TodoItem on a TodoNode + a paired TaskNode + the chain edge from
- * the previous sibling task (if any). Mutates `board` in place.
+ * Create a TodoItem on a TodoNode + a paired TaskNode (no chain edge — the
+ * user chains tasks by hand). Mutates `board` in place.
  *
  * Throws if the TodoNode is missing — callers must check first or catch.
  */
@@ -149,19 +149,8 @@ export function createTodoTaskPair(
   }
   board.nodes = [...board.nodes, taskNode];
 
-  // ── 7. Chain edge from previous sibling ──────────────────────────────────
-  if (siblings.length > 0) {
-    const prev = siblings[siblings.length - 1];
-    if (prev) {
-      const edge: AnyEdge = {
-        id: `edge-${ctx.uuid()}`,
-        from: { nodeId: prev.id, event: 'task.next' },
-        to: { nodeId: taskNodeId, command: 'task.activate' },
-        enabled: true,
-      };
-      board.edges = [...board.edges, edge];
-    }
-  }
+  // No chain edge: adding a task never chains it (todo-node F25). The user
+  // chains by hand (`task chain`, `task addNext`, `edge add`).
 
   return { todoItemId: addedItem.id, taskNodeId };
 }

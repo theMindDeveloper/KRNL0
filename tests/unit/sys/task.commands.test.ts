@@ -30,6 +30,7 @@ import {
   taskList,
   taskDuration,
   taskSibling,
+  taskChain,
   taskResetPomo,
   type TaskCtx,
 } from '../../../src/sys/commands/task';
@@ -171,18 +172,17 @@ describe('sys task add', () => {
     expect((tasks[1]!.state as TaskState).sequenceNumber).toBe(2);
   });
 
-  it('adds a chain edge from the previous sibling', async () => {
+  it('todo-node F25 — adding a second task creates no chain edge', async () => {
     await taskAdd(ctx, TODO_MOTHER_ID, 'task 1');
     await taskAdd(ctx, TODO_MOTHER_ID, 'task 2');
     const { edges } = readBoard();
-    expect(edges.length).toBeGreaterThanOrEqual(1);
     const tasks = findTasks();
     const task1 = tasks.find((t) => (t.state as TaskState).sequenceNumber === 1)!;
     const task2 = tasks.find((t) => (t.state as TaskState).sequenceNumber === 2)!;
     const chainEdge = edges.find(
       (e) => e.from.nodeId === task1.id && e.to.nodeId === task2.id,
     );
-    expect(chainEdge).toBeDefined();
+    expect(chainEdge).toBeUndefined();
   });
 
   it('uses first todo mother when todoId is undefined', async () => {
@@ -562,6 +562,8 @@ describe('sys task sibling', () => {
     const res2 = await taskAdd(ctx, TODO_MOTHER_ID, 'task 2');
     const task1Id = (res1.data as { id: string }).id;
     const task2Id = (res2.data as { id: string }).id;
+    // Adding never chains (todo-node F25) — wire task1 → task2 by hand.
+    expect((await taskChain(ctx, [task1Id, task2Id])).ok).toBe(true);
 
     const sibRes = await taskSibling(ctx, task1Id);
     const sibId = (sibRes.data as { id: string }).id;

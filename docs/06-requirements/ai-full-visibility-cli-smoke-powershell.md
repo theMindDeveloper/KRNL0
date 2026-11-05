@@ -119,7 +119,7 @@ krnl edge list
 
 **Expected:**
 - Every command succeeds. **Especially step 4** — that was the verbatim issue #117 failure (`No todo node with id "c27bc74b"`). It now resolves the TodoItem prefix to its parent TodoNode and adds the task there.
-- `krnl edge list` at the end shows the chain edges automatically created by `todo add` (Week1→Week2→Week3→Week4 task chain) **plus** your manual `task chain` edge between "Linear algebra review" and "Probability primer".
+- `krnl edge list` at the end shows only your manual `task chain` edge between "Linear algebra review" and "Probability primer". `todo add` creates no chain edges (todo-node F26, #205) — chain Week1→Week4 with `krnl task chain` if you want them sequential.
 
 ### If any habit name is "Ambiguous"
 

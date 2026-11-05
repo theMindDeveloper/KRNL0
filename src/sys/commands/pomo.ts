@@ -20,6 +20,7 @@ import type { BoardShape } from '../../shared/dispatch/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
 import { selectPomoReality } from '../../renderer/store/pomoReality';
+import { spanTaskName } from '../../renderer/components/nodes/PomoNode/taskTargets';
 import { spanTagFor } from '../../renderer/store/spanTags';
 import { isValidYMD } from '../../shared/ymd';
 
@@ -378,12 +379,15 @@ export function pomoSegments(ctx: { boardPath: string }, opts: { date?: string; 
     .filter((sg) => sg.endMs > dayStart && sg.startMs < dayEnd)
     .map((sg) => ({
       id: sg.id, kind: sg.kind, taskId: sg.taskId, label: sg.label, live: sg.live,
+      // #204 — the task the span counts toward (its text, else the span label
+      // when the task node is gone); null when untagged.
+      taskName: spanTaskName(raw.nodes, sg),
       start: hm(sg.startMs), end: hm(sg.endMs), minutes: Math.max(1, Math.round((sg.endMs - sg.startMs) / 60_000)),
     }));
   if (opts.json) return { ok: true, message: JSON.stringify(segs), data: segs };
   if (segs.length === 0) return { ok: true, message: `no tracked segments on ${date}`, data: segs };
   const lines = segs.map((sg) =>
-    `  ${sg.id.slice(0, 8)}  ${sg.kind === 'work' ? 'focus' : 'break'}  ${sg.start}–${sg.live ? 'now  ' : sg.end}  ${String(sg.minutes).padStart(3)}m  ${sg.label || (sg.kind === 'work' ? '(untagged)' : '')}`);
+    `  ${sg.id.slice(0, 8)}  ${sg.kind === 'work' ? 'focus' : 'break'}  ${sg.start}–${sg.live ? 'now  ' : sg.end}  ${String(sg.minutes).padStart(3)}m  ${sg.taskName ? `→ ${sg.taskName}` : sg.label || (sg.kind === 'work' ? '(untagged)' : '')}`);
   return { ok: true, message: [`tracked segments — ${date}`, ...lines].join('\n'), data: segs };
 }
 

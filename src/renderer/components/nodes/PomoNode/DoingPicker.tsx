@@ -19,7 +19,8 @@ export interface DoingPickerProps {
   caption: string;
   current: DoingChoice | null;
   recents: readonly DoingChoice[];
-  tasks: ReadonlyArray<{ id: string; text: string }>;
+  /** Open tasks, then tasks done today (`done: true`, own group — #204). */
+  tasks: ReadonlyArray<{ id: string; text: string; done?: boolean }>;
   library: readonly TagDef[];
   onPick: (choice: DoingChoice) => void;
   onClear: () => void;
@@ -31,6 +32,8 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
+  const openTasks = tasks.filter((t) => !t.done);
+  const doneTasks = tasks.filter((t) => t.done);
   const cat = (tag: string | null) => (tag ? library.find((t) => t.id === tag) : undefined);
   const curCat = current && !current.taskId ? cat(current.tag) : undefined;
 
@@ -119,8 +122,10 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
           />
           {recents.length > 0 && <span style={{ ...mono, padding: '4px 8px 2px' }}>Recent</span>}
           {recents.map((c, i) => row(`r-${i}`, c, `pomo-now-recent-${i}`))}
-          {tasks.length > 0 && <span style={{ ...mono, padding: '8px 8px 2px' }}>Tasks</span>}
-          {tasks.map((t) => row(`t-${t.id}`, { label: t.text, tag: null, taskId: t.id }, `pomo-now-task-${t.id}`))}
+          {openTasks.length > 0 && <span style={{ ...mono, padding: '8px 8px 2px' }}>Tasks</span>}
+          {openTasks.map((t) => row(`t-${t.id}`, { label: t.text, tag: null, taskId: t.id }, `pomo-now-task-${t.id}`))}
+          {doneTasks.length > 0 && <span style={{ ...mono, padding: '8px 8px 2px' }}>Done today</span>}
+          {doneTasks.map((t) => row(`t-${t.id}`, { label: t.text, tag: null, taskId: t.id }, `pomo-now-task-${t.id}`))}
         </div>
       </Popover>
     </>

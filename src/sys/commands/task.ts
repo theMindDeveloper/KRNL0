@@ -246,20 +246,8 @@ export async function taskAdd(
 
   updateNode(board, todoMother.id, { ...todoMother, state: linkedTodoState });
   board.nodes = [...board.nodes, taskNode];
-
-  // Add chain edge from previous sibling
-  if (siblings.length > 0) {
-    const prev = siblings[siblings.length - 1];
-    if (prev) {
-      const edge = {
-        id: `edge-${randomUUID()}`,
-        from: { nodeId: prev.id, event: 'task.next' },
-        to: { nodeId: taskId, command: 'task.activate' },
-        enabled: true,
-      };
-      board.edges = [...board.edges, edge];
-    }
-  }
+  // No chain edge: adding a task never chains it (todo-node F25). Chain by
+  // hand with `task chain` / `task addNext`.
 
   saveBoard(ctx, board);
   return {

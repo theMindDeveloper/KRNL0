@@ -28,6 +28,9 @@ export interface MenuSegment {
   startMs: number;
   endMs: number;
   live: boolean;
+  /** #204 — name of the task the span counts toward (task text, else the
+   *  span's own label when the task is gone). Shown as "Tagged: X". */
+  taskName?: string | null;
 }
 
 export interface MenuTask {
@@ -71,6 +74,11 @@ export function segmentMenuItems(
       onSelect: () => {},
     },
   ];
+  // #204 — say which task the span counts toward, so a tagged span never
+  // reads as untagged (the header alone only gives kind and times).
+  if (isWork && !opts.easy && seg.taskId && seg.taskName) {
+    items.push({ header: true, label: `Tagged: ${clip(seg.taskName)}`, onSelect: () => {} });
+  }
   // Only finished focus spans carry a tag; the live span is tagged from the Pomo.
   // Easy mode never links spans to tasks.
   if (isWork && !seg.live && !opts.easy) {

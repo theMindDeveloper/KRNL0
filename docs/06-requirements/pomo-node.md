@@ -31,6 +31,7 @@
 | F21 | The ☰ button in the Pomo header opens a span log: every recorded work/break span of a day (‹ › to page days) with a delete button, so tiny spans are easy to remove. |
 | F22 | Analytics: Focus counts every recorded work span (not only spans that reached the session length); breaks are totalled; "sessions" counts full pomodoros only. Timer faces scale to the configured session length instead of a fixed 25. |
 | F23 | Away guard: when a running span or break was not seen live for 15 min or more (the machine slept, or the app was closed with the timer running), the Pomo asks "AWAY 18:02–09:14 · 15h 12m — count that time?" with COUNT IT or STOP AT 18:02 (records the span up to that moment and stops). The last-seen time is a per-window heartbeat, not board data. CLI: `krnl pomo stop --at HH:MM`. |
+| F24 | **Finished tasks stay taggable** (#204). Ticking the tagged task done still stops the pomo and records the span with its task (time-model F1). The Doing picker, the "Log this span" panel and the pomodoro TASK selector list open tasks, then a **Done today** group (✓), so the time can keep counting toward a task just ticked. Same list builder as the Calendar retag list (`PomoNode/taskTargets.ts`). CLI: `krnl pomo tag <taskRef>` / `pomo retag` accept done tasks. |
 
 ---
 
@@ -132,6 +133,12 @@ Feature: PomoNode vapor timer
     When the component renders
     Then a React Flow Handle with type "source" and position "right" is present
     And its vertical position is at 50% of the node height
+
+  Scenario: F24 — ticking the tagged task done keeps the span's task
+    Given an Observe session tagged "build cluster" has run since 10:06
+    When the user ticks "build cluster" done in the Todo at 16:27
+    Then the pomo is idle and a 10:06–16:27 span counts toward "build cluster"
+    And "build cluster" is listed under "Done today" in the Doing picker
 ```
 
 ---

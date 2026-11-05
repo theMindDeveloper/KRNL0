@@ -9,7 +9,7 @@
 | F1 | Calendar and Clock use one lane packer (`store/laneLayout.ts`). Overlapping blocks form a cluster, every block in a cluster reports the same lane count, and a block widens over lanes that stay free for its whole interval. |
 | F2 | *(Superseded by F16.)* Calendar reality used to be a thin rail on the left edge of each day column. Planned task and habit blocks still keep a small left gutter, where the highlight's edge shows. |
 | F3 | Reality colours: focus = a faint wash in the colour of the task it is tagged with (acid when untagged) with a solid edge. Break = a faint neutral hatch with a dashed edge. A pause is a gap. The live span is a little stronger. |
-| F4 | Right-clicking a reality span (Calendar highlight or Clock wedge) opens its menu (F17). Left-clicking a Clock wedge, or **Details…** in the menu, opens the popup with start, end and duration, a **Counts toward** selector (retag), and Delete. |
+| F4 | Right-clicking a reality span (Calendar highlight or Clock wedge) opens its menu (F17). **Left-clicking** a Clock wedge or a Calendar highlight (#203 — the day column hit-tests, since the bands take no pointer events; several overlapping spans open the picker, whose rows then open their details), or **Details…** in the menu, opens the popup with start, end and duration, a **Counts toward** selector (retag), and Delete. A left click on a task block still opens the task popup. |
 | F5 | Planned blocks show their real time range even when they cross midnight, and are at least 14 px tall. How much text they show is set by F13. |
 | F6 | Block states: done = faded (✓ when there is room). Missed = planned time passed while still open (lighter tint, "missed" in the agenda). Overrun = tracked > planned: a rust strip on the right edge at any size, plus "+Xm over" in the time line when it fits. |
 | F7 | Habit blocks are tinted with a coloured edge, like tasks, not a solid bright bar. |
@@ -26,6 +26,10 @@
 | F18 | **Clock parity.** The Clock day view offers the same menus from the same builder (`ContextMenu/scheduleMenus.ts`): right-click a task arc or a task-list row for the task menu, and a pomo wedge for the segment menu. The Clock has no task details popup, so its task menu has no **Details…**. |
 | F19 | **CLI twins.** Tag / Untag → `pomo retag <seg> <task|none>`. Delete segment → `pomo delete-segment <seg>`. Start focus → `task pomo <ref>`. Mark done → `task toggle <ref>`. Unschedule → `task unschedule <ref>`. `pomo segments [--date] [--json]` lists segment ids. |
 | F20 | **No scrolling.** The Calendar hour grid shows a window of whole hours that fits the panel. The wheel, the ‹ HH–HH › pager, or a drag held at the top/bottom edge flips to the next window. The agenda list and the Clock task list page by whole rows (`ui/PagedView`). The Clock dial flexes to the free space, so the whole Clock always fits. |
+| F21 | **A tagged span names its task** (#204). The Calendar band shows the task name (faint, top-right), the details popup title is the task name, the right-click menu has a **Tagged: <task>** line, and the layer picker row names it. The name is the task's current text, else the span's own label (the task text at tagging time) when the task node is gone. The **Counts toward** selector lists open tasks, then done tasks (✓, newest first); a span whose task was deleted keeps an extra "<name> (deleted)" option instead of reading blank. CLI: `krnl pomo segments [--json]` prints `→ <task>` / a `taskName` field. |
+| F22 | **The Clock follows now** (#201). At app start a past day, or today in the other half, snaps to today and the current 12-hour half; a future day is kept. When the local day changes, a clock showing the day that ended moves to the new day; at noon or midnight a clock showing today's ending half flips to the new half. A clock browsing another day is never moved. Applied through `clock.goNow` / `clock.setViewWindow` (`ClockNode/follow.ts`); CLI `krnl clock now`. `selectedDate` stays persisted (ADR 0004 §3). |
+| F23 | **Clock overlay never takes the pointer** (#202). Ticks, numerals, the readout, hands, second hand and hub are one `pointer-events: none` group, so hovering or clicking a wedge under a numeral works. |
+| F24 | **Clock names tagged spans too** (#204). The Clock span menu shows **Tagged: <task>** and lists open, then done ✓ tasks (same builder as F21); its **Counts toward** select lists a span's deleted task under the span label. |
 
 ## Gherkin Scenarios (ATDD)
 
@@ -68,6 +72,21 @@ Feature: Readable parallel tasks and pomo highlights
     Then both are drawn as bands behind the task blocks
     And the focus band is a tinted wash and the break band is a hatch
     And dropping a task onto that time still schedules it
+
+  Scenario: F4 — left-click a recorded span on the calendar (#203)
+    Given a 25 minute focus span at 09:00
+    When I left-click it on the calendar
+    Then its details popup opens with 09:00, 09:25 and "Counts toward"
+    When two recorded spans overlap where I left-click
+    Then the picker lists both, and picking one opens its details
+
+  Scenario: F21 — a tagged span names its task (#204)
+    Given a focus span tagged "build cluster" and "build cluster" is done
+    Then the calendar band is labelled "build cluster"
+    And its right-click menu shows "Tagged: build cluster"
+    And its details popup is titled "build cluster"
+    When "build cluster" is deleted
+    Then "Counts toward" reads "build cluster (deleted)"
 
   Scenario: F17 — retag a focus span from the calendar
     Given a focus span tagged "Math"

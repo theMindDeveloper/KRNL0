@@ -1119,6 +1119,22 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 
 ---
 
+## [2026-11-05] — Bug batch: terminal, clock, calendar, observe tags, no auto-chain, Orb Claude button
+
+**Type:** Bug Fix + Feature
+**Issues:** #199, #200, #201, #202, #203, #204, #205, #206
+**Branch:** `TMD/bug-batch-terminal-clock-calendar`
+**Files changed:** `Station/{StationLayout.tsx,layoutGeometry.ts}`, `TerminalNode/{index.tsx,session.ts,liveTerminals.ts,fitGuard.ts}`, `ClockNode/{index.tsx,follow.ts}`, `CalendarNode/WeekView.tsx`, `ContextMenu/scheduleMenus.ts`, `PomoNode/{index.tsx,DoingPicker.tsx,SpanLabeler.tsx,taskTargets.ts}`, `Canvas/commandDispatch.ts`, `shared/dispatch/todo.ts`, `sys/{parser.ts,SysFacade.ts,commands/{clock,pomo,task}.ts}`, `shared/cli/commandRegistry.ts`, `Orb/index.tsx`, `store/{claudeLaunch.ts,useCliDispatch.ts}`, requirement docs, tests
+**Summary:**
+- **Terminal crash on first open (#199):** the Station bottom row fed saved panel sizes back into the panels, the panel library re-emitted them rounded, and the save started over until React's update limit (#185). Restored sizes are now a snapshot per visible-panel set, and sizes within 0.01 % of the stored ones are not saved again.
+- **Terminal 2-column prompt (#200):** the terminal fitted itself while its panel was ~6 px wide, so the shell redrew its prompt 2 columns wide. One guarded fit ignores sizes under 10×3 and resizes the PTY only on a real change.
+- **Clock on a new day (#201):** the clock kept yesterday's `selectedDate` (and the morning half after noon). It now follows now: at app start and at midnight/noon it moves to today and the current half unless the user is browsing another day. New `krnl clock now`.
+- **Clock hover flicker (#202):** ticks, numerals, readout, hands and hub are one `pointer-events: none` group.
+- **Calendar left-click (#203):** a left click on recorded time opens its details (overlaps → picker); right click keeps the menu; Escape closes the details.
+- **Tagged time looked untagged (#204):** recorded spans show their task name on the band, popup, menus ("Tagged: X") and in `krnl pomo segments`; done tasks stay taggable (✓, "Done today" in the Pomo); a deleted task shows as "name (deleted)" instead of a blank select. The data was never lost.
+- **No auto-chain (#205):** adding tasks (Todo UI, `todo add`, `task add`) no longer links them; users chain manually.
+- **Orb → Claude Code (#206):** a quick action shows the terminal and runs `claude --dangerously-skip-permissions`; CLI `krnl term claude [--bypass]`.
+- **Verified in the real app** (isolated copy of the maintainer's board): clock moved from Nov 4 to today on start, numerals pass the pointer through, left-click opens "filmgenie" details, right-click shows "Tagged: filmgenie" and "✓ cluster build", terminal opened with no error and no staircase.
 ## [2026-11-05] — Idle CPU: frame budget for decorative animations
 
 **Type:** Performance

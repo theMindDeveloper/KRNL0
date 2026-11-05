@@ -681,6 +681,7 @@ export class SysFacade {
         case 'show': return clockCmd.clockShow(ctx, command.json);
         case 'dial': return clockCmd.clockDial(ctx, command.arg);
         case 'half': return clockCmd.clockHalf(ctx, command.arg);
+        case 'now':  return clockCmd.clockNow(ctx);
       }
     }
 

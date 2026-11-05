@@ -13,7 +13,8 @@ import { CategoryIcon } from './CategoryIcon';
 export interface SpanLabelerProps {
   minutes: number;
   initialText: string;
-  tasks: ReadonlyArray<{ id: string; text: string }>;
+  /** Open tasks, then tasks done today (`done: true`, own group — #204). */
+  tasks: ReadonlyArray<{ id: string; text: string; done?: boolean }>;
   library: readonly TagDef[];
   /** Classifier guess for a name (null = none). */
   guess: (text: string) => string | null;
@@ -154,8 +155,10 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
             onKeyDown={(e) => { if (e.key === 'Enter') addCategory(); }}
             style={{ margin: '2px 4px', padding: '4px 6px', background: 'transparent', border: '1px dashed var(--ink-4)', borderRadius: 5, color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 10, outline: 'none' }}
           />
-          {tasks.length > 0 && <span style={{ ...mono, padding: '8px 8px 2px' }}>Or count toward a task</span>}
-          {tasks.map((t) => row(`task-${t.id}`, task?.id === t.id, () => choose({ kind: 'task', id: t.id }), <span aria-hidden style={{ color: 'var(--ink-3)' }}>☐</span>, t.text, `pomo-ask-task-${t.id}`))}
+          {tasks.some((t) => !t.done) && <span style={{ ...mono, padding: '8px 8px 2px' }}>Or count toward a task</span>}
+          {tasks.filter((t) => !t.done).map((t) => row(`task-${t.id}`, task?.id === t.id, () => choose({ kind: 'task', id: t.id }), <span aria-hidden style={{ color: 'var(--ink-3)' }}>☐</span>, t.text, `pomo-ask-task-${t.id}`))}
+          {tasks.some((t) => t.done) && <span style={{ ...mono, padding: '8px 8px 2px' }}>Done today</span>}
+          {tasks.filter((t) => t.done).map((t) => row(`task-${t.id}`, task?.id === t.id, () => choose({ kind: 'task', id: t.id }), <span aria-hidden style={{ color: 'var(--ink-3)' }}>✓</span>, t.text, `pomo-ask-task-${t.id}`))}
         </div>
       </Popover>
     </div>
