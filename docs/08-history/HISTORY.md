@@ -1135,3 +1135,14 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **No auto-chain (#205):** adding tasks (Todo UI, `todo add`, `task add`) no longer links them; users chain manually.
 - **Orb → Claude Code (#206):** a quick action shows the terminal and runs `claude --dangerously-skip-permissions`; CLI `krnl term claude [--bypass]`.
 - **Verified in the real app** (isolated copy of the maintainer's board): clock moved from Nov 4 to today on start, numerals pass the pointer through, left-click opens "filmgenie" details, right-click shows "Tagged: filmgenie" and "✓ cluster build", terminal opened with no error and no staircase.
+## [2026-11-05] — Idle CPU: frame budget for decorative animations
+
+**Type:** Performance
+**Issue:** #197
+**Branch:** `TMD/kernel-gpu-windows-usage-f9f3aa`
+**Files changed:** `renderer/utils/frameBudget.ts` (new), `renderer/index.tsx`, `AmbientRadio/index.tsx`, `docs/06-requirements/render-frame-budget.md` (new), `tests/unit/renderer/frameBudget.test.ts`
+**Summary:**
+- **Cause (measured over CDP on a copy of a real board, Pro theme):** the window rendered ~218 frames/s on a high-refresh monitor whenever any infinite CSS animation ran, and every frame costs CPU in the GPU process and the renderer. Idle cost ~2.2 cores (~25-28% of 8 cores in Task Manager); with animations stopped it was 0%. The silent radio widget also redrew an identical canvas every refresh.
+- **Frame budget:** every infinite CSS animation gets effect-level `steps()` timing (~30 updates/s) and its start time snapped to one shared 30 fps beat, so Chromium skips the frames where nothing changes and all animations change in the same frame. Keyframes, curves and durations are untouched; transitions, one-shot animations and `data-frame-budget="off"` subtrees keep full refresh.
+- **Radio:** draws once per state change while silent; while playing it draws on a ~60 fps timer (the speed its per-frame particle motion was tuned for) instead of the monitor rate.
+- **Result:** idle ~190-220% of a core -> ~27-30% (~3.5% in Task Manager), with every animation still moving.

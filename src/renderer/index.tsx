@@ -10,6 +10,7 @@ import './styles/reactflow-theme.css';
 import './styles/chassis.css';
 import '@xterm/xterm/css/xterm.css';
 import { installDockThemes } from './styles/dock-themes';
+import { installFrameBudget } from './utils/frameBudget';
 
 installGlobalErrorCapture();
 installBoardSaveLogging();
@@ -17,6 +18,9 @@ installBoardSaveLogging();
 // defineDockTheme() pipeline. Inject before React renders so the canvas
 // paints themed on first frame, not on rehydration.
 installDockThemes();
+// Decorative infinite animations update ~30x/s instead of at the monitor
+// refresh rate — keeps every animation, cuts idle CPU ~5x (issue #197).
+installFrameBudget();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element');

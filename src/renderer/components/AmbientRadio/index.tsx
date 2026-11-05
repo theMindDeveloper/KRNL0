@@ -121,6 +121,11 @@ const CHORD_LABELS: Record<string, string> = {
 
 const WIDTH = 300;
 const HEIGHT = 148;
+// Canvas cadence while playing (issue #197). Particle motion is per-frame and
+// was tuned on 60 Hz displays, so ~60 fps keeps the designed speed instead of
+// running at whatever the monitor refreshes at (218 fps measured on a
+// high-refresh panel). Silent = no timer at all (see the render loop).
+export const RADIO_FRAME_MS = 16;
 const POS_KEY    = 'krnl0-ambient-radio-pos';
 const PARAMS_KEY = 'krnl0-ambient-radio-params';
 const STATE_KEY  = 'krnl0-ambient-radio-state';
@@ -419,6 +424,8 @@ export function AmbientRadio() {
   // doesn't re-create the rAF closure (which would briefly drop a frame).
   const hiddenRef = useRef(false);
   const docHiddenRef = useRef(typeof document !== 'undefined' && document.hidden);
+  // Set by the render loop effect: requests one canvas frame (issue #197).
+  const kickRef = useRef<() => void>(() => {});
 
   const draggingRef = useRef(false);
   const dragMovedRef = useRef(false);
@@ -433,7 +440,7 @@ export function AmbientRadio() {
   // background. Costs ~0% when the user is doing anything else; saves a full
   // 60fps canvas paint when they alt-tab away.
   useEffect(() => {
-    const onVis = () => { docHiddenRef.current = document.hidden; };
+    const onVis = () => { docHiddenRef.current = document.hidden; kickRef.current(); };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
@@ -462,17 +469,33 @@ export function AmbientRadio() {
     const ctx = cvs.getContext('2d');
     if (!ctx) return;
     let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    // Frame budget (issue #197). Particles only move while a layer is
+    // playing, so a silent widget is a still picture: draw it once per state
+    // change instead of at the monitor refresh rate (~218 fps measured).
+    // While playing, draw on a RADIO_FRAME_MS timer that hands off to one rAF, so
+    // the page is not woken on every refresh just to skip it.
+    const isAnimating = (): boolean => playingRef.current && activeLayersRef.current.size > 0;
+    const isVisible = (): boolean => !hiddenRef.current && !docHiddenRef.current;
+
+    const loop = () => {
+      raf = 0;
+      if (!isVisible()) return; // redrawn by kick() when shown again
+      draw();
+      if (isAnimating() && timer === null) {
+        timer = setTimeout(() => {
+          timer = null;
+          if (raf === 0) raf = requestAnimationFrame(loop);
+        }, RADIO_FRAME_MS);
+      }
+    };
+    // Request one frame now (state changed, widget shown, playback started).
+    kickRef.current = () => {
+      if (raf === 0 && timer === null) raf = requestAnimationFrame(loop);
+    };
 
     const draw = () => {
-      // Skip the whole canvas pass when the widget is offscreen (collapsed
-      // chip / display:none) or the window is in the background. The rAF
-      // callback still re-arms itself so playback can resume the moment
-      // the widget reopens. macOS rAF runs at ~60Hz; without this gate we
-      // burned a full frame on a canvas the user couldn't see.
-      if (hiddenRef.current || docHiddenRef.current) {
-        raf = requestAnimationFrame(draw);
-        return;
-      }
       const active = activeLayersRef.current;
       const running = playingRef.current;
       const focused = focusedIdRef.current;
@@ -613,12 +636,18 @@ export function AmbientRadio() {
           el.style.opacity = running ? String(.4 + Math.abs(Math.sin(phase + i * .75)) * .6) : '0.15';
         });
       }
-
-      raf = requestAnimationFrame(draw);
     };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (timer !== null) clearTimeout(timer);
+      kickRef.current = () => {};
+    };
   }, []);
+
+  // Redraw on every state change that affects the picture; restarts the
+  // timed loop when playback starts or the widget becomes visible again.
+  useEffect(() => { kickRef.current(); }, [playing, focusedId, activeLayers, hidden]);
 
   useEffect(() => () => { audioEngine.stopAll(); ytStop(); }, []);
 
