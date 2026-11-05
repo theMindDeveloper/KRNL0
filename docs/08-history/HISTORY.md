@@ -1138,6 +1138,28 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 
 ---
 
+## [2026-11-05] — Idle CPU: frame budget for decorative animations
+
+**Type:** Performance
+**Issue:** #197
+**Branch:** `TMD/kernel-gpu-windows-usage-f9f3aa`
+**Files changed:** `renderer/utils/frameBudget.ts` (new), `renderer/index.tsx`, `AmbientRadio/index.tsx`, `docs/06-requirements/render-frame-budget.md` (new), `tests/unit/renderer/frameBudget.test.ts`
+**Summary:**
+- **Cause (measured over CDP on a copy of a real board, Pro theme):** the window rendered ~218 frames/s on a high-refresh monitor whenever any infinite CSS animation ran, and every frame costs CPU in the GPU process and the renderer. Idle cost ~2.2 cores (~25-28% of 8 cores in Task Manager); with animations stopped it was 0%. The silent radio widget also redrew an identical canvas every refresh.
+- **Frame budget:** every infinite CSS animation gets effect-level `steps()` timing (~30 updates/s) and its start time snapped to one shared 30 fps beat, so Chromium skips the frames where nothing changes and all animations change in the same frame. Keyframes, curves and durations are untouched; transitions, one-shot animations and `data-frame-budget="off"` subtrees keep full refresh.
+- **Radio:** draws once per state change while silent; while playing it draws on a ~60 fps timer (the speed its per-frame particle motion was tuned for) instead of the monitor rate.
+- **Result:** idle ~190-220% of a core -> ~27-30% (~3.5% in Task Manager), with every animation still moving.
+
+---
+
+## [2026-11-05] — v0.10.0 re-release (Nov 5 build)
+
+**Type:** Release
+**PRs:** #198 (idle CPU frame budget), #208 (bug batch), this release-notes PR
+**Summary:** The v0.10.0 tag moves to main with #198 and #208 merged, and the Windows installer is rebuilt locally in place of the Nov 3 build (same reason as Nov 3: the release workflow's Windows job can't build node-pty on the CI image). `docs/releases/v0.10.0.md` and the GitHub release gain an "Updated build (Nov 5)" section. Same version number, by the maintainer's choice.
+
+---
+
 ## [2026-11-05] — Time log: what you did, when, on what
 
 **Type:** Feature + UX
@@ -1150,3 +1172,4 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **Overviews:** Analytics **Time log** page (task × day heatmap, week/month, worked / plan, by tag on the days worked); Clock **▦ WEEK** (7 static 24-h rings sized to the panel; `krnl clock week`); Calendar month cells show hours; Todo rows "⏱ 1h20 / 30m"; task details show a timeline (per-day work, plan moves, completions).
 - **UX:** one popup for left and right click on recorded time (no duplicate menu); one compact searchable task/category picker (tasks first, categories as chips) for "name this span" and Counts toward; any done task can still collect time; estimate **0 = no set time** (row reads "open", `krnl task duration <ref> 0`); click the estimate to edit it; app open/close markers on Calendar and Clock; Orb "claude code" button in Claude orange.
 - **Verified in the real app** on a copy of the maintainer's board (week view, edit end time, log time here, + log past time, todo tracked figure, open marker, backfill).
+
