@@ -49,3 +49,15 @@ describe('estimate 0 = no set time', () => {
     expect(SysParser.parse(['task', 'duration', 'abcd', '0'])).toMatchObject({ kind: 'task', sub: 'duration', minutes: 0 });
   });
 });
+
+import { freeStretchWithin } from '../../../src/renderer/components/ui/LogTimeDial';
+
+describe('freeStretchWithin (Trim)', () => {
+  it('returns the longest free part of the selection', () => {
+    // 08:45–13:15 over a session 10:06–16:22 → 08:45–10:06
+    expect(freeStretchWithin([{ startMin: 606, endMin: 982 }], 525, 795)).toEqual({ startMin: 525, endMin: 606 });
+  });
+  it('null when the selection is fully covered', () => {
+    expect(freeStretchWithin([{ startMin: 500, endMin: 900 }], 600, 700)).toBeNull();
+  });
+});

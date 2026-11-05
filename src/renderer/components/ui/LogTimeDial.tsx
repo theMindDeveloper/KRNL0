@@ -1,12 +1,11 @@
 // #207 — "Log time" pieces (no clock face):
 //   LogTimeDayPicker  Today · Yesterday · ‹ Thu, Nov 5 ›
-//   LogTimeBar        the day as a 0–24 h strip: recorded sessions grey, the
-//                     selection bright; drag on it to pick a stretch, click a
-//                     grey-free part to start there (15-min snap, never past now)
+//   LogTimeBar        a thin 0–24 h picture of the day (view only): recorded
+//                     sessions grey, the stretch being added bright
 //   LogTimeQuickFill  duration chips (15m · 30m · 1h · 2h from the start) and
 //                     the day's gaps between sessions
 
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { selectPomoReality } from '../../store/pomoReality';
 import { ymdOf } from '../nodes/PomoNode/spanEdit';
@@ -85,55 +84,34 @@ export function LogTimeDayPicker({ dayYMD, onChange }: { dayYMD: string; onChang
   );
 }
 
-/** The day as a 0–24 h strip. Drag to pick a stretch (snaps to 15 min, stops at now). */
-export function LogTimeBar({ dayYMD, startHM, endHM, onChange }: {
+/** The day as a thin 0–24 h strip — a picture only: what's recorded (grey),
+ *  what you're adding (bright), now and the future (hatched). No input. */
+export function LogTimeBar({ dayYMD, startHM, endHM }: {
   dayYMD: string;
   startHM: string;
   endHM: string;
-  onChange: (startHM: string, endHM: string) => void;
 }): JSX.Element {
   const { spans, nowMin } = useDay(dayYMD);
-  const ref = useRef<HTMLDivElement>(null);
-  const drag = useRef<number | null>(null);
-  const cap = nowMin ?? DAY;
   const a = toMin(startHM);
   const bRaw = toMin(endHM);
-  const b = bRaw <= a ? DAY : bRaw; // past midnight: the strip shows it to 24:00
+  const b = bRaw <= a ? DAY : bRaw; // past midnight: shown to 24:00
   const pct = (m: number): string => `${(Math.max(0, Math.min(DAY, m)) / DAY) * 100}%`;
-  const minAt = (e: React.PointerEvent): number => {
-    const r = ref.current!.getBoundingClientRect();
-    const m = ((e.clientX - r.left) / r.width) * DAY;
-    return Math.max(0, Math.min(cap, Math.round(m / SNAP_MIN) * SNAP_MIN));
-  };
-  const set = (x: number, y: number): void => {
-    const lo = Math.min(x, y);
-    const hi = Math.min(cap, Math.max(x, y) === lo ? lo + SNAP_MIN : Math.max(x, y));
-    onChange(toHM(Math.min(lo, hi - 5)), toHM(hi));
-  };
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div
-        ref={ref}
-        data-testid="log-time-bar"
-        title="Drag to pick when you worked"
-        onPointerDown={(e) => { (e.currentTarget as Element).setPointerCapture(e.pointerId); const m = minAt(e); drag.current = m; set(m, m + 60); }}
-        onPointerMove={(e) => { if (drag.current !== null) set(drag.current, minAt(e)); }}
-        onPointerUp={() => { drag.current = null; }}
-        style={{ position: 'relative', height: 26, borderRadius: 6, background: 'var(--paper-2)', border: '1px solid var(--paper-3)', cursor: 'crosshair', touchAction: 'none', overflow: 'hidden' }}
-      >
-        {/* hour grid every 3 h */}
-        {Array.from({ length: 7 }).map((_, i) => (
-          <span key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: pct((i + 1) * 180), width: 1, background: 'var(--paper-3)' }} />
+    <div data-testid="log-time-bar" aria-hidden title="Your day: recorded (grey) and what you're adding (bright)"
+      style={{ display: 'flex', flexDirection: 'column', gap: 3, pointerEvents: 'none', userSelect: 'none' }}>
+      <div style={{ position: 'relative', height: 8, borderRadius: 4, background: 'var(--paper-2)', overflow: 'hidden' }}>
+        {nowMin !== null && <span style={{ position: 'absolute', top: 0, bottom: 0, left: pct(nowMin), right: 0, background: 'repeating-linear-gradient(45deg, transparent 0 3px, color-mix(in srgb, var(--ink-4) 22%, transparent) 3px 4px)' }} />}
+        {spans.map((s2, i) => (
+          <span key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: pct(s2.startMin), width: pct(s2.endMin - s2.startMin), background: 'var(--ink-3)', opacity: 0.6 }} />
         ))}
-        {/* the future (today) is out of reach */}
-        {nowMin !== null && <span style={{ position: 'absolute', top: 0, bottom: 0, left: pct(nowMin), right: 0, background: 'repeating-linear-gradient(45deg, transparent 0 4px, color-mix(in srgb, var(--ink-4) 18%, transparent) 4px 5px)' }} />}
-        {spans.map((s, i) => (
-          <span key={i} title="Already recorded" style={{ position: 'absolute', top: 4, bottom: 4, left: pct(s.startMin), width: `calc(${pct(s.endMin - s.startMin)})`, borderRadius: 3, background: 'var(--ink-3)', opacity: 0.55 }} />
-        ))}
-        <span data-testid="log-time-bar-selection" style={{ position: 'absolute', top: 2, bottom: 2, left: pct(a), width: `calc(${pct(b - a)})`, minWidth: 3, borderRadius: 4, background: 'var(--acid)', opacity: 0.9, boxShadow: '0 0 0 1px var(--acid)' }} />
-        {nowMin !== null && <span style={{ position: 'absolute', top: 0, bottom: 0, left: pct(nowMin), width: 2, background: 'var(--rust)' }} />}
+        <span data-testid="log-time-bar-selection" style={{ position: 'absolute', top: 0, bottom: 0, left: pct(a), width: pct(b - a), minWidth: 2, background: 'var(--acid)' }} />
+        {spans.map((s2, i) => {
+          const lo = Math.max(a, s2.startMin); const hi = Math.min(b, s2.endMin);
+          return hi > lo ? <span key={`o${i}`} style={{ position: 'absolute', top: 0, bottom: 0, left: pct(lo), width: pct(hi - lo), background: 'var(--rust)' }} /> : null;
+        })}
+        {nowMin !== null && <span style={{ position: 'absolute', top: 0, bottom: 0, left: pct(nowMin), width: 1.5, background: 'var(--rust)' }} />}
       </div>
-      <div style={{ position: 'relative', height: 10, fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-4)' }}>
+      <div style={{ position: 'relative', height: 9, fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--ink-4)' }}>
         {[0, 6, 12, 18, 24].map((h) => (
           <span key={h} style={{ position: 'absolute', left: pct(h * 60), transform: h === 0 ? 'none' : h === 24 ? 'translateX(-100%)' : 'translateX(-50%)' }}>{String(h).padStart(2, '0')}</span>
         ))}
@@ -168,4 +146,63 @@ export function LogTimeQuickFill({ dayYMD, startHM, onChange }: { dayYMD: string
       ))}
     </div>
   );
+}
+
+// ── Simple layout pieces (#207 — fewer options, easier to read) ────────────
+
+/** The longest free stretch inside [a, b] (minutes of the day), or null. Pure. */
+export function freeStretchWithin(spans: readonly DaySpanMin[], a: number, b: number): DaySpanMin | null {
+  let free: DaySpanMin[] = [{ startMin: a, endMin: b }];
+  for (const s of spans) {
+    free = free.flatMap((f) => {
+      if (s.endMin <= f.startMin || s.startMin >= f.endMin) return [f];
+      const out: DaySpanMin[] = [];
+      if (s.startMin > f.startMin) out.push({ startMin: f.startMin, endMin: s.startMin });
+      if (s.endMin < f.endMin) out.push({ startMin: s.endMin, endMin: f.endMin });
+      return out;
+    });
+  }
+  const best = free.filter((f) => f.endMin - f.startMin >= 5).sort((x, y) => (y.endMin - y.startMin) - (x.endMin - x.startMin))[0];
+  return best ? { startMin: Math.ceil(best.startMin), endMin: Math.floor(best.endMin) } : null;
+}
+
+/** ‹ Today › — one control for the day (Today / Yesterday / a date; never the future). */
+export function LogTimeDayStepper({ dayYMD, onChange }: { dayYMD: string; onChange: (ymd: string) => void }): JSX.Element {
+  const today = ymdOf(Date.now());
+  const [y, m, d] = dayYMD.split('-').map(Number) as [number, number, number];
+  const date = new Date(y, m - 1, d);
+  const label = dayYMD === today ? 'Today' : dayYMD === addDaysYMD(today, -1) ? 'Yesterday' : `${DOW[date.getDay()]}, ${MON[date.getMonth()]} ${date.getDate()}`;
+  const arrow = (disabled: boolean): React.CSSProperties => ({
+    width: 28, height: 28, borderRadius: 999, border: '1px solid var(--paper-3)', background: 'transparent',
+    color: 'var(--ink-2)', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.3 : 1, fontSize: 13,
+  });
+  return (
+    <div data-testid="log-time-day" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <button type="button" aria-label="Day before" style={arrow(false)} onClick={() => onChange(addDaysYMD(dayYMD, -1))}>‹</button>
+      <span data-testid="log-time-date" style={{ flex: 1, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{label}</span>
+      <button type="button" aria-label="Day after" style={arrow(dayYMD >= today)} disabled={dayYMD >= today} onClick={() => onChange(addDaysYMD(dayYMD, 1))}>›</button>
+    </div>
+  );
+}
+
+/** "Fill a gap" chips — at most two (the latest gaps of the day). */
+export function LogTimeGaps({ dayYMD, onChange }: { dayYMD: string; onChange: (startHM: string, endHM: string) => void }): JSX.Element | null {
+  const { spans, nowMin } = useDay(dayYMD);
+  const gaps = gapsOfDay(spans, nowMin).slice(-2);
+  if (gaps.length === 0) return null;
+  return (
+    <div data-testid="log-time-quick" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>Fill a gap:</span>
+      {gaps.map((g) => (
+        <button key={g.startMin} type="button" data-testid="log-time-gap" style={chip()} onClick={() => onChange(toHM(g.startMin), toHM(g.endMin))}>
+          {toHM(g.startMin)}–{toHM(g.endMin)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Recorded work of a day in minutes — for the Trim action. */
+export function useDaySpans(dayYMD: string): DaySpanMin[] {
+  return useDay(dayYMD).spans;
 }

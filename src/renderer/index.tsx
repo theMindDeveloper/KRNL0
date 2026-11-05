@@ -10,6 +10,7 @@ import './styles/reactflow-theme.css';
 import './styles/chassis.css';
 import '@xterm/xterm/css/xterm.css';
 import { installDockThemes } from './styles/dock-themes';
+import { installTaskColors } from './store/taskColors';
 import { installFrameBudget } from './utils/frameBudget';
 
 installGlobalErrorCapture();
@@ -18,6 +19,8 @@ installBoardSaveLogging();
 // defineDockTheme() pipeline. Inject before React renders so the canvas
 // paints themed on first frame, not on rehydration.
 installDockThemes();
+// #207 — every current task gets its own colour (kept in step with the board).
+installTaskColors();
 // Decorative infinite animations update ~30x/s instead of at the monitor
 // refresh rate — keeps every animation, cuts idle CPU ~5x (issue #197).
 installFrameBudget();

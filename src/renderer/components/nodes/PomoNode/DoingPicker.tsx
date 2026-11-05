@@ -72,7 +72,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
     );
   };
   const typedHit = q !== '' && (recents.some((c) => c.label.toLowerCase() === q) || tasks.some((t) => t.text.toLowerCase() === q));
-  const shownRecents = recents.filter((c) => !q || c.label.toLowerCase().includes(q)).slice(0, 3);
+  // #207 — no "Recent" list (it repeated the tasks); just tasks and categories.
   const shownOpen = openTasks.slice(0, 6);
   const cats = library.filter((t) => !q || t.label.toLowerCase().includes(q) || q.length > 0);
   const icon = (c: DoingChoice) => {
@@ -156,14 +156,12 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
             onChange={(e) => setTyped(e.target.value)}
             onKeyDown={(e) => {
               if (e.key !== 'Enter' || !typed.trim()) return;
-              const only = shownOpen.length + shownRecents.length === 1 ? (shownOpen[0] ? { label: shownOpen[0].text, tag: null, taskId: shownOpen[0].id } : shownRecents[0]) : null;
+              const only = shownOpen.length === 1 && shownOpen[0] ? { label: shownOpen[0].text, tag: null, taskId: shownOpen[0].id } : null;
               pick(only ?? { label: typed.trim(), tag: null, taskId: null });
             }}
             style={{ margin: '0 0 6px', padding: '7px 9px', background: 'var(--paper-2)', border: '1px solid var(--paper-3)', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 11, outline: 'none' }}
           />
           {q && !typedHit && row('new', { label: typed.trim(), tag: null, taskId: null }, 'pomo-now-new')}
-          {shownRecents.length > 0 && <span style={{ ...mono, padding: '6px 8px 2px' }}>Recent</span>}
-          {shownRecents.map((c, i) => row(`r-${i}`, c, `pomo-now-recent-${i}`))}
           {shownOpen.length > 0 && <span style={{ ...mono, padding: '8px 8px 2px' }}>Tasks</span>}
           {shownOpen.map((t) => row(`t-${t.id}`, { label: t.text, tag: null, taskId: t.id }, `pomo-now-task-${t.id}`))}
           {openTasks.length > shownOpen.length && <span style={{ ...mono, textTransform: 'none', letterSpacing: 0, padding: '0 8px' }}>+{openTasks.length - shownOpen.length} more — keep typing</span>}

@@ -9,7 +9,7 @@ import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskState, TaskKind } from '../TaskNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import type { TagDef } from '../../../../shared/tags/classify';
-import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
+import { toneVarForTask } from '../../../utils/taskColor';
 import { spanTone } from '../../../store/spanTags';
 import { wallHoursFromDayStart } from './wallHours';
 
@@ -179,7 +179,7 @@ export function planForDay(
       realStart: startH,
       realEnd: endH,
       name: info.text,
-      colorVar: TASK_TONE_VAR[colorForTask(p.taskId)],
+      colorVar: toneVarForTask(p.taskId),
       plannedMin: info.plannedMin,
       breakdown: p.breakdown,
       parallelGroupId: p.parallelGroupId,

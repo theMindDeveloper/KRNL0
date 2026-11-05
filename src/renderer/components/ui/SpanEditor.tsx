@@ -22,7 +22,7 @@ import { TimeField, parseTime } from './TimeField';
 import { AppSelect } from './AppSelect';
 import { Z } from './layers';
 import { TaskTagPicker } from './TaskTagPicker';
-import { LogTimeDayPicker, LogTimeBar, LogTimeQuickFill } from './LogTimeDial';
+import { LogTimeBar, LogTimeDayStepper, LogTimeGaps, freeStretchWithin, toHM, toMin, useDaySpans } from './LogTimeDial';
 import { SPACE, popupColumn } from './spacing';
 import { toneVarForTask } from '../../utils/taskColor';
 import { boardTagLibrary } from '../../store/spanTags';
@@ -278,6 +278,7 @@ export function LogTimeHost(): JSX.Element | null {
   const [day, setDay] = useState('');
   const [error, setError] = useState<string | null>(null);
   const pomo = usePomoState();
+  const daySpans = useDaySpans(day || ymdOf(Date.now()));
 
   useEffect(() => {
     const on = (e: Event): void => {
@@ -305,7 +306,12 @@ export function LogTimeHost(): JSX.Element | null {
     if (err) { setError(err); return; }
     setReq(null);
   };
-  const W = 340;
+  const W = 320;
+  // Overlap with recorded time → offer to trim to the free part.
+  const fit = problem && problem.startsWith('Overlaps') && times && !crossesMidnight
+    ? freeStretchWithin(daySpans, toMin(startHM), toMin(endHM))
+    : null;
+  const label: React.CSSProperties = { fontSize: 11, color: 'var(--ink-3)', width: 40, flexShrink: 0 };
 
   return createPortal(
     <>
@@ -322,26 +328,36 @@ export function LogTimeHost(): JSX.Element | null {
           ...popupColumn,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.inline }}>
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.04em' }}>Log time</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>work you didn't record</span>
+        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}>Log time you didn't record</span>
+        {/* #207 — simple: day, from/to, what it was for. The strip only shows it. */}
+        <LogTimeDayStepper dayYMD={day} onChange={(d2) => { setDay(d2); setError(null); }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.inline }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline }}>
+            <span style={label}>From</span>
+            <TimeField testId="log-time-start" value={startHM} onChange={(v) => { setStartHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline }}>
+            <span style={label}>To</span>
+            <TimeField testId="log-time-end" value={endHM} onChange={(v) => { setEndHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
+            {times && <span style={{ fontSize: 11, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>{durLabel(times.endMs - times.startMs)}{crossesMidnight ? ' · next day' : ''}</span>}
+          </div>
         </div>
-        {/* #207 — day, then the time: a strip of the day you can drag on, or type. */}
-        <LogTimeDayPicker dayYMD={day} onChange={(d2) => { setDay(d2); setError(null); }} />
-        <LogTimeBar dayYMD={day} startHM={startHM} endHM={endHM} onChange={setRange} />
+        <LogTimeBar dayYMD={day} startHM={startHM} endHM={endHM} />
+        <LogTimeGaps dayYMD={day} onChange={setRange} />
         <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline }}>
-          <TimeField testId="log-time-start" value={startHM} onChange={(v) => { setStartHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
-          <span style={{ color: 'var(--ink-4)' }}>→</span>
-          <TimeField testId="log-time-end" value={endHM} onChange={(v) => { setEndHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
-          {times && <span style={{ fontSize: 10, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{durLabel(times.endMs - times.startMs)}{crossesMidnight ? ' · +1 day' : ''}</span>}
-        </div>
-        <LogTimeQuickFill dayYMD={day} startHM={startHM} onChange={setRange} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.caption }}>
-          <span style={{ fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Counts toward</span>
+          <span style={label}>For</span>
           <TaskPickButton testId="log-time-task" value={taskId || null} onChange={(id) => setTaskId(id ?? '')} />
         </div>
-        {(error ?? problem) && <div role="alert" data-testid="log-time-problem" style={{ fontSize: 10, color: 'var(--rust)' }}>{error ?? problem}</div>}
+        {(error ?? problem) && (
+          <div role="alert" data-testid="log-time-problem" style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline, fontSize: 11, color: 'var(--rust)' }}>
+            <span style={{ flex: 1 }}>{error ?? problem}</span>
+            {fit && (
+              <button type="button" data-testid="log-time-trim" style={btn(false)} onClick={() => setRange(toHM(fit.startMin), toHM(fit.endMin))}>
+                Trim to {toHM(fit.startMin)}–{toHM(fit.endMin)}
+              </button>
+            )}
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: SPACE.inline }}>
           <button type="button" onClick={() => setReq(null)} style={btn(false)}>Cancel</button>
           <button type="button" data-testid="log-time-save" disabled={!!problem} onClick={save} style={btn(true, !!problem)}>
