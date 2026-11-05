@@ -35,17 +35,37 @@ jobs:
             asset_glob: |
               release/*.dmg
               release/*.dmg.blockmap
-          - os: windows-latest
+          # Pinned (Decision 36): windows-latest ships Visual Studio 2026
+          # ("18"), which @electron/rebuild's node-gyp rejects, so node-pty
+          # can't compile there. Move to windows-latest once node-gyp
+          # supports it.
+          - os: windows-2022
             label: Windows (x64)
             artifact: krnl0-windows-x64
             ebuild_args: --win --x64
+            # latest.yml is what installed apps read to find this update —
+            # it must ship with the .exe and .blockmap of the same build.
             asset_glob: |
               release/*.exe
               release/*.exe.blockmap
+              release/latest.yml
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Installed apps compare versions, not files: a tag that doesn't match
+      # package.json would publish a build no one is offered (or the same
+      # number twice). See docs/releases/RELEASING.md.
+      - name: Tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$PKG" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($PKG). Bump the version (npm version patch|minor --no-git-tag-version) and tag that."
+            exit 1
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -130,6 +150,19 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
+      # Only for the release notes file (docs/releases/<tag>.md), if written.
+      - name: Checkout release notes
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: docs/releases
+
+      - name: Pick release notes
+        id: notes
+        shell: bash
+        run: |
+          f="docs/releases/${GITHUB_REF_NAME}.md"
+          if [ -f "$f" ]; then echo "path=$f" >> "$GITHUB_OUTPUT"; else echo "path=" >> "$GITHUB_OUTPUT"; fi
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -144,6 +177,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
+          body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: true
           draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || 'true' }}
           fail_on_unmatched_files: true
@@ -152,3 +186,4 @@ jobs:
             dist-artifacts/*.dmg.blockmap
             dist-artifacts/*.exe
             dist-artifacts/*.exe.blockmap
+            dist-artifacts/latest.yml
