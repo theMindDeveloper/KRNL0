@@ -2269,6 +2269,56 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 
 /* ============================================================
+   Window swap by drag (motherDrag.ts) — the picked-up window dims,
+   the one under the pointer lights up with "Swap here", and both
+   settle in after the drop. Transform / opacity only.
+   ============================================================ */
+.mother-frame[data-mother-dragging='true'] {
+  opacity: 0.4;
+  transform: scale(0.97);
+  outline: 2px dashed color-mix(in srgb, var(--acid) 70%, transparent);
+  outline-offset: -2px;
+}
+.mother-frame[data-drop-target='true'],
+.mother-frame[data-swapped='true'] {
+  outline: 2px solid var(--acid);
+  outline-offset: -2px;
+}
+.mother-frame[data-drop-target='true'] {
+  box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--acid) 8%, transparent) !important;
+}
+.krnl-swap-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 50;
+  transform: translate(-50%, -50%);
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--acid);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mother-frame[data-mother-dragging='true'] {
+    transition: opacity 160ms ease, transform 160ms ease;
+  }
+  .krnl-swap-label {
+    animation: krnl-swap-pop 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+@keyframes krnl-swap-pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* ============================================================
    BLUEPRINT chassis — technical drafting board
    ============================================================
    Aesthetic: an engineering blueprint laid across the mother row.

@@ -26,7 +26,8 @@ import { rfToScreen, getZoom } from '../../../utils/viewportBus';
 // target in the other (when both happen to be live during a layout-mode
 // transition). The string is namespaced so it doesn't collide with stray
 // drag payloads from other apps or the canvas image-drop path.
-export const MOTHER_DRAG_MIME = 'application/x-krnl0-mother';
+import { MOTHER_DRAG_MIME, startMotherDrag, endMotherDrag, markDropTarget, leaveDropTarget, playSwap } from './motherDrag';
+export { MOTHER_DRAG_MIME };
 
 // Station mode mounts mother nodes inside resizable panels (ADR 0008). Each
 // mother component renders its own <MotherFrame width=540> internally; in
@@ -107,15 +108,21 @@ export function MotherFrame({
     if (!e.dataTransfer.types.includes(MOTHER_DRAG_MIME)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    markDropTarget(e.currentTarget as HTMLElement);
+  }, []);
+  const onDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(MOTHER_DRAG_MIME)) return;
+    leaveDropTarget(e.currentTarget as HTMLElement, e.relatedTarget);
   }, []);
   const onDrop = useCallback((e: React.DragEvent) => {
     const sourceId = e.dataTransfer.getData(MOTHER_DRAG_MIME);
-    if (!sourceId || sourceId === nodeId) return;
+    if (!sourceId || sourceId === nodeId) { endMotherDrag(); return; }
     e.preventDefault();
     e.stopPropagation();
     swapMotherSlots(sourceId, nodeId);
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
+    playSwap([sourceId, nodeId]);
   }, [nodeId, swapMotherSlots]);
 
   // Badge position tracking (canvas variant only) — pure arithmetic, no DOM reads.
@@ -175,6 +182,7 @@ export function MotherFrame({
       onMouseEnter={() => setHoveredNodeId(nodeId)}
       onMouseLeave={() => setHoveredNodeId(null)}
       onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
       onDrop={onDrop}
       style={{
         position: 'relative',
@@ -283,14 +291,14 @@ function MotherDragHandle({ nodeId }: { nodeId: string }) {
   const onDragStart = useCallback(
     (e: React.DragEvent) => {
       e.stopPropagation();
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData(MOTHER_DRAG_MIME, nodeId);
       (e.currentTarget as HTMLDivElement).dataset.dragging = 'true';
+      startMotherDrag(e, nodeId);
     },
     [nodeId],
   );
   const onDragEnd = useCallback((e: React.DragEvent) => {
     delete (e.currentTarget as HTMLDivElement).dataset.dragging;
+    endMotherDrag();
   }, []);
   const stop = useCallback((e: React.PointerEvent | React.MouseEvent) => {
     // RF reads unhandled pointerdown / mousedown as the start of a pan or

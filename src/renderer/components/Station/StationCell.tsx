@@ -21,6 +21,7 @@ import { useCallback } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { NODE_REGISTRY } from '../nodes/registry';
 import { MotherFrameStationContext, MOTHER_TOTAL, MOTHER_DRAG_MIME } from '../nodes/MotherFrame';
+import { startMotherDrag, endMotherDrag, playSwap } from '../nodes/MotherFrame/motherDrag';
 import { makeCommandHandler } from '../Canvas/commandDispatch';
 import { resolveStationSlot, SLOT_INDEX } from './SlotResolver';
 import type { StationSlot } from '../../../shared/types';
@@ -62,9 +63,10 @@ export function StationCell({ slot }: Props) {
   };
   const onDrop = (e: React.DragEvent) => {
     const sourceId = e.dataTransfer.getData(DRAG_MIME);
-    if (!sourceId || sourceId === node.id) return;
+    if (!sourceId || sourceId === node.id) { endMotherDrag(); return; }
     e.preventDefault();
     swapMotherSlots(sourceId, node.id);
+    playSwap([sourceId, node.id]);
   };
 
   return (
@@ -89,13 +91,14 @@ export function StationCell({ slot }: Props) {
 }
 
 function DragHandle({ nodeId }: { nodeId: string }) {
+  // The drag carries a picture of the whole window, not just this grip.
   const onDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData(DRAG_MIME, nodeId);
     (e.currentTarget as HTMLDivElement).dataset.dragging = 'true';
+    startMotherDrag(e, nodeId);
   };
   const onDragEnd = (e: React.DragEvent) => {
     delete (e.currentTarget as HTMLDivElement).dataset.dragging;
+    endMotherDrag();
   };
 
   return (
