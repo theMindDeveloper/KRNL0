@@ -22,6 +22,7 @@ import { BrandMark } from './BrandMark';
 import { CanvasSwitcher } from './CanvasSwitcher';
 import { CloseButton } from '../ui/CloseButton';
 import { Z } from '../ui/layers';
+import { UpdatesSection } from './UpdatesSection';
 
 type Theme = 'light' | 'dark';
 
@@ -343,6 +344,8 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
             })}
           </div>
         </div>
+
+        <UpdatesSection />
 
         <div
           style={{

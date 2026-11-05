@@ -11,6 +11,7 @@ import { BrowserWindow } from 'electron';
 import { SysFacade } from '../../sys/SysFacade';
 import type { CliDispatchFn } from '../../sys/SysFacade';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
+import { getUpdater } from '../updater';
 
 export interface RpcServer {
   socketPath: string;
@@ -100,12 +101,14 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
 
         chain = chain.then(async () => {
           const dispatch = getDispatch?.() ?? null;
+          const updater = getUpdater();
           const facade = new SysFacade({
             boardPath,
             hasOpenRenderer: () => BrowserWindow.getAllWindows().length > 0,
             onBoardChanged: notifyBoardChanged,
             viewSize: windowViewSize,
             ...(dispatch ? { cliDispatch: dispatch } : {}),
+            ...(updater ? { updater } : {}),
           });
           let result: { ok: boolean; message?: string; exitCode?: unknown; data?: unknown };
           try {

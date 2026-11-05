@@ -15,15 +15,31 @@
     "claude/**/*"
   ],
   "afterPack": "build/afterPack.js",
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "theMindDeveloper",
+      "repo": "KRNL0",
+      "releaseType": "release"
+    }
+  ],
   "mac": {
     "target": "dmg",
-    "icon": "build/icon.icns"
+    "icon": "build/icon.icns",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
   },
   "win": {
     "target": "nsis",
     "icon": "build/icon.ico"
   },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "differentialPackage": true,
+    "artifactName": "${productName}-Setup-${version}.${ext}"
+  },
   "linux": {
-    "target": "AppImage"
+    "target": "AppImage",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
   }
 }

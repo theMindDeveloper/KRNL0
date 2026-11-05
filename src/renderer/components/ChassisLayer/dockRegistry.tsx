@@ -217,7 +217,7 @@ export const DOCK_REGISTRY = defineRegistry({
   'krnl-dock': {
     id: 'krnl-dock',
     manifest: MANIFESTS['krnl-dock'],
-    label: 'KRNL Dock',
+    label: 'Nuclear',
     sublabel: 'Rack chassis',
     glyph: KRNL_DOCK_GLYPH,
     Chrome: KrnlDockChrome,

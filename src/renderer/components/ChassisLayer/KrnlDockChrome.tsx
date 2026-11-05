@@ -264,7 +264,7 @@ export function KrnlDockChrome() {
           </div>
         </div>
 
-        <div className="dk-badge dk-badge-top">KRNL · DOCK-A1</div>
+        <div className="dk-badge dk-badge-top">NUCLEAR · A1</div>
       </div>
 
       {/* ===== BOTTOM RAIL ===== */}
@@ -383,7 +383,7 @@ export function KrnlDockChrome() {
             <div className="dk-term-bar">
               <div className="dk-traffic"><span /><span /><span /></div>
               <div className="dk-term-title">
-                krnl-dock <span className="dk-dot">·</span> /var/log <span className="dk-dot">·</span> <span className="dk-live">live</span>
+                nuclear <span className="dk-dot">·</span> /var/log <span className="dk-dot">·</span> <span className="dk-live">live</span>
               </div>
               <div className="dk-term-stamp">rec</div>
             </div>

@@ -20,6 +20,7 @@ import { useStore } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
 import { Z } from '../ui/layers';
+import { primaryUpdateAction, useUpdateStore } from '../../store/updateStore';
 
 // Injected from package.json at build time (electron.vite.config.ts).
 const BOARD_VERSION = `v${typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'}`;
@@ -136,7 +137,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
         <StatusItem label="zoom" testId="statusbar-zoom">
           {zoomPct}%
         </StatusItem>
-        <StatusItem testId="statusbar-version">{BOARD_VERSION}</StatusItem>
+        <VersionItem />
       </div>
     </div>
   );
@@ -174,4 +175,37 @@ function StatusItem({ label, children, valueColor, testId }: StatusItemProps) {
       <span style={{ color: valueColor ?? 'var(--k-status-value, #d9d1b8)' }}>{children}</span>
     </span>
   );
+}
+
+/**
+ * Version, plus the update state when there is one (Decision 36, F4):
+ * `v0.10.0` · `v0.10.0 · ↓ 42%` · `v0.10.0 → 0.11.0` (clickable: restart or download).
+ */
+function VersionItem() {
+  const state = useUpdateStore((s) => s.state);
+  const action = primaryUpdateAction(state);
+  if (state?.status === 'downloading') {
+    return (
+      <StatusItem testId="statusbar-version">
+        {BOARD_VERSION} · ↓ {Math.round(state.percent ?? 0)}%
+      </StatusItem>
+    );
+  }
+  if (state && action) {
+    return (
+      <button
+        type="button"
+        data-testid="statusbar-version"
+        title={action.title}
+        onClick={() => { void action.run(); }}
+        style={{
+          all: 'unset', cursor: 'pointer', whiteSpace: 'nowrap',
+          color: 'var(--k-status-ok, var(--accent-on-dark))',
+        }}
+      >
+        {BOARD_VERSION} → {state.latestVersion}
+      </button>
+    );
+  }
+  return <StatusItem testId="statusbar-version">{BOARD_VERSION}</StatusItem>;
 }

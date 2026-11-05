@@ -279,6 +279,15 @@ krnl theme show                              # read; headless-capable
 krnl say "<text>" / krnl hear
 ```
 
+### App updates
+```
+krnl update [status] [--json]   # version + update state ("up to date", "0.11.0 is ready", …)
+krnl update check [--json]      # ask GitHub now; on Windows a newer version starts downloading
+krnl update install             # restart into a downloaded update (Windows) / open the download page (macOS)
+krnl update open                # open the release notes page
+```
+`update install` restarts the whole app, terminal included: say so and only run it when the user asked for it. A downloaded update also installs by itself when the user quits KRNL0.
+
 ---
 
 ## Working with IDs

@@ -28,6 +28,7 @@ import { isFrameStyleId } from '../../shared/frameStyles';
 import { radioControl } from '../components/AmbientRadio/radioControl';
 import { launchClaudeInTerminal } from './claudeLaunch';
 import { startTour } from '../components/Tour/TourHost';
+import { flushBeforeRestart } from './updateStore';
 
 export function useCliDispatch(): void {
   const store = useBoardStore;
@@ -40,6 +41,13 @@ export function useCliDispatch(): void {
       if (command === 'tour.start') {
         const ok = startTour(String(args['id'] ?? ''));
         bridge.cliDispatchReply!(id, ok, ok ? `Tour "${String(args['id'])}" started` : `No tour "${String(args['id'])}"`);
+        return;
+      }
+      // Decision 36 F7: main is about to quit to install an update.
+      if (command === 'app.flush') {
+        void flushBeforeRestart()
+          .then(() => bridge.cliDispatchReply!(id, true, 'flushed'))
+          .catch((e: unknown) => bridge.cliDispatchReply!(id, false, e instanceof Error ? e.message : String(e)));
         return;
       }
       // Async: waits for the terminal's shell before typing into it (#206).

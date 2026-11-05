@@ -1187,3 +1187,30 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - **No stretch on drop (same PR):** dropping no longer squashes a window to the other slot's shape for a moment: pictures keep their proportions and fade out mid-flight while the real windows, already at their new size, fade in underneath.
 - **Real cast shadow (same PR):** the moving light (it read as a glow) is gone. The held window casts a tight shadow — its own outline with the same tilt, offset by the movement — as a sharp contact shadow on the window under it and a small soft one on the background. Its strength is set from the measured brightness of the surface it falls on, so it reads on the light and dark themes and every window frame (strong on dark, gentle on light).
 - **Cast shadow removed (same PR):** the drag shadow experiments are taken out; holding a window keeps the 3D tilt, the empty-slot outline, "Swap here" and the quick, stretch-free drop.
+
+---
+
+## [2026-11-05] — App updates: notify + auto-update from GitHub Releases
+
+**Type:** Feature + CI
+**Issue:** #211 · Decision 36 · docs/06-requirements/app-updates.md
+**Branch:** `TMD/auto-update-launcher-github-59d480`
+**Files changed:** `src/main/updater/` (new: `UpdateService.ts`, `backends.ts`, `index.ts`), `src/shared/update.ts` (new), `src/sys/commands/update.ts` (new), `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, `src/main/index.ts`, `src/main/preload.ts`, `src/main/rpc/server.ts`, `src/main/ipc/handlers.ts`, `src/renderer/store/updateStore.ts` (new), `src/renderer/components/ui/UpdateNoticeBar.tsx` (new), `src/renderer/components/TopBar/UpdatesSection.tsx` (new), `TopBar/index.tsx`, `StatusBar/index.tsx`, `App.tsx`, `useCliDispatch.ts`, `env.d.ts`, `electron-builder.json`, `.github/workflows/release.yml`, `package.json` (`electron-updater ~6.1.8`), `AGENTS.md` (rule 11 + "Releases & updates"), `claude/CLAUDE.md`, `docs/releases/RELEASING.md` (new), `docs/03-architecture/decisions.md` (Decision 36), tests (5 new files, 78 tests)
+**Summary:**
+- **Installed apps update themselves from GitHub Releases (free).** Windows (NSIS): `electron-updater` checks ~15 s after start and every 4 h, downloads in the background (blockmap differential, sha512-verified), then shows "KRNL0 X.Y.Z is ready — Restart · Later"; Later installs silently on quit. macOS / Linux: notify-only via GitHub's `releases/latest` API ("is out — Download"), because Squirrel.Mac needs a paid Apple signature. Drafts and pre-releases are never offered.
+- **One state machine in main** (`UpdateService`, backend + timers injected) pushed to the window (`update:state`) and pulled on mount. Status bar version item (`v0.10.0 · ↓ 42%`, `v0.10.0 → 0.11.0`), Settings → Updates (state, Check now, Restart / Download, What's new), and `krnl update status|check|install|open`. Before a restart the window commits the focused edit and saves the camera (`app.flush`); a CLI install replies before the app quits.
+- **Off in dev builds and isolated worktrees** (`app.isPackaged`, `KRNL0_USER_DATA`); `KRNL0_DISABLE_UPDATES=1` turns it off, `KRNL0_UPDATES=notify` forces the notify check for trying the flow.
+- **Release pipeline fixed:** the Windows job failed on `windows-latest` (VS 2026 / node-gyp can't build node-pty), now pinned to `windows-2022`; `latest.yml` ships with the installer; asset names have no spaces (`KRNL0-Setup-X.Y.Z.exe` — GitHub had turned spaces into dots); CI fails when the tag isn't `package.json`'s version; `docs/releases/vX.Y.Z.md` becomes the release body.
+- **Release process written down** (AGENTS.md rule 11, docs/releases/RELEASING.md): patch for fixes, minor for feature releases, never reuse a version or move a published tag, Publish on the draft is the switch that ships it.
+- **Also fixed:** `SysFacade` dropped its `viewSize` dependency, so CLI-added nodes never used the visible-centre placement.
+- **Flaky test fixed (macOS CI):** `time.cli.test.ts` read "entries since `Date.now()`" right after a logging command; on a fast runner that command's `task.created` carried the same millisecond and was counted. Those windows now start at a position in the log instead of a timestamp.
+- **Verified:** local `electron-builder --win` writes `latest.yml` (url = `KRNL0-Setup-0.10.0.exe`), `resources/app-update.yml` (github, theMindDeveloper/KRNL0) and bundles `electron-updater`. Typecheck 0 errors; 195 files / 2098 tests green. Not yet verified: a real update end to end. Apps on v0.10.0 have no updater, so the first updater-enabled release is installed by hand once; automatic updates can be seen from the release after it.
+
+---
+
+## [2026-11-05] — Frame style "KRNL Dock" renamed to "Nuclear"
+
+**Type:** Chore (UI copy)
+**Branch:** `TMD/auto-update-launcher-github-59d480`
+**Files changed:** `src/shared/frameStyles.ts`, `src/renderer/components/ChassisLayer/dockRegistry.tsx`, `KrnlDockChrome.tsx`, `src/sys/SysFacade.ts`, `tests/unit/sys/theme.frame.test.ts`, `docs/06-requirements/theme-engine.md`, `docs/04-visual-system/chassis-cookbook.md`
+**Summary:** The frame style shown as "KRNL Dock" is now **Nuclear** in the style picker, on the frame's own nameplate (`NUCLEAR · A1`, log caption `nuclear · /var/log`) and in `krnl theme frames`. The id stays `krnl-dock`, so saved choices and scripts keep working. `krnl theme frame` now accepts a style's id or its shown name in any case (`nuclear`, `Paper`).

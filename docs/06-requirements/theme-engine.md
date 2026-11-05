@@ -2,7 +2,7 @@
 
 *Frame styles become full themes · Derived from ADR 0009 (frame-style theme engine) and the "KRNL0 Reimagined" design drafts*
 
-Today a frame style (Classic, Synthesizer, Telemetry, KRNL Dock, Blueprint, Macintosh, Submarine) only paints chrome around the mother row. The components inside look the same in every style, child nodes on the canvas never pick up a style's tokens, and about 80 colour literals inside components ignore themes entirely. This document specifies the engine that lets every frame style skin every component from one manifest, and adds a new **Pro** frame style. **Classic stays the default and keeps today's green look unchanged.**
+Today a frame style (Classic, Synthesizer, Telemetry, Nuclear (id `krnl-dock`), Blueprint, Macintosh, Submarine) only paints chrome around the mother row. The components inside look the same in every style, child nodes on the canvas never pick up a style's tokens, and about 80 colour literals inside components ignore themes entirely. This document specifies the engine that lets every frame style skin every component from one manifest, and adds a new **Pro** frame style. **Classic stays the default and keeps today's green look unchanged.**
 
 ---
 
