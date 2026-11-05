@@ -2270,8 +2270,9 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 
 /* ============================================================
    Window swap by drag (motherDrag.ts) — the picked-up window dims,
-   the one under the pointer lights up with "Swap here", and both
-   settle in after the drop. Transform / opacity only.
+   the one under the pointer lights up with "Swap here", and after the
+   drop the two windows fly to each other's place (pictures above
+   everything, then the real windows fade in). Transform / opacity only.
    ============================================================ */
 .mother-frame[data-mother-dragging='true'] {
   opacity: 0.4;
@@ -2279,8 +2280,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   outline: 2px dashed color-mix(in srgb, var(--acid) 70%, transparent);
   outline-offset: -2px;
 }
-.mother-frame[data-drop-target='true'],
-.mother-frame[data-swapped='true'] {
+.mother-frame[data-drop-target='true'] {
   outline: 2px solid var(--acid);
   outline-offset: -2px;
 }

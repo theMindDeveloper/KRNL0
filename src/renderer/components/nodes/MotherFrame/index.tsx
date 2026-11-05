@@ -26,7 +26,7 @@ import { rfToScreen, getZoom } from '../../../utils/viewportBus';
 // target in the other (when both happen to be live during a layout-mode
 // transition). The string is namespaced so it doesn't collide with stray
 // drag payloads from other apps or the canvas image-drop path.
-import { MOTHER_DRAG_MIME, startMotherDrag, endMotherDrag, markDropTarget, leaveDropTarget, playSwap } from './motherDrag';
+import { MOTHER_DRAG_MIME, startMotherDrag, endMotherDrag, markDropTarget, leaveDropTarget, animateSwap } from './motherDrag';
 export { MOTHER_DRAG_MIME };
 
 // Station mode mounts mother nodes inside resizable panels (ADR 0008). Each
@@ -119,10 +119,12 @@ export function MotherFrame({
     if (!sourceId || sourceId === nodeId) { endMotherDrag(); return; }
     e.preventDefault();
     e.stopPropagation();
-    swapMotherSlots(sourceId, nodeId);
-    const updated = useBoardStore.getState().board;
-    if (updated) void saveBoard(updated);
-    playSwap([sourceId, nodeId]);
+    // The two windows fly to each other's place.
+    animateSwap(sourceId, nodeId, () => {
+      swapMotherSlots(sourceId, nodeId);
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+    });
   }, [nodeId, swapMotherSlots]);
 
   // Badge position tracking (canvas variant only) — pure arithmetic, no DOM reads.

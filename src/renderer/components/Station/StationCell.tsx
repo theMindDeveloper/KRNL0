@@ -21,7 +21,7 @@ import { useCallback } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { NODE_REGISTRY } from '../nodes/registry';
 import { MotherFrameStationContext, MOTHER_TOTAL, MOTHER_DRAG_MIME } from '../nodes/MotherFrame';
-import { startMotherDrag, endMotherDrag, playSwap } from '../nodes/MotherFrame/motherDrag';
+import { startMotherDrag, endMotherDrag, animateSwap } from '../nodes/MotherFrame/motherDrag';
 import { makeCommandHandler } from '../Canvas/commandDispatch';
 import { resolveStationSlot, SLOT_INDEX } from './SlotResolver';
 import type { StationSlot } from '../../../shared/types';
@@ -65,8 +65,7 @@ export function StationCell({ slot }: Props) {
     const sourceId = e.dataTransfer.getData(DRAG_MIME);
     if (!sourceId || sourceId === node.id) { endMotherDrag(); return; }
     e.preventDefault();
-    swapMotherSlots(sourceId, node.id);
-    playSwap([sourceId, node.id]);
+    animateSwap(sourceId, node.id, () => swapMotherSlots(sourceId, node.id));
   };
 
   return (
