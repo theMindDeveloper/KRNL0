@@ -129,8 +129,8 @@ function layerFor(frame: HTMLElement): Layer {
 
 /** Fly a picture from one box to another (both in the layer's coordinates).
  *  One smooth ease-out move: it starts at full speed from where you let go
- *  and settles into place; a lifted picture's shadow sinks as it lands. */
-function fly(ghost: HTMLElement, from: Box, to: Box, lifted: boolean, startTilt = ''): Animation {
+ *  and settles into place. */
+function fly(ghost: HTMLElement, from: Box, to: Box, startTilt = ''): Animation {
   const dx = to.left + to.width / 2 - (from.left + from.width / 2);
   const dy = to.top + to.height / 2 - (from.top + from.height / 2);
   const sx = to.width / from.width;
@@ -138,14 +138,8 @@ function fly(ghost: HTMLElement, from: Box, to: Box, lifted: boolean, startTilt 
   ghost.style.transformOrigin = 'center';
   return ghost.animate(
     [
-      {
-        transform: `perspective(${PERSPECTIVE}px) translate(0px, 0px) ${startTilt || 'rotateX(0deg) rotateY(0deg)'} scale(1, 1)`,
-        boxShadow: lifted ? '0 22px 46px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)' : '0 6px 16px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.2)',
-      },
-      {
-        transform: `perspective(${PERSPECTIVE}px) translate(${dx}px, ${dy}px) rotateX(0deg) rotateY(0deg) scale(${sx}, ${sy})`,
-        boxShadow: '0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0)',
-      },
+      { transform: `perspective(${PERSPECTIVE}px) translate(0px, 0px) ${startTilt || 'rotateX(0deg) rotateY(0deg)'} scale(1, 1)` },
+      { transform: `perspective(${PERSPECTIVE}px) translate(${dx}px, ${dy}px) rotateX(0deg) rotateY(0deg) scale(${sx}, ${sy})` },
     ],
     { duration: FLY_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' },
   );
@@ -172,6 +166,98 @@ function swapInStore(a: string, b: string): void {
   if (board) void saveBoard(board);
 }
 
+// ── cast shadow ────────────────────────────────────────────────────────────
+// The held window casts its shadow on what is under it, lit from above the
+// middle of the screen. Two surfaces at two depths: the window you are over
+// is close (a sharper, nearer shadow, clipped to that window) and the
+// background is far (a softer shadow that sits further out, with a hole
+// where the window is). Moving the held window shifts the two by different
+// amounts — the parallax that reads as depth.
+//
+// Cost: each shadow is a plain blurred box drawn once (will-change:
+// transform); per frame only their transforms change, which the compositor
+// handles. The clip shapes change only when the window under you changes.
+
+interface CastShadow { root: HTMLElement; far: HTMLElement; nearClip: HTMLElement; near: HTMLElement; farClip: HTMLElement; surface: Box | null }
+
+const FAR = { k: 1.0, inset: 0.94, blur: 26, alpha: 0.34 };
+const NEAR = { k: 0.5, inset: 0.97, blur: 9, alpha: 0.5 };
+
+function makeCastShadow(base: Box): CastShadow {
+  const layer = (z: number): HTMLElement => {
+    const el = document.createElement('div');
+    Object.assign(el.style, { position: 'fixed', left: '0', top: '0', width: '100vw', height: '100vh', zIndex: String(z), pointerEvents: 'none', overflow: 'hidden' } satisfies Partial<CSSStyleDeclaration>);
+    return el;
+  };
+  const blob = (blur: number, alpha: number): HTMLElement => {
+    const el = document.createElement('div');
+    Object.assign(el.style, {
+      position: 'absolute', left: '0', top: '0', width: `${base.width}px`, height: `${base.height}px`,
+      borderRadius: '14px', background: `rgba(0,0,0,${alpha})`, filter: `blur(${blur}px)`,
+      transformOrigin: '0 0', willChange: 'transform',
+    } satisfies Partial<CSSStyleDeclaration>);
+    return el;
+  };
+  const root = document.createElement('div');
+  root.className = 'krnl-cast-shadow';
+  const farClip = layer(8999);
+  const far = blob(FAR.blur, FAR.alpha);
+  farClip.appendChild(far);
+  const nearClip = layer(9000);
+  nearClip.style.display = 'none';
+  nearClip.style.borderRadius = '8px';
+  const near = blob(NEAR.blur, NEAR.alpha);
+  nearClip.appendChild(near);
+  root.append(farClip, nearClip);
+  document.body.appendChild(root);
+  if (typeof root.animate === 'function') root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
+  return { root, far, near, nearClip, farClip, surface: null };
+}
+
+/** The window under the held one (or none): the near shadow falls on it,
+ *  the far one everywhere else. */
+function setShadowSurface(cs: CastShadow, r: Box | null): void {
+  cs.surface = r;
+  if (!r) {
+    cs.nearClip.style.display = 'none';
+    cs.farClip.style.clipPath = '';
+    return;
+  }
+  Object.assign(cs.nearClip.style, { display: 'block', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  const L = r.left; const T = r.top; const R = r.left + r.width; const B = r.top + r.height;
+  cs.farClip.style.clipPath =
+    `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${L}px ${T}px, ${R}px ${T}px, ${R}px ${B}px, ${L}px ${B}px, ${L}px ${T}px)`;
+}
+
+/** Place both shadows for the held window's box `hb` (untilted, on screen),
+ *  its scale `s` against the base size and its tilt. */
+function placeShadow(cs: CastShadow, hb: Box, s: number, rx: number, ry: number): void {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const cx = hb.left + hb.width / 2;
+  const cy = hb.top + hb.height / 2;
+  // Light above the middle of the screen: the shadow falls away from it,
+  // further the further out you carry the window; the tilt leans it too.
+  const ox = (cx - vw / 2) * 0.05 - ry * 1.2;
+  const oy = 34 + (cy - vh * 0.3) * 0.04 + rx * 0.8;
+  const put = (el: HTMLElement, d: { k: number; inset: number }, originX: number, originY: number): void => {
+    const sc = s * d.inset;
+    const x = hb.left + (hb.width - hb.width * d.inset) / 2 + ox * d.k - originX;
+    const y = hb.top + (hb.height - hb.height * d.inset) / 2 + oy * d.k - originY;
+    el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${sc})`;
+  };
+  put(cs.far, FAR, 0, 0);
+  if (cs.surface) put(cs.near, NEAR, cs.surface.left, cs.surface.top);
+}
+
+function dropShadow(cs: CastShadow): void {
+  const root = cs.root;
+  if (typeof root.animate === 'function') {
+    root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: 'ease-out', fill: 'forwards' }).onfinish = () => root.remove();
+  }
+  setTimeout(() => root.remove(), 320);
+}
+
 // ── holding a window ───────────────────────────────────────────────────────
 let holding = false;
 
@@ -192,7 +278,7 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
   // set at pick-up
   let source: HTMLElement | null = null;
   let ghost: HTMLElement | null = null;
-  let shadow: HTMLElement | null = null; // a soft shadow on the surface below it
+  let shadow: CastShadow | null = null; // cast on what is under the held window
   let origin: Box | null = null;
   let gx = 0; let gy = 0;           // grab point inside the window
   let s = 1; let sTarget = 1;       // hold scale
@@ -200,6 +286,7 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
   let lastX = startX; let lastY = startY;
   let raf = 0;
   let prevCursor = '';
+  let lastSurfaceEl: HTMLElement | null = null;
 
   const frameLoop = (): void => {
     if (!ghost) return;
@@ -214,10 +301,12 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     const dy = py - startY;
     ghost.style.transform =
       `translate3d(${dx}px, ${dy}px, 0) perspective(${PERSPECTIVE}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
-    // The shadow lies below and a little behind the tilt, like a card held
-    // above a desk. Only its transform changes (the blur is drawn once).
-    if (shadow) {
-      shadow.style.transform = `translate3d(${dx - ry * 1.2}px, ${dy + 24 + rx * 0.6}px, 0) scale(${s * 0.96})`;
+    if (shadow && origin) {
+      const hb: Box = {
+        left: origin.left + dx + gx * (1 - s), top: origin.top + dy + gy * (1 - s),
+        width: origin.width * s, height: origin.height * s,
+      };
+      placeShadow(shadow, hb, s, rx, ry);
     }
     raf = requestAnimationFrame(frameLoop);
   };
@@ -231,21 +320,9 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     gx = startX - origin.left;
     gy = startY - origin.top;
     sTarget = Math.min(1.03, Math.max(0.35, HOLD_MAX_W / origin.width));
-    shadow = document.createElement('div');
-    shadow.className = 'krnl-swap-shadow';
-    Object.assign(shadow.style, {
-      position: 'fixed', left: `${origin.left}px`, top: `${origin.top}px`,
-      width: `${origin.width}px`, height: `${origin.height}px`, zIndex: '9000',
-      borderRadius: '12px', background: 'rgba(0,0,0,0.55)', filter: 'blur(22px)',
-      pointerEvents: 'none', transformOrigin: `${gx}px ${gy}px`, willChange: 'transform',
-    } satisfies Partial<CSSStyleDeclaration>);
-    document.body.appendChild(shadow);
-    if (typeof shadow.animate === 'function') shadow.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
+    shadow = makeCastShadow(origin);
     ghost = ghostOf(source, origin, 9001, 'fixed');
-    Object.assign(ghost.style, {
-      transformOrigin: `${gx}px ${gy}px`, // tilts and shrinks around your hand
-      boxShadow: '0 2px 6px rgba(0,0,0,0.3)', // contact edge; the soft shadow is the element below
-    });
+    ghost.style.transformOrigin = `${gx}px ${gy}px`; // tilts and shrinks around your hand
     document.body.appendChild(ghost);
     source.dataset.motherDragging = 'true';
     document.body.dataset.motherDrag = 'true';
@@ -259,6 +336,11 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     const frame = under?.closest<HTMLElement>('.mother-frame[data-tour]') ?? null;
     if (frame && frame !== source) markDropTarget(frame);
     else if (currentTarget) { unmark(currentTarget); currentTarget = null; }
+    // Only when the window under you changes (cheap the rest of the time).
+    if (shadow && lastSurfaceEl !== currentTarget) {
+      setShadowSurface(shadow, currentTarget ? boxOf(currentTarget) : null);
+      lastSurfaceEl = currentTarget;
+    }
   };
 
   function cleanup(): void {
@@ -288,17 +370,11 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     };
     const layer = layerFor(src);
     endMotherDrag();
-    if (shadow) {
-      const sh = shadow;
-      if (typeof sh.animate === 'function') sh.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: 'ease-out', fill: 'forwards' }).onfinish = () => sh.remove();
-      setTimeout(() => sh.remove(), 300);
-      shadow = null;
-    }
+    if (shadow) { dropShadow(shadow); shadow = null; }
 
     // Re-seat the held picture in the flight layer, at the same place.
     held.style.transform = 'none';
     held.style.position = layer.position;
-    held.style.boxShadow = '';
     layer.host.appendChild(held);
     const heldLocal = layer.local(heldBox);
     setBox(held, heldLocal);
@@ -308,7 +384,7 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     if (!targetId || !other || still) {
       if (targetId) swapInStore(nodeId, targetId);
       // Back to its own slot (or, without motion, just gone).
-      const back = still || targetId ? null : fly(held, heldLocal, layer.local(from0), true, tilt);
+      const back = still || targetId ? null : fly(held, heldLocal, layer.local(from0), tilt);
       const done = (): void => land([src], [held]);
       if (back) back.finished.then(done, done); else done();
       return;
@@ -322,7 +398,7 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     const toB = layer.local(from0);     // the other → the slot you emptied
     const otherGhost = ghostOf(other, otherFrom, 9000, layer.position);
     layer.host.insertBefore(otherGhost, held); // under the held one
-    const flights = [fly(held, heldLocal, toA, true, tilt), fly(otherGhost, otherFrom, toB, false)];
+    const flights = [fly(held, heldLocal, toA, tilt), fly(otherGhost, otherFrom, toB)];
     swapInStore(nodeId, targetId);
 
     // Keep the real windows hidden under the pictures until they land.
