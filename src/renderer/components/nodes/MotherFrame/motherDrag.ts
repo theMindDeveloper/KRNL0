@@ -128,21 +128,32 @@ function layerFor(frame: HTMLElement): Layer {
 }
 
 /** Fly a picture from one box to another (both in the layer's coordinates).
- *  One smooth ease-out move: it starts at full speed from where you let go
- *  and settles into place. */
-function fly(ghost: HTMLElement, from: Box, to: Box, startTilt = ''): Animation {
+ *  One smooth ease-out move that starts at full speed from where you let go.
+ *  The picture keeps its proportions (it is never stretched to a slot of
+ *  another shape); with `crossfade` it fades out over the second half while
+ *  the real window, already laid out at its new size, fades in under it. */
+function fly(ghost: HTMLElement, from: Box, to: Box, startTilt = '', crossfade = false): Animation {
   const dx = to.left + to.width / 2 - (from.left + from.width / 2);
   const dy = to.top + to.height / 2 - (from.top + from.height / 2);
-  const sx = to.width / from.width;
-  const sy = to.height / from.height;
+  const k = Math.min(to.width / from.width, to.height / from.height); // fit, same proportions
   ghost.style.transformOrigin = 'center';
+  if (crossfade) {
+    ghost.animate([{ opacity: 1 }, { opacity: 1, offset: 0.4 }, { opacity: 0 }], { duration: FLY_MS, easing: 'ease-out', fill: 'forwards' });
+  }
   return ghost.animate(
     [
-      { transform: `perspective(${PERSPECTIVE}px) translate(0px, 0px) ${startTilt || 'rotateX(0deg) rotateY(0deg)'} scale(1, 1)` },
-      { transform: `perspective(${PERSPECTIVE}px) translate(${dx}px, ${dy}px) rotateX(0deg) rotateY(0deg) scale(${sx}, ${sy})` },
+      { transform: `perspective(${PERSPECTIVE}px) translate(0px, 0px) ${startTilt || 'rotateX(0deg) rotateY(0deg)'} scale(1)` },
+      { transform: `perspective(${PERSPECTIVE}px) translate(${dx}px, ${dy}px) rotateX(0deg) rotateY(0deg) scale(${k})` },
     ],
     { duration: FLY_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' },
   );
+}
+
+/** The real window fades in during the flight (from about a third of the way). */
+function fadeInDuring(f: HTMLElement): void {
+  f.style.opacity = '';
+  if (typeof f.animate !== 'function') return;
+  f.animate([{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }], { duration: FLY_MS, easing: 'ease-out' });
 }
 
 /** Real windows fade in under the pictures; the pictures go. */
@@ -185,13 +196,18 @@ function swapInStore(a: string, b: string): void {
 // changes.
 
 interface CastShadow {
-  root: HTMLElement; farClip: HTMLElement; far: HTMLElement; nearClip: HTMLElement; near: HTMLElement;
+  root: HTMLElement; light: HTMLElement; farClip: HTMLElement; far: HTMLElement; nearClip: HTMLElement; near: HTMLElement;
   origin: Box; surface: Box | null;
 }
 
+// A shadow is the absence of light: on a near-black theme a black shadow has
+// nothing to darken. So the held window carries a soft light that brightens
+// the surface around it a little, and the shadow is cast into that light.
+const LIGHT_PX = 1300;
+
 /** k: how far it trails; tilt: how strongly its shape follows the tilt. */
-const FAR = { k: 1.0, tilt: 1.35, inset: 0.93, blur: 18, alpha: 0.5 };
-const NEAR = { k: 0.6, tilt: 1.15, inset: 0.97, blur: 7, alpha: 0.62 };
+const FAR = { k: 1.0, tilt: 1.35, inset: 0.93, blur: 16, alpha: 0.72 };
+const NEAR = { k: 0.6, tilt: 1.15, inset: 0.97, blur: 6, alpha: 0.8 };
 
 function makeCastShadow(origin: Box, gx: number, gy: number): CastShadow {
   const layer = (z: number): HTMLElement => {
@@ -211,6 +227,14 @@ function makeCastShadow(origin: Box, gx: number, gy: number): CastShadow {
   };
   const root = document.createElement('div');
   root.className = 'krnl-cast-shadow';
+  const lightLayer = layer(8998);
+  const light = document.createElement('div');
+  Object.assign(light.style, {
+    position: 'absolute', left: `${-LIGHT_PX / 2}px`, top: `${-LIGHT_PX / 2}px`,
+    width: `${LIGHT_PX}px`, height: `${LIGHT_PX}px`, borderRadius: '50%', willChange: 'transform',
+    background: 'radial-gradient(closest-side, rgba(255,255,255,0.11), rgba(255,255,255,0.05) 55%, rgba(255,255,255,0) 100%)',
+  } satisfies Partial<CSSStyleDeclaration>);
+  lightLayer.appendChild(light);
   const farClip = layer(8999);
   const far = blob(FAR.blur, FAR.alpha);
   farClip.appendChild(far);
@@ -219,10 +243,10 @@ function makeCastShadow(origin: Box, gx: number, gy: number): CastShadow {
   nearClip.style.borderRadius = '8px';
   const near = blob(NEAR.blur, NEAR.alpha);
   nearClip.appendChild(near);
-  root.append(farClip, nearClip);
+  root.append(lightLayer, farClip, nearClip);
   document.body.appendChild(root);
   if (typeof root.animate === 'function') root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
-  return { root, farClip, far, nearClip, near, origin, surface: null };
+  return { root, light, farClip, far, nearClip, near, origin, surface: null };
 }
 
 /** The window under the held one (or none): the near shadow falls on it,
@@ -255,6 +279,7 @@ function placeShadow(cs: CastShadow, dx: number, dy: number, s: number, rx: numb
       `translate3d(${dx + ox * d.k}px, ${dy + oy * d.k}px, 0) perspective(${PERSPECTIVE}px) ` +
       `rotateX(${rx * d.tilt}deg) rotateY(${ry * d.tilt}deg) scale(${s * d.inset})`;
   };
+  cs.light.style.transform = `translate3d(${cx}px, ${cy + 30}px, 0)`; // the light is around your hand
   put(cs.far, FAR);
   if (cs.surface) put(cs.near, NEAR);
 }
@@ -401,23 +426,22 @@ export function beginHold(e: React.PointerEvent, nodeId: string): void {
     const toB = layer.local(from0);     // the other → the slot you emptied
     const otherGhost = ghostOf(other, otherFrom, 9000, layer.position);
     layer.host.insertBefore(otherGhost, held); // under the held one
-    const flights = [fly(held, heldLocal, toA, tilt), fly(otherGhost, otherFrom, toB)];
+    const flights = [fly(held, heldLocal, toA, tilt, true), fly(otherGhost, otherFrom, toB, '', true)];
     swapInStore(nodeId, targetId);
 
-    // Keep the real windows hidden under the pictures until they land.
+    // The real windows, already at their new size, fade in under the
+    // pictures during the flight — no moment where a window is the wrong shape.
+    for (const id of [nodeId, targetId]) { const f = frameOf(id); if (f) f.style.opacity = '0'; }
+    requestAnimationFrame(() => { // after React has drawn the swap
+      for (const id of [nodeId, targetId]) { const f = frameOf(id); if (f) fadeInDuring(f); }
+    });
     let landed = false;
-    const hide = (): void => {
-      if (landed) return;
-      for (const id of [nodeId, targetId]) { const f = frameOf(id); if (f) f.style.opacity = '0'; }
-    };
-    hide();
-    requestAnimationFrame(hide); // after React has drawn the swap
     const finish = (): void => {
       if (landed) return;
       landed = true;
-      const na = frameOf(nodeId);
-      const nb = frameOf(targetId);
-      land([na, nb].filter((f): f is HTMLElement => !!f), [held, otherGhost]);
+      for (const id of [nodeId, targetId]) { const f = frameOf(id); if (f) f.style.opacity = ''; }
+      held.remove();
+      otherGhost.remove();
     };
     Promise.all(flights.map((f) => f.finished)).then(finish, finish);
     setTimeout(finish, FLY_MS + 200); // never leave a window hidden
