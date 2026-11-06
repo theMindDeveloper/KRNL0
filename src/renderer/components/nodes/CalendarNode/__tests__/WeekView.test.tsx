@@ -435,7 +435,8 @@ describe('WeekView — early-morning task (PR #122 24h grid)', () => {
     expect(block?.textContent ?? '').not.toContain('↑');
     // Row height is 28px and the task starts at hour 3 → top = 3 * 28 = 84px.
     const style = (block as HTMLElement)?.style;
-    expect(style?.top).toBe('84px');
+    // + half the 3px gap kept between stacked blocks.
+    expect(style?.top).toBe('85.5px');
   });
 });
 

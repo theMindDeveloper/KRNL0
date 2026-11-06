@@ -161,7 +161,7 @@ describe('B2 — Inline ETA edit', () => {
     renderTaskNode(makeTaskState({ plannedMin: 60, durationMin: 25, eta: '~25 min' }));
     const eta = document.querySelector('.task-eta') as HTMLElement;
     // plannedMin=60 wins over eta='~25 min'
-    expect(eta?.textContent).toBe('~60 min');
+    expect(eta?.textContent).toBe('1h');
   });
 });
 

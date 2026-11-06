@@ -18,7 +18,7 @@ import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange, selectSchedule } from '../../../store/scheduleSelector';
 import { packLanes } from '../../../store/laneLayout';
-import { layoutDayBlocks, BLOCK_TEXT_INSET } from './dayBlockLayout';
+import { layoutDayBlocks, BLOCK_TEXT_INSET, LANE_CAP, MIN_LANE_PX } from './dayBlockLayout';
 import { AppSelect } from '../../ui/AppSelect';
 import { SpanTimeEditor, CountsToward, openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
 import { SPACE, popupColumn } from '../../ui/spacing';
@@ -220,6 +220,26 @@ interface WeekViewProps {
 const GUTTER_WIDTH = 36; // px — time gutter width
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
 const MIN_BLOCK_PX = 14; // px — a planned block is never thinner than one text line
+/** Space between two blocks that touch in time. */
+const BLOCK_GAP = 3;
+
+const CAL_ICONS = {
+  up: 'M12 19V5M6 11l6-6 6 6',
+  down: 'M12 5v14M6 13l6 6 6-6',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
+  replan: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
+  prev: 'M15 5l-7 7 7 7',
+  next: 'M9 5l7 7-7 7',
+  grid: 'M4 4h16v16H4zM4 9.5h16M4 15h16M9.5 4v16',
+} as const;
+
+function CalIcon({ name, size = 11 }: { name: keyof typeof CAL_ICONS; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={CAL_ICONS[name]} />
+    </svg>
+  );
+}
 
 type HabitScheduleKind = 'weekly' | 'daily';
 
@@ -233,7 +253,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // A thin strip in every view: a wide labelled rail read as extra task
   // blocks next to the plan. Minutes live in the hover / click popup.
   // Pomo spans are background highlights now, so blocks need no rail gutter.
-  const rail = singleDay ? '12px' : '7px';
+  // The recorded rail's lane: inset from the day line, then the plan blocks.
+  const rail = singleDay ? '14px' : '10px';
   const [layers, setLayers] = useState<CalLayers>(readLayers);
   const toggleLayer = (k: keyof CalLayers): void => {
     setLayers((cur) => { const next = { ...cur, [k]: !cur[k] }; writeLayers(next); return next; });
@@ -744,7 +765,19 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // Today: start a little before now (what's next matters most).
       target = Math.max(0, now.getHours() * 60 + now.getMinutes() - 90);
     }
-    el.scrollTop = Math.max(0, Math.floor((target - 20) / 60) * rowHeight);
+    // Open on a whole hour (the last page too — the browser would stop
+    // mid-hour) and never on a block cut in half: step back to its start.
+    const maxHour = Math.max(0, Math.floor((el.scrollHeight - el.clientHeight) / rowHeight));
+    let hour = Math.min(maxHour, Math.max(0, Math.floor((target - 20) / 60)));
+    for (let moved = true; moved && hour > 0;) {
+      moved = false;
+      for (const ymd of weekDays) {
+        for (const sl of slicesByDay.get(ymd) ?? []) {
+          if (sl.sliceStartMin < hour * 60 && sl.sliceEndMin > hour * 60) { hour = Math.floor(sl.sliceStartMin / 60); moved = true; }
+        }
+      }
+    }
+    el.scrollTop = hour * rowHeight;
     setGridTop(el.scrollTop);
   }, [baseYMD, dayCount, weekDays, slicesByDay, rowHeight]);
 
@@ -1011,7 +1044,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const dayLayout = layoutDayBlocks(
       slices.map((sl) => ({ id: sl.task.id, startMin: sl.sliceStartMin, endMin: sl.sliceEndMin, slice: sl })),
       rawLayout,
-      planPx,
+      planPx - (singleDay ? 14 : 10),
+      MIN_LANE_PX,
+      singleDay ? LANE_CAP.day : LANE_CAP.week,
     );
     const colLayout = dayLayout.placements;
     const hiddenIds = dayLayout.hidden;
@@ -1225,14 +1260,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // How much text fits: measured column width × this block's lanes.
       // Unmeasured (tests / first paint) counts as roomy.
       const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-      const railNum = singleDay ? 12 : 7;
+      const railNum = singleDay ? 14 : 10;
       const widthPx = ((colPx - railNum) * span) / colCount - 3;
-      // A narrow parallel lane shows its title vertically so every block
-      // stays identifiable; only a tiny block goes label-less.
+      // Text is never rotated: a lane too narrow for a title is a plain bar
+      // (its name is in the tooltip); short blocks show the title on one line.
       const detail: 'none' | 'vertical' | 'title' | 'full' =
-        heightPx < 14 ? 'none'
-        : widthPx < 34 ? (widthPx >= 12 && heightPx >= 36 ? 'vertical' : 'none')
-        : widthPx < 110 || heightPx < 32 ? 'title' : 'full';
+        heightPx < 14 || widthPx < 34 ? 'none'
+        : widthPx < 110 || heightPx < 40 ? 'title' : 'full';
 
       return (
         <div
@@ -1251,23 +1285,24 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             (isMissed ? ' · missed' : '') +
             (isContinuation ? ' (continued from previous day)' : '')
           }
+          className="cal-block"
           style={{
             position: 'absolute',
-            top: topPx,
-            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 4px)`,
+            // A fixed gap between stacked blocks so back-to-back tasks never
+            // read as one slab.
+            top: topPx + BLOCK_GAP / 2,
+            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 2px)`,
             right: `calc((100% - ${rail}) * ${rightFrac} + 3px)`,
-            height: heightPx,
+            height: Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP),
             // Calm by default: a tinted card with a solid colour edge. Done
             // fades; missed is a lighter tint; overrun is a rust strip on the
             // right edge (drawn below) — states that survive any block size.
             // No set time: the block fades out at the bottom (open-ended).
             background: task.timeOpen
               ? `linear-gradient(to bottom, color-mix(in srgb, ${taskTone} 28%, var(--paper)) 0%, color-mix(in srgb, ${taskTone} 14%, transparent) 55%, transparent 100%)`
-              : `color-mix(in srgb, ${taskTone} ${isMissed ? 12 : 24}%, var(--paper))`,
+              : `color-mix(in srgb, ${taskTone} ${isMissed || isDone ? 11 : 24}%, var(--paper))`,
             // Soft full outline in the task colour (no left accent strip).
-            border: isMissed && !isContinuation
-              ? `1.5px dashed color-mix(in srgb, ${taskTone} 70%, var(--ink-3))`
-              : `1px solid color-mix(in srgb, ${taskTone} ${task.timeOpen ? 35 : 55}%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${taskTone} ${task.timeOpen || isMissed || isDone ? 35 : 55}%, transparent)`,
             ...(task.timeOpen ? { borderBottomColor: 'transparent' } : {}),
             borderTopLeftRadius,
             borderTopRightRadius,
@@ -1277,7 +1312,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             overflow: 'hidden',
             zIndex: 2,
             padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : 0,
-            opacity: isGrayed ? 0.45 : 1,
+            opacity: 1,
             boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
             display: 'flex',
             flexDirection: 'column',
@@ -1290,56 +1325,19 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           {/* Continuation arrows — ↑ on continuation slices, ↓ on slices that
               spill into the next day. */}
           {isContinuation && detail !== 'none' && (
-            <span
-              style={{
-                position: 'absolute',
-                top: 1,
-                left: 2,
-                fontSize: 9,
-                color: 'var(--acid-ink, var(--acid))',
-                fontFamily: 'var(--font-mono)',
-                lineHeight: 1,
-                pointerEvents: 'none',
-              }}
-            >
-              ↑
+            <span aria-hidden style={{ position: 'absolute', top: 3, left: 3, color: 'var(--ink-3)', lineHeight: 0, pointerEvents: 'none' }}>
+              <CalIcon name="up" />
             </span>
           )}
           {hasContinuation && detail !== 'none' && (
-            <span
-              style={{
-                position: 'absolute',
-                bottom: 1,
-                right: 2,
-                fontSize: 9,
-                color: 'var(--acid-ink, var(--acid))',
-                fontFamily: 'var(--font-mono)',
-                lineHeight: 1,
-                pointerEvents: 'none',
-              }}
-            >
-              ↓
+            <span aria-hidden title="Continues tomorrow" style={{ position: 'absolute', bottom: 3, right: 3, color: 'var(--ink-3)', lineHeight: 0, pointerEvents: 'none' }}>
+              <CalIcon name="down" />
             </span>
           )}
-          {/* #171 — completed marker. A done task shows a ✓ so it reads as
-              "finished" rather than just "greyed", distinguishing it from an
-              overrun (elapsed-but-undone) block which carries no checkmark. */}
-          {isDone && !isContinuation && detail === 'full' && (
-            <span
-              data-testid={`task-done-check-${task.id}`}
-              style={{
-                position: 'absolute',
-                top: 1,
-                right: 3,
-                fontSize: 9,
-                fontWeight: 700,
-                color: 'var(--acid-ink, var(--acid))',
-                fontFamily: 'var(--font-mono)',
-                lineHeight: 1,
-                pointerEvents: 'none',
-              }}
-            >
-              ✓
+          {/* #171 — a done task shows a check, so it reads as finished. */}
+          {isDone && !isContinuation && detail !== 'none' && (
+            <span data-testid={`task-done-check-${task.id}`} aria-hidden style={{ position: 'absolute', top: detail === 'full' ? 4 : '50%', transform: detail === 'full' ? undefined : 'translateY(-50%)', right: 4, color: 'var(--acid-ink, var(--acid))', lineHeight: 0, pointerEvents: 'none' }}>
+              <CalIcon name="check" />
             </span>
           )}
           {/* Decision 28 §6 — work/break sub-regions.
@@ -1395,32 +1393,21 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           )}
           {/* Label — only what fits (see `detail`). Everything else is in the
               hover title and the click popup. */}
-          {detail === 'vertical' && (
-            <span
-              style={{
-                fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 600, color: 'var(--ink)',
-                writingMode: 'vertical-rl', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                position: 'absolute', top: 4, bottom: 4, left: '50%', transform: 'translateX(-50%)',
-                pointerEvents: 'none', zIndex: 1, lineHeight: 1,
-              }}
-            >
-              {task.text}
-            </span>
-          )}
           {(detail === 'title' || detail === 'full') && (
             <span
               style={{
                 fontFamily: 'var(--font-sans)',
                 fontSize: detail === 'full' ? 11.5 : 10,
                 fontWeight: 600,
-                color: 'var(--ink)',
+                color: isDone ? 'var(--ink-2)' : 'var(--ink)',
+                textDecoration: 'none',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 display: 'block',
                 minWidth: 0,
-                paddingLeft: isContinuation ? 10 : 0,
-                paddingRight: isDone && detail === 'full' ? 12 : 0,
+                paddingLeft: isContinuation ? 12 : 0,
+                paddingRight: isDone || (isMissed && !isContinuation) ? 16 : 0,
                 pointerEvents: 'none',
                 position: 'relative',
                 zIndex: 1,
@@ -1432,6 +1419,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           )}
           {detail === 'full' && (
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
+              {isMissed && !isContinuation && <span style={{ color: 'var(--ink-2)', fontWeight: 600 }}>Missed · </span>}
               {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : `${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)}`}
               {startNote && <span data-testid={`task-start-delta-${task.id}`}>{startNote}</span>}
               {overrunMin > 0
@@ -1444,31 +1432,24 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               block the question too. REPLAN shows how to drag it. */}
           {/* Only where it fits beside the title: in a small block the dashed
               outline says "missed" and the click popup offers the move. */}
-          {isMissed && !isContinuation && heightPx >= 30 && widthPx >= 120 && (
-            <>
-              {detail === 'full' && widthPx >= 170 && (
-                <span style={{ position: 'relative', zIndex: 1, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)', whiteSpace: 'nowrap', pointerEvents: 'none' }}>didn't happen? drag it to a new time</span>
-              )}
-              <button
-                type="button"
-                className="nodrag"
-                data-testid={`task-replan-${task.id}`}
-                title="Didn't happen? Replan it"
-                aria-label={`Replan ${task.text}`}
-                draggable={false}
-                onClick={(e) => { e.stopPropagation(); showPlanGuide({ mode: 'replan', taskId: task.id, text: task.text }); }}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  position: 'absolute', top: 2, right: 2, zIndex: 4,
-                  height: 16, minWidth: 16, padding: widthPx >= 90 ? '0 6px' : 0, borderRadius: 999, cursor: 'pointer', lineHeight: 1,
-                  border: '1px solid var(--acid-ink, var(--acid))', background: 'var(--paper)', color: 'var(--acid-ink, var(--acid))',
-                  fontFamily: 'var(--font-mono)', fontSize: 8.5, letterSpacing: '0.06em',
-                  boxShadow: '0 0 8px color-mix(in srgb, var(--acid) 35%, transparent)',
-                }}
-              >
-                {widthPx >= 90 ? '↻ REPLAN' : '↻'}
-              </button>
-            </>
+          {isMissed && !isContinuation && detail !== 'none' && (
+            <button
+              type="button"
+              className="nodrag cal-replan"
+              data-testid={`task-replan-${task.id}`}
+              title="Didn't happen? Replan it"
+              aria-label={`Replan ${task.text}`}
+              draggable={false}
+              onClick={(e) => { e.stopPropagation(); showPlanGuide({ mode: 'replan', taskId: task.id, text: task.text }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute', top: detail === 'full' ? 3 : '50%', transform: detail === 'full' ? undefined : 'translateY(-50%)', right: 3, zIndex: 4,
+                width: 18, height: 18, padding: 0, borderRadius: 5, cursor: 'pointer', display: 'grid', placeItems: 'center',
+                border: 0, background: 'var(--paper)', color: 'var(--ink-2)',
+              }}
+            >
+              <CalIcon name="replan" />
+            </button>
           )}
           {/* Overrun at any size: a rust strip on the right edge. */}
           {overrunMin > 0 && !isContinuation && (
@@ -1622,7 +1603,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           <div style={{ position: 'relative', paddingLeft: 14, minWidth: 0 }}>
             <span aria-hidden style={{ position: 'absolute', left: 2, top: 5, width: 7, height: 7, borderRadius: 999, background: it.tone }} />
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.25, wordBreak: 'break-word' }}>
-              {it.done ? '✓ ' : ''}{it.title}
+              {it.done && <span style={{ color: 'var(--acid-ink, var(--acid))', marginRight: 4, display: 'inline-block', verticalAlign: '-1px' }}><CalIcon name="check" size={10} /></span>}{it.title}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 3, fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)' }}>
               <span>{it.habit ? `habit · ${fmtDur(it.plannedMin)}` : `${fmtDur(it.plannedMin)} planned`}</span>
@@ -1693,7 +1674,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           onClick={() => setLayoutPref('grid')}
           style={{ marginTop: 10, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer' }}
         >
-          ▦ time grid
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><CalIcon name="grid" size={11} />Time grid</span>
         </button>
       </div>
     );
@@ -1758,17 +1739,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             // beside the plan, never on top of it. A break is a gap.
             position: 'absolute',
             top: topPx + 1,
-            left: 2,
-            width: `calc(${rail} - 4px)`,
+            left: singleDay ? 5 : 4,
+            width: singleDay ? 4 : 3,
             height: Math.max(2, heightPx - 2),
             pointerEvents: 'none',
             zIndex: 1,
             borderRadius: 999,
             background: isWork ? tone : 'transparent',
-            boxShadow: isWork
-              ? (seg.live ? `0 0 0 2px color-mix(in srgb, ${tone} 35%, transparent)` : 'none')
-              : `inset 0 0 0 1px color-mix(in srgb, var(--ink-3) 45%, transparent)`,
-            opacity: isWork ? 1 : 0.7,
+            // A break draws nothing: it is the gap in the rail (hover keeps its title).
+            boxShadow: isWork && seg.live ? `0 0 0 2px color-mix(in srgb, ${tone} 35%, transparent)` : 'none',
           }}
         />
       );
@@ -1902,8 +1881,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={navBtnStyle}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          aria-label="Previous"
         >
-          ←
+          <CalIcon name="prev" size={13} />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
           <span
@@ -2018,8 +1998,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={navBtnStyle}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          aria-label="Next"
         >
-          →
+          <CalIcon name="next" size={13} />
         </button>
       </div>
 
@@ -2166,7 +2147,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             // inside still overflow below (they have explicit rowHeight each),
             // but separator lines are tied to col height. Setting minHeight
             // matches scrollHeight and lets the overlay span the full grid.
-            minHeight: rowCount * rowHeight,
+            // Plus the part of an hour the panel shows past the last whole
+            // hour, so every page (the last too) starts on a whole hour.
+            minHeight: rowCount * rowHeight + (gridH > 0 ? gridH % rowHeight : 0),
           }}
         >
           {/* Day-separator lines overlay — absolute layer sized to the full
@@ -2505,7 +2488,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 {spanTitle(realityPopup.seg, 'Focus session')}
               </span>
               {realityPopup.seg.live && (
-                <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em' }}>◆ LIVE</span>
+                <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 3 }}><span aria-hidden style={{ width: 5, height: 5, borderRadius: 999, background: 'currentColor' }} />LIVE</span>
               )}
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>tracked reality</span>

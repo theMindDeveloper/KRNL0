@@ -3,9 +3,10 @@
 //
 // The lane packer (store/laneLayout.ts) puts every task of an overlap cluster
 // side by side. In a narrow week column that makes 4–5 parallel tasks thin,
-// unreadable slivers. Up to MIN_SIDE_BY_SIDE parallel tasks always sit side by
-// side (each block stays visible and clickable, a narrow one shows its title
-// vertically). Beyond that, lanes are capped at what fits at a readable width:
+// unreadable slivers (and sideways text). So: two parallel tasks always sit
+// side by side; beyond that, lanes are what fits at a readable width, capped
+// per view (week 2, day 4 — LANE_CAP). Text is never rotated.
+// Over the cap:
 //   - lanes ≥ 2: the first (maxLanes − 1) lanes show; the rest collapse into a
 //     chip in the last lane.
 //   - lanes = 1 (a column narrower than two readable lanes): lane 0 shows at
@@ -18,7 +19,9 @@
 /** Narrowest lane that still carries a readable, ellipsized title. */
 export const MIN_LANE_PX = 64;
 /** Parallel tasks that always get their own lane, however narrow the column. */
-export const MIN_SIDE_BY_SIDE = 4;
+export const MIN_SIDE_BY_SIDE = 2;
+/** Most lanes a day column shows: the week is an overview, the day has room. */
+export const LANE_CAP = { week: 2, day: 4 } as const;
 /** Padding between block text and the block edge (both sides). */
 export const BLOCK_TEXT_INSET = 4;
 
@@ -61,8 +64,9 @@ export function layoutDayBlocks<T extends DayBlockSlice>(
   raw: ReadonlyMap<string, LanePlacement>,
   planPx: number,
   minLanePx = MIN_LANE_PX,
+  cap: number = LANE_CAP.day,
 ): DayBlockLayout<T> {
-  const maxLanes = Math.max(MIN_SIDE_BY_SIDE, readableLaneCount(planPx, minLanePx));
+  const maxLanes = Math.max(MIN_SIDE_BY_SIDE, Math.min(cap, readableLaneCount(planPx, minLanePx)));
   const placements = new Map<string, LanePlacement>();
   const hiddenSlices: T[] = [];
   for (const sl of slices) {
@@ -98,6 +102,23 @@ export function layoutDayBlocks<T extends DayBlockSlice>(
     leftFrac: compact ? 0 : (maxLanes - 1) / maxLanes,
     compact,
   }));
+
+  // Widen each visible block over the lanes to its right that stay free for
+  // its whole time — the chip's lane is only taken where hidden tasks are.
+  const byId = new Map(slices.map((sl) => [sl.id, sl] as const));
+  const overlaps = (a: DayBlockSlice, s0: number, e0: number) => a.startMin < e0 && s0 < a.endMin;
+  for (const [id, pl] of placements) {
+    if (pl.colCount !== maxLanes) continue;
+    const me = byId.get(id)!;
+    let span = 1;
+    for (let lane = pl.colIndex + 1; lane < maxLanes; lane++) {
+      const taken = [...placements].some(([oid, op]) => oid !== id && op.colIndex <= lane && lane < op.colIndex + (oid === id ? 1 : op.span) && overlaps(byId.get(oid)!, me.startMin, me.endMin))
+        || (lane === maxLanes - 1 && overflow.some((o) => o.slices.some((h) => overlaps(h, me.startMin, me.endMin))));
+      if (taken) break;
+      span++;
+    }
+    placements.set(id, { ...pl, span });
+  }
 
   return { maxLanes, placements, hidden: new Set(hiddenSlices.map((s) => s.id)), overflow };
 }
