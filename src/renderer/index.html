@@ -7,11 +7,79 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Geist:wght@300;400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Geist:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
       rel="stylesheet"
     />
+    <!-- Startup splash (launch-experience.md F1–F3). Plain HTML so it paints
+         before any script loads; src/renderer/splash.ts fills it in and
+         removes it the moment the board is on screen. -->
+    <style>
+      #boot-splash { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center;
+        background: #0e0d0b; font-family: 'JetBrains Mono', ui-monospace, monospace; color: #f4efe2;
+        -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; transition: opacity 220ms cubic-bezier(.32,.72,0,1); -webkit-app-region: drag; }
+      #boot-splash.is-out { opacity: 0; pointer-events: none; }
+      .bs-card { width: 720px; height: 450px; max-width: calc(100vw - 32px); background: #1b1a13; border-radius: 14px; overflow: hidden;
+        display: flex; flex-direction: column; box-shadow: inset 0 0 0 1px #2f2b24, 0 24px 60px rgba(0,0,0,.45); }
+      .bs-main { flex: 1; display: flex; min-height: 0; }
+      .bs-art { width: 312px; flex-shrink: 0; position: relative; overflow: hidden; }
+      .bs-art img { position: absolute; width: 400px; height: 400px; left: -36px; top: 4px; object-fit: cover; transition: opacity 300ms; }
+      .bs-body { flex: 1; min-width: 0; padding: 48px 40px 32px 8px; display: flex; flex-direction: column; gap: 24px; }
+      .bs-label { font-size: 10.5px; line-height: 16px; letter-spacing: .12em; text-transform: uppercase; color: #b3aa94; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .bs-word { display: flex; align-items: center; gap: 6px; font-size: 64px; line-height: 1; font-weight: 800; letter-spacing: -.035em; }
+      .bs-zero { display: inline-block; width: 28px; height: 48px; border: 7px solid #c9f158; border-radius: 999px; margin-left: 2px; }
+      .bs-tag { font-size: 13px; line-height: 20px; color: #ddd6c6; }
+      .bs-steps { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #d4cfc0; }
+      .bs-step { display: flex; align-items: center; gap: 10px; min-height: 18px; }
+      .bs-step > i { font-style: normal; color: #c9f158; }
+      .bs-step > b { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+      .bs-step > u { flex: 1; border-bottom: 1px dotted #3a352c; text-decoration: none; min-width: 12px; }
+      .bs-step > em { font-style: normal; color: #c9f158; white-space: nowrap; }
+      .bs-step > em.wait { color: #8f8572; animation: bsBlink 1.1s steps(2, end) infinite; }
+      .bs-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+      .bs-bar { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 3px; }
+      .bs-bar > span { height: 8px; border-radius: 2px; background: #2f2b24; transition: background 160ms; }
+      .bs-bar > span.on { background: #c9f158; }
+      .bs-meta { display: flex; justify-content: space-between; font-size: 11.5px; line-height: 16px; color: #b3aa94; }
+      .bs-status { height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 24px; background: #131210;
+        box-shadow: inset 0 1px 0 #2f2b24; font-size: 10.5px; letter-spacing: .1em; color: #8f8572; text-transform: uppercase; white-space: nowrap; }
+      .bs-status > span:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+      @keyframes bsBlink { 50% { opacity: .25; } }
+      @media (max-width: 760px) { .bs-art { display: none; } .bs-body { padding-left: 32px; } }
+      @media (prefers-reduced-motion: reduce) { .bs-step > em.wait { animation: none; } #boot-splash { transition: none; } }
+    </style>
   </head>
   <body>
+    <div id="boot-splash" role="status" aria-live="polite" aria-label="Opening KRNL0">
+      <div class="bs-card">
+        <div class="bs-main">
+          <div class="bs-art"><img id="bs-cube" src="./assets/launch/cube-dark.webp" alt="" /></div>
+          <div class="bs-body">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <span class="bs-label" id="bs-kicker">◆ Booting</span>
+              <div class="bs-word">KRNL<span class="bs-zero" aria-hidden="true"></span></div>
+              <span class="bs-tag">plan the day. watch it happen.</span>
+            </div>
+            <div class="bs-steps" id="bs-steps">
+              <div class="bs-step" data-step="board"><i>›</i><b>board.json</b><u></u><em class="wait">···</em></div>
+            </div>
+            <div class="bs-foot">
+              <div class="bs-bar" id="bs-bar" role="progressbar" aria-label="Opening your board" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10"></div>
+              <div class="bs-meta"><span id="bs-what">opening your board</span><span id="bs-time"></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="bs-status"><span id="bs-path">~/Documents/KRNL0</span><span style="color: #c9f158;">● Local</span><span style="margin-left: auto;">Free · source on GitHub</span></div>
+      </div>
+    </div>
+    <script>
+      // The pocket timer loads this same page: it never shows the splash.
+      if (new URLSearchParams(location.search).get('pocket') === '1') {
+        var s = document.getElementById('boot-splash'); if (s) s.remove();
+      } else {
+        var bar = document.getElementById('bs-bar');
+        for (var i = 0; i < 30; i++) { var seg = document.createElement('span'); if (i < 3) seg.className = 'on'; bar.appendChild(seg); }
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   </body>

@@ -91,4 +91,36 @@ contextBridge.exposeInMainWorld('krnl', {
     ipcRenderer.on('update:state', listener)
     return () => { ipcRenderer.removeListener('update:state', listener) }
   },
+
+  // Decision 37 — pocket timer. Main window side: send the Pomo snapshot, run
+  // the pocket's buttons. Pocket side: read the snapshot, send a button.
+  pocketSendState: (snapshot: unknown) => ipcRenderer.send('pocket:state', snapshot),
+  onPocketRun: (callback: (command: string) => void) => {
+    const listener = (_event: unknown, command: string) => callback(command)
+    ipcRenderer.on('pocket:run', listener)
+    return () => { ipcRenderer.removeListener('pocket:run', listener) }
+  },
+  pocketGet: (): Promise<unknown> => ipcRenderer.invoke('pocket:get'),
+  onPocketSnapshot: (callback: (snapshot: unknown) => void) => {
+    const listener = (_event: unknown, snapshot: unknown) => callback(snapshot)
+    ipcRenderer.on('pocket:snapshot', listener)
+    return () => { ipcRenderer.removeListener('pocket:snapshot', listener) }
+  },
+  onPocketPrefs: (callback: (prefs: unknown) => void) => {
+    const listener = (_event: unknown, prefs: unknown) => callback(prefs)
+    ipcRenderer.on('pocket:prefs', listener)
+    return () => { ipcRenderer.removeListener('pocket:prefs', listener) }
+  },
+  pocketCommand: (command: string): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:command', command),
+  pocketOpenMain: () => ipcRenderer.send('pocket:open'),
+  pocketCollapse: (collapsed: boolean) => ipcRenderer.send('pocket:collapse', collapsed),
+  pocketResize: (height: number) => ipcRenderer.send('pocket:resize', height),
+  pocketSettingsGet: (): Promise<unknown> => ipcRenderer.invoke('pocket:settings:get'),
+  pocketSettingsSet: (on: boolean): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:settings:set', on),
+
+  // Decision 38 — launch experience: version, backup, time away, app prefs.
+  appLaunch: (): Promise<unknown> => ipcRenderer.invoke('app:launch'),
+  appPrefsSet: (patch: unknown): Promise<unknown> => ipcRenderer.invoke('app:prefs:set', patch),
+  appBackupsOpen: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('app:backups:open'),
+  appOpenExternal: (url: string): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('app:open-external', url),
 })

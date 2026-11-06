@@ -9,6 +9,11 @@ import { TOURS } from '../renderer/components/Tour/tours';
 const EOL = String.fromCharCode(10);
 import { timeLog, timeReport } from './commands/time';
 import * as habit from './commands/habit';
+import * as miniCmd from './commands/mini';
+import * as launchCmd from './commands/launch';
+import type { CatchupBoard } from '../renderer/launch/catchup';
+import type { AppStatePort } from '../shared/appState';
+import type { PocketPort } from '../shared/pocket';
 import * as todo from './commands/todo';
 import * as task from './commands/task';
 import * as boardCmd from './commands/board';
@@ -82,6 +87,10 @@ export interface SysFacadeDeps {
   viewSize?: () => { width: number; height: number } | null;
   /** Decision 36: the app's updater (main only; absent in tests / headless). */
   updater?: UpdaterPort;
+  /** Decision 37: the floating pocket timer (main only; absent in tests / headless). */
+  pocket?: PocketPort;
+  /** Decision 38: launch info and app prefs (main only; absent in tests / headless). */
+  appState?: AppStatePort;
 }
 
 function defaultBoardPath(): string {
@@ -128,8 +137,43 @@ export class SysFacade {
       ...(deps?.cliDispatch ? { cliDispatch: deps.cliDispatch } : {}),
       ...(deps?.viewSize ? { viewSize: deps.viewSize } : {}),
       ...(deps?.updater ? { updater: deps.updater } : {}),
+      ...(deps?.pocket ? { pocket: deps.pocket } : {}),
+      ...(deps?.appState ? { appState: deps.appState } : {}),
     };
     this.version = readVersion();
+  }
+
+  /** Opens something in the window, or explains that it needs one. */
+  private inWindow(command: string, args: Record<string, unknown>): Promise<SysResult> | SysResult {
+    if (!this.deps.hasOpenRenderer() || !this.deps.cliDispatch) {
+      return { ok: false, message: "This opens in the KRNL0 window — run it in KRNL0's terminal with the app open.", data: { exitCode: 2 } };
+    }
+    return this.deps.cliDispatch(command, args);
+  }
+
+  private async runLaunch(command: Extract<SysCommand, { kind: 'whatsnew' | 'feedback' | 'catchup' | 'share' | 'app' }>): Promise<SysResult> {
+    const board = (): CatchupBoard => {
+      const b = loadBoardFrom(this.deps.boardPath) as Partial<CatchupBoard> | null;
+      return { nodes: b?.nodes ?? [], edges: b?.edges ?? [] };
+    };
+    switch (command.kind) {
+      case 'whatsnew':
+        return command.sub === 'show' ? this.inWindow('whatsnew.show', {}) : launchCmd.whatsnewPrint(command.json);
+      case 'feedback':
+        if (command.link || !this.deps.hasOpenRenderer() || !this.deps.cliDispatch) return launchCmd.feedbackLink(command.title, command.feedbackKind);
+        return this.inWindow('feedback.open', { title: command.title, kind: command.feedbackKind ?? 'bug' });
+      case 'catchup':
+        return command.sub === 'show' ? this.inWindow('catchup.show', {}) : launchCmd.catchupPrint(board(), command.json);
+      case 'share':
+        if (command.sub === 'list') return launchCmd.shareList(board().nodes, command.json);
+        return this.inWindow('share.show', command.sub === 'streak' ? { kind: 'streak', habit: command.habit ?? '' } : { kind: 'sessions' });
+      case 'app': {
+        const port = this.deps.appState;
+        if (!port) return { ok: false, message: 'This belongs to the running KRNL0 app — run it in its terminal.', data: { exitCode: 2 } };
+        if (command.sub === 'celebrations') return launchCmd.appCelebrations(port, command.on);
+        return command.sub === 'backups' ? launchCmd.appBackups(port, command.json) : launchCmd.appStatus(port, command.json);
+      }
+    }
   }
 
   /** light / dark as the open window shows it; undefined when headless.
@@ -300,6 +344,26 @@ export class SysFacade {
         case 'install': return updateCmd.updateInstall(updater);
         case 'open':    return updateCmd.updateOpen(updater);
       }
+    }
+
+    // ── Floating pocket timer (Decision 37) ─────────────────────────────────
+    if (command.kind === 'mini') {
+      const pocket = this.deps.pocket;
+      if (!pocket) {
+        return { ok: false, message: 'The floating timer belongs to the running KRNL0 app — run this in its terminal.', data: { exitCode: 2 } };
+      }
+      switch (command.sub) {
+        case 'status': return miniCmd.miniStatus(pocket, command.json);
+        case 'show':   return miniCmd.miniShow(pocket);
+        case 'hide':   return miniCmd.miniHide(pocket);
+        case 'on':     return miniCmd.miniSetEnabled(pocket, true);
+        case 'off':    return miniCmd.miniSetEnabled(pocket, false);
+      }
+    }
+
+    // ── Launch experience (Decision 38) ───────────────────────────────────────
+    if (command.kind === 'whatsnew' || command.kind === 'feedback' || command.kind === 'catchup' || command.kind === 'share' || command.kind === 'app') {
+      return this.runLaunch(command);
     }
 
     if (command.kind === 'whoami') {

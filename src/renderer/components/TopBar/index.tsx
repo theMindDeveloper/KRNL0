@@ -23,6 +23,9 @@ import { CanvasSwitcher } from './CanvasSwitcher';
 import { CloseButton } from '../ui/CloseButton';
 import { Z } from '../ui/layers';
 import { UpdatesSection } from './UpdatesSection';
+import { PocketSection } from './PocketSection';
+import { BackupsSection, CelebrationsSection } from './LaunchSettings';
+import { HelpMenu } from '../Launch/HelpMenu';
 
 type Theme = 'light' | 'dark';
 
@@ -75,6 +78,12 @@ export function TopBar() {
   const [dockStyle, setDockStyle] = useDockStyle();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const rf = useReactFlow();
+  // Help › Check for updates and What's new › Show me open Settings.
+  useEffect(() => {
+    const open = (): void => setSettingsOpen(true);
+    window.addEventListener('krnl:open-settings', open);
+    return () => window.removeEventListener('krnl:open-settings', open);
+  }, []);
 
   // Some dock skins declare themselves dark-only (see dockRegistry.theme).
   // Hide the theme toggle while one is selected and force the global theme
@@ -218,6 +227,7 @@ export function TopBar() {
         <LayoutModeToggle />
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
         <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
+        <HelpMenu />
         <TopBarButton label="⚙" onClick={() => setSettingsOpen(true)} testId="topbar-settings" />
       </div>
 
@@ -266,6 +276,8 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
         style={{
           width: 380,
           maxWidth: '90vw',
+          maxHeight: 'calc(100vh - 48px)',
+          overflowY: 'auto',
           background: 'var(--paper)',
           border: '1px solid var(--paper-3)',
           borderRadius: 10,
@@ -345,7 +357,10 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
           </div>
         </div>
 
+        <PocketSection />
+        <CelebrationsSection />
         <UpdatesSection />
+        <BackupsSection />
 
         <div
           style={{

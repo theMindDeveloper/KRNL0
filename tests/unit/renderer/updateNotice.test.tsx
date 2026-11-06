@@ -77,7 +77,7 @@ describe('UpdateNoticeBar (F2, F3)', () => {
     useUpdateStore.setState({ state: ready });
     render(<UpdateNoticeBar />);
     expect(screen.getByTestId('update-notice').textContent).toContain('KRNL0 0.11.0 is ready');
-    expect(screen.getByTestId('update-notice-action').textContent).toBe('Restart');
+    expect(screen.getByTestId('update-notice-action').textContent).toBe('Restart now');
   });
 
   it('offers Download on notify-only platforms', () => {
@@ -134,7 +134,8 @@ describe('Status bar version item (F4)', () => {
     render(<StatusBar />);
     expect(screen.getByTestId('statusbar-version').textContent).toMatch(/^v\d+\.\d+\.\d+$/);
     act(() => useUpdateStore.setState({ state: { ...ready, status: 'downloading', percent: 42 } }));
-    expect(screen.getByTestId('statusbar-version').textContent).toContain('↓ 42%');
+    expect(screen.getByTestId('statusbar-version').textContent).toContain('42%');
+    expect(screen.getByTestId('statusbar-version').textContent).toContain('↓ 0.11.0');
     act(() => useUpdateStore.setState({ state: ready }));
     expect(screen.getByTestId('statusbar-version').textContent).toContain('→ 0.11.0');
     expect(screen.getByTestId('statusbar-version').tagName).toBe('BUTTON');

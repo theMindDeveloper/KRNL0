@@ -29,6 +29,9 @@ import { radioControl } from '../components/AmbientRadio/radioControl';
 import { launchClaudeInTerminal } from './claudeLaunch';
 import { startTour } from '../components/Tour/TourHost';
 import { flushBeforeRestart } from './updateStore';
+import { openFeedback, openWelcomeBack, openWhatsNew, showMilestone, todayYMD } from '../launch/launchStore';
+import { shareCardFor } from '../launch/milestones';
+import { isFeedbackKind } from '../../shared/feedback';
 
 export function useCliDispatch(): void {
   const store = useBoardStore;
@@ -55,6 +58,32 @@ export function useCliDispatch(): void {
         void launchClaudeInTerminal(args['bypass'] === true)
           .then((r) => bridge.cliDispatchReply!(id, r.ok, r.message))
           .catch((e: unknown) => bridge.cliDispatchReply!(id, false, e instanceof Error ? e.message : String(e)));
+        return;
+      }
+      // Decision 38 — launch experience surfaces (krnl whatsnew show, feedback, catchup show, share).
+      if (command === 'whatsnew.show') {
+        const shown = openWhatsNew();
+        bridge.cliDispatchReply!(id, shown, shown ? "What's new is open in the window" : 'No release notes in this build');
+        return;
+      }
+      if (command === 'feedback.open') {
+        openFeedback(isFeedbackKind(args['kind']) ? args['kind'] : 'bug', String(args['title'] ?? ''));
+        bridge.cliDispatchReply!(id, true, 'Send feedback is open in the window. Nothing is sent until the user posts it on GitHub.');
+        return;
+      }
+      if (command === 'catchup.show') {
+        const shown = openWelcomeBack(true, null);
+        bridge.cliDispatchReply!(id, shown, shown ? 'Welcome back is open in the window' : 'The board is not loaded yet');
+        return;
+      }
+      if (command === 'share.show') {
+        const board = store.getState().board;
+        const habit = String(args['habit'] ?? '');
+        const card = board
+          ? shareCardFor(board.nodes, todayYMD(), args['kind'] === 'sessions' ? { kind: 'sessions' } : { kind: 'streak', habit })
+          : null;
+        if (card) showMilestone(card);
+        bridge.cliDispatchReply!(id, card !== null, card ? `Card open in the window: ${card.value} ${card.kind === 'streak' ? `days · ${card.habit}` : 'focus sessions'}` : habit ? `No habit called "${habit}"` : 'No habits yet');
         return;
       }
       let ok = false;

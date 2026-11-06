@@ -72,6 +72,19 @@ export type SysCommand =
   | { kind: 'info'; json: boolean }
   | { kind: 'update'; sub: 'status' | 'check'; json: boolean }
   | { kind: 'update'; sub: 'install' | 'open' }
+  | { kind: 'mini'; sub: 'status'; json: boolean }
+  | { kind: 'mini'; sub: 'show' | 'hide' | 'on' | 'off' }
+  // Decision 38 — launch experience
+  | { kind: 'whatsnew'; sub: 'print'; json: boolean }
+  | { kind: 'whatsnew'; sub: 'show' }
+  | { kind: 'feedback'; title: string; feedbackKind: string | undefined; link: boolean }
+  | { kind: 'catchup'; sub: 'print'; json: boolean }
+  | { kind: 'catchup'; sub: 'show' }
+  | { kind: 'share'; sub: 'streak'; habit: string | undefined }
+  | { kind: 'share'; sub: 'sessions' }
+  | { kind: 'share'; sub: 'list'; json: boolean }
+  | { kind: 'app'; sub: 'status' | 'backups'; json: boolean }
+  | { kind: 'app'; sub: 'celebrations'; on: boolean | undefined }
   | { kind: 'settings'; sub: 'show'; json: boolean }
   | { kind: 'settings'; sub: 'mode'; mode: string | undefined }
   | { kind: 'settings'; sub: 'layout'; layout: string | undefined }
@@ -315,6 +328,55 @@ export class SysParser {
       if (sub === 'status' || sub === 'check') return { kind: 'update', sub, json: hasFlag(rest, 'json') };
       if (sub === 'install' || sub === 'open') return { kind: 'update', sub };
       return { kind: 'invalid', message: `Unknown subcommand: update ${sub}. Try: update status | check | install | open` };
+    }
+
+    // Decision 37 — the floating pocket timer. Bare `mini` (or `mini --json`) = status.
+    if (cmd === 'mini') {
+      if (sub === undefined || sub.startsWith('--')) {
+        return { kind: 'mini', sub: 'status', json: hasFlag([sub ?? '', ...rest], 'json') };
+      }
+      if (sub === 'status') return { kind: 'mini', sub, json: hasFlag(rest, 'json') };
+      if (sub === 'show' || sub === 'hide' || sub === 'on' || sub === 'off') return { kind: 'mini', sub };
+      return { kind: 'invalid', message: `Unknown subcommand: mini ${sub}. Try: mini status | show | hide | on | off` };
+    }
+
+    // Decision 38 — launch experience (launch-experience.md F7, F15, F19, F23, F24).
+    if (cmd === 'whatsnew') {
+      if (sub === undefined || sub.startsWith('--')) return { kind: 'whatsnew', sub: 'print', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'show') return { kind: 'whatsnew', sub: 'show' };
+      return { kind: 'invalid', message: `Unknown subcommand: whatsnew ${sub}. Try: whatsnew [--json] | whatsnew show` };
+    }
+    if (cmd === 'feedback') {
+      const args = [sub ?? '', ...rest].filter((a) => a !== '');
+      const words: string[] = [];
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i]!;
+        if (a === '--kind') { i++; continue; }
+        if (a.startsWith('--')) continue;
+        words.push(a);
+      }
+      return { kind: 'feedback', title: words.join(' '), feedbackKind: flag(args, 'kind'), link: hasFlag(args, 'link') };
+    }
+    if (cmd === 'catchup') {
+      if (sub === undefined || sub.startsWith('--')) return { kind: 'catchup', sub: 'print', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'show') return { kind: 'catchup', sub: 'show' };
+      return { kind: 'invalid', message: `Unknown subcommand: catchup ${sub}. Try: catchup [--json] | catchup show` };
+    }
+    if (cmd === 'share') {
+      if (sub === undefined || sub === 'list' || sub.startsWith('--')) return { kind: 'share', sub: 'list', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'streak') return { kind: 'share', sub: 'streak', habit: rest.filter((a) => !a.startsWith('--')).join(' ') || undefined };
+      if (sub === 'sessions') return { kind: 'share', sub: 'sessions' };
+      return { kind: 'invalid', message: `Unknown subcommand: share ${sub}. Try: share list | share streak ["habit"] | share sessions` };
+    }
+    if (cmd === 'app') {
+      if (sub === undefined || sub === 'status' || sub.startsWith('--')) return { kind: 'app', sub: 'status', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'backups') return { kind: 'app', sub: 'backups', json: hasFlag(rest, 'json') };
+      if (sub === 'celebrations') {
+        const v = rest[0];
+        if (v !== undefined && v !== 'on' && v !== 'off') return { kind: 'invalid', message: 'Usage: app celebrations [on|off]' };
+        return { kind: 'app', sub: 'celebrations', on: v === undefined ? undefined : v === 'on' };
+      }
+      return { kind: 'invalid', message: `Unknown subcommand: app ${sub}. Try: app status | backups | celebrations [on|off]` };
     }
 
     if (cmd === 'settings') {

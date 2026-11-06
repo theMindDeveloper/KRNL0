@@ -7,6 +7,7 @@
  */
 
 import { app, BrowserWindow } from 'electron';
+import { getMainWindow } from './mainWindow';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -54,7 +55,7 @@ export function writeBoardFile(board: RawBoard): void {
 
 /** Size of the open window's content area, so CLI placement can aim at the visible centre. */
 export function windowViewSize(): { width: number; height: number } | null {
-  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed());
+  const w = getMainWindow();
   if (!w) return null;
   const [width, height] = w.getContentSize();
   return width && height ? { width, height } : null;

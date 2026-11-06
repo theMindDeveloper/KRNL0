@@ -285,6 +285,58 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'mini',
+    summary: 'The floating timer: the Pomo node over other apps while KRNL0 is minimised',
+    subcommands: [
+      { name: 'status', usage: 'mini status [--json]', summary: 'On or off, showing or hidden, collapsed, and whether a session runs (default)' },
+      { name: 'show', usage: 'mini show', summary: 'Show it now, even with KRNL0 open, while a session runs' },
+      { name: 'hide', usage: 'mini hide', summary: 'Hide it until KRNL0 is minimised again' },
+      { name: 'on', usage: 'mini on', summary: 'Turn the floating timer on' },
+      { name: 'off', usage: 'mini off', summary: 'Turn the floating timer off' },
+    ],
+  },
+  {
+    group: 'whatsnew',
+    summary: "What's new in this version (the box shown once after a feature update)",
+    subcommands: [
+      { name: 'print', usage: 'whatsnew [--json]', summary: 'Print the newest release notes (default)' },
+      { name: 'show', usage: 'whatsnew show', summary: "Open the What's new box in the KRNL0 window" },
+    ],
+  },
+  {
+    group: 'feedback',
+    summary: 'Send feedback: a filled-in GitHub issue the user posts themselves',
+    subcommands: [
+      { name: 'open', usage: 'feedback ["title"] [--kind bug|idea|question|love] [--link]', summary: 'Open Send feedback with the title filled in (or print the GitHub link with --link / without a window)' },
+    ],
+  },
+  {
+    group: 'catchup',
+    summary: 'Welcome back: what slipped while KRNL0 was closed',
+    subcommands: [
+      { name: 'print', usage: 'catchup [--json]', summary: 'Tasks past their planned day (chains grouped under their first task) and habit streaks (default)' },
+      { name: 'show', usage: 'catchup show', summary: 'Open the Welcome back dialog in the window, even when nothing slipped' },
+    ],
+  },
+  {
+    group: 'share',
+    summary: 'Milestone cards: habit streaks and focus sessions, as an image to save or share',
+    subcommands: [
+      { name: 'list', usage: 'share list [--json]', summary: 'Streaks and focus sessions, and the next milestone of each (default)' },
+      { name: 'streak', usage: 'share streak ["habit"]', summary: 'Open the card for a habit streak (longest one when no name is given)' },
+      { name: 'sessions', usage: 'share sessions', summary: 'Open the card for your focus sessions' },
+    ],
+  },
+  {
+    group: 'app',
+    summary: 'The app itself: version, board backups, time away, celebrations',
+    subcommands: [
+      { name: 'status', usage: 'app status [--json]', summary: 'Version, the version it updated from, backups, time away, settings (default)' },
+      { name: 'backups', usage: 'app backups [--json]', summary: 'The board copies made before each update, and their folder' },
+      { name: 'celebrations', usage: 'app celebrations [on|off]', summary: 'Milestone cards on or off (shows the setting without an argument)' },
+    ],
+  },
+  {
     group: 'tour',
     summary: 'Guided tutorials — one per part of the app',
     subcommands: [

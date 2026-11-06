@@ -30,6 +30,8 @@ import { ObserveDash } from './ObserveDash';
 import { useAwayGap } from './useAwayGap';
 import { Switch } from '../../ui/Switch';
 import { calcRemainingPct, primaryButtonLabel, primaryTooltip, pipState } from './display';
+import { formatRemaining, isObserve, isPromptDone, pomoClock, stopCommand, todayCycles } from './derive';
+import { setPocketAway } from '../../../pocket/pocketAway';
 
 const TICK_MS = 500;
 
@@ -43,14 +45,6 @@ const spanText = (ms: number): string => {
   const min = Math.round(ms / 60_000);
   return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`;
 };
-
-function formatRemaining(ms: number): string {
-  const safe = Math.max(0, ms);
-  const totalSec = Math.ceil(safe / 1000);
-  const mm = Math.floor(totalSec / 60);
-  const ss = totalSec % 60;
-  return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
-}
 
 export function PomoNode({
   node,
@@ -91,28 +85,20 @@ export function PomoNode({
   // carries accumulated work across pause gaps so the threshold is correct.
   // An Observe span leaves the day-long OBSERVE_SPAN_MIN in state until the
   // next Start; Pomodoro mode shows the configured session length meanwhile.
-  const sessionMin = state.durationMin === OBSERVE_SPAN_MIN ? config.sessionMin : state.durationMin;
-  const thresholdMs = sessionMin * 60_000;
-  const liveWorkMs =
-    state.status === 'running' && state.startedAt !== null
-      ? state.sessionWorkSec * 1000 + (Date.now() - Date.parse(state.startedAt))
-      : state.status === 'paused'
-        ? state.sessionWorkSec * 1000 + state.pausedElapsedMs
-        : 0;
-  const remainingMs = Math.max(0, thresholdMs - liveWorkMs);
-  const breakElapsedMs =
-    state.status === 'break' && state.startedAt !== null
-      ? Date.now() - Date.parse(state.startedAt)
-      : 0;
+  // derive.ts holds these rules so the pocket window (Decision 37) shares them.
+  const clock = pomoClock(state, config, Date.now());
+  const { sessionMin, thresholdMs, liveWorkMs, remainingMs, breakElapsedMs } = clock;
   // The "Are you done?" prompt fires once the work threshold is reached. The
   // timer keeps running (arc keeps growing) — NO auto-break, NO auto-stop.
   // Observe mode: no threshold, so no prompt — the timer just counts up.
   // Easy mode is always Observe and never asks, names or links anything.
   const easy = useEasyMode();
-  const observe = easy || config.mode === 'observe';
+  const observe = isObserve(config, easy);
   // Time the app couldn't see (sleep / closed app) is asked about, not booked.
   const { gap: away, dismiss: dismissAway } = useAwayGap(state.status, state.startedAt);
-  const promptDone = !away && !observe && state.status === 'running' && liveWorkMs >= thresholdMs;
+  const promptDone = isPromptDone(observe, away !== null, state.status, clock);
+  // The pocket window shows "open KRNL0" instead of controls while this is asked (pocket F11).
+  useEffect(() => { setPocketAway(away !== null); }, [away]);
 
   // Issue #166 slice 5 — OS notification when threshold is first reached.
   // Fires once per transition false→true; uses Web Notification API (works
@@ -169,19 +155,7 @@ export function PomoNode({
   // falls on the local date today. A full cycle = `longBreakEvery` sessions
   // (e.g. 4 default), so `cyclesToday = floor(sessionsToday / longBreakEvery)`.
   // Distinct from the per-task pip counter (which is per-task progress).
-  const { cyclesToday, sessionsToday, progressToNext } = (() => {
-    const today = new Date().toLocaleDateString('en-CA');
-    let count = 0;
-    for (const rec of state.history) {
-      if (!rec.completed || !rec.endedAt) continue;
-      if (new Date(rec.endedAt).toLocaleDateString('en-CA') === today) count++;
-    }
-    return {
-      cyclesToday: Math.floor(count / config.longBreakEvery),
-      sessionsToday: count,
-      progressToNext: count % config.longBreakEvery,
-    };
-  })();
+  const { cyclesToday, sessionsToday, progressToNext } = todayCycles(state.history, config.longBreakEvery, Date.now());
 
   // Issue #166 — observer-model controls (dispatch the new verbs).
   const handlePrimary = () => {
@@ -193,7 +167,7 @@ export function PomoNode({
   const handleBreak = () => onCommand('pomo.break');
   // One Stop button: records the session so far, or discards it when
   // "Count stopped sessions" is off in the Pomo settings.
-  const handleStop = () => onCommand(!observe && config.countStopped === false ? 'pomo.discard' : 'pomo.stop');
+  const handleStop = () => onCommand(stopCommand(observe, config));
 
   // Observe mode — "what was this?" whenever a work span closes (Stop or
   // Break) untagged: free text + a tag (ADR 0016). A span already tagged with
