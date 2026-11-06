@@ -19,6 +19,7 @@ import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { stepsFor, tourById, type Tour } from './tours';
 import { setTourAnchor } from './tourAnchor';
+import { settingsSectionFor } from '../TopBar/SettingsModal';
 import { useLayerVisibility } from '../../store/layerVisibility';
 
 export const TOUR_EVENT = 'krnl:tour';
@@ -41,7 +42,7 @@ export function startTour(id: string): boolean {
  * camera centres it. A step about something hidden would otherwise point at
  * nothing and its "waiting for…" could never happen.
  */
-function bringIntoView(nodeId: string): void {
+function bringIntoView(nodeId: string, focus = true): void {
   const st = useBoardStore.getState();
   const board = st.board;
   const node = board?.nodes.find((n) => n.id === nodeId);
@@ -54,7 +55,7 @@ function bringIntoView(nodeId: string): void {
   }
   const layers = useLayerVisibility.getState();
   for (const l of ['tasks', 'texts', 'images'] as const) if (!layers[l]) layers.setLayer(l, true);
-  if (board.layoutMode !== 'station') focusNode(nodeId);
+  if (focus && board.layoutMode !== 'station') focusNode(nodeId);
 }
 
 /** `**word**` in a step's text → a highlighted word (the thing to look at or press). */
@@ -80,6 +81,7 @@ const KEY_WORD: React.CSSProperties = {
 };
 
 const SETTINGS_MODAL = '[data-testid="settings-modal"]';
+const GEAR_SELECTOR = '[data-testid="topbar-settings"]';
 
 interface Rect { left: number; top: number; width: number; height: number }
 
@@ -142,9 +144,22 @@ export function coveringPanel(el: Element, box: Rect): HTMLElement | null {
  * visible one wins, preferring those inside the window the step is about.
  * `box` is null when it exists but can't be seen right now.
  */
-export function findTarget(selector: string, scope: Element | null): { el: Element; box: Rect | null } | null {
+export function findTarget(selector: string, scope: Element | null, text?: string): { el: Element; box: Rect | null } | null {
   let list: Element[];
   try { list = Array.from(document.querySelectorAll(selector)); } catch { return null; }
+  if (text) {
+    // The element itself, or its own row (a few levels up, holding no other
+    // match) names the item — a PLAN button is found by its task's row.
+    const named = list.filter((e) => {
+      let node: Element | null = e;
+      for (let up = 0; node && up < 5; up++, node = node.parentElement) {
+        if (up > 0 && list.some((o) => o !== e && node!.contains(o))) return false;
+        if ((node.textContent ?? '').includes(text)) return true;
+      }
+      return false;
+    });
+    if (named.length > 0) list = named;
+  }
   if (list.length === 0) return null;
   const inScope = scope ? list.filter((e) => scope.contains(e)) : [];
   const pool = inScope.length > 0 ? inScope : list;
@@ -267,7 +282,12 @@ export function TourHost(): JSX.Element | null {
       if (ownMode.current === null) ownMode.current = cur;
       if (cur !== step.mode) st.setUiMode(step.mode);
     }
-    if (step.press) {
+    if (step.press === GEAR_SELECTOR) {
+      // Rule: Settings opens on the page that holds what the step talks about
+      // (the target is not in the page until its section is shown).
+      window.dispatchEvent(new CustomEvent('krnl:open-settings', { detail: { section: settingsSectionFor(step.target) } }));
+      openedSettings.current = true;
+    } else if (step.press) {
       const el = document.querySelector(step.press);
       if (el instanceof HTMLElement && !document.querySelector(SETTINGS_MODAL)) {
         el.click();
@@ -280,6 +300,7 @@ export function TourHost(): JSX.Element | null {
     if (step.event) window.dispatchEvent(new CustomEvent(step.event));
     startBoard.current = useBoardStore.getState().board;
     if (step.node) bringIntoView(step.node);
+    for (const extra of step.also ?? []) bringIntoView(extra, false);
     // Never leave the words hidden: show them anyway if the target is slow.
     const key = `${tour?.id}:${i}`;
     const t = setTimeout(() => setReadyKey(key), 500);
@@ -299,7 +320,7 @@ export function TourHost(): JSX.Element | null {
       // The target, or (when it isn't on screen, e.g. no tasks to show a tag
       // on) the window the step is about.
       const scope = step.node ? document.querySelector(`[data-tour="${step.node}"]`) : null;
-      const found = step.target ? findTarget(step.target, scope) : null;
+      const found = step.target ? findTarget(step.target, scope, step.targetText) : null;
       if (found && !found.box && !scrolled) {
         // Present but scrolled out of sight inside its window (a Calendar
         // block below the fold): bring it into view once.
@@ -309,6 +330,13 @@ export function TourHost(): JSX.Element | null {
       // A floating panel covering it steps aside for this step (put back when the step ends).
       if (found?.box) {
         const cover = coveringPanel(found.el, found.box);
+        if (cover && !tucked.has(cover)) { cover.classList.add('krnl-tour-tucked'); tucked.add(cover); }
+      }
+      // The other windows the step needs stay uncovered too.
+      for (const extra of step.also ?? []) {
+        const w = document.querySelector(`[data-tour="${extra}"]`);
+        const wb = w ? visibleBox(w) : null;
+        const cover = w && wb ? coveringPanel(w, wb) : null;
         if (cover && !tucked.has(cover)) { cover.classList.add('krnl-tour-tucked'); tucked.add(cover); }
       }
       const scopeBox = scope ? visibleBox(scope) : null;
@@ -417,7 +445,11 @@ export function TourHost(): JSX.Element | null {
         <div key={`${tour.id}-${step.target ?? step.node ?? ''}`} data-testid="tour-spotlight" aria-hidden style={{
           position: 'fixed', left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2,
           borderRadius: 10, border: '2px solid var(--acid)',
-          boxShadow: '0 0 0 9999px rgba(0,0,0,0.5), 0 0 22px color-mix(in srgb, var(--acid) 50%, transparent)',
+          // Rule: while a step waits for the user to act, nothing is dimmed —
+          // what they must click never looks disabled.
+          boxShadow: step.waitFor
+            ? '0 0 0 4px color-mix(in srgb, var(--acid) 22%, transparent), 0 0 22px color-mix(in srgb, var(--acid) 50%, transparent)'
+            : '0 0 0 9999px rgba(0,0,0,0.42), 0 0 22px color-mix(in srgb, var(--acid) 50%, transparent)',
           pointerEvents: 'none', zIndex: Z.tourBackdrop, animation: 'krnl-tour-in 200ms ease-out',
         }}>
           {step.badge && (
@@ -429,7 +461,7 @@ export function TourHost(): JSX.Element | null {
           )}
         </div>
       ) : (
-        <div aria-hidden style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', pointerEvents: 'none', zIndex: Z.tourBackdrop }} />
+        <div aria-hidden style={{ position: 'fixed', inset: 0, background: step.waitFor ? 'transparent' : 'rgba(0,0,0,0.35)', pointerEvents: 'none', zIndex: Z.tourBackdrop }} />
       )}
       <div
         ref={cardRef}

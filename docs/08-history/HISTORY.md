@@ -1343,3 +1343,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Files changed:** `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/styles/launch.css`, `tests/unit/renderer/tourPlaceCard.test.ts`
 **Summary:** A tour step used the first element matching its selector, wherever it sat — a Calendar block hidden under the grid's header, or a REPLAN badge inside a hidden panel — so the ring pointed at empty spots. Targets are now found by what they are, never by position: of all matches, the most visible one wins (inside the window, not hidden, clipped by every scrolling ancestor), preferring those inside the window the step is about; a match scrolled out of sight is scrolled into view once; if nothing is visible the ring goes around the window itself. A floating panel lying on top of the target (the ambient radio, a chat panel) fades aside for that step and comes back after.
 
+## [2026-11-06] — Tour engine rules: right Settings page, named items, no dimming while waiting, every needed window shown
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Tour/{TourHost,tours}.ts(x)`, `src/renderer/components/TopBar/SettingsModal.tsx`, `tests/unit/renderer/tourRules.test.tsx`
+**Summary:** Four rules in the tour engine, so these bugs can't come back step by step: (1) a step that opens Settings opens it on the page that holds what it talks about (Sounds, Finished cards, Floating timer…), so the card no longer sits on an empty General page over the thing it describes; (2) a step can name its item (`targetText`) and the spotlight lands on that item, or on the button in that item's row (Demo · tick me, Demo · plan me, Demo · gym, Demo · read); (3) while a step waits for the user to act, nothing is dimmed, so what they must click never looks disabled; (4) a step lists every window it needs (`also`, e.g. Todo and Calendar for a drag) — each is un-hidden, and a floating panel covering any of them steps aside for that step.
+

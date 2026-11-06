@@ -29,6 +29,19 @@ const SECTIONS: ReadonlyArray<{ id: SettingsSection; icon: SettingsIconName; lab
   { id: 'reset', icon: 'reset', label: 'Reset', title: 'Start over', blurb: 'Wipe the board and begin from the default workspace.' },
 ];
 
+/** Which section holds a Settings element (tours open Settings on the right page). */
+const TARGET_SECTION: ReadonlyArray<[string, SettingsSection]> = [
+  ['settings-sound', 'sounds'], ['settings-finished', 'finished'], ['settings-show-finished', 'finished'],
+  ['settings-pocket', 'timer'], ['settings-celebrations', 'celebrations'], ['settings-updates', 'updates'],
+  ['settings-backups', 'updates'], ['settings-factory-reset', 'reset'], ['settings-theme', 'general'],
+  ['settings-mode', 'general'], ['Easy or Advanced', 'general'], ['Light or dark', 'general'],
+];
+
+export function settingsSectionFor(selector: string | undefined): SettingsSection {
+  if (!selector) return 'general';
+  return TARGET_SECTION.find(([key]) => selector.includes(key))?.[1] ?? 'general';
+}
+
 export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: {
   onClose: () => void; theme: Theme; onTheme: (t: Theme) => void; initial?: SettingsSection;
 }) {
