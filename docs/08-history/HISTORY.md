@@ -1511,3 +1511,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`
 **Summary:** Each Clock schedule row was marked by a 4 px colour bar on its left edge (the design checker's "side-tab"; our rule is no left accent bars). The task's colour is now a dot, as in the Todo rows, so the same task looks the same in both windows.
+
+## [2026-11-07] — UI loop batch 20: analytics change arrows
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/SummaryHero.tsx`, `src/renderer/analytics/charts/KpiTiles.tsx`
+**Summary:** The change against the previous period read "▲ 217%" / "▼ 12%" with text triangles; it is now a drawn up or down arrow in the same colour. With this the live design check of the main screen has no low-contrast text, no covered text and no left stripes left (184 findings this evening → 156; what remains is the app's 10–10.5 px label size, a design decision to review, not a bug).

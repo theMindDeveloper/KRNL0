@@ -57,7 +57,7 @@ export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byD
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--k-an-ink, #f4f6f8)', fontVariantNumeric: 'tabular-nums' }}>{s.value}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: tone, whiteSpace: 'nowrap' }}>
-                  {d === null ? '—' : `${d >= 0 ? '▲' : '▼'} ${Math.abs(d)}%`}
+                  {d === null ? '—' : <><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.05em', marginRight: 3 }}><path d={d >= 0 ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6'} /></svg>{Math.abs(d)}%</>}
                 </span>
               </div>
             </div>
