@@ -90,6 +90,75 @@ const same = (a: Rect | null, b: Rect | null): boolean =>
 
 /** Where the card goes: below the target, else above, right, left — else the bottom-right corner. */
 /**
+ * The part of an element you can actually see: inside the window, not hidden
+ * (display / visibility / opacity), and clipped by every scrolling or clipping
+ * ancestor (a Calendar block under the grid's header counts only for what
+ * shows). Null when nothing of it is visible.
+ */
+export function visibleBox(el: Element): Rect | null {
+  const anyEl = el as Element & { checkVisibility?: (o: Record<string, boolean>) => boolean };
+  if (typeof anyEl.checkVisibility === 'function' && !anyEl.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return null;
+  const r = el.getBoundingClientRect();
+  let l = Math.max(0, r.left);
+  let t = Math.max(0, r.top);
+  let rt = Math.min(window.innerWidth, r.right);
+  let b = Math.min(window.innerHeight, r.bottom);
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const cs = getComputedStyle(p);
+    if (/(hidden|auto|scroll|clip)/.test(`${cs.overflowX} ${cs.overflowY}`)) {
+      const pr = p.getBoundingClientRect();
+      l = Math.max(l, pr.left); t = Math.max(t, pr.top); rt = Math.min(rt, pr.right); b = Math.min(b, pr.bottom);
+    }
+    if (rt - l < 2 || b - t < 2) return null;
+  }
+  return rt - l >= 2 && b - t >= 2 ? { left: l, top: t, width: rt - l, height: b - t } : null;
+}
+
+/**
+ * A floating panel (radio, a chat panel…) lying on top of what a step points
+ * at: the nearest fixed-position ancestor of whatever covers the target's
+ * visible box. Null when nothing covers it. The tour card itself never counts.
+ */
+export function coveringPanel(el: Element, box: Rect): HTMLElement | null {
+  const pts: Array<[number, number]> = [
+    [box.left + box.width / 2, box.top + box.height / 2],
+    [box.left + box.width * 0.25, box.top + box.height / 2],
+    [box.left + box.width * 0.75, box.top + box.height / 2],
+  ];
+  for (const [x, y] of pts) {
+    const hit = document.elementFromPoint(x, y);
+    if (!hit || el.contains(hit) || hit.contains(el) || hit.closest('[data-testid="tour-card"]')) continue;
+    for (let p: HTMLElement | null = hit as HTMLElement; p && p !== document.body; p = p.parentElement) {
+      if (p.contains(el)) break;
+      if (getComputedStyle(p).position === 'fixed') return p;
+    }
+  }
+  return null;
+}
+
+/**
+ * The element a step points at, found by what it is — never by where it
+ * happens to sit, since every window can be moved. Of all matches, the most
+ * visible one wins, preferring those inside the window the step is about.
+ * `box` is null when it exists but can't be seen right now.
+ */
+export function findTarget(selector: string, scope: Element | null): { el: Element; box: Rect | null } | null {
+  let list: Element[];
+  try { list = Array.from(document.querySelectorAll(selector)); } catch { return null; }
+  if (list.length === 0) return null;
+  const inScope = scope ? list.filter((e) => scope.contains(e)) : [];
+  const pool = inScope.length > 0 ? inScope : list;
+  let best: { el: Element; box: Rect | null } | null = null;
+  let bestArea = -1;
+  for (const el of pool) {
+    const box = visibleBox(el);
+    const area = box ? box.width * box.height : 0;
+    if (area > bestArea) { best = { el, box }; bestArea = area; }
+  }
+  return best;
+}
+
+/**
  * Where the guide card goes: below, above, right or left of what it talks
  * about — never on top of it. When no side has room (a tall Settings section,
  * a big window), the spot on screen that covers the least of it wins.
@@ -224,13 +293,28 @@ export function TourHost(): JSX.Element | null {
     // The ring is only drawn once the target has stopped moving (the camera
     // may still be gliding to it) and is on screen.
     let prev: Rect | null = null;
+    let scrolled = false;
+    const tucked = new Set<HTMLElement>();
     const measure = (): void => {
       // The target, or (when it isn't on screen, e.g. no tasks to show a tag
       // on) the window the step is about.
-      const el = (step.target ? document.querySelector(step.target) : null)
-        ?? (step.node ? document.querySelector(`[data-tour="${step.node}"]`) : null);
-      const r = el?.getBoundingClientRect();
-      const now: Rect | null = r && r.width > 0 && r.height > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height } : null;
+      const scope = step.node ? document.querySelector(`[data-tour="${step.node}"]`) : null;
+      const found = step.target ? findTarget(step.target, scope) : null;
+      if (found && !found.box && !scrolled) {
+        // Present but scrolled out of sight inside its window (a Calendar
+        // block below the fold): bring it into view once.
+        scrolled = true;
+        found.el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+      }
+      // A floating panel covering it steps aside for this step (put back when the step ends).
+      if (found?.box) {
+        const cover = coveringPanel(found.el, found.box);
+        if (cover && !tucked.has(cover)) { cover.classList.add('krnl-tour-tucked'); tucked.add(cover); }
+      }
+      const scopeBox = scope ? visibleBox(scope) : null;
+      // Not visible (yet): the window the step is about, so the ring never
+      // points at an empty spot.
+      const now: Rect | null = found?.box ?? scopeBox;
       const onScreen = !!now && now.left < window.innerWidth && now.top < window.innerHeight && now.left + now.width > 0 && now.top + now.height > 0;
       const still = same(now, prev);
       prev = now;
@@ -243,7 +327,10 @@ export function TourHost(): JSX.Element | null {
     };
     measure();
     const id = setInterval(measure, 80);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      for (const t of tucked) t.classList.remove('krnl-tour-tucked');
+    };
   }, [step]);
 
   // wait for the real action

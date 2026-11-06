@@ -21,3 +21,12 @@ describe('placeCard', () => {
     expect(p).toBeDefined();
   });
 });
+
+// @vitest-environment-free: findTarget relies on layout, covered in jsdom only for selection rules.
+import { findTarget } from '../../../src/renderer/components/Tour/TourHost';
+describe('findTarget', () => {
+  it('returns null for no match or a bad selector', () => {
+    expect(findTarget('[data-nothing-here]', null)).toBeNull();
+    expect(findTarget('[[bad', null)).toBeNull();
+  });
+});

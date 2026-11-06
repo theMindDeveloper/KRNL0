@@ -206,3 +206,6 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 .dm-morning__close { appearance: none; border: 0; background: transparent; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-3); cursor: pointer; flex-shrink: 0; }
 .dm-morning__close:hover { background: var(--paper-2); color: var(--ink); }
 @media (max-width: 600px) { .dm-card { width: calc(100vw - 32px); } .dm-grid { grid-template-columns: 1fr; } .dm-title { font-size: 32px; } }
+
+/* A floating panel that covers what the tour points at steps aside for that step. */
+.krnl-tour-tucked { opacity: .06 !important; pointer-events: none !important; transition: opacity 200ms ease; }

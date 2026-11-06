@@ -1336,3 +1336,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Files changed:** `src/renderer/components/nodes/HabitNode/index.tsx`, `src/renderer/components/Tour/TourHost.tsx`, `tests/unit/renderer/tourPlaceCard.test.ts`
 **Summary:** Habits lower in the list (e.g. "No sugar") couldn't be reached: the new streak and repair lines made rows taller, the list scrolls, but the wheel over it zoomed the canvas instead. The habit list now keeps the wheel (`nowheel`, contained overscroll), like the Calendar and notes. The tour's guide card no longer covers what it talks about: when no side of the target has room (a tall Settings section), it takes the spot on screen that overlaps it least.
 
+## [2026-11-06] — Fix: tour steps find what they talk about, wherever it is
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/styles/launch.css`, `tests/unit/renderer/tourPlaceCard.test.ts`
+**Summary:** A tour step used the first element matching its selector, wherever it sat — a Calendar block hidden under the grid's header, or a REPLAN badge inside a hidden panel — so the ring pointed at empty spots. Targets are now found by what they are, never by position: of all matches, the most visible one wins (inside the window, not hidden, clipped by every scrolling ancestor), preferring those inside the window the step is about; a match scrolled out of sight is scrolled into view once; if nothing is visible the ring goes around the window itself. A floating panel lying on top of the target (the ambient radio, a chat panel) fades aside for that step and comes back after.
+
