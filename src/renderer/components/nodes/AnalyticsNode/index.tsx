@@ -253,7 +253,7 @@ const tabPill = (active: boolean): React.CSSProperties => ({
 
 const chipBtn = (active: boolean): React.CSSProperties => ({
   fontFamily: 'var(--font-mono)',
-  fontSize: 9,
+  fontSize: 10,
   letterSpacing: '0.04em',
   padding: '3px 8px',
   border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),

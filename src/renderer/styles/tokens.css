@@ -854,3 +854,6 @@ select option { background: var(--paper); color: var(--ink); }
   --task-17: oklch(0.75 0.13 92);
   --task-18: oklch(0.75 0.13 232);
 }
+
+/* Placeholders follow the theme (the browser's grey was 3.9:1 on dark windows). */
+::placeholder { color: var(--ink-3); opacity: 1; }

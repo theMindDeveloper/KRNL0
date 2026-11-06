@@ -1129,7 +1129,7 @@ export function AmbientRadio() {
               fontSize: 10, fontWeight: 500, color: '#c4b5fd',
               letterSpacing: '0.04em', textTransform: 'uppercase',
             }}>ambient.radio</span>
-            <span style={{ fontSize: 9, color: 'rgba(196,181,253,.35)', marginLeft: 2 }}>v03</span>
+            <span style={{ fontSize: 9, color: 'rgba(196,181,253,.62)', marginLeft: 2 }}>v03</span>
 
             {/* Active-layers badge */}
             {activeLayers.size >= 2 && (
@@ -1185,7 +1185,7 @@ export function AmbientRadio() {
               )}
             </div>
             {activeLayers.size === 0 && (
-              <div style={{ position: 'absolute', top: 26, left: 12, fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.45, color: focusedPreset.col, zIndex: 2, pointerEvents: 'none' }}>
+              <div style={{ position: 'absolute', top: 26, left: 12, fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.78, color: focusedPreset.col, zIndex: 2, pointerEvents: 'none' }}>
                 tap a chip to layer
               </div>
             )}
@@ -1489,7 +1489,7 @@ export function AmbientRadio() {
             <>
               {/* Preset chips — tap to layer */}
               <div style={{ padding: '8px 10px 4px' }}>
-                <div style={{ fontSize: 7, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.3)', marginBottom: 5 }}>
+                <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.58)', marginBottom: 5 }}>
                   tap to layer
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>

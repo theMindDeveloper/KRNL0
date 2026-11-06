@@ -1476,3 +1476,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/pocket/CapsuleView.tsx`
 **Summary:** The floating capsule's hover card labelled "● Time log", "● working" and "● Deep work · pomo.025" with the ● character; the dots are drawn, in the label's colour, on the text's baseline.
+
+## [2026-11-07] — UI loop batch 15: no low-contrast text left on the main screen
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/styles/tokens.css`, `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/components/nodes/{TodoNode/index,AnalyticsNode/index,CalendarNode/WeekView}.tsx`
+**Summary:** The design checker's run on the live app went from 10 low-contrast texts this evening to 0: placeholders now follow the theme (the browser's grey was 3.9:1 on dark windows), and the ambient radio's "v03", "tap a chip to layer" and "tap to layer" are readable. The smallest labels grew about a point: Todo's PLAN (9 → 10 px), Analytics' range chips (9 → 10), the calendar's day headers and hour labels (9 → 10) and half-hour labels (7.5 → 8.5), all still fitting their space.

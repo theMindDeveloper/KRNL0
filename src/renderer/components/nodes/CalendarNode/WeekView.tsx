@@ -2028,7 +2028,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 textAlign: 'center',
                 padding: '4px 0 3px',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 9,
+                fontSize: 10,
                 color: isToday ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
@@ -2104,7 +2104,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                     top: 1,
                     right: 4,
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 9,
+                    fontSize: 10,
                     color: 'var(--ink-3)',
                     lineHeight: 1,
                   }}
@@ -2121,7 +2121,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                       top: (min / 60) * rowHeight - 4,
                       right: 4,
                       fontFamily: 'var(--font-mono)',
-                      fontSize: 7.5,
+                      fontSize: 8.5,
                       color: 'var(--ink-4)',
                       lineHeight: 1,
                     }}

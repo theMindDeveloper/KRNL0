@@ -698,9 +698,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           }}
           onMouseDown={(e) => e.stopPropagation()}
           style={{
-            flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, height: 18, padding: '0 6px',
+            flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, height: 19, padding: '0 7px',
             borderRadius: 999, border: '1px solid var(--paper-3)', background: 'transparent', cursor: 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.06em', color: 'var(--ink-3)',
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.04em', color: 'var(--ink-3)',
           }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
