@@ -12,6 +12,7 @@
 // Search filters both lists; ↑ ↓ move, Enter picks, Esc closes. Tasks come
 // first because they are what time is usually counted toward.
 
+import { LineGlyph } from './LineGlyph';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { TagDef } from '../../../shared/tags/classify';
 import { slugifyTag } from '../../../shared/tags/classify';
@@ -170,7 +171,7 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
       )}
       {taskItems.filter((t) => t.done).map((it) => (
         <button key={it.key} type="button" data-testid={`${testIdPrefix}-task-${it.id}`} style={{ ...rowStyle(it), color: 'var(--ink-3)' }} onMouseEnter={() => setActive(idx(it))} onClick={() => choose(it)}>
-          <span aria-hidden style={{ width: 10, color: 'var(--acid-ink, var(--acid))' }}>✓</span>
+          <span aria-hidden style={{ width: 10, color: 'var(--acid-ink, var(--acid))', display: 'inline-flex' }}><LineGlyph name="check" size={10} /></span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'line-through', textDecorationColor: 'var(--ink-4)' }}>{it.label}</span>
           {pill(it.id)}
         </button>

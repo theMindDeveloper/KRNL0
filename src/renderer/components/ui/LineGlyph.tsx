@@ -11,6 +11,8 @@ const PATHS = {
   diamond: <path d="M12 4l7 8-7 8-7-8z" fill="currentColor" />,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
+  /** A task (linked span, task choice) — not "done". */
+  task: <rect x="5" y="5" width="14" height="14" rx="3.5" />,
   dot: <circle cx="12" cy="12" r="4.5" fill="currentColor" stroke="none" />,
 } as const;
 

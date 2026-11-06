@@ -3,6 +3,7 @@
 // planned time, time actually tracked on it, and quick actions. Mirrors the
 // tracked-span popup so tasks, habits and observed time behave the same on click.
 
+import { LineGlyph } from './LineGlyph';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
@@ -132,7 +133,7 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: info.done ? 'line-through' : 'none' }}>
           {info.text || 'Untitled task'}
         </span>
-        {info.done && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>✓ DONE</span>}
+        {info.done && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }} ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><LineGlyph name="check" size={9} weight={2.6} />DONE</span></span>}
       </div>
       <div style={{ fontSize: 10, color: 'var(--ink-3)', marginBottom: 8 }}>{when}</div>
       {!easy && <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--ink-2)', marginBottom: 10, flexWrap: 'wrap' }}>

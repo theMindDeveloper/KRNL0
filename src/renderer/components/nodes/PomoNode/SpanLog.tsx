@@ -2,6 +2,7 @@
 // with a delete button each. Tiny or misclicked spans that are hard to hit on
 // the Calendar/Clock are easy to find and remove here.
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import { useState } from 'react';
 import type { PomoSessionRecord } from './types';
 import type { TagDef } from '../../../../shared/tags/classify';
@@ -78,10 +79,10 @@ export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLo
                   style={{
                     flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
                     fontFamily: 'var(--font-mono)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    color: unnamed ? 'var(--acid)' : 'var(--ink)', textDecoration: unnamed ? 'underline dotted' : 'none',
+                    color: unnamed ? 'var(--acid-ink, var(--acid))' : 'var(--ink)', textDecoration: unnamed ? 'underline dotted' : 'none',
                   }}
                 >
-                  {r.taskId ? '☐ ' : ''}{name}{cat ? <span style={{ color: 'var(--ink-3)' }}> · {cat.label}</span> : null}
+                  {r.taskId ? <><LineGlyph name="task" size={10} /> </> : ''}{name}{cat ? <span style={{ color: 'var(--ink-3)' }}> · {cat.label}</span> : null}
                 </button>
               )}
               <span style={{ color: 'var(--ink-3)', flexShrink: 0 }}>{fmtDur(end - start)}</span>
@@ -93,7 +94,7 @@ export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLo
                 onClick={() => onDelete(r.id)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', lineHeight: 1 }}
               >
-                ✕
+                <LineGlyph name="close" size={10} />
               </button>
             </div>
           );

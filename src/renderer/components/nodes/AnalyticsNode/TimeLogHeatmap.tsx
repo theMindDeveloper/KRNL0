@@ -8,6 +8,7 @@
 //   - bottom: per-day totals, then "By tag" — the share of time per tag
 // Built once per open / range change — no animation.
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import { useEffect, useMemo, useState } from 'react';
 import { foldTimeLog, type TimeLogEntry, type TimeLogFold } from '../../../../shared/timelog';
 import { queryTimeLog } from '../../../store/timeLog';
@@ -176,7 +177,7 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
                 <span style={{ width: TOTAL_W, flexShrink: 0, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                   <span style={{ color: ink1, fontWeight: 600 }}>{fmt(t.totalMin)}</span>
                   {t.plannedMin ? <span style={{ color: t.totalMin > t.plannedMin ? 'var(--rust)' : ink3 }}> / {fmt(t.plannedMin)}</span> : null}
-                  {t.done && <span style={{ color: 'var(--acid-ink, var(--acid))' }}> ✓</span>}
+                  {t.done && <span style={{ color: 'var(--acid-ink, var(--acid))', marginLeft: 4 }}><LineGlyph name="check" size={10} /></span>}
                 </span>
               </div>
             );

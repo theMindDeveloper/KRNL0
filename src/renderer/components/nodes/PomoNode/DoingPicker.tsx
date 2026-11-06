@@ -3,6 +3,7 @@
 // tasks, and a field to type a new one. Picking sets what Start / Continue /
 // Back to work records; ✕ clears it so the next span is asked about.
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import { useRef, useState } from 'react';
 import type { TagDef } from '../../../../shared/tags/classify';
 import { Popover } from '../../ui/Popover';
@@ -76,7 +77,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
   const shownOpen = openTasks.slice(0, 6);
   const cats = library.filter((t) => !q || t.label.toLowerCase().includes(q) || q.length > 0);
   const icon = (c: DoingChoice) => {
-    if (c.taskId) return <span aria-hidden style={{ color: 'var(--ink-3)', width: 12, textAlign: 'center' }}>☑</span>;
+    if (c.taskId) return <span aria-hidden style={{ color: 'var(--ink-3)', width: 12, textAlign: 'center', display: 'inline-flex', justifyContent: 'center' }}><LineGlyph name="task" size={11} /></span>;
     const t = cat(c.tag);
     return t ? <CategoryIcon id={t.id} color={t.color} size={12} /> : <span aria-hidden style={{ width: 12, textAlign: 'center', color: 'var(--ink-4)' }}>·</span>;
   };
@@ -141,7 +142,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
             onClick={onClear}
             style={{ background: 'transparent', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 11, padding: '0 4px', lineHeight: 1 }}
           >
-            ✕
+            <LineGlyph name="close" size={10} />
           </button>
         )}
       </div>

@@ -7,6 +7,7 @@
  * to the classifier. Dismisses on click-outside or ESC, like ContextMenu.
  */
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { TodoItem, TodoState } from './types';
@@ -92,7 +93,7 @@ export function TagPicker({ x, y, item, state, onPick, onDismiss }: TagPickerPro
     >
       <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
       <span style={{ flex: 1 }}>{t.label}</span>
-      {item.tag === t.id && <span style={{ fontSize: 10, color: 'var(--acid-ink, var(--acid))' }}>✓</span>}
+      {item.tag === t.id && <span style={{ fontSize: 10, color: 'var(--acid-ink, var(--acid))', display: 'inline-flex' }}><LineGlyph name="check" size={11} /></span>}
       {hint && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-4)', letterSpacing: '0.06em' }}>{hint}</span>}
     </button>
   );
