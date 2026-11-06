@@ -105,10 +105,17 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
         <button type="button" style={segBtn(span === 'week')} onClick={() => setSpan('week')}>Week</button>
         <button type="button" style={segBtn(span === 'month')} onClick={() => setSpan('month')}>Month</button>
         <span style={{ flex: 1 }} />
-        <button type="button" aria-label="Earlier" style={segBtn(false)} onClick={() => setAnchor(shift(span, anchor, -1))}>‹</button>
-        <span data-testid="time-log-range" style={{ minWidth: 130, textAlign: 'center', color: ink1, fontSize: 12 }}>{r.title}</span>
-        <button type="button" aria-label="Later" style={segBtn(false)} onClick={() => setAnchor(shift(span, anchor, 1))}>›</button>
-        <button type="button" style={segBtn(false)} onClick={() => setAnchor(new Date())}>This {span}</button>
+        {/* The arrows and the range wrap as one unit, never "›" alone on a line. */}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+          <button type="button" aria-label="Earlier" style={{ ...segBtn(false), display: 'inline-grid', placeItems: 'center' }} onClick={() => setAnchor(shift(span, anchor, -1))}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+          <span data-testid="time-log-range" style={{ minWidth: 110, textAlign: 'center', color: ink1, fontSize: 12 }}>{r.title}</span>
+          <button type="button" aria-label="Later" style={{ ...segBtn(false), display: 'inline-grid', placeItems: 'center' }} onClick={() => setAnchor(shift(span, anchor, 1))}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 5l7 7-7 7" /></svg>
+          </button>
+          <button type="button" style={segBtn(false)} onClick={() => setAnchor(new Date())}>This {span}</button>
+        </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 22, fontWeight: 700, color: ink1, fontFamily: 'var(--font-sans)' }}>{fold ? fmt(fold.totalMin) : '…'}</span>

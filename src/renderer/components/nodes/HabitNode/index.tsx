@@ -917,16 +917,7 @@ const MonthRow = memo(function MonthRow({
         >
           {habit.name}
         </div>
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
-            color: 'var(--rust)',
-            letterSpacing: '0.04em',
-          }}
-        >
-          {`▲ ${streak}`}
-        </div>
+        <StreakBadge streak={streak} />
       </div>
 
       <div
@@ -1126,16 +1117,7 @@ const YearRow = memo(function YearRow({
         >
           {habit.name}
         </div>
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
-            color: 'var(--rust)',
-            letterSpacing: '0.04em',
-          }}
-        >
-          {`▲ ${streak}`}
-        </div>
+        <StreakBadge streak={streak} />
       </div>
 
       {/* Canvas-based year grid — replaces 371 cell divs with one canvas.
@@ -1157,3 +1139,21 @@ const YearRow = memo(function YearRow({
     </div>
   );
 });
+
+
+/** The streak in Month and Year views: the week view's flame and count. */
+function StreakBadge({ streak }: { streak: number }) {
+  return (
+    <div
+      title={streak > 0 ? `${streak} day${streak === 1 ? '' : 's'} in a row` : 'No streak yet'}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+        fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600,
+        color: streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
+      }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>
+      {streak}
+    </div>
+  );
+}

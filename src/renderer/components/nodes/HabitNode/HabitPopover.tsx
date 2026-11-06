@@ -27,8 +27,11 @@ export function HabitPopover({ view, onSetView, onClose }: Props) {
       if (!ref.current) return;
       if (!ref.current.contains(e.target as Node)) onClose();
     };
+    // Escape closes it too, like every other popover.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('keydown', onKey); };
   }, [onClose]);
 
   return (

@@ -1427,3 +1427,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/Launch/{ShareDialog,FeedbackDialog}.tsx`, `src/renderer/launch/milestones.ts`, `src/renderer/styles/launch.css`
 **Summary:** Share a milestone: the chosen card wasn't marked (the list uses `aria-checked`, the shared style only knew `aria-pressed`) — it now has a background and an outline; habits with a 0-day streak are no longer offered as cards; Copy and Save image have icons. Send feedback: Copy diagnostics, Send by email and Continue on GitHub have line icons. What's new: the outlined 01/02/03 numbers use ink-3, and the current one the dark acid, so they read on the light dialog.
+
+## [2026-11-07] — UI loop batch 8: Easy mode pass, time log navigation, habit month/year
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/TimeLogHeatmap.tsx`, `src/renderer/components/nodes/HabitNode/{index,HabitPopover}.tsx`
+**Summary:** The whole station was rendered in Easy mode in both themes. Analytics › Time per task: in a small window the week navigation wrapped "›" onto a line of its own, away from the dates; the arrows, the range and "This week" now wrap as one unit, with line chevrons. Habits in Month and Year view showed the streak as a rust "▲ 7"; they use the week view's flame and count (acid when going, grey at 0). The habit view popover now closes with Escape like every other popover.
