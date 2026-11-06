@@ -14,7 +14,7 @@
 | F4 | The text node and image node buttons dispatch `board.addNode` with kind `text`/`image` at canvas center; the select and connect buttons change the active tool mode only (no node creation) |
 | F5 | The statusbar (height 28 px, background `var(--ink)`) renders via `<Panel position="bottom-left">` showing: active node count, edge count, and current board name |
 | F6 | The theme toggle switches between `data-theme="dark"` and `data-theme="light"` on the `<html>` element; the selection persists to `localStorage` under key `krnl0-theme` |
-| F7 | The FIT button calls `reactFlowInstance.fitView({ padding: CANVAS_FIT_PADDING })` bringing all nodes into view, clear of the floating tool rail on the left (`Canvas/fitPadding.ts`: 104 px left, 28–32 px elsewhere) |
+| F7 | The FIT button calls `reactFlowInstance.fitView({ padding: CANVAS_FIT_PADDING })` bringing all nodes into view, clear of the floating tool rail on the left and the minimap on the right (`Canvas/fitPadding.ts`: 104 px left, 184 px right, 28 px top and bottom) |
 | F8 | Dock button keyboard shortcuts: `V` activates select mode, `N` creates a text note node, `I` creates an image node, `Escape` deactivates connect mode; shortcuts are shown as tooltip text on each button |
 | F9 | Fixed (mother) nodes show `‹` / `›` reorder arrows on hover; clicking an arrow swaps that node's horizontal position with its adjacent neighbour |
 

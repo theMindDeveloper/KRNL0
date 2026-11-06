@@ -1497,3 +1497,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/{AmbientRadio/index,StatusBar/index}.tsx`, `src/renderer/components/nodes/{ClockNode/index,TodoNode/index}.tsx`
 **Summary:** A full re-audit of the canvas, Todo, Habit, Pomo and Calendar in both themes found the last texts under 4.5:1 and fixed them: the ambient radio's unselected chips, header buttons and volume number; the Clock's active AM chip (now the deeper rust, like PM); the Todo's over-plan time; and the status bar's Pomo value in light mode. Only disabled buttons stay dim, as intended.
+
+## [2026-11-07] — UI loop batch 18: nothing opens under the minimap
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Canvas/fitPadding.ts`, `docs/06-requirements/app-chrome.md` F7
+**Summary:** After the tool-rail fix, the design checker's last covered text was a task card's time under the minimap in the bottom-right corner. The fit padding now also leaves the minimap's width on the right; the live page has no covered text left.
