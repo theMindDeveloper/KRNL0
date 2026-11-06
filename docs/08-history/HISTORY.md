@@ -1518,3 +1518,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/AnalyticsNode/SummaryHero.tsx`, `src/renderer/analytics/charts/KpiTiles.tsx`
 **Summary:** The change against the previous period read "▲ 217%" / "▼ 12%" with text triangles; it is now a drawn up or down arrow in the same colour. With this the live design check of the main screen has no low-contrast text, no covered text and no left stripes left (184 findings this evening → 156; what remains is the app's 10–10.5 px label size, a design decision to review, not a bug).
+
+## [2026-11-07] — UI loop batch 21: habit lane icons
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`
+**Summary:** The habit lane (a habit placed on the canvas) used ● ✓ ▲ ↻ characters for its colour, today's tick, its streak and its cadence; they are drawn now, and the streak uses the flame like every other habit view. Covered by the lane's tests; not render-checked (the preview board has no lane).
