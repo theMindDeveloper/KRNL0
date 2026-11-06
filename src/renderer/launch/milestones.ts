@@ -155,6 +155,7 @@ export function shareCardFor(nodes: readonly NodeLike[], today: string, what: { 
 export function allShareCards(nodes: readonly NodeLike[], today: string, nowMs = Date.now()): Milestone[] {
   const out: Milestone[] = [];
   for (const h of habitStreaks(nodes, today)) {
+    if (h.current < 1) continue; // nothing to share yet
     out.push({ id: `share:${h.id}`, kind: 'streak', value: h.current, habit: h.name, best: h.current >= h.best, log: h.log, total: new Set(h.log).size });
   }
   const s = shareCardFor(nodes, today, { kind: 'sessions' }, nowMs);

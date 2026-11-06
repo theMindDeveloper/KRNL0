@@ -1420,3 +1420,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/AnalyticsNode/{guide,PageNav}.ts(x)`, `src/renderer/analytics/charts/Radar.tsx`
 **Summary:** The Insights page put three charts in a row; in a station-sized Analytics window each was ~110 px wide, so titles were cut ("MULTIVARIATI…") and the radar's and the pie's labels ran off the card. Insights now holds four charts two by two (radar, sources split, tasks × focus, focus by weekday) and the two distributions moved to a new **Day to day** page, one full-width chart per row. The radar keeps every label inside the chart: side labels grow away from the centre, small charts use short names (Streak, Active, Focus; the full name is the tooltip) and leave more room around the shape. Easy mode's page order is unchanged.
+
+## [2026-11-07] — UI loop batch 7: launch dialogs — share list, icons on buttons, readable numerals
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Launch/{ShareDialog,FeedbackDialog}.tsx`, `src/renderer/launch/milestones.ts`, `src/renderer/styles/launch.css`
+**Summary:** Share a milestone: the chosen card wasn't marked (the list uses `aria-checked`, the shared style only knew `aria-pressed`) — it now has a background and an outline; habits with a 0-day streak are no longer offered as cards; Copy and Save image have icons. Send feedback: Copy diagnostics, Send by email and Continue on GitHub have line icons. What's new: the outlined 01/02/03 numbers use ink-3, and the current one the dark acid, so they read on the light dialog.

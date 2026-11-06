@@ -111,11 +111,13 @@ export function ShareDialog() {
           </div>
           <p className="ln-meta" style={{ margin: 0 }}>Only the habit name and numbers are on the card. No tasks, no times of day.</p>
           <div className="ln-row" style={{ marginTop: 'auto', gap: 8 }}>
-            <button type="button" className="ln-btn ln-btn--sm ln-btn--line" disabled={!canvas} onClick={() => { if (canvas) void copyCard(canvas).then(setCopied); }}>
+            <button type="button" className="ln-btn ln-btn--sm ln-btn--line" disabled={!canvas} onClick={() => { if (canvas) void copyCard(canvas).then(setCopied); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={copied ? 'M5 12.5l4.5 4.5L19 7.5' : 'M9 9h10v11H9zM5 15V4h10'} /></svg>
               {copied ? 'Copied' : 'Copy'}
             </button>
-            <button type="button" className="ln-btn ln-btn--sm ln-btn--primary" style={{ flex: 1 }} disabled={!canvas}
+            <button type="button" className="ln-btn ln-btn--sm ln-btn--primary" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }} disabled={!canvas}
               onClick={() => { if (canvas) saveCard(canvas, cardFileName(card, fmt)); }} data-testid="share-save">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M4.5 19.5h15" /></svg>
               Save image
             </button>
           </div>

@@ -35,6 +35,13 @@ export function currentDiagnostics(): Diagnostics {
   return { version: info?.version ?? APP_VERSION, os: info?.system ?? navigator.platform, errors: recentErrors() };
 }
 
+const ICON_BTN: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 7 };
+
+/** A 14px line icon for the dialog's buttons. */
+function Ico({ d }: { d: string }) {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}><path d={d} /></svg>;
+}
+
 export function FeedbackDialog() {
   const preset = useLaunchStore((s) => s.feedback);
   const [kind, setKind] = useState<FeedbackKind>('bug');
@@ -140,10 +147,10 @@ export function FeedbackDialog() {
         </div>
 
         <div className="ln-row" style={{ padding: '16px 24px 24px', gap: 8, boxShadow: 'inset 0 1px 0 var(--paper-3)' }}>
-          <button type="button" className="ln-btn ln-btn--sm" onClick={copy} data-testid="feedback-copy">{copied ? 'Copied' : 'Copy diagnostics'}</button>
+          <button type="button" className="ln-btn ln-btn--sm" onClick={copy} data-testid="feedback-copy" style={ICON_BTN}>{copied ? <><Ico d="M5 12.5l4.5 4.5L19 7.5" />Copied</> : <><Ico d="M9 9h10v11H9zM5 15V4h10" />Copy diagnostics</>}</button>
           <span style={{ flex: 1 }} />
-          <button type="button" className="ln-btn ln-btn--sm ln-btn--line" onClick={email} data-testid="feedback-email" title={`Opens your mail app with an email to ${FEEDBACK_EMAIL}`}>Send by email</button>
-          <button type="button" className="ln-btn ln-btn--sm ln-btn--primary" onClick={send} data-testid="feedback-send">Continue on GitHub</button>
+          <button type="button" className="ln-btn ln-btn--sm ln-btn--line" onClick={email} data-testid="feedback-email" title={`Opens your mail app with an email to ${FEEDBACK_EMAIL}`} style={ICON_BTN}><Ico d="M3.5 6h17v12h-17zM4 7l8 6 8-6" />Send by email</button>
+          <button type="button" className="ln-btn ln-btn--sm ln-btn--primary" onClick={send} data-testid="feedback-send" style={ICON_BTN}>Continue on GitHub<Ico d="M14 4h6v6M20 4l-8 8M18 14v5H5V6h5" /></button>
         </div>
       </div>
     </div>,
