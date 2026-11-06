@@ -1532,3 +1532,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`, `src/renderer/dev/previewBridge.ts`
 **Summary:** The rich preview board now has a habit lane, so batch 21's icons were rendered and checked in both themes. Its running streak was rust; it is acid like every other habit view (grey at 0).
+
+## [2026-11-07] — UI loop batch 23: the morning greeting no longer covers windows
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/DayMoments/index.tsx`, `src/renderer/styles/launch.css`
+**Summary:** "Good morning." floated at the top centre over the Todo and Habit windows (it covered a Todo row and the Habits header) and stayed until dismissed or the board changed. It now sits bottom centre above the status bar and goes by itself after 15 seconds. Its entrance used the shared rise animation, whose transform dropped the -50% centring, so it slid in diagonally from the right; it has its own keyframes now and none under reduced motion.

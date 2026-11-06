@@ -97,6 +97,12 @@ export function DayMoments() {
   const [morningBoard, setMorningBoard] = useState<typeof board>(null);
   useEffect(() => { if (morning) setMorningBoard(useBoardStore.getState().board); }, [morning]);
   useEffect(() => { if (morning && morningBoard && board !== morningBoard) setMorning(null); }, [board, morning, morningBoard]);
+  // A greeting, not a task: it goes by itself after a short while.
+  useEffect(() => {
+    if (!morning) return;
+    const t = window.setTimeout(() => setMorning(null), 15_000);
+    return () => window.clearTimeout(t);
+  }, [morning]);
 
   // Escape closes the card.
   useEffect(() => {
