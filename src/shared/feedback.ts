@@ -30,11 +30,22 @@ export interface Diagnostics {
   errors: string[];
 }
 
+/**
+ * A report is posted publicly: take the user's account name out of paths
+ * (C:\Users\<name>, /Users/<name>, /home/<name> → ~) and hide email addresses.
+ */
+export function scrubDiagnosticLine(line: string): string {
+  return line
+    .replace(/[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s'"]+/gi, '~')
+    .replace(/\/(?:Users|home)\/[^/\s'"]+/g, '~')
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '<email>');
+}
+
 /** The block pasted into a report (and copied by "Copy diagnostics"). */
 export function diagnosticsText(d: Diagnostics): string {
   const lines = [`KRNL0 ${d.version} · ${d.os}`];
   if (d.errors.length > 0) {
-    lines.push('', 'Recent errors:', ...d.errors.map((e) => `- ${e}`));
+    lines.push('', 'Recent errors:', ...d.errors.map((e) => `- ${scrubDiagnosticLine(e)}`));
   }
   return lines.join('\n');
 }

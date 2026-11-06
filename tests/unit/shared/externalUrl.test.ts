@@ -18,3 +18,18 @@ describe('isAllowedExternalUrl', () => {
     expect(isAllowedExternalUrl(42)).toBe(false);
   });
 });
+
+import { diagnosticsText, scrubDiagnosticLine } from '../../../src/shared/feedback';
+
+describe('feedback diagnostics are scrubbed before they go public', () => {
+  it('takes the account name out of paths and hides emails', () => {
+    expect(scrubDiagnosticLine('ENOENT C:\\Users\\momo\\Documents\\krnl0\\board.json')).toBe('ENOENT ~\\Documents\\krnl0\\board.json');
+    expect(scrubDiagnosticLine('at /Users/ana/Library/x.js and /home/bob/.config')).toBe('at ~/Library/x.js and ~/.config');
+    expect(scrubDiagnosticLine('sent to someone@example.com')).toBe('sent to <email>');
+  });
+  it('diagnosticsText uses the scrubbed lines', () => {
+    const t = diagnosticsText({ version: '0.11.0', os: 'Windows 11', errors: ['C:/Users/momo/x failed'] });
+    expect(t).toContain('~/x failed');
+    expect(t).not.toContain('momo');
+  });
+});

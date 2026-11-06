@@ -1392,3 +1392,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/launch/{catchup,milestones}.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `docs/06-requirements/launch-experience.md` F20, tests `launch.catchup`, `launch.dialogs`
 **Summary:** Welcome back hid every task that had a predecessor, expecting it to come along with its head — but when the head was already done, or not due yet, the slipped task was shown nowhere. A slipped task is now listed under a head only when an earlier task in its chain slipped too; otherwise it is a head itself. A follower that slipped carries its time, and "Today", "Tomorrow", "Unplan" and "Bring all" move it with its head (same day, its own time), so it doesn't come back on the next launch. Milestones fired only when a count was exactly 7, 30, 100…; a repaired day (1 → 8) or logged past time (99 → 101) skipped the card for good. Now the highest milestone reached within 3 days / 5 sessions shows, once; an old long streak does not replay earlier ones.
+
+## [2026-11-06] — Bug hunt batch 3: feedback reports don't publish your account name
+
+**Type:** Bug Fix (privacy)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/feedback.ts`, `tests/unit/shared/externalUrl.test.ts`
+**Summary:** Send feedback can attach the session's recent errors to a public GitHub issue. Error lines often hold file paths such as `C:\Users\<name>\Documents\krnl0\board.json`, which would publish the user's account name. Paths under a home folder now read `~` (Windows, macOS and Linux forms) and email addresses read `<email>`, in both the issue link and "Copy diagnostics".
