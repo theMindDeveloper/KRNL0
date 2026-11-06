@@ -444,7 +444,8 @@ export function PomoNode({
                 onClick={(e) => { e.stopPropagation(); if (!active) onCommand('pomo.setConfig', { config: { mode: m } }); }}
                 style={{
                   padding: '2px 7px',
-                  background: active ? 'var(--rust)' : 'transparent',
+                  // rust-deep: the paper-coloured label stays readable in light mode.
+                  background: active ? 'var(--rust-deep, var(--rust))' : 'transparent',
                   color: active ? 'var(--paper)' : 'var(--ink-3)',
                   border: 'none',
                   fontFamily: 'var(--font-mono)',
@@ -563,9 +564,9 @@ export function PomoNode({
                   style={{
                     flex: 1,
                     padding: '5px 2px',
-                    background: isActive ? 'var(--rust)' : 'transparent',
+                    background: isActive ? 'var(--rust-deep, var(--rust))' : 'transparent',
                     color: isActive ? 'var(--paper)' : 'var(--ink-3)',
-                    border: `1px solid ${isActive ? 'var(--rust)' : 'var(--paper-3)'}`,
+                    border: `1px solid ${isActive ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
                     borderRadius: 4,
                     fontFamily: 'var(--font-mono)',
                     fontSize: 9,

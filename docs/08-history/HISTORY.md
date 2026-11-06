@@ -1406,3 +1406,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`
 **Summary:** The Clock's schedule faded rows that were over to 42 % opacity (3.7:1); they now keep full opacity in a quieter ink, with their colour bar at half strength. Times and durations are 10 px at readable contrast, the active PM/AM chip uses the deeper rust so its label reads in light mode, and the header's ◉ / ▦ / ◷ characters are a dot and line icons. All nine Analytics pages were rendered in both themes and at the small station size; the Insights page still squeezes three cards across a very narrow window (noted for a follow-up: the page grid needs to reflow by width).
+
+## [2026-11-06] — UI loop batch 5: month and year views readable, Pomo chips, steadier test runs
+
+**Type:** Polish + Chore
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{MonthView,YearView}.tsx`, `src/renderer/components/nodes/PomoNode/index.tsx`, `vitest.config.ts`, `tests/unit/renderer/launch.dialogs.test.tsx`
+**Summary:** Month view: days of the neighbouring months were ink-4 at 35 % (2.8:1); now quieter but readable. Year view: days with a light acid fill kept light text (1.1:1); dark text now starts at about a third of the fill. Pomo: the active POMO/OBSERVE and session-length chips use the deeper rust so their paper-coloured label reads in light mode (3.9 → 5:1). Tests: render tests that cold-load the whole station took 15–18 s under a full parallel run with the dev app open and timed out at random; the timeout is 30 s, and the new Welcome back test loads its command module up front.

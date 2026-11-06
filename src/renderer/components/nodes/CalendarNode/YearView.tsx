@@ -87,7 +87,8 @@ export function YearView({ state, onCommand }: Props) {
                         border: day === today ? '1px solid var(--acid)' : '1px solid transparent',
                         borderRadius: 2,
                         background: pct > 0 ? `color-mix(in srgb, var(--acid) ${pct}%, var(--paper-2))` : 'var(--paper-2)',
-                        color: pct > 55 ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
+                        // Dark text once the acid fill is light enough to need it (from about a third).
+                        color: pct > 35 ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
                         fontFamily: 'var(--font-mono)', fontSize: 7.5, lineHeight: 1,
                         display: 'grid', placeItems: 'center',
                       }}

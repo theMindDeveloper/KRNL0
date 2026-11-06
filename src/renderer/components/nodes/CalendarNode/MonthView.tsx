@@ -576,8 +576,9 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     ? '#1a1814'
                     : inCurrentMonth
                       ? 'var(--ink-1)'
-                      : 'var(--ink-4)',
-                  opacity: inCurrentMonth ? 1 : 0.35,
+                      : 'var(--ink-3)',
+                  // Other months: quieter ink, still readable (was ink-4 at 35 %).
+                  opacity: inCurrentMonth ? 1 : 0.7,
                   textAlign: 'right',
                   lineHeight: 1,
                   marginBottom: 2,

@@ -93,6 +93,8 @@ describe('Welcome back (F13, F14)', () => {
 
 describe('Welcome back moves a chain together (F14)', () => {
   it('"Bring all" moves a follower that slipped too, keeping its time', async () => {
+    // Load the command module first: the dialog imports it on demand.
+    await import('../../../src/renderer/components/Canvas/commandDispatch');
     bridge();
     const board = {
       nodes: [
@@ -110,7 +112,7 @@ describe('Welcome back moves a chain together (F14)', () => {
     const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     await vi.waitFor(() => expect(st('a')).toBe(`${ymd}T09:00`), { timeout: 5000 });
     expect(st('b')).toBe(`${ymd}T15:30`);
-  });
+  }, 20_000);
 });
 
 describe('Send feedback (F17, F18)', () => {
