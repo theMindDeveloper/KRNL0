@@ -5,9 +5,9 @@
 
 import { useEffect, useState } from 'react';
 import { Switch } from '../ui/Switch';
+import { SettingsIcon } from '../ui/SettingsIcons';
 import { POCKET_LOOKS, POCKET_LOOK_LABEL, isPocketLook, type PocketLook } from '../../../shared/pocket';
 
-const LOOK_EMOJI: Record<PocketLook, string> = { dial: '⭕', capsule: '💊', box: '🔲' };
 const LOOK_HINT: Record<PocketLook, string> = {
   dial: 'Round, with the Clock’s ticks. Hover for buttons.',
   capsule: 'A slim pill. Hover for the details.',
@@ -60,7 +60,7 @@ export function PocketSection() {
             onClick={() => pick(look)}
             className="st-choice st-choice--text"
           >
-            <span className="st-choice__label">{LOOK_EMOJI[look]} {POCKET_LOOK_LABEL[look]}</span>
+            <span className="st-choice__label"><SettingsIcon name={look} size={15} />{POCKET_LOOK_LABEL[look]}</span>
             <span className="st-choice__hint">{LOOK_HINT[look]}</span>
           </button>
         ))}

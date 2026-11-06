@@ -102,16 +102,17 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
    the right. The current section is a filled row, never an edge bar. */
 .st { width: 760px; height: min(560px, calc(100vh - 48px)); display: flex; }
 .st-nav { width: 200px; flex-shrink: 0; padding: 20px 12px; display: flex; flex-direction: column; gap: 2px; background: var(--paper-2); box-shadow: inset -1px 0 0 var(--paper-3); }
-.st-nav__title { font-size: 13px; font-weight: 700; padding: 4px 10px 16px; letter-spacing: .02em; }
+.st-nav__title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; padding: 4px 10px 16px; letter-spacing: .02em; color: var(--ink); }
 .st-nav__item { appearance: none; border: 0; font: inherit; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-radius: 8px;
   background: transparent; color: var(--ink-2); font-size: 12.5px; cursor: pointer; text-align: left; transition: background 140ms, color 140ms; }
 .st-nav__item:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
 .st-nav__item[aria-current="page"] { background: color-mix(in srgb, var(--acid) 16%, var(--paper)); color: var(--ink); font-weight: 600; }
 .st-nav__item:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
-.st-nav__emoji { width: 24px; height: 24px; display: grid; place-items: center; font-size: 15px; border-radius: 6px; background: var(--paper); box-shadow: inset 0 0 0 1px var(--paper-3); }
+.st-nav__icon { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; color: var(--ink-3); background: var(--paper); box-shadow: inset 0 0 0 1px var(--paper-3); }
+.st-nav__item[aria-current="page"] .st-nav__icon { color: var(--acid-ink, var(--acid)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 45%, var(--paper-3)); }
 .st-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .st-head { display: flex; align-items: flex-start; gap: 14px; padding: 24px 24px 16px; }
-.st-head__emoji { width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; font-size: 24px; border-radius: 12px; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--paper-3); }
+.st-head__icon { width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px; color: var(--acid-ink, var(--acid)); background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--paper-3); }
 .st-head__title { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
 .st-head__blurb { margin: 4px 0 0; font-size: 12px; line-height: 18px; color: var(--ink-3); }
 .st-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 24px 24px; display: flex; flex-direction: column; gap: 12px; }
@@ -119,6 +120,7 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 .st-card > div[data-testid] { margin-bottom: 0 !important; }
 .st-card--danger { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rust) 45%, var(--paper-3)); background: color-mix(in srgb, var(--rust) 6%, var(--paper-2)); }
 .st-card__title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--ink); }
+.st-card__title svg { color: var(--ink-3); }
 .st-text { margin: 0; font-size: 12px; line-height: 19px; color: var(--ink-2); }
 .st-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .st-choice { appearance: none; border: 0; font: inherit; cursor: pointer; text-align: left; padding: 10px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px;
@@ -127,7 +129,9 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 .st-choice[aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--acid); background: color-mix(in srgb, var(--acid) 8%, var(--paper)); }
 .st-choice:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
 .st-choice--text { padding: 12px; gap: 4px; }
-.st-choice__label { font-size: 12.5px; font-weight: 600; }
+.st-choice__label { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
+.st-choice__label svg { color: var(--ink-3); }
+.st-choice[aria-checked="true"] .st-choice__label svg { color: var(--acid-ink, var(--acid)); }
 .st-choice__hint { font-size: 11px; line-height: 16px; color: var(--ink-3); }
 .st-swatch { height: 56px; border-radius: 6px; display: grid; grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; gap: 4px; padding: 6px; }
 .st-swatch i { border-radius: 3px; }

@@ -12,16 +12,17 @@ import { useBoardStore } from '../../store/boardStore';
 import { UpdatesSection } from './UpdatesSection';
 import { PocketSection } from './PocketSection';
 import { BackupsSection, CelebrationsSection } from './LaunchSettings';
+import { SettingsIcon, type SettingsIconName } from '../ui/SettingsIcons';
 
 export type Theme = 'light' | 'dark';
 export type SettingsSection = 'general' | 'timer' | 'celebrations' | 'updates' | 'reset';
 
-const SECTIONS: ReadonlyArray<{ id: SettingsSection; emoji: string; label: string; title: string; blurb: string }> = [
-  { id: 'general', emoji: '✨', label: 'General', title: 'General', blurb: 'How KRNL0 looks, and how much of it you see.' },
-  { id: 'timer', emoji: '⏱️', label: 'Floating timer', title: 'Floating timer', blurb: 'Keep the Pomo in sight while you work in other apps.' },
-  { id: 'celebrations', emoji: '🎉', label: 'Celebrations', title: 'Celebrations', blurb: 'A card to keep or share when you hit a milestone.' },
-  { id: 'updates', emoji: '🔄', label: 'Updates', title: 'Updates & backups', blurb: 'New versions arrive by themselves. Your board is copied first.' },
-  { id: 'reset', emoji: '🧨', label: 'Reset', title: 'Start over', blurb: 'Wipe the board and begin from the default workspace.' },
+const SECTIONS: ReadonlyArray<{ id: SettingsSection; icon: SettingsIconName; label: string; title: string; blurb: string }> = [
+  { id: 'general', icon: 'general', label: 'General', title: 'General', blurb: 'How KRNL0 looks, and how much of it you see.' },
+  { id: 'timer', icon: 'timer', label: 'Floating timer', title: 'Floating timer', blurb: 'Keep the Pomo in sight while you work in other apps.' },
+  { id: 'celebrations', icon: 'celebrations', label: 'Celebrations', title: 'Celebrations', blurb: 'A card to keep or share when you hit a milestone.' },
+  { id: 'updates', icon: 'updates', label: 'Updates', title: 'Updates & backups', blurb: 'New versions arrive by themselves. Your board is copied first.' },
+  { id: 'reset', icon: 'reset', label: 'Reset', title: 'Start over', blurb: 'Wipe the board and begin from the default workspace.' },
 ];
 
 export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: {
@@ -55,7 +56,7 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
     >
       <div className="ln-dialog st" onClick={(e) => e.stopPropagation()}>
         <nav className="st-nav" aria-label="Settings sections">
-          <div className="st-nav__title">⚙️ Settings</div>
+          <div className="st-nav__title"><SettingsIcon name="settings" />Settings</div>
           {SECTIONS.map((s) => (
             <button
               key={s.id}
@@ -65,7 +66,7 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
               onClick={() => setSection(s.id)}
               data-testid={`settings-tab-${s.id}`}
             >
-              <span className="st-nav__emoji" aria-hidden>{s.emoji}</span>
+              <span className="st-nav__icon" aria-hidden><SettingsIcon name={s.icon} /></span>
               <span>{s.label}</span>
             </button>
           ))}
@@ -73,7 +74,7 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
 
         <div className="st-main">
           <header className="st-head">
-            <span className="st-head__emoji" aria-hidden>{meta.emoji}</span>
+            <span className="st-head__icon" aria-hidden><SettingsIcon name={meta.icon} size={22} /></span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h2 className="st-head__title">{meta.title}</h2>
               <p className="st-head__blurb">{meta.blurb}</p>
@@ -99,10 +100,10 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
   );
 }
 
-function Card({ title, emoji, children }: { title?: string; emoji?: string; children: ReactNode }) {
+function Card({ title, icon, children }: { title?: string; icon?: SettingsIconName; children: ReactNode }) {
   return (
     <section className="st-card">
-      {title && <h3 className="st-card__title"><span aria-hidden>{emoji}</span>{title}</h3>}
+      {title && <h3 className="st-card__title">{icon && <SettingsIcon name={icon} size={15} />}{title}</h3>}
       {children}
     </section>
   );
@@ -113,29 +114,29 @@ function General({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void
   const easy = useEasyMode();
   return (
     <>
-      <Card title="Appearance" emoji="🎨">
+      <Card title="Appearance" icon="appearance">
         <div role="radiogroup" aria-label="Light or dark" className="st-choices">
           {(['light', 'dark'] as const).map((t) => (
             <button key={t} type="button" role="radio" aria-checked={theme === t} data-testid={`settings-theme-${t}`} onClick={() => onTheme(t)} className="st-choice">
               <span className={`st-swatch st-swatch--${t}`} aria-hidden>
                 <i /><i /><i />
               </span>
-              <span className="st-choice__label">{t === 'light' ? '☀️ Light' : '🌙 Dark'}</span>
+              <span className="st-choice__label"><SettingsIcon name={t === 'light' ? 'sun' : 'moon'} size={15} />{t === 'light' ? 'Light' : 'Dark'}</span>
             </button>
           ))}
         </div>
       </Card>
       {/* Easy / Advanced — Easy hides the links between features; data is the same. */}
-      <Card title="Mode" emoji="🧭">
+      <Card title="Mode" icon="mode">
         <div role="radiogroup" aria-label="Easy or Advanced" className="st-choices">
           {([
-            ['easy', '🌱 Easy', 'Plan your day and see where the time went'],
-            ['advanced', '🛠️ Advanced', 'Connect tasks, categories and focus'],
+            ['easy', 'Easy', 'Plan your day and see where the time went'],
+            ['advanced', 'Advanced', 'Connect tasks, categories and focus'],
           ] as const).map(([m, label, hint]) => {
             const on = (m === 'easy') === easy;
             return (
               <button key={m} type="button" role="radio" aria-checked={on} data-testid={`settings-mode-${m}`} onClick={() => setUiMode(m)} className="st-choice st-choice--text">
-                <span className="st-choice__label">{label}</span>
+                <span className="st-choice__label"><SettingsIcon name={m} size={15} />{label}</span>
                 <span className="st-choice__hint">{hint}</span>
               </button>
             );
@@ -150,7 +151,7 @@ function Reset({ onClose }: { onClose: () => void }) {
   const factoryReset = useBoardStore((s) => s.factoryReset);
   return (
     <section className="st-card st-card--danger">
-      <h3 className="st-card__title" style={{ color: 'var(--rust)' }}><span aria-hidden>⚠️</span>Factory reset</h3>
+      <h3 className="st-card__title" style={{ color: 'var(--rust)' }}><SettingsIcon name="warning" size={15} />Factory reset</h3>
       <p className="st-text">
         Deletes the current board — all tasks, habits, schedules, history and layout — and starts fresh from the
         default workspace. This cannot be undone. A copy from before the last update stays in Updates › Board backups.
