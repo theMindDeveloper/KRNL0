@@ -10,6 +10,7 @@ import { app, ipcMain, shell, type BrowserWindow } from 'electron';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { arch, release, type as osType } from 'os';
+import { FEEDBACK_EMAIL } from '../shared/feedback';
 import {
   DAY_MS,
   applyPrefsPatch,
@@ -176,8 +177,10 @@ export function registerAppStateHandlers(): void {
     return err ? { ok: false, message: err } : { ok: true, message: dir };
   });
   ipcMain.handle('app:open-external', async (_e, url: unknown) => {
-    // Only the project's own pages: the feedback flow and Help links.
-    if (typeof url !== 'string' || !url.startsWith('https://github.com/theMindDeveloper/KRNL0')) {
+    // Only the project's own pages and the feedback email: the feedback flow and Help links.
+    const ok = typeof url === 'string'
+      && (url.startsWith('https://github.com/theMindDeveloper/KRNL0') || url.startsWith(`mailto:${FEEDBACK_EMAIL}?`));
+    if (!ok) {
       return { ok: false, message: 'refused' };
     }
     await shell.openExternal(url);

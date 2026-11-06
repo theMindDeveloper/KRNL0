@@ -37,7 +37,7 @@ Everything here is about the moments around using KRNL0: opening it, after an up
 **Help and feedback**
 - **F16** A **?** button in the top bar opens Help: What's new, Take the tour, Catch up (opens Welcome back any time), Share a milestone (a card for the longest streak, or the focus sessions), Send feedback, Copy diagnostics, Source on GitHub, Check for updates, Board backups, and the version.
 - **F17** Send feedback: what it is (Something's broken / An idea / A question / Something I love), a short title, a description, and two switches — app version and system, recent errors (with **view**). It says the board, tasks and notes are never added.
-- **F18** **Continue on GitHub** opens a filled-in GitHub issue in the browser; nothing is sent from the app. The link stays under 7,500 characters (oldest error lines go first, then the description is shortened). **Copy diagnostics** copies the version, system and errors.
+- **F18** **Continue on GitHub** opens a filled-in GitHub issue in the browser; nothing is sent from the app. The link stays under 7,500 characters (oldest error lines go first, then the description is shortened). **Copy diagnostics** copies the version, system and errors. **Send by email** opens the user's mail app with the same report addressed to the maintainer (theminddevlab@gmail.com), for people without a GitHub account; the link stays under 1,900 characters.
 - **F19** `krnl feedback "title" [--kind bug|idea|question|love]` opens the dialog with the title filled in; with `--link` or without a window it prints the GitHub link.
 
 **Milestones**
@@ -152,7 +152,7 @@ Feature: Time at a glance (F10–F11)
 ## Out of scope (for now)
 
 - A release channel (stable / beta): it would change the update pipeline (AGENTS.md rule 11).
-- Attaching a screenshot to feedback (a GitHub link can't carry one), a non-GitHub feedback form, and GitHub Discussions links (Discussions is off).
+- Attaching a screenshot to feedback (a GitHub link can't carry one), a web feedback form (email covers people without GitHub), and GitHub Discussions links (Discussions is off).
 - A screen while the Windows installer runs after quitting (it runs outside the app).
 - A date picker in Welcome back (Today / Tomorrow / Unplan cover it without a native picker).
 - What's new as a note on the canvas (draft D) and the other splash / What's new drafts.

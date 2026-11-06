@@ -5,7 +5,7 @@
 // dialog goes to the open window through cliDispatch.
 
 import { describeWhatsNew, latestNotes } from '../../shared/whatsnew';
-import { buildIssueUrl, isFeedbackKind, type FeedbackKind } from '../../shared/feedback';
+import { FEEDBACK_EMAIL, buildIssueUrl, buildMailto, isFeedbackKind, type FeedbackKind } from '../../shared/feedback';
 import { describeAway, type AppStatePort } from '../../shared/appState';
 import { computeCatchup, describeCatchup, type CatchupBoard } from '../../renderer/launch/catchup';
 import { STREAK_MILESTONES, SESSION_MILESTONES, focusStats, habitStreaks } from '../../renderer/launch/milestones';
@@ -46,8 +46,14 @@ export function shareList(nodes: CatchupBoard['nodes'], json: boolean, today = t
 
 export function feedbackLink(title: string, kind: string | undefined): SysResult {
   const k: FeedbackKind = isFeedbackKind(kind) ? kind : 'bug';
-  const url = buildIssueUrl({ kind: k, title, text: '', diagnostics: null, includeErrors: false });
-  return { ok: true, message: `Open this link to file it on GitHub:\n${url}`, data: { url } };
+  const report = { kind: k, title, text: '', diagnostics: null, includeErrors: false };
+  const url = buildIssueUrl(report);
+  const mailto = buildMailto(report);
+  return {
+    ok: true,
+    message: `Open this link to file it on GitHub:\n${url}\nNo GitHub account? Email ${FEEDBACK_EMAIL}:\n${mailto}`,
+    data: { url, mailto, email: FEEDBACK_EMAIL },
+  };
 }
 
 export function appStatus(port: AppStatePort, json: boolean): SysResult {

@@ -7,6 +7,8 @@
 
 export const REPO_URL = 'https://github.com/theMindDeveloper/KRNL0';
 export const ISSUES_NEW_URL = `${REPO_URL}/issues/new`;
+/** For people without a GitHub account: the report goes by email instead. */
+export const FEEDBACK_EMAIL = 'theminddevlab@gmail.com';
 
 export type FeedbackKind = 'bug' | 'idea' | 'question' | 'love';
 
@@ -78,6 +80,31 @@ export function buildIssueUrl(r: FeedbackReport): string {
     url = make(rep);
   }
   while (url.length > MAX_URL_LENGTH && rep.text.length > 200) {
+    rep = { ...rep, text: `${rep.text.slice(0, Math.floor(rep.text.length * 0.8))}… (shortened)` };
+    url = make(rep);
+  }
+  return url;
+}
+
+/** Mail clients cut long mailto links; keep the whole link under this. */
+export const MAX_MAILTO_LENGTH = 1900;
+
+/**
+ * The same report as an email to the maintainer (no GitHub account needed).
+ * Opens the user's mail app with it filled in; they press Send themselves.
+ */
+export function buildMailto(r: FeedbackReport): string {
+  const kind = FEEDBACK_KINDS.find((k) => k.id === r.kind) ?? FEEDBACK_KINDS[0]!;
+  const subject = `KRNL0 ${kind.prefix}: ${r.title.trim() || 'Feedback from the app'}`;
+  const make = (rep: FeedbackReport): string =>
+    `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(issueBody(rep).replace('_Sent from KRNL0 › Help › Send feedback._', 'Sent from KRNL0 › Help › Send feedback.'))}`;
+  let rep = r;
+  let url = make(rep);
+  while (url.length > MAX_MAILTO_LENGTH && rep.diagnostics && rep.includeErrors && rep.diagnostics.errors.length > 0) {
+    rep = { ...rep, diagnostics: { ...rep.diagnostics, errors: rep.diagnostics.errors.slice(1) } };
+    url = make(rep);
+  }
+  while (url.length > MAX_MAILTO_LENGTH && rep.text.length > 120) {
     rep = { ...rep, text: `${rep.text.slice(0, Math.floor(rep.text.length * 0.8))}… (shortened)` };
     url = make(rep);
   }

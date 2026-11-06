@@ -11,8 +11,10 @@ import { Switch } from '../ui/Switch';
 import { closeFeedback, useLaunchStore } from '../../launch/launchStore';
 import { useEventLog } from '../../store/eventLog';
 import {
+  FEEDBACK_EMAIL,
   FEEDBACK_KINDS,
   buildIssueUrl,
+  buildMailto,
   diagnosticsText,
   type Diagnostics,
   type FeedbackKind,
@@ -66,9 +68,13 @@ export function FeedbackDialog() {
     ? 'What happened, and what did you expect?'
     : kind === 'idea' ? 'What would you like KRNL0 to do?' : kind === 'question' ? 'What would you like to know?' : 'What do you like about it?';
 
+  const report = { kind, title, text, diagnostics: withSystem ? diagnostics : null, includeErrors: withErrors };
   const send = (): void => {
-    const url = buildIssueUrl({ kind, title, text, diagnostics: withSystem ? diagnostics : null, includeErrors: withErrors });
-    void window.krnl?.appOpenExternal?.(url);
+    void window.krnl?.appOpenExternal?.(buildIssueUrl(report));
+    closeFeedback();
+  };
+  const email = (): void => {
+    void window.krnl?.appOpenExternal?.(buildMailto(report));
     closeFeedback();
   };
   const copy = (): void => {
@@ -126,13 +132,17 @@ export function FeedbackDialog() {
               <Switch checked={withErrors && withSystem} onChange={setWithErrors} title="Recent errors" />
             </div>
             {showErrors && <pre className="ln-pre">{diagnostics.errors.join('\n')}</pre>}
-            <span className="ln-meta" style={{ marginTop: 8 }}>Your board, tasks and notes are never added.</span>
+            <span className="ln-meta" style={{ marginTop: 8 }}>
+              Your board, tasks and notes are never added. GitHub opens a filled-in issue; no GitHub account? Send it by email
+              to {FEEDBACK_EMAIL}. Nothing is sent until you post or send it.
+            </span>
           </div>
         </div>
 
         <div className="ln-row" style={{ padding: '16px 24px 24px', gap: 8, boxShadow: 'inset 0 1px 0 var(--paper-3)' }}>
-          <span className="ln-meta" style={{ flex: 1, minWidth: 0 }}>Opens a filled-in GitHub issue. Nothing is sent until you post it.</span>
           <button type="button" className="ln-btn ln-btn--sm" onClick={copy} data-testid="feedback-copy">{copied ? 'Copied' : 'Copy diagnostics'}</button>
+          <span style={{ flex: 1 }} />
+          <button type="button" className="ln-btn ln-btn--sm ln-btn--line" onClick={email} data-testid="feedback-email" title={`Opens your mail app with an email to ${FEEDBACK_EMAIL}`}>Send by email</button>
           <button type="button" className="ln-btn ln-btn--sm ln-btn--primary" onClick={send} data-testid="feedback-send">Continue on GitHub</button>
         </div>
       </div>

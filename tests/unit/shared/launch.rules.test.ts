@@ -13,7 +13,7 @@ import {
   DEFAULT_APP_STATE,
 } from '../../../src/shared/appState';
 import { RELEASES, describeWhatsNew, latestNotes, notesFor, shouldShowWhatsNew } from '../../../src/shared/whatsnew';
-import { ISSUES_NEW_URL, MAX_URL_LENGTH, buildIssueUrl, diagnosticsText, isFeedbackKind } from '../../../src/shared/feedback';
+import { FEEDBACK_EMAIL, ISSUES_NEW_URL, MAX_MAILTO_LENGTH, MAX_URL_LENGTH, buildIssueUrl, buildMailto, diagnosticsText, isFeedbackKind } from '../../../src/shared/feedback';
 import { IDLE_VIEW, systemTimerView } from '../../../src/shared/systemTimer';
 import { defaultPomoConfig, defaultPomoState } from '../../../src/renderer/components/nodes/PomoNode/types';
 import type { PocketSnapshot } from '../../../src/shared/pocket';
@@ -113,6 +113,16 @@ describe('feedback link (F18)', () => {
     const errors = Array.from({ length: 40 }, (_, i) => `error ${i} ${'x'.repeat(200)}`);
     const url = buildIssueUrl({ kind: 'bug', title: 't', text: 'y'.repeat(9000), diagnostics: { ...diagnostics, errors }, includeErrors: true });
     expect(url.length).toBeLessThanOrEqual(MAX_URL_LENGTH);
+  });
+  it('by email: to the maintainer, subject and body filled in, short enough for mail apps', () => {
+    const url = buildMailto({ kind: 'idea', title: 'Dark calendar', text: 'Please.', diagnostics, includeErrors: true });
+    expect(url.startsWith(`mailto:${FEEDBACK_EMAIL}?`)).toBe(true);
+    const q = new URLSearchParams(url.slice(url.indexOf('?') + 1));
+    expect(q.get('subject')).toBe('KRNL0 Idea: Dark calendar');
+    expect(q.get('body')).toContain('Please.');
+    expect(q.get('body')).toContain('KRNL0 0.11.0');
+    const long = buildMailto({ kind: 'bug', title: 't', text: 'y'.repeat(5000), diagnostics: { ...diagnostics, errors: Array.from({ length: 30 }, () => 'e'.repeat(100)) }, includeErrors: true });
+    expect(long.length).toBeLessThanOrEqual(MAX_MAILTO_LENGTH);
   });
   it('kinds and diagnostics text', () => {
     expect(isFeedbackKind('love')).toBe(true);
