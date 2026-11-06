@@ -6,7 +6,8 @@ import { todoBuckets, todoReclassify, todoTagLibrary, visibleItems } from './com
 import { tagDisplay } from '../../../../shared/tags/classify';
 import { useEasyMode } from '../../../store/uiMode';
 import { TagPicker } from './TagPicker';
-import { isoToYMD, todayLocal, addDays } from '../../../analytics/dateRange';
+import { showPlanGuide } from '../../PlanGuide';
+
 import { defaultTodoConfig } from './types';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { ContextMenu } from '../../ContextMenu';
@@ -52,7 +53,6 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   // ADR 0016 — Done / Archive dropdowns (collapsed by default) + tag picker.
   const [doneOpen, setDoneOpen] = useState(false);
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [tagPicker, setTagPicker] = useState<{ x: number; y: number; itemId: string } | null>(null);
 
   // 60-second tick for past-item graying — also rolls yesterday's Done into
@@ -232,7 +232,6 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   }, 0);
 
   const undoneCount = buckets.active.length;
-  const hasDone = buckets.done.length > 0;
 
   const submitTask = (name: string, durationMin: number | null) => {
     // Time is optional — no duration → an open-ended task.
@@ -537,6 +536,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           onClick={(e) => e.stopPropagation()}
           style={{
             flex: 1,
+            // Let a long title shrink (ellipsis) so the PLAN / tag buttons
+            // after it stay inside the window.
+            minWidth: 0,
             fontFamily: 'var(--font-sans)',
             fontSize: 12.5,
             color: item.done ? 'var(--ink-4)' : 'var(--ink)',
@@ -679,6 +681,30 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         );
       })()}
 
+      {/* engagement.md F14 — PLAN shows how to drag the row onto the Calendar. */}
+      {!item.done && !archived && !sched && (
+        <button
+          type="button"
+          className="todo-plan"
+          data-testid={`todo-plan-${item.id}`}
+          title="Plan it: drag it onto the Calendar"
+          aria-label={`Plan: ${item.text}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            showPlanGuide({ mode: 'plan', itemId: item.id, taskId: item.taskNodeId, text: item.text });
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, height: 18, padding: '0 6px',
+            borderRadius: 999, border: '1px solid var(--paper-3)', background: 'transparent', cursor: 'pointer',
+            fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.06em', color: 'var(--ink-3)',
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
+          PLAN
+        </button>
+      )}
+
       {/* Delete — hover-revealed */}
       <button
         type="button"
@@ -752,30 +778,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               </span>
             )}
           </span>
-          {/* F6 / ADR 0016: archive-now button — visible when ≥1 item is in
-              Done. Done items archive on their own when the day ends; this
-              just does it early. Nothing is deleted. */}
-          {hasDone && (
-            <button
-              type="button"
-              data-testid="clear-done-btn"
-              title="Move today's done items to the archive"
-              onClick={() => onCommand('todo.archiveDone')}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                color: 'var(--ink-4)',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                padding: '0 2px',
-              }}
-            >
-              ARCHIVE DONE
-            </button>
-          )}
+          {/* One Done list (engagement.md F7): no "archive" step in the UI.
+              Today's done items sit in "Done today"; earlier days fold below.
+              `todo.archiveDone` stays for the CLI. */}
         </div>
 
         {/* Item list */}
@@ -802,7 +807,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             <>
               <SectionToggle
                 testId="todo-done-toggle"
-                label="Done"
+                label="Done today"
                 count={doneItems.length}
                 open={doneOpen}
                 onToggle={() => setDoneOpen((o) => !o)}
@@ -811,45 +816,39 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             </>
           )}
 
-          {/* ADR 0016 — Archive dropdown: done items from earlier days,
-              newest first, with a day label whenever the day changes. */}
-          {buckets.archived.length > 0 && (
-            <>
-              <SectionToggle
-                testId="todo-archive-toggle"
-                label="Archive"
-                count={buckets.archived.length}
-                open={archiveOpen}
-                onToggle={() => setArchiveOpen((o) => !o)}
-                action={archiveOpen ? { label: 'CLEAR', testId: 'todo-clear-archive-btn', onSelect: () => undoable(`Cleared ${buckets.archived.length} archived`, () => onCommand('todo.clearArchived')) } : undefined}
-              />
-              {archiveOpen && buckets.archived.map((item, idx) => {
-                const day = item.completedAt ? isoToYMD(item.completedAt) : '';
-                const prevDay = idx > 0 ? isoToYMD(buckets.archived[idx - 1]!.completedAt ?? '') : null;
-                return (
-                  <div key={item.id}>
-                    {day !== prevDay && (
-                      <div
-                        style={{
-                          padding: '4px 14px 2px',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 9,
-                          color: 'var(--ink-4)',
-                          letterSpacing: '0.06em',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {dayLabel(day)}
-                      </div>
-                    )}
-                    {renderRow(item, true)}
-                  </div>
-                );
-              })}
-            </>
-          )}
+          {/* engagement.md F7 — only today's Done shows here. Done items from
+              earlier days stay in the data (Analytics, \`todo list --archived\`). */}
           </div>
         </PagedView>
+
+        {/* engagement.md F13 — one-tap guesses while asking "how long?".
+            mousedown keeps the input focused (its blur would cancel the add). */}
+        {inputFocused && inputPhase === 'duration' && (
+          <div
+            data-testid="todo-estimate-chips"
+            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: '8px 14px 0', borderTop: '1px dashed var(--paper-3)' }}
+          >
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)', marginRight: 2 }}>
+              how long? (your guess)
+            </span>
+            {([15, 30, 60, 120] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                data-testid={`todo-estimate-${m}`}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onClick={(e) => { e.stopPropagation(); submitTask(pendingName.trim(), m); }}
+                style={{
+                  height: 24, padding: '0 10px', borderRadius: 999, cursor: 'pointer',
+                  border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)',
+                  fontFamily: 'var(--font-mono)', fontSize: 11,
+                }}
+              >
+                {m < 60 ? `${m}m` : `${m / 60}h`}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* F4: add-task row — "add task" placeholder swaps to input on click, ↵ always visible */}
         <div
@@ -895,7 +894,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 }
               }}
               autoFocus
-              placeholder={inputPhase === 'name' ? 'task → spawns a node…' : 'how long? (min, optional — Enter to skip)'}
+              placeholder={inputPhase === 'name' ? 'task → spawns a node…' : 'or type minutes — Enter to skip'}
               style={{
                 flex: 1,
                 background: 'transparent',
@@ -965,19 +964,6 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   );
 }
 
-/** "Today" / "Yesterday" / "Mon 3 Nov" for an archive day header. */
-function dayLabel(ymd: string): string {
-  if (!ymd) return '';
-  const today = todayLocal();
-  if (ymd === today) return 'Today';
-  if (ymd === addDays(today, -1)) return 'Yesterday';
-  return new Date(`${ymd}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
 /** Collapsible section header for the Done / Archive dropdowns. */
 function SectionToggle({
   label,
@@ -1036,7 +1022,7 @@ function SectionToggle({
           data-testid={action.testId}
           onClick={(e) => { e.stopPropagation(); action.onSelect(); }}
           onMouseDown={(e) => e.stopPropagation()}
-          title="Delete archived items for good (analytics keeps their history)"
+          title="Delete earlier days' done items for good (analytics keeps their history)"
           style={{
             background: 'transparent',
             border: 'none',

@@ -36,7 +36,14 @@ import {
   getYearGridCells,
   isDayScheduled,
 } from './types';
-import { calcStreak } from './commands';
+import { bestStreak, calcStreak, milestoneReached, nextMilestone, repairableDay } from './commands';
+
+/** YYYY-MM-DD plus `n` days (local). */
+function addDaysLocal(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HabitPopover } from './HabitPopover';
@@ -44,6 +51,7 @@ import { HabitContextMenu } from './HabitContextMenu';
 import { HabitIcon } from './HabitIcon';
 import { Z } from '../../ui/layers';
 import { undoable } from '../../../store/undoNotice';
+import { openShare } from '../../../launch/launchStore';
 
 function getISOWeek(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -539,6 +547,14 @@ const WeekRow = memo(function WeekRow({
     () => calcStreak(habit.log, today, habit.schedule),
     [habit.log, today, habit.schedule],
   );
+  const best = useMemo(() => bestStreak(habit.log, habit.schedule), [habit.log, habit.schedule]);
+  const milestone = milestoneReached(streak);
+  const nextMs = nextMilestone(streak);
+  const toNext = nextMs !== null ? nextMs - streak : null;
+  const [repairHidden, setRepairHidden] = useState(false);
+  const repairCandidate = useMemo(() => repairableDay(habit.log, today, habit.schedule), [habit.log, today, habit.schedule]);
+  const repairDay = repairCandidate !== null && !repairHidden && !repairDismissed(habit.id, repairCandidate) ? repairCandidate : null;
+  const repairLabel = repairDay === null ? '' : repairDay === addDaysLocal(today, -1) ? 'yesterday' : new Date(`${repairDay}T00:00:00`).toLocaleDateString('en', { weekday: 'long' });
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -667,17 +683,78 @@ const WeekRow = memo(function WeekRow({
         style={{
           marginTop: 3,
           paddingLeft: 22,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
           fontFamily: 'var(--font-mono)',
           fontSize: 9.5,
           color: 'var(--rust)',
           letterSpacing: '0.04em',
         }}
       >
-        {`▲ ${streak} day streak`}
+        <span>{`▲ ${streak} day streak`}</span>
+        {milestone !== null && (
+          <button
+            type="button"
+            data-testid={`habit-milestone-${habit.id}`}
+            title="Open the card to save or share"
+            className="nodrag"
+            onClick={(e) => {
+              e.stopPropagation();
+              openShare({ id: `share:${habit.id}`, kind: 'streak', value: streak, habit: habit.name, best: streak >= best, log: habit.log, total: new Set(habit.log).size });
+            }}
+            style={{ padding: '0 6px', border: 0, borderRadius: 999, background: 'var(--acid)', color: 'var(--ink-on-bright)', fontWeight: 700, lineHeight: '14px', font: 'inherit', fontSize: 'inherit', cursor: 'pointer' }}
+          >
+            {milestone} days ↗
+          </button>
+        )}
+        {toNext !== null && streak > 0 && milestone === null && (
+          <span style={{ color: 'var(--ink-3)' }}>· {toNext} to {nextMs}</span>
+        )}
+        {best > streak && <span data-testid={`habit-best-${habit.id}`} style={{ color: 'var(--ink-3)' }}>· best {best}</span>}
       </div>
+
+      {/* engagement.md F17 — a missed day can be repaired, not a silent reset. */}
+      {repairDay !== null && (
+        <div
+          data-testid={`habit-repair-${habit.id}`}
+          style={{ marginTop: 4, marginLeft: 22, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-2)' }}
+        >
+          <span>Missed {repairLabel}? Tick it if you did it.</span>
+          <button
+            type="button"
+            data-testid={`habit-repair-yes-${habit.id}`}
+            onClick={(e) => { e.stopPropagation(); onToggle(habit.id, repairDay); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ height: 20, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--btn-primary-ring)', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.06em' }}
+          >
+            I DID IT
+          </button>
+          <button
+            type="button"
+            data-testid={`habit-repair-no-${habit.id}`}
+            onClick={(e) => { e.stopPropagation(); dismissRepair(habit.id, repairDay); setRepairHidden(true); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ height: 20, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 9.5 }}
+          >
+            no, start fresh
+          </button>
+        </div>
+      )}
     </div>
   );
 });
+
+const REPAIR_KEY = 'krnl0-habit-repair-dismissed';
+function repairDismissed(habitId: string, day: string): boolean {
+  try { return (JSON.parse(localStorage.getItem(REPAIR_KEY) ?? '{}') as Record<string, string>)[habitId] === day; } catch { return false; }
+}
+function dismissRepair(habitId: string, day: string): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(REPAIR_KEY) ?? '{}') as Record<string, string>;
+    localStorage.setItem(REPAIR_KEY, JSON.stringify({ ...all, [habitId]: day }));
+  } catch { /* no storage */ }
+}
 
 // ── Month view ──────────────────────────────────────────────────────────
 

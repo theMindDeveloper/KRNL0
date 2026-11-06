@@ -263,6 +263,39 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'finished',
+    summary: 'Finished task cards on the canvas (same as Settings → Finished cards)',
+    subcommands: [
+      { name: 'status', usage: 'finished status', summary: 'When finished cards leave the board, and whether they are shown anyway' },
+      { name: 'policy', usage: 'finished <overnight|hour|keep>', summary: 'Leave the board overnight, after 1 hour, or keep them' },
+      { name: 'show', usage: 'finished show', summary: 'Show finished cards on the board anyway' },
+      { name: 'hide', usage: 'finished hide', summary: 'Hide finished cards again (the policy applies)' },
+    ],
+  },
+  {
+    group: 'recap',
+    summary: 'Close the day — the day recap, yesterday, last week',
+    subcommands: [
+      { name: 'today', usage: 'recap [today]', summary: 'Today: tasks done, planned done, recorded time, top streak' },
+      { name: 'yesterday', usage: 'recap yesterday', summary: 'The same for yesterday (the morning line)' },
+      { name: 'week', usage: 'recap week', summary: 'Last week, Monday to Sunday, and its best day' },
+      { name: 'show', usage: 'recap show', summary: 'Open the day recap card in the window' },
+    ],
+  },
+  {
+    group: 'sound',
+    summary: 'UI sounds — the pack, volume and on/off (same as Settings → Sounds)',
+    subcommands: [
+      { name: 'status', usage: 'sound status', summary: 'On or off, the pack, the volume (default when no subcommand)' },
+      { name: 'list', usage: 'sound list', summary: 'The packs (snd01, zen, crisp) and the moments' },
+      { name: 'pack', usage: 'sound pack <snd01|zen|crisp>', summary: 'Choose the sound pack' },
+      { name: 'volume', usage: 'sound volume <0-100>', summary: 'Set the UI sound volume' },
+      { name: 'on', usage: 'sound on', summary: 'Turn UI sounds on' },
+      { name: 'off', usage: 'sound off', summary: 'Turn UI sounds off' },
+      { name: 'play', usage: 'sound play <moment>', summary: 'Play one moment in the current pack (add, done, start, …)' },
+    ],
+  },
+  {
     group: 'radio',
     summary: 'Ambient Radio — the sound mix in the open window',
     subcommands: [
@@ -342,7 +375,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Guided tutorials — one per part of the app',
     subcommands: [
       { name: 'list', usage: 'tour list', summary: 'List the tutorials' },
-      { name: 'start', usage: 'tour start <id>', summary: 'Start a tutorial in the KRNL0 window (welcome, pomo, todo, calendar, clock, habits, analytics, terminal)' },
+      { name: 'start', usage: 'tour start <id>', summary: 'Start a tutorial in the KRNL0 window (first-day, welcome, pomo, todo, calendar, clock, habits, analytics, terminal)' },
     ],
   },
   {

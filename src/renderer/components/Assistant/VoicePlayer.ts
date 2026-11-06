@@ -4,7 +4,7 @@ import { CLIP_MAP } from './clipMap';
 
 // Eagerly load every .mp3 under ./audio at bundle time.
 // Vite resolves them to hashed asset URLs for both dev and production.
-const _allClips = import.meta.glob('./audio/**/*.mp3', { as: 'url', eager: true }) as Record<string, string>;
+const _allClips = import.meta.glob('./audio/**/*.mp3', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 
 // Build a lookup: filename stem (basename without .mp3) → resolved URL.
 // Folder paths are stripped — clipMap references stems only.

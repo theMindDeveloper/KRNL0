@@ -149,16 +149,11 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
       expect(root.classList.contains('done')).toBe(true);
     });
 
-    it('task text has line-through styling when done', () => {
-      renderTaskNode(makeTaskState({ done: true }));
+    it('a done task shows the done card with its title (engagement.md F2)', () => {
+      renderTaskNode(makeTaskState({ done: true, text: 'write report' }));
       const text = document.querySelector('.task-text') as HTMLElement;
-      expect(text.style.textDecorationLine).toBe('line-through');
-    });
-
-    it('task text color is var(--ink-4) when done', () => {
-      renderTaskNode(makeTaskState({ done: true }));
-      const text = document.querySelector('.task-text') as HTMLElement;
-      expect(text.style.color).toBe('var(--ink-4)');
+      expect(text.textContent).toBe('write report');
+      expect(screen.getByTestId('task-node-root').dataset.doneCard).toBe('true');
     });
 
     it('node root does not have class "done" when done is false', () => {

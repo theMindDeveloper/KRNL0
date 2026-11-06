@@ -22,7 +22,10 @@ import { useBoardStore } from './store/boardStore';
 import { useBoardChannel } from './store/useBoardChannel';
 import { RadialChooserHost } from './components/ui/RadialChooser';
 import { LogTimeHost, RetagPickerHost } from './components/ui/SpanEditor';
-import { TourHost } from './components/Tour/TourHost';
+import { TourHost, startTour } from './components/Tour/TourHost';
+import { DayMoments } from './components/DayMoments';
+import { PlanGuide } from './components/PlanGuide';
+import { installWhatsNewDemo } from './dev/whatsNewDemo';
 import { useCliDispatch } from './store/useCliDispatch';
 import { installTimeLogWriter } from './store/timeLog';
 import { UndoNoticeBar } from './components/ui/UndoNoticeBar';
@@ -107,6 +110,16 @@ function AppInner() {
   // strategy A), so this fires after the new tree's RF instance is ready.
   // Delay one rAF + a short tick so the new RF wrapper has measured its
   // container before fitView reads its dimensions.
+  // TEMPORARY (branch review) — the "What's new" tour's demo data, and a
+  // dev-only auto-start: `VITE_KRNL_TOUR=whats-new npm run dev`.
+  useEffect(() => {
+    installWhatsNewDemo();
+    const id = import.meta.env.DEV ? (import.meta.env['VITE_KRNL_TOUR'] as string | undefined) : undefined;
+    if (!id) return;
+    const t = window.setTimeout(() => startTour(id), 3000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const lastModeRef = useRef<string | null>(null);
   useEffect(() => {
     if (lastModeRef.current === effectiveMode) return;
@@ -169,6 +182,8 @@ function AppInner() {
       <LogTimeHost />
       <RetagPickerHost />
       <TourHost />
+      <DayMoments />
+      <PlanGuide />
       <UndoNoticeBar />
       <UpdateNoticeBar />
       <LaunchHost />

@@ -9,7 +9,9 @@ import { calcStreak } from '../components/nodes/HabitNode/commands';
 import type { HabitSchedule } from '../components/nodes/HabitNode/types';
 import { bestStreak } from './catchup';
 
-export const STREAK_MILESTONES = [7, 30, 100, 365] as const;
+/** The Habit node's milestones (its seal shows on the same days). */
+export { STREAK_MILESTONES } from '../components/nodes/HabitNode/commands';
+import { STREAK_MILESTONES } from '../components/nodes/HabitNode/commands';
 export const SESSION_MILESTONES = [10, 100, 500] as const;
 
 export type Milestone =

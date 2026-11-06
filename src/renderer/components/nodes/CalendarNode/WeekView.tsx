@@ -44,6 +44,7 @@ import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { PagedView } from '../../ui/PagedView';
 import { TaskPopup } from './TaskPopup';
+import { showPlanGuide } from '../../PlanGuide';
 import { hourWindow, stepHourWindow } from './hourWindow';
 import { Z } from '../../ui/layers';
 import { screenScale } from './screenScale';
@@ -1068,7 +1069,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const isMissed = isPast && !task.done;
       const isGrayed = isDone;
       const trackedMin = (trackedByTask.get(task.id) ?? 0) / 60;
-      const overrunMin = Math.round(trackedMin - task.plannedMin);
+      // A done task shows its time neutrally ("took X"), never as an overrun (C11).
+      const overrunMin = task.done ? 0 : Math.round(trackedMin - task.plannedMin);
       // Labels show the task's real start/end, not this day's slice edges
       // (a 22:30–01:00 block must not read "22:30–00:00").
       const taskStartDate = new Date(task.startISO);
@@ -1235,7 +1237,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               ? `linear-gradient(to bottom, color-mix(in srgb, ${taskTone} 28%, var(--paper)) 0%, color-mix(in srgb, ${taskTone} 14%, transparent) 55%, transparent 100%)`
               : `color-mix(in srgb, ${taskTone} ${isMissed ? 12 : 24}%, var(--paper))`,
             // Soft full outline in the task colour (no left accent strip).
-            border: `1px solid color-mix(in srgb, ${taskTone} ${task.timeOpen ? 35 : 55}%, transparent)`,
+            border: isMissed && !isContinuation
+              ? '1.5px dashed var(--acid-ink, var(--acid))'
+              : `1px solid color-mix(in srgb, ${taskTone} ${task.timeOpen ? 35 : 55}%, transparent)`,
             ...(task.timeOpen ? { borderBottomColor: 'transparent' } : {}),
             borderTopLeftRadius,
             borderTopRightRadius,
@@ -1402,8 +1406,37 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               {startNote && <span data-testid={`task-start-delta-${task.id}`}>{startNote}</span>}
               {overrunMin > 0
                 ? <span data-testid={`task-overrun-${task.id}`} style={{ color: 'var(--rust)', fontWeight: 700 }}> · +{fmtDur(overrunMin)} over</span>
-                : trackedMin > 0 ? ` · ${fmtDur(trackedMin)} tracked` : ''}
+                : trackedMin > 0 ? (task.done ? ` · took ${fmtDur(trackedMin)}` : ` · ${fmtDur(trackedMin)} tracked`) : ''}
             </span>
+          )}
+          {/* engagement.md F19 — a missed block asks, it doesn't accuse: a
+              REPLAN badge pinned to its corner at any size, and in a roomy
+              block the question too. REPLAN shows how to drag it. */}
+          {isMissed && !isContinuation && heightPx >= 14 && (
+            <>
+              {detail === 'full' && widthPx >= 170 && (
+                <span style={{ position: 'relative', zIndex: 1, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)', whiteSpace: 'nowrap', pointerEvents: 'none' }}>didn't happen? drag it to a new time</span>
+              )}
+              <button
+                type="button"
+                className="nodrag"
+                data-testid={`task-replan-${task.id}`}
+                title="Didn't happen? Replan it"
+                aria-label={`Replan ${task.text}`}
+                draggable={false}
+                onClick={(e) => { e.stopPropagation(); showPlanGuide({ mode: 'replan', taskId: task.id, text: task.text }); }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  position: 'absolute', top: 2, right: 2, zIndex: 4,
+                  height: 16, minWidth: 16, padding: widthPx >= 90 ? '0 6px' : 0, borderRadius: 999, cursor: 'pointer', lineHeight: 1,
+                  border: '1px solid var(--acid-ink, var(--acid))', background: 'var(--paper)', color: 'var(--acid-ink, var(--acid))',
+                  fontFamily: 'var(--font-mono)', fontSize: 8.5, letterSpacing: '0.06em',
+                  boxShadow: '0 0 8px color-mix(in srgb, var(--acid) 35%, transparent)',
+                }}
+              >
+                {widthPx >= 90 ? '↻ REPLAN' : '↻'}
+              </button>
+            </>
           )}
           {/* Overrun at any size: a rust strip on the right edge. */}
           {overrunMin > 0 && !isContinuation && (

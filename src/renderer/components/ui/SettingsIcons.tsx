@@ -19,6 +19,9 @@ const PATHS = {
   dial: <><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5v2.5M20.5 12H18M12 20.5V18M3.5 12H6" /><path d="M12 12V8" /></>,
   capsule: <><rect x="2.5" y="7" width="19" height="10" rx="5" /><circle cx="7.5" cy="12" r="2" /><path d="M12 12h5" /></>,
   box: <><rect x="4" y="4" width="16" height="16" rx="2.5" /><path d="M4 9h16M8 13h8M8 16h5" /></>,
+  sound: <><path d="M11 5 6 9H3v6h3l5 4z" /><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /></>,
+  play: <path d="M8 5.5v13l10-6.5z" />,
+  finished: <><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.8 2.8L16.5 9.5" /></>,
   warning: <><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h0" /></>,
 } satisfies Record<string, ReactNode>;
 

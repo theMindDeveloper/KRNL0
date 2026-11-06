@@ -51,7 +51,7 @@ export function HelpMenu() {
               <span>What&apos;s new in {notes.minor}</span><span />
             </button>
           )}
-          <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { startTour('welcome'); })}>
+          <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { startTour('first-day'); })}>
             <span>Take the tour</span><span />
           </button>
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { openWelcomeBack(true, null); })} data-testid="help-catchup">

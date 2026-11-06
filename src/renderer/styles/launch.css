@@ -139,3 +139,20 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 .st-swatch--light { background: #ebe1c2; } .st-swatch--light i { background: #f6efd0; box-shadow: inset 0 0 0 1px #d6cfbf; } .st-swatch--light i:nth-child(2) { background: #a9c94a; }
 .st-swatch--dark { background: #131210; } .st-swatch--dark i { background: #1f1d18; box-shadow: inset 0 0 0 1px #2f2b24; } .st-swatch--dark i:nth-child(2) { background: #c9f158; }
 @media (max-width: 800px) { .st { width: calc(100vw - 32px); } .st-nav { width: 64px; } .st-nav__item > span:last-child, .st-nav__title { display: none; } }
+
+/* Settings rows, slider and chips (Sounds, Finished cards). */
+.st-row { display: flex; align-items: center; gap: 12px; }
+.st-row__title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.st-row__hint { font-size: 11px; line-height: 16px; color: var(--ink-3); margin-top: 2px; }
+.st-row__value { width: 28px; text-align: right; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.st-range { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(to right, var(--acid) 0 var(--st-fill, 50%), var(--paper-3) var(--st-fill, 50%) 100%); }
+.st-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--paper); box-shadow: 0 0 0 2px var(--acid), 0 1px 3px rgba(0,0,0,.35); cursor: pointer; }
+.st-range:focus-visible { outline: 2px solid var(--rust); outline-offset: 4px; }
+.st-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.st-chip { appearance: none; border: 0; font: inherit; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px;
+  font-size: 11px; color: var(--ink-2); background: var(--paper); box-shadow: inset 0 0 0 1px var(--paper-3); cursor: pointer; transition: box-shadow 140ms, color 140ms; }
+.st-chip:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(--acid); }
+.st-chip svg { color: var(--acid-ink, var(--acid)); }
+.st-choice:disabled, .st-chip:disabled { cursor: default; }

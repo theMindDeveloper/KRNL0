@@ -22,6 +22,11 @@ import { setTourAnchor } from './tourAnchor';
 
 export const TOUR_EVENT = 'krnl:tour';
 
+// Which tour is running (null = none). Other overlays (the day recap) wait
+// while a tour is on screen.
+let activeTourId: string | null = null;
+export const activeTour = (): string | null => activeTourId;
+
 export function startTour(id: string): boolean {
   if (!tourById(id)) return false;
   window.dispatchEvent(new CustomEvent<{ id: string }>(TOUR_EVENT, { detail: { id } }));
@@ -134,6 +139,12 @@ export function TourHost(): JSX.Element | null {
     useBoardStore.getState().setUiMode(mode);
     end();
   };
+  useEffect(() => { activeTourId = tour?.id ?? null; }, [tour]);
+  // The furthest step reached. Going Back to a step whose action was already
+  // done must not wait for it again (or auto-advance at once): it shows Next.
+  const [reached, setReached] = useState(0);
+  useEffect(() => { if (!tour) setReached(0); else setReached((r) => Math.max(r, i)); }, [tour, i]);
+  const revisit = i < reached;
   const step = tour?.steps[i];
   const last = !!tour && i === tour.steps.length - 1;
   const next = (): void => { if (!tour) return; if (last) end(); else setI(i + 1); };
@@ -170,6 +181,8 @@ export function TourHost(): JSX.Element | null {
     } else {
       closeSettings();
     }
+    // A step may announce itself (the first-day tour opens the day recap).
+    if (step.event) window.dispatchEvent(new CustomEvent(step.event));
     startBoard.current = useBoardStore.getState().board;
     if (step.node) bringIntoView(step.node);
     // Never leave the words hidden: show them anyway if the target is slow.
@@ -209,7 +222,7 @@ export function TourHost(): JSX.Element | null {
 
   // wait for the real action
   useEffect(() => {
-    if (!step?.waitFor) return;
+    if (!step?.waitFor || revisit) return;
     const w = step.waitFor;
     let done = false;
     // A short pause so the user sees their action land before the next step.
@@ -222,7 +235,7 @@ export function TourHost(): JSX.Element | null {
     const check = (b: Board | null): void => { if (b && startBoard.current && w.board(b, startBoard.current)) advance(); };
     check(useBoardStore.getState().board);
     return useBoardStore.subscribe((s) => check(s.board));
-  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, revisit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // keys: Enter / → next (when not waiting), ← back, Esc ends
   useEffect(() => {
@@ -231,7 +244,7 @@ export function TourHost(): JSX.Element | null {
       if (e.key === 'Escape') { e.preventDefault(); end(); return; }
       const typing = e.target instanceof HTMLElement && (e.target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(e.target.tagName));
       if (typing) return;
-      if ((e.key === 'Enter' || e.key === 'ArrowRight') && !step?.waitFor && !step?.choices) { e.preventDefault(); next(); }
+      if ((e.key === 'Enter' || e.key === 'ArrowRight') && (!step?.waitFor || revisit) && !step?.choices) { e.preventDefault(); next(); }
       if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); setI(i - 1); }
     };
     window.addEventListener('keydown', on);
@@ -261,9 +274,11 @@ export function TourHost(): JSX.Element | null {
     pos = cardPos.current;
   }
   anchorPos.current = pos;
-  const ownLabel = (ownMode.current ?? uiMode) === 'easy' ? 'Easy' : 'Advanced';
-  // The step text decides the highlight (write `**{mode}**`).
-  const text = step.text.split('{mode}').join(ownLabel);
+  const ownEasy = (ownMode.current ?? uiMode) === 'easy';
+  const ownLabel = ownEasy ? 'Easy' : 'Advanced';
+  // The step text decides the highlight (write `**{mode}**`). `{pomo}` is the
+  // timer's name: "Record" in Easy, "Pomo" in Advanced (research C6).
+  const text = step.text.split('{mode}').join(ownLabel).split('{pomo}').join(ownEasy ? 'Record' : 'Pomo');
 
   const btn = (primary: boolean): React.CSSProperties => ({
     fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.06em', padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
@@ -334,7 +349,7 @@ export function TourHost(): JSX.Element | null {
         >
           {renderTourText(text)}
         </div>
-        {step.waitFor && (
+        {step.waitFor && !revisit && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontFamily: 'var(--font-mono)', color: 'var(--acid-ink, var(--acid))', opacity: ready ? 1 : 0, transition: 'opacity 200ms ease 200ms' }}>
             <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--acid)', animation: 'krnl-tour-orb 1.6s ease-in-out infinite' }} />
             {step.hint ?? 'Waiting for you…'}
@@ -348,7 +363,7 @@ export function TourHost(): JSX.Element | null {
             ? step.choices.map((c, k) => (
               <button key={c.mode} type="button" data-testid={`tour-choose-${c.mode}`} style={btn(k === 0)} onClick={() => choose(c.mode)}>{c.label}</button>
             ))
-            : step.waitFor
+            : step.waitFor && !revisit
               ? <button type="button" data-testid="tour-skip" style={btn(false)} onClick={next}>Skip</button>
               : <button type="button" data-testid="tour-next" style={btn(true)} onClick={next}>{last ? 'Done' : 'Next →'}</button>}
         </div>

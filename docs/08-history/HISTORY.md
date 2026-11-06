@@ -1276,3 +1276,41 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Files changed:** `src/shared/feedback.ts`, `src/main/appState.ts`, `src/renderer/components/Launch/FeedbackDialog.tsx`, `src/sys/commands/launch.ts`, `tests/unit/shared/launch.rules.test.ts`, `docs/06-requirements/launch-experience.md`
 **Summary:** Send feedback gains **Send by email** next to Continue on GitHub, for people without a GitHub account: it opens the user's mail app with the report (kind, title, text, version and system, recent errors if ticked) addressed to theminddevlab@gmail.com; nothing is sent until they press Send. The link is kept under 1,900 characters. Main lets only that mailto address through besides the project's GitHub pages. `krnl feedback --link` prints both links.
 
+## [2026-11-06] — UI sounds: three sound packs, volume and on/off
+
+**Type:** Feature
+**Requirements:** [docs/06-requirements/ui-sounds.md](../06-requirements/ui-sounds.md)
+**Files changed:** `src/renderer/sfx/{soundPacks,soundSettings,soundMoments,uiSounds,soundCli}.ts`, `src/renderer/sfx/packs/` (audio + `CREDITS.md`), `src/renderer/components/Canvas/commandDispatch.ts`, `src/renderer/components/TopBar/{index,SoundSection}.tsx`, `src/sys/{parser,SysFacade}.ts`, `src/renderer/store/useCliDispatch.ts`, `src/shared/cli/commandRegistry.ts`, `docs/06-requirements/{ui-sounds,ai-full-visibility-cli}.md`, `tests/unit/renderer/uiSounds.test.ts`
+**Summary:** Short sounds now confirm actions: add, plan on the Calendar, timer start / pause / resume / break / stop, a finished pomodoro, task done / reopened, habit check-in / removal, delete. Three bundled free packs, picked by ear on `docs/research/free-kits.html`: **SND01 · Sine** (default, snd.dev), **Zen** (UI SFX, CC0) and **Crisp** (Anipixels, CC BY 4.0, credited in Settings and `CREDITS.md`). The moment is read from what changed on the board (`soundMoments.ts`), hooked once in `makeCommandHandler`, so every UI path for the same action sounds the same; view changes and per-second time keeping never take the snapshot. Web Audio engine with decode-on-first-use, a per-pack warm-up and an 80 ms repeat guard. Settings → Sounds: on/off switch, volume 0–100, pack buttons that play a sample. Settings are per install in `localStorage` (`krnl0-sound`), not board data. CLI: `krnl sound status|list|pack <id>|volume <0-100>|on|off|play <moment>`.
+
+---
+
+## [2026-11-06] — Finished tasks read neutrally; Easy calls the timer "Record"
+
+**Type:** Feature (UI copy) + Chore
+**Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/Station/StationToolbar.tsx`, `src/renderer/components/Tour/{TourHost.tsx,tours.ts}`, `src/renderer/components/Assistant/VoicePlayer.ts`, `src/renderer/sfx/{sfxEngine,uiSounds}.ts`, `docs/research/engagement-and-onboarding.md`
+**Summary:** From the engagement research (C6, C11). A task that is done no longer shows the rust "+28m OVER": the card reads `PLAN 1H · TOOK 1H 28` in neutral ink, and its calendar block reads "· took 1h 28" with no rust strip; open tasks still show overruns. In Easy mode the panel toolbar names the Pomo **Record**, and tours write `{pomo}`, shown as "Record" in Easy and "Pomo" in Advanced. The sound and voice loaders use Vite's `query: '?url'` glob form (the `as: 'url'` deprecation warning is gone). Voice reactions were dropped by the maintainer; the research report records it and the final sound choice.
+
+---
+
+## [2026-11-06] — Engagement: finish, close the day, first-day tour
+
+**Type:** Feature
+**Requirements:** [docs/06-requirements/engagement.md](../06-requirements/engagement.md) F1–F19 (designs picked from the "KRNL0 Engagement Drafts" canvas: 1A, 2A+2C, 3A+3B+3C, 4A, 5A+5B, 6A+6B, 7A+7C, 8A)
+**Files changed:**
+- New: `src/renderer/store/{finishedCards,dayRecap,dayProgress,engagementCli}.ts`, `src/renderer/components/{DayMoments,PlanGuide}/index.tsx`, `src/renderer/components/TopBar/FinishedSection.tsx`
+- Changed: `TaskNode`, `TodoNode`, `HabitNode` (+ `commands.ts`), `ClockNode`, `CalendarNode/WeekView.tsx`, `Canvas/CanvasFlow.tsx`, `Orb`, `Tour/{TourHost,tours}`, `ui/Popover.tsx`, `App.tsx`, `styles/tokens.css`, `src/sys/{parser,SysFacade}.ts`, `useCliDispatch.ts`, `commandRegistry.ts`
+- Tests: `tests/unit/renderer/engagement.test.ts`, Todo test updates
+
+**Summary:**
+- **Finishing a task:** a ticked task becomes the **done card** (design 9B, same 220×120 box): how long it took as the big number, what was planned, when it was finished, and a ring for today's planned tasks. Ticking plays a one-shot reward (check pop, a burst of 8 dots, a border glow).
+- **Finished cards leave the canvas:** they go overnight by default, with "after 1 hour" and "keep" as the other options and a "show finished" switch in Settings. A chain, or a task with its subtasks, leaves together when all of it is done. Hiding is render-only, so nothing is deleted.
+- **Only "Done today":** the Todo list keeps today's done items in a "Done today" fold; older ones leave the list (Analytics and `todo list --archived` keep them). The "ARCHIVE DONE" button is gone.
+- **Closing the day:** a recap card appears once a day, when the plan is all done or from 21:00. A morning line reads "yesterday: 4 done · 3h 10m", and a Monday look-back covers last week.
+- **"Your first day" tour:** 16 steps through the whole loop, started by the orb's first click on a fresh board and listed first in the orb menu as "Start here".
+- **Adding and planning to-dos:** estimate chips (15m–2h) appear after a to-do's name. A PLAN button on unplanned rows teaches drag and drop with one small one-shot animation (`components/PlanGuide`): a ghost of the task glides once onto the Calendar, its edge pulses once, and a tiny chip beside the row says "drag it onto the Calendar". Nothing covers the Calendar or repeats.
+- **Habit streaks:** the streak line shows the next milestone and best streak, with a seal at 7/30/100/365 days. A "Missed yesterday? I DID IT" repair replaces the silent reset.
+- **Clock:** an outer ring closes as the day's planned blocks are done, and seven week marks sit under the dial.
+- **Missed calendar blocks:** a dashed outline and a ↻ REPLAN corner badge at any size; REPLAN makes the block hop once with a tiny "drag to a new time" chip beside it.
+- **CLI:** `krnl finished …` and `krnl recap …`.
+- **Fix:** nested popovers (a TimeField inside a popover) no longer close their parent.

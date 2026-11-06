@@ -12,14 +12,18 @@ import { useBoardStore } from '../../store/boardStore';
 import { UpdatesSection } from './UpdatesSection';
 import { PocketSection } from './PocketSection';
 import { BackupsSection, CelebrationsSection } from './LaunchSettings';
+import { SoundSection } from './SoundSection';
+import { FinishedSection } from './FinishedSection';
 import { SettingsIcon, type SettingsIconName } from '../ui/SettingsIcons';
 
 export type Theme = 'light' | 'dark';
-export type SettingsSection = 'general' | 'timer' | 'celebrations' | 'updates' | 'reset';
+export type SettingsSection = 'general' | 'timer' | 'sounds' | 'finished' | 'celebrations' | 'updates' | 'reset';
 
 const SECTIONS: ReadonlyArray<{ id: SettingsSection; icon: SettingsIconName; label: string; title: string; blurb: string }> = [
   { id: 'general', icon: 'general', label: 'General', title: 'General', blurb: 'How KRNL0 looks, and how much of it you see.' },
   { id: 'timer', icon: 'timer', label: 'Floating timer', title: 'Floating timer', blurb: 'Keep the Pomo in sight while you work in other apps.' },
+  { id: 'sounds', icon: 'sound', label: 'Sounds', title: 'Sounds', blurb: 'Small sounds that confirm what you just did.' },
+  { id: 'finished', icon: 'finished', label: 'Finished cards', title: 'Finished cards', blurb: 'Done tasks clear off the board so today stays in focus.' },
   { id: 'celebrations', icon: 'celebrations', label: 'Celebrations', title: 'Celebrations', blurb: 'A card to keep or share when you hit a milestone.' },
   { id: 'updates', icon: 'updates', label: 'Updates', title: 'Updates & backups', blurb: 'New versions arrive by themselves. Your board is copied first.' },
   { id: 'reset', icon: 'reset', label: 'Reset', title: 'Start over', blurb: 'Wipe the board and begin from the default workspace.' },
@@ -84,6 +88,8 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
           <div className="st-body">
             {section === 'general' && <General theme={theme} onTheme={onTheme} />}
             {section === 'timer' && <Card><PocketSection /></Card>}
+            {section === 'sounds' && <SoundSection />}
+            {section === 'finished' && <FinishedSection />}
             {section === 'celebrations' && <Card><CelebrationsSection /></Card>}
             {section === 'updates' && (
               <>

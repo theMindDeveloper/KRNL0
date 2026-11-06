@@ -42,30 +42,9 @@ export interface Catchup {
 
 const rec = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {});
 
-function nextDay(ymd: string): string {
-  const d = new Date(`${ymd}T00:00:00`);
-  d.setDate(d.getDate() + 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** Longest run of logged scheduled days (non-scheduled days neither extend nor break it). */
-export function bestStreak(log: readonly string[], schedule?: HabitSchedule): number {
-  if (log.length === 0) return 0;
-  const days = [...new Set(log)].sort();
-  const seen = new Set(days);
-  let best = 0;
-  let run = 0;
-  let cursor = days[0]!;
-  const last = days[days.length - 1]!;
-  let guard = 0;
-  while (cursor <= last && guard++ < 4000) {
-    if (isDayScheduled(schedule, cursor)) {
-      if (seen.has(cursor)) { run++; best = Math.max(best, run); } else run = 0;
-    }
-    cursor = nextDay(cursor);
-  }
-  return best;
-}
+/** Longest run of logged scheduled days — the Habit node's own rule (engagement.md F16). */
+export { bestStreak } from '../components/nodes/HabitNode/commands';
+import { bestStreak } from '../components/nodes/HabitNode/commands';
 
 export function computeCatchup(board: CatchupBoard, today: string): Catchup {
   const tasks = new Map<string, NodeLike>();

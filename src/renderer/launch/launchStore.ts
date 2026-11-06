@@ -75,6 +75,7 @@ export function openWelcomeBack(force = false, awayMs: number | null = useLaunch
   const catchup = computeCatchup(board, todayYMD());
   if (!force && isEmptyCatchup(catchup)) return false;
   useLaunchStore.setState({ welcome: { catchup, awayMs }, whatsNew: null, feedback: null });
+  if (!force) welcomed = true;
   return true;
 }
 
@@ -83,6 +84,18 @@ export function refreshWelcomeBack(): void {
   const board = useBoardStore.getState().board;
   if (!st || !board) return;
   useLaunchStore.setState({ welcome: { ...st, catchup: computeCatchup(board, todayYMD()) } });
+}
+
+let welcomed = false;
+/** Welcome back already summed up the days away on this launch (the morning line stays quiet). */
+export function welcomedThisRun(): boolean {
+  return welcomed;
+}
+
+/** A launch dialog is open: other moments (recap, morning line) wait. */
+export function launchDialogOpen(): boolean {
+  const s = useLaunchStore.getState();
+  return s.whatsNew !== null || s.welcome !== null || s.feedback !== null || s.share !== null;
 }
 
 export function closeWelcomeBack(): void {
@@ -156,7 +169,7 @@ export function runLaunchFlow(): void {
   if (info.kind === 'patch' && info.previousVersion) useLaunchStore.setState({ patchVersion: info.version });
 
   const welcome = (): void => {
-    if (shouldWelcomeBack(info)) openWelcomeBack(info.simulated, info.awayMs);
+    if (shouldWelcomeBack(info) && openWelcomeBack(info.simulated, info.awayMs)) welcomed = true;
   };
   // A simulated feature update in a build whose own notes don't exist yet
   // (dev runs the previous version number) previews the newest notes.

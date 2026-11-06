@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
@@ -12,6 +12,7 @@ import { useTick } from '../../../hooks/useTick';
 import type { PomoState } from '../PomoNode/types';
 import { trackedSecondsForTask, planStatus, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { formatElapsed } from './format';
+import { DoneCard } from './DoneCard';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
 
@@ -29,18 +30,18 @@ function fmtMin(totalMin: number): string {
  * (store/trackedTime.ts); the bar fills tracked / planned and turns rust when
  * more time was spent than planned. Hidden until something was tracked.
  */
-function PlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean }) {
+function PlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean; done?: boolean }) {
   // Only the card the pomo is running on ticks; every other card re-renders
   // just when the pomo node changes.
   return props.live ? <LivePlanTrackedBar {...props} /> : <PlanTrackedBarView {...props} nowMs={null} />;
 }
 
-function LivePlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean }) {
+function LivePlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean; done?: boolean }) {
   const tick = useTick();
   return <PlanTrackedBarView {...props} nowMs={tick} />;
 }
 
-function PlanTrackedBarView({ taskId, plannedMin, live, open = false, nowMs }: { taskId: string; plannedMin: number; live: boolean; open?: boolean; nowMs: number | null }) {
+function PlanTrackedBarView({ taskId, plannedMin, live, open = false, done = false, nowMs }: { taskId: string; plannedMin: number; live: boolean; open?: boolean; done?: boolean; nowMs: number | null }) {
   const pomoNode = useBoardStore(selectPomoNode);
   const trackedSec = useMemo(
     () => trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now()),
@@ -51,7 +52,10 @@ function PlanTrackedBarView({ taskId, plannedMin, live, open = false, nowMs }: {
   const status = open ? (trackedSec > 0 ? 'on-track' : 'untracked') : planStatus(trackedSec, plannedMin);
   if (status === 'untracked' && !live) return null;
   const ratio = open ? 0 : plannedMin > 0 ? trackedSec / (plannedMin * 60) : 0;
-  const color = status === 'overrun' ? 'var(--rust)' : live ? 'var(--acid)' : 'var(--ink-3)';
+  // A finished task never ends on a penalty: once done, an overrun reads as a
+  // neutral "took X" (research C11, docs/research/engagement-and-onboarding.md).
+  const overrun = status === 'overrun' && !done;
+  const color = overrun ? 'var(--rust)' : live ? 'var(--acid)' : 'var(--ink-3)';
   return (
     <div data-testid="task-plan-tracked" style={{ padding: '4px 10px 6px' }}>
       <div
@@ -67,8 +71,8 @@ function PlanTrackedBarView({ taskId, plannedMin, live, open = false, nowMs }: {
       >
         <span>{open ? 'NO SET TIME' : `PLAN ${fmtMin(plannedMin)}`}</span>
         <span style={{ color }}>
-          {status === 'overrun' ? '+' + fmtMin(trackedSec / 60 - plannedMin) + ' OVER · ' : ''}
-          TRACKED {fmtMin(trackedSec / 60)}
+          {overrun ? '+' + fmtMin(trackedSec / 60 - plannedMin) + ' OVER · ' : ''}
+          {done ? 'TOOK' : 'TRACKED'} {fmtMin(trackedSec / 60)}
         </span>
       </div>
       <div style={{ height: 3, background: 'var(--paper-3)', borderRadius: 2, overflow: 'hidden' }}>
@@ -149,6 +153,19 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     : null;
   const isPastScheduled = scheduledEndMs !== null && scheduledEndMs <= nowMs;
   const isGrayed = state.done || isPastScheduled;
+
+  // engagement.md F1–F2 — the done moment: ticking turns the card into the
+  // done card and plays its one-shot reward. Reopening restores the full card.
+  const wasDone = useRef(state.done);
+  const [popping, setPopping] = useState(false);
+  useEffect(() => {
+    const justTicked = state.done && !wasDone.current;
+    wasDone.current = state.done;
+    if (!justTicked) return;
+    setPopping(true);
+    const t = setTimeout(() => setPopping(false), 900);
+    return () => clearTimeout(t);
+  }, [state.done]);
 
   // Corner timer: tracked time on this task, derived from the pomo spans
   // tagged with it (live while the pomo is running on it).
@@ -460,6 +477,24 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       ? '0 0 0 2px var(--acid)'
       : 'var(--shadow-1)';
 
+  // engagement.md F2 — a done task shows the done card (design 9B): the
+  // result, the plan, the time, today's progress. Just ticked → the reward.
+  if (state.done) {
+    return (
+      <DoneCard
+        state={state}
+        trackedSec={elapsedSec}
+        celebrate={popping}
+        onReopen={() => onCommand('task.toggle')}
+        onContextMenu={handleContextMenu}
+      >
+        {ctxMenu !== null && (
+          <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxItems} onDismiss={() => setCtxMenu(null)} />
+        )}
+      </DoneCard>
+    );
+  }
+
   return (
     <div
       data-testid="task-node-root"
@@ -577,7 +612,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
           <button
             type="button"
-            className={`task-check${state.done ? ' task-check--done' : ''}`}
+            className={`task-check${state.done ? ' task-check--done' : ''}${popping ? ' task-check--pop' : ''}`}
             onClick={(e) => {
               e.stopPropagation();
               onCommand('task.toggle');
@@ -844,6 +879,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         plannedMin={state.plannedMin ?? state.durationMin ?? 25}
         live={isActiveRunning}
         open={state.timeOpen === true}
+        done={state.done}
       />
     </div>
   );
