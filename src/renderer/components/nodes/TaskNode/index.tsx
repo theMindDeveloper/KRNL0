@@ -472,7 +472,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         tone={tagTone}
         icon={isActiveRunning ? 'clock' : 'calendar'}
         when={isActiveRunning ? 'Focusing now' : isActivePaused ? 'Paused' : when ? (isPastScheduled ? `Was ${when}` : when) : 'Not on the calendar'}
-        whenColor={isActiveRunning ? 'var(--acid-ink, var(--acid))' : isPastScheduled ? 'var(--rust)' : undefined}
+        whenColor={isActiveRunning ? 'var(--acid-ink, var(--acid))' : isPastScheduled ? 'color-mix(in srgb, var(--rust) 72%, var(--ink))' : undefined}
       />
 
         {/* Note — free-form text under the task body. Click to edit.

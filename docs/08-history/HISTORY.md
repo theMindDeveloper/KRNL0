@@ -1434,3 +1434,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/AnalyticsNode/TimeLogHeatmap.tsx`, `src/renderer/components/nodes/HabitNode/{index,HabitPopover}.tsx`
 **Summary:** The whole station was rendered in Easy mode in both themes. Analytics › Time per task: in a small window the week navigation wrapped "›" onto a line of its own, away from the dates; the arrows, the range and "This week" now wrap as one unit, with line chevrons. Habits in Month and Year view showed the streak as a rust "▲ 7"; they use the week view's flame and count (acid when going, grey at 0). The habit view popover now closes with Escape like every other popover.
+
+## [2026-11-07] — UI loop batch 9: task card in light mode
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`
+**Summary:** The task card's open, missed and done states were rendered in light mode: one shape, readable. The missed card's "Was Tue 3 · 18:00" used plain rust (3.9:1 on the light card) and now uses the same darker rust as Welcome back. The first-day tour was walked again in light mode: 14 steps, the card never covers its target, its text reads on the light card.
