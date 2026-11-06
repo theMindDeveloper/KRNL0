@@ -304,7 +304,7 @@ export function TourHost(): JSX.Element | null {
         // Present but scrolled out of sight inside its window (a Calendar
         // block below the fold): bring it into view once.
         scrolled = true;
-        found.el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+        try { (found.el as HTMLElement).scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch { /* never break a tour */ }
       }
       // A floating panel covering it steps aside for this step (put back when the step ends).
       if (found?.box) {
