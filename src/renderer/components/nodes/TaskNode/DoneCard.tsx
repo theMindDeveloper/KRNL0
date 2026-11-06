@@ -6,8 +6,8 @@
 // burst from it, the border glows once. Then it rests.
 
 import type { MouseEvent, ReactNode } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { useBoardStore } from '../../../store/boardStore';
+import { CARD_H, CardIcon, CardMetaRow, CardMeter, cardFrameStyle } from './CardParts';
+import { toneVarForTask } from '../../../utils/taskColor';
 import type { TaskState } from './types';
 
 type Loose = Record<string, unknown>;
@@ -45,6 +45,8 @@ export function todayTally(nodes: ReadonlyArray<{ kind: string; state: unknown }
 }
 
 interface Props {
+  /** The task node's id — its tag colour is the same as on the open card. */
+  taskId: string;
   state: TaskState;
   trackedSec: number;
   /** Just ticked: play the one-shot reward. */
@@ -54,18 +56,19 @@ interface Props {
   children?: ReactNode;
 }
 
-export function DoneCard({ state, trackedSec, celebrate, onReopen, onContextMenu, children }: Props) {
-  const tally = useBoardStore(useShallow((s) => todayTally(s.board?.nodes ?? [], Date.now())));
+export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onContextMenu, children }: Props) {
   const plannedMin = state.plannedMin ?? state.durationMin ?? 0;
   const tookMin = trackedSec / 60;
   const at = state.completedAt ? new Date(state.completedAt) : null;
   const atLabel = at && !Number.isNaN(at.getTime())
     ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
     : '';
-  const usePlan = tally.planned > 0;
-  const ratio = usePlan ? tally.plannedDone / tally.planned : 1;
-  const C = 2 * Math.PI * 8;
-  const k9 = { fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' } as const;
+  const tone = toneVarForTask(taskId);
+  const planned = !state.timeOpen && plannedMin > 0;
+  // A finished task never ends on a penalty: it reads "took X", in plain ink.
+  const verdict = !planned || tookMin <= 0 ? null
+    : Math.abs(tookMin - plannedMin) <= Math.max(5, plannedMin * 0.1) ? 'on plan'
+    : `of ${fmtTook(plannedMin)} planned`;
 
   return (
     <div
@@ -74,14 +77,10 @@ export function DoneCard({ state, trackedSec, celebrate, onReopen, onContextMenu
       data-done-card="true"
       className={`done task-done-card${celebrate ? ' task-done-card--celebrate' : ''}`}
       onContextMenu={onContextMenu}
-      style={{
-        position: 'relative', width: 220, height: 120, boxSizing: 'border-box',
-        padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 4,
-        borderRadius: 'var(--radius-lg)', background: 'color-mix(in srgb, var(--acid) 5%, var(--node-bg))',
-        border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', boxShadow: 'var(--shadow-1)',
-      }}
+      style={{ ...cardFrameStyle('done'), height: CARD_H }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+      {/* Row 1: check · title · reopen — the same places as the open card */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
         <span style={{ position: 'relative', display: 'grid', placeItems: 'center' }}>
           <button
             type="button"
@@ -100,35 +99,33 @@ export function DoneCard({ state, trackedSec, celebrate, onReopen, onContextMenu
             </span>
           )}
         </span>
-        <span className="task-text" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span className="task-text" title={state.text} style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '18px', color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {state.text}
         </span>
+        <button
+          type="button"
+          className="nodrag task-card-action"
+          onClick={(e) => { e.stopPropagation(); onReopen(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Reopen"
+          aria-label="Reopen"
+          style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, border: 0, cursor: 'pointer', background: 'transparent', color: 'var(--ink-3)' }}
+        >
+          <CardIcon name="undo" size={13} />
+        </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2, minWidth: 0 }}>
-        <span data-testid="done-card-took" style={{ fontFamily: 'var(--font-serif)', fontSize: 32, lineHeight: 1, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
-          {tookMin > 0 ? fmtTook(tookMin) : 'Done'}
-        </span>
-        <span style={{ ...k9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {tookMin > 0
-            ? (state.timeOpen || plannedMin <= 0 ? 'recorded' : `of ${fmtTook(plannedMin)} planned`)
-            : (state.timeOpen || plannedMin <= 0 ? 'no time recorded' : `${fmtTook(plannedMin)} planned`)}
-        </span>
-      </div>
+      {/* Row 2: tag · when it was finished */}
+      <CardMetaRow tag={state.tag ?? ''} tone={tone} icon="check" when={atLabel ? `Done ${atLabel}` : 'Done'} whenColor="var(--acid-ink, var(--acid))" />
 
-      <div style={{ flex: 1 }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-          <circle cx="10" cy="10" r="8" fill="none" stroke="var(--paper-3)" strokeWidth="2.6" />
-          <circle cx="10" cy="10" r="8" fill="none" stroke="var(--acid)" strokeWidth="2.6" strokeLinecap="round"
-            strokeDasharray={`${(ratio * C).toFixed(2)} ${C.toFixed(2)}`} transform="rotate(-90 10 10)" />
-        </svg>
-        <span data-testid="done-card-today" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
-          {usePlan ? `${tally.plannedDone} of ${tally.planned} planned today` : `${tally.doneToday} done today`}
-        </span>
-        <span style={{ flex: 1 }} />
-        {atLabel && <span style={k9} title="Finished at">done {atLabel}</span>}
-      </div>
+      {/* Meter: full — how long it took, against the plan */}
+      <CardMeter
+        ratio={1}
+        color="var(--acid)"
+        leftTestId="done-card-took"
+        left={tookMin > 0 ? `Took ${fmtTook(tookMin)}` : 'Done'}
+        right={verdict ?? (planned ? `${fmtTook(plannedMin)} planned` : 'no set time')}
+      />
       {children}
     </div>
   );

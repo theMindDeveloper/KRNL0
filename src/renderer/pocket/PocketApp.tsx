@@ -30,6 +30,8 @@ import type { TimerFace } from '../components/nodes/PomoNode/types';
 import { POCKET_SHADOW, buildModel } from './model';
 import { DialTab, DialView } from './DialView';
 import { CapsuleView } from './CapsuleView';
+import { AskWhat } from './parts';
+import { POCKET_LABEL_COMMAND, isObserve as isObserveMode, spanToName } from '../components/nodes/PomoNode/derive';
 
 const FACES: Record<TimerFace, ComponentType<TimerFaceProps>> = {
   ascii: Ascii, lcd: Lcd, blocks: Blocks, vapor: Vapor, vu: Vu, outline: Outline, mac: Mac,
@@ -59,6 +61,8 @@ export function PocketApp() {
   const [prefs, setPrefs] = useState<PocketPrefs>(DEFAULT_POCKET_PREFS);
   const [now, setNow] = useState(() => Date.now());
   const [hover, setHover] = useState(false);
+  /** Spans the user skipped naming here (the node can still ask). */
+  const [skipped, setSkipped] = useState<ReadonlySet<string>>(() => new Set());
   const rootRef = useRef<HTMLDivElement>(null);
 
   // The window is transparent: the page must not paint a background.
@@ -118,13 +122,41 @@ export function PocketApp() {
     );
   }
 
+  // Observe: ask what the span that just ended was (pocket-timer.md F13).
+  const askRec = !snap.away && isObserveMode(snap.config, snap.easy) && !snap.easy ? spanToName(snap.state.history, now) : null;
+  const askCard = askRec && !skipped.has(askRec.id) ? (
+      <AskWhat
+        minutes={Math.max(1, Math.round((Date.parse(askRec.endedAt) - Date.parse(askRec.startedAt)) / 60_000))}
+        tags={snap.library.slice(0, 5)}
+        onPick={(t) => {
+          void window.krnl?.pocketCommand?.(POCKET_LABEL_COMMAND, { id: askRec.id, taskId: null, label: t.label, tag: t.id });
+          setSkipped((cur) => new Set(cur).add(askRec.id));
+        }}
+        onSkip={() => setSkipped((cur) => new Set(cur).add(askRec.id))}
+      />
+  ) : null;
+  const ask = askCard ? <div style={{ padding: '0 8px 8px' }}>{askCard}</div> : null;
+  const askBox = askCard && askRec ? (
+    <AskWhat
+      themed
+      minutes={Math.max(1, Math.round((Date.parse(askRec.endedAt) - Date.parse(askRec.startedAt)) / 60_000))}
+      tags={snap.library.slice(0, 5)}
+      onPick={(t) => {
+        void window.krnl?.pocketCommand?.(POCKET_LABEL_COMMAND, { id: askRec.id, taskId: null, label: t.label, tag: t.id });
+        setSkipped((cur) => new Set(cur).add(askRec.id));
+      }}
+      onSkip={() => setSkipped((cur) => new Set(cur).add(askRec.id))}
+    />
+  ) : null;
+
   if (prefs.look === 'dial' || prefs.look === 'capsule') {
     const m = buildModel(snap, now);
     return (
-      <div ref={rootRef} style={{ display: 'inline-block' }} data-testid="pocket">
+      <div ref={rootRef} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: prefs.look === 'dial' ? 'center' : 'flex-start' }} data-testid="pocket">
         {prefs.look === 'capsule'
           ? <CapsuleView m={m} hover={hover} />
           : prefs.collapsed ? <DialTab m={m} /> : <DialView m={m} hover={hover} />}
+        {ask}
       </div>
     );
   }
@@ -217,6 +249,7 @@ export function PocketApp() {
         {!isPocketLive(state.status) && <span style={{ ...label, textAlign: 'center' }}>Nothing is being timed</span>}
       </div>
     </div>
+    {askBox && <div style={{ marginTop: 8 }}>{askBox}</div>}
     </div>
   );
 }

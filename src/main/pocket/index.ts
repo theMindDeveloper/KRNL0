@@ -24,7 +24,7 @@ import {
   type PocketSnapshot,
   type PocketStatus,
 } from '../../shared/pocket';
-import { isPomoControlCommand } from '../../renderer/components/nodes/PomoNode/derive';
+import { POCKET_LABEL_COMMAND, isPocketLabelArgs, isPomoControlCommand } from '../../renderer/components/nodes/PomoNode/derive';
 import { getMainWindow, revealMainWindow } from '../mainWindow';
 
 export interface PocketOptions {
@@ -243,13 +243,14 @@ export function initPocket(options: PocketOptions): PocketPort {
   ipcMain.handle('pocket:get', (e) => (fromPocket(e) ? { snapshot, prefs } : null));
 
   // The pocket's buttons — only the node's own control commands pass (F5).
-  ipcMain.handle('pocket:command', (e, command: unknown) => {
+  ipcMain.handle('pocket:command', (e, command: unknown, args: unknown) => {
     if (!fromPocket(e)) return { ok: false, message: 'not the pocket window' };
-    if (!isPomoControlCommand(command)) return { ok: false, message: `refused: ${String(command)}` };
+    const label = command === POCKET_LABEL_COMMAND && isPocketLabelArgs(args);
+    if (!isPomoControlCommand(command) && !label) return { ok: false, message: `refused: ${String(command)}` };
     const main = getMainWindow();
     if (!main) return { ok: false, message: 'KRNL0 is not open' };
-    main.webContents.send('pocket:run', command);
-    return { ok: true, message: command };
+    main.webContents.send('pocket:run', command, label ? args : undefined);
+    return { ok: true, message: String(command) };
   });
 
   ipcMain.on('pocket:open', (e) => {

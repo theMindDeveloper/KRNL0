@@ -50,8 +50,14 @@ export async function setAppPrefs(patch: AppPrefsPatch): Promise<void> {
 
 // ── What's new ───────────────────────────────────────────────────────────────
 
+/** Only one window at a time: a launch dialog closes a day recap that is open. */
+function closeDayMoment(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('krnl:day-moment-close'));
+}
+
 export function openWhatsNew(release: WhatsNewRelease | null = latestNotes()): boolean {
   if (!release) return false;
+  closeDayMoment();
   useLaunchStore.setState({ whatsNew: release, welcome: null, feedback: null });
   return true;
 }
@@ -74,6 +80,7 @@ export function openWelcomeBack(force = false, awayMs: number | null = useLaunch
   if (!board) return false;
   const catchup = computeCatchup(board, todayYMD());
   if (!force && isEmptyCatchup(catchup)) return false;
+  closeDayMoment();
   useLaunchStore.setState({ welcome: { catchup, awayMs }, whatsNew: null, feedback: null });
   if (!force) welcomed = true;
   return true;
@@ -105,6 +112,7 @@ export function closeWelcomeBack(): void {
 // ── Feedback ─────────────────────────────────────────────────────────────────
 
 export function openFeedback(kind: FeedbackKind = 'bug', title = ''): void {
+  closeDayMoment();
   useLaunchStore.setState({ feedback: { kind, title }, whatsNew: null, welcome: null });
 }
 
@@ -129,6 +137,7 @@ export function openShare(pick?: Milestone): boolean {
   if (pick && !cards.some((c) => c.id === pick.id)) cards.unshift(pick);
   const first = pick ?? cards.find((c) => c.kind === 'streak' && c.value > 0) ?? cards[cards.length - 1];
   if (!first) return false;
+  closeDayMoment();
   useLaunchStore.setState({ share: { cards, id: first.id }, milestone: null });
   return true;
 }

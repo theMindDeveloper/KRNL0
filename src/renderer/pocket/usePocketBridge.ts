@@ -8,7 +8,7 @@ import { isEasyBoard } from '../store/uiMode';
 import { boardTagLibrary } from '../store/spanTags';
 import { makeCommandHandler } from '../components/Canvas/commandDispatch';
 import { defaultPomoConfig, type PomoConfig, type PomoState, type TimerFace } from '../components/nodes/PomoNode/types';
-import { isPomoControlCommand } from '../components/nodes/PomoNode/derive';
+import { isPomoControlCommand, POCKET_LABEL_COMMAND, isPocketLabelArgs } from '../components/nodes/PomoNode/derive';
 import { useFrameTheme } from '../themes/useFrameTheme';
 import type { PocketSnapshot } from '../../shared/pocket';
 import type { Board } from '../../shared/types';
@@ -85,12 +85,15 @@ export function usePocketBridge(): void {
   useEffect(() => {
     const on = window.krnl?.onPocketRun;
     if (!on) return;
-    return on((command) => {
-      if (!isPomoControlCommand(command)) return;
+    return on((command, args) => {
+      // The node's own controls, or naming a span that just ended (checked again here).
+      const label = command === POCKET_LABEL_COMMAND && isPocketLabelArgs(args);
+      if (!isPomoControlCommand(command) && !label) return;
       const pomo = pomoMother(useBoardStore.getState().board);
       if (!pomo) return;
       try {
-        makeCommandHandler(pomo.id)(command);
+        if (label) makeCommandHandler(pomo.id)(command, args as unknown as Record<string, unknown>);
+        else makeCommandHandler(pomo.id)(command);
       } catch {
         // makeCommandHandler already logged it to the event log.
       }

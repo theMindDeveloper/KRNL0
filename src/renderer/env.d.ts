@@ -57,11 +57,11 @@ interface KrnlBridge {
   onUpdateState?: (callback: (state: unknown) => void) => () => void
   // Decision 37 — pocket timer. Use renderer/pocket/*, not these directly.
   pocketSendState?: (snapshot: unknown) => void
-  onPocketRun?: (callback: (command: string) => void) => () => void
+  onPocketRun?: (callback: (command: string, args?: unknown) => void) => () => void
   pocketGet?: () => Promise<unknown>
   onPocketSnapshot?: (callback: (snapshot: unknown) => void) => () => void
   onPocketPrefs?: (callback: (prefs: unknown) => void) => () => void
-  pocketCommand?: (command: string) => Promise<{ ok: boolean; message: string }>
+  pocketCommand?: (command: string, args?: unknown) => Promise<{ ok: boolean; message: string }>
   pocketOpenMain?: () => void
   pocketCollapse?: (collapsed: boolean) => void
   pocketResize?: (size: { width: number; height: number }) => void

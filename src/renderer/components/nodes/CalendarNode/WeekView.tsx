@@ -183,6 +183,28 @@ interface ScheduledHabit {
   color: string;        // CSS color token name (e.g. 'acid', 'cyan')
   icon: string | undefined;
   schedule: HabitSchedule;
+  /** Days done ("YYYY-MM-DD") — the pill shows done / not done. */
+  log: readonly string[];
+  /** The habit mother, to tick the habit from the calendar. */
+  motherId: string;
+}
+
+// ── Layers (calendar-visual-grammar) ─────────────────────────────────────────
+// One rule per kind of thing, so nothing covers anything else:
+//   plan      → the only real blocks (outlined, titled), side by side when they overlap
+//   recorded  → a thin rail at the left edge of each day; a break is a gap in it
+//   habits    → small pills at their time on the right edge, ticked from here
+// Recorded and Habits can be switched off in the header (kept per install).
+const LAYERS_KEY = 'krnl0-calendar-layers';
+interface CalLayers { recorded: boolean; habits: boolean }
+function readLayers(): CalLayers {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LAYERS_KEY) ?? 'null') as Partial<CalLayers> | null;
+    return { recorded: raw?.recorded !== false, habits: raw?.habits !== false };
+  } catch { return { recorded: true, habits: true }; }
+}
+function writeLayers(l: CalLayers): void {
+  try { localStorage.setItem(LAYERS_KEY, JSON.stringify(l)); } catch { /* no storage */ }
 }
 
 interface WeekViewProps {
@@ -211,7 +233,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // A thin strip in every view: a wide labelled rail read as extra task
   // blocks next to the plan. Minutes live in the hover / click popup.
   // Pomo spans are background highlights now, so blocks need no rail gutter.
-  const rail = '0px';
+  const rail = singleDay ? '12px' : '7px';
+  const [layers, setLayers] = useState<CalLayers>(readLayers);
+  const toggleLayer = (k: keyof CalLayers): void => {
+    setLayers((cur) => { const next = { ...cur, [k]: !cur[k] }; writeLayers(next); return next; });
+  };
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows
   // the same 24-hour grid.
@@ -646,6 +672,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             color: h.color,
             icon: h.icon,
             schedule: h.schedule,
+            log: h.log,
+            motherId: n.id,
           });
         }
       }
@@ -1197,7 +1225,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // How much text fits: measured column width × this block's lanes.
       // Unmeasured (tests / first paint) counts as roomy.
       const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-      const railNum = 0;
+      const railNum = singleDay ? 12 : 7;
       const widthPx = ((colPx - railNum) * span) / colCount - 3;
       // A narrow parallel lane shows its title vertically so every block
       // stays identifiable; only a tiny block goes label-less.
@@ -1238,7 +1266,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               : `color-mix(in srgb, ${taskTone} ${isMissed ? 12 : 24}%, var(--paper))`,
             // Soft full outline in the task colour (no left accent strip).
             border: isMissed && !isContinuation
-              ? '1.5px dashed var(--acid-ink, var(--acid))'
+              ? `1.5px dashed color-mix(in srgb, ${taskTone} 70%, var(--ink-3))`
               : `1px solid color-mix(in srgb, ${taskTone} ${task.timeOpen ? 35 : 55}%, transparent)`,
             ...(task.timeOpen ? { borderBottomColor: 'transparent' } : {}),
             borderTopLeftRadius,
@@ -1355,8 +1383,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                       height: `${tailPct}%`,
                       borderTop: `1px dashed ${taskTone}`,
                       pointerEvents: 'none',
-                      backgroundImage: `repeating-linear-gradient(135deg, ${taskTone} 0 1px, transparent 1px ${stripeSize}px)`,
-                      opacity: 0.6,
+                      // A planned break: the block's own tone, much lighter, under a
+                      // dashed line — calm, no stripes. Long breaks get a deeper line.
+                      background: `color-mix(in srgb, ${taskTone} ${stripeSize > 6 ? 4 : 7}%, transparent)`,
+                      opacity: 0.9,
                     }}
                   />
                 );
@@ -1412,7 +1442,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           {/* engagement.md F19 — a missed block asks, it doesn't accuse: a
               REPLAN badge pinned to its corner at any size, and in a roomy
               block the question too. REPLAN shows how to drag it. */}
-          {isMissed && !isContinuation && heightPx >= 14 && (
+          {/* Only where it fits beside the title: in a small block the dashed
+              outline says "missed" and the click popup offers the move. */}
+          {isMissed && !isContinuation && heightPx >= 30 && widthPx >= 120 && (
             <>
               {detail === 'full' && widthPx >= 170 && (
                 <span style={{ position: 'relative', zIndex: 1, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)', whiteSpace: 'nowrap', pointerEvents: 'none' }}>didn't happen? drag it to a new time</span>
@@ -1629,8 +1661,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 key={`sr-${r.id}-${i}`}
                 style={{
                   position: 'absolute', top: 0, bottom: 0, left: pct(r.startMin), width: widthPct(r.startMin, r.endMin),
+                  // A break is a gap with a faint outline, never stripes.
                   background: r.kind === 'work' ? spanTone(tagLibrary, r, easy) : 'transparent',
-                  backgroundImage: r.kind === 'work' ? undefined : 'repeating-linear-gradient(135deg, var(--ink-3) 0 1px, transparent 1px 3px)',
+                  boxShadow: r.kind === 'work' ? undefined : 'inset 0 0 0 1px color-mix(in srgb, var(--ink-3) 40%, transparent)',
                 }}
               />
             ))}
@@ -1698,18 +1731,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   }
 
   function renderRealityBlocks(dayYMD: string) {
+    if (!layers.recorded) return null;
     const segs = realityByDay.get(dayYMD);
     if (!segs || segs.length === 0) return null;
     return segs.map((seg, i) => {
       const topPx = (seg.startMin / 60) * rowHeight;
-      const heightPx = Math.max(2, ((seg.endMin - seg.startMin) / 60) * rowHeight);
+      const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
       const tone = spanTone(tagLibrary, seg, easy);
       const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
-      // #204 — name what the time counted toward (task, else the span's own
-      // name) so a tagged span never looks untagged. Faint, top-right, behind
-      // the plan blocks; hidden on slivers.
-      const name = isWork && !easy ? spanTaskName(seg) ?? (seg.label || (seg.tag ? (tagLibrary.find((t) => t.id === seg.tag)?.label ?? null) : null)) : null;
       return (
         <div
           key={`reality-${seg.id}-${i}`}
@@ -1722,34 +1752,25 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               ? `${spanTitle(seg, 'Focus')} ${fmtHM(seg.startMs)} to now (recording)`
               : `${spanTitle(seg, 'Focus')} ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)}, ${minutes} minutes`
           }
+          title={isWork ? `Recorded: ${spanTitle(seg, 'Focus')} · ${fmtHM(seg.startMs)}–${seg.live ? 'now' : fmtHM(seg.endMs)}` : `Break · ${minutes}m`}
           style={{
+            // What really happened: a rail at the left edge of the day,
+            // beside the plan, never on top of it. A break is a gap.
             position: 'absolute',
-            top: topPx,
-            left: 0,
-            right: 0,
-            height: heightPx,
+            top: topPx + 1,
+            left: 2,
+            width: `calc(${rail} - 4px)`,
+            height: Math.max(2, heightPx - 2),
             pointerEvents: 'none',
-            zIndex: 0,
-            background: isWork
-              ? `color-mix(in srgb, ${tone} ${seg.live ? 20 : 13}%, transparent)`
-              : `repeating-linear-gradient(135deg, color-mix(in srgb, ${tone} 22%, transparent) 0 1px, transparent 1px 7px)`,
-            borderRadius: 3,
+            zIndex: 1,
+            borderRadius: 999,
+            background: isWork ? tone : 'transparent',
+            boxShadow: isWork
+              ? (seg.live ? `0 0 0 2px color-mix(in srgb, ${tone} 35%, transparent)` : 'none')
+              : `inset 0 0 0 1px color-mix(in srgb, var(--ink-3) 45%, transparent)`,
+            opacity: isWork ? 1 : 0.7,
           }}
-        >
-          {name && heightPx >= 14 && (
-            <span
-              data-testid="calendar-reality-name"
-              style={{
-                position: 'absolute', top: 1, right: 4, maxWidth: '70%',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.04em',
-                color: `color-mix(in srgb, ${tone} 70%, var(--ink-3))`,
-              }}
-            >
-              {name}
-            </span>
-          )}
-        </div>
+        />
       );
     });
   }
@@ -1757,8 +1778,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // ── Habit block renderer (ADR 0002 §6) ──────────────────────────────────────
 
   function renderHabitBlocks(dayYMD: string) {
+    if (!layers.habits) return null;
     const isoDow = ymdToIsoDow(dayYMD);
     const blocks: ReactNode[] = [];
+    const isFuture = dayYMD > toYMD(new Date());
 
     for (const habit of scheduledHabits) {
       if (!habitScheduledOnDow(habit.schedule, isoDow)) continue;
@@ -1772,80 +1795,65 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
       const hoursFromStart = habitHour - hourRange.start + habitMin / 60;
       const topPx = Math.round(hoursFromStart * rowHeight);
-
-      const nameLabel = habit.name.length > 10 ? habit.name.slice(0, 9) + '…' : habit.name;
-      const blockHeight =
-        habit.schedule.durationMin && habit.schedule.durationMin > 0
-          ? Math.max(14, Math.round((habit.schedule.durationMin / 60) * rowHeight))
-          : 12;
-      const titleSuffix = habit.schedule.durationMin
-        ? ` (${habit.schedule.durationMin} min)`
-        : '';
+      const done = habit.log.includes(dayYMD);
+      const colour = `var(--${habit.color})`;
+      const titleSuffix = habit.schedule.durationMin ? ` (${habit.schedule.durationMin} min)` : '';
 
       blocks.push(
-        <div
+        <button
+          type="button"
           key={`habit-block-${habit.id}`}
           data-testid={`habit-block-${habit.id}-${dayYMD}`}
-          title={`${habit.name} — repeats · ${habit.schedule.timeOfDay}${titleSuffix}`}
+          data-habit-done={done ? 'true' : undefined}
+          disabled={isFuture}
+          title={`${habit.name} · ${habit.schedule.timeOfDay}${titleSuffix} — ${isFuture ? 'later' : done ? 'done · click to undo' : 'click to tick it'}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isFuture) return;
+            const st = useBoardStore.getState();
+            const mother = st.board?.nodes.find((n) => n.id === habit.motherId);
+            if (!mother) return;
+            import('../../Canvas/commandDispatch').then(({ makeCommandHandler }) => {
+              makeCommandHandler(mother.id)('habit.toggleDay', { id: habit.id, date: dayYMD });
+            }).catch(() => { /* never break the calendar */ });
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="nodrag"
           style={{
+            // A habit is a small pill at its time on the right edge — it marks
+            // the moment without covering the plan beside it.
             position: 'absolute',
-            top: topPx,
-            // Plan layer, right of the reality rail. A tinted block with a
-            // coloured edge (like tasks) instead of a solid bright bar, so a
-            // habit no longer shouts over tasks and tracked time.
-            left: `calc(${rail} + 1px)`,
-            right: 2,
-            height: blockHeight,
-            background: `color-mix(in srgb, var(--${habit.color}) 22%, var(--paper))`,
-            border: `1px solid color-mix(in srgb, var(--${habit.color}) 55%, transparent)`,
-            borderRadius: 2,
-            overflow: 'hidden',
-            zIndex: 1,
-            display: 'flex',
+            top: topPx + 1,
+            right: 3,
+            left: 'auto',
+            height: 18,
+            maxWidth: singleDay ? 168 : 'calc(100% - 14px)',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: 2,
-            padding: '0 2px',
-            pointerEvents: 'none',
+            gap: 4,
+            padding: singleDay ? '0 7px 0 4px' : '0 4px',
+            borderRadius: 999,
+            border: `1px solid color-mix(in srgb, ${colour} ${done ? 0 : 60}%, transparent)`,
+            background: done ? colour : 'color-mix(in srgb, var(--paper) 88%, transparent)',
+            color: done ? 'var(--ink-on-bright)' : 'var(--ink)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+            zIndex: 3,
+            cursor: isFuture ? 'default' : 'pointer',
+            font: 'inherit',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9.5,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
           }}
         >
-          {habit.icon && (
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 8,
-                lineHeight: 1,
-                flexShrink: 0,
-                // Theme-locked dark — see tokens.css --ink-on-bright.
-                color: 'var(--ink)',
-              }}
-            >
-              <HabitIcon icon={habit.icon} size={10} />
-            </span>
-          )}
-          <span
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 8,
-              fontWeight: 600,
-              // KRNL0 contrast rule (see tokens.css --ink-on-bright):
-              // never light text on a bright accent bg. Habit colors are
-              // all bright/tinted, so the label is locked to dark in
-              // every theme.
-              color: 'var(--ink)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              lineHeight: 1,
-            }}
-          >
-            {nameLabel}
+          <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0, color: done ? 'var(--ink-on-bright)' : colour }}>
+            {done
+              ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+              : habit.icon ? <HabitIcon icon={habit.icon} size={10} /> : <span style={{ width: 7, height: 7, borderRadius: 999, background: colour, display: 'inline-block' }} />}
           </span>
-          {/* Recurring marker: habits & routines repeat on the calendar. */}
-          <svg data-testid="habit-block-repeat" width="8" height="8" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            aria-label="repeats" style={{ flexShrink: 0, marginLeft: 'auto', color: 'var(--ink-2)' }}>
-            <path d="M3 7a5 5 0 0 1 8.6-3.4L13 5" /><path d="M13 2v3h-3" /><path d="M13 9a5 5 0 0 1-8.6 3.4L3 11" /><path d="M3 14v-3h3" />
-          </svg>
-        </div>,
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{habit.name}</span>
+        </button>,
       );
     }
 
@@ -1910,60 +1918,33 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             {singleDay ? weekLabel : `Week of ${weekLabel}`}
           </span>
 
-          {/* Legend chip — explains the two block treatments used on the
-              calendar surface: solid = work session, diagonal-stripe with
-              dashed top border = break. Same visual language as the actual
-              calendar-task-break-tail renderer above. */}
-          <div
-            data-testid="week-legend"
-            title="Solid = work session • Striped (dashed top) = break"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '2px 7px',
-              background: 'var(--paper-2)',
-              border: '1px dashed var(--paper-3)',
-              borderRadius: 3,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 8.5,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-3)',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <span
-                aria-hidden
+          {/* Layers — what the rail and the pills mean, and a switch for each. */}
+          <div data-testid="week-legend" role="group" aria-label="Calendar layers" style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
+            {([
+              ['recorded', 'Recorded', 'What you really did: the rail at the left of each day. Breaks are gaps.'],
+              ['habits', 'Habits', 'Habits and routines at their time. Click one to tick it.'],
+            ] as const).map(([k, label, tip]) => (
+              <button
+                key={k}
+                type="button"
+                data-testid={`calendar-layer-${k}`}
+                aria-pressed={layers[k]}
+                title={`${tip} Click to ${layers[k] ? 'hide' : 'show'}.`}
+                onClick={() => toggleLayer(k)}
                 style={{
-                  width: 12,
-                  height: 9,
-                  background: 'var(--acid)',
-                  borderRadius: 1,
-                  display: 'inline-block',
-                  opacity: 0.85,
+                  display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px', borderRadius: 999, cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.04em',
+                  border: `1px solid ${layers[k] ? 'color-mix(in srgb, var(--acid) 45%, var(--paper-3))' : 'var(--paper-3)'}`,
+                  background: layers[k] ? 'color-mix(in srgb, var(--acid) 10%, var(--paper-2))' : 'transparent',
+                  color: layers[k] ? 'var(--ink)' : 'var(--ink-4)',
                 }}
-              />
-              session
-            </span>
-            <span style={{ color: 'var(--ink-4)' }}>·</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <span
-                aria-hidden
-                style={{
-                  width: 12,
-                  height: 9,
-                  borderRadius: 1,
-                  borderTop: '1px dashed var(--acid)',
-                  backgroundImage:
-                    'repeating-linear-gradient(135deg, var(--acid) 0 1px, transparent 1px 4px)',
-                  display: 'inline-block',
-                  opacity: 0.85,
-                }}
-              />
-              break
-            </span>
+              >
+                {k === 'recorded'
+                  ? <span aria-hidden style={{ width: 4, height: 12, borderRadius: 999, background: layers[k] ? 'var(--acid)' : 'var(--paper-3)' }} />
+                  : <span aria-hidden style={{ width: 12, height: 8, borderRadius: 999, border: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}` }} />}
+                {label}
+              </button>
+            ))}
           </div>
 
           {/* #9 — jump to the current week (like the clock's "now"). */}

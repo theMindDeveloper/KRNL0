@@ -6,6 +6,7 @@
  * Theme toggle writes data-theme on <html> and persists to localStorage.
  */
 
+import { SettingsIcon } from '../ui/SettingsIcons';
 import { useState, useEffect, useLayoutEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
@@ -126,7 +127,7 @@ export function TopBar() {
     rf.fitView({ padding: 0.2, duration: 300 });
   };
 
-  const themeLabel = shownTheme === 'dark' ? '☾ DARK' : '☀ LIGHT';
+  const themeLabel = <><SettingsIcon name={shownTheme === 'dark' ? 'moon' : 'sun'} size={12} />{shownTheme === 'dark' ? 'DARK' : 'LIGHT'}</>;
 
   return (
     <div
@@ -228,7 +229,7 @@ export function TopBar() {
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
         <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
         <HelpMenu />
-        <TopBarButton label="⚙" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
+        <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
       </div>
 
       {settingsOpen && (
@@ -239,16 +240,19 @@ export function TopBar() {
 }
 
 interface TopBarButtonProps {
-  label: string;
+  label: React.ReactNode;
+  title?: string;
   onClick: () => void;
   testId?: string;
 }
 
-function TopBarButton({ label, onClick, testId }: TopBarButtonProps) {
+function TopBarButton({ label, title, onClick, testId }: TopBarButtonProps) {
   return (
     <button
       type="button"
       data-testid={testId}
+      title={title}
+      aria-label={title}
       className="krnl-topbar-btn"
       onClick={onClick}
       style={{
@@ -257,6 +261,9 @@ function TopBarButton({ label, onClick, testId }: TopBarButtonProps) {
         borderRadius: 'var(--radius)',
         padding: '4px 10px',
         cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
         fontFamily: 'var(--font-mono)',
         fontSize: 10.5,
         color: 'var(--ink-3)',

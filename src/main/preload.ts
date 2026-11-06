@@ -95,8 +95,8 @@ contextBridge.exposeInMainWorld('krnl', {
   // Decision 37 — pocket timer. Main window side: send the Pomo snapshot, run
   // the pocket's buttons. Pocket side: read the snapshot, send a button.
   pocketSendState: (snapshot: unknown) => ipcRenderer.send('pocket:state', snapshot),
-  onPocketRun: (callback: (command: string) => void) => {
-    const listener = (_event: unknown, command: string) => callback(command)
+  onPocketRun: (callback: (command: string, args?: unknown) => void) => {
+    const listener = (_event: unknown, command: string, args?: unknown) => callback(command, args)
     ipcRenderer.on('pocket:run', listener)
     return () => { ipcRenderer.removeListener('pocket:run', listener) }
   },
@@ -111,7 +111,7 @@ contextBridge.exposeInMainWorld('krnl', {
     ipcRenderer.on('pocket:prefs', listener)
     return () => { ipcRenderer.removeListener('pocket:prefs', listener) }
   },
-  pocketCommand: (command: string): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:command', command),
+  pocketCommand: (command: string, args?: unknown): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:command', command, args),
   pocketOpenMain: () => ipcRenderer.send('pocket:open'),
   pocketCollapse: (collapsed: boolean) => ipcRenderer.send('pocket:collapse', collapsed),
   pocketResize: (size: { width: number; height: number }) => ipcRenderer.send('pocket:resize', size),

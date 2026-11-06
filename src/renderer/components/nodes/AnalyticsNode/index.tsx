@@ -17,6 +17,7 @@
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
 
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import { TimeLogHeatmap } from './TimeLogHeatmap';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from '../types';
@@ -604,7 +605,7 @@ export function AnalyticsNode({
           style={gearBtnStyle(settingsOpen)}
           title={settingsOpen ? 'Done curating' : 'Pin or hide cards'}
         >
-          {settingsOpen ? '✓' : '⚙'}
+          {settingsOpen ? <SettingsIcon name="check" size={12} /> : <SettingsIcon name="settings" size={12} />}
         </button>
       </div>
 

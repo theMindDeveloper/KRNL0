@@ -261,17 +261,19 @@ describe('F6 — Theme toggle persists to localStorage', () => {
     expect(toggleBtn.textContent).toContain('LIGHT');
   });
 
-  it('button label shows ☾ DARK when theme is dark', () => {
+  it('button label shows a moon icon and DARK when theme is dark', () => {
     localStorage.setItem('krnl0-theme', 'dark');
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('☾');
+    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('DARK');
+    expect(screen.getByTestId('topbar-theme-toggle').querySelector('svg')).not.toBeNull();
   });
 
-  it('button label shows ☀ LIGHT when theme is light', () => {
+  it('button label shows a sun icon and LIGHT when theme is light', () => {
     localStorage.setItem('krnl0-theme', 'light');
     document.documentElement.setAttribute('data-theme', 'light');
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('☀');
+    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('LIGHT');
+    expect(screen.getByTestId('topbar-theme-toggle').querySelector('svg')).not.toBeNull();
   });
 });
 

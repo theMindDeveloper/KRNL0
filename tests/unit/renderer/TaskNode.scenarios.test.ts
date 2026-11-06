@@ -79,25 +79,25 @@ function renderTaskNode(
 
 describe('TaskNode Gherkin scenarios (Issue #40)', () => {
 
-  // ── F1 — Header format ────────────────────────────────────────────────────
-  describe('F1 — Header format', () => {
-    it('header text is "task · #03 L1"', () => {
+  // ── F1 — One card shape (task-node.md F1, revised) ─────────────────────
+  describe('F1 — one card shape, no internal numbering', () => {
+    it('shows no "#NN · L" header — the sequence and layer are not user information', () => {
       renderTaskNode(makeTaskState());
-      const header = screen.getByTestId('task-header');
-      // The header contains "● task · #03 L1"; bullet is a separate span
-      expect(header.textContent).toContain('task · #03 L1');
+      expect(screen.queryByTestId('task-header')).toBeNull();
+      expect(screen.getByTestId('task-node-root').textContent).not.toMatch(/#0\d|L\d/);
     });
 
-    it('pads sequence number to 2 digits', () => {
-      renderTaskNode(makeTaskState({ sequenceNumber: 1 }));
-      const header = screen.getByTestId('task-header');
-      expect(header.textContent).toContain('#01');
+    it('open and done cards have the same 220 px frame and a meter as the last row', () => {
+      renderTaskNode(makeTaskState({ done: false }));
+      const open = screen.getByTestId('task-node-root') as HTMLElement;
+      expect(open.style.width).toBe('220px');
+      expect(open.style.minHeight).toBe('120px');
+      expect(screen.getByTestId('task-meter')).toBeTruthy();
     });
 
-    it('shows the layer depth', () => {
-      renderTaskNode(makeTaskState({ layer: 2 }));
-      const header = screen.getByTestId('task-header');
-      expect(header.textContent).toContain('L2');
+    it('the drag-to-Calendar action sits in the title row', () => {
+      renderTaskNode(makeTaskState());
+      expect(screen.getByTestId('task-calendar-grip').getAttribute('title')).toContain('Calendar');
     });
   });
 
@@ -186,17 +186,12 @@ describe('TaskNode Gherkin scenarios (Issue #40)', () => {
       expect(tag?.textContent).toBe('deep');
     });
 
-    it('footer contains the ETA string "~45 min"', () => {
+    it('the meter shows the estimate ("45m"), double-click to change', () => {
       renderTaskNode(makeTaskState());
       const eta = document.querySelector('.task-eta');
       expect(eta).not.toBeNull();
-      expect(eta?.textContent).toBe('~45 min');
-    });
-
-    it('footer has .task-foot class', () => {
-      renderTaskNode(makeTaskState());
-      const foot = document.querySelector('.task-foot');
-      expect(foot).not.toBeNull();
+      expect(eta?.textContent).toBe('45m');
+      expect(eta?.getAttribute('title')).toContain('double-click');
     });
   });
 

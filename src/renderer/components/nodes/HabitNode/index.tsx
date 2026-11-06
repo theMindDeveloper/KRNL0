@@ -13,6 +13,7 @@
 //   single onClick reads `data-date` from the target. 371 cells per
 //   habit → 1 listener.
 
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -238,7 +239,7 @@ export function HabitNode({
               borderRadius: 3,
             }}
           >
-            ⚙
+            <SettingsIcon name="settings" size={12} />
           </button>
         </div>
 
@@ -689,14 +690,22 @@ const WeekRow = memo(function WeekRow({
           alignItems: 'center',
           gap: 6,
           fontFamily: 'var(--font-mono)',
-          fontSize: 9.5,
-          color: 'var(--rust)',
-          letterSpacing: '0.04em',
+          fontSize: 10,
+          color: 'var(--ink-3)',
+          letterSpacing: '0.02em',
+          minWidth: 0,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
         }}
       >
         {streak > 0
-          ? <span>{`▲ ${streak} day streak`}</span>
-          : <span style={{ color: 'var(--ink-3)' }}>{best > 0 ? 'start a new streak today' : 'tick today to start a streak'}</span>}
+          ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--acid-ink, var(--acid))', fontWeight: 600 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>
+              {`${streak} day${streak === 1 ? '' : 's'}`}
+            </span>
+          )
+          : <span>{best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
         {milestone !== null && (
           <button
             type="button"
@@ -707,42 +716,52 @@ const WeekRow = memo(function WeekRow({
               e.stopPropagation();
               openShare({ id: `share:${habit.id}`, kind: 'streak', value: streak, habit: habit.name, best: streak >= best, log: habit.log, total: new Set(habit.log).size });
             }}
-            style={{ padding: '0 6px', border: 0, borderRadius: 999, background: 'var(--acid)', color: 'var(--ink-on-bright)', fontWeight: 700, lineHeight: '14px', font: 'inherit', fontSize: 'inherit', cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 16, padding: '0 7px', border: 0, borderRadius: 999, background: 'var(--acid)', color: 'var(--ink-on-bright)', fontWeight: 700, font: 'inherit', fontSize: 'inherit', cursor: 'pointer' }}
           >
-            {milestone} days ↗
+            {milestone}-day card
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M8 16 16 8M9 8h7v7" /></svg>
           </button>
         )}
         {toNext !== null && streak > 0 && milestone === null && (
-          <span style={{ color: 'var(--ink-3)' }}>· {toNext} to {nextMs}</span>
+          <span>· {toNext} to {nextMs}</span>
         )}
-        {best > streak && streak > 0 && <span data-testid={`habit-best-${habit.id}`} style={{ color: 'var(--ink-3)' }}>· best {best}</span>}
-        {best > 0 && streak === 0 && <span data-testid={`habit-best-${habit.id}`} style={{ color: 'var(--ink-3)' }}>· best {best}</span>}
+        {best > streak && <span data-testid={`habit-best-${habit.id}`}>· best {best}</span>}
       </div>
 
       {/* engagement.md F17 — a missed day can be repaired, not a silent reset. */}
       {repairDay !== null && (
         <div
           data-testid={`habit-repair-${habit.id}`}
-          style={{ marginTop: 4, marginLeft: 22, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-2)' }}
+          className="nodrag"
+          style={{
+            marginTop: 6, marginLeft: 22, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 5px 5px 10px', borderRadius: 8,
+            background: 'var(--paper-2)', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-2)', minWidth: 0,
+          }}
         >
-          <span>Missed {repairLabel}? Tick it if you did it.</span>
+          <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`Missed ${repairLabel}? Tick it if you did it.`}>
+            Did it {repairLabel}?
+          </span>
           <button
             type="button"
             data-testid={`habit-repair-yes-${habit.id}`}
             onClick={(e) => { e.stopPropagation(); onToggle(habit.id, repairDay); }}
             onMouseDown={(e) => e.stopPropagation()}
-            style={{ height: 20, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--btn-primary-ring)', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.06em' }}
+            title={`Tick ${repairLabel} — your streak carries on`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 22, padding: '0 9px', borderRadius: 6, cursor: 'pointer', border: 0, background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, flexShrink: 0 }}
           >
-            I DID IT
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            Yes
           </button>
           <button
             type="button"
             data-testid={`habit-repair-no-${habit.id}`}
             onClick={(e) => { e.stopPropagation(); dismissRepair(habit.id, repairDay); setRepairHidden(true); }}
             onMouseDown={(e) => e.stopPropagation()}
-            style={{ height: 20, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 9.5 }}
+            title="No — start fresh"
+            aria-label="No, start fresh"
+            style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: 6, cursor: 'pointer', border: 0, background: 'transparent', color: 'var(--ink-3)', flexShrink: 0 }}
           >
-            no, start fresh
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
       )}

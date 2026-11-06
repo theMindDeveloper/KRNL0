@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
@@ -416,7 +417,7 @@ export function PomoNode({
           onMouseDown={(e) => e.stopPropagation()}
           style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid-ink, var(--acid))', borderColor: 'var(--acid-ink, var(--acid))' } : {}) }}
         >
-          {logOpen ? '✕' : '☰'}
+          {logOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="menu" size={12} />}
         </button>
         {/* Mode switch — Pomodoro rhythm, or just observe where the time goes.
             Locked while a span is in flight, like the gear. Hidden in Easy mode. */}
@@ -475,7 +476,7 @@ export function PomoNode({
           onMouseDown={(e) => e.stopPropagation()}
           style={{ fontSize: 11 }}
         >
-          {gearOpen ? '✕' : '⚙'}
+          {gearOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="settings" size={12} />}
         </button>}
       </div>
 

@@ -26,6 +26,7 @@ node, never a second timer.
 | F9 | **On / off.** Settings → Floating timer switch (on by default). Off: the pocket never shows. |
 | F10 | **CLI** (AGENTS.md rule 8): `krnl mini status [--json]`, `krnl mini show`, `krnl mini hide`, `krnl mini on`, `krnl mini off`, `krnl mini look [dial\|capsule\|box]`. `show` shows it now, whatever the main window's state, while a session runs. |
 | F12 | **Three looks** (Settings → Floating timer, `krnl mini look`). **Dial** (default): a 184 px round timer with the Clock's ticks; in Pomodoro the ring is the time left, in Observe it is the day 06–22 with today's spans as arcs and breaks as dots; hovering shows the controls under it. **Capsule**: a pill — a small ring that empties (Pomodoro) or a recording dot and a count-up (Observe); `done?` turns it acid; hovering opens a card with the time, meter or day strip, totals and controls. **Box**: the node itself (F2–F4). The window is transparent and sized to the look; main watches the pointer for hover, since drag regions hide it from the page. |
+| F13 | **"What were those 25m?" in Observe.** When the newest work span is unnamed (no task, no label) and ended under 20 minutes ago, every look shows a small card under the timer with the top five categories as one-click chips and a × to skip. A chip sends `pomo.retagSegment {id, taskId:null, label, tag}` — the only command the pocket may send with arguments; main checks the shape (`isPocketLabelArgs`) before passing it on. Skipping only hides it in the pocket; the node still asks. |
 | F11 | **Away time.** When the node is asking whether time spent asleep/away should count, the pocket shows "Away time — open KRNL0 to decide" instead of controls, so the two never disagree. |
 
 ## Non-Functional Requirements
@@ -40,7 +41,7 @@ node, never a second timer.
 
 ## Out of scope (follow-ups)
 
-- The Observe "what was this?" tagger inside the pocket — the node asks when KRNL0 is opened.
+- Free-text naming or tagging a span to a task from the pocket (the chips cover categories; anything else is named in KRNL0).
 - Docking the dial's tab to the screen edge (it is a small tab wherever the dial was).
 
 ## Use Cases

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useContext } from 'react';
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
 import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
@@ -432,7 +433,7 @@ export function ClockNode({
               fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
             }}
           >
-            {dialOnly ? '☰ SCHEDULE' : '⤢ BIG CLOCK'}
+            {dialOnly ? <><SettingsIcon name="menu" size={11} /> SCHEDULE</> : <><SettingsIcon name="expand" size={11} /> BIG CLOCK</>}
           </button>
           </span>
         </div>

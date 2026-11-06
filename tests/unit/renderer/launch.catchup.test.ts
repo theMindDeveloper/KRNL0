@@ -71,10 +71,11 @@ describe('habits in the catch-up (F15)', () => {
       edges: [],
     };
     const c = computeCatchup(board, TODAY);
-    expect(c.habits).toEqual([
+    expect(c.habits).toMatchObject([
       { id: 'run', name: 'Morning run', current: 0, best: 12, broken: true },
       { id: 'read', name: 'Read 20 pages', current: 6, best: 6, broken: false },
     ]);
+    expect(c.habits[0]!.log).toHaveLength(12);
   });
   it('bestStreak finds the longest run', () => {
     expect(bestStreak(['2026-11-01', '2026-11-02', '2026-11-04', '2026-11-05', '2026-11-06'])).toBe(3);

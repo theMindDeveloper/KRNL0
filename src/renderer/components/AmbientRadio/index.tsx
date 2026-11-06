@@ -21,6 +21,7 @@
  * shell #090811, per-preset accent colour, JetBrains Mono).
  */
 
+import { SettingsIcon } from '../ui/SettingsIcons';
 import { PagedView } from '../ui/PagedView';
 import { Z as LAYERS } from '../ui/layers';
 import { registerRadio } from './radioControl';
@@ -1158,7 +1159,7 @@ export function AmbientRadio() {
             )}
 
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
-              <button type="button" data-testid="ambient-radio-gear" title="Settings" onClick={() => setSettingsOpen((o) => !o)} style={headerBtn(settingsOpen)}>⚙</button>
+              <button type="button" data-testid="ambient-radio-gear" title="Settings" onClick={() => setSettingsOpen((o) => !o)} style={headerBtn(settingsOpen)}><SettingsIcon name="settings" size={12} /></button>
               <button type="button" title="Snap to edge" onClick={snapToNearestEdge} style={headerBtn(false)}>−</button>
             </div>
           </div>

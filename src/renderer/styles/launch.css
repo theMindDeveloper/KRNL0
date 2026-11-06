@@ -209,3 +209,49 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 
 /* A floating panel that covers what the tour points at steps aside for that step. */
 .krnl-tour-tucked { opacity: .06 !important; pointer-events: none !important; transition: opacity 200ms ease; }
+
+/* Welcome back (components/Launch/WelcomeBack.tsx) — the days away as calendar
+   columns, the task card's tag chips, the habit week grid, icon buttons. */
+.wb { width: 640px; display: flex; flex-direction: column; }
+.wb-head { display: flex; align-items: flex-start; gap: 12px; padding: 28px 28px 18px; }
+.wb-sub { margin: 8px 0 0; font-size: 13px; line-height: 20px; color: var(--ink-2); }
+.wb-sub b { color: var(--ink); font-weight: 600; }
+.wb-body { padding: 0 28px 8px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; min-height: 0; max-height: calc(100vh - 260px); }
+.wb-days { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.wb-day { display: flex; flex-direction: column; gap: 4px; padding: 10px 10px 9px; border-radius: 10px; background: var(--paper-2); }
+.wb-day.is-today { background: color-mix(in srgb, var(--acid) 12%, var(--paper-2)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 55%, transparent); }
+.wb-day__dow { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.wb-day.is-today .wb-day__dow { color: var(--acid-ink, var(--acid)); }
+.wb-day__num { font-family: var(--font-serif); font-size: 26px; line-height: 1; color: var(--ink); }
+.wb-day__marks { display: flex; gap: 3px; min-height: 10px; align-items: center; }
+.wb-day__marks i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.wb-day__marks .wb-day__in { width: auto; height: auto; border-radius: 0; color: var(--acid-ink, var(--acid)); display: inline-flex; }
+.wb-section { display: flex; flex-direction: column; }
+.wb-section__head { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+.wb-section__head h3 { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--ink); flex: 1; }
+.wb-task { display: flex; align-items: center; gap: 12px; padding: 10px 0; box-shadow: inset 0 -1px 0 var(--paper-3); }
+.wb-task:last-child { box-shadow: none; }
+.wb-task__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.wb-task__title { font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wb-task__meta { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.wb-tag { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 999px; text-transform: capitalize; white-space: nowrap; }
+.wb-tag i { width: 6px; height: 6px; border-radius: 50%; }
+.wb-was { color: var(--rust); white-space: nowrap; }
+.wb-follow { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-2); padding-left: 2px; }
+.wb-follow span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wb-follow em { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+.wb-task__actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.wb-ic { gap: 6px; }
+.wb-icon { width: 28px; padding: 0; color: var(--ink-2); }
+.wb-icon:hover { color: var(--ink); }
+.wb-habits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wb-habit { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; border-radius: 12px; background: var(--paper-2); min-width: 0; }
+.wb-habit__name { font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wb-habit__grid { display: flex; gap: 3px; }
+.wb-habit__grid i { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1.5px var(--paper-3); display: inline-block; }
+.wb-habit__grid i.is-today { box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+.wb-habit__say { font-size: 11.5px; color: var(--ink-2); }
+.wb-habit__say span { color: var(--ink-3); }
+.wb-going { display: inline-flex; align-items: center; gap: 5px; color: var(--acid-ink, var(--acid)) !important; font-weight: 600; }
+.wb-foot { display: flex; align-items: center; gap: 8px; padding: 14px 28px 20px; box-shadow: inset 0 1px 0 var(--paper-3); }
+@media (max-width: 700px) { .wb { width: calc(100vw - 32px); } .wb-habits { grid-template-columns: 1fr; } }

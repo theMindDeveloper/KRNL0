@@ -21,6 +21,8 @@ export interface SlippedTask {
   wasDay: string;
   /** "HH:mm" part of the plan, kept when the task is moved. */
   time: string;
+  /** The task's tag, if any. */
+  tag?: string;
   /** Tasks chained after this one, in order (they move with it). */
   followers: Array<{ id: string; text: string }>;
 }
@@ -32,6 +34,10 @@ export interface HabitCatchup {
   best: number;
   /** The streak ended while away (current 0, there was a run before). */
   broken: boolean;
+  /** Done days, for the week grid. */
+  log: string[];
+  /** Colour token name (acid, cyan, …). */
+  color: string;
 }
 
 export interface Catchup {
@@ -80,7 +86,7 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
       }
       frontier = next;
     }
-    slipped.push({ id: n.id, text: String(s['text'] ?? 'Untitled'), wasDay: day, time: at.slice(11, 16) || '09:00', followers });
+    slipped.push({ id: n.id, text: String(s['text'] ?? 'Untitled'), wasDay: day, time: at.slice(11, 16) || '09:00', followers, ...(typeof s['tag'] === 'string' && s['tag'] ? { tag: s['tag'] } : {}) });
   }
   slipped.sort((a, b) => (a.wasDay === b.wasDay ? a.text.localeCompare(b.text) : a.wasDay.localeCompare(b.wasDay)));
 
@@ -96,7 +102,7 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
       const current = calcStreak(log, today, schedule);
       const best = bestStreak(log, schedule);
       if (current === 0 && best < 2) continue;
-      habits.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current, best, broken: current === 0 });
+      habits.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current, best, broken: current === 0, log, color: typeof h['color'] === 'string' ? h['color'] : 'acid' });
     }
   }
   habits.sort((a, b) => Number(b.broken) - Number(a.broken) || b.best - a.best);

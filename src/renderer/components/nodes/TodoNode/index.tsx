@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TodoConfig, TodoItem, TodoState } from './types';
@@ -621,7 +622,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               {/* #207 — one readable figure: tracked / planned once anything is tracked. */}
               {trackedMin > 0 && (
                 <span data-testid="todo-item-tracked" style={{ color: !openTime && trackedMin > bd.effectiveMin ? 'var(--rust)' : 'var(--ink-2)' }}>
-                  ⏱ {fmtTodoMin(trackedMin)}{!openTime && <span style={{ opacity: 0.5 }}> / </span>}
+                  <SettingsIcon name="clock" size={10} /> {fmtTodoMin(trackedMin)}{!openTime && <span style={{ opacity: 0.5 }}> / </span>}
                 </span>
               )}
               {openTime
@@ -785,7 +786,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
         {/* Item list */}
         {/* No scrolling: rows that don't fit go to the next page (PagedView). */}
-        <PagedView testId="todo-pages" itemSelector=".todo-body > *" style={{ flex: '1 1 0', minHeight: 0 }} contentStyle={{ padding: '6px 0' }}>
+        {/* Opening "Done today" shows the page it is on, so its rows never land
+            unseen on the next page (the header with empty space under it). */}
+        <PagedView testId="todo-pages" itemSelector=".todo-body > *" revealSelector={doneOpen ? '.todo-item.done' : null} style={{ flex: '1 1 0', minHeight: 0 }} contentStyle={{ padding: '6px 0' }}>
           <div className="todo-body" style={{ display: 'contents' }}>
           {items.length === 0 ? (
             <div

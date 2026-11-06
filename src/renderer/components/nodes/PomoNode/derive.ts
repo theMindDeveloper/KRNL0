@@ -149,3 +149,28 @@ export function pomoControls(args: {
   // Pomodoro break: the primary ends it (the node's handlePrimary sends pomo.stop).
   return [{ id: 'endBreak', command: 'pomo.stop', label: 'End break', primary: true }];
 }
+
+/**
+ * The floating timer may also name a span that just ended (Observe, "What was
+ * this?"): only this command, only these arguments (pocket-timer.md F13).
+ */
+export const POCKET_LABEL_COMMAND = 'pomo.retagSegment';
+
+export interface PocketLabelArgs { id: string; taskId: null; label: string; tag?: string }
+
+export function isPocketLabelArgs(v: unknown): v is PocketLabelArgs {
+  if (typeof v !== 'object' || v === null) return false;
+  const a = v as Record<string, unknown>;
+  return typeof a['id'] === 'string' && a['id'].length > 0 && a['id'].length < 80
+    && a['taskId'] === null
+    && typeof a['label'] === 'string' && a['label'].length > 0 && a['label'].length <= 80
+    && (a['tag'] === undefined || (typeof a['tag'] === 'string' && a['tag'].length <= 60));
+}
+
+/** The work span the pocket should ask about: the newest one, unnamed, ended in the last 20 minutes. */
+export function spanToName(history: PomoState['history'], nowMs: number): PomoState['history'][number] | null {
+  const last = [...history].reverse().find((r) => (r.kind ?? 'work') === 'work');
+  if (!last || last.taskId || last.label) return null;
+  const ended = Date.parse(last.endedAt);
+  return Number.isFinite(ended) && nowMs - ended < 20 * 60_000 ? last : null;
+}

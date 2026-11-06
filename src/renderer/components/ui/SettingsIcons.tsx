@@ -22,6 +22,11 @@ const PATHS = {
   sound: <><path d="M11 5 6 9H3v6h3l5 4z" /><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /></>,
   play: <path d="M8 5.5v13l10-6.5z" />,
   finished: <><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.8 2.8L16.5 9.5" /></>,
+  close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
+  check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  expand: <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />,
+  clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
   warning: <><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h0" /></>,
 } satisfies Record<string, ReactNode>;
 
@@ -29,7 +34,7 @@ export type SettingsIconName = keyof typeof PATHS;
 
 export function SettingsIcon({ name, size = 16 }: { name: SettingsIconName; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0, display: 'block' }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0, display: 'inline-block', verticalAlign: 'middle' }}>
       {PATHS[name]}
     </svg>
   );

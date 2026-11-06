@@ -82,10 +82,11 @@ describe('Welcome back (F13, F14)', () => {
     render(<WelcomeBack />);
     const dialog = screen.getByTestId('welcome-back');
     expect(dialog.textContent).toContain('Outline chapter 3');
-    expect(dialog.textContent).toContain('follows the task above');
-    expect(dialog.textContent).toContain('away 4 days');
-    expect(screen.getAllByText('Today')).toHaveLength(1);
-    fireEvent.click(screen.getByTestId('welcome-done'));
+    expect(dialog.textContent).toContain('comes along');
+    expect(dialog.textContent).toContain('4 days');
+    // Only the first task of the chain gets buttons: one "Plan it today" button.
+    expect(screen.getAllByTitle(/^Plan it today/)).toHaveLength(1);
+    fireEvent.click(screen.getByText('Later'));
     expect(useLaunchStore.getState().welcome).toBeNull();
   });
 });

@@ -6,7 +6,7 @@ import type { PomoControl, PomoControlId } from '../components/nodes/PomoNode/de
 import type { DaySpans } from '../components/nodes/PomoNode/daySpans';
 import { ACID, COAL, EDGE, INK, INK3, MONO, MUTED, NO_DRAG, POCKET_SHADOW, openMain, runControl } from './model';
 
-const ICONS: Record<PomoControlId | 'open' | 'dock' | 'expand', ReactNode> = {
+const ICONS: Record<PomoControlId | 'open' | 'dock' | 'expand' | 'close', ReactNode> = {
   start: <path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none" />,
   resume: <path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none" />,
   backToWork: <path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none" />,
@@ -18,6 +18,7 @@ const ICONS: Record<PomoControlId | 'open' | 'dock' | 'expand', ReactNode> = {
   open: <><path d="M14 4h6v6M20 4l-8 8" /><path d="M18 14v5H5V6h5" /></>,
   dock: <path d="M5 12h14" />,
   expand: <><path d="M12 5v14M5 12h14" /></>,
+  close: <path d="M7 7l10 10M17 7 7 17" />,
 };
 
 export function Icon({ name, size = 15 }: { name: keyof typeof ICONS; size?: number }) {
@@ -175,3 +176,49 @@ export const labelStyle: CSSProperties = { fontFamily: MONO, fontSize: 10, lette
 export const cardStyle: CSSProperties = {
   background: COAL, borderRadius: 14, boxShadow: `inset 0 0 0 1px ${EDGE}, ${POCKET_SHADOW}`, color: INK, fontFamily: MONO,
 };
+
+/**
+ * Observe: "What was those 25m?" after a span ends — the node's question,
+ * answered with one click on a category (pocket-timer.md F13). Sends only the
+ * span-labelling command; main checks it again.
+ */
+export function AskWhat({ minutes, tags, onPick, onSkip, themed = false }: {
+  minutes: number;
+  /** Box look: follow the app's light/dark tokens (the dial and capsule are always dark). */
+  themed?: boolean;
+  tags: ReadonlyArray<{ id: string; label: string; color: string }>;
+  onPick: (tag: { id: string; label: string }) => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div
+      data-testid="pocket-ask"
+      style={{
+        ...cardStyle, ...NO_DRAG, padding: '10px 10px 10px 14px', display: 'flex', flexDirection: 'column', gap: 8, width: 304, boxSizing: 'border-box',
+        ...(themed ? { background: 'var(--node-bg)', color: 'var(--ink)', border: '1px solid var(--paper-3)' } : {}),
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 12.5, color: themed ? 'var(--ink)' : INK, flex: 1 }}>What were those {minutes}m?</span>
+        <RoundButton title="Skip — name it later in KRNL0" onClick={onSkip} size={24}><Icon name="close" size={12} /></RoundButton>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {tags.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className="pk-btn"
+            onClick={() => onPick(t)}
+            style={{
+              ...NO_DRAG, display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 999, border: 0, cursor: 'pointer',
+              background: `color-mix(in srgb, ${t.color} 18%, ${themed ? 'var(--paper-2)' : '#1f1d18'})`, color: themed ? 'var(--ink)' : INK, fontFamily: MONO, fontSize: 11.5,
+            }}
+          >
+            <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, background: t.color }} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
