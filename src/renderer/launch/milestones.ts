@@ -13,8 +13,18 @@ export const STREAK_MILESTONES = [7, 30, 100, 365] as const;
 export const SESSION_MILESTONES = [10, 100, 500] as const;
 
 export type Milestone =
-  | { id: string; kind: 'streak'; value: number; habit: string; best: boolean }
-  | { id: string; kind: 'sessions'; value: number; focusedMs: number };
+  | {
+      id: string; kind: 'streak'; value: number; habit: string; best: boolean;
+      /** The habit's done days ("YYYY-MM-DD"), for the card's day grid. */
+      log: string[];
+      /** Days done in all (the story card's "140 days"). */
+      total: number;
+    }
+  | {
+      id: string; kind: 'sessions'; value: number; focusedMs: number;
+      /** Focused ms per week, the last 12 weeks, oldest first (the card's bars). */
+      weeks: number[];
+    };
 
 interface NodeLike { kind: string; isMother?: boolean; state?: unknown }
 
@@ -38,7 +48,26 @@ export function focusStats(nodes: readonly NodeLike[], sinceMs = 0): { sessions:
   return { sessions, focusedMs };
 }
 
-export interface HabitStreak { id: string; name: string; current: number; best: number }
+export interface HabitStreak { id: string; name: string; current: number; best: number; log: string[] }
+
+/** Focused ms per week for the last `n` weeks, oldest first. */
+export function weeklyFocus(nodes: readonly NodeLike[], nowMs: number, n = 12): number[] {
+  const pomo = nodes.find((x) => x.kind === 'pomo' && x.isMother === true);
+  const history = rec(pomo?.state)['history'];
+  const weeks = new Array<number>(n).fill(0);
+  if (!Array.isArray(history)) return weeks;
+  const WEEK = 7 * 86_400_000;
+  for (const raw of history) {
+    const r = rec(raw);
+    if ((r['kind'] ?? 'work') !== 'work') continue;
+    const a = Date.parse(String(r['startedAt']));
+    const b = Date.parse(String(r['endedAt']));
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) continue;
+    const ago = Math.floor((nowMs - a) / WEEK);
+    if (ago >= 0 && ago < n) weeks[n - 1 - ago]! += b - a;
+  }
+  return weeks;
+}
 
 export function habitStreaks(nodes: readonly NodeLike[], today: string): HabitStreak[] {
   const mother = nodes.find((n) => n.kind === 'habit' && n.isMother === true);
@@ -50,7 +79,7 @@ export function habitStreaks(nodes: readonly NodeLike[], today: string): HabitSt
     if (h['archived'] === true || typeof h['id'] !== 'string') continue;
     const log = Array.isArray(h['log']) ? h['log'].filter((d): d is string => typeof d === 'string') : [];
     const schedule = h['schedule'] as HabitSchedule | undefined;
-    out.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current: calcStreak(log, today, schedule), best: bestStreak(log, schedule) });
+    out.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current: calcStreak(log, today, schedule), best: bestStreak(log, schedule), log });
   }
   return out;
 }
@@ -66,7 +95,7 @@ export function findNewMilestone(nodes: readonly NodeLike[], today: string, seen
     for (const m of STREAK_MILESTONES) {
       const id = `streak:${h.id}:${m}`;
       if (h.current === m && !done.has(id)) {
-        return { id, kind: 'streak', value: m, habit: h.name, best: h.best <= m };
+        return { id, kind: 'streak', value: m, habit: h.name, best: h.best <= m, log: h.log, total: new Set(h.log).size };
       }
     }
   }
@@ -75,7 +104,7 @@ export function findNewMilestone(nodes: readonly NodeLike[], today: string, seen
   for (const m of SESSION_MILESTONES) {
     const id = `sessions:${m}`;
     if (sessions === m && !done.has(id)) {
-      return { id, kind: 'sessions', value: m, focusedMs: focusStats(nodes, twelveWeeks).focusedMs };
+      return { id, kind: 'sessions', value: m, focusedMs: focusStats(nodes, twelveWeeks).focusedMs, weeks: weeklyFocus(nodes, nowMs) };
     }
   }
   return null;
@@ -99,7 +128,7 @@ export function milestoneLine(m: Milestone): { title: string; sub: string } {
 export function shareCardFor(nodes: readonly NodeLike[], today: string, what: { kind: 'streak'; habit?: string } | { kind: 'sessions' }, nowMs = Date.now()): Milestone | null {
   if (what.kind === 'sessions') {
     const { sessions } = focusStats(nodes);
-    return { id: 'share:sessions', kind: 'sessions', value: sessions, focusedMs: focusStats(nodes, nowMs - 84 * 86_400_000).focusedMs };
+    return { id: 'share:sessions', kind: 'sessions', value: sessions, focusedMs: focusStats(nodes, nowMs - 84 * 86_400_000).focusedMs, weeks: weeklyFocus(nodes, nowMs) };
   }
   const streaks = habitStreaks(nodes, today);
   const q = what.habit?.trim().toLowerCase();
@@ -107,5 +136,16 @@ export function shareCardFor(nodes: readonly NodeLike[], today: string, what: { 
     ? streaks.find((s) => s.name.toLowerCase() === q) ?? streaks.find((s) => s.name.toLowerCase().includes(q))
     : [...streaks].sort((a, b) => b.current - a.current)[0];
   if (!h) return null;
-  return { id: `share:${h.id}`, kind: 'streak', value: h.current, habit: h.name, best: h.current >= h.best };
+  return { id: `share:${h.id}`, kind: 'streak', value: h.current, habit: h.name, best: h.current >= h.best, log: h.log, total: new Set(h.log).size };
+}
+
+/** Every card the board can make right now: each habit's streak, then focus sessions (the share window's list). */
+export function allShareCards(nodes: readonly NodeLike[], today: string, nowMs = Date.now()): Milestone[] {
+  const out: Milestone[] = [];
+  for (const h of habitStreaks(nodes, today)) {
+    out.push({ id: `share:${h.id}`, kind: 'streak', value: h.current, habit: h.name, best: h.current >= h.best, log: h.log, total: new Set(h.log).size });
+  }
+  const s = shareCardFor(nodes, today, { kind: 'sessions' }, nowMs);
+  if (s) out.push(s);
+  return out;
 }

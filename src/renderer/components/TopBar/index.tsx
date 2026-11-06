@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useLayoutEffect } from 'react';
-import { createPortal, flushSync } from 'react-dom';
+import { flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutModeToggle } from '../ui/LayoutModeToggle';
 import { useDockStyle, DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
@@ -15,16 +15,11 @@ import { isDarkOnly } from '../ChassisLayer/dockRegistry';
 import { StationToolbar } from '../Station/StationToolbar';
 import { MANIFESTS } from '../../themes/manifests';
 import { runLookTransition } from '../../themes/transition';
-import { HoldButton } from '../ui/HoldButton';
-import { useEasyMode } from '../../store/uiMode';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
 import { CanvasSwitcher } from './CanvasSwitcher';
-import { CloseButton } from '../ui/CloseButton';
 import { Z } from '../ui/layers';
-import { UpdatesSection } from './UpdatesSection';
-import { PocketSection } from './PocketSection';
-import { BackupsSection, CelebrationsSection } from './LaunchSettings';
+import { SettingsModal, type SettingsSection } from './SettingsModal';
 import { HelpMenu } from '../Launch/HelpMenu';
 
 type Theme = 'light' | 'dark';
@@ -77,10 +72,15 @@ export function TopBar() {
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
   const [dockStyle, setDockStyle] = useDockStyle();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('general');
   const rf = useReactFlow();
   // Help › Check for updates and What's new › Show me open Settings.
   useEffect(() => {
-    const open = (): void => setSettingsOpen(true);
+    const open = (e: Event): void => {
+      const section = (e as CustomEvent<{ section?: SettingsSection }>).detail?.section;
+      setSettingsSection(section ?? 'general');
+      setSettingsOpen(true);
+    };
     window.addEventListener('krnl:open-settings', open);
     return () => window.removeEventListener('krnl:open-settings', open);
   }, []);
@@ -228,180 +228,13 @@ export function TopBar() {
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
         <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
         <HelpMenu />
-        <TopBarButton label="⚙" onClick={() => setSettingsOpen(true)} testId="topbar-settings" />
+        <TopBarButton label="⚙" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
       </div>
 
       {settingsOpen && (
-        <SettingsModal theme={shownTheme} onTheme={chooseTheme} onClose={() => setSettingsOpen(false)} />
+        <SettingsModal theme={shownTheme} onTheme={chooseTheme} initial={settingsSection} onClose={() => setSettingsOpen(false)} />
       )}
     </div>
-  );
-}
-
-// ── Program settings modal (factory reset) ──────────────────────────────────
-
-function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme: Theme; onTheme: (t: Theme) => void }) {
-  const factoryReset = useBoardStore((s) => s.factoryReset);
-  const setUiMode = useBoardStore((s) => s.setUiMode);
-  const easy = useEasyMode();
-  // Escape closes, like every other dialog — unless a dropdown inside handles it.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      if ((e.target as HTMLElement | null)?.closest?.('[data-own-escape]')) return;
-      onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return createPortal(
-    <div
-      data-testid="settings-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Settings"
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: Z.modal,
-        background: 'rgba(0,0,0,0.55)',
-        display: 'grid',
-        placeItems: 'center',
-        WebkitAppRegion: 'no-drag',
-      } as React.CSSProperties}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 380,
-          maxWidth: '90vw',
-          maxHeight: 'calc(100vh - 48px)',
-          overflowY: 'auto',
-          background: 'var(--paper)',
-          border: '1px solid var(--paper-3)',
-          borderRadius: 10,
-          padding: '18px 20px',
-          boxShadow: 'var(--shadow-1)',
-          fontFamily: 'var(--font-mono)',
-          color: 'var(--ink)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em' }}>
-            Settings
-          </span>
-          <div style={{ flex: 1 }} />
-          <CloseButton testId="settings-close" label="Close settings" onClick={onClose} />
-        </div>
-
-        {/* Appearance — first, so the reset below is never the only thing here. */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontSize: 9.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
-            Appearance
-          </span>
-          <div role="radiogroup" aria-label="Light or dark" style={{ display: 'flex', gap: 6 }}>
-            {(['light', 'dark'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="radio"
-                aria-checked={theme === t}
-                data-testid={`settings-theme-${t}`}
-                onClick={() => onTheme(t)}
-                style={{
-                  flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
-                  border: `1px solid ${theme === t ? 'var(--acid)' : 'var(--paper-3)'}`,
-                  background: theme === t ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
-                  color: 'var(--ink)',
-                }}
-              >
-                {t === 'light' ? '☀ Light' : '☾ Dark'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Easy / Advanced — Easy hides the links between features; data is the same. */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-          <span style={{ fontSize: 9.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
-            Mode
-          </span>
-          <div role="radiogroup" aria-label="Easy or Advanced" style={{ display: 'flex', gap: 6 }}>
-            {([
-              ['easy', 'Easy', 'Plan your day and see where the time went'],
-              ['advanced', 'Advanced', 'Connect tasks, categories and focus'],
-            ] as const).map(([m, label, hint]) => {
-              const on = (m === 'easy') === easy;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  data-testid={`settings-mode-${m}`}
-                  onClick={() => setUiMode(m)}
-                  style={{
-                    flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                    fontFamily: 'var(--font-mono)', color: 'var(--ink)',
-                    border: `1px solid ${on ? 'var(--acid)' : 'var(--paper-3)'}`,
-                    background: on ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
-                  }}
-                >
-                  <div style={{ fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700 }}>{label}</div>
-                  <div style={{ fontSize: 9.5, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.4 }}>{hint}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <PocketSection />
-        <CelebrationsSection />
-        <UpdatesSection />
-        <BackupsSection />
-
-        <div
-          style={{
-            border: '1px solid #3a2a2a',
-            borderRadius: 8,
-            padding: '12px 14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 9.5,
-              color: 'var(--rust)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              fontWeight: 700,
-            }}
-          >
-            Factory reset
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-            Deletes the current board — all tasks, habits, schedules, history and
-            layout — and starts fresh from the default workspace. This cannot be
-            undone.
-          </span>
-          <HoldButton
-            testId="settings-factory-reset"
-            label="Reset everything"
-            holdingLabel="Hold to reset…"
-            onConfirm={() => {
-              void factoryReset();
-              onClose();
-            }}
-            style={{ width: '100%' }}
-          />
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }
 

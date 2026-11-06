@@ -4,7 +4,7 @@
 // Hover shows the controls under it; collapsed it is a small tab.
 
 import { fmtMin } from '../components/nodes/PomoNode/daySpans';
-import { ACID, COAL, CYAN, DRAG, EDGE, INK, INK3, MONO, MUTED, NO_DRAG, openMain, setCollapsed, type PocketModel } from './model';
+import { ACID, COAL, CYAN, DRAG, EDGE, INK, INK3, MONO, MUTED, NO_DRAG, POCKET_SHADOW, openMain, setCollapsed, type PocketModel } from './model';
 import { ControlRow, DayRing, Icon, RoundButton, Ring, Ticks, cardStyle, labelStyle } from './parts';
 
 const SIZE = 184;
@@ -46,7 +46,7 @@ export function DialView({ m, hover }: { m: PocketModel; hover: boolean }) {
   return (
     // No fixed width: the window follows the widest part, so nothing is clipped.
     <div style={{ padding: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: SIZE }} data-testid="pocket-dial">
-      <div style={{ ...DRAG, position: 'relative', width: SIZE, height: SIZE, borderRadius: '50%', background: COAL, boxShadow: `inset 0 0 0 1px ${EDGE}, 0 10px 28px rgba(0,0,0,.5)` }}>
+      <div style={{ ...DRAG, position: 'relative', width: SIZE, height: SIZE, borderRadius: '50%', background: COAL, boxShadow: `inset 0 0 0 1px ${EDGE}, ${POCKET_SHADOW}` }}>
         {m.observe ? (
           <DayRing size={SIZE} stroke={7} day={m.day} now={m.now} />
         ) : (

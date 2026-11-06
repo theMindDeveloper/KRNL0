@@ -4,7 +4,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { PomoControl, PomoControlId } from '../components/nodes/PomoNode/derive';
 import type { DaySpans } from '../components/nodes/PomoNode/daySpans';
-import { ACID, COAL, EDGE, INK, INK3, MONO, MUTED, NO_DRAG, openMain, runControl } from './model';
+import { ACID, COAL, EDGE, INK, INK3, MONO, MUTED, NO_DRAG, POCKET_SHADOW, openMain, runControl } from './model';
 
 const ICONS: Record<PomoControlId | 'open' | 'dock' | 'expand', ReactNode> = {
   start: <path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none" />,
@@ -173,5 +173,5 @@ export function DayRing({ size, stroke, day, now }: { size: number; stroke: numb
 
 export const labelStyle: CSSProperties = { fontFamily: MONO, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: INK3 };
 export const cardStyle: CSSProperties = {
-  background: COAL, borderRadius: 14, boxShadow: `inset 0 0 0 1px ${EDGE}, 0 10px 24px rgba(0,0,0,.45)`, color: INK, fontFamily: MONO,
+  background: COAL, borderRadius: 14, boxShadow: `inset 0 0 0 1px ${EDGE}, ${POCKET_SHADOW}`, color: INK, fontFamily: MONO,
 };

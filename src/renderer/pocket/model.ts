@@ -79,6 +79,12 @@ export const INK = '#f4efe2';
 export const INK3 = '#b3aa94';
 export const COAL = '#0e0d0b';
 export const EDGE = '#3a352c';
+/**
+ * The window is transparent and only 8 px bigger than the shape, so a shadow
+ * must stay inside that margin — a wider one is cut off at the window's
+ * square edge and shows as a grey box around the pill or dial.
+ */
+export const POCKET_SHADOW = '0 2px 5px rgba(0,0,0,.35)';
 
 // Electron's window drag region; buttons opt out so they stay clickable.
 export const DRAG = { WebkitAppRegion: 'drag' } as unknown as CSSProperties;

@@ -12,7 +12,7 @@ import { shouldWelcomeBack, type AppPrefsPatch, type AppStateFile, type LaunchIn
 import { latestNotes, notesFor, shouldShowWhatsNew, type WhatsNewRelease } from '../../shared/whatsnew';
 import type { FeedbackKind } from '../../shared/feedback';
 import { computeCatchup, isEmptyCatchup, type Catchup } from './catchup';
-import { findNewMilestone, type Milestone } from './milestones';
+import { allShareCards, findNewMilestone, type Milestone } from './milestones';
 import { splashLaunch } from '../splash';
 
 export interface LaunchUi {
@@ -24,6 +24,8 @@ export interface LaunchUi {
   welcome: { catchup: Catchup; awayMs: number | null } | null;
   feedback: { kind: FeedbackKind; title: string } | null;
   milestone: Milestone | null;
+  /** The share window: every card the board can make, and which one is shown. */
+  share: { cards: Milestone[]; id: string } | null;
 }
 
 export const useLaunchStore = create<LaunchUi>(() => ({
@@ -34,6 +36,7 @@ export const useLaunchStore = create<LaunchUi>(() => ({
   welcome: null,
   feedback: null,
   milestone: null,
+  share: null,
 }));
 
 export function todayYMD(d = new Date()): string {
@@ -104,6 +107,21 @@ export function showMilestone(m: Milestone): void {
 
 export function closeMilestone(): void {
   useLaunchStore.setState({ milestone: null });
+}
+
+/** Open the share window on `pick` (or the first card), with every card the board can make. */
+export function openShare(pick?: Milestone): boolean {
+  const board = useBoardStore.getState().board;
+  const cards = board ? allShareCards(board.nodes, todayYMD()) : [];
+  if (pick && !cards.some((c) => c.id === pick.id)) cards.unshift(pick);
+  const first = pick ?? cards.find((c) => c.kind === 'streak' && c.value > 0) ?? cards[cards.length - 1];
+  if (!first) return false;
+  useLaunchStore.setState({ share: { cards, id: first.id }, milestone: null });
+  return true;
+}
+
+export function closeShare(): void {
+  useLaunchStore.setState({ share: null });
 }
 
 // ── Launch flow ──────────────────────────────────────────────────────────────

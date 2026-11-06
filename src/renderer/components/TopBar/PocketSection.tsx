@@ -7,6 +7,13 @@ import { useEffect, useState } from 'react';
 import { Switch } from '../ui/Switch';
 import { POCKET_LOOKS, POCKET_LOOK_LABEL, isPocketLook, type PocketLook } from '../../../shared/pocket';
 
+const LOOK_EMOJI: Record<PocketLook, string> = { dial: '⭕', capsule: '💊', box: '🔲' };
+const LOOK_HINT: Record<PocketLook, string> = {
+  dial: 'Round, with the Clock’s ticks. Hover for buttons.',
+  capsule: 'A slim pill. Hover for the details.',
+  box: 'The Pomo node itself, with your timer face.',
+};
+
 function read(v: unknown): { enabled: boolean; look: PocketLook } | null {
   if (typeof v !== 'object' || v === null) return null;
   const r = v as { enabled?: unknown; look?: unknown };
@@ -35,17 +42,14 @@ export function PocketSection() {
   };
 
   return (
-    <div data-testid="settings-pocket" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-      <span style={{ fontSize: 9.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
-        Floating timer
-      </span>
+    <div data-testid="settings-pocket" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ flex: 1, fontSize: 10.5, color: 'var(--ink-2)', lineHeight: 1.45 }}>
+        <span style={{ flex: 1, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>
           Show the Pomo over other apps while KRNL0 is minimised
         </span>
         <Switch checked={state.enabled} onChange={flip} testId="settings-pocket-switch" title="Floating timer" />
       </div>
-      <div role="radiogroup" aria-label="Floating timer look" style={{ display: 'flex', gap: 6, opacity: state.enabled ? 1 : 0.5 }}>
+      <div role="radiogroup" aria-label="Floating timer look" className="st-choices" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', opacity: state.enabled ? 1 : 0.5 }}>
         {POCKET_LOOKS.map((look) => (
           <button
             key={look}
@@ -54,15 +58,10 @@ export function PocketSection() {
             aria-checked={state.look === look}
             data-testid={`settings-pocket-look-${look}`}
             onClick={() => pick(look)}
-            style={{
-              flex: 1, padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10.5,
-              letterSpacing: '0.06em', textTransform: 'uppercase',
-              border: `1px solid ${state.look === look ? 'var(--acid)' : 'var(--paper-3)'}`,
-              background: state.look === look ? 'color-mix(in srgb, var(--acid) 14%, transparent)' : 'transparent',
-              color: 'var(--ink)',
-            }}
+            className="st-choice st-choice--text"
           >
-            {POCKET_LOOK_LABEL[look]}
+            <span className="st-choice__label">{LOOK_EMOJI[look]} {POCKET_LOOK_LABEL[look]}</span>
+            <span className="st-choice__hint">{LOOK_HINT[look]}</span>
           </button>
         ))}
       </div>

@@ -48,6 +48,8 @@ function render(el: HTMLElement): void {
 if (isPocket) {
   // The pocket never shows the startup splash (index.html removes it too).
   document.getElementById('boot-splash')?.remove();
+  // Transparent from the first frame (the window has no background of its own).
+  document.documentElement.classList.add('krnl-pocket');
   createRoot(root).render(
     <StrictMode>
       <PocketApp />

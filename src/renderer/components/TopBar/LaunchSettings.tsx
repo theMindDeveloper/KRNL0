@@ -8,7 +8,7 @@ import { RELEASES } from '../../../shared/whatsnew';
 import { BACKUPS_KEPT } from '../../../shared/appState';
 
 const head: React.CSSProperties = { fontSize: 9.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 };
-const small: React.CSSProperties = { fontSize: 10.5, color: 'var(--ink-2)', lineHeight: 1.45 };
+const small: React.CSSProperties = { fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 };
 const button: React.CSSProperties = {
   padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em',
   textTransform: 'uppercase', border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', whiteSpace: 'nowrap',
@@ -50,7 +50,6 @@ export function CelebrationsSection() {
   if (on === undefined) return null;
   return (
     <div data-testid="settings-celebrations" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-      <span style={head}>Celebrations</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ ...small, flex: 1 }}>A card to save or share at 7, 30, 100 and 365 day streaks and 10, 100, 500 focus sessions</span>
         <Switch checked={on} onChange={(v) => { void setAppPrefs({ celebrations: v }); }} testId="settings-celebrations-switch" title="Celebrations" />

@@ -6,6 +6,7 @@ import { PatchNotice } from './PatchNotice';
 import { WelcomeBack } from './WelcomeBack';
 import { FeedbackDialog } from './FeedbackDialog';
 import { MilestoneNotice } from './MilestoneNotice';
+import { ShareDialog } from './ShareDialog';
 
 export function LaunchHost() {
   return (
@@ -15,6 +16,7 @@ export function LaunchHost() {
       <WhatsNewDialog />
       <WelcomeBack />
       <FeedbackDialog />
+      <ShareDialog />
     </>
   );
 }

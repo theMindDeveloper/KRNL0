@@ -22,9 +22,6 @@ export function UpdatesSection() {
 
   return (
     <div data-testid="settings-updates" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-      <span style={{ fontSize: 9.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
-        Updates
-      </span>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11 }}>
         <span style={{ fontWeight: 700 }}>KRNL0 v{state?.currentVersion ?? APP_VERSION}</span>
         <span

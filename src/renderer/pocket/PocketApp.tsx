@@ -27,7 +27,7 @@ import { Outline } from '../components/nodes/PomoNode/variants/Outline';
 import { Mac } from '../components/nodes/PomoNode/variants/Mac';
 import type { TimerFaceProps } from '../components/nodes/PomoNode/variants/types';
 import type { TimerFace } from '../components/nodes/PomoNode/types';
-import { buildModel } from './model';
+import { POCKET_SHADOW, buildModel } from './model';
 import { DialTab, DialView } from './DialView';
 import { CapsuleView } from './CapsuleView';
 
@@ -242,7 +242,7 @@ function modeChip(observe: boolean): CSSProperties {
 }
 
 /** The box look's own rounded frame and shadow (the window itself is transparent). */
-const boxFrame: CSSProperties = { borderRadius: 10, boxShadow: '0 0 0 1px var(--paper-3), 0 10px 24px rgba(0,0,0,.45)', boxSizing: 'border-box' };
+const boxFrame: CSSProperties = { borderRadius: 10, boxShadow: `0 0 0 1px var(--paper-3), ${POCKET_SHADOW}`, boxSizing: 'border-box' };
 
 const shell: CSSProperties = {
   width: '100%', boxSizing: 'border-box', background: 'var(--node-bg)', color: 'var(--ink)',

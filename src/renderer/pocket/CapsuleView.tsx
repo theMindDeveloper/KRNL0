@@ -3,14 +3,14 @@
 // and a count-up. Hover opens a card under it with the details and controls.
 
 import { ObserveDash } from '../components/nodes/PomoNode/ObserveDash';
-import { ACID, COAL, CYAN, DRAG, EDGE, INK, INK3, MONO, MUTED, NO_DRAG, RUST, endsAt, openMain, type PocketModel } from './model';
+import { ACID, COAL, CYAN, DRAG, EDGE, INK, INK3, MONO, MUTED, NO_DRAG, POCKET_SHADOW, RUST, endsAt, openMain, type PocketModel } from './model';
 import { ControlRow, Ring, cardStyle, labelStyle } from './parts';
 
 function Pill({ m }: { m: PocketModel }) {
   const base = { ...cardStyle, ...DRAG, height: 56, borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 12, padding: '0 20px 0 10px', whiteSpace: 'nowrap' as const };
   if (m.promptDone) {
     return (
-      <div style={{ ...base, background: ACID, color: COAL, padding: '0 8px 0 18px', boxShadow: '0 10px 24px rgba(0,0,0,.45)' }}>
+      <div style={{ ...base, background: ACID, color: COAL, padding: '0 8px 0 18px', boxShadow: POCKET_SHADOW }}>
         <span style={{ fontSize: 13, fontWeight: 700 }}>done?</span>
         <span style={{ height: 40, display: 'inline-flex', alignItems: 'center', padding: '0 12px', borderRadius: 999, background: COAL, color: ACID, fontSize: 11.5, fontWeight: 600 }}>extend · break · stop</span>
       </div>
@@ -25,7 +25,7 @@ function Pill({ m }: { m: PocketModel }) {
       : <span style={{ width: 8, height: 8, marginLeft: 14, borderRadius: '50%', background: ACID, boxShadow: '0 0 0 3px rgba(201,241,88,.18)', flexShrink: 0 }} />)
     : <Ring size={36} stroke={4} fraction={m.onBreak ? m.breakUsed : m.remaining} color={m.tone} />;
   return (
-    <div style={{ ...base, boxShadow: `inset 0 0 0 1px ${m.paused ? '#5f5541' : EDGE}, 0 10px 24px rgba(0,0,0,.45)` }} data-testid="pocket-capsule">
+    <div style={{ ...base, boxShadow: `inset 0 0 0 1px ${m.paused ? '#5f5541' : EDGE}, ${POCKET_SHADOW}` }} data-testid="pocket-capsule">
       {lead}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
         <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 300, lineHeight: 1, color: m.paused ? INK3 : INK, fontVariantNumeric: 'tabular-nums' }}>

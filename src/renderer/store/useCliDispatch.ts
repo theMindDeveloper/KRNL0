@@ -29,7 +29,7 @@ import { radioControl } from '../components/AmbientRadio/radioControl';
 import { launchClaudeInTerminal } from './claudeLaunch';
 import { startTour } from '../components/Tour/TourHost';
 import { flushBeforeRestart } from './updateStore';
-import { openFeedback, openWelcomeBack, openWhatsNew, showMilestone, todayYMD } from '../launch/launchStore';
+import { openFeedback, openShare, openWelcomeBack, openWhatsNew, todayYMD } from '../launch/launchStore';
 import { shareCardFor } from '../launch/milestones';
 import { isFeedbackKind } from '../../shared/feedback';
 
@@ -82,7 +82,7 @@ export function useCliDispatch(): void {
         const card = board
           ? shareCardFor(board.nodes, todayYMD(), args['kind'] === 'sessions' ? { kind: 'sessions' } : { kind: 'streak', habit })
           : null;
-        if (card) showMilestone(card);
+        if (card) openShare(card);
         bridge.cliDispatchReply!(id, card !== null, card ? `Card open in the window: ${card.value} ${card.kind === 'streak' ? `days · ${card.habit}` : 'focus sessions'}` : habit ? `No habit called "${habit}"` : 'No habits yet');
         return;
       }
