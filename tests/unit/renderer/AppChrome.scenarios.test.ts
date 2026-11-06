@@ -93,16 +93,16 @@ describe('F1 — Topbar left content', () => {
     expect(screen.getByTestId('topbar-brand').textContent).toContain('KRNL0');
   });
 
-  it('renders breadcrumb text "∷ ~/krnl0 / canvas /"', () => {
+  it('renders breadcrumb text "~/krnl0 / canvas /"', () => {
     renderWithWrapper(React.createElement(TopBar));
     expect(screen.getByTestId('topbar-breadcrumb').textContent).toBe(
-      '∷ ~/krnl0 / canvas /'
+      '~/krnl0 / canvas /'
     );
   });
 
-  it('renders badge text "◆ live"', () => {
+  it('renders badge text "live" with a dot (no glyph)', () => {
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-live-badge').textContent).toBe('◆ live');
+    expect(screen.getByTestId('topbar-live-badge').textContent).toBe('live');
   });
 });
 

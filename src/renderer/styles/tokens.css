@@ -637,8 +637,10 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   cursor: default;
 }
 .habit-cell--year   { border-radius: 1px; }
-.habit-cell--past   { opacity: 0.4; }
-.habit-cell--future { /* no extra */ }
+.habit-cell--past   { opacity: 0.55; }
+/* Future days: an empty outline — they can't be ticked yet, and must never
+   look heavier than the past. */
+.habit-cell--future { background: transparent; box-shadow: inset 0 0 0 1px var(--paper-3); }
 /* Non-scheduled days (per habit.schedule) — de-emphasised + non-interactive. */
 .habit-cell--unscheduled {
   opacity: 0.15;
@@ -646,43 +648,15 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   pointer-events: none;
 }
 
-/* PR6 — done state uses LifeOS's two-color trick: outer is ink (dark),
-   inner ::after is the habit color (acid by default). Gives a small
-   "framed" look instead of a flat block. Year-density variant skips the
-   inner block since 5px cells leave no usable inner area. */
+/* Done: a solid block in the habit's colour, in both themes (the old framed
+   two-colour cell read as an empty box with an outline). */
 .habit-cell--done {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--habit-color, var(--acid));
+  border-color: var(--habit-color, var(--acid));
+  box-shadow: none;
   opacity: 1;
 }
-.habit-cell--done::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  background: var(--habit-color, var(--acid));
-  border-radius: 1px;
-  pointer-events: none;
-}
-.habit-cell--year.habit-cell--done {
-  background: var(--habit-color, var(--acid));
-  border-color: var(--habit-color, var(--acid));
-}
-.habit-cell--year.habit-cell--done::after {
-  display: none;
-}
-/* Dark-mode inversion: outer becomes the habit color, inner becomes paper
-   so the cell still reads against the dark background. */
-[data-theme="dark"] .habit-cell--done {
-  background: var(--habit-color, var(--acid));
-  border-color: var(--habit-color, var(--acid));
-}
-[data-theme="dark"] .habit-cell--done::after {
-  background: var(--paper);
-}
-[data-theme="dark"] .habit-cell--year.habit-cell--done {
-  background: var(--habit-color, var(--acid));
-  border-color: var(--habit-color, var(--acid));
-}
+.habit-cell--done::after { content: none; }
 
 .habit-cell--today {
   background: transparent;
@@ -696,6 +670,9 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
 /* Today + done: keep the two-color body but add the today outline so the
    "today" cue survives the done fill. */
 .habit-cell--done.habit-cell--today {
+  /* Ticked today must look ticked: the today rule above clears the fill. */
+  background: var(--habit-color, var(--acid));
+  border-color: var(--habit-color, var(--acid));
   outline: 1.5px solid var(--habit-color, var(--acid));
   outline-offset: 1px;
 }

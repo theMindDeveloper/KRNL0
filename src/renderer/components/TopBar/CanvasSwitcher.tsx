@@ -68,10 +68,11 @@ export function CanvasSwitcher() {
           background: 'transparent', border: '1px solid var(--paper-3)', borderRadius: 'var(--radius)',
           padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10.5,
           color: 'var(--ink-2, var(--ink))', letterSpacing: '0.03em', whiteSpace: 'nowrap',
-          maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis',
+          maxWidth: 180, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
         }}
       >
-        {active?.name ?? DEFAULT_CANVAS_NAME} <span style={{ color: 'var(--ink-4)' }}>▾</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{active?.name ?? DEFAULT_CANVAS_NAME}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: 'var(--ink-3)', flexShrink: 0 }}><path d="M6 9l6 6 6-6" /></svg>
       </button>
       <Popover anchor={anchor.current} open={open} onClose={close} minWidth={220}>
         <div data-testid="canvas-switcher-list" style={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)', fontSize: 11 }}>

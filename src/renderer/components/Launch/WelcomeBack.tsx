@@ -173,7 +173,7 @@ export function WelcomeBack() {
                       <div className="wb-habit__say">
                         {h.broken
                           ? <>Start again today <span>· best {h.best}</span></>
-                          : <span className="wb-going"><Icon name="flame" size={12} />{h.current} days, still going</span>}
+                          : <span className="wb-going"><Icon name="flame" size={12} />{h.current} {h.current === 1 ? 'day' : 'days'}, still going</span>}
                       </div>
                     </div>
                   );

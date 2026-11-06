@@ -23,13 +23,20 @@ function read(v: unknown): { enabled: boolean; look: PocketLook } | null {
 
 export function PocketSection() {
   const [state, setState] = useState<{ enabled: boolean; look: PocketLook } | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
-    void window.krnl?.pocketSettingsGet?.().then((s) => setState(read(s)));
+    const get = window.krnl?.pocketSettingsGet;
+    if (!get) { setUnavailable(true); return; }
+    void get().then((s) => { const r = read(s); setState(r); if (!r) setUnavailable(true); }, () => setUnavailable(true));
   }, []);
 
-  // No pocket outside Electron (browser preview): nothing to switch.
-  if (state === null) return null;
+  // Never an empty card: say why there is nothing to switch.
+  if (state === null) {
+    return unavailable
+      ? <p data-testid="settings-pocket-unavailable" style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>The floating timer is part of the desktop app.</p>
+      : null;
+  }
 
   const flip = (next: boolean): void => {
     setState({ ...state, enabled: next });

@@ -46,8 +46,9 @@ export function BackupsSection() {
 }
 
 export function CelebrationsSection() {
-  const on = useLaunchStore((s) => s.prefs?.celebrations);
-  if (on === undefined) return null;
+  const loaded = useLaunchStore((s) => s.prefs);
+  // Until the app's settings are read, the switch shows the default (on).
+  const on = loaded?.celebrations ?? true;
   return (
     <div data-testid="settings-celebrations" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

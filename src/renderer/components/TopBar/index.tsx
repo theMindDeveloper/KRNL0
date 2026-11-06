@@ -186,15 +186,17 @@ export function TopBar() {
         {/* Breadcrumb */}
         <span
           data-testid="topbar-breadcrumb"
+          className="krnl-breadcrumb"
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 10.5,
-            color: 'var(--ink-4)',
+            color: 'var(--ink-3)',
             letterSpacing: '0.03em',
             userSelect: 'none',
+            whiteSpace: 'nowrap',
           }}
         >
-          ∷ ~/krnl0 / canvas /
+          ~/krnl0 / canvas /
         </span>
         {/* Decision 33 — canvas switcher (the breadcrumb's last segment). */}
         <CanvasSwitcher />
@@ -205,13 +207,19 @@ export function TopBar() {
           className="krnl-live-badge"
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 10.5,
             color: 'var(--acid-ink, var(--acid))',
             letterSpacing: '0.04em',
             userSelect: 'none',
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            marginRight: 10,
           }}
         >
-          ◆ live
+          <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor' }} />
+          live
         </span>
       </div>
 
