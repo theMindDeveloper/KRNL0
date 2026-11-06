@@ -50,7 +50,7 @@ export function RoundButton({ title, onClick, children, primary = false, size = 
 }
 
 /** Icon buttons for Pomodoro, words for Observe (as in the designs), plus Open and an optional extra. */
-export function ControlRow({ controls, words, extra }: { controls: PomoControl[]; words: boolean; extra?: ReactNode }) {
+export function ControlRow({ controls, words, extra, size = 32 }: { controls: PomoControl[]; words: boolean; extra?: ReactNode; size?: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       {controls.map((c) => (words ? (
@@ -71,12 +71,12 @@ export function ControlRow({ controls, words, extra }: { controls: PomoControl[]
           {c.label}
         </button>
       ) : (
-        <RoundButton key={c.id} title={c.label} onClick={() => runControl(c)} primary={c.primary} testId={`pocket-${c.id}`}>
+        <RoundButton key={c.id} title={c.label} onClick={() => runControl(c)} primary={c.primary} size={size} testId={`pocket-${c.id}`}>
           <Icon name={c.id} />
         </RoundButton>
       )))}
       <span style={{ width: 1, height: 20, background: EDGE, margin: '0 4px' }} />
-      <RoundButton title="Open KRNL0" onClick={openMain}><Icon name="open" /></RoundButton>
+      <RoundButton title="Open KRNL0" onClick={openMain} size={size}><Icon name="open" /></RoundButton>
       {extra}
     </div>
   );

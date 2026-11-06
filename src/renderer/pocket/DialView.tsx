@@ -44,7 +44,8 @@ export function DialView({ m, hover }: { m: PocketModel; hover: boolean }) {
   const { text, color } = centerLabel(m);
   const ringFraction = m.onBreak ? m.breakUsed : m.promptDone ? 1 : m.remaining;
   return (
-    <div style={{ padding: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, width: SIZE + 16 }} data-testid="pocket-dial">
+    // No fixed width: the window follows the widest part, so nothing is clipped.
+    <div style={{ padding: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: SIZE }} data-testid="pocket-dial">
       <div style={{ ...DRAG, position: 'relative', width: SIZE, height: SIZE, borderRadius: '50%', background: COAL, boxShadow: `inset 0 0 0 1px ${EDGE}, 0 10px 28px rgba(0,0,0,.5)` }}>
         {m.observe ? (
           <DayRing size={SIZE} stroke={7} day={m.day} now={m.now} />
@@ -69,10 +70,12 @@ export function DialView({ m, hover }: { m: PocketModel; hover: boolean }) {
               Decide in KRNL0
             </button>
           ) : (
+            // Icons (labels on hover), so the bar fits under the 184 px dial.
             <ControlRow
               controls={m.controls}
-              words={m.observe || m.promptDone}
-              extra={<RoundButton title="Shrink to a tab" onClick={() => setCollapsed(true)}><Icon name="dock" /></RoundButton>}
+              words={false}
+              size={30}
+              extra={<RoundButton title="Shrink to a tab" size={30} onClick={() => setCollapsed(true)}><Icon name="dock" /></RoundButton>}
             />
           )}
         </div>
