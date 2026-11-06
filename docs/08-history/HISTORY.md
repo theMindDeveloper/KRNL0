@@ -1525,3 +1525,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`
 **Summary:** The habit lane (a habit placed on the canvas) used ● ✓ ▲ ↻ characters for its colour, today's tick, its streak and its cadence; they are drawn now, and the streak uses the flame like every other habit view. Covered by the lane's tests; not render-checked (the preview board has no lane).
+
+## [2026-11-07] — UI loop batch 22: habit lane checked on screen
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`, `src/renderer/dev/previewBridge.ts`
+**Summary:** The rich preview board now has a habit lane, so batch 21's icons were rendered and checked in both themes. Its running streak was rust; it is acid like every other habit view (grey at 0).

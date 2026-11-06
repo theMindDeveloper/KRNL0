@@ -213,6 +213,8 @@ function richBoard(): Json {
       { id: 'h-med', name: 'Meditate', icon: 'meditate', createdAt: created, log: [], archived: false, color: 'cyan', schedule: { kind: 'daily', timeOfDay: '13:00', durationMin: 10 } },
     ],
   };
+  // A habit placed on the canvas (habit lane), for render checks.
+  nodes.push({ id: 'lane-run', kind: 'habit.lane', position: { x: -840, y: 1500 }, isMother: false, state: { habitId: 'h-run' }, config: {} });
   return b;
 }
 
