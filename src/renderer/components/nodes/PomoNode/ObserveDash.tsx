@@ -5,7 +5,7 @@
 
 import type { PomoState } from './types';
 import type { TagDef } from '../../../../shared/tags/classify';
-import { spanTone } from '../../../store/spanTags';
+import { fmtMin, todaySpans } from './daySpans';
 
 export interface ObserveDashProps {
   state: PomoState;
@@ -18,43 +18,9 @@ export interface ObserveDashProps {
 }
 
 
-function fmtMin(ms: number): string {
-  const min = Math.floor(ms / 60_000);
-  return min < 60 ? `${min}m` : `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, '0')}m`;
-}
 
 export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: ObserveDashProps) {
-  const dayStart = new Date(nowMs);
-  dayStart.setHours(0, 0, 0, 0);
-  const d0 = dayStart.getTime();
-  const DAY = 86_400_000;
-
-  // Today's spans, clipped to the day, plus the live one.
-  const spans: Array<{ id: string; start: number; end: number; break: boolean; color: string }> = [];
-  for (const r of state.history) {
-    const start = Math.max(d0, Date.parse(r.startedAt));
-    const end = Math.min(d0 + DAY, Date.parse(r.endedAt));
-    if (!(end > start)) continue;
-    const color = spanTone(library, r, plain);
-    spans.push({ id: r.id, start, end, break: r.kind === 'break', color });
-  }
-  const live = (state.status === 'running' || state.status === 'break') && state.startedAt !== null;
-  if (live) {
-    const start = Math.max(d0, Date.parse(state.startedAt as string));
-    if (nowMs > start) {
-      spans.push({
-        id: 'live', start, end: nowMs, break: state.status === 'break',
-        color: spanTone(library, { kind: 'work', taskId: state.activeTaskId, tag: state.tag ?? null }, plain),
-      });
-    }
-  }
-  let workMs = 0;
-  let breakMs = 0;
-  let workSpans = 0;
-  for (const s of spans) {
-    if (s.break) breakMs += s.end - s.start;
-    else { workMs += s.end - s.start; workSpans++; }
-  }
+  const { d0, spans, workMs, breakMs, workSpans, live } = todaySpans(state, library, nowMs, plain);
 
   // Show the waking part of the day: 06–22 by default, widened to fit spans.
   const firstH = Math.min(6, ...spans.map((s) => Math.floor((s.start - d0) / 3_600_000)));

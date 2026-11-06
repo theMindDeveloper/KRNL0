@@ -1,5 +1,6 @@
 // Runs a guided tour (tours.ts): a spotlight on what the guide talks about,
-// a guide card (with a small orb) that glides to it, and steps that wait for
+// a guide card that glides to it — the real assistant orb rides on its corner
+// (tourAnchor.ts), never a second copy — and steps that wait for
 // the real action. The app stays usable underneath (the dimming takes no
 // pointer events). Mount once (App). Start with startTour(id) / `krnl tour start <id>`.
 //
@@ -17,6 +18,7 @@ import { focusNode } from '../../store/scheduleActions';
 import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { stepsFor, tourById, type Tour } from './tours';
+import { setTourAnchor } from './tourAnchor';
 
 export const TOUR_EVENT = 'krnl:tour';
 
@@ -109,6 +111,8 @@ export function TourHost(): JSX.Element | null {
   // Last card position: the card stays where it is while the next target
   // settles, then glides there.
   const cardPos = useRef<{ left: number; top: number } | null>(null);
+  /** The card's spot in the last render, for the orb (tourAnchor.ts). */
+  const anchorPos = useRef<{ left: number; top: number }>({ left: 0, top: 0 });
 
   const closeSettings = (): void => {
     if (!openedSettings.current) return;
@@ -234,6 +238,14 @@ export function TourHost(): JSX.Element | null {
     return () => window.removeEventListener('keydown', on);
   });
 
+  // The real orb rides on the card's top-left corner (64 px orb, centred on
+  // it). After every render: the card's spot is worked out during render.
+  useEffect(() => {
+    if (!tour || !step) { setTourAnchor(null); return; }
+    setTourAnchor({ x: Math.round(anchorPos.current.left) - 32, y: Math.round(anchorPos.current.top) - 32 });
+  });
+  useEffect(() => () => setTourAnchor(null), []);
+
   if (!tour || !step) return null;
 
   const W = Math.min(420, window.innerWidth - 24);
@@ -248,6 +260,7 @@ export function TourHost(): JSX.Element | null {
   } else if (pointsAt && cardPos.current) {
     pos = cardPos.current;
   }
+  anchorPos.current = pos;
   const ownLabel = (ownMode.current ?? uiMode) === 'easy' ? 'Easy' : 'Advanced';
   // The step text decides the highlight (write `**{mode}**`).
   const text = step.text.split('{mode}').join(ownLabel);
@@ -299,18 +312,6 @@ export function TourHost(): JSX.Element | null {
           transition: 'left 460ms cubic-bezier(0.22, 1, 0.36, 1), top 460ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
-        {/* The guide: a small orb riding on the card, so it reads as "the guide moved over here". */}
-        <span aria-hidden data-testid="tour-orb" style={{
-          position: 'absolute', left: -14, top: -14, width: 28, height: 28, borderRadius: '50%',
-          background: 'radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--acid) 35%, white), var(--acid) 55%, color-mix(in srgb, var(--acid) 50%, black))',
-          boxShadow: '0 0 12px 2px color-mix(in srgb, var(--acid) 55%, transparent)',
-        }}>
-          <span style={{
-            position: 'absolute', inset: -6, borderRadius: '50%',
-            background: 'radial-gradient(circle, color-mix(in srgb, var(--acid) 60%, transparent), transparent 70%)',
-            animation: 'krnl-tour-orb 2.4s ease-in-out infinite',
-          }} />
-        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-mono)' }}>
           <span style={{ fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-2)', fontWeight: 700 }}>{tour.title}</span>
           <span style={{ flex: 1 }} />

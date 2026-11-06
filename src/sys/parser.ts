@@ -74,6 +74,7 @@ export type SysCommand =
   | { kind: 'update'; sub: 'install' | 'open' }
   | { kind: 'mini'; sub: 'status'; json: boolean }
   | { kind: 'mini'; sub: 'show' | 'hide' | 'on' | 'off' }
+  | { kind: 'mini'; sub: 'look'; look: string | undefined }
   // Decision 38 — launch experience
   | { kind: 'whatsnew'; sub: 'print'; json: boolean }
   | { kind: 'whatsnew'; sub: 'show' }
@@ -337,7 +338,8 @@ export class SysParser {
       }
       if (sub === 'status') return { kind: 'mini', sub, json: hasFlag(rest, 'json') };
       if (sub === 'show' || sub === 'hide' || sub === 'on' || sub === 'off') return { kind: 'mini', sub };
-      return { kind: 'invalid', message: `Unknown subcommand: mini ${sub}. Try: mini status | show | hide | on | off` };
+      if (sub === 'look') return { kind: 'mini', sub: 'look', look: rest[0] };
+      return { kind: 'invalid', message: `Unknown subcommand: mini ${sub}. Try: mini status | show | hide | on | off | look <dial|capsule|box>` };
     }
 
     // Decision 38 — launch experience (launch-experience.md F7, F15, F19, F23, F24).

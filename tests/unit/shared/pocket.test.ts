@@ -2,7 +2,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_POCKET_PREFS,
+  POCKET_MAX_WIDTH,
   clampPocketPosition,
+  clampPocketSize,
+  initialPocketSize,
   describePocketStatus,
   isPocketLive,
   parsePocketPrefs,
@@ -52,13 +55,28 @@ describe('clampPocketPosition (F7)', () => {
 describe('parsePocketPrefs', () => {
   it('fills defaults and drops junk', () => {
     expect(parsePocketPrefs(null)).toEqual(DEFAULT_POCKET_PREFS);
-    expect(parsePocketPrefs({ enabled: false, collapsed: 'yes', x: 10.6, y: 'a' })).toEqual({ enabled: false, collapsed: false, x: 11, y: null });
+    expect(parsePocketPrefs({ enabled: false, collapsed: 'yes', x: 10.6, y: 'a' })).toEqual({ enabled: false, collapsed: false, look: 'dial', x: 11, y: null });
+    expect(parsePocketPrefs({ look: 'capsule' }).look).toBe('capsule');
+    expect(parsePocketPrefs({ look: 'orb' }).look).toBe('dial');
   });
 });
 
 describe('describePocketStatus', () => {
   it('reads plainly', () => {
-    expect(describePocketStatus({ enabled: false, visible: false, collapsed: false, live: true })).toBe('Floating timer is off.');
-    expect(describePocketStatus({ enabled: true, visible: true, collapsed: true, live: true })).toBe('Floating timer is on · showing (collapsed) · a session is running.');
+    expect(describePocketStatus({ enabled: false, visible: false, collapsed: false, look: 'dial', live: true })).toBe('Floating timer is off.');
+    expect(describePocketStatus({ enabled: true, visible: true, collapsed: true, look: 'box', live: true })).toBe('Floating timer is on (box) · showing (collapsed) · a session is running.');
+  });
+});
+
+describe('looks (F12)', () => {
+  it('dial is the default and each look starts at its own size', () => {
+    expect(DEFAULT_POCKET_PREFS.look).toBe('dial');
+    expect(initialPocketSize('dial', false)).toEqual({ width: 200, height: 200 });
+    expect(initialPocketSize('dial', true).width).toBeLessThan(80);
+    expect(initialPocketSize('box', true).height).toBe(48);
+  });
+  it('a size the view reports is kept within limits', () => {
+    expect(clampPocketSize(9999, 3)).toEqual({ width: POCKET_MAX_WIDTH, height: 40 });
+    expect(clampPocketSize(200.4, 263.6)).toEqual({ width: 200, height: 264 });
   });
 });

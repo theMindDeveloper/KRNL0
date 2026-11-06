@@ -6,22 +6,51 @@
 import type { PomoConfig, PomoState, TimerFace } from '../renderer/components/nodes/PomoNode/types';
 import type { TagDef } from './tags/taxonomy';
 
-/** Width is fixed; height follows the content (the pocket measures itself). */
+/** The box look's width. Every look measures itself; the window follows (within the limits below). */
 export const POCKET_WIDTH = 304;
 export const POCKET_COLLAPSED_HEIGHT = 48;
-export const POCKET_MAX_HEIGHT = 420;
+export const POCKET_MAX_HEIGHT = 520;
+export const POCKET_MIN_SIZE = 40;
+export const POCKET_MAX_WIDTH = 420;
+
+/**
+ * How the floating timer looks (pocket-timer.md F12): a round dial (the
+ * default), a capsule like the 0 in the logo, or the Pomo node as a box.
+ */
+export type PocketLook = 'dial' | 'capsule' | 'box';
+export const POCKET_LOOKS: readonly PocketLook[] = ['dial', 'capsule', 'box'];
+export const POCKET_LOOK_LABEL: Record<PocketLook, string> = { dial: 'Dial', capsule: 'Capsule', box: 'Box' };
+
+export function isPocketLook(v: unknown): v is PocketLook {
+  return v === 'dial' || v === 'capsule' || v === 'box';
+}
+
+/** The window's first size for a look, before the view has measured itself. */
+export function initialPocketSize(look: PocketLook, collapsed: boolean): { width: number; height: number } {
+  if (look === 'dial') return collapsed ? { width: 60, height: 108 } : { width: 200, height: 200 };
+  if (look === 'capsule') return { width: 280, height: 72 };
+  return collapsed ? { width: POCKET_WIDTH, height: POCKET_COLLAPSED_HEIGHT } : { width: POCKET_WIDTH, height: 260 };
+}
+
+/** Clamp a size the view reports. */
+export function clampPocketSize(w: number, h: number): { width: number; height: number } {
+  const c = (v: number, lo: number, hi: number) => Math.round(Math.min(hi, Math.max(lo, v)));
+  return { width: c(w, POCKET_MIN_SIZE, POCKET_MAX_WIDTH), height: c(h, POCKET_MIN_SIZE, POCKET_MAX_HEIGHT) };
+}
 
 export interface PocketPrefs {
   /** Settings → Floating timer (F9). */
   enabled: boolean;
-  /** One-line strip instead of the node (F6). */
+  /** Smallest form: a line (box), a docked tab (dial). The capsule is always small (F6). */
   collapsed: boolean;
+  /** Dial (default), capsule or box (F12). */
+  look: PocketLook;
   /** Last top-left position in screen coordinates; null until the user moves it. */
   x: number | null;
   y: number | null;
 }
 
-export const DEFAULT_POCKET_PREFS: PocketPrefs = { enabled: true, collapsed: false, x: null, y: null };
+export const DEFAULT_POCKET_PREFS: PocketPrefs = { enabled: true, collapsed: false, look: 'dial', x: null, y: null };
 
 /** Tolerant read of userData/pocket.json — a bad file falls back to the defaults. */
 export function parsePocketPrefs(raw: unknown): PocketPrefs {
@@ -31,6 +60,7 @@ export function parsePocketPrefs(raw: unknown): PocketPrefs {
   return {
     enabled: typeof r['enabled'] === 'boolean' ? r['enabled'] : DEFAULT_POCKET_PREFS.enabled,
     collapsed: typeof r['collapsed'] === 'boolean' ? r['collapsed'] : DEFAULT_POCKET_PREFS.collapsed,
+    look: isPocketLook(r['look']) ? r['look'] : DEFAULT_POCKET_PREFS.look,
     x: num(r['x']),
     y: num(r['y']),
   };
@@ -106,6 +136,7 @@ export interface PocketStatus {
   enabled: boolean;
   visible: boolean;
   collapsed: boolean;
+  look: PocketLook;
   /** The Pomo node is timing something. */
   live: boolean;
 }
@@ -116,11 +147,12 @@ export interface PocketPort {
   show(): { ok: boolean; message: string };
   hide(): { ok: boolean; message: string };
   setEnabled(on: boolean): { ok: boolean; message: string };
+  setLook(look: PocketLook): { ok: boolean; message: string };
 }
 
 export function describePocketStatus(s: PocketStatus): string {
   if (!s.enabled) return 'Floating timer is off.';
   const where = s.visible ? 'showing' : 'hidden';
   const what = s.live ? 'a session is running' : 'nothing is being timed';
-  return `Floating timer is on · ${where}${s.collapsed ? ' (collapsed)' : ''} · ${what}.`;
+  return `Floating timer is on (${POCKET_LOOK_LABEL[s.look].toLowerCase()}) · ${where}${s.collapsed ? ' (collapsed)' : ''} · ${what}.`;
 }

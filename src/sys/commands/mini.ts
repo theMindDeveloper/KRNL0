@@ -2,7 +2,7 @@
 // docs/06-requirements/pocket-timer.md F10). Thin: the running app's pocket
 // does the work; this only formats its answers.
 
-import { describePocketStatus, type PocketPort } from '../../shared/pocket';
+import { POCKET_LOOKS, describePocketStatus, isPocketLook, type PocketPort } from '../../shared/pocket';
 import type { SysResult } from '../SysFacade';
 
 export function miniStatus(pocket: PocketPort, json = false): SysResult {
@@ -20,4 +20,11 @@ export function miniHide(pocket: PocketPort): SysResult {
 
 export function miniSetEnabled(pocket: PocketPort, on: boolean): SysResult {
   return pocket.setEnabled(on);
+}
+
+/** `krnl mini look <dial|capsule|box>` — without a value, says the current look (F12). */
+export function miniLook(pocket: PocketPort, look: string | undefined): SysResult {
+  if (look === undefined) return { ok: true, message: `Floating timer look: ${pocket.status().look}. Choose: ${POCKET_LOOKS.join(' | ')}`, data: { look: pocket.status().look } };
+  if (!isPocketLook(look)) return { ok: false, message: `Unknown look "${look}". Choose: ${POCKET_LOOKS.join(' | ')}` };
+  return pocket.setLook(look);
 }

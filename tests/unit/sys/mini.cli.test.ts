@@ -21,11 +21,12 @@ function fakePocket(status: PocketStatus) {
     show: vi.fn(() => ({ ok: true, message: 'Floating timer shown.' })),
     hide: vi.fn(() => ({ ok: true, message: 'Floating timer hidden.' })),
     setEnabled: vi.fn((on: boolean) => ({ ok: true, message: on ? 'Floating timer on.' : 'Floating timer off.' })),
+    setLook: vi.fn((look: string) => ({ ok: true, message: `Floating timer look: ${look}.` })),
   };
   return port satisfies PocketPort;
 }
 
-const live: PocketStatus = { enabled: true, visible: true, collapsed: false, live: true };
+const live: PocketStatus = { enabled: true, visible: true, collapsed: false, look: 'dial', live: true };
 
 describe('mini parser', () => {
   it.each([
@@ -36,6 +37,8 @@ describe('mini parser', () => {
     [['mini', 'hide'], { kind: 'mini', sub: 'hide' }],
     [['mini', 'on'], { kind: 'mini', sub: 'on' }],
     [['mini', 'off'], { kind: 'mini', sub: 'off' }],
+    [['mini', 'look', 'capsule'], { kind: 'mini', sub: 'look', look: 'capsule' }],
+    [['mini', 'look'], { kind: 'mini', sub: 'look', look: undefined }],
   ])('%j', (argv, expected) => {
     expect(SysParser.parse(argv)).toEqual(expected);
   });
@@ -48,7 +51,7 @@ describe('mini parser', () => {
 describe('mini commands', () => {
   it('status prints plain words, --json the bare status', async () => {
     const r = await new SysFacade({ boardPath, pocket: fakePocket(live) }).run(['mini']);
-    expect(r.message).toBe('Floating timer is on · showing · a session is running.');
+    expect(r.message).toBe('Floating timer is on (dial) · showing · a session is running.');
     const j = await new SysFacade({ boardPath, pocket: fakePocket(live) }).run(['mini', 'status', '--json']);
     expect(JSON.parse(j.message!)).toEqual(live);
   });
@@ -59,6 +62,16 @@ describe('mini commands', () => {
     expect(p.setEnabled).toHaveBeenCalledWith(false);
     await new SysFacade({ boardPath, pocket: p }).run(['mini', 'show']);
     expect(p.show).toHaveBeenCalled();
+  });
+
+  it('look picks dial, capsule or box (F12)', async () => {
+    const p = fakePocket(live);
+    await new SysFacade({ boardPath, pocket: p }).run(['mini', 'look', 'box']);
+    expect(p.setLook).toHaveBeenCalledWith('box');
+    const bad = await new SysFacade({ boardPath, pocket: p }).run(['mini', 'look', 'orb']);
+    expect(bad.ok).toBe(false);
+    const now = await new SysFacade({ boardPath, pocket: p }).run(['mini', 'look']);
+    expect(now.message).toContain('dial');
   });
 
   it('outside the app it says where to run it', async () => {

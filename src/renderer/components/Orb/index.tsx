@@ -37,6 +37,7 @@ import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
 import { launchClaudeInTerminal } from '../../store/claudeLaunch';
 import { TOURS } from '../Tour/tours';
+import { useTourAnchor } from '../Tour/tourAnchor';
 
 /** Voice flows not offered in the chat for now. */
 const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
@@ -213,6 +214,15 @@ export function Orb() {
 
   // ── Drag state ────────────────────────────────────────────────────────────
   const [pos, setPos]           = useState<OrbPos>(loadPos);
+  // During a guided tour the orb itself rides on the tour card (no copy).
+  const tourAt = useTourAnchor((s) => s.at);
+  const [tourGlide, setTourGlide] = useState(false);
+  useEffect(() => {
+    // Glide while a tour moves it and on the way back home, never while dragging.
+    setTourGlide(true);
+    const t = window.setTimeout(() => setTourGlide(tourAt !== null), 520);
+    return () => window.clearTimeout(t);
+  }, [tourAt]);
   const [settleKey, setSettleKey] = useState(0);
   const draggingRef    = useRef(false);
   const dragMovedRef   = useRef(false);
@@ -535,15 +545,19 @@ export function Orb() {
       key={settleKey}
       style={{
         position: 'fixed',
-        left: pos.x,
-        top: pos.y,
-        zIndex: Z.widget,
+        left: tourAt ? tourAt.x : pos.x,
+        top: tourAt ? tourAt.y : pos.y,
+        zIndex: tourAt ? Z.tour + 1 : Z.widget,
         fontFamily: 'var(--font-mono)',
+        transform: tourAt ? 'scale(0.6)' : 'none',
+        transition: tourGlide
+          ? 'left 460ms cubic-bezier(0.22, 1, 0.36, 1), top 460ms cubic-bezier(0.22, 1, 0.36, 1), transform 460ms cubic-bezier(0.22, 1, 0.36, 1)'
+          : 'none',
         animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
       }}
     >
       {/* Voice caption — shown during flows */}
-      {caption !== null && !open && (
+      {caption !== null && !open && !tourAt && (
         <div
           style={{
             position: 'absolute',
@@ -574,7 +588,7 @@ export function Orb() {
       )}
 
       {/* Chat panel */}
-      {open && (
+      {open && !tourAt && (
         <div
           data-testid="orb-chat-panel"
           style={{

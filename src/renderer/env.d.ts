@@ -64,7 +64,9 @@ interface KrnlBridge {
   pocketCommand?: (command: string) => Promise<{ ok: boolean; message: string }>
   pocketOpenMain?: () => void
   pocketCollapse?: (collapsed: boolean) => void
-  pocketResize?: (height: number) => void
+  pocketResize?: (size: { width: number; height: number }) => void
+  onPocketHover?: (callback: (over: boolean) => void) => () => void
+  pocketLookSet?: (look: string) => Promise<{ ok: boolean; message: string }>
   pocketSettingsGet?: () => Promise<unknown>
   pocketSettingsSet?: (on: boolean) => Promise<{ ok: boolean; message: string }>
   // Decision 38 — launch experience. Use renderer/launch/*, not these directly.

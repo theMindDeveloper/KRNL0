@@ -358,6 +358,7 @@ export class SysFacade {
         case 'hide':   return miniCmd.miniHide(pocket);
         case 'on':     return miniCmd.miniSetEnabled(pocket, true);
         case 'off':    return miniCmd.miniSetEnabled(pocket, false);
+        case 'look':   return miniCmd.miniLook(pocket, command.look);
       }
     }
 

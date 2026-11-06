@@ -10,13 +10,15 @@ import { BrowserWindow, app, ipcMain, screen, type IpcMainEvent, type IpcMainInv
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import {
-  POCKET_COLLAPSED_HEIGHT,
-  POCKET_MAX_HEIGHT,
-  POCKET_WIDTH,
+  POCKET_LOOK_LABEL,
   clampPocketPosition,
+  clampPocketSize,
+  initialPocketSize,
   isPocketLive,
+  isPocketLook,
   parsePocketPrefs,
   shouldShowPocket,
+  type PocketLook,
   type PocketPort,
   type PocketPrefs,
   type PocketSnapshot,
@@ -40,7 +42,11 @@ let prefs: PocketPrefs = parsePocketPrefs(null);
 let snapshot: PocketSnapshot | null = null;
 /** `krnl mini show` while a session runs: show even with the main window up. */
 let forced = false;
-let height = 260;
+/** The window's content size; the view measures itself and main follows (F12). */
+let size = initialPocketSize('dial', false);
+/** Pointer-over-window polling: hover shows the dial's and capsule's controls. */
+let hoverTimer: ReturnType<typeof setInterval> | null = null;
+let hovering = false;
 /** Other main-side views of the Pomo (taskbar, menu bar) follow the same snapshot. */
 const snapshotListeners = new Set<(s: PocketSnapshot | null) => void>();
 
@@ -79,14 +85,42 @@ function savePrefs(): void {
 }
 
 const live = (): boolean => isPocketLive(snapshot?.state.status);
-const contentHeight = (): number => (prefs.collapsed ? POCKET_COLLAPSED_HEIGHT : height);
+
+function applySize(): void {
+  if (pocket && !pocket.isDestroyed()) pocket.setContentSize(size.width, size.height);
+}
+
+/**
+ * Drag regions swallow mouse events on Windows, so the view can't see hover
+ * on a draggable dial. Main polls the pointer while the pocket is shown.
+ */
+function startHoverWatch(): void {
+  if (hoverTimer) return;
+  hoverTimer = setInterval(() => {
+    if (!pocket || pocket.isDestroyed() || !pocket.isVisible()) { stopHoverWatch(); return; }
+    const p = screen.getCursorScreenPoint();
+    const b = pocket.getBounds();
+    const over = p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height;
+    if (over !== hovering) {
+      hovering = over;
+      sendToPocket('pocket:hover', over);
+    }
+  }, 120);
+}
+
+function stopHoverWatch(): void {
+  if (hoverTimer) clearInterval(hoverTimer);
+  hoverTimer = null;
+  if (hovering) { hovering = false; sendToPocket('pocket:hover', false); }
+}
 
 function ensureWindow(): BrowserWindow | null {
   if (pocket && !pocket.isDestroyed()) return pocket;
   if (!opts) return null;
+  size = initialPocketSize(prefs.look, prefs.collapsed);
   const win = new BrowserWindow({
-    width: POCKET_WIDTH,
-    height: contentHeight(),
+    width: size.width,
+    height: size.height,
     useContentSize: true,
     show: false,
     frame: false,
@@ -96,9 +130,12 @@ function ensureWindow(): BrowserWindow | null {
     fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    hasShadow: true,
+    // Transparent so the dial can be round and the capsule a pill; each look
+    // draws its own shape and shadow.
+    transparent: true,
+    hasShadow: false,
     title: 'KRNL0 timer',
-    backgroundColor: '#1c1a13',
+    backgroundColor: '#00000000',
     icon: opts.icon,
     webPreferences: {
       preload: opts.preload,
@@ -126,7 +163,6 @@ function ensureWindow(): BrowserWindow | null {
 }
 
 function place(win: BrowserWindow): void {
-  const size = { width: POCKET_WIDTH, height: contentHeight() };
   const areas = screen.getAllDisplays().map((d) => d.workArea);
   const { x, y } = clampPocketPosition({ x: prefs.x, y: prefs.y }, size, areas);
   win.setContentSize(size.width, size.height);
@@ -150,8 +186,10 @@ function reevaluate(): void {
       place(win);
       win.showInactive();
     }
+    startHoverWatch();
   } else if (pocket && !pocket.isDestroyed() && pocket.isVisible()) {
     pocket.hide();
+    stopHoverWatch();
   }
 }
 
@@ -224,20 +262,26 @@ export function initPocket(options: PocketOptions): PocketPort {
     prefs = { ...prefs, collapsed };
     savePrefs();
     sendToPocket('pocket:prefs', prefs);
-    if (pocket && !pocket.isDestroyed()) pocket.setContentSize(POCKET_WIDTH, contentHeight());
+    size = initialPocketSize(prefs.look, prefs.collapsed);
+    applySize();
   });
 
-  // The pocket measures its content; the window follows (expanded only).
-  ipcMain.on('pocket:resize', (e, h: unknown) => {
-    if (!fromPocket(e) || typeof h !== 'number' || !Number.isFinite(h)) return;
-    height = Math.max(POCKET_COLLAPSED_HEIGHT, Math.min(POCKET_MAX_HEIGHT, Math.round(h)));
-    if (!prefs.collapsed && pocket && !pocket.isDestroyed()) pocket.setContentSize(POCKET_WIDTH, height);
+  // The pocket measures its content; the window follows.
+  ipcMain.on('pocket:resize', (e, raw: unknown) => {
+    if (!fromPocket(e) || typeof raw !== 'object' || raw === null) return;
+    const { width, height } = raw as { width?: unknown; height?: unknown };
+    if (typeof width !== 'number' || typeof height !== 'number' || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    const next = clampPocketSize(width, height);
+    if (next.width === size.width && next.height === size.height) return;
+    size = next;
+    applySize();
   });
 
   const status = (): PocketStatus => ({
     enabled: prefs.enabled,
     visible: pocket !== null && !pocket.isDestroyed() && pocket.isVisible(),
     collapsed: prefs.collapsed,
+    look: prefs.look,
     live: live(),
   });
 
@@ -262,6 +306,14 @@ export function initPocket(options: PocketOptions): PocketPort {
       reevaluate();
       return { ok: true, message: on ? 'Floating timer on.' : 'Floating timer off.' };
     },
+    setLook: (look: PocketLook) => {
+      prefs = { ...prefs, look };
+      savePrefs();
+      sendToPocket('pocket:prefs', prefs);
+      size = initialPocketSize(look, prefs.collapsed);
+      applySize();
+      return { ok: true, message: `Floating timer look: ${POCKET_LOOK_LABEL[look]}.` };
+    },
   };
 }
 
@@ -269,6 +321,7 @@ export function initPocket(options: PocketOptions): PocketPort {
 export function registerPocketSettings(port: PocketPort): void {
   ipcMain.handle('pocket:settings:get', () => port.status());
   ipcMain.handle('pocket:settings:set', (_e, on: unknown) => (typeof on === 'boolean' ? port.setEnabled(on) : { ok: false, message: 'expected true or false' }));
+  ipcMain.handle('pocket:look:set', (_e, look: unknown) => (isPocketLook(look) ? port.setLook(look) : { ok: false, message: 'expected dial, capsule or box' }));
 }
 
 let port: PocketPort | null = null;

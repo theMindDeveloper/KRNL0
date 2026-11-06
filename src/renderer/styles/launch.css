@@ -85,3 +85,14 @@ textarea.ln-input { height: auto; min-height: 104px; padding: 10px 12px; line-he
 @keyframes lnFade { from { opacity: 0; } }
 @keyframes lnRise { from { opacity: 0; transform: translateY(8px) scale(.99); } }
 @media (prefers-reduced-motion: reduce) { .ln-scrim, .ln-dialog, .ln-toast, .ln-wn__art img { animation: none; } }
+
+/* Pocket timer looks (pocket-timer.md F12). The window is transparent, so the
+   page must be too; each look draws its own shape. */
+html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: transparent !important; overflow: hidden; }
+.pk-btn:hover { filter: brightness(1.15); background-color: rgba(244, 239, 226, .08); }
+.pk-btn:focus-visible { outline: 2px solid #ee8466; outline-offset: 2px; }
+.pk-pulse { animation: pkPulse 1.4s ease-in-out infinite; }
+@keyframes pkPulse { 50% { opacity: .45; } }
+/* The node's Observe dash inside the always-dark capsule card. */
+.pk-dash { --ink: #f4efe2; --ink-2: #ddd6c6; --ink-3: #b3aa94; --ink-4: #8f8572; --paper-2: #1f1d18; --paper-3: #2f2b24; --acid: #c9f158; --rust: #ee8466; }
+@media (prefers-reduced-motion: reduce) { .pk-pulse { animation: none; } }

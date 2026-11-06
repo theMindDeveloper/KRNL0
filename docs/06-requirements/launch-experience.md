@@ -35,7 +35,7 @@ Everything here is about the moments around using KRNL0: opening it, after an up
 - **F15** Habits: a broken streak is said plainly with the best run (`best 12 · start again today`); a running one says `▲ 6 · still going`. `krnl catchup [--json]` prints the same; `krnl catchup show` opens the dialog even when nothing slipped.
 
 **Help and feedback**
-- **F16** A **?** button in the top bar opens Help: What's new, Take the tour, Send feedback, Copy diagnostics, Source on GitHub, Check for updates, Board backups, and the version.
+- **F16** A **?** button in the top bar opens Help: What's new, Take the tour, Catch up (opens Welcome back any time), Share a milestone (a card for the longest streak, or the focus sessions), Send feedback, Copy diagnostics, Source on GitHub, Check for updates, Board backups, and the version.
 - **F17** Send feedback: what it is (Something's broken / An idea / A question / Something I love), a short title, a description, and two switches — app version and system, recent errors (with **view**). It says the board, tasks and notes are never added.
 - **F18** **Continue on GitHub** opens a filled-in GitHub issue in the browser; nothing is sent from the app. The link stays under 7,500 characters (oldest error lines go first, then the description is shortened). **Copy diagnostics** copies the version, system and errors.
 - **F19** `krnl feedback "title" [--kind bug|idea|question|love]` opens the dialog with the title filled in; with `--link` or without a window it prints the GitHub link.

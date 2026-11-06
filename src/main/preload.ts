@@ -114,7 +114,13 @@ contextBridge.exposeInMainWorld('krnl', {
   pocketCommand: (command: string): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:command', command),
   pocketOpenMain: () => ipcRenderer.send('pocket:open'),
   pocketCollapse: (collapsed: boolean) => ipcRenderer.send('pocket:collapse', collapsed),
-  pocketResize: (height: number) => ipcRenderer.send('pocket:resize', height),
+  pocketResize: (size: { width: number; height: number }) => ipcRenderer.send('pocket:resize', size),
+  onPocketHover: (callback: (over: boolean) => void) => {
+    const listener = (_event: unknown, over: boolean) => callback(over)
+    ipcRenderer.on('pocket:hover', listener)
+    return () => { ipcRenderer.removeListener('pocket:hover', listener) }
+  },
+  pocketLookSet: (look: string): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:look:set', look),
   pocketSettingsGet: (): Promise<unknown> => ipcRenderer.invoke('pocket:settings:get'),
   pocketSettingsSet: (on: boolean): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:settings:set', on),
 

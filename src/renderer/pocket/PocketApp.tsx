@@ -1,12 +1,12 @@
 // The pocket timer view (Decision 37, docs/06-requirements/pocket-timer.md).
 // Rendered in the small always-on-top window instead of App. It shows the
-// Pomo node in its current mode — Pomodoro (countdown face, pips, "Are you
-// done?") or Observe (count-up, day strip, totals) — from the snapshot the
-// main window sends, and sends the node's own commands back. It never loads
-// or saves the board.
+// Pomo node in its current mode — Pomodoro or Observe — in one of three looks
+// (F12): a round dial (default), a capsule, or the node as a box. It reads
+// the snapshot the main window sends and sends the node's own commands back.
+// It never loads or saves the board.
 
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
-import { DEFAULT_POCKET_PREFS, isPocketLive, parsePocketPrefs, type PocketPrefs, type PocketSnapshot } from '../../shared/pocket';
+import { DEFAULT_POCKET_PREFS, POCKET_WIDTH, isPocketLive, parsePocketPrefs, type PocketPrefs, type PocketSnapshot } from '../../shared/pocket';
 import {
   formatElapsed,
   formatRemaining,
@@ -27,6 +27,9 @@ import { Outline } from '../components/nodes/PomoNode/variants/Outline';
 import { Mac } from '../components/nodes/PomoNode/variants/Mac';
 import type { TimerFaceProps } from '../components/nodes/PomoNode/variants/types';
 import type { TimerFace } from '../components/nodes/PomoNode/types';
+import { buildModel } from './model';
+import { DialTab, DialView } from './DialView';
+import { CapsuleView } from './CapsuleView';
 
 const FACES: Record<TimerFace, ComponentType<TimerFaceProps>> = {
   ascii: Ascii, lcd: Lcd, blocks: Blocks, vapor: Vapor, vu: Vu, outline: Outline, mac: Mac,
@@ -55,7 +58,13 @@ export function PocketApp() {
   const [snap, setSnap] = useState<PocketSnapshot | null>(null);
   const [prefs, setPrefs] = useState<PocketPrefs>(DEFAULT_POCKET_PREFS);
   const [now, setNow] = useState(() => Date.now());
+  const [hover, setHover] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // The window is transparent: the page must not paint a background.
+  useEffect(() => { document.documentElement.classList.add('krnl-pocket'); }, []);
+  // Main watches the pointer (drag regions hide hover from the page).
+  useEffect(() => window.krnl?.onPocketHover?.((over) => setHover(over)), []);
 
   useEffect(() => {
     const k = window.krnl;
@@ -75,16 +84,25 @@ export function PocketApp() {
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => { if (snap) applyRoot(snap.root); }, [snap]);
+  useEffect(() => {
+    if (!snap) return;
+    applyRoot(snap.root);
+    document.documentElement.classList.add('krnl-pocket');
+  }, [snap]);
 
-  // The window follows the content's height (expanded only).
+  // The window follows the content's size, in every look and state.
   useEffect(() => {
     const el = rootRef.current;
-    if (!el || prefs.collapsed || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => window.krnl?.pocketResize?.(el.getBoundingClientRect().height));
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const send = (): void => {
+      const r = el.getBoundingClientRect();
+      window.krnl?.pocketResize?.({ width: Math.ceil(r.width), height: Math.ceil(r.height) });
+    };
+    const ro = new ResizeObserver(send);
     ro.observe(el);
+    send();
     return () => ro.disconnect();
-  }, [prefs.collapsed, snap !== null]);
+  }, [prefs.collapsed, prefs.look, snap !== null]);
 
   const run = (c: PomoControl): void => { void window.krnl?.pocketCommand?.(c.command); };
   const open = (): void => window.krnl?.pocketOpenMain?.();
@@ -92,8 +110,21 @@ export function PocketApp() {
 
   if (!snap) {
     return (
-      <div ref={rootRef} style={{ ...shell, ...DRAG, height: 48, padding: '0 14px', display: 'flex', alignItems: 'center' }}>
-        <span style={label}>KRNL0 · waiting for the Pomo…</span>
+      <div ref={rootRef} style={{ display: 'inline-block', padding: 8 }}>
+        <div style={{ ...shell, ...DRAG, ...boxFrame, height: 48, padding: '0 14px', display: 'flex', alignItems: 'center' }}>
+          <span style={label}>KRNL0 · waiting for the Pomo…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (prefs.look === 'dial' || prefs.look === 'capsule') {
+    const m = buildModel(snap, now);
+    return (
+      <div ref={rootRef} style={{ display: 'inline-block' }} data-testid="pocket">
+        {prefs.look === 'capsule'
+          ? <CapsuleView m={m} hover={hover} />
+          : prefs.collapsed ? <DialTab m={m} /> : <DialView m={m} hover={hover} />}
       </div>
     );
   }
@@ -124,18 +155,21 @@ export function PocketApp() {
     const time = observe ? formatElapsed(observedMs) : faceText;
     const tail = observe ? (onBreak ? 'break' : '↑ time log') : onBreak ? 'break' : state.status === 'paused' ? 'paused' : `${doneDots} / ${pips}`;
     return (
-      <div ref={rootRef} style={{ ...shell, ...DRAG, height: 48, display: 'flex', alignItems: 'center', gap: 10, padding: '0 6px 0 14px' }}>
+      <div ref={rootRef} style={{ display: 'inline-block', padding: 8 }}>
+      <div style={{ ...shell, ...DRAG, ...boxFrame, width: POCKET_WIDTH, height: 48, display: 'flex', alignItems: 'center', gap: 10, padding: '0 6px 0 14px' }}>
         <span style={{ width: 7, height: 7, borderRadius: 999, background: dot, flexShrink: 0 }} />
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 19, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{time}</span>
         <span style={{ ...label, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tail}</span>
         <IconButton title="Expand" onClick={() => collapse(false)}><path d="M12 5v14M5 12h14" /></IconButton>
         <IconButton title="Open KRNL0" onClick={open}><path d="M14 4h6v6M20 4l-8 8" /><path d="M18 14v5H5V6h5" /></IconButton>
       </div>
+      </div>
     );
   }
 
   return (
-    <div ref={rootRef} style={shell} data-testid="pocket">
+    <div ref={rootRef} style={{ display: 'inline-block', padding: 8 }} data-testid="pocket">
+    <div style={{ ...shell, ...boxFrame, width: POCKET_WIDTH }}>
       <header style={{ ...DRAG, height: 32, display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 0 12px', borderBottom: '1px solid var(--paper-3)' }}>
         <span style={{ width: 6, height: 6, borderRadius: 999, background: dot, flexShrink: 0 }} />
         <span style={{ ...label, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title} {titleRight}</span>
@@ -183,6 +217,7 @@ export function PocketApp() {
         {!isPocketLive(state.status) && <span style={{ ...label, textAlign: 'center' }}>Nothing is being timed</span>}
       </div>
     </div>
+    </div>
   );
 }
 
@@ -205,6 +240,9 @@ function modeChip(observe: boolean): CSSProperties {
     background: observe ? 'color-mix(in srgb, var(--rust) 16%, transparent)' : 'color-mix(in srgb, var(--acid) 14%, transparent)',
   };
 }
+
+/** The box look's own rounded frame and shadow (the window itself is transparent). */
+const boxFrame: CSSProperties = { borderRadius: 10, boxShadow: '0 0 0 1px var(--paper-3), 0 10px 24px rgba(0,0,0,.45)', boxSizing: 'border-box' };
 
 const shell: CSSProperties = {
   width: '100%', boxSizing: 'border-box', background: 'var(--node-bg)', color: 'var(--ink)',

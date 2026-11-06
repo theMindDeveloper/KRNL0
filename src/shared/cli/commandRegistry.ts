@@ -293,6 +293,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'hide', usage: 'mini hide', summary: 'Hide it until KRNL0 is minimised again' },
       { name: 'on', usage: 'mini on', summary: 'Turn the floating timer on' },
       { name: 'off', usage: 'mini off', summary: 'Turn the floating timer off' },
+      { name: 'look', usage: 'mini look [dial|capsule|box]', summary: 'How it looks: a round dial (default), a capsule, or the Pomo node as a box'},
     ],
   },
   {
