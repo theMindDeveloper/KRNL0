@@ -1399,3 +1399,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/shared/feedback.ts`, `tests/unit/shared/externalUrl.test.ts`
 **Summary:** Send feedback can attach the session's recent errors to a public GitHub issue. Error lines often hold file paths such as `C:\Users\<name>\Documents\krnl0\board.json`, which would publish the user's account name. Paths under a home folder now read `~` (Windows, macOS and Linux forms) and email addresses read `<email>`, in both the issue link and "Copy diagnostics".
+
+## [2026-11-06] — UI loop batch 4: Clock schedule readable, last glyphs gone
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`
+**Summary:** The Clock's schedule faded rows that were over to 42 % opacity (3.7:1); they now keep full opacity in a quieter ink, with their colour bar at half strength. Times and durations are 10 px at readable contrast, the active PM/AM chip uses the deeper rust so its label reads in light mode, and the header's ◉ / ▦ / ◷ characters are a dot and line icons. All nine Analytics pages were rendered in both themes and at the small station size; the Insights page still squeezes three cards across a very narrow window (noted for a follow-up: the page grid needs to reflow by width).

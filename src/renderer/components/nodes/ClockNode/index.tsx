@@ -398,7 +398,7 @@ export function ClockNode({
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-2)' }}>
-            <span style={{ color: isToday ? 'var(--cyan)' : 'var(--ink-4)', fontSize: 9 }}>◉</span>
+            <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: isToday ? 'var(--cyan)' : 'var(--ink-4)', boxShadow: isToday ? '0 0 0 2px color-mix(in srgb, var(--cyan) 25%, transparent)' : 'none' }} />
             {isToday ? 'Today · Schedule' : 'Day · Schedule'}
           </span>
           <span style={{ display: 'flex', gap: 6 }}>
@@ -414,9 +414,10 @@ export function ClockNode({
               color: weekView ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
               border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
               fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
             }}
           >
-            {weekView ? '◷ DAY' : '▦ WEEK'}
+            {weekView ? <><SettingsIcon name="clock" size={11} /> DAY</> : <><SettingsIcon name="dial" size={11} /> WEEK</>}
           </button>
           <button
             type="button"
@@ -589,9 +590,10 @@ export function ClockNode({
             onClick={() => onCommand('clock.setViewWindow', { window: 1 })}
             style={{
               padding: '3px 10px',
-              background: viewWindow === 1 ? 'var(--rust)' : 'transparent',
+              // rust-deep: the paper-coloured label reads on it in both themes.
+              background: viewWindow === 1 ? 'var(--rust-deep, var(--rust))' : 'transparent',
               color: viewWindow === 1 ? 'var(--paper)' : 'var(--ink-3)',
-              border: `1px solid ${viewWindow === 1 ? 'var(--rust)' : 'var(--paper-3)'}`,
+              border: `1px solid ${viewWindow === 1 ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'inherit',
@@ -1248,7 +1250,8 @@ export function ClockNode({
                   alignItems: 'center',
                   gap: 8,
                   padding: '4px 0',
-                  opacity: ended ? 0.42 : 1,
+                  // Over: quieter ink, never faded below readable.
+                  opacity: 1,
                   position: 'relative',
                 }}
               >
@@ -1261,13 +1264,14 @@ export function ClockNode({
                     background: t.colorVar,
                     display: 'inline-block',
                     alignSelf: 'center',
+                    opacity: ended ? 0.5 : 1,
                   }}
                 />
                 {/* Start time */}
                 <span
                   style={{
-                    color: on ? 'var(--rust)' : 'var(--ink-3)',
-                    fontSize: 9.5,
+                    color: on ? 'color-mix(in srgb, var(--rust) 75%, var(--ink))' : 'var(--ink-3)',
+                    fontSize: 10,
                     letterSpacing: '0.02em',
                     whiteSpace: 'nowrap',
                   }}
@@ -1277,7 +1281,7 @@ export function ClockNode({
                 {/* Name */}
                 <span
                   style={{
-                    color: 'var(--ink)',
+                    color: ended ? 'var(--ink-3)' : 'var(--ink)',
                     fontSize: 12,
                     fontFamily: 'var(--font-sans)',
                     fontWeight: on ? 600 : 400,
@@ -1293,8 +1297,8 @@ export function ClockNode({
                 {/* Duration */}
                 <span
                   style={{
-                    color: 'var(--ink-4)',
-                    fontSize: 9.5,
+                    color: 'var(--ink-3)',
+                    fontSize: 10,
                     letterSpacing: '0.02em',
                   }}
                 >
