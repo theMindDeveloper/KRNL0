@@ -13,6 +13,7 @@
 //   single onClick reads `data-date` from the target. 371 cells per
 //   habit → 1 listener.
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
@@ -217,7 +218,7 @@ export function HabitNode({
             gap: 6,
           }}
         >
-          <span style={{ color: 'var(--rust)' }}>●</span>
+          <span style={{ color: 'var(--rust)', display: 'inline-flex' }}><LineGlyph name="dot" size={10} /></span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {titleByView[view]}
           </span>

@@ -1455,3 +1455,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/pocket/{DialView,CapsuleView,PocketApp}.tsx`
 **Summary:** The dial's caption read "▶ Start", "● Working", "❚❚ Paused" in the OS symbol font; it now says Start, Working, Paused (the ring and colour already show the state). The capsule's Observe count-up arrow is a drawn arrow with an accessible name, and the collapsed box says "time log" without the ↑ character.
+
+## [2026-11-07] — UI loop batch 12: drawn ticks, crosses and dots
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/ui/LineGlyph.tsx`, `src/renderer/components/nodes/{TaskNode/DoneCard,TodoNode/index,HabitNode/index}.tsx`, `src/renderer/components/{StatusBar/index,TopBar/CanvasSwitcher}.tsx`
+**Summary:** The tick inside every done checkbox (Todo rows and the done task card) was the ✓ character; it is now a drawn tick that sits centred in the box in both themes. The Todo row's remove ✕, the canvas switcher's ✓ and ✕, and the ● dots in the Todo and Habit headers and the status bar's "connected" are drawn too (`LineGlyph` gained check, close, dot and an optional stroke weight).

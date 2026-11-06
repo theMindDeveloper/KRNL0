@@ -3,6 +3,7 @@
 // confirm. Mother nodes and their data are shared, so deleting a canvas only
 // removes its free nodes and drawings. CLI twin: `krnl canvas …`.
 
+import { LineGlyph } from '../ui/LineGlyph';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
@@ -127,7 +128,7 @@ export function CanvasSwitcher() {
                   color: 'var(--ink)', fontWeight: isActive ? 700 : 400,
                 }}
               >
-                <span style={{ width: 12, color: 'var(--acid-ink, var(--acid))' }}>{isActive ? '✓' : ''}</span>
+                <span style={{ width: 12, color: 'var(--acid-ink, var(--acid))' }}>{isActive ? <LineGlyph name="check" size={11} /> : null}</span>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
                 <button
                   type="button" title="Rename" aria-label={`Rename ${c.name}`} style={rowBtn}
@@ -137,7 +138,7 @@ export function CanvasSwitcher() {
                   <button
                     type="button" title="Delete" aria-label={`Delete ${c.name}`} data-testid={`canvas-delete-${c.id}`} style={rowBtn}
                     onClick={(e) => { e.stopPropagation(); setConfirmDel(c.id); }}
-                  >✕</button>
+                  ><LineGlyph name="close" size={10} /></button>
                 )}
               </div>
             );

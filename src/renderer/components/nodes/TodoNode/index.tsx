@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import type { NodeProps } from '../types';
@@ -503,7 +504,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         title={archived ? 'Restore to list' : undefined}
       >
         {item.done && (
-          <span className="task-check__mark">✓</span>
+          <span className="task-check__mark"><LineGlyph name="check" size={12} weight={3} /></span>
         )}
       </button>
 
@@ -736,7 +737,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         }}
         aria-label={`Delete: ${item.text}`}
       >
-        ✕
+        <LineGlyph name="close" size={11} />
       </button>
     </div>
     );
@@ -761,7 +762,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           }}
         >
           <span data-testid="todo-header">
-            <span style={{ color: 'var(--cyan)' }}>●</span>
+            <span style={{ color: 'var(--cyan)' }}><LineGlyph name="dot" size={10} /></span>
             {` Todos (${undoneCount})`}
             {/* PR8 — overdue count badge in rust. Only visible when at least
                 one undone item's scheduled-end has passed. */}

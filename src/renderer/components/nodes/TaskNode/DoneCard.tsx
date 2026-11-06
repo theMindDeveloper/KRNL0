@@ -5,6 +5,7 @@
 // Clock). Ticking plays a one-shot reward: the check pops, eight small dots
 // burst from it, the border glows once. Then it rests.
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import type { MouseEvent, ReactNode } from 'react';
 import { CARD_H, CardIcon, CardMetaRow, CardMeter, cardFrameStyle } from './CardParts';
 import { toneVarForTask } from '../../../utils/taskColor';
@@ -91,7 +92,7 @@ export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onCon
             aria-label="Mark undone"
             title="Reopen"
           >
-            <span className="task-check__mark">✓</span>
+            <span className="task-check__mark"><LineGlyph name="check" size={12} weight={3} /></span>
           </button>
           {celebrate && (
             <span aria-hidden className="task-done-burst">

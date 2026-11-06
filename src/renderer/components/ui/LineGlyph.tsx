@@ -9,11 +9,14 @@ const PATHS = {
   note: <><circle cx="8" cy="17" r="2.5" /><path d="M10.5 17V5l8-1.5V15" /><circle cx="16" cy="15" r="2.5" /></>,
   chevron: <path d="M9 6l6 6-6 6" />,
   diamond: <path d="M12 4l7 8-7 8-7-8z" fill="currentColor" />,
+  check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
+  dot: <circle cx="12" cy="12" r="4.5" fill="currentColor" stroke="none" />,
 } as const;
 
 export type LineGlyphName = keyof typeof PATHS;
 
-export function LineGlyph({ name, size = 11 }: { name: LineGlyphName; size?: number }) {
+export function LineGlyph({ name, size = 11, weight = 2 }: { name: LineGlyphName; size?: number; weight?: number }) {
   return (
     <svg
       width={size}
@@ -21,7 +24,7 @@ export function LineGlyph({ name, size = 11 }: { name: LineGlyphName; size?: num
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={2}
+      strokeWidth={weight}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
