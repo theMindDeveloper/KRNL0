@@ -1413,3 +1413,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/{MonthView,YearView}.tsx`, `src/renderer/components/nodes/PomoNode/index.tsx`, `vitest.config.ts`, `tests/unit/renderer/launch.dialogs.test.tsx`
 **Summary:** Month view: days of the neighbouring months were ink-4 at 35 % (2.8:1); now quieter but readable. Year view: days with a light acid fill kept light text (1.1:1); dark text now starts at about a third of the fill. Pomo: the active POMO/OBSERVE and session-length chips use the deeper rust so their paper-coloured label reads in light mode (3.9 → 5:1). Tests: render tests that cold-load the whole station took 15–18 s under a full parallel run with the dev app open and timed out at random; the timeout is 30 s, and the new Welcome back test loads its command module up front.
+
+## [2026-11-06] — UI loop batch 6: Analytics Insights fits a small window
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/{guide,PageNav}.ts(x)`, `src/renderer/analytics/charts/Radar.tsx`
+**Summary:** The Insights page put three charts in a row; in a station-sized Analytics window each was ~110 px wide, so titles were cut ("MULTIVARIATI…") and the radar's and the pie's labels ran off the card. Insights now holds four charts two by two (radar, sources split, tasks × focus, focus by weekday) and the two distributions moved to a new **Day to day** page, one full-width chart per row. The radar keeps every label inside the chart: side labels grow away from the centre, small charts use short names (Streak, Active, Focus; the full name is the tooltip) and leave more room around the shape. Easy mode's page order is unchanged.

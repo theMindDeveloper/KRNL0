@@ -13,6 +13,7 @@ const ICONS: Record<PageId, React.ReactNode> = {
   log: (<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M9 9v11M14 9v11" /><path d="M6 13h1M11 16h1M16 12h1" /></>),
   estimates: (<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" /></>),
   insights: (<><path d="M12 3v9h9" /><path d="M20.5 15.5A9 9 0 1 1 8.5 3.7" /></>),
+  spread: (<><path d="M3 20h18" /><path d="M6 20v-5M10 20V8M14 20v-9M18 20v-4" /></>),
   habits: (<path d="M12 21c-4 0-7-2.8-7-6.8 0-3.3 2.4-5.2 3.6-8.2.4 2 1.6 3.2 2.9 3.6C11 6.5 12.8 4.2 15 3c-.4 3 1.4 4.8 2.6 6.6.9 1.4 1.4 2.8 1.4 4.6 0 4-3 6.8-7 6.8z" />),
 };
 
