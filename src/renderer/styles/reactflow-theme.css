@@ -291,3 +291,9 @@
 
 /* Top bar: the path gives its room to the canvas name on narrower windows. */
 @media (max-width: 1380px) { .krnl-breadcrumb { display: none; } }
+
+/* Calendar sub-header gives way to the window's width, never wraps. */
+.cal-subhead { container-type: inline-size; }
+@container (max-width: 600px) { .cal-weekof { display: none; } }
+@container (max-width: 470px) { .cal-layer-label { display: none; } }
+@container (max-width: 400px) { .cal-zoom { display: none; } }

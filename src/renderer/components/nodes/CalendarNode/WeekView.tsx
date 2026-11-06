@@ -1761,6 +1761,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const isoDow = ymdToIsoDow(dayYMD);
     const blocks: ReactNode[] = [];
     const isFuture = dayYMD > toYMD(new Date());
+    // A narrow day column shows each habit as a round icon (name in the tooltip).
+    const colPxH = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
+    const iconOnly = colPxH < 96;
 
     for (const habit of scheduledHabits) {
       if (!habitScheduledOnDow(habit.schedule, isoDow)) continue;
@@ -1807,31 +1810,33 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             left: 'auto',
             height: 18,
             maxWidth: singleDay ? 168 : 'calc(100% - 14px)',
+            ...(iconOnly ? { width: 18, justifyContent: 'center', padding: 0 } : { padding: singleDay ? '0 7px 0 4px' : '0 6px 0 4px' }),
             display: 'inline-flex',
             alignItems: 'center',
             gap: 4,
-            padding: singleDay ? '0 7px 0 4px' : '0 4px',
             borderRadius: 999,
-            border: `1px solid color-mix(in srgb, ${colour} ${done ? 0 : 60}%, transparent)`,
-            background: done ? colour : 'color-mix(in srgb, var(--paper) 88%, transparent)',
-            color: done ? 'var(--ink-on-bright)' : 'var(--ink)',
+            // Done: the habit's colour as a tint with a check; open: an outline.
+            // Text is always ink, so it reads in every colour and theme.
+            border: `1px solid color-mix(in srgb, ${colour} ${done ? 80 : 60}%, transparent)`,
+            background: done ? `color-mix(in srgb, ${colour} 30%, var(--paper))` : 'var(--paper)',
+            color: 'var(--ink)',
             boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
             zIndex: 3,
             cursor: isFuture ? 'default' : 'pointer',
             font: 'inherit',
             fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
+            fontSize: 10,
             fontWeight: 600,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
           }}
         >
-          <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0, color: done ? 'var(--ink-on-bright)' : colour }}>
+          <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0, color: done ? 'var(--ink)' : colour }}>
             {done
               ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
               : habit.icon ? <HabitIcon icon={habit.icon} size={10} /> : <span style={{ width: 7, height: 7, borderRadius: 999, background: colour, display: 'inline-block' }} />}
           </span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{habit.name}</span>
+          {!iconOnly && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{habit.name}</span>}
         </button>,
       );
     }
@@ -1863,9 +1868,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         position: 'relative',
       }}
     >
-      {/* Sub-header: [←] Week of {Month D} [→] */}
+      {/* Sub-header: [←] Week of {Month D} [→] — parts give way to its width (cal-subhead in CSS). */}
       <div
+        className="cal-subhead"
         style={{
+          gap: 6,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -1885,17 +1892,21 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         >
           <CalIcon name="prev" size={13} />
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, minWidth: 0, flex: 1 }}>
           <span
             data-testid="week-label"
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
               color: 'var(--ink-1)',
-              letterSpacing: '0.06em',
+              letterSpacing: '0.04em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              minWidth: 0,
             }}
           >
-            {singleDay ? weekLabel : `Week of ${weekLabel}`}
+            {singleDay ? weekLabel : <><span className="cal-weekof">Week of </span>{weekLabel}</>}
           </span>
 
           {/* Layers — what the rail and the pills mean, and a switch for each. */}
@@ -1913,7 +1924,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 onClick={() => toggleLayer(k)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px', borderRadius: 999, cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.04em',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.02em', flexShrink: 0,
                   border: `1px solid ${layers[k] ? 'color-mix(in srgb, var(--acid) 45%, var(--paper-3))' : 'var(--paper-3)'}`,
                   background: layers[k] ? 'color-mix(in srgb, var(--acid) 10%, var(--paper-2))' : 'transparent',
                   color: layers[k] ? 'var(--ink)' : 'var(--ink-4)',
@@ -1922,7 +1933,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 {k === 'recorded'
                   ? <span aria-hidden style={{ width: 4, height: 12, borderRadius: 999, background: layers[k] ? 'var(--acid)' : 'var(--paper-3)' }} />
                   : <span aria-hidden style={{ width: 12, height: 8, borderRadius: 999, border: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}` }} />}
-                {label}
+                <span className="cal-layer-label">{label}</span>
               </button>
             ))}
           </div>
@@ -1935,9 +1946,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             title="Jump to this week"
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 8.5,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
+              fontSize: 10,
+              letterSpacing: '0.02em',
               color: 'var(--ink-2)',
               background: 'var(--paper-2)',
               border: '1px solid var(--paper-3)',
@@ -1954,6 +1964,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               section boundaries; the gutter gains :30/:15 sub-marks as you go. */}
           <div
             data-testid="week-zoom"
+            className="cal-zoom"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
           >
             <button
@@ -1970,9 +1981,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               data-testid="week-zoom-level"
               style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: 8.5,
+                fontSize: 10,
                 color: 'var(--ink-3)',
-                minWidth: 26,
+                minWidth: 28,
                 textAlign: 'center',
                 letterSpacing: '0.02em',
               }}
