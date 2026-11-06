@@ -1,0 +1,36 @@
+name: Something's broken
+description: Report a bug in KRNL0. The app can fill this in for you (Help › Send feedback).
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. In KRNL0, **Help › Send feedback** opens this form with your version and system already filled in.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      placeholder: I ticked Morning run on Sunday, but the week view still shows the cell empty.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+      placeholder: |
+        1. Open the Habit node
+        2. ...
+  - type: input
+    id: version
+    attributes:
+      label: KRNL0 version and system
+      description: Help › Copy diagnostics, or Settings › Updates.
+      placeholder: KRNL0 0.11.0 · Windows 11 · x64
+    validations:
+      required: true
+  - type: textarea
+    id: errors
+    attributes:
+      label: Recent errors (optional)
+      description: Paste from Help › Copy diagnostics. Never paste your board file.
+      render: text
