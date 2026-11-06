@@ -1483,3 +1483,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/styles/tokens.css`, `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/components/nodes/{TodoNode/index,AnalyticsNode/index,CalendarNode/WeekView}.tsx`
 **Summary:** The design checker's run on the live app went from 10 low-contrast texts this evening to 0: placeholders now follow the theme (the browser's grey was 3.9:1 on dark windows), and the ambient radio's "v03", "tap a chip to layer" and "tap to layer" are readable. The smallest labels grew about a point: Todo's PLAN (9 → 10 px), Analytics' range chips (9 → 10), the calendar's day headers and hour labels (9 → 10) and half-hour labels (7.5 → 8.5), all still fitting their space.
+
+## [2026-11-07] — UI loop batch 16: the canvas opens clear of the tool rail
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Canvas/fitPadding.ts` (new), `src/renderer/App.tsx`, `src/renderer/components/TopBar/index.tsx`, `docs/06-requirements/app-chrome.md` F7, `tests/unit/renderer/AppChrome.scenarios.test.ts`
+**Summary:** Fitting the board to the window used an even padding, so the left column of cards opened under the floating tool rail (the design checker flagged their "Not started" lines as a third covered). The opening fit and the FIT button now use one padding that leaves 104 px on the left for the rail.

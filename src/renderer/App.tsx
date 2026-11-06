@@ -9,6 +9,7 @@
  * first paint — satisfying NF4 / Gherkin F6b.
  */
 
+import { CANVAS_FIT_PADDING } from './components/Canvas/fitPadding';
 import { useEffect, useRef, useState, Component, type ReactNode } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
@@ -117,7 +118,7 @@ function AppInner() {
       try {
         // maxZoom: 1 keeps fitView from over-zooming when the visible set is
         // small (e.g. a single task node). Matches seedBoard's default zoom.
-        fitView({ padding: 0.18, duration: 400, maxZoom: 1 });
+        fitView({ padding: CANVAS_FIT_PADDING, duration: 400, maxZoom: 1 });
       } catch {
         /* RF not ready yet — skipped */
       }

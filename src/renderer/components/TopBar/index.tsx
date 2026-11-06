@@ -6,6 +6,7 @@
  * Theme toggle writes data-theme on <html> and persists to localStorage.
  */
 
+import { CANVAS_FIT_PADDING } from '../Canvas/fitPadding';
 import { SettingsIcon } from '../ui/SettingsIcons';
 import { useState, useEffect, useLayoutEffect } from 'react';
 import { flushSync } from 'react-dom';
@@ -124,7 +125,7 @@ export function TopBar() {
   const handleThemeToggle = () => chooseTheme(shownTheme === 'dark' ? 'light' : 'dark');
 
   const handleFit = () => {
-    rf.fitView({ padding: 0.2, duration: 300 });
+    rf.fitView({ padding: CANVAS_FIT_PADDING, duration: 300 });
   };
 
   const themeLabel = <><SettingsIcon name={shownTheme === 'dark' ? 'moon' : 'sun'} size={12} />{shownTheme === 'dark' ? 'DARK' : 'LIGHT'}</>;

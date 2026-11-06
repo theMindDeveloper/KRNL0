@@ -14,6 +14,7 @@
  *  - F7: Test that TopBar's FIT button calls fitView with correct options.
  */
 
+import { CANVAS_FIT_PADDING } from '../../../src/renderer/components/Canvas/fitPadding';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
@@ -304,10 +305,10 @@ describe('F7 — FIT button calls fitView', () => {
     mockFitView.mockClear();
   });
 
-  it('calls rf.fitView with { padding: 0.2, duration: 300 }', () => {
+  it('calls rf.fitView with the canvas padding (clear of the tool rail) and duration 300', () => {
     renderWithWrapper(React.createElement(TopBar));
     fireEvent.click(screen.getByTestId('topbar-fit'));
-    expect(mockFitView).toHaveBeenCalledWith({ padding: 0.2, duration: 300 });
+    expect(mockFitView).toHaveBeenCalledWith({ padding: CANVAS_FIT_PADDING, duration: 300 });
   });
 });
 
