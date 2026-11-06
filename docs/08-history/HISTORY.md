@@ -1469,3 +1469,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/ui/{LineGlyph,TaskInfoPopup,TaskTagPicker}.tsx`, `src/renderer/components/nodes/PomoNode/{DoingPicker,SpanLabeler,SpanLog}.tsx`, `src/renderer/components/nodes/TodoNode/TagPicker.tsx`, `src/renderer/components/nodes/AnalyticsNode/TimeLogHeatmap.tsx`
 **Summary:** The Pomo pickers, span labeller and span log used ✕ ☑ ☐ ✓ characters; they are drawn icons now. A span or choice linked to a task shows a small task mark (it used ☐/☑, which read as "done"), and a ticked choice shows a drawn tick. In the span log the unnamed span's "name it…" was lime on a light row (1:1 in light mode) and now uses the dark acid. The tag pickers, the task popup's DONE and the time log's done mark are drawn too.
+
+## [2026-11-07] — UI loop batch 14: capsule card dots
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/pocket/CapsuleView.tsx`
+**Summary:** The floating capsule's hover card labelled "● Time log", "● working" and "● Deep work · pomo.025" with the ● character; the dots are drawn, in the label's colour, on the text's baseline.
