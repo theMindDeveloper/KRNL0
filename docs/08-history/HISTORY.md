@@ -1448,3 +1448,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/ui/LineGlyph.tsx` (new), `src/renderer/components/{AmbientRadio/index,Orb/index,Assistant/Commander}.tsx`
 **Summary:** The assistant menu's ▸, the orb's ▶/◆ and the ambient radio's ▶ ★ ☆ ♪ were text characters (the OS symbol font, off the baseline, ignoring the app's stroke). They are now line icons from one small shared `LineGlyph` (play, star, star outline, note, chevron, diamond) that follow the text colour; the radio's empty-saves hint says "tap the star".
+
+## [2026-11-07] — UI loop batch 11: floating timer captions without glyphs
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/pocket/{DialView,CapsuleView,PocketApp}.tsx`
+**Summary:** The dial's caption read "▶ Start", "● Working", "❚❚ Paused" in the OS symbol font; it now says Start, Working, Paused (the ring and colour already show the state). The capsule's Observe count-up arrow is a drawn arrow with an accessible name, and the collapsed box says "time log" without the ↑ character.

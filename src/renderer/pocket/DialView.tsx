@@ -13,12 +13,12 @@ function centerLabel(m: PocketModel): { text: string; color: string } {
   if (m.snap.away) return { text: 'Away · open KRNL0', color: '#ee8466' };
   if (m.observe) {
     if (m.onBreak) return { text: 'On break', color: INK3 };
-    if (m.idle) return { text: '▶ Start', color: ACID };
-    return { text: '● Working', color: ACID };
+    if (m.idle) return { text: 'Start', color: ACID };
+    return { text: 'Working', color: ACID };
   }
   if (m.promptDone) return { text: 'Done?', color: ACID };
   if (m.onBreak) return { text: 'Break', color: CYAN };
-  if (m.paused) return { text: '❚❚ Paused', color: INK3 };
+  if (m.paused) return { text: 'Paused', color: INK3 };
   return { text: `Focus · ${m.doneDots + 1}/${m.pips}`, color: ACID };
 }
 

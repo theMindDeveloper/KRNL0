@@ -29,7 +29,7 @@ function Pill({ m }: { m: PocketModel }) {
       {lead}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
         <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 300, lineHeight: 1, color: m.paused ? INK3 : INK, fontVariantNumeric: 'tabular-nums' }}>
-          {m.time}{m.observe && !m.onBreak && <span style={{ color: ACID, fontSize: 13, marginLeft: 6 }}>↑</span>}
+          {m.time}{m.observe && !m.onBreak && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={ACID} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-label="counting up" style={{ marginLeft: 6, verticalAlign: '0.1em' }}><path d="M12 19V5M6 11l6-6 6 6" /></svg>}
         </span>
         <span style={{ fontSize: 10, color: m.onBreak ? (m.observe ? INK3 : CYAN) : INK3, maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</span>
       </div>

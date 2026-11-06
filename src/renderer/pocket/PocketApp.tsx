@@ -185,7 +185,7 @@ export function PocketApp() {
 
   if (prefs.collapsed) {
     const time = observe ? formatElapsed(observedMs) : faceText;
-    const tail = observe ? (onBreak ? 'break' : '↑ time log') : onBreak ? 'break' : state.status === 'paused' ? 'paused' : `${doneDots} / ${pips}`;
+    const tail = observe ? (onBreak ? 'break' : 'time log') : onBreak ? 'break' : state.status === 'paused' ? 'paused' : `${doneDots} / ${pips}`;
     return (
       <div ref={rootRef} style={{ display: 'inline-block', padding: 8 }}>
       <div style={{ ...shell, ...DRAG, ...boxFrame, width: POCKET_WIDTH, height: 48, display: 'flex', alignItems: 'center', gap: 10, padding: '0 6px 0 14px' }}>
