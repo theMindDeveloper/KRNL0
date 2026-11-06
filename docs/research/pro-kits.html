@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KRNL0 Pro Sound Kits</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: three designer kits side by side; first the app's moments mapped onto each kit, then every sound in each kit. */
+:root{
+  --paper:#ebe1c2; --paper-2:#ddd0a7; --ink:#1a1612; --ink-2:#38302a; --ink-3:#554b38;
+  --acid:#c9f158; --acid-ink:#3f5c0a; --line:rgba(26,22,18,.16); --card:#f3ecd6;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --serif:'Instrument Serif',Georgia,serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#131210; --paper-2:#1f1d18; --ink:#f4efe2; --ink-2:#ddd6c6; --ink-3:#b3aa94;
+  --acid-ink:#c9f158; --line:rgba(244,239,226,.14); --card:#1a1915; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-left)) 72px;display:grid;gap:26px}
+h1{font-family:var(--serif);font-weight:400;font-size:clamp(34px,5vw,50px);line-height:1;margin:0}
+h1 em{color:var(--acid-ink)}
+h2{font-family:var(--serif);font-weight:400;font-size:26px;margin:0}
+p{margin:0;max-width:74ch;color:var(--ink-2)}
+a{color:var(--ink)}
+.lab{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.row{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center}
+.btn{all:unset;cursor:pointer;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border-radius:8px;border:1px solid var(--ink)}
+.btn:hover{background:var(--paper-2)}
+.btn.primary{background:var(--acid);color:#1a1612;border-color:#1a1612}
+.btn:focus-visible,.pb:focus-visible,input:focus-visible{outline:2px solid var(--acid-ink);outline-offset:2px}
+label.k{display:flex;gap:8px;align-items:center}
+input[type=range]{accent-color:var(--acid-ink);width:130px}
+.caption{min-height:1.5em;font-size:12px;color:var(--ink-3)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-weight:500;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);background:var(--paper-2)}
+tr:last-child td{border-bottom:0}
+td small{color:var(--ink-3)}
+.pb{all:unset;cursor:pointer;display:inline-flex;gap:8px;align-items:center;padding:5px 10px 5px 6px;border-radius:99px;border:1px solid var(--line);background:var(--paper)}
+.pb:hover{border-color:var(--ink)}
+.pb i{width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-style:normal;font-size:9px}
+.pb.on{background:var(--acid);color:#1a1612;border-color:#1a1612}
+.kits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.kits{grid-template-columns:minmax(0,1fr)}}
+.kit{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px;display:grid;gap:10px;align-content:start}
+.grid{display:flex;flex-wrap:wrap;gap:6px}
+.status{font-size:11px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <div class="lab">KRNL0 · sound research · round 6: kits made by sound designers</div>
+    <h1>Pro kits, <em>free</em></h1>
+    <p><b>SND</b> is three complete UI sound kits, each made by a professional sound designer for exactly this job: buttons, selects, toggles, transitions, notifications, warnings and celebrations. They're free for commercial use; the designers keep the copyright. This page streams them from the public CDN, so nothing is downloaded into the project yet.</p>
+    <div class="row">
+      <button class="btn primary" id="dayAll" type="button">▶ A day in each kit</button>
+      <button class="btn" id="stop" type="button">■ Stop</button>
+      <label class="k" for="vol"><span class="lab">Volume</span><input id="vol" type="range" min="0" max="1" step="0.01" value="0.7"></label>
+      <label class="k" for="warm"><span class="lab">Warmth</span><input id="warm" type="range" min="2000" max="20000" step="100" value="20000"></label>
+      <label class="k" for="low"><span class="lab">Low boost</span><input id="low" type="range" min="0" max="12" step="0.5" value="0"></label>
+    </div>
+    <div class="caption" id="caption" aria-live="polite">Loading kits…</div>
+  </header>
+
+  <section style="display:grid;gap:10px" aria-labelledby="m-h">
+    <h2 id="m-h">KRNL0's moments in each kit</h2>
+    <p>My first mapping of the app's moments onto each kit's sounds. Each kit was designed as one family, so the moments differ clearly and still belong together.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Moment</th><th>SND01 · Sine<br><small>Yasuhiro Tsuchiya</small></th><th>SND02 · Piano<br><small>Ayako Taniguchi</small></th><th>SND03 · Industrial<br><small>INDUSTRIAL JP</small></th></tr></thead>
+      <tbody id="moments"></tbody>
+    </table></div>
+  </section>
+
+  <section style="display:grid;gap:10px" aria-labelledby="a-h">
+    <h2 id="a-h">Every sound in each kit</h2>
+    <div class="kits" id="kits"></div>
+  </section>
+
+  <section style="display:grid;gap:8px" aria-labelledby="o-h">
+    <h2 id="o-h">Other free kits made by pros</h2>
+    <p>These can't be streamed here; listen on their pages, and I can download any you like and add it to this comparison.</p>
+    <p>· <a href="https://shapeforms.itch.io/shapeforms-audio-free-sfx" target="_blank" rel="noopener">Shapeforms Audio · Free SFX</a>: 180 sounds from a professional game-audio studio, including parts of their Future UI library. Royalty-free, commercial use, no credit; no AI training; don't share the raw files on their own.<br>
+    · <a href="https://rawambience.itch.io/essential-menu-click-sounds" target="_blank" rel="noopener">rawAmbience · Free Interface Sounds</a>: 42 interface sounds, royalty-free for commercial projects.<br>
+    · <a href="https://sonniss.com/gameaudiogdc" target="_blank" rel="noopener">Sonniss GDC bundles</a>: gigabytes of professional libraries, free and royalty-free each year; UI packs are in some years' bundles.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  const CDN = 'https://cdn.jsdelivr.net/npm/snd-lib@1.2.4/';
+  const KITS = [
+    { id:'01', name:'SND01 · Sine', by:'Yasuhiro Tsuchiya', vibe:'clean, soft electronic' },
+    { id:'02', name:'SND02 · Piano', by:'Ayako Taniguchi', vibe:'warm, acoustic, musical' },
+    { id:'03', name:'SND03 · Industrial', by:'INDUSTRIAL JP', vibe:'mechanical, tactile, textured' }
+  ];
+  const MOMENTS = [
+    ['Add a to-do','tap_01'],['Plan on the Calendar','swipe_02'],['Start the timer','transition_up'],['Take a break','transition_down'],
+    ['Back to work','toggle_on'],['Stop & save','button'],['Task done','select'],['Reopen a task','toggle_off'],
+    ['Planned block missed','caution'],['Tick a habit','tap_03'],['7-day streak / day complete','celebration'],
+    ['Gentle nudge','notification'],["Can't do that",'disabled'],['Typing / small taps','type_01']
+  ];
+  const $ = (id) => document.getElementById(id), cap = $('caption');
+  let ctx = null, master, lp, shelf;
+  const kit = {};   // id -> { buffer, map }
+
+  function audio(){
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return ctx; }
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'playback' });
+    master = ctx.createGain(); master.gain.value = +$('vol').value;
+    lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = +$('warm').value; lp.Q.value = 0.5;
+    shelf = ctx.createBiquadFilter(); shelf.type = 'lowshelf'; shelf.frequency.value = 220; shelf.gain.value = +$('low').value;
+    shelf.connect(lp); lp.connect(master); master.connect(ctx.destination);
+    return ctx;
+  }
+  async function load(k){
+    const map = (await (await fetch(CDN + 'assets/sounds/sprite/' + k.id + '/audioSprite.json')).json()).spritemap;
+    const bytes = await (await fetch(CDN + 'assets/sounds/sprite/' + k.id + '/audioSprite.mp3')).arrayBuffer();
+    const tmp = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100, 44100);
+    const buffer = await tmp.decodeAudioData(bytes);
+    kit[k.id] = { buffer, map };
+  }
+  function play(kid, name, el){
+    const k = kit[kid]; if (!k || !k.map[name]) return 0;
+    const c = audio(), s = k.map[name];
+    const src = c.createBufferSource(); src.buffer = k.buffer;
+    src.connect(shelf);
+    const dur = Math.min(s.end - s.start, name.endsWith('_loop') ? 2.5 : 10);
+    src.start(c.currentTime + 0.02, s.start, dur);
+    if (el){ el.classList.add('on'); setTimeout(() => el.classList.remove('on'), Math.max(250, dur * 1000)); }
+    return dur;
+  }
+  const btn = (kid, name, label) => '<button class="pb" type="button" data-k="' + kid + '" data-s="' + name + '"><i>▶</i>' + (label || name.replace(/_/g, ' ')) + '</button>';
+
+  function render(){
+    $('moments').innerHTML = MOMENTS.map(([m, s]) => '<tr><td>' + m + '</td>' + KITS.map((k) => '<td>' + btn(k.id, s, s.replace(/_/g, ' ')) + '</td>').join('') + '</tr>').join('');
+    $('kits').innerHTML = KITS.map((k) => '<div class="kit"><div><h2>' + k.name + '</h2><div class="lab">' + k.by + ' · ' + k.vibe + '</div></div><div class="status" id="st-' + k.id + '">loading…</div><div class="grid" id="g-' + k.id + '"></div></div>').join('');
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('.pb'); if (!b) return;
+      play(b.dataset.k, b.dataset.s, b);
+      const k = KITS.find((x) => x.id === b.dataset.k); cap.textContent = k.name + ' · ' + b.dataset.s.replace(/_/g, ' ');
+    });
+  }
+  render();
+  Promise.all(KITS.map((k) => load(k).then(() => {
+    $('st-' + k.id).textContent = Object.keys(kit[k.id].map).length + ' sounds';
+    $('g-' + k.id).innerHTML = Object.keys(kit[k.id].map).map((n) => btn(k.id, n)).join('');
+  }).catch(() => { $('st-' + k.id).textContent = 'Could not load (offline?)'; })))
+    .then(() => { cap.textContent = 'Ready. Browsers only play sound after a click.'; });
+
+  $('vol').addEventListener('input', () => { if (master) master.gain.value = +$('vol').value; });
+  $('warm').addEventListener('input', () => { if (lp) lp.frequency.value = +$('warm').value; });
+  $('low').addEventListener('input', () => { if (shelf) shelf.gain.value = +$('low').value; });
+
+  let timers = [];
+  $('dayAll').addEventListener('click', () => {
+    audio(); timers.forEach(clearTimeout); timers = [];
+    const day = ['tap_01','swipe_02','transition_up','transition_down','toggle_on','button','select','caution','tap_03','notification','celebration'];
+    let t = 0;
+    KITS.forEach((k) => {
+      timers.push(setTimeout(() => { cap.textContent = k.name + ' · a day: add, plan, start, break, back, stop, done, missed, habit, nudge, day complete'; }, t));
+      day.forEach((s) => { timers.push(setTimeout(() => play(k.id, s), t)); t += s === 'celebration' ? 2200 : 900; });
+      t += 800;
+    });
+  });
+  $('stop').addEventListener('click', () => { timers.forEach(clearTimeout); timers = []; cap.textContent = 'Stopped.'; });
+})();
+</script>
+</body>
+</html>
