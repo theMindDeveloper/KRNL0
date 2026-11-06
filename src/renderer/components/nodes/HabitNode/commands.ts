@@ -299,3 +299,69 @@ function prevDayStr(dateStr: string): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
+
+// ── engagement.md F16–F17 — streaks that forgive ─────────────────────────────
+
+export const STREAK_MILESTONES = [7, 30, 100, 365] as const;
+
+/** The next milestone above `streak` (null past the last one). */
+export function nextMilestone(streak: number): number | null {
+  return STREAK_MILESTONES.find((m) => m > streak) ?? null;
+}
+
+/** The milestone reached exactly today's streak, if any (shows the seal). */
+export function milestoneReached(streak: number): number | null {
+  return (STREAK_MILESTONES as readonly number[]).includes(streak) ? streak : null;
+}
+
+/** Longest run of consecutive scheduled days ever logged. Kept forever: it only grows. */
+export function bestStreak(log: string[], schedule?: HabitSchedule): number {
+  if (log.length === 0) return 0;
+  const sorted = [...new Set(log)].sort();
+  const logSet = new Set(sorted);
+  let best = 0;
+  for (const day of sorted) {
+    // Only start counting at the first day of a run.
+    let prev = prevDayStr(day);
+    let safety = 366;
+    while (!isDayScheduled(schedule, prev) && safety-- > 0) prev = prevDayStr(prev);
+    if (logSet.has(prev)) continue;
+    let run = 0;
+    let cursor = day;
+    while (logSet.has(cursor)) {
+      run++;
+      let next = nextDayStr(cursor);
+      safety = 366;
+      while (!isDayScheduled(schedule, next) && safety-- > 0) next = nextDayStr(next);
+      cursor = next;
+    }
+    best = Math.max(best, run);
+  }
+  return best;
+}
+
+/**
+ * The scheduled day before today that broke a streak and can still be ticked
+ * ("Missed yesterday? Tick it if you did it"): the last scheduled day before
+ * today is not logged, but the scheduled day before that is. Null otherwise.
+ */
+export function repairableDay(log: string[], today: string, schedule?: HabitSchedule): string | null {
+  const logSet = new Set(log);
+  let missed = prevDayStr(today);
+  let safety = 366;
+  while (!isDayScheduled(schedule, missed) && safety-- > 0) missed = prevDayStr(missed);
+  if (logSet.has(missed)) return null;
+  let before = prevDayStr(missed);
+  safety = 366;
+  while (!isDayScheduled(schedule, before) && safety-- > 0) before = prevDayStr(before);
+  return logSet.has(before) ? missed : null;
+}
+
+function nextDayStr(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}

@@ -18,6 +18,8 @@ import { activeCanvasOf, isOnCanvas } from '../../shared/canvas';
 import type { BoardShape } from '../../shared/dispatch/types';
 import { TERM_CLEAR_EVENT, TERM_FONT_MIN, TERM_FONT_MAX } from '../components/nodes/TerminalNode/constants';
 import { sfxEngine } from '../sfx/sfxEngine';
+import { runSoundCommand } from '../sfx/soundCli';
+import { runEngagementCommand } from './engagementCli';
 import { useEventLog } from './eventLog/store';
 import type { Board } from '../../shared/types';
 import type { Node } from '../../shared/types';
@@ -286,6 +288,29 @@ export function useCliDispatch(): void {
             sfxEngine.stop();
             ok = true;
             message = 'SFX stopped';
+            break;
+          }
+
+          case 'finished.status':
+          case 'finished.show':
+          case 'finished.hide':
+          case 'finished.policy':
+          case 'recap.today':
+          case 'recap.yesterday':
+          case 'recap.week':
+          case 'recap.show': {
+            ({ ok, message } = runEngagementCommand(command, args as Record<string, unknown>, store.getState().board));
+            break;
+          }
+
+          case 'sound.status':
+          case 'sound.list':
+          case 'sound.on':
+          case 'sound.off':
+          case 'sound.pack':
+          case 'sound.volume':
+          case 'sound.play': {
+            ({ ok, message } = runSoundCommand(command, args as Record<string, unknown>));
             break;
           }
 

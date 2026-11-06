@@ -105,6 +105,13 @@ export type SysCommand =
   | { kind: 'sfx'; sub: 'play'; clipId: string | undefined }
   | { kind: 'sfx'; sub: 'stop' }
   | { kind: 'sfx'; sub: 'list' }
+  | { kind: 'finished'; sub: 'status' | 'show' | 'hide' }
+  | { kind: 'finished'; sub: 'policy'; policy: string }
+  | { kind: 'recap'; sub: 'today' | 'yesterday' | 'week' | 'show' }
+  | { kind: 'sound'; sub: 'status' | 'list' | 'on' | 'off' }
+  | { kind: 'sound'; sub: 'pack'; pack: string | undefined }
+  | { kind: 'sound'; sub: 'volume'; volume: number | undefined }
+  | { kind: 'sound'; sub: 'play'; moment: string | undefined }
   | { kind: 'radio'; sub: 'list' | 'status' | 'stop' }
   | { kind: 'radio'; sub: 'play'; preset: string | undefined }
   | { kind: 'radio'; sub: 'remove'; preset: string | undefined }
@@ -871,6 +878,31 @@ export class SysParser {
       if (sub === 'play') return { kind: 'sfx', sub: 'play', clipId: rest[0] };
       if (sub === 'stop') return { kind: 'sfx', sub: 'stop' };
       if (sub === 'list') return { kind: 'sfx', sub: 'list' };
+    }
+
+    // Finished task cards on the canvas (engagement.md F6).
+    if (cmd === 'finished') {
+      if (sub === undefined || sub === 'status') return { kind: 'finished', sub: 'status' };
+      if (sub === 'show' || sub === 'hide') return { kind: 'finished', sub };
+      return { kind: 'finished', sub: 'policy', policy: sub };
+    }
+
+    // Close the day (engagement.md F11).
+    if (cmd === 'recap') {
+      if (sub === undefined || sub === 'today') return { kind: 'recap', sub: 'today' };
+      if (sub === 'yesterday' || sub === 'week' || sub === 'show') return { kind: 'recap', sub };
+    }
+
+    // UI sounds (docs/06-requirements/ui-sounds.md F7).
+    if (cmd === 'sound') {
+      if (sub === undefined || sub === 'status') return { kind: 'sound', sub: 'status' };
+      if (sub === 'list' || sub === 'on' || sub === 'off') return { kind: 'sound', sub };
+      if (sub === 'pack') return { kind: 'sound', sub: 'pack', pack: rest[0] };
+      if (sub === 'play') return { kind: 'sound', sub: 'play', moment: rest[0] };
+      if (sub === 'volume') {
+        const v = rest[0] !== undefined ? Number(rest[0]) : NaN;
+        return { kind: 'sound', sub: 'volume', volume: Number.isFinite(v) ? v : undefined };
+      }
     }
 
     // Ambient Radio — the mix in the open window.

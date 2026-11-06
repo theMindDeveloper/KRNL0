@@ -23,6 +23,8 @@ import { CanvasSwitcher } from './CanvasSwitcher';
 import { CloseButton } from '../ui/CloseButton';
 import { Z } from '../ui/layers';
 import { UpdatesSection } from './UpdatesSection';
+import { SoundSection } from './SoundSection';
+import { FinishedSection } from './FinishedSection';
 
 type Theme = 'light' | 'dark';
 
@@ -266,6 +268,8 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
         style={{
           width: 380,
           maxWidth: '90vw',
+          maxHeight: '88vh',
+          overflowY: 'auto',
           background: 'var(--paper)',
           border: '1px solid var(--paper-3)',
           borderRadius: 10,
@@ -344,6 +348,10 @@ function SettingsModal({ onClose, theme, onTheme }: { onClose: () => void; theme
             })}
           </div>
         </div>
+
+        <SoundSection />
+
+        <FinishedSection />
 
         <UpdatesSection />
 

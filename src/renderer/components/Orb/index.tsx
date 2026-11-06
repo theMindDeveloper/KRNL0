@@ -28,6 +28,14 @@ import {
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../renderer/store/boardStore';
 import { isFreshBoard } from './freshBoard';
+
+const FIRST_DAY_KEY = 'krnl0-first-day-offered';
+function firstDayOffered(): boolean {
+  try { return localStorage.getItem(FIRST_DAY_KEY) === '1'; } catch { return true; }
+}
+function markFirstDayOffered(): void {
+  try { localStorage.setItem(FIRST_DAY_KEY, '1'); } catch { /* no storage */ }
+}
 import { voicePlayer } from '../Assistant/VoicePlayer';
 import { ScriptRunner } from '../Assistant/ScriptRunner';
 import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
@@ -381,10 +389,18 @@ export function Orb() {
       return;
     }
 
+    // engagement.md F12 — the promised tour: the first click on a fresh
+    // board starts "Your first day" instead of opening the menu (once).
+    if (!open && isFreshBoard(useBoardStore.getState().board) && !firstDayOffered()) {
+      markFirstDayOffered();
+      startTour('first-day');
+      return;
+    }
+
     // Play a random acknowledgment clip and toggle the panel.
     voicePlayer.playRandom(CLICK_CLIPS).catch(() => {});
     setOpen((o) => !o);
-  }, [activeFlowId]);
+  }, [activeFlowId, open]);
 
   // ── Flow launcher ─────────────────────────────────────────────────────────
   const launchFlow = useCallback((flow: Flow) => {
@@ -711,8 +727,27 @@ export function Orb() {
                   ))}
                   {/* Guided tours — one short text tutorial per part of the app. */}
                   <div style={{ marginTop: 8, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8270' }}>Tutorials</div>
+                  {/* engagement.md F12 — the whole loop, first. */}
+                  <button
+                    type="button"
+                    data-testid="orb-tour-first-day"
+                    onClick={() => { setOpen(false); startTour('first-day'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%', boxSizing: 'border-box',
+                      background: 'rgba(201, 241, 88, 0.12)', border: '1px solid rgba(201, 241, 88, 0.4)', color: '#d4cfc0',
+                      padding: '8px 10px', borderRadius: 8, fontFamily: 'inherit', cursor: 'pointer',
+                    }}
+                  >
+                    <span aria-hidden style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--accent-on-dark)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="#0e1012"><path d="M8 5v14l11-7z" /></svg>
+                    </span>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>Start here · Your first day</span>
+                      <span style={{ fontSize: 10, color: '#8a8270' }}>plan one real thing and do it · 4 min</span>
+                    </span>
+                  </button>
                   <div data-testid="orb-tours" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4 }}>
-                    {TOURS.map((t) => (
+                    {TOURS.filter((t) => t.id !== 'first-day').map((t) => (
                       <button
                         key={t.id}
                         type="button"

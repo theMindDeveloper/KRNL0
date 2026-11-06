@@ -34,6 +34,8 @@ export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
     const onDown = (e: PointerEvent) => {
       const t = e.target as globalThis.Node;
       if (ref.current?.contains(t) || anchor?.contains(t)) return;
+      // A popover opened from inside this one (e.g. a TimeField's picker) is part of it.
+      if (t instanceof Element && t.closest('.krnl-popover')) return;
       onClose();
     };
     const onKey = (e: KeyboardEvent) => {
@@ -57,7 +59,7 @@ export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
   return createPortal(
     <div
       ref={ref}
-      className="nodrag nowheel"
+      className="krnl-popover nodrag nowheel"
       onPointerDown={stop} onMouseDown={stop} onClick={stop} onWheel={stop} onContextMenu={stop}
       style={{
         position: 'fixed', zIndex: Z.popover,

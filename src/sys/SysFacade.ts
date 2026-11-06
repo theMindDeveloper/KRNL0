@@ -557,6 +557,36 @@ export class SysFacade {
       if (command.sub === 'list') return this.deps.cliDispatch('sfx.list', {});
     }
 
+    if (command.kind === 'finished' || command.kind === 'recap') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: `${command.kind} requires an open renderer window`, data: { exitCode: 2 } };
+      }
+      if (command.kind === 'finished' && command.sub === 'policy') {
+        return this.deps.cliDispatch('finished.policy', { policy: command.policy });
+      }
+      return this.deps.cliDispatch(`${command.kind}.${command.sub}`, {});
+    }
+
+    if (command.kind === 'sound') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'sound requires an open renderer window', data: { exitCode: 2 } };
+      }
+      switch (command.sub) {
+        case 'pack':
+          if (!command.pack) return { ok: false, message: 'sound pack requires <id> (see: krnl sound list)' };
+          return this.deps.cliDispatch('sound.pack', { pack: command.pack });
+        case 'volume':
+          if (command.volume === undefined || command.volume < 0 || command.volume > 100) {
+            return { ok: false, message: 'sound volume requires a number from 0 to 100' };
+          }
+          return this.deps.cliDispatch('sound.volume', { volume: command.volume });
+        case 'play':
+          if (!command.moment) return { ok: false, message: 'sound play requires <moment> (see: krnl sound list)' };
+          return this.deps.cliDispatch('sound.play', { moment: command.moment });
+        default: return this.deps.cliDispatch(`sound.${command.sub}`, {});
+      }
+    }
+
     if (command.kind === 'radio') {
       if (!this.deps.cliDispatch) {
         return { ok: false, message: 'radio requires an open renderer window', data: { exitCode: 2 } };

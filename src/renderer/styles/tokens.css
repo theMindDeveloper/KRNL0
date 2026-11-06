@@ -581,6 +581,48 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   text-shadow: 0 0 4px rgba(201,241,88,0.5);
 }
 
+/* engagement.md F1 — the done moment: one-shot pop + ring (no loop, so the
+   frame budget #197 is untouched). Off under reduced motion. */
+.task-check--pop { animation: krnl-check-pop 420ms cubic-bezier(0.32, 0.72, 0, 1) 1; }
+@keyframes krnl-check-pop {
+  0%   { transform: scale(0.6); box-shadow: 0 0 0 0 rgba(201,241,88,0.55); }
+  55%  { transform: scale(1.18); box-shadow: 0 0 0 7px rgba(201,241,88,0.18); }
+  100% { transform: scale(1); box-shadow: 0 0 0 10px rgba(201,241,88,0); }
+}
+@media (prefers-reduced-motion: reduce) { .task-check--pop { animation: none; } }
+/* The done card's reward (engagement.md F2): 8 dots burst from the check once,
+   and the border glows once. */
+.task-done-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.task-done-burst i {
+  position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 1px; background: var(--acid);
+  animation: krnl-done-burst 560ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+}
+@keyframes krnl-done-burst {
+  0%   { transform: rotate(var(--a)) translateX(4px) scale(1); opacity: 1; }
+  100% { transform: rotate(var(--a)) translateX(20px) scale(0.4); opacity: 0; }
+}
+.task-done-card--celebrate { animation: krnl-done-glow 900ms ease-out 1; }
+@keyframes krnl-done-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(201,241,88,0.0), var(--shadow-1); }
+  25%  { box-shadow: 0 0 0 3px rgba(201,241,88,0.35), 0 0 22px rgba(201,241,88,0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(201,241,88,0), var(--shadow-1); }
+}
+@media (prefers-reduced-motion: reduce) { .task-done-burst { display: none; } .task-done-card--celebrate { animation: none; } }
+[data-motion="reduced"] .task-done-burst { display: none; }
+[data-motion="reduced"] .task-done-card--celebrate { animation: none; }
+[data-motion="reduced"] .task-check--pop { animation: none; }
+
+/* engagement.md F19 — REPLAN: the missed block lifts and hops once ("I can move"). */
+.krnl-hop { animation: krnl-hop 640ms cubic-bezier(0.32, 0.72, 0, 1) 1; }
+@keyframes krnl-hop {
+  0%   { transform: translateY(0); box-shadow: none; }
+  30%  { transform: translateY(-4px) scale(1.02); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+  60%  { transform: translateY(10px) scale(1.02); }
+  100% { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .krnl-hop { animation: none; } }
+[data-motion="reduced"] .krnl-hop { animation: none; }
+
 /* ── HabitNode cell classes (perf — avoid per-cell inline styles) ───── */
 .habit-cell {
   /* `position: relative` is needed for the done-state inner ::after block

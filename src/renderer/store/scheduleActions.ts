@@ -102,6 +102,8 @@ export async function toggleHabitToday(habitId: string): Promise<void> {
 
 /** Window event the canvas listens for to centre a node (works from any surface). */
 export const FOCUS_NODE_EVENT = 'krnl:focus-node';
+/** Window event the canvas listens for to fit several nodes on screen (`detail.nodeIds`). */
+export const FIT_NODES_EVENT = 'krnl:fit-nodes';
 
 export function focusNode(nodeId: string): void {
   window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { nodeId } }));
