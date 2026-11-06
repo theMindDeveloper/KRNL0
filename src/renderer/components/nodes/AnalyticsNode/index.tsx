@@ -19,7 +19,7 @@
 
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { TimeLogHeatmap } from './TimeLogHeatmap';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
@@ -206,6 +206,8 @@ const summaryChipStyle: React.CSSProperties = {
   borderRadius: 999,
   background: 'var(--k-an-bg-3, rgba(20,22,24,0.6))',
   color: 'var(--k-an-ink-1, #eef1f4)',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 };
 
 const gearBtnStyle = (active: boolean): React.CSSProperties => ({
@@ -578,23 +580,23 @@ export function AnalyticsNode({
       {/* Titlebar — the shared header class, so every frame style's header
           skin (Macintosh title bar, Submarine module tag, …) reaches it as it
           does the other mother windows. */}
-      <div className="krnl-node-header" style={titlebarStyle}>
+      <div className="krnl-node-header an-head" style={titlebarStyle}>
         <span style={dotStyle} aria-hidden />
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
         <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
-        <span style={{ color: 'var(--k-an-ink-2b, #aab0b7)' }}>{sources.length} sources</span>
+        <span style={{ color: 'var(--k-an-ink-2b, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{sources.length} sources</span>
         <div style={{ flex: 1 }} />
-        <span style={summaryChipStyle}>
+        <span className="an-chip an-chip--done" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>done </span>
           <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.tasksDone}</span>
         </span>
-        <span style={summaryChipStyle}>
+        <span className="an-chip an-chip--focus" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>focus </span>
           <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin}m</span>
         </span>
-        <span style={summaryChipStyle}>
+        <span className="an-chip an-chip--streak" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>streak </span>
-          <span style={{ color: 'var(--acid, #c9f158)' }}>{streaks.longestHabitStreak}d</span>
+          <span style={{ color: 'var(--acid-ink, var(--acid, #c9f158))', fontWeight: 600 }}>{streaks.longestHabitStreak}d</span>
         </span>
         <button
           type="button"
@@ -782,14 +784,37 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
     [
       {
         cardId: 'estimates.kpis' as const,
-        render: () => card('estimates.kpis', `Plan vs actual · last ${state.rangeDays}d`, 3, 96, () => (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: 'minmax(0, 1fr)', gap: 10, width: '100%', height: '100%' }}>
-            {tile('Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy')}
-            {tile('Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned')}
-            {tile('Tracked', fmtMinutes(k.trackedMin), `${k.overCount} over · ${k.underCount} within plan`, 'estimates-kpi-tracked')}
-            {tile('On a task', k.taggedShare === null ? '—' : `${Math.round(k.taggedShare * 100)}%`, 'of pomo work linked to a task', 'estimates-kpi-tagged')}
-          </div>
-        )),
+        render: () => card('estimates.kpis', `Plan vs actual · last ${state.rangeDays}d`, 3, 96, (size) => {
+          const kpis: Array<[string, string, string, string]> = [
+            ['Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy'],
+            ['Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned'],
+            ['Tracked', fmtMinutes(k.trackedMin), `${k.overCount} over · ${k.underCount} within plan`, 'estimates-kpi-tracked'],
+            ['On a task', k.taggedShare === null ? '—' : `${Math.round(k.taggedShare * 100)}%`, 'of pomo work linked to a task', 'estimates-kpi-tagged'],
+          ];
+          // Fit the room the card has: one row of four, a 2×2 grid, or — when
+          // a tile would be too small for its three lines — a plain list.
+          const w = size.width || 600;
+          const h = size.height || 96;
+          const cols = w >= 520 ? 4 : 2;
+          const rowH = (h - (4 / cols - 1) * 10) / (4 / cols);
+          if (rowH < 68 || w / cols < 120) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, width: '100%' }}>
+                {kpis.map(([label, value, sub, id]) => (
+                  <div key={id} data-testid={id} title={sub} style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0, padding: '3px 0', borderBottom: '1px solid var(--k-an-line, #2a2e33)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--k-an-ink-3, #aab0b7)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(0, 1fr)', gap: 10, width: '100%', height: '100%' }}>
+              {kpis.map(([label, value, sub, id]) => <Fragment key={id}>{tile(label, value, sub, id)}</Fragment>)}
+            </div>
+          );
+        }),
       },
       {
         cardId: 'estimates.perTask' as const,

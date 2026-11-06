@@ -412,7 +412,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   // One Todo row — shared by the open list, the Done dropdown and the Archive.
   const renderRow = (item: TodoItem, archived = false) => {
-    // Gray out if done OR if the scheduled end has passed.
+    // Only done rows fade. A task whose planned time passed is missed — it
+    // stays fully readable (the overdue dot marks it), as on the Calendar.
     const sched = item.taskNodeId !== null
       ? taskScheduledInfo.get(item.taskNodeId)
       : item.scheduledFor
@@ -420,7 +421,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         : undefined;
     const isPast = sched !== undefined &&
       new Date(sched.scheduledFor).getTime() + sched.durationMin * 60_000 <= nowMs;
-    const isGrayed = item.done || isPast;
+    const isGrayed = item.done;
+    void isPast;
     return (
     <div
       key={item.id}
@@ -453,20 +455,17 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       {/* PR8 — rust overdue dot. Only on items whose scheduled end
           has passed and that are still undone. Sits at the start
           of the row so the eye catches it before content. */}
-      {isPast && !item.done && (
-        <span
-          aria-label="overdue"
-          data-testid={`todo-overdue-dot-${item.id}`}
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: '50%',
-            background: 'var(--rust)',
-            flexShrink: 0,
-            boxShadow: '0 0 6px rgba(200, 85, 61, 0.45)',
-          }}
-        />
-      )}
+      {/* The slot is kept on every row so the checkboxes line up. */}
+      <span
+        {...(isPast && !item.done ? { 'aria-label': 'overdue', 'data-testid': `todo-overdue-dot-${item.id}` } : { 'aria-hidden': true })}
+        style={{
+          width: 5,
+          height: 5,
+          borderRadius: '50%',
+          background: isPast && !item.done ? 'var(--rust)' : 'transparent',
+          flexShrink: 0,
+        }}
+      />
       {/* Shared per-task color dot — links this todo row to its
           Calendar block and Clock arc. Only shown when the item
           is bound to an actual task node. */}
@@ -613,21 +612,24 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 cursor: item.done ? 'default' : 'pointer',
                 flexShrink: 0,
                 fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                color: 'var(--ink-4)',
-                letterSpacing: '0.04em',
+                fontSize: 10.5,
+                color: 'var(--ink-3)',
+                letterSpacing: '0.02em',
                 whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
               }}
             >
               {/* #207 — one readable figure: tracked / planned once anything is tracked. */}
               {trackedMin > 0 && (
                 <span data-testid="todo-item-tracked" style={{ color: !openTime && trackedMin > bd.effectiveMin ? 'var(--rust)' : 'var(--ink-2)' }}>
-                  <SettingsIcon name="clock" size={10} /> {fmtTodoMin(trackedMin)}{!openTime && <span style={{ opacity: 0.5 }}> / </span>}
+                  <SettingsIcon name="clock" size={11} /> {fmtTodoMin(trackedMin)}{!openTime && <span style={{ color: 'var(--ink-3)' }}> / </span>}
                 </span>
               )}
               {openTime
-                ? (trackedMin > 0 ? null : <span style={{ color: 'var(--ink-4)' }}>open</span>)
-                : <span style={{ color: trackedMin > 0 ? 'var(--ink-4)' : 'var(--ink-3)' }}>{fmtTodoMin(bd.effectiveMin)}</span>}
+                ? (trackedMin > 0 ? null : <span style={{ color: 'var(--ink-3)' }}>open</span>)
+                : <span style={{ color: 'var(--ink-3)' }}>{fmtTodoMin(bd.effectiveMin)}</span>}
             </span>
           );
         })()
@@ -656,20 +658,19 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--font-mono)',
-              fontSize: 9,
-              color: disp ? 'var(--ink-3)' : 'var(--ink-4)',
-              background: disp ? 'var(--paper-2)' : 'transparent',
-              border: `1px ${isAuto ? 'dashed' : 'solid'} ${disp ? 'var(--paper-3)' : 'transparent'}`,
-              padding: '0 5px',
-              borderRadius: 3,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              maxWidth: 84,
+              fontSize: 10.5,
+              // Same chip as the task card: the tag's colour, tinted; text mixed toward ink.
+              color: disp ? `color-mix(in srgb, ${disp.color} 45%, var(--ink))` : 'var(--ink-3)',
+              background: disp ? `color-mix(in srgb, ${disp.color} 16%, transparent)` : 'transparent',
+              border: `1px ${isAuto ? 'dashed' : 'solid'} ${disp ? (isAuto ? `color-mix(in srgb, ${disp.color} 55%, transparent)` : 'transparent') : 'transparent'}`,
+              padding: '1px 8px',
+              borderRadius: 999,
+              letterSpacing: '0.01em',
+              maxWidth: 96,
               overflow: 'hidden',
               whiteSpace: 'nowrap',
               cursor: 'pointer',
-              opacity: disp ? 1 : 0.6,
-              lineHeight: '14px',
+              lineHeight: '15px',
             }}
           >
             {disp ? (
@@ -771,11 +772,16 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   color: 'var(--rust)',
                   marginLeft: 8,
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
-                  letterSpacing: '0.06em',
+                  fontSize: 10.5,
+                  letterSpacing: '0.02em',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  textTransform: 'none',
                 }}
               >
-                ● {overdueCount} OVERDUE
+                <span aria-hidden style={{ width: 5, height: 5, borderRadius: 999, background: 'currentColor' }} />
+                {overdueCount} overdue
               </span>
             )}
           </span>

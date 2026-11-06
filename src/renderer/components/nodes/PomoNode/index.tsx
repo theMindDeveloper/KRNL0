@@ -794,7 +794,7 @@ export function PomoNode({
               color: 'var(--ink-3)',
             }}
           >
-            <span aria-hidden style={{ color: isTaskMode ? 'var(--acid)' : 'var(--ink-4)' }}>{isTaskMode ? '☑' : '☐'}</span>
+            <span aria-hidden style={{ color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', lineHeight: 0 }}><SettingsIcon name={isTaskMode ? 'finished' : 'box'} size={12} /></span>
             <span>TASK</span>
             <AppSelect
               ariaLabel="Link this session to a task"
@@ -1060,9 +1060,8 @@ function CycleCounter({
         <span
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 7.5,
-            color: 'var(--ink-4)',
-            letterSpacing: '0.08em',
+            fontSize: 10,
+            color: 'var(--ink-3)',
           }}
         >
           ×
@@ -1075,8 +1074,8 @@ function CycleCounter({
             fontVariantNumeric: 'tabular-nums',
             fontWeight: 700,
             lineHeight: 1,
-            color: cellColor,
-            textShadow: hasAny ? '0 0 6px color-mix(in srgb, var(--acid) 50%, transparent)' : 'none',
+            // acid-ink: lime text is unreadable on a light pomo.
+            color: hasAny ? 'var(--acid-ink, var(--acid))' : cellColor,
           }}
         >
           {cyclesToday}
@@ -1094,7 +1093,7 @@ function CycleCounter({
               height: 7,
               background: 'var(--acid)',
               transform: 'rotate(45deg)',
-              boxShadow: '0 0 5px color-mix(in srgb, var(--acid) 50%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--acid-ink, var(--acid)) 60%, transparent)',
               flexShrink: 0,
             }}
           />
@@ -1147,15 +1146,14 @@ function CycleCounter({
       <span
         style={{
           fontFamily: 'var(--font-mono)',
-          fontSize: 8,
-          color: 'var(--ink-4)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
+          fontSize: 10,
+          color: 'var(--ink-3)',
+          letterSpacing: '0.02em',
           flexShrink: 0,
           whiteSpace: 'nowrap',
         }}
       >
-        cycles · today
+        cycles today
       </span>
     </div>
   );

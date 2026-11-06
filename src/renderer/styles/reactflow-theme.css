@@ -282,3 +282,9 @@
 .cal-block .cal-replan { opacity: 0; transition: opacity 120ms ease; }
 .cal-block:hover .cal-replan,
 .cal-block .cal-replan:focus-visible { opacity: 1; }
+
+/* Analytics header: chips give way to the window's width (the gear stays). */
+.an-head { container-type: inline-size; }
+@container (max-width: 420px) { .an-chip--done { display: none; } }
+@container (max-width: 340px) { .an-chip--focus { display: none; } }
+@container (max-width: 250px) { .an-chip--streak { display: none; } }
