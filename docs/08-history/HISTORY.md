@@ -1441,3 +1441,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`
 **Summary:** The task card's open, missed and done states were rendered in light mode: one shape, readable. The missed card's "Was Tue 3 · 18:00" used plain rust (3.9:1 on the light card) and now uses the same darker rust as Welcome back. The first-day tour was walked again in light mode: 14 steps, the card never covers its target, its text reads on the light card.
+
+## [2026-11-07] — UI loop batch 10: line icons in the assistant menu and the ambient radio
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/ui/LineGlyph.tsx` (new), `src/renderer/components/{AmbientRadio/index,Orb/index,Assistant/Commander}.tsx`
+**Summary:** The assistant menu's ▸, the orb's ▶/◆ and the ambient radio's ▶ ★ ☆ ♪ were text characters (the OS symbol font, off the baseline, ignoring the app's stroke). They are now line icons from one small shared `LineGlyph` (play, star, star outline, note, chevron, diamond) that follow the text colour; the radio's empty-saves hint says "tap the star".

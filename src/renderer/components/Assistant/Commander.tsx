@@ -6,6 +6,7 @@
  * On submit, fires `onLaunch` with the params for sessionFromCommanderFlow.
  */
 
+import { LineGlyph } from '../ui/LineGlyph';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { voicePlayer } from './VoicePlayer';
 import { CloseButton } from '../ui/CloseButton';
@@ -123,7 +124,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
         >
           <span>
             <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--accent-on-dark)' }}>
-              ▸
+              <LineGlyph name="chevron" size={10} />
             </span>
             commander · new session
           </span>

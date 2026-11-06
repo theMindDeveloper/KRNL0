@@ -17,6 +17,7 @@
  *   movement and krnl command execution.
  */
 
+import { LineGlyph } from '../ui/LineGlyph';
 import {
   useState,
   useEffect,
@@ -598,7 +599,7 @@ export function Orb() {
           }}
         >
           <span style={{ color: isRunning ? '#c9f158' : 'var(--accent-on-dark)', marginRight: 6, opacity: 0.8 }}>
-            {isRunning ? '▶' : '◆'}
+            <LineGlyph name={isRunning ? 'play' : 'diamond'} size={9} />
           </span>
           {caption}
         </div>
@@ -688,7 +689,7 @@ export function Orb() {
                       marginBottom: 4,
                     }}
                   >
-                    {'▸ commander · plan a session'}
+                    <><LineGlyph name="chevron" size={10} /> commander · plan a session</>
                   </button>
                   {/* Claude Code in the board terminal, permission prompts off (#206). */}
                   <button
@@ -716,7 +717,7 @@ export function Orb() {
                       boxShadow: '0 0 10px rgba(217,119,87,0.35), inset 0 0 8px rgba(217,119,87,0.12)',
                     }}
                   >
-                    {'▸ claude code'}
+                    <><LineGlyph name="chevron" size={10} /> claude code</>
                   </button>
                   {/* Voice flows are hidden until proper voice tutorials exist — the
                       text Tutorials below replace them (maintainer, 2026-11-05). */}

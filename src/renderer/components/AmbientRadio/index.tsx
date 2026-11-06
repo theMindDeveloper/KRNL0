@@ -21,6 +21,7 @@
  * shell #090811, per-preset accent colour, JetBrains Mono).
  */
 
+import { LineGlyph } from '../ui/LineGlyph';
 import { SettingsIcon } from '../ui/SettingsIcons';
 import { PagedView } from '../ui/PagedView';
 import { Z as LAYERS } from '../ui/layers';
@@ -1104,7 +1105,7 @@ export function AmbientRadio() {
             data-testid="ambient-radio-edge-tab-left"
             style={{ ...edgeTab, right: -PEEK_PX, borderLeft: 'none', borderRadius: '0 6px 6px 0' }}
             onClick={restoreFromEdge}
-          >▶</div>
+          ><LineGlyph name="play" size={12} /></div>
         )}
         {edge === 'right' && (
           <div
@@ -1246,7 +1247,7 @@ export function AmbientRadio() {
                     flexShrink: 0,
                     transition: 'background .15s, color .15s, border-color .15s',
                   }}
-                >{isStarred ? '★' : '☆'}</button>
+                ><LineGlyph name={isStarred ? 'star' : 'starOutline'} size={12} /></button>
                 <button
                   type="button"
                   data-testid="ambient-radio-yt-favs-toggle"
@@ -1284,7 +1285,7 @@ export function AmbientRadio() {
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
                   }}
-                >▶ Load</button>
+                ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><LineGlyph name="play" size={10} />Load</span></button>
               </div>
 
               {favsOpen && (
@@ -1299,7 +1300,7 @@ export function AmbientRadio() {
                 >
                   {ytFavs.length === 0 ? (
                     <div style={{ fontSize: 8, color: 'rgba(255,255,255,.3)', letterSpacing: '0.04em', textAlign: 'center' }}>
-                      no saved videos — load one, then tap ☆
+                      no saved videos — load one, then tap the star
                     </div>
                   ) : ytFavs.map((fav) => {
                     const playing_ = currentVidId === fav.id;
@@ -1326,7 +1327,7 @@ export function AmbientRadio() {
                           fontSize: 9,
                           color: playing_ ? '#f43f5e' : 'rgba(244,63,94,.7)',
                           flexShrink: 0,
-                        }}>{playing_ ? '▶' : '♪'}</span>
+                        }}><LineGlyph name={playing_ ? 'play' : 'note'} size={11} /></span>
                         <span
                           title={fav.title}
                           style={{
