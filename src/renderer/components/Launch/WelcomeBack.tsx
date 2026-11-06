@@ -32,13 +32,22 @@ function dayParts(ymd: string): { dow: string; num: string } {
 async function plan(task: SlippedTask, day: string | null): Promise<void> {
   const { makeCommandHandler } = await import('../Canvas/commandDispatch');
   makeCommandHandler(task.id)('task.setSchedule', { scheduledFor: day === null ? null : movedSchedule(task, day) });
+  // A follower that slipped too moves with its head (same day, its own time).
+  for (const f of task.followers) {
+    if (f.time !== undefined) makeCommandHandler(f.id)('task.setSchedule', { scheduledFor: day === null ? null : movedSchedule({ time: f.time }, day) });
+  }
   refreshWelcomeBack();
 }
 
 async function moveAll(tasks: readonly SlippedTask[]): Promise<void> {
   const { makeCommandHandler } = await import('../Canvas/commandDispatch');
   const today = todayYMD();
-  for (const t of tasks) makeCommandHandler(t.id)('task.setSchedule', { scheduledFor: movedSchedule(t, today) });
+  for (const t of tasks) {
+    makeCommandHandler(t.id)('task.setSchedule', { scheduledFor: movedSchedule(t, today) });
+    for (const f of t.followers) {
+      if (f.time !== undefined) makeCommandHandler(f.id)('task.setSchedule', { scheduledFor: movedSchedule({ time: f.time }, today) });
+    }
+  }
   refreshWelcomeBack();
 }
 

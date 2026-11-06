@@ -41,7 +41,7 @@ Everything here is about the moments around using KRNL0: opening it, after an up
 - **F19** `krnl feedback "title" [--kind bug|idea|question|love]` opens the dialog with the title filled in; with `--link` or without a window it prints the GitHub link.
 
 **Milestones**
-- **F20** On the day a habit streak reaches 7, 30, 100 or 365, or the focus sessions reach 10, 100 or 500, a small card appears bottom right — each milestone once, and only while Celebrations is on.
+- **F20** When a habit streak reaches 7, 30, 100 or 365, or the focus sessions reach 10, 100 or 500, a small card appears bottom right — each milestone once, and only while Celebrations is on. A count that jumps past a milestone (a repaired day, logged past time) still gets its card if it is within 3 days / 5 sessions of it; an older, longer streak does not replay past milestones.
 - **F21** The card is a 1080 × 1080 image: a cream "paper" card with the habit name for streaks, the dark LCD card for sessions. Only a habit name and numbers — never tasks or times of day.
 - **F22** **Save image** saves the PNG, **Copy** puts it on the clipboard, **Not now** closes it.
 - **F23** Settings › Celebrations turns cards off; `krnl app celebrations on|off`. `krnl share list` shows streaks, sessions and the next milestone; `krnl share streak ["habit"]` / `krnl share sessions` open a card for the current numbers.

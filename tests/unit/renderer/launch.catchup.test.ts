@@ -52,6 +52,25 @@ describe('computeCatchup (F13)', () => {
     const b2 = { nodes: [task('a', 'A', '2026-11-03T09:00'), task('b', 'B', '2026-11-03T10:00')], edges: [next('a', 'b')] };
     expect(computeCatchup(b2, TODAY).tasks.map((t) => t.id)).toEqual(['a']);
   });
+  it('a slipped task whose chain head is already done still shows (it is the head now)', () => {
+    const b3 = { nodes: [task('a', 'A', '2026-11-02T09:00', true), task('b', 'B', '2026-11-03T10:00')], edges: [next('a', 'b')] };
+    expect(computeCatchup(b3, TODAY).tasks.map((t) => t.id)).toEqual(['b']);
+  });
+  it('a slipped task after an unplanned, open head still shows', () => {
+    const b4 = { nodes: [task('a', 'A'), task('b', 'B', '2026-11-03T10:00')], edges: [next('a', 'b')] };
+    expect(computeCatchup(b4, TODAY).tasks.map((t) => t.id)).toEqual(['b']);
+  });
+  it('a slipped task further down a slipped chain is listed once, under its head', () => {
+    const b5 = {
+      nodes: [task('a', 'A', '2026-11-02T09:00'), task('x', 'X'), task('b', 'B', '2026-11-03T10:00')],
+      edges: [next('a', 'x'), next('x', 'b')],
+    };
+    const c5 = computeCatchup(b5, TODAY);
+    expect(c5.tasks.map((t) => t.id)).toEqual(['a']);
+    expect(c5.tasks[0]!.followers.map((f) => f.id)).toEqual(['x', 'b']);
+    // b slipped itself: it carries its time so it moves with the head.
+    expect(c5.tasks[0]!.followers).toEqual([{ id: 'x', text: 'X' }, { id: 'b', text: 'B', time: '10:00' }]);
+  });
   it('says plainly when nothing slipped', () => {
     const empty = computeCatchup({ nodes: [], edges: [] }, TODAY);
     expect(isEmptyCatchup(empty)).toBe(true);
@@ -89,8 +108,16 @@ describe('milestones (F20–F23)', () => {
     const m = findNewMilestone(streakBoard(30), TODAY, []);
     expect(m).toMatchObject({ id: 'streak:run:30', kind: 'streak', value: 30, habit: 'Morning run' });
     expect(findNewMilestone(streakBoard(30), TODAY, ['streak:run:30'])).toBeNull();
-    expect(findNewMilestone(streakBoard(31), TODAY, [])).toBeNull();
+    expect(findNewMilestone(streakBoard(31), TODAY, [])).toMatchObject({ id: 'streak:run:30' });
+    expect(findNewMilestone(streakBoard(34), TODAY, [])).toBeNull();
     expect(milestoneLine(m!).title).toBe('30 days of Morning run.');
+  });
+  it('a streak that jumps past a milestone (a repaired day) still gets its card, once', () => {
+    expect(findNewMilestone(streakBoard(8), TODAY, [])).toMatchObject({ id: 'streak:run:7', value: 7 });
+    expect(findNewMilestone(streakBoard(8), TODAY, ['streak:run:7'])).toBeNull();
+  });
+  it('an old long streak does not replay past milestones', () => {
+    expect(findNewMilestone(streakBoard(40), TODAY, [])).toBeNull();
   });
   it('focus sessions count finished work spans', () => {
     const history = Array.from({ length: 10 }, (_, i) => ({

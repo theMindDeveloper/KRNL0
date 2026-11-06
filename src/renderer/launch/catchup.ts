@@ -23,8 +23,9 @@ export interface SlippedTask {
   time: string;
   /** The task's tag, if any. */
   tag?: string;
-  /** Tasks chained after this one, in order (they move with it). */
-  followers: Array<{ id: string; text: string }>;
+  /** Tasks chained after this one, in order (they move with it). `time` is
+   *  set when the follower itself slipped: it moves to the same day too. */
+  followers: Array<{ id: string; text: string; time?: string }>;
 }
 
 export interface HabitCatchup {
@@ -57,22 +58,47 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
   for (const n of board.nodes) if (n.kind === 'todo.task') tasks.set(n.id, n);
 
   const nexts = new Map<string, string[]>();
-  const hasPrev = new Set<string>();
+  const prevs = new Map<string, string[]>();
   for (const e of board.edges) {
     if (e.from.event !== 'task.next') continue;
     if (!tasks.has(e.from.nodeId) || !tasks.has(e.to.nodeId)) continue;
     nexts.set(e.from.nodeId, [...(nexts.get(e.from.nodeId) ?? []), e.to.nodeId]);
-    hasPrev.add(e.to.nodeId);
+    prevs.set(e.to.nodeId, [...(prevs.get(e.to.nodeId) ?? []), e.from.nodeId]);
   }
+
+  // Slipped: planned before today and not done.
+  const isSlipped = (id: string): boolean => {
+    const s = rec(tasks.get(id)?.state);
+    const day = (typeof s['scheduledFor'] === 'string' ? s['scheduledFor'] : '').slice(0, 10);
+    return s['done'] !== true && /^\d{4}-\d{2}-\d{2}$/.test(day) && day < today;
+  };
+  // A slipped task moves with an earlier slipped task in its chain (it is
+  // listed under it). Only then: a done or not-yet-due head carries nothing,
+  // so the task is a head itself.
+  const hasSlippedAncestor = (id: string): boolean => {
+    const seen = new Set<string>([id]);
+    let frontier = prevs.get(id) ?? [];
+    while (frontier.length > 0 && seen.size < 200) {
+      const up: string[] = [];
+      for (const p of frontier) {
+        if (seen.has(p)) continue;
+        seen.add(p);
+        if (isSlipped(p)) return true;
+        up.push(...(prevs.get(p) ?? []));
+      }
+      frontier = up;
+    }
+    return false;
+  };
 
   const slipped: SlippedTask[] = [];
   for (const n of tasks.values()) {
     const s = rec(n.state);
     const at = typeof s['scheduledFor'] === 'string' ? s['scheduledFor'] : '';
     const day = at.slice(0, 10);
-    if (s['done'] === true || !/^\d{4}-\d{2}-\d{2}$/.test(day) || day >= today) continue;
-    if (hasPrev.has(n.id)) continue; // a follower moves with its head
-    const followers: Array<{ id: string; text: string }> = [];
+    if (!isSlipped(n.id)) continue;
+    if (hasSlippedAncestor(n.id)) continue; // it moves with that head
+    const followers: Array<{ id: string; text: string; time?: string }> = [];
     const seen = new Set<string>([n.id]);
     let frontier = nexts.get(n.id) ?? [];
     while (frontier.length > 0 && followers.length < 20) {
@@ -81,7 +107,10 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
         if (seen.has(id)) continue;
         seen.add(id);
         const fs = rec(tasks.get(id)?.state);
-        if (fs['done'] !== true) followers.push({ id, text: String(fs['text'] ?? 'Untitled') });
+        if (fs['done'] !== true) {
+          const fAt = typeof fs['scheduledFor'] === 'string' ? fs['scheduledFor'] : '';
+          followers.push({ id, text: String(fs['text'] ?? 'Untitled'), ...(isSlipped(id) ? { time: fAt.slice(11, 16) || '09:00' } : {}) });
+        }
         next.push(...(nexts.get(id) ?? []));
       }
       frontier = next;

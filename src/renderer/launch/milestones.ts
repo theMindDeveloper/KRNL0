@@ -91,23 +91,33 @@ export function habitStreaks(nodes: readonly NodeLike[], today: string): HabitSt
  * streak counts on the day it hits the number exactly, so a long streak that
  * existed before this feature doesn't pop a card for an old number.
  */
+/** How far past a milestone it still counts as just reached: a repaired day
+ *  can lift a streak from 1 to 8, logged past time can add two sessions. */
+const STREAK_GRACE = 3;
+const SESSION_GRACE = 5;
+
+/** The highest milestone in `list` that `n` reached recently (n ≥ m, within grace). */
+function reached(list: readonly number[], n: number, grace: number, isSeen: (m: number) => boolean): number | null {
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i]!;
+    if (n >= m && n < m + grace) return isSeen(m) ? null : m;
+  }
+  return null;
+}
+
 export function findNewMilestone(nodes: readonly NodeLike[], today: string, seen: readonly string[], nowMs = Date.now()): Milestone | null {
   const done = new Set(seen);
   for (const h of habitStreaks(nodes, today)) {
-    for (const m of STREAK_MILESTONES) {
-      const id = `streak:${h.id}:${m}`;
-      if (h.current === m && !done.has(id)) {
-        return { id, kind: 'streak', value: m, habit: h.name, best: h.best <= m, log: h.log, total: new Set(h.log).size };
-      }
+    const m = reached(STREAK_MILESTONES, h.current, STREAK_GRACE, (v) => done.has(`streak:${h.id}:${v}`));
+    if (m !== null) {
+      return { id: `streak:${h.id}:${m}`, kind: 'streak', value: m, habit: h.name, best: h.best <= h.current, log: h.log, total: new Set(h.log).size };
     }
   }
   const twelveWeeks = nowMs - 84 * 86_400_000;
   const { sessions } = focusStats(nodes);
-  for (const m of SESSION_MILESTONES) {
-    const id = `sessions:${m}`;
-    if (sessions === m && !done.has(id)) {
-      return { id, kind: 'sessions', value: m, focusedMs: focusStats(nodes, twelveWeeks).focusedMs, weeks: weeklyFocus(nodes, nowMs) };
-    }
+  const m = reached(SESSION_MILESTONES, sessions, SESSION_GRACE, (v) => done.has(`sessions:${v}`));
+  if (m !== null) {
+    return { id: `sessions:${m}`, kind: 'sessions', value: m, focusedMs: focusStats(nodes, twelveWeeks).focusedMs, weeks: weeklyFocus(nodes, nowMs) };
   }
   return null;
 }

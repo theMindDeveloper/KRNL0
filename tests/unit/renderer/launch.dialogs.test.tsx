@@ -91,6 +91,28 @@ describe('Welcome back (F13, F14)', () => {
   });
 });
 
+describe('Welcome back moves a chain together (F14)', () => {
+  it('"Bring all" moves a follower that slipped too, keeping its time', async () => {
+    bridge();
+    const board = {
+      nodes: [
+        { id: 'a', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Head', done: false, scheduledFor: '2020-01-02T09:00' } },
+        { id: 'b', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Follower', done: false, scheduledFor: '2020-01-03T15:30' } },
+      ],
+      edges: [{ id: 'e', from: { nodeId: 'a', event: 'task.next' }, to: { nodeId: 'b', command: 'task.activate' } }],
+    };
+    useBoardStore.setState({ board: board as never });
+    act(() => { openWelcomeBack(true, 4 * 86_400_000); });
+    render(<WelcomeBack />);
+    fireEvent.click(screen.getByTestId('welcome-done'));
+    const st = (id: string) => (useBoardStore.getState().board!.nodes.find((n) => n.id === id)!.state as { scheduledFor?: string }).scheduledFor;
+    const today = new Date();
+    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    await vi.waitFor(() => expect(st('a')).toBe(`${ymd}T09:00`), { timeout: 5000 });
+    expect(st('b')).toBe(`${ymd}T15:30`);
+  });
+});
+
 describe('Send feedback (F17, F18)', () => {
   it('opens a filled-in GitHub issue and nothing else', () => {
     const krnl = bridge();
