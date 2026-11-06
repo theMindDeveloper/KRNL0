@@ -22,7 +22,7 @@ export function fmtTook(min: number): string {
   if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
   const r = m % 60;
-  return r ? `${h}h ${String(r).padStart(2, '0')}` : `${h}h`;
+  return r ? `${h}h ${String(r).padStart(2, '0')}m` : `${h}h`;
 }
 
 /** Today: tasks finished, and planned blocks done of planned. */
@@ -77,7 +77,7 @@ export function DoneCard({ state, trackedSec, celebrate, onReopen, onContextMenu
       style={{
         position: 'relative', width: 220, height: 120, boxSizing: 'border-box',
         padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 4,
-        borderRadius: 'var(--radius-lg)', background: 'var(--node-bg)',
+        borderRadius: 'var(--radius-lg)', background: 'color-mix(in srgb, var(--acid) 5%, var(--node-bg))',
         border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', boxShadow: 'var(--shadow-1)',
       }}
     >
@@ -100,7 +100,7 @@ export function DoneCard({ state, trackedSec, celebrate, onReopen, onContextMenu
             </span>
           )}
         </span>
-        <span className="task-text" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span className="task-text" style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {state.text}
         </span>
       </div>
@@ -127,7 +127,7 @@ export function DoneCard({ state, trackedSec, celebrate, onReopen, onContextMenu
           {usePlan ? `${tally.plannedDone} of ${tally.planned} planned today` : `${tally.doneToday} done today`}
         </span>
         <span style={{ flex: 1 }} />
-        {atLabel && <span style={k9}>{atLabel}</span>}
+        {atLabel && <span style={k9} title="Finished at">done {atLabel}</span>}
       </div>
       {children}
     </div>

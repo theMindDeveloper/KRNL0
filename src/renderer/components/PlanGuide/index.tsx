@@ -103,9 +103,10 @@ export function PlanGuide() {
   const { req, from, to } = shown;
   const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const chipText = req.mode === 'plan' ? 'drag it onto the Calendar' : 'drag to a new time';
-  // The chip sits beside the source, never on the Calendar.
-  const chipLeft = Math.min(window.innerWidth - 190, from.left + from.width + 8);
-  const chipTop = from.top + from.height / 2 - 11;
+  // The chip sits just under the source, inside its own panel — never on the
+  // Calendar and never on a neighbouring window.
+  const chipLeft = Math.max(8, Math.min(window.innerWidth - 210, from.left + 24));
+  const chipTop = Math.min(window.innerHeight - 30, from.top + from.height + 4);
   const ghostDx = to ? to.left + to.width / 2 - (from.left + 40) : 0;
   const ghostDy = to ? to.top + Math.min(120, to.height / 3) - from.top : 0;
 
@@ -147,7 +148,7 @@ export function PlanGuide() {
         style={{
           position: 'absolute', left: chipLeft, top: chipTop, height: 22, padding: '0 9px', borderRadius: 999,
           display: 'flex', alignItems: 'center', gap: 6,
-          background: 'var(--node-bg)', border: '1px solid var(--paper-3)', boxShadow: 'var(--shadow-1)',
+          background: 'var(--paper)', border: '1px solid color-mix(in srgb, var(--acid) 55%, var(--paper-3))', boxShadow: 'var(--shadow-1)',
           fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink)', whiteSpace: 'nowrap',
           animation: `krnl-guide-chip ${SHOW_MS}ms ease 1 both`,
         }}

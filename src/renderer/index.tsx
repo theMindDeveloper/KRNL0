@@ -62,6 +62,8 @@ if (isPocket) {
     m.installPreviewBridge();
     const soloKind = new URLSearchParams(location.search).get('solo');
     if (soloKind) {
+      // The single-node preview never mounts App, which removes the splash.
+      document.getElementById('boot-splash')?.remove();
       createRoot(root).render(<solo.SoloPreview kind={soloKind} />);
     } else {
       render(root);

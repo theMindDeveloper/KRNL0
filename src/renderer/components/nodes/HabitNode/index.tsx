@@ -692,7 +692,9 @@ const WeekRow = memo(function WeekRow({
           letterSpacing: '0.04em',
         }}
       >
-        <span>{`▲ ${streak} day streak`}</span>
+        {streak > 0
+          ? <span>{`▲ ${streak} day streak`}</span>
+          : <span style={{ color: 'var(--ink-3)' }}>{best > 0 ? 'start a new streak today' : 'tick today to start a streak'}</span>}
         {milestone !== null && (
           <button
             type="button"
@@ -711,7 +713,8 @@ const WeekRow = memo(function WeekRow({
         {toNext !== null && streak > 0 && milestone === null && (
           <span style={{ color: 'var(--ink-3)' }}>· {toNext} to {nextMs}</span>
         )}
-        {best > streak && <span data-testid={`habit-best-${habit.id}`} style={{ color: 'var(--ink-3)' }}>· best {best}</span>}
+        {best > streak && streak > 0 && <span data-testid={`habit-best-${habit.id}`} style={{ color: 'var(--ink-3)' }}>· best {best}</span>}
+        {best > 0 && streak === 0 && <span data-testid={`habit-best-${habit.id}`} style={{ color: 'var(--ink-3)' }}>· best {best}</span>}
       </div>
 
       {/* engagement.md F17 — a missed day can be repaired, not a silent reset. */}
