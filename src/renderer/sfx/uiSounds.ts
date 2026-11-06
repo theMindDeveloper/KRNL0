@@ -109,10 +109,32 @@ class UiSoundEngine {
             src.buffer = bufs[k]!;
             src.playbackRate.value = st.rate;
             const g = ctx.createGain();
-            g.gain.value = volume * st.gain;
-            src.connect(g).connect(out);
-            src.onended = () => { src.disconnect(); g.disconnect(); };
+            const level = volume * st.gain;
             const when = t0 + st.at / 1000;
+            // A cut from a sprite starts and stops mid-wave: without a short
+            // fade in and out each edge is an audible click (the "glitchy
+            // tick"). 4 ms in, 14 ms out.
+            const buf = bufs[k]!;
+            const length = (st.duration ?? Math.max(0, buf.duration - st.offset)) / st.rate;
+            g.gain.setValueAtTime(0, when);
+            g.gain.linearRampToValueAtTime(level, when + 0.004);
+            if (length > 0.03) {
+              g.gain.setValueAtTime(level, when + length - 0.014);
+              g.gain.linearRampToValueAtTime(0, when + length);
+            }
+            // Pitched-up hits get harsh at the top: roll off the highest frequencies.
+            let tail: AudioNode = g;
+            let lp: BiquadFilterNode | null = null;
+            if (st.rate > 1.15) {
+              lp = ctx.createBiquadFilter();
+              lp.type = 'lowpass';
+              lp.frequency.value = 7000;
+              g.connect(lp);
+              tail = lp;
+            }
+            src.connect(g);
+            tail.connect(out);
+            src.onended = () => { src.disconnect(); g.disconnect(); lp?.disconnect(); };
             if (st.duration !== undefined) src.start(when, st.offset, st.duration);
             else src.start(when, st.offset);
           });

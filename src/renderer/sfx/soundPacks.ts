@@ -79,7 +79,7 @@ export const SOUND_PACKS: Record<SoundPackId, SoundPack> = {
       stop: [{ s: 'button', rate: 0.8 }, { s: 'toggle_off', at: 120, rate: 0.7 }],
       sessionDone: [{ s: 'celebration' }],
       // the reward: a press and a rising sparkle
-      done: [{ s: 'select' }, { s: 'tap_02', at: 90, rate: 1.5, gain: 0.7 }, { s: 'tap_02', at: 170, rate: 2, gain: 0.55 }],
+      done: [{ s: 'select' }, { s: 'tap_02', at: 90, rate: 1.26, gain: 0.6 }, { s: 'tap_02', at: 175, rate: 1.5, gain: 0.45 }],
       reopen: [{ s: 'toggle_off', gain: 0.8 }],
       // two-note step up
       habit: [{ s: 'tap_03' }, { s: 'tap_03', at: 85, rate: 1.33 }],

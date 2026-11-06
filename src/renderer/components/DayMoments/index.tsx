@@ -12,7 +12,7 @@ import { addDays } from '../../analytics/dateRange';
 import { fmtMinutes } from '../../analytics/summary';
 import {
   boardHasHistory, dayHeadline, daySummary, DAY_MOMENTS_KEY, mondayOf, morningLine, parseSeen,
-  shouldShowRecap, shouldShowWeek, weekHeadline, weekSummary, ymdOf,
+  shouldShowRecap, shouldShowWeek, weekSummary, ymdOf,
   type DaySummary, type Seen, type WeekSummary,
 } from '../../store/dayRecap';
 import { activeTour } from '../Tour/TourHost';
@@ -109,62 +109,35 @@ export function DayMoments() {
   return (
     <>
       {morning && !card && (
-        <div
-          role="status"
-          data-testid="morning-line"
-          style={{
-            position: 'fixed', left: '50%', top: 56, transform: 'translateX(-50%)', zIndex: Z.notice,
-            display: 'flex', alignItems: 'center', gap: 10, maxWidth: 'calc(100vw - 32px)',
-            padding: '6px 6px 6px 14px', borderRadius: 999,
-            background: 'var(--node-bg)', border: '1px solid var(--paper-3)', boxShadow: 'var(--shadow-1)',
-            fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink)',
-          }}
-        >
-          <span style={{ color: 'var(--acid-ink, var(--acid))' }}>◆</span>
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>good morning · {morning}</span>
-          <button
-            type="button"
-            aria-label="Dismiss"
-            data-testid="morning-line-close"
-            onClick={() => setMorning(null)}
-            style={{ all: 'unset', cursor: 'pointer', width: 24, height: 24, display: 'grid', placeItems: 'center', color: 'var(--ink-3)', borderRadius: 999 }}
-          >
+        <div role="status" data-testid="morning-line" className="dm-morning" style={{ zIndex: Z.notice }}>
+          <span className="dm-morning__sun" aria-hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+          </span>
+          <span className="dm-morning__text"><b>Good morning.</b> {morning}</span>
+          <button type="button" aria-label="Dismiss" data-testid="morning-line-close" className="dm-morning__close" onClick={() => setMorning(null)}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
       )}
       {card && createPortal(
-        <div
-          data-testid="day-moment-backdrop"
-          onClick={() => setCard(null)}
-          style={{ position: 'fixed', inset: 0, zIndex: Z.modal, background: 'rgba(0,0,0,0.45)', display: 'grid', placeItems: 'center' }}
-        >
+        <div data-testid="day-moment-backdrop" className="ln-scrim" onClick={() => setCard(null)} style={{ zIndex: Z.modal }}>
           <div
             role="dialog"
             aria-modal="true"
             aria-label={card.kind === 'day' ? 'Day recap' : 'Last week'}
             data-testid={card.kind === 'day' ? 'day-recap' : 'week-recap'}
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 400, maxWidth: '90vw', boxSizing: 'border-box', padding: 22, borderRadius: 14,
-              background: 'var(--node-bg)', border: '1px solid var(--paper-3)', boxShadow: 'var(--shadow-2)',
-              color: 'var(--ink)', fontFamily: 'var(--font-mono)', display: 'flex', flexDirection: 'column', gap: 16,
-            }}
+            className="ln-dialog dm-card"
           >
             {card.kind === 'day' ? <DayCard day={card.day} /> : <WeekCard week={card.week} />}
-            <button
-              type="button"
-              data-testid="day-moment-close"
-              onClick={() => setCard(null)}
-              autoFocus
-              style={{
-                alignSelf: 'flex-start', padding: '9px 16px', borderRadius: 6, cursor: 'pointer',
-                border: '1px solid var(--btn-primary-ring)', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)',
-                fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
-              }}
-            >
-              {card.kind === 'day' ? 'GOOD NIGHT' : 'START THE WEEK'}
-            </button>
+            <footer className="dm-foot">
+              <span className="ln-meta">
+                {card.kind === 'day' ? 'Tomorrow starts fresh. See you then.' : 'A fresh week. Nothing carries over as debt.'}
+              </span>
+              <button type="button" data-testid="day-moment-close" className="ln-btn ln-btn--sm ln-btn--primary" onClick={() => setCard(null)}>
+                {card.kind === 'day' ? 'Good night' : 'Start the week'}
+              </button>
+            </footer>
           </div>
         </div>,
         document.body,
@@ -173,26 +146,70 @@ export function DayMoments() {
   );
 }
 
-const LAB = { fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' } as const;
+const longDate = (ymd: string, opts: Intl.DateTimeFormatOptions) => new Date(`${ymd}T00:00:00`).toLocaleDateString('en-GB', opts);
+
+/** How the day went against its plan, in plain words and without blame. */
+function planVerdict(plan: number, real: number): string {
+  const d = real - plan;
+  if (Math.abs(d) <= Math.max(5, plan * 0.1)) return 'right on plan';
+  return d > 0 ? `${fmtMinutes(d)} more than planned` : `${fmtMinutes(-d)} less than planned`;
+}
+
+function Ring({ done, total }: { done: number; total: number }) {
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  const f = total > 0 ? Math.min(1, done / total) : 1;
+  return (
+    <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden className="dm-ring">
+      <circle cx="42" cy="42" r={r} fill="none" stroke="var(--paper-3)" strokeWidth="7" />
+      <circle cx="42" cy="42" r={r} fill="none" stroke="var(--acid)" strokeWidth="7" strokeLinecap="round"
+        strokeDasharray={`${(c * f).toFixed(1)} ${c.toFixed(1)}`} transform="rotate(-90 42 42)" />
+    </svg>
+  );
+}
 
 function DayCard({ day }: { day: DaySummary }) {
   const plan = day.plannedMin;
-  const scale = Math.max(plan, day.focusMin, 1);
-  const date = new Date(`${day.date}T00:00:00`).toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short' }).toLowerCase();
+  const scale = Math.max(plan, day.focusMin, 1) * 1.08;
+  const hasPlan = day.planned > 0;
   return (
     <>
-      <div style={{ ...LAB, color: 'var(--acid-ink, var(--acid))' }}>◆ day complete · {date}</div>
-      <div style={{ fontFamily: 'var(--font-serif)', fontSize: 30, lineHeight: 1.1 }}>{dayHeadline(day)}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-        <div><div style={{ fontSize: 22 }}>{day.planned > 0 ? `${day.plannedDone}/${day.planned}` : day.done}</div><div style={LAB}>{day.planned > 0 ? 'planned done' : 'tasks'}</div></div>
-        <div><div style={{ fontSize: 22 }}>{fmtMinutes(day.focusMin)}</div><div style={LAB}>recorded</div></div>
-        <div><div style={{ fontSize: 22 }}>{day.topStreak ? `▲ ${day.topStreak.streak}` : '—'}</div><div style={LAB}>{day.topStreak ? day.topStreak.label : 'streak'}</div></div>
+      <header className="dm-head">
+        <span className="ln-label dm-kicker"><i aria-hidden />Day complete · {longDate(day.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+        <h2 className="ln-display dm-title">{dayHeadline(day)}</h2>
+      </header>
+
+      <div className="dm-grid">
+        <div className="dm-tile dm-tile--ring">
+          <div className="dm-ring-wrap">
+            <Ring done={hasPlan ? day.plannedDone : day.done} total={hasPlan ? day.planned : Math.max(1, day.done)} />
+            <span className="dm-ring__num">{hasPlan ? `${day.plannedDone}/${day.planned}` : day.done}</span>
+          </div>
+          <span className="ln-label">{hasPlan ? 'planned, done' : 'tasks done'}</span>
+        </div>
+        <div className="dm-stack">
+          <div className="dm-tile">
+            <span className="ln-label">Recorded</span>
+            <span className="dm-num">{fmtMinutes(day.focusMin)}</span>
+          </div>
+          <div className="dm-tile">
+            <span className="ln-label">{day.topStreak ? day.topStreak.label : 'Streak'}</span>
+            <span className="dm-num">{day.topStreak ? <><span className="dm-up">▲</span> {day.topStreak.streak} days</> : '—'}</span>
+          </div>
+        </div>
       </div>
+
       {plan > 0 && (
-        <div data-testid="day-recap-bars">
-          <div style={{ ...LAB, marginBottom: 6 }}>plan {fmtMinutes(plan)} · real {fmtMinutes(day.focusMin)}</div>
-          <div style={{ height: 8, background: 'var(--paper-3)', borderRadius: 4 }}><div style={{ height: 8, width: `${(plan / scale) * 100}%`, background: 'var(--ink-3)', borderRadius: 4 }} /></div>
-          <div style={{ height: 8, marginTop: 4, background: 'var(--paper-3)', borderRadius: 4 }}><div style={{ height: 8, width: `${(day.focusMin / scale) * 100}%`, background: 'var(--acid)', borderRadius: 4 }} /></div>
+        <div data-testid="day-recap-bars" className="dm-meter">
+          <div className="dm-meter__track">
+            <span className="dm-meter__fill" style={{ width: `${(day.focusMin / scale) * 100}%` }} />
+            <span className="dm-meter__plan" style={{ left: `${(plan / scale) * 100}%` }} title={`Planned ${fmtMinutes(plan)}`} />
+          </div>
+          <div className="dm-meter__legend">
+            <span><i className="dm-key dm-key--real" />recorded {fmtMinutes(day.focusMin)}</span>
+            <span><i className="dm-key dm-key--plan" />planned {fmtMinutes(plan)}</span>
+            <span className="dm-meter__verdict">{planVerdict(plan, day.focusMin)}</span>
+          </div>
         </div>
       )}
     </>
@@ -200,26 +217,36 @@ function DayCard({ day }: { day: DaySummary }) {
 }
 
 function WeekCard({ week }: { week: WeekSummary }) {
-  const max = Math.max(1, ...week.days.map((d) => d.done * 30 + d.focusMin));
-  const fmt = (ymd: string) => new Date(`${ymd}T00:00:00`).toLocaleDateString('en', { day: 'numeric', month: 'short' }).toLowerCase();
+  const max = Math.max(1, ...week.days.map((d) => d.focusMin));
+  const activeDays = week.days.filter((d) => d.done > 0 || d.focusMin > 0).length;
+  const best = week.bestDay ? longDate(week.bestDay, { weekday: 'long' }) : null;
   return (
     <>
-      <div style={{ ...LAB, color: 'var(--acid-ink, var(--acid))' }}>◆ last week · {fmt(week.start)} – {fmt(week.end)}</div>
-      <div style={{ fontFamily: 'var(--font-serif)', fontSize: 28, lineHeight: 1.1 }}>{weekHeadline(week)}</div>
-      <div data-testid="week-recap-bars" style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 90 }}>
+      <header className="dm-head">
+        <span className="ln-label dm-kicker"><i aria-hidden />Last week · {longDate(week.start, { day: 'numeric', month: 'short' })} – {longDate(week.end, { day: 'numeric', month: 'short' })}</span>
+        <h2 className="ln-display dm-title">{week.done} done, {fmtMinutes(week.focusMin)} focused.</h2>
+        {best && <p className="ln-body" style={{ margin: 0 }}>Your best day was <b style={{ color: 'var(--ink)' }}>{best}</b>.</p>}
+      </header>
+
+      <div data-testid="week-recap-bars" className="dm-week">
         {week.days.map((d) => {
-          const h = Math.max(4, Math.round(((d.done * 30 + d.focusMin) / max) * 76));
-          const best = d.date === week.bestDay;
-          const dow = new Date(`${d.date}T00:00:00`).toLocaleDateString('en', { weekday: 'narrow' }).toLowerCase();
+          const h = d.focusMin > 0 ? Math.max(6, Math.round((d.focusMin / max) * 92)) : 3;
+          const isBest = d.date === week.bestDay;
           return (
-            <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }} title={`${d.done} done · ${fmtMinutes(d.focusMin)}`}>
-              <div style={{ width: '100%', height: h, background: best ? 'var(--acid)' : 'var(--ink-4)', borderRadius: 3 }} />
-              <span style={LAB}>{dow}</span>
+            <div key={d.date} className="dm-week__col" title={`${d.done} done · ${fmtMinutes(d.focusMin)}`}>
+              <span className="dm-week__val">{d.focusMin > 0 ? fmtMinutes(d.focusMin) : ''}</span>
+              <span className={`dm-week__bar${isBest ? ' is-best' : ''}${d.focusMin === 0 ? ' is-empty' : ''}`} style={{ height: h }} />
+              <span className={`dm-week__day${isBest ? ' is-best' : ''}`}>{longDate(d.date, { weekday: 'short' }).slice(0, 2)}</span>
             </div>
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>fresh week · nothing carried as debt</div>
+
+      <div className="dm-row3">
+        <div className="dm-tile"><span className="ln-label">Done</span><span className="dm-num">{week.done}</span></div>
+        <div className="dm-tile"><span className="ln-label">Focused</span><span className="dm-num">{fmtMinutes(week.focusMin)}</span></div>
+        <div className="dm-tile"><span className="ln-label">Active days</span><span className="dm-num">{activeDays} of 7</span></div>
+      </div>
     </>
   );
 }

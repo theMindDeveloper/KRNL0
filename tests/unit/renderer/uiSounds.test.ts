@@ -135,12 +135,13 @@ describe('F6/F8 — engine', () => {
     uiSounds.resetGuard();
     starts = 0;
     fetches = 0;
-    const gain = () => ({ gain: { value: 1 }, connect: (x: unknown) => x, disconnect: () => {} });
+    const gain = () => ({ gain: { value: 1, setValueAtTime: () => {}, linearRampToValueAtTime: () => {} }, connect: (x: unknown) => x, disconnect: () => {} });
     class FakeContext {
       state = 'running';
       currentTime = 0;
       destination = {};
       createGain = gain;
+      createBiquadFilter = () => ({ type: 'lowpass', frequency: { value: 0 }, connect: (x: unknown) => x, disconnect: () => {} });
       createBufferSource = () => ({ buffer: null, playbackRate: { value: 1 }, connect: (x: unknown) => x, disconnect: () => {}, start: () => { starts += 1; }, onended: null });
       decodeAudioData = () => Promise.resolve({ duration: 0.2 });
       resume = () => Promise.resolve();

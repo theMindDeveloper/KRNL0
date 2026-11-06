@@ -19,6 +19,7 @@ import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { stepsFor, tourById, type Tour } from './tours';
 import { setTourAnchor } from './tourAnchor';
+import { useLayerVisibility } from '../../store/layerVisibility';
 
 export const TOUR_EVENT = 'krnl:tour';
 
@@ -33,22 +34,27 @@ export function startTour(id: string): boolean {
   return true;
 }
 
-/** Bring a mother window into view: centre it on the canvas, or show its Station panel. */
+/**
+ * Bring the window a step talks about into view, whatever hid it: a window
+ * the user hid from the toolbar comes back (Station and Canvas alike), the
+ * canvas's task / text / image layers are switched on, and on the canvas the
+ * camera centres it. A step about something hidden would otherwise point at
+ * nothing and its "waiting for…" could never happen.
+ */
 function bringIntoView(nodeId: string): void {
   const st = useBoardStore.getState();
   const board = st.board;
   const node = board?.nodes.find((n) => n.id === nodeId);
   if (!board || !node) return;
-  if (board.layoutMode === 'station') {
-    if (isStationHidden(node)) {
-      const cfg = (node.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
-      st.updateNode(node.id, { config: { ...cfg, stationHidden: false } });
-      const b = useBoardStore.getState().board;
-      if (b) void saveBoard(b);
-    }
-  } else {
-    focusNode(nodeId);
+  if (isStationHidden(node)) {
+    const cfg = (node.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
+    st.updateNode(node.id, { config: { ...cfg, stationHidden: false } });
+    const b = useBoardStore.getState().board;
+    if (b) void saveBoard(b);
   }
+  const layers = useLayerVisibility.getState();
+  for (const l of ['tasks', 'texts', 'images'] as const) if (!layers[l]) layers.setLayer(l, true);
+  if (board.layoutMode !== 'station') focusNode(nodeId);
 }
 
 /** `**word**` in a step's text → a highlighted word (the thing to look at or press). */
@@ -78,7 +84,9 @@ const SETTINGS_MODAL = '[data-testid="settings-modal"]';
 interface Rect { left: number; top: number; width: number; height: number }
 
 const same = (a: Rect | null, b: Rect | null): boolean =>
-  !!a && !!b && Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1;
+  // 3 px: a target that pulses or hops a little still counts as resting, so
+  // the words don't wait (and the card doesn't chase it).
+  !!a && !!b && Math.abs(a.left - b.left) < 3 && Math.abs(a.top - b.top) < 3 && Math.abs(a.width - b.width) < 3 && Math.abs(a.height - b.height) < 3;
 
 /** Where the card goes: below the target, else above, right, left — else the bottom-right corner. */
 function placeCard(r: Rect, w: number, h: number): { left: number; top: number } {
@@ -187,7 +195,7 @@ export function TourHost(): JSX.Element | null {
     if (step.node) bringIntoView(step.node);
     // Never leave the words hidden: show them anyway if the target is slow.
     const key = `${tour?.id}:${i}`;
-    const t = setTimeout(() => setReadyKey(key), 1200);
+    const t = setTimeout(() => setReadyKey(key), 500);
     return () => clearTimeout(t);
   }, [tour, i]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -216,7 +224,7 @@ export function TourHost(): JSX.Element | null {
       if (nextRect) setReadyKey(key);
     };
     measure();
-    const id = setInterval(measure, 100);
+    const id = setInterval(measure, 80);
     return () => clearInterval(id);
   }, [step]);
 
@@ -255,6 +263,11 @@ export function TourHost(): JSX.Element | null {
   // it). After every render: the card's spot is worked out during render.
   useEffect(() => {
     if (!tour || !step) { setTourAnchor(null); return; }
+    // A step about the orb itself (or its menu) keeps the orb where it is:
+    // the card is placed by the orb there, so moving the orb would move the
+    // card, which would move the orb again — an endless chase.
+    const target = step.target ? document.querySelector(step.target) : null;
+    if (target?.closest('[data-orb-root]')) { setTourAnchor(null); return; }
     setTourAnchor({ x: Math.round(anchorPos.current.left) - 32, y: Math.round(anchorPos.current.top) - 32 });
   });
   useEffect(() => () => setTourAnchor(null), []);
@@ -344,7 +357,7 @@ export function TourHost(): JSX.Element | null {
           style={{
             fontSize: 15.5, lineHeight: 1.6, fontFamily: 'var(--font-sans)', color: 'var(--ink)',
             opacity: ready ? 1 : 0, transform: ready ? 'none' : 'translateY(4px)',
-            transition: ready ? 'opacity 260ms ease 160ms, transform 260ms ease 160ms' : 'none',
+            transition: ready ? 'opacity 200ms ease 40ms, transform 200ms ease 40ms' : 'none',
           }}
         >
           {renderTourText(text)}

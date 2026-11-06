@@ -559,6 +559,7 @@ export function Orb() {
       )}
     <div
       key={settleKey}
+      data-orb-root
       style={{
         position: 'fixed',
         left: tourAt ? tourAt.x : pos.x,
