@@ -1255,12 +1255,13 @@ export function ClockNode({
                   position: 'relative',
                 }}
               >
-                {/* Color bar */}
+                {/* The task's colour as a dot, as in the Todo rows (no left bar). */}
                 <span
+                  aria-hidden
                   style={{
-                    width: 4,
-                    height: 16,
-                    borderRadius: 1,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
                     background: t.colorVar,
                     display: 'inline-block',
                     alignSelf: 'center',

@@ -1504,3 +1504,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/Canvas/fitPadding.ts`, `docs/06-requirements/app-chrome.md` F7
 **Summary:** After the tool-rail fix, the design checker's last covered text was a task card's time under the minimap in the bottom-right corner. The fit padding now also leaves the minimap's width on the right; the live page has no covered text left.
+
+## [2026-11-07] — UI loop batch 19: Clock rows lose their left bars
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`
+**Summary:** Each Clock schedule row was marked by a 4 px colour bar on its left edge (the design checker's "side-tab"; our rule is no left accent bars). The task's colour is now a dot, as in the Todo rows, so the same task looks the same in both windows.
