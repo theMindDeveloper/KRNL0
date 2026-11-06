@@ -29,8 +29,8 @@ import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
 import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
-import type { CalendarConfig, CalendarState } from './types';
-import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, granularityFor } from './types';
+import type { CalendarConfig, CalendarLayers, CalendarState } from './types';
+import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularityFor } from './types';
 import { getMondayOf, toYMD } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
@@ -195,17 +195,7 @@ interface ScheduledHabit {
 //   recorded  → a thin rail at the left edge of each day; a break is a gap in it
 //   habits    → small pills at their time on the right edge, ticked from here
 // Recorded and Habits can be switched off in the header (kept per install).
-const LAYERS_KEY = 'krnl0-calendar-layers';
-interface CalLayers { recorded: boolean; habits: boolean }
-function readLayers(): CalLayers {
-  try {
-    const raw = JSON.parse(localStorage.getItem(LAYERS_KEY) ?? 'null') as Partial<CalLayers> | null;
-    return { recorded: raw?.recorded !== false, habits: raw?.habits !== false };
-  } catch { return { recorded: true, habits: true }; }
-}
-function writeLayers(l: CalLayers): void {
-  try { localStorage.setItem(LAYERS_KEY, JSON.stringify(l)); } catch { /* no storage */ }
-}
+type CalLayers = CalendarLayers;
 
 interface WeekViewProps {
   state: CalendarState;
@@ -255,9 +245,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // Pomo spans are background highlights now, so blocks need no rail gutter.
   // The recorded rail's lane: inset from the day line, then the plan blocks.
   const rail = singleDay ? '14px' : '10px';
-  const [layers, setLayers] = useState<CalLayers>(readLayers);
+  // Layers live in the calendar's state (calendar.setLayers / `krnl cal layers`).
+  const layers: CalLayers = calendarLayersOf(state);
   const toggleLayer = (k: keyof CalLayers): void => {
-    setLayers((cur) => { const next = { ...cur, [k]: !cur[k] }; writeLayers(next); return next; });
+    onCommand('calendar.setLayers', { [k]: !layers[k] });
   };
   // Always render the full day (00 → 23) regardless of any persisted
   // hourRange in the node config. This guarantees every calendar shows

@@ -44,6 +44,7 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'now' }
   | { kind: 'clock'; sub: 'week'; arg: string | undefined }
   | { kind: 'cal'; sub: 'zoom'; zoom: number | undefined }
+  | { kind: 'cal'; sub: 'layers'; layer: string | undefined; on: string | undefined; json: boolean }
   // Decision 35 — durable time log reads (time-log F13)
   | { kind: 'time'; sub: 'log'; from: string | undefined; to: string | undefined; json: boolean }
   | { kind: 'time'; sub: 'report'; month: string | undefined; by: string | undefined; json: boolean }
@@ -561,6 +562,7 @@ export class SysParser {
 
     if (cmd === 'cal') {
       if (sub === 'view') return { kind: 'cal', sub: 'view', view: rest[0], date: flag(rest, 'date') };
+      if (sub === 'layers') return { kind: 'cal', sub: 'layers', layer: rest.find((r) => !r.startsWith('--')), on: rest.filter((r) => !r.startsWith('--'))[1], json: hasFlag(rest, 'json') };
       if (sub === 'zoom') {
         const z = rest[0] !== undefined ? Number(rest[0]) : NaN;
         return { kind: 'cal', sub: 'zoom', zoom: Number.isFinite(z) ? z : undefined };

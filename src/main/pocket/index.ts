@@ -7,8 +7,9 @@
 // `pocket:run` on the main window). The pocket never touches the board.
 
 import { BrowserWindow, app, ipcMain, screen, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { writeFileAtomic } from '../persistence/board';
 import {
   POCKET_LOOK_LABEL,
   clampPocketPosition,
@@ -77,8 +78,7 @@ function loadPrefs(): PocketPrefs {
 
 function savePrefs(): void {
   try {
-    mkdirSync(dirname(prefsPath()), { recursive: true });
-    writeFileSync(prefsPath(), JSON.stringify(prefs, null, 2));
+    writeFileAtomic(prefsPath(), JSON.stringify(prefs, null, 2));
   } catch (err) {
     log(`prefs not saved: ${err instanceof Error ? err.message : String(err)}`);
   }

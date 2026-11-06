@@ -7,10 +7,11 @@
 // over `app:launch`; the sys CLI reads it through getAppStatePort().
 
 import { app, ipcMain, shell, type BrowserWindow } from 'electron';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import { arch, release, type as osType } from 'os';
-import { FEEDBACK_EMAIL } from '../shared/feedback';
+import { isAllowedExternalUrl } from '../shared/feedback';
+import { writeFileAtomic } from './persistence/board';
 import {
   DAY_MS,
   applyPrefsPatch,
@@ -33,8 +34,8 @@ let launch: LaunchInfo | null = null;
 
 function save(): void {
   try {
-    mkdirSync(dirname(statePath), { recursive: true });
-    writeFileSync(statePath, JSON.stringify(state, null, 2));
+    // Atomic: a crash mid-write must not wipe the user's settings.
+    writeFileAtomic(statePath, JSON.stringify(state, null, 2));
   } catch (err) {
     log(`not saved: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -178,9 +179,7 @@ export function registerAppStateHandlers(): void {
   });
   ipcMain.handle('app:open-external', async (_e, url: unknown) => {
     // Only the project's own pages and the feedback email: the feedback flow and Help links.
-    const ok = typeof url === 'string'
-      && (url.startsWith('https://github.com/theMindDeveloper/KRNL0') || url.startsWith(`mailto:${FEEDBACK_EMAIL}?`));
-    if (!ok) {
+    if (!isAllowedExternalUrl(url)) {
       return { ok: false, message: 'refused' };
     }
     await shell.openExternal(url);

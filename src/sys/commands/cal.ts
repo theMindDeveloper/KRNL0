@@ -10,7 +10,8 @@ import type { Board } from '../../shared/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode } from '../../shared/dispatch/types';
 import { isValidYMD } from '../../shared/ymd';
-import { calendarSetZoom } from '../../renderer/components/nodes/CalendarNode/commands';
+import { calendarSetLayers, calendarSetZoom } from '../../renderer/components/nodes/CalendarNode/commands';
+import { calendarLayersOf } from '../../renderer/components/nodes/CalendarNode/types';
 import { CAL_ZOOM_MAX, CAL_ZOOM_MIN, granularityFor, type CalendarState } from '../../renderer/components/nodes/CalendarNode/types';
 
 export interface CalCtx {
@@ -124,6 +125,33 @@ export function calZoom(ctx: CalCtx & { onBoardChanged?: () => void }, zoom: num
   saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
   ctx.onBoardChanged?.();
   return { ok: true, message: `calendar zoom ${zoom} (${granularityFor(zoom)}-minute grid)`, data: { zoom } };
+}
+
+/**
+ * krnl cal layers                     → show both layers' state
+ * krnl cal layers recorded|habits on|off
+ * The recorded rail and the habit pills over the plan (calendar F-layers).
+ */
+export function calLayers(
+  ctx: CalCtx & { onBoardChanged?: () => void },
+  layer: string | undefined,
+  on: string | undefined,
+  json = false,
+): SysResult {
+  const board = loadBoard(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const cal = board.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return { ok: false, message: 'No calendar on the board' };
+  const cur = calendarLayersOf(cal.state as CalendarState);
+  const show = (l: typeof cur): string => `recorded ${l.recorded ? 'on' : 'off'} · habits ${l.habits ? 'on' : 'off'}`;
+  if (layer === undefined) return { ok: true, message: json ? JSON.stringify(cur) : show(cur), data: cur };
+  if (layer !== 'recorded' && layer !== 'habits') return { ok: false, message: 'cal layers <recorded|habits> <on|off>' };
+  if (on !== 'on' && on !== 'off') return { ok: false, message: `cal layers ${layer} needs on or off` };
+  cal.state = calendarSetLayers(cal.state as CalendarState, { [layer]: on === 'on' });
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  const next = calendarLayersOf(cal.state as CalendarState);
+  return { ok: true, message: show(next), data: next };
 }
 
 export function calView(
