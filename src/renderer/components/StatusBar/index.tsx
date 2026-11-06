@@ -104,7 +104,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
         <StatusItem label="claude" testId="statusbar-claude" valueColor="var(--k-status-ok, var(--accent-on-dark))">
           <LineGlyph name="dot" size={9} /> connected
         </StatusItem>
-        <StatusItem label="pomo" testId="statusbar-pomo" valueColor="var(--k-status-warn, var(--rust))">
+        <StatusItem label="pomo" testId="statusbar-pomo" valueColor="var(--k-status-warn, color-mix(in srgb, var(--rust) 75%, var(--ink)))">
           {pomoText}
         </StatusItem>
         <StatusItem label="day" testId="statusbar-day">

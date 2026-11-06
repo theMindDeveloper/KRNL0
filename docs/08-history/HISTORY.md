@@ -1490,3 +1490,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/Canvas/fitPadding.ts` (new), `src/renderer/App.tsx`, `src/renderer/components/TopBar/index.tsx`, `docs/06-requirements/app-chrome.md` F7, `tests/unit/renderer/AppChrome.scenarios.test.ts`
 **Summary:** Fitting the board to the window used an even padding, so the left column of cards opened under the floating tool rail (the design checker flagged their "Not started" lines as a third covered). The opening fit and the FIT button now use one padding that leaves 104 px on the left for the rail.
+
+## [2026-11-07] — UI loop batch 17: last contrast misses
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/{AmbientRadio/index,StatusBar/index}.tsx`, `src/renderer/components/nodes/{ClockNode/index,TodoNode/index}.tsx`
+**Summary:** A full re-audit of the canvas, Todo, Habit, Pomo and Calendar in both themes found the last texts under 4.5:1 and fixed them: the ambient radio's unselected chips, header buttons and volume number; the Clock's active AM chip (now the deeper rust, like PM); the Todo's over-plan time; and the status bar's Pomo value in light mode. Only disabled buttons stay dim, as intended.

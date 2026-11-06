@@ -1055,7 +1055,7 @@ export function AmbientRadio() {
   const headerBtn = (active: boolean): CSSProperties => ({
     background: active ? `rgba(${focusedPreset.rgb},.18)` : 'none',
     border: 0,
-    color: active ? focusedPreset.col : 'rgba(196,181,253,.4)',
+    color: active ? focusedPreset.col : 'rgba(196,181,253,.72)',
     cursor: 'pointer',
     width: 18, height: 18,
     display: 'grid', placeItems: 'center',
@@ -1513,7 +1513,7 @@ export function AmbientRadio() {
                           gap: 4,
                           border: `1px solid ${on ? s.col : (isFocused ? `rgba(${s.rgb},.35)` : 'rgba(255,255,255,.1)')}`,
                           background: on ? `rgba(${s.rgb},.18)` : 'rgba(255,255,255,.04)',
-                          color: on ? s.col : 'rgba(255,255,255,.42)',
+                          color: on ? s.col : 'rgba(255,255,255,.66)',
                           borderRadius: 100,
                           cursor: 'pointer',
                           transition: 'all .12s',
@@ -1630,7 +1630,7 @@ export function AmbientRadio() {
               onChange={onVolumeChange}
               testId="ambient-radio-volume"
             />
-            <span style={{ fontSize: 8.5, color: 'rgba(255,255,255,.3)', minWidth: 22, textAlign: 'right', flexShrink: 0 }}>{volume}</span>
+            <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,.62)', minWidth: 22, textAlign: 'right', flexShrink: 0 }}>{volume}</span>
           </div>
         </div>
       </div>

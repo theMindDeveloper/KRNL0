@@ -552,9 +552,9 @@ export function ClockNode({
             onClick={() => onCommand('clock.setViewWindow', { window: 0 })}
             style={{
               padding: '3px 10px',
-              background: viewWindow === 0 ? 'var(--rust)' : 'transparent',
+              background: viewWindow === 0 ? 'var(--rust-deep, var(--rust))' : 'transparent',
               color: viewWindow === 0 ? 'var(--paper)' : 'var(--ink-3)',
-              border: `1px solid ${viewWindow === 0 ? 'var(--rust)' : 'var(--paper-3)'}`,
+              border: `1px solid ${viewWindow === 0 ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'inherit',

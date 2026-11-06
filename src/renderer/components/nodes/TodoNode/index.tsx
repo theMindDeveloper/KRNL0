@@ -624,7 +624,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             >
               {/* #207 — one readable figure: tracked / planned once anything is tracked. */}
               {trackedMin > 0 && (
-                <span data-testid="todo-item-tracked" style={{ color: !openTime && trackedMin > bd.effectiveMin ? 'var(--rust)' : 'var(--ink-2)' }}>
+                <span data-testid="todo-item-tracked" style={{ color: !openTime && trackedMin > bd.effectiveMin ? 'color-mix(in srgb, var(--rust) 72%, var(--ink))' : 'var(--ink-2)' }}>
                   <SettingsIcon name="clock" size={11} /> {fmtTodoMin(trackedMin)}{!openTime && <span style={{ color: 'var(--ink-3)' }}> / </span>}
                 </span>
               )}
