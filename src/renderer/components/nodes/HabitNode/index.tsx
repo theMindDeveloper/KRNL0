@@ -243,7 +243,9 @@ export function HabitNode({
         </div>
 
         {/* Body */}
-        <div ref={bodyRef} style={{ padding: '14px 16px', position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {/* nowheel: the wheel scrolls a long habit list instead of zooming the
+            canvas — without it the habits below the fold were out of reach. */}
+        <div ref={bodyRef} className="nowheel" style={{ padding: '14px 16px', position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
           {view === 'week' && (
             <WeekView
               habits={visibleHabits}

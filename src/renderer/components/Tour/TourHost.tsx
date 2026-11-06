@@ -89,9 +89,12 @@ const same = (a: Rect | null, b: Rect | null): boolean =>
   !!a && !!b && Math.abs(a.left - b.left) < 3 && Math.abs(a.top - b.top) < 3 && Math.abs(a.width - b.width) < 3 && Math.abs(a.height - b.height) < 3;
 
 /** Where the card goes: below the target, else above, right, left — else the bottom-right corner. */
-function placeCard(r: Rect, w: number, h: number): { left: number; top: number } {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+/**
+ * Where the guide card goes: below, above, right or left of what it talks
+ * about — never on top of it. When no side has room (a tall Settings section,
+ * a big window), the spot on screen that covers the least of it wins.
+ */
+export function placeCard(r: Rect, w: number, h: number, vw = window.innerWidth, vh = window.innerHeight): { left: number; top: number } {
   const gap = 18;
   const m = 12;
   const clampX = (x: number) => Math.max(m, Math.min(x, vw - w - m));
@@ -100,7 +103,22 @@ function placeCard(r: Rect, w: number, h: number): { left: number; top: number }
   if (r.top - gap - h > m) return { left: clampX(r.left), top: r.top - gap - h };
   if (r.left + r.width + gap + w < vw - m) return { left: r.left + r.width + gap, top: clampY(r.top) };
   if (r.left - gap - w > m) return { left: r.left - gap - w, top: clampY(r.top) };
-  return { left: vw - w - m, top: vh - h - m };
+  const overlap = (p: { left: number; top: number }): number => {
+    const x = Math.max(0, Math.min(p.left + w, r.left + r.width) - Math.max(p.left, r.left));
+    const y = Math.max(0, Math.min(p.top + h, r.top + r.height) - Math.max(p.top, r.top));
+    return x * y;
+  };
+  const candidates = [
+    { left: clampX(r.left), top: clampY(r.top + r.height + gap) },
+    { left: clampX(r.left), top: clampY(r.top - gap - h) },
+    { left: clampX(r.left + r.width + gap), top: clampY(r.top) },
+    { left: clampX(r.left - gap - w), top: clampY(r.top) },
+    { left: vw - w - m, top: vh - h - m },
+    { left: m, top: vh - h - m },
+    { left: vw - w - m, top: m },
+    { left: m, top: m },
+  ];
+  return candidates.reduce((best, c) => (overlap(c) < overlap(best) ? c : best));
 }
 
 export function TourHost(): JSX.Element | null {

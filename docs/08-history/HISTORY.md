@@ -1329,3 +1329,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Files changed:** `src/renderer/components/DayMoments/index.tsx`, `src/renderer/styles/launch.css`, `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/components/Orb/index.tsx`, `src/renderer/sfx/{uiSounds,soundPacks}.ts`, `tests/unit/renderer/uiSounds.test.ts`
 **Summary:** The day recap, last-week card and morning line are redesigned in the launch design language: the paper dialog with a scrim, an acid kicker, a serif headline, a done ring and number tiles, one plan-vs-recorded meter with a plan marker and a blame-free verdict ("right on plan", "40m less than planned"), a week of rounded bars with values and the best day in acid, three tiles (done, focused, active days), and a footer with the button on the right; the morning line is a pill with a sun icon. Fixes: a tour step about the orb (or its menu) no longer makes the card and the orb chase each other; a tour's words show as soon as the target holds still (3 px tolerance, at most 0.5 s instead of 1.2 s); a step about a window brings it back if it was hidden from the toolbar and switches the canvas layers on; every UI sound hit fades in (4 ms) and out (14 ms), and pitched-up hits are rolled off above 7 kHz, which removes the glitchy click on ticks; the task-done sparkle is pitched lower.
 
+## [2026-11-06] — Fix: habits below the fold, tour card covering its target
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitNode/index.tsx`, `src/renderer/components/Tour/TourHost.tsx`, `tests/unit/renderer/tourPlaceCard.test.ts`
+**Summary:** Habits lower in the list (e.g. "No sugar") couldn't be reached: the new streak and repair lines made rows taller, the list scrolls, but the wheel over it zoomed the canvas instead. The habit list now keeps the wheel (`nowheel`, contained overscroll), like the Calendar and notes. The tour's guide card no longer covers what it talks about: when no side of the target has room (a tall Settings section), it takes the spot on screen that overlaps it least.
+
