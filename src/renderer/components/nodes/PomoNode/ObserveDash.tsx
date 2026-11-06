@@ -1,6 +1,6 @@
 // Observe mode face — the running time of the current span, today's spans on
-// a day strip (work in its category / task colour, breaks hatched) and three
-// small totals. Replaces the pomodoro timer faces, which assume a session
+// a day strip (work as rounded segments in its category / task colour, breaks
+// as a thin quiet line in the gap) and three small totals. Replaces the pomodoro timer faces, which assume a session
 // length Observe mode doesn't have.
 
 import type { PomoState } from './types';
@@ -17,7 +17,6 @@ export interface ObserveDashProps {
   plain?: boolean;
 }
 
-const HATCH = 'repeating-linear-gradient(135deg, var(--ink-3) 0 1px, transparent 1px 3px)';
 
 function fmtMin(ms: number): string {
   const min = Math.floor(ms / 60_000);
@@ -95,19 +94,32 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
 
       {/* Today on a strip: where the time went. */}
       <div>
-        <div style={{ position: 'relative', height: 14, background: 'var(--paper-2)', border: '1px solid var(--paper-3)', borderRadius: 3, overflow: 'hidden' }}>
-          {spans.map((sp) => (
-            <span
-              key={sp.id}
-              style={{
-                position: 'absolute', top: 0, bottom: 0, left: pct(sp.start),
-                width: `max(2px, ${((sp.end - sp.start) / (hi - lo)) * 100}%)`,
-                background: sp.break ? HATCH : sp.color,
-                opacity: sp.break ? 0.8 : 0.9,
-              }}
-            />
-          ))}
-          <span aria-hidden style={{ position: 'absolute', top: -1, bottom: -1, left: pct(nowMs), width: 1.5, background: 'var(--rust)' }} />
+        <div data-testid="pomo-observe-strip" style={{ position: 'relative', height: 10, background: 'var(--paper-2)', borderRadius: 999 }}>
+          {spans.map((sp) => {
+            const w = ((sp.end - sp.start) / (hi - lo)) * 100;
+            // Work: a rounded segment, 1px clear of its neighbours so spans
+            // read as separate pieces. Break: a thin line through the gap.
+            return sp.break ? (
+              <span
+                key={sp.id}
+                data-span="break"
+                style={{
+                  position: 'absolute', top: 4, height: 2, left: pct(sp.start),
+                  width: `max(2px, ${w}%)`, borderRadius: 999, background: 'var(--ink-4)',
+                }}
+              />
+            ) : (
+              <span
+                key={sp.id}
+                data-span="work"
+                style={{
+                  position: 'absolute', top: 0, bottom: 0, left: `calc(${pct(sp.start)} + 1px)`,
+                  width: `max(4px, calc(${w}% - 2px))`, borderRadius: 999, background: sp.color,
+                }}
+              />
+            );
+          })}
+          <span aria-hidden style={{ position: 'absolute', top: -3, bottom: -3, left: pct(nowMs), width: 2, marginLeft: -1, borderRadius: 999, background: 'var(--ink)' }} />
         </div>
         <div style={{ position: 'relative', height: 12, marginTop: 3 }}>
           {ticks.map((t) => (
