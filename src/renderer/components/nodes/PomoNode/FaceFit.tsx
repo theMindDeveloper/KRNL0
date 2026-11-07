@@ -33,7 +33,8 @@ export function FaceFit({ children }: { children: ReactNode }) {
       const natural = i.offsetHeight;
       const room = o.clientHeight;
       if (natural <= 0 || room <= 0) return;
-      const next = Math.max(MIN_SCALE, Math.min(1, Math.floor((room / natural) * 100) / 100));
+      // 4 px spare: big digits' line boxes run a little past their container.
+      const next = natural <= room ? 1 : Math.max(MIN_SCALE, Math.floor(((room - 4) / natural) * 100) / 100);
       setScale((cur) => (Math.abs(cur - next) < 0.01 ? cur : next));
     };
     const ro = new ResizeObserver(fit);

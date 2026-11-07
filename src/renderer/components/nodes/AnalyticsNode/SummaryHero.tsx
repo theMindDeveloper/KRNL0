@@ -41,7 +41,8 @@ export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byD
         {summary.headline}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: 8 }}>
+      {/* Four tiles: one row when wide, 2 × 2 when narrow (never 3 + 1). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(max(120px, calc(50% - 4px)), 1fr))', gap: 8, flexShrink: 0 }}>
         {summary.stats.map((s) => {
           const d = s.deltaPct;
           const tone = d === null ? 'var(--k-an-ink-4, #7d848b)' : d >= 0 ? 'var(--acid, #c9f158)' : 'var(--k-an-warm, #ff8e64)';
@@ -55,7 +56,7 @@ export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byD
                 {s.label}
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--k-an-ink, #f4f6f8)', fontVariantNumeric: 'tabular-nums' }}>{s.value}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--k-an-ink, #f4f6f8)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{s.value}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tone, whiteSpace: 'nowrap' }}>
                   {d === null ? '—' : <><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.05em', marginRight: 3 }}><path d={d >= 0 ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6'} /></svg>{Math.abs(d)}%</>}
                 </span>
@@ -87,7 +88,8 @@ export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byD
         </svg>
       )}
 
-      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {/* The sentences take what's left; in a small window they scroll rather than being cut. */}
+      <ul className="nowheel" style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', paddingBottom: 10, maskImage: 'linear-gradient(to bottom, #000 calc(100% - 16px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 16px), transparent)' }}>
         {summary.sentences.map((t) => (
           <li key={t} style={{ display: 'flex', gap: 8, fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: 1.4, color: 'var(--k-an-ink-2b, #aab0b7)' }}>
             <span aria-hidden style={{ color: 'var(--acid, #c9f158)', flexShrink: 0 }}>•</span>
