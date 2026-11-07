@@ -1601,3 +1601,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Type:** Verification (no code change)
 **Branch:** `feat/pocket-pomo`
 **Summary:** The fixes a screenshot can't show were checked against the real thing, each with the old code as a control. **Taskbar** — the built app run through an Electron test harness (isolated board and profile, `KRNL0_BOARD_DIR` / `KRNL0_USER_DATA`), recording every taskbar call: START sets the thumbnail buttons once (Break, Stop), STOP clears them, START again restores them; three light/dark switches while timing rebuilt them 9 times with the old code and 0 times with the fix. **Floating timer** — same harness: it opens on the primary display; parked at the bottom edge and grown by hover (200 → 256 px) it moves up and stays inside the work area; with the old code it ended at y = −248, off screen. **Sound** — the real sound engine rendered in Chromium through an OfflineAudioContext and measured: the first/last 0.18 ms of every hit stay within 5–11 % of peak with the fades, against 47–89 % (audible clicks) with the fades removed.
+
+## [2026-11-07] — macOS menu bar covered
+
+**Type:** Tests
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `tests/unit/main/taskbar.test.ts`
+**Summary:** The menu-bar timer can't be run on this Windows machine, so its code path is exercised with the platform set to macOS and the Electron `Tray` recorded: the time shows while timing and counts down every second, the menu has the state line, the controls, the Floating timer switch and Open KRNL0, the menu is rebuilt only when the state changes (an open menu isn't closed every second), the paused title changes, and the menu-bar item goes away when the timer stops. Only Apple's own drawing of it is left unchecked.
