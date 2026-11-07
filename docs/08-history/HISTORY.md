@@ -1664,3 +1664,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/TaskPopup.tsx`
 **Summary:** Drove the main flows in the preview and checked the board after each: tick a Todo row (task done), tick and untick a habit, open a plan's popup and take it off the calendar, drag a Todo row onto the calendar (scheduled at the drop slot), start and stop the Pomo (a span recorded, idle) — all pass, no console errors. One finding: the popup's action said "Remove" in warning red, which reads as delete, though it keeps the task. It is "Unschedule" everywhere else (drop strip, right-click menu, `krnl task unschedule`), so it now says Unschedule, in the neutral colour, with "Take it off the calendar — the task stays in your Todo" as its tooltip.
+
+## [2026-11-07] — Pomo: a compact face for short windows; pocket names never lost
+
+**Type:** Bug Fix + UX
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/{FaceFit.tsx,index.tsx}`, `src/renderer/pocket/PocketApp.tsx`, `tests/unit/renderer/pocket.askCard.test.tsx`
+**Summary:** Review of the face fitter: measured every face at 1280×720, 1440×900 and 1920×1080 — the scale is stable (no feedback loop) and START is always visible, but at 1280×720 the faces sat at 0.45–0.53 scale, which puts their 11 px labels at about 5 px, and the Vapor glass was clipped. Under 0.85 the panel now shows a compact face (the time at 34 px, a thin progress line, one 11 px state label: Ready / Focus / Paused / Break, or Observing / On break) and returns to the full face when there is room. Floating timer: picking a tag on "What were those 25m?" hid the card even if KRNL0 refused the name; now the card comes back so the name is not lost (UI test for both outcomes).

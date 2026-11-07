@@ -12,7 +12,7 @@ import type { TaskState } from '../TaskNode/types';
 import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
-import { FaceFit, compactLevelFor } from './FaceFit';
+import { CompactFace, FaceFit, compactLevelFor } from './FaceFit';
 import { Vapor } from './variants/Vapor';
 import { Vu } from './variants/Vu';
 import { Outline } from './variants/Outline';
@@ -683,7 +683,12 @@ export function PomoNode({
           {/* PR4 — timer face switch: swap inner face without touching outer chrome.
               In a station slot the face is fitted to the room left, so the
               controls below it (START, task) are never cut off. */}
-          <FaceWrap fit={inStation}>
+          <FaceWrap
+            fit={inStation}
+            compact={observe
+              ? <CompactFace time={formatRemaining(observedMs)} label={state.status === 'break' ? 'On break' : state.status === 'running' ? 'Observing' : 'Ready to observe'} pct={null} />
+              : <CompactFace time={clockText} label={state.status === 'break' ? 'Break' : running ? 'Focus' : state.status === 'paused' ? 'Paused' : 'Ready'} pct={state.status === 'idle' || state.status === 'done' ? null : elapsedPct} />}
+          >
           {observe ? (
             <ObserveDash state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} plain={easy} />
           ) : (<>
@@ -1207,6 +1212,6 @@ function PomoIcon({ kind }: { kind: 'play' | 'pause' | 'stop' | 'break' | 'skip'
 }
 
 /** The face, fitted to the room left in a station slot; as-is elsewhere. */
-function FaceWrap({ fit, children }: { fit: boolean; children: React.ReactNode }) {
-  return fit ? <FaceFit>{children}</FaceFit> : <>{children}</>;
+function FaceWrap({ fit, compact, children }: { fit: boolean; compact?: React.ReactNode; children: React.ReactNode }) {
+  return fit ? <FaceFit compact={compact}>{children}</FaceFit> : <>{children}</>;
 }
