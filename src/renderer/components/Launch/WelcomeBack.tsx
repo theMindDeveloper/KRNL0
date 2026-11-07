@@ -41,7 +41,10 @@ function lengthOf(id: string): number {
 function moving(tasks: readonly SlippedTask[]): Array<{ id: string; time: string; lengthMin: number }> {
   const out: Array<{ id: string; time: string; lengthMin: number }> = [];
   for (const t of tasks) {
-    out.push({ id: t.id, time: t.time, lengthMin: lengthOf(t.id) });
+    // Followers without their own time run right after the head: the head's
+    // landing slot must hold the whole chain, or they land on another plan.
+    const chained = t.followers.filter((f) => f.time === undefined).reduce((sum, f) => sum + lengthOf(f.id), 0);
+    out.push({ id: t.id, time: t.time, lengthMin: lengthOf(t.id) + chained });
     for (const f of t.followers) if (f.time !== undefined) out.push({ id: f.id, time: f.time, lengthMin: lengthOf(f.id) });
   }
   return out;

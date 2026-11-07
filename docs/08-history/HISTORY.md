@@ -1748,3 +1748,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.hourPager.test.tsx` (new), `docs/06-requirements/calendar-clock-visuals.md` (F15)
 **Summary:** Seen in the real-app capture: the "‹ 11–17 ›" pill floated over the grid's bottom-right and covered Sunday's letter bars (G, D, P), so they could not be read or clicked. The pager is now two chevrons in the empty corner above the time gutter — up for earlier hours, down for later — next to the hour labels it moves (the range is in their aria-labels; the gutter already shows the hours). Checked in the preview: the corner holds the chevrons and the grid's bottom-right is clear.
+
+## [2026-11-07] — Radio follows window resizes; Welcome back keeps whole chains clear
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/components/Launch/WelcomeBack.tsx`, `tests/unit/renderer/ambientRadio.resize.test.tsx` (new)
+**Summary:** (1) The Ambient Radio never listened for window resizes: a tab tucked to the right edge stayed at its old x, so after maximising it floated mid-screen and after shrinking it was out of reach. A tucked tab now follows its edge and a floating radio is pulled back into view. (2) Welcome back's "move to today" now reserves room for a slipped task's untimed followers too (they run right after it), so the chain does not land on another plan.

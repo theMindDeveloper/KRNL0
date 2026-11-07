@@ -423,6 +423,25 @@ export function AmbientRadio() {
   useEffect(() => {
     try { localStorage.setItem(EDGE_KEY, edge); } catch { /* quota */ }
   }, [edge]);
+  // The window was resized (maximised, snapped, a smaller screen): a tucked
+  // tab follows its edge, and a floating radio is pulled back into view —
+  // never left mid-screen or out of reach.
+  const edgeRef = useRef(edge);
+  edgeRef.current = edge;
+  useEffect(() => {
+    const onResize = () => {
+      setPos((p) => {
+        const maxY = Math.max(0, window.innerHeight - HEIGHT);
+        const y = Math.min(Math.max(0, p.y), maxY);
+        const e = edgeRef.current;
+        if (e !== 'none') return placeForEdge(e, { x: p.x, y });
+        const x = Math.min(Math.max(0, p.x), Math.max(0, window.innerWidth - WIDTH));
+        return x === p.x && y === p.y ? p : { x, y };
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [isDragging, setIsDragging] = useState(false);
   // Visual-only hide. Keeps the YT iframe and audio engine alive so music
   // continues playing while the panel disappears (driven by the Jen bridge).
