@@ -115,8 +115,11 @@ export interface LaunchInfo {
 
 /** Backup name for the board as the previous version left it. */
 export function backupFileName(previousVersion: string | null, currentVersion: string): string {
-  const from = previousVersion ? `v${previousVersion}` : 'older';
-  return `board-${from}-before-v${currentVersion}.json`;
+  // Versions come from app-state.json: keep only version characters, so a
+  // damaged file can never put a path (../) into the backup's name.
+  const safe = (v: string): string => v.replace(/[^0-9A-Za-z.+-]/g, '').slice(0, 40) || 'unknown';
+  const from = previousVersion ? `v${safe(previousVersion)}` : 'older';
+  return `board-${from}-before-v${safe(currentVersion)}.json`;
 }
 
 /** Board copies to delete so only the newest `keep` remain. `files` are names with mtimes. */

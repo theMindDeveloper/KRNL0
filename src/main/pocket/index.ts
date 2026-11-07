@@ -86,8 +86,21 @@ function savePrefs(): void {
 
 const live = (): boolean => isPocketLive(snapshot?.state.status);
 
+/** Work areas with the primary display first (where a first-time pocket opens). */
+function workAreas() {
+  const primary = screen.getPrimaryDisplay();
+  return [primary, ...screen.getAllDisplays().filter((d) => d.id !== primary.id)].map((d) => d.workArea);
+}
+
 function applySize(): void {
-  if (pocket && !pocket.isDestroyed()) pocket.setContentSize(size.width, size.height);
+  if (!pocket || pocket.isDestroyed()) return;
+  pocket.setContentSize(size.width, size.height);
+  // Grown (hover controls, the "what was this?" card): keep it on screen.
+  // (On Windows the nudge may be remembered as the new position; that's fine —
+  // it is still where the user put it, just inside the screen.)
+  const [x, y] = pocket.getPosition();
+  const fit = clampPocketPosition({ x: x ?? null, y: y ?? null }, size, workAreas());
+  if (fit.x !== x || fit.y !== y) pocket.setPosition(fit.x, fit.y);
 }
 
 /**
@@ -163,8 +176,7 @@ function ensureWindow(): BrowserWindow | null {
 }
 
 function place(win: BrowserWindow): void {
-  const areas = screen.getAllDisplays().map((d) => d.workArea);
-  const { x, y } = clampPocketPosition({ x: prefs.x, y: prefs.y }, size, areas);
+  const { x, y } = clampPocketPosition({ x: prefs.x, y: prefs.y }, size, workAreas());
   win.setContentSize(size.width, size.height);
   win.setPosition(x, y);
 }

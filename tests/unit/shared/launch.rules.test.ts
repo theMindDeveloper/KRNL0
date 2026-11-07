@@ -53,6 +53,9 @@ describe('board backups (F4)', () => {
   it('names the copy after the version that left the board', () => {
     expect(backupFileName('0.10.1', '0.11.0')).toBe('board-v0.10.1-before-v0.11.0.json');
     expect(backupFileName(null, '0.11.0')).toBe('board-older-before-v0.11.0.json');
+    // A damaged app-state.json can never put a path into the name.
+    expect(backupFileName('../../evil', '0.11.0')).toBe('board-v....evil-before-v0.11.0.json');
+    expect(backupFileName('0.10.1', '0.11.0/../x')).not.toContain('/');
   });
   it('keeps the newest three', () => {
     const files = [1, 5, 3, 4, 2].map((t) => ({ name: `board-v0.${t}.0-before-v1.json`, mtimeMs: t }));

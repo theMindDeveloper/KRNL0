@@ -76,6 +76,10 @@ export const RELEASES: readonly WhatsNewRelease[] = [
       'Welcome back: after two or more days away, a short list of what slipped, with one-click fixes.',
       'Milestone cards for habit streaks and focus sessions, with a Celebrations switch in Settings.',
       'Observe mode draws breaks as a thin line instead of stripes.',
+      'The Calendar shows your plan as blocks, what you recorded as a thin bar beside each day, and habits as small pills you can tick; switch Recorded and Habits in its header.',
+      'A task card keeps the same shape when you tick it, so nothing moves under your click.',
+      'The floating timer comes in three looks (Dial, Capsule, Box) and asks what an Observe span was.',
+      'Easier to read: larger labels, stronger contrast in light and dark, and line icons throughout.',
     ],
   },
   {

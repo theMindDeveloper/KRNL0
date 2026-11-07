@@ -59,6 +59,7 @@ function renderWindows(v: SystemTimerView): void {
     win.setOverlayIcon(null, '');
     win.setThumbarButtons([]);
     win.setTitle('KRNL0');
+    lastKey = ''; // buttons cleared: the next live state sets them again
     return;
   }
   if (v.progress !== null) win.setProgressBar(Math.max(0.01, v.progress), { mode: v.barMode === 'paused' ? 'paused' : 'normal' });
@@ -124,7 +125,9 @@ function render(): void {
 export function initTaskbar(mainWindow: BrowserWindow): void {
   win = mainWindow;
   lastKey = '';
-  const off = onPocketSnapshot((s) => { snap = s; lastKey = ''; render(); });
+  // Overlay and thumbnail buttons follow `lastKey` (state changes only):
+  // resetting it on every snapshot rebuilt them on each Todo edit (flicker).
+  const off = onPocketSnapshot((s) => { snap = s; render(); });
   mainWindow.on('closed', () => {
     off();
     if (ticker) { clearInterval(ticker); ticker = null; }
