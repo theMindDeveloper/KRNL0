@@ -14,7 +14,7 @@ import type { CalendarState, CalendarConfig } from '../types';
 const state: CalendarState = { selectedDate: null, anchorDate: '2026-05-11', zoom: 1 };
 const config: CalendarConfig = { view: 'week', weekStartsOn: 'monday', showHabits: true, showPomoHeatmap: true, hourRange: { start: 0, end: 24 } };
 
-let heightSpy: ReturnType<typeof vi.spyOn> | null = null;
+let heightSpy: { mockRestore: () => void } | null = null;
 
 beforeEach(() => {
   useBoardStore.setState({
