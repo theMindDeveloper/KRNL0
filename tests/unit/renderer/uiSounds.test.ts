@@ -168,6 +168,51 @@ describe('F6/F8 — engine', () => {
     expect(starts).toBe(0);
   });
 
+  it('no click: every hit fades in over 4 ms and out over its last 14 ms; pitched-up hits get a 7 kHz roll-off', async () => {
+    const ramps: Array<[string, number, number]> = [];
+    const filters: Array<{ type: string; hz: number }> = [];
+    const rates: number[] = [];
+    class RecordingContext {
+      state = 'running';
+      currentTime = 0;
+      destination = {};
+      createGain = () => ({
+        gain: {
+          value: 1,
+          setValueAtTime: (v: number, t: number) => { ramps.push(['set', v, t]); },
+          linearRampToValueAtTime: (v: number, t: number) => { ramps.push(['ramp', v, t]); },
+        },
+        connect: (x: unknown) => x, disconnect: () => {},
+      });
+      createBiquadFilter = () => {
+        const f = { type: '', frequency: { value: 0 }, connect: (x: unknown) => x, disconnect: () => {} };
+        queueMicrotask(() => filters.push({ type: f.type, hz: f.frequency.value }));
+        return f;
+      };
+      createBufferSource = () => {
+        const src = { buffer: null, playbackRate: { value: 1 }, connect: (x: unknown) => x, disconnect: () => {}, start: () => { starts += 1; rates.push(src.playbackRate.value); }, onended: null };
+        return src;
+      };
+      decodeAudioData = () => Promise.resolve({ duration: 0.2 });
+      resume = () => Promise.resolve();
+    }
+    vi.stubGlobal('AudioContext', RecordingContext);
+    window.AudioContext = RecordingContext as unknown as typeof AudioContext;
+    uiSounds.play('done');
+    await flush(); await flush();
+    // Each hit: starts at 0, reaches its level 4 ms later, holds, then ramps to 0 at its end.
+    const starts0 = ramps.filter(([k, v]) => k === 'set' && v === 0);
+    expect(starts0.length).toBeGreaterThan(0);
+    for (const [, , t] of starts0) {
+      const up = ramps.find(([k, v, t2]) => k === 'ramp' && v > 0 && Math.abs(t2 - (t + 0.004)) < 1e-9);
+      expect(up).toBeDefined();
+    }
+    expect(ramps.some(([k, v]) => k === 'ramp' && v === 0)).toBe(true);
+    // Any hit played faster than 1.15× goes through a 7 kHz low-pass.
+    const fast = rates.filter((r) => r > 1.15).length;
+    expect(filters.filter((f) => f.type === 'lowpass' && f.hz === 7000).length).toBe(fast);
+  });
+
   it('F8 — the same moment twice within 80 ms plays once', async () => {
     uiSounds.play('add');
     uiSounds.play('add');

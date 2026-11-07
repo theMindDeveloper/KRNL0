@@ -80,3 +80,24 @@ describe('looks (F12)', () => {
     expect(clampPocketSize(200.4, 263.6)).toEqual({ width: 200, height: 264 });
   });
 });
+
+import { clampPocketPosition as clampPos } from '../../../src/shared/pocket';
+
+describe('the pocket stays on screen when it grows (hover controls, the question card)', () => {
+  const screenA = { x: 0, y: 0, width: 1920, height: 1040 };
+  const screenB = { x: 1920, y: 0, width: 1280, height: 760 };
+  it('parked at the bottom edge, a taller pocket is pulled up into the screen', () => {
+    // 200 px tall dial parked at the bottom, then it grows to 330 px.
+    const grown = clampPos({ x: 1600, y: 1040 - 200 }, { width: 304, height: 330 }, [screenA]);
+    expect(grown.y + 330).toBeLessThanOrEqual(1040);
+    expect(grown.x).toBe(1600);
+  });
+  it('a first-time pocket opens on the first area given (main passes the primary display first)', () => {
+    const first = clampPos({ x: null, y: null }, { width: 304, height: 200 }, [screenB, screenA]);
+    expect(first.x).toBeGreaterThanOrEqual(screenB.x);
+  });
+  it('a pocket left on an unplugged monitor comes back to the nearest one', () => {
+    const back = clampPos({ x: 5000, y: 300 }, { width: 304, height: 200 }, [screenA]);
+    expect(back.x + 304).toBeLessThanOrEqual(1920);
+  });
+});

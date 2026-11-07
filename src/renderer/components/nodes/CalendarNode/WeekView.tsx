@@ -2097,12 +2097,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   boxSizing: 'border-box',
                 }}
               >
-                {/* Top-of-hour label, e.g. "13" */}
+                {/* Top-of-hour label, e.g. "13". Only whole hours in the window
+                    are labelled: the leftover slice under the last whole hour
+                    keeps its lines but no half-cut label. */}
                 <span
                   style={{
                     position: 'absolute',
                     top: 1,
                     right: 4,
+                    visibility: hour >= win.endHour || hour < win.startHour ? 'hidden' : undefined,
                     fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     color: 'var(--ink-3)',
@@ -2120,6 +2123,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                       position: 'absolute',
                       top: (min / 60) * rowHeight - 4,
                       right: 4,
+                      visibility: hour >= win.endHour || hour < win.startHour ? 'hidden' : undefined,
                       fontFamily: 'var(--font-mono)',
                       fontSize: 11,
                       color: 'var(--ink-4)',
