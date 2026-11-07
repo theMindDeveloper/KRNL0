@@ -221,6 +221,8 @@ const CAL_ICONS = {
   down: 'M12 5v14M6 13l6 6 6-6',
   check: 'M5 12.5l4.5 4.5L19 7.5',
   replan: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
+  chevUp: 'M6 15l6-6 6 6',
+  chevDown: 'M6 9l6 6 6-6',
   prev: 'M15 5l-7 7 7 7',
   next: 'M9 5l7 7-7 7',
   grid: 'M4 4h16v16H4zM4 9.5h16M4 15h16M9.5 4v16',
@@ -2097,15 +2099,31 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         </button>
       </div>
 
-      {/* Day column headers (Mon-Sun) */}
+      {/* Day column headers (Mon-Sun). The corner above the time gutter
+          holds the hour pager: up for earlier hours, down for later — beside
+          the hour labels it moves, never over a plan. */}
       <div
         style={{
           display: 'flex',
           flexShrink: 0,
-          paddingLeft: GUTTER_WIDTH,
           borderBottom: '1px solid var(--paper-3)',
         }}
       >
+        <div
+          data-testid="calendar-hour-pager"
+          style={{ width: GUTTER_WIDTH, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0 }}
+        >
+          {!useAgenda && win.pages > 1 && (
+            <>
+              <button type="button" className="nodrag" aria-label={`Earlier hours (now ${String(win.startHour).padStart(2, '0')}–${String(win.endHour).padStart(2, '0')})`}
+                title="Earlier hours" disabled={win.startHour === 0}
+                onClick={() => flipHours(-1)} style={hourPagerBtn(win.startHour === 0)}><CalIcon name="chevUp" size={12} /></button>
+              <button type="button" className="nodrag" aria-label={`Later hours (now ${String(win.startHour).padStart(2, '0')}–${String(win.endHour).padStart(2, '0')})`}
+                title="Later hours" disabled={win.endHour >= rowCount}
+                onClick={() => flipHours(1)} style={hourPagerBtn(win.endHour >= rowCount)}><CalIcon name="chevDown" size={12} /></button>
+            </>
+          )}
+        </div>
         {weekDays.map((dayYMD) => {
           const isToday = dayYMD === today;
           const dayNum = parseInt(dayYMD.slice(8, 10), 10);
@@ -2395,27 +2413,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         </div>
       </div>
 
-      {!useAgenda && win.pages > 1 && (
-        <div
-          data-testid="calendar-hour-pager"
-          style={{
-            position: 'absolute', right: 8, bottom: 6, zIndex: 6,
-            display: 'flex', alignItems: 'center', gap: 2,
-            background: 'color-mix(in srgb, var(--paper) 88%, transparent)',
-            border: '1px solid var(--paper-3)', borderRadius: 999, padding: '1px 4px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-          }}
-        >
-          <button type="button" aria-label="Earlier hours" disabled={win.startHour === 0}
-            onClick={() => flipHours(-1)} style={hourPagerBtn(win.startHour === 0)}><CalIcon name="prev" size={10} /></button>
-          <span style={{ fontVariantNumeric: 'tabular-nums', padding: '0 2px' }}>
-            {String(win.startHour).padStart(2, '0')}–{String(win.endHour).padStart(2, '0')}
-          </span>
-          <button type="button" aria-label="Later hours" disabled={win.endHour >= rowCount}
-            onClick={() => flipHours(1)} style={hourPagerBtn(win.endHour >= rowCount)}><CalIcon name="next" size={10} /></button>
-        </div>
-      )}
 
       {/* F28 — while a plan from this calendar is dragged: drop it here to
           take it off the calendar (it goes back to Todo). */}
@@ -2725,7 +2722,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 // Compact zoom button (− / +). Disabled state dims and blocks the cursor.
 function hourPagerBtn(disabled: boolean): React.CSSProperties {
   return {
-    background: 'transparent', border: 'none', padding: '0 4px', fontSize: 13, lineHeight: 1,
+    background: 'transparent', border: 'none', padding: 0, width: 18, height: 18, borderRadius: 4, lineHeight: 0,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     color: disabled ? 'var(--ink-4)' : 'var(--ink-2)', opacity: disabled ? 0.4 : 1,
     cursor: disabled ? 'default' : 'pointer', fontFamily: 'var(--font-mono)',
   };

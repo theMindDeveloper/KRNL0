@@ -1741,3 +1741,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/styles/reactflow-theme.css`, `tests/unit/renderer/schedule-menu-parity.test.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.clash.test.tsx`, `docs/06-requirements/calendar-clock-visuals.md` (F29)
 **Summary:** User feedback: the recessed dark lane looked heavy, and the 4 px gap before it made it unclear which day it belonged to. Four drafts went to the design canvas ("Recorded time · four ways"); this builds the part drafts A and C share — tracked time is a 5 px strip of colour flush on the day's own left line (6 px day, 4 px Station), drawn only where time was tracked, with no slot and no gap. Plans now start 8 px from the day line (was 16). Untagged time uses a deeper lime in light mode (pale acid vanished on paper). Short 12 px bars now show their letter too ("Call the dentist" was a blank bar). Checked in the preview: wide and narrow week, light and dark — every strip at 0 px from its day line.
+
+## [2026-11-07] — Hour pager moves out of the grid
+
+**Type:** Bug Fix (visual)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.hourPager.test.tsx` (new), `docs/06-requirements/calendar-clock-visuals.md` (F15)
+**Summary:** Seen in the real-app capture: the "‹ 11–17 ›" pill floated over the grid's bottom-right and covered Sunday's letter bars (G, D, P), so they could not be read or clicked. The pager is now two chevrons in the empty corner above the time gutter — up for earlier hours, down for later — next to the hour labels it moves (the range is in their aria-labels; the gutter already shows the hours). Checked in the preview: the corner holds the chevrons and the grid's bottom-right is clear.
