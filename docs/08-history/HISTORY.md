@@ -1706,3 +1706,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`
 **Summary:** Review of the task card: its minute clock only runs while the task has a time, and held the time the card mounted. A card unscheduled since the morning and then planned into an earlier slot showed as not missed for up to a minute. The clock is now refreshed on every (re)schedule. Rest of the card (pomo subscription by field, timers only while needed, the one-shot done pop) is correct.
+
+## [2026-11-07] — Review of the presentational files; no NaN rings
+
+**Type:** Bug Fix (hardening)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/display.ts`, `tests/unit/renderer/pomoFaceFit.test.ts`
+**Summary:** Pass over the presentational files changed today (pocket views and model, settings sections, launch dialogs) for division by zero, unchecked indexing and date parsing. One finding, probed with a zero-length config: `calcRemainingPct` returned NaN for 0/0, which blanks every ring and fill in the faces and the floating timer. The UI and CLI clamp the session length to positive, but board.json loading accepts any number, so a hand-edited 0 could reach it; it now reads as nothing left (test). The rest guard their maths (`Math.max(1, …)`) and their lookups.

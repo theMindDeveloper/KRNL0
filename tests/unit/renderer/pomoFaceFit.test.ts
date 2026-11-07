@@ -15,3 +15,13 @@ describe('compactLevelFor', () => {
     expect(compactLevelFor(0)).toBe(3);
   });
 });
+
+import { calcRemainingPct } from '../../../src/renderer/components/nodes/PomoNode/display';
+describe('calcRemainingPct never returns NaN', () => {
+  it('a zero or broken session length reads as nothing left, not NaN', () => {
+    expect(calcRemainingPct('running', 0, 0)).toBe(0);
+    expect(calcRemainingPct('paused', Number.NaN, 25 * 60_000)).toBe(0);
+    expect(calcRemainingPct('running', 12.5 * 60_000, 25 * 60_000)).toBe(50);
+    expect(calcRemainingPct('idle', 0, 0)).toBe(100);
+  });
+});
