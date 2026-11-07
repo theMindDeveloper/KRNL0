@@ -45,7 +45,8 @@ export function shareList(nodes: CatchupBoard['nodes'], json: boolean, today = t
 }
 
 export function feedbackLink(title: string, kind: string | undefined): SysResult {
-  const k: FeedbackKind = isFeedbackKind(kind) ? kind : 'bug';
+  if (kind !== undefined && !isFeedbackKind(kind)) return { ok: false, message: `Unknown kind "${kind}". Use bug, idea, question or love.` };
+  const k: FeedbackKind = kind ?? 'bug';
   const report = { kind: k, title, text: '', diagnostics: null, includeErrors: false };
   const url = buildIssueUrl(report);
   const mailto = buildMailto(report);

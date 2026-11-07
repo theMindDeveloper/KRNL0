@@ -13,7 +13,7 @@ import {
   DEFAULT_APP_STATE,
 } from '../../../src/shared/appState';
 import { RELEASES, describeWhatsNew, latestNotes, notesFor, shouldShowWhatsNew } from '../../../src/shared/whatsnew';
-import { FEEDBACK_EMAIL, ISSUES_NEW_URL, MAX_MAILTO_LENGTH, MAX_URL_LENGTH, buildIssueUrl, buildMailto, diagnosticsText, isFeedbackKind } from '../../../src/shared/feedback';
+import { FEEDBACK_EMAIL, ISSUES_NEW_URL, MAX_MAILTO_LENGTH, MAX_TITLE_LENGTH, MAX_URL_LENGTH, buildIssueUrl, buildMailto, diagnosticsText, isAllowedExternalUrl, isFeedbackKind } from '../../../src/shared/feedback';
 import { IDLE_VIEW, systemTimerView } from '../../../src/shared/systemTimer';
 import { defaultPomoConfig, defaultPomoState } from '../../../src/renderer/components/nodes/PomoNode/types';
 import type { PocketSnapshot } from '../../../src/shared/pocket';
@@ -168,5 +168,27 @@ describe('taskbar / menu bar view (F10, F11)', () => {
   it('no controls while KRNL0 asks about time away', () => {
     const v = { ...snap({ status: 'running', startedAt: new Date(now).toISOString() }), away: true };
     expect(systemTimerView(v, now).controls).toEqual([]);
+  });
+});
+
+describe('feedback links stay openable with any title (F16, CLI too)', () => {
+  it('a pasted paragraph as the title is cut, and both links stay within limits and pass the open-link check', () => {
+    const r = { kind: 'bug' as const, title: 'word '.repeat(3000), text: 'z'.repeat(9000), diagnostics: null, includeErrors: false };
+    const issue = buildIssueUrl(r);
+    const mail = buildMailto(r);
+    expect(issue.length).toBeLessThanOrEqual(MAX_URL_LENGTH);
+    expect(mail.length).toBeLessThanOrEqual(MAX_MAILTO_LENGTH);
+    expect(isAllowedExternalUrl(issue)).toBe(true);
+    expect(isAllowedExternalUrl(mail)).toBe(true);
+    expect(new URL(issue).searchParams.get('title')!.length).toBeLessThanOrEqual('Bug: '.length + MAX_TITLE_LENGTH);
+  });
+});
+
+describe('krnl feedback --kind', () => {
+  it('a mistyped kind is an error, not a silent bug report', async () => {
+    const { feedbackLink } = await import('../../../src/sys/commands/launch');
+    expect(feedbackLink('Calendar', 'idae').ok).toBe(false);
+    expect(feedbackLink('Calendar', 'idea').ok).toBe(true);
+    expect(feedbackLink('Calendar', undefined).ok).toBe(true);
   });
 });

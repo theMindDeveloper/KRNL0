@@ -73,10 +73,13 @@ export function issueBody(r: FeedbackReport): string {
   return parts.join('\n');
 }
 
-/**
- * The prefilled GitHub link. When it would be too long, the oldest error lines
- * are dropped first, then the description is shortened, so the link still opens.
- */
+/** Titles longer than this are cut (the dialog stops at it; the CLI may not). */
+export const MAX_TITLE_LENGTH = 120;
+const titleOf = (t: string): string => {
+  const s = t.trim().replace(/\s+/g, ' ');
+  return s.length > MAX_TITLE_LENGTH ? `${s.slice(0, MAX_TITLE_LENGTH - 1)}…` : s;
+};
+
 /**
  * Links the app may open in the browser: the project's own GitHub pages and a
  * mail to the feedback address. Matched by parsed host and path — a plain
@@ -92,9 +95,13 @@ export function isAllowedExternalUrl(url: unknown): url is string {
   return u.pathname === repo || u.pathname.startsWith(`${repo}/`);
 }
 
+/**
+ * The prefilled GitHub link. When it would be too long, the oldest error lines
+ * are dropped first, then the description is shortened, so the link still opens.
+ */
 export function buildIssueUrl(r: FeedbackReport): string {
   const kind = FEEDBACK_KINDS.find((k) => k.id === r.kind) ?? FEEDBACK_KINDS[0]!;
-  const title = `${kind.prefix}: ${r.title.trim() || 'Feedback from the app'}`;
+  const title = `${kind.prefix}: ${titleOf(r.title) || 'Feedback from the app'}`;
   const make = (rep: FeedbackReport): string => {
     const q = new URLSearchParams({ title, body: issueBody(rep), labels: kind.githubLabel });
     return `${ISSUES_NEW_URL}?${q.toString()}`;
@@ -121,7 +128,7 @@ export const MAX_MAILTO_LENGTH = 1900;
  */
 export function buildMailto(r: FeedbackReport): string {
   const kind = FEEDBACK_KINDS.find((k) => k.id === r.kind) ?? FEEDBACK_KINDS[0]!;
-  const subject = `KRNL0 ${kind.prefix}: ${r.title.trim() || 'Feedback from the app'}`;
+  const subject = `KRNL0 ${kind.prefix}: ${titleOf(r.title) || 'Feedback from the app'}`;
   const make = (rep: FeedbackReport): string =>
     `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(issueBody(rep).replace('_Sent from KRNL0 › Help › Send feedback._', 'Sent from KRNL0 › Help › Send feedback.'))}`;
   let rep = r;
