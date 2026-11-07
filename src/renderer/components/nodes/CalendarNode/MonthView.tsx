@@ -379,12 +379,19 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
               style={{
                 display: 'flex',
                 gap: 4,
-                overflow: 'hidden',
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                scrollbarWidth: 'none',
+                // The strip scrolls sideways; its right edge fades to say so.
+                maskImage: 'linear-gradient(to right, #000 calc(100% - 18px), transparent)',
+                WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 18px), transparent)',
+                paddingRight: 14,
                 flex: 1,
                 minWidth: 0,
               }}
             >
-              {todaysTasks.slice(0, 3).map((t) => (
+              {/* Every plan of today, scrolling sideways — none hidden behind "+N". */}
+              {todaysTasks.map((t) => (
                 <span
                   key={t.id}
                   title={t.text}
@@ -405,18 +412,6 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                   {truncateLabel(t.text)}
                 </span>
               ))}
-              {todaysTasks.length > 3 && (
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    color: 'var(--ink-3)',
-                    flexShrink: 0,
-                  }}
-                >
-                  +{todaysTasks.length - 3}
-                </span>
-              )}
             </div>
           </div>
         );
@@ -472,10 +467,11 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
             })();
           const dayNum = parseInt(ymd.slice(8, 10), 10);
           const tasks = tasksByDay.get(ymd) ?? [];
-          // Only whole, readable chips; the rest go into "+N".
-          const fit = chipsThatFit(cellH, tasks.length);
-          const visible = tasks.slice(0, fit.shown);
-          const overflow = fit.overflow;
+          // Every plan keeps its own chip (readable, clickable, draggable);
+          // a full day scrolls inside its cell instead of hiding plans as "+N".
+          const visible = tasks;
+          // More than fits: the list fades at its foot, saying "scroll for more".
+          const scrolls = chipsThatFit(cellH, tasks.length).overflow > 0;
 
           // Compute habit dots for this cell.
           const cellDate = parseAnchorDate(ymd);
@@ -483,9 +479,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
           const cellHabits = showHabits
             ? scheduledHabits.filter((h) => ymd >= h.createdYMD && habitScheduledOnDow(h.schedule, cellIsoDow))
             : [];
-          // Up to MAX_DOTS dots; past that, MAX_DOTS - 1 dots and "+N" for the rest.
-          const visibleDots = cellHabits.length <= MAX_DOTS ? cellHabits : cellHabits.slice(0, MAX_DOTS - 1);
-          const dotOverflow = cellHabits.length - visibleDots.length;
+          // Every habit keeps its dot; they wrap onto a second row.
+          const visibleDots = cellHabits;
 
           // PR7 — out-of-month cells render empty (no day number, no chips,
           // no hover/click). Today cell uses the `krnl-month-cell--today`
@@ -509,7 +504,9 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
               onDrop={inCurrentMonth ? (e) => handleDrop(ymd, e) : undefined}
               style={{
                 position: 'relative',
-                background: isSelected && !isToday ? 'var(--paper-2)' : 'transparent',
+                // A faint fill marks each day of this month as its own cell, so
+                // its dots and chips read as belonging to it.
+                background: isSelected && !isToday ? 'var(--paper-2)' : inCurrentMonth ? 'color-mix(in srgb, var(--paper-2) 45%, transparent)' : 'transparent',
                 border: isSelected
                   ? '1px solid var(--acid)'
                   : '1px solid transparent',
@@ -534,7 +531,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                 inCurrentMonth
                   ? (e) => {
                       if (!isSelected && !isToday) {
-                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.background = 'color-mix(in srgb, var(--paper-2) 45%, transparent)';
                       }
                     }
                   : undefined
@@ -600,7 +597,11 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     flexDirection: 'column',
                     gap: 1,
                     flex: 1,
-                    overflow: 'hidden',
+                    minHeight: 0,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    scrollbarWidth: 'thin',
+                    ...(scrolls ? { maskImage: 'linear-gradient(to bottom, #000 calc(100% - 12px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 12px), transparent)', paddingBottom: 8 } : {}),
                     position: 'relative',
                     zIndex: 1,
                   }}
@@ -636,20 +637,6 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                       {truncateLabel(task.text)}
                     </div>
                   ))}
-                  {overflow > 0 && (
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        color: 'var(--ink-3)',
-                        lineHeight: '1.3',
-                        flexShrink: 0,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      +{overflow}{fit.shown > 0 ? ' more' : ''}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -660,8 +647,10 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                   style={{
                     display: 'flex',
                     flexDirection: 'row',
+                    flexWrap: 'wrap',
                     gap: 2,
                     alignItems: 'center',
+                    flexShrink: 0,
                     position: 'relative',
                     zIndex: 1,
                     marginTop: 1,
@@ -682,18 +671,6 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                       }}
                     />
                   ))}
-                  {dotOverflow > 0 && (
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        color: isToday ? '#1a1814' : 'var(--ink-3)',
-                        lineHeight: 1,
-                      }}
-                    >
-                      +{dotOverflow}
-                    </span>
-                  )}
                 </div>
               )}
             </div>

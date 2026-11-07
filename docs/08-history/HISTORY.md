@@ -1776,3 +1776,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
 **Summary:** Plans with room for their name and time cut the title at one line ("Outline thesi…", "Draft section…") even in blocks an hour tall. A block at least 48 px tall now gives its title two lines (clamped, never spilling) with the time still under it. Checked in the preview at 1100 and 760 px. Follow-up: the time line under a missed plan was cut ("Missed · 09:30–1…"). The time now comes first and never cuts; "Missed", "started 5m late" and "took 1h20" follow as whole pieces that wrap under it, and a block shows only as many whole lines as fit under its title (no sliver of a wrapped line). Tall title-only blocks (narrow columns) also wrap the title to two lines. Checked at 900, 1100 and 1440 px.
+
+## [2026-11-07] — Month view hides nothing behind "+N"
+
+**Type:** UI Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/MonthView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/MonthView.test.tsx`
+**Summary:** Month view hid plans behind "+10 more" in a cell and "+9" in the TODAY strip, and habit dots behind "+2" — against the rule that every item stays readable and draggable. A full day now keeps every plan as its own chip in a list that scrolls inside the cell (fading at its foot when there is more); the TODAY strip shows every plan of today and scrolls sideways (fading at its right edge); every habit keeps its dot, wrapping to a second row. Days of the month get a faint fill so each cell — and the dots at its foot — reads as one day (before, a row of dots looked like it belonged to the next row's date). Checked at 1100 and 520 px, dark and light; tests updated.
