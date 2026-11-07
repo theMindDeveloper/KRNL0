@@ -1769,3 +1769,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/NowLine.tsx`, `src/renderer/styles/reactflow-theme.css`, `tests/unit/renderer/schedule-menu-parity.test.tsx`, `docs/06-requirements/calendar-clock-visuals.md` (F29)
 **Summary:** After the dark recessed lane and then the flush edge strip were both rejected ("cut off from the left side"), ten drafts went to the design canvas; the user liked the Clock rail best, and it was refined into four versions built from the Clock's own parts. A4 ships: a track one shade lighter than the day (the Clock's ring track), 4 px inside the day's own line, rounded at both ends; recorded focus fills it with round caps in its tag colour; the track only covers time that has passed (full on past days, up to a "now" knob today, none on days ahead), so it fills up like the Clock's ring and no empty bar runs down future days (which read as a scrollbar). The now line drops its own dot while the knob shows, and the knob uses the now line's red. On light paper the track is half as strong. All four versions sit behind one constant (`RAIL_STYLE`). Checked in the preview: wide week, Station-width week and day view, dark and light, now knob paged into view. Follow-up check on last week (nothing recorded) showed seven bare tracks reading as scrollbars again, so a past day with no recorded time draws no track at all (today keeps its track for the knob); test added.
+
+## [2026-11-07] — Tall calendar plans show their whole title
+
+**Type:** UI Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+**Summary:** Plans with room for their name and time cut the title at one line ("Outline thesi…", "Draft section…") even in blocks an hour tall. A block at least 48 px tall now gives its title two lines (clamped, never spilling) with the time still under it. Checked in the preview at 1100 and 760 px.

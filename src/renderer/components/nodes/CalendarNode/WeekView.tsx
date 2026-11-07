@@ -1478,10 +1478,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 fontWeight: 600,
                 color: isDone ? 'var(--ink-2)' : 'var(--ink)',
                 textDecoration: 'none',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: 'block',
+                // A tall block gives its title two lines (the time still fits
+                // under it) instead of cutting it at the first.
+                ...(detail === 'full' && blockH >= 48
+                  ? { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, whiteSpace: 'normal', overflowWrap: 'anywhere' as const, overflow: 'hidden' }
+                  : { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }),
                 minWidth: 0,
                 paddingLeft: isContinuation ? 12 : 0,
                 paddingRight: isDone || (isMissed && !isContinuation) ? 16 : 0,
