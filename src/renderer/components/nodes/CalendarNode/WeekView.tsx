@@ -304,7 +304,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // on the Monday and shows seven. dayCount drives the column grid throughout.
   const dayCount = singleDay ? 1 : 7;
   const tinyDays = !singleDay && gridW > 0 && (gridW - GUTTER_WIDTH) / dayCount < 70;
-  const rail = `${RAIL_PX(singleDay, tinyDays)}px`;
   const mondayYMD = getMondayYMD(state.anchorDate);
   const baseYMD = singleDay ? state.anchorDate : mondayYMD;
 
@@ -1013,11 +1012,20 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const minute = (relY / rowHeight) * 60;
 
     const items: LayerItem[] = [];
-    // Task slices covering this minute on this day.
-    for (const slice of slicesByDay.get(dayYMD) ?? []) {
-      if (minute >= slice.sliceStartMin && minute < slice.sliceEndMin) {
-        items.push({ kind: 'task', task: slice.task });
+    // Task slices covering this minute — and, when they clash, every plan of
+    // that clash (all that overlap them, directly or through another), so a
+    // short plan beside the click (a "TS" chip) is listed too, in time order.
+    const daySlices = slicesByDay.get(dayYMD) ?? [];
+    const hit = new Set(daySlices.filter((sl) => minute >= sl.sliceStartMin && minute < sl.sliceEndMin));
+    for (let grew = hit.size > 0; grew;) {
+      grew = false;
+      for (const sl of daySlices) {
+        if (hit.has(sl)) continue;
+        if ([...hit].some((h) => sl.sliceStartMin < h.sliceEndMin && h.sliceStartMin < sl.sliceEndMin)) { hit.add(sl); grew = true; }
       }
+    }
+    for (const slice of [...hit].sort((x, y) => x.sliceStartMin - y.sliceStartMin)) {
+      items.push({ kind: 'task', task: slice.task });
     }
     // Tracked-reality segments covering this minute on this day.
     for (const seg of realityByDay.get(dayYMD) ?? []) {
@@ -1076,8 +1084,18 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
   // ── Task block renderer ─────────────────────────────────────────────────────
 
+  /** Room kept at a day's left for its recorded-time track — only on days
+   *  that draw one (recorded time that day, or today with the Recorded layer
+   *  on); elsewhere plans start 4 px from the day line, like the right side. */
+  function railPxFor(dayYMD: string): number {
+    const hasTrack = layers.recorded && ((realityByDay.get(dayYMD)?.length ?? 0) > 0 || dayYMD === toYMD(new Date()));
+    return hasTrack ? RAIL_PX(singleDay, tinyDays) : 4;
+  }
+
   function renderTaskBlocks(dayYMD: string) {
     const slices = slicesByDay.get(dayYMD);
+    const dayRailPx = railPxFor(dayYMD);
+    const rail = `${dayRailPx}px`;
     if (!slices || slices.length === 0) return null;
 
     const rawLayout = computeColumnLayout(slices, (MIN_BLOCK_PX / rowHeight) * 60);
@@ -1086,7 +1104,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     // A clash narrower than that is slim letter bars (F28) — every plan still
     // its own block at its own time, nothing hidden behind a count.
     const colPxAll = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-    const railNumAll = RAIL_PX(singleDay, tinyDays);
+    const railNumAll = dayRailPx;
     const dayLayout = layoutDayBlocks(
       slices.map((sl) => ({ id: sl.task.id, startMin: sl.sliceStartMin, endMin: sl.sliceEndMin, slice: sl })),
       rawLayout,
@@ -1309,7 +1327,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // How much text fits: measured column width × this block's lanes.
       // Unmeasured (tests / first paint) counts as roomy.
       const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-      const railNum = RAIL_PX(singleDay, tinyDays);
+      const railNum = dayRailPx;
       const widthPx = ((colPx - railNum) * span) / colCount - 3;
       // Text is never rotated: a lane too narrow for a title is a plain bar
       // (its name is in the tooltip); short blocks show the title on one line.
@@ -1355,6 +1373,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           title={
             `${task.text} · ${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)} · plan ${fmtDur(task.plannedMin)}` +
             (trackedMin > 0 ? ` · tracked ${fmtDur(trackedMin)}` : '') +
+            (overrunMin > 0 ? ` (${fmtDur(overrunMin)} over plan)` : '') +
             (isMissed ? ' · missed' : '') +
             (isContinuation ? ' (continued from previous day)' : '')
           }
@@ -1541,15 +1560,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               <CalIcon name="replan" />
             </button>
           )}
-          {/* Overrun: a rust strip on the right edge — not on a bar under 12 px,
-              where it would be half the bar (the tooltip still says "+X over"). */}
-          {overrunMin > 0 && !isContinuation && widthPx >= 12 && (
-            <span
-              aria-hidden
-              data-testid={detail === 'full' ? undefined : `task-overrun-${task.id}`}
-              style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 3, background: 'var(--rust)', pointerEvents: 'none', zIndex: 1 }}
-            />
-          )}
+          {/* Overrun is said in words ("+5m over" in the time line, and the
+              tooltip) — no unexplained colour strip on the block's edge. */}
           {/* #7 — resize handles: drag the top edge to move the start, the
               bottom edge to change the duration. Snapped to granularity. */}
           {resizable && (
