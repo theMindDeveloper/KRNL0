@@ -1803,7 +1803,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const dayPx = rowCount * rowHeight;
     // A4: the track only covers time that has passed — the whole day before
     // today, up to now today, nothing on days still ahead.
-    const trackEnd = RAIL_STYLE !== 'A4' || dayYMD < todayYMD ? dayPx - 3 : dayYMD === todayYMD ? nowPx : 0;
+    // A day with nothing recorded gets no empty track (a week of bare tracks
+    // reads as scrollbars) — except today, whose track carries the knob.
+    const trackEnd = segs.length === 0 && dayYMD !== todayYMD ? 0
+      : RAIL_STYLE !== 'A4' || dayYMD < todayYMD ? dayPx - 3 : dayYMD === todayYMD ? nowPx : 0;
     const out: ReactNode[] = [];
     if (trackEnd > 3) {
       out.push(

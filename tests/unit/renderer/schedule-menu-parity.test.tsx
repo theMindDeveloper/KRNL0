@@ -161,6 +161,15 @@ describe('Calendar pomo spans as background highlights', () => {
     expect(band.style.borderRadius).toBe(`${parseFloat(track.style.width) / 2}px`);
   });
 
+  it('a past day with nothing recorded draws no empty track (a week of bare tracks read as scrollbars)', () => {
+    seed();
+    const y = new Date(d0); y.setDate(y.getDate() - 3);
+    const past = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+    render(<WeekView state={{ ...calState(), anchorDate: past }} config={calConfig()} onCommand={() => {}} singleDay />);
+    expect(document.querySelector('[data-testid="calendar-reality-block"]')).toBeNull();
+    expect(document.querySelector('[data-testid="calendar-reality-track"]')).toBeNull();
+  });
+
   it('today has one "now" mark: the knob on the track (the now line drops its own dot)', () => {
     seed();
     render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
