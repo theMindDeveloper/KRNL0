@@ -58,6 +58,7 @@ export function Mac({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
                 position: 'absolute',
                 left: `${(v / TOTAL) * 100}%`,
                 transform: v === 0 ? 'none' : v === TOTAL ? 'translateX(-100%)' : 'translateX(-50%)',
+                whiteSpace: 'nowrap',
               }}
             >
               {v === TOTAL ? `${v} min` : v}

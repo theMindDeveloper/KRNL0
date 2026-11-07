@@ -1546,3 +1546,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** ~70 renderer files (`fontSize` 9 / 9.5 / 10 / 10.5 → 11 in style objects, `font-size` in CSS), `src/renderer/components/nodes/{PomoNode,TodoNode,AnalyticsNode}/index.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/pocket/parts.tsx`, `src/renderer/styles/reactflow-theme.css`, `docs/04-visual-system/design-tokens.md`
 **Summary:** The app's labels, meta rows, chips and buttons were 9–10.5 px, which the design checker counted as 147 legibility failures on the main screen. All functional text is now at least 11 px; only the Calendar's half-hour ruler marks stay at 10 px to fit their gutter, and SVG chart axes are unchanged. Done in stages with a backup, each measured: no clipped text, no overlapping controls, the Calendar layout check still passes, the tour still never covers its target, the top bar fits at 1280 px. Where bigger text crowded a layout, the layout gave way: the Pomo header keeps one line (the session code shortens first), Todo titles keep at least 72 px (PLAN becomes its icon and tag chips narrow in a small window), and Analytics card toolbars wrap under their title. The light Box look's skip button follows the theme. Live design check: 184 findings this evening → 12 (no low contrast, no covered text, no left stripes, no undersized functional text). The rule is now in design-tokens.md.
+
+## [2026-11-07] — UI loop batch 25: every Pomo timer face checked at the new size
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/variants/{Mac,Outline}.tsx`, `src/renderer/dev/previewBridge.ts`
+**Summary:** After the 11 px floor, all seven timer faces were rendered (`?face=` on the preview board). The Mac face's last axis label wrapped "25 / min" onto two lines; it stays on one. The Outline face's dimension line read "◄ 0 … 25 MIN ►" with text arrows; it reads "0 … 25 MIN". The ASCII face keeps its characters — text art is that face's identity.

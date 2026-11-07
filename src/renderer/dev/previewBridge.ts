@@ -224,6 +224,12 @@ export function installPreviewBridge(): void {
   const name = new URLSearchParams(location.search).get('fixture') ?? 'stress';
   const build = FIXTURES[name] ?? stressBoard;
   let board: unknown = build();
+  // `?face=lcd` — show the Pomo with that timer face (render checks).
+  const face = new URLSearchParams(location.search).get('face');
+  if (face) {
+    const pomo = ((board as Json)['nodes'] as Json[]).find((n) => n['kind'] === 'pomo');
+    if (pomo) pomo['config'] = { ...(pomo['config'] as Json), face };
+  }
   const noop = async () => {};
   const bridge = {
     boardLoad: async () => board,
