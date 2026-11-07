@@ -11,7 +11,9 @@
 // CLI twins (rule 8): pomo retag <seg> <task|none> · pomo delete-segment <seg>
 // · task toggle <ref> · task pomo <ref> · task unschedule <ref>.
 
-import { useBoardStore } from './boardStore';
+import { useBoardStore, pushHistory } from './boardStore';
+import { unscheduleOne } from './chainSchedule';
+import type { Board } from '../../shared/types';
 import { saveBoard } from './eventLog';
 import { pomoDeleteSegment, pomoRetagSegment, pomoStopAt } from '../components/nodes/PomoNode/commands';
 import { pomoEditSegment, pomoAddSegment, spanProblem } from '../components/nodes/PomoNode/spanEdit';
@@ -68,15 +70,21 @@ export function placementOf(taskId: string): { startISO: string; endISO: string 
 }
 
 /**
- * Take a task off the calendar. A chain successor has no time of its own, so
- * this unschedules the chain's anchor (the whole chain leaves the calendar);
- * the menu says "Unschedule chain" in that case. Goes through the dispatcher
- * so the linked Todo row's time is cleared too (CLI: task unschedule).
+ * Take this task — and only it — off the calendar (CLI: task unschedule).
+ * Tasks timed by the chain keep their current times; this task stops
+ * following its predecessor so the chain cannot pull it back
+ * (chainSchedule.ts). Goes through the dispatcher so linked Todo rows' times
+ * follow.
  */
 export async function unscheduleTask(taskId: string): Promise<void> {
-  const anchor = scheduleAnchorOf(taskId);
-  if (!anchor) return;
-  await dispatchToTask(anchor, 'task.setSchedule', { scheduledFor: null });
+  const board = useBoardStore.getState().board;
+  if (!board) return;
+  const plan = unscheduleOne(board as Board, taskId);
+  if (!plan) return;
+  if (plan.edges !== board.edges) {
+    useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges: plan.edges } } : s));
+  }
+  for (const w of plan.writes) await dispatchToTask(w.taskId, 'task.setSchedule', { scheduledFor: w.scheduledFor });
 }
 
 async function dispatchToTask(taskId: string, command: string, args: Record<string, unknown> = {}): Promise<void> {

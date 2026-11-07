@@ -25,6 +25,7 @@
  * per-task session checkpoint, extended task.toggle and task.delete cascades.
  */
 
+import { detachIfPushed } from '../../store/chainSchedule';
 import { useBoardStore, pushHistory } from '../../store/boardStore';
 import { emit, saveBoard } from '../../store/eventLog';
 import { commandCanSound, momentFromChange, soundSnapshot } from '../../sfx/soundMoments';
@@ -1323,6 +1324,17 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           enabled: true,
         }));
         useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges } } : s));
+      }
+
+      // Put somewhere its chain would push it away from (before the task
+      // before it ends, or another day): it leaves the chain and lands where
+      // it was put; the tasks after it still follow it.
+      if (!withTask) {
+        const b0 = useBoardStore.getState().board;
+        if (b0) {
+          const edges = detachIfPushed(b0, taskId, scheduleArgs.scheduledFor);
+          if (edges !== b0.edges) useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges } } : s));
+        }
       }
 
       const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
