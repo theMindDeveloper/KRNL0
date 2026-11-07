@@ -770,7 +770,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               <span
                 data-testid="todo-overdue-badge"
                 style={{
-                  color: 'var(--rust)',
+                  // Mixed toward the ink: darker on paper, lighter on dark — 4.5:1 in both themes.
+                  color: 'color-mix(in srgb, var(--rust) 78%, var(--ink))',
                   marginLeft: 8,
                   fontFamily: 'var(--font-mono)',
                   fontSize: 11,

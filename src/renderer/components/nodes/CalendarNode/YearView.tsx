@@ -4,7 +4,7 @@
 // and carries a dot when tasks are planned on it. Today is outlined. Click a
 // day to open it in the day view; ‹ › step a year.
 
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
 import type { NodeProps } from '../types';
 import type { CalendarConfig, CalendarState } from './types';
@@ -15,6 +15,27 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Month label + weekday row, in px (11 px text, 3 px gaps). */
+const MONTH_HEAD_PX = 34;
+const CELL_GAP = 2;
+const MONTH_GAP = 14;
+
+/**
+ * The layout with the biggest square day cells that fits the box: 12 months
+ * in even rows (2, 3, 4 or 6 across — never 7 + 5), six week rows each.
+ */
+export function yearLayout(w: number, h: number): { cols: number; cell: number } {
+  let best = { cols: 4, cell: 0 };
+  for (const cols of [2, 3, 4, 6]) {
+    const rows = 12 / cols;
+    const byW = ((w - MONTH_GAP * (cols - 1)) / cols - CELL_GAP * 6) / 7;
+    const byH = ((h - MONTH_GAP * (rows - 1)) / rows - MONTH_HEAD_PX - CELL_GAP * 5) / 6;
+    const cell = Math.floor(Math.min(byW, byH, 28));
+    if (cell > best.cell) best = { cols, cell };
+  }
+  return { cols: best.cols, cell: Math.max(6, best.cell) };
+}
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 interface Props {
@@ -29,6 +50,24 @@ export function YearView({ state, onCommand }: Props) {
   const { tasks, focus } = useMemo(() => yearActivity(board, year, Date.now()), [board, year]);
   const maxFocus = Math.max(30, ...focus.values());
   const today = ymd(new Date());
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [fit, setFit] = useState({ cols: 6, cell: 16 });
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        const next = yearLayout(el.clientWidth, el.clientHeight);
+        setFit((f) => (f.cols === next.cols && f.cell === next.cell ? f : next));
+      }
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const openDay = (day: string) => {
     onCommand('calendar.setAnchor', { date: day });
@@ -49,15 +88,10 @@ export function YearView({ state, onCommand }: Props) {
         </span>
       </div>
 
-      {/* 12 months fill the panel: 4×3 when wide, 3×4 when tall — CSS grid
-          with fr rows so nothing ever scrolls. */}
-      <div
-        style={{
-          flex: 1, minHeight: 0, display: 'grid', gap: 10,
-          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-          gridAutoRows: '1fr',
-        }}
-      >
+      {/* 12 months in even rows (2, 3, 4 or 6 across by width — container
+          query in reactflow-theme.css), square day cells, centred. */}
+      <div ref={wrapRef} data-testid="calendar-year-fit" data-cols={fit.cols} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'safe center', alignItems: 'center', overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${fit.cols}, ${fit.cell * 7 + CELL_GAP * 6}px)`, columnGap: MONTH_GAP, rowGap: MONTH_GAP, justifyContent: 'center' }}>
         {MONTHS.map((name, m) => {
           const first = new Date(year, m, 1);
           const lead = (first.getDay() + 6) % 7; // Monday-first
@@ -67,9 +101,9 @@ export function YearView({ state, onCommand }: Props) {
           return (
             <div key={name} data-testid={`calendar-year-month-${m + 1}`} style={{ minHeight: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: today.startsWith(`${year}-${pad(m + 1)}`) ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{name}</span>
-              <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: '1fr', gap: 2 }}>
-                {DOW.map((d, i) => (
-                  <span key={`h${i}`} aria-hidden style={{ fontFamily: 'var(--font-mono)', fontSize: 7.5, color: 'var(--ink-4)', textAlign: 'center' }}>{d}</span>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, ${fit.cell}px)`, gridAutoRows: 'auto', alignContent: 'start', gap: CELL_GAP }}>
+                {fit.cell >= 12 && DOW.map((d, i) => (
+                  <span key={`h${i}`} aria-hidden style={{ fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1, color: 'var(--ink-3)', textAlign: 'center' }}>{d}</span>
                 ))}
                 {cells.map((day, i) => {
                   if (!day) return <span key={`e${i}`} />;
@@ -84,17 +118,15 @@ export function YearView({ state, onCommand }: Props) {
                       title={`${day}${f > 0 ? ` · ${Math.round(f)}m focus` : ''}${t > 0 ? ` · ${t} planned` : ''}`}
                       onClick={() => openDay(day)}
                       style={{
-                        position: 'relative', minHeight: 0, padding: 0, cursor: 'pointer',
+                        position: 'relative', minHeight: 0, padding: 0, cursor: 'pointer', aspectRatio: '1 / 1',
                         border: day === today ? '1px solid var(--acid)' : '1px solid transparent',
                         borderRadius: 2,
                         background: pct > 0 ? `color-mix(in srgb, var(--acid) ${pct}%, var(--paper-2))` : 'var(--paper-2)',
-                        // Dark text once the acid fill is light enough to need it (from about a third).
-                        color: pct > 35 ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
-                        fontFamily: 'var(--font-mono)', fontSize: 7.5, lineHeight: 1,
-                        display: 'grid', placeItems: 'center',
+                        // A heat map: no numbers in the cells (too small to read at
+                        // any year size); the date and minutes are in the tooltip.
                       }}
+                      aria-label={`${day}${f > 0 ? `, ${Math.round(f)} minutes focus` : ''}${t > 0 ? `, ${t} planned` : ''}`}
                     >
-                      {Number(day.slice(8))}
                       {t > 0 && (
                         <span aria-hidden style={{ position: 'absolute', right: 1, top: 1, width: 3, height: 3, borderRadius: 999, background: 'var(--cyan)' }} />
                       )}
@@ -105,6 +137,7 @@ export function YearView({ state, onCommand }: Props) {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
