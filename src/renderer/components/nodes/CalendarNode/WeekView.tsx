@@ -1331,6 +1331,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const letterStack = letter !== undefined && !letterRow && letter.length > 1 && widthPx >= 10 && blockH >= letter.length * 11 + 2;
       const letterFits = letterRow || letterStack;
       const tickFits = letterFits && blockH >= (letterStack ? letter.length * 11 + 18 : 34) && widthPx >= 12;
+      // Whole lines the time row may use under the title (never a sliver of a
+      // wrapped piece): the title's lines are over-estimated (7.2 px a letter,
+      // room kept for the corner badge), so the row never claims space it lacks.
+      const titleInner = widthPx - 2 * BLOCK_TEXT_INSET - 20;
+      const titleLinesEst = blockH >= 48 && task.text.length * 7.2 > titleInner ? 2 : 1;
+      const timeRowLines = Math.max(1, Math.min(2, Math.floor((blockH - 6 - titleLinesEst * 14) / 14)));
       // A short bar centres its letter; a tall one keeps it at the top, tick below.
       const letterTop = blockH >= (letterStack ? letter.length * 11 + 14 : 30);
 
@@ -1480,8 +1486,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 textDecoration: 'none',
                 // A tall block gives its title two lines (the time still fits
                 // under it) instead of cutting it at the first.
-                ...(detail === 'full' && blockH >= 48
-                  ? { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, whiteSpace: 'normal', overflowWrap: 'anywhere' as const, overflow: 'hidden' }
+                flexShrink: 0,
+                ...((detail === 'full' && blockH >= 48) || (detail === 'title' && blockH >= 34)
+                  ? { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, whiteSpace: 'normal', overflowWrap: 'anywhere' as const, overflow: 'hidden', textAlign: detail === 'title' ? 'center' as const : undefined }
                   : { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }),
                 minWidth: 0,
                 paddingLeft: isContinuation ? 12 : 0,
@@ -1496,13 +1503,18 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             </span>
           )}
           {detail === 'full' && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
-              {isMissed && !isContinuation && <span style={{ color: 'var(--ink-2)', fontWeight: 600 }}>Missed · </span>}
-              {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : `${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)}`}
-              {startNote && <span data-testid={`task-start-delta-${task.id}`}>{startNote}</span>}
+            // The time comes first and never cuts; "Missed" (and tracked or
+            // over notes) wrap under it as whole pieces, so a short block
+            // loses those pieces at its bottom edge, never half the time.
+            <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 10, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: '14px', color: 'var(--ink-3)', overflow: 'hidden', minHeight: 14, maxHeight: timeRowLines * 14, flexShrink: 0, pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
+              <span style={{ whiteSpace: 'nowrap' }}>
+                {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : `${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)}`}
+              </span>
+              {startNote && <span data-testid={`task-start-delta-${task.id}`} style={{ whiteSpace: 'nowrap' }}>{startNote.replace(/^ · /, '')}</span>}
+              {isMissed && !isContinuation && <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-2)', fontWeight: 600 }}>Missed</span>}
               {overrunMin > 0
-                ? <span data-testid={`task-overrun-${task.id}`} style={{ color: 'var(--rust)', fontWeight: 700 }}> · +{fmtDur(overrunMin)} over</span>
-                : trackedMin > 0 ? (task.done ? ` · took ${fmtDur(trackedMin)}` : ` · ${fmtDur(trackedMin)} tracked`) : ''}
+                ? <span data-testid={`task-overrun-${task.id}`} style={{ whiteSpace: 'nowrap', color: 'var(--rust)', fontWeight: 700 }}>+{fmtDur(overrunMin)} over</span>
+                : trackedMin > 0 ? <span style={{ whiteSpace: 'nowrap' }}>{task.done ? `took ${fmtDur(trackedMin)}` : `${fmtDur(trackedMin)} tracked`}</span> : null}
             </span>
           )}
           {/* engagement.md F19 — a missed block asks, it doesn't accuse: a
