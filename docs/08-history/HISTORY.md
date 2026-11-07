@@ -1553,3 +1553,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/PomoNode/variants/{Mac,Outline}.tsx`, `src/renderer/dev/previewBridge.ts`
 **Summary:** After the 11 px floor, all seven timer faces were rendered (`?face=` on the preview board). The Mac face's last axis label wrapped "25 / min" onto two lines; it stays on one. The Outline face's dimension line read "◄ 0 … 25 MIN ►" with text arrows; it reads "0 … 25 MIN". The ASCII face keeps its characters — text art is that face's identity.
+
+## [2026-11-07] — UI loop batch 26: every frame style checked at the new size
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/index.tsx`
+**Summary:** All eight frame styles (Pro, Classic, Synthesizer, Telemetry, KRNL dock, Blueprint, Macintosh, Submarine) were rendered after the 11 px floor: no clipped text. In the narrower Synthesizer frame the Pomo mode switch was squeezed to "OBSERV"; the switch no longer shrinks (the window title gives way instead) and its letter spacing is tighter now that the text is larger.

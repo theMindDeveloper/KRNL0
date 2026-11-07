@@ -427,7 +427,8 @@ export function PomoNode({
         {!easy && <div
           role="group"
           aria-label="Pomo mode"
-          style={{ display: 'flex', border: '1px solid var(--paper-3)', borderRadius: 4, overflow: 'hidden' }}
+          // Never shrinks: the title on the left gives way instead.
+          style={{ display: 'flex', border: '1px solid var(--paper-3)', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {(['pomodoro', 'observe'] as const).map((m) => {
@@ -447,13 +448,15 @@ export function PomoNode({
                 onClick={(e) => { e.stopPropagation(); if (!active) onCommand('pomo.setConfig', { config: { mode: m } }); }}
                 style={{
                   padding: '2px 7px',
+                  flexShrink: 0,
                   // rust-deep: the paper-coloured label stays readable in light mode.
                   background: active ? 'var(--rust-deep, var(--rust))' : 'transparent',
                   color: active ? 'var(--paper)' : 'var(--ink-3)',
                   border: 'none',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 11,
-                  letterSpacing: '0.06em',
+                  letterSpacing: '0.01em',
+                  whiteSpace: 'nowrap',
                   cursor: gearDisabled ? 'not-allowed' : 'pointer',
                   opacity: gearDisabled && !active ? 0.4 : 1,
                 }}
