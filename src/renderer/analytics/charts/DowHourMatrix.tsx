@@ -27,7 +27,7 @@ export function DowHourMatrix({
   height = 200,
   colorMax = '#c9f158',
 }: DowHourMatrixProps) {
-  const pad = { left: 30, right: 8, top: 8, bottom: 20 };
+  const pad = { left: 30, right: 8, top: 20, bottom: 20 };
   const innerW = Math.max(60, width - pad.left - pad.right);
   const innerH = Math.max(60, height - pad.top - pad.bottom);
   const cellW = innerW / 24;
@@ -97,7 +97,7 @@ export function DowHourMatrix({
           key={lbl}
           x={pad.left - 4}
           y={pad.top + i * cellH + cellH / 2 + 3}
-          fontSize={8.5}
+          fontSize={11}
           textAnchor="end"
           fill={COLOR_LABEL}
           fontFamily="var(--font-mono)"
@@ -112,7 +112,7 @@ export function DowHourMatrix({
           key={h}
           x={pad.left + h * cellW + cellW / 2}
           y={height - 6}
-          fontSize={8.5}
+          fontSize={11}
           textAnchor="middle"
           fill={COLOR_LABEL}
           fontFamily="var(--font-mono)"
@@ -122,12 +122,12 @@ export function DowHourMatrix({
       ))}
 
       {/* Peak legend */}
-      <g transform={`translate(${pad.left + innerW - 72}, ${pad.top - 4})`}>
-        <text x={0} y={4} fontSize={8} fill="var(--k-an-ink-3, #9aa1a8)" fontFamily="var(--font-mono)">peak</text>
-        <rect x={24} y={-2} width={10} height={8} fill={colorMax} opacity={0.18} rx={1} />
-        <rect x={36} y={-2} width={10} height={8} fill={colorMax} opacity={0.55} rx={1} />
-        <rect x={48} y={-2} width={10} height={8} fill={colorMax} opacity={1} rx={1} />
-        <text x={62} y={4} fontSize={8} fill="var(--k-an-ink-2, #c8cdd3)" fontFamily="var(--font-mono)">
+      <g transform={`translate(${pad.left + innerW - 90}, ${pad.top - 12})`}>
+        <text x={0} y={4} fontSize={11} fill="var(--k-an-ink-3, #9aa1a8)" fontFamily="var(--font-mono)">peak</text>
+        <rect x={34} y={-2} width={10} height={8} fill={colorMax} opacity={0.18} rx={1} />
+        <rect x={46} y={-2} width={10} height={8} fill={colorMax} opacity={0.55} rx={1} />
+        <rect x={58} y={-2} width={10} height={8} fill={colorMax} opacity={1} rx={1} />
+        <text x={72} y={4} fontSize={11} fill="var(--k-an-ink-2, #c8cdd3)" fontFamily="var(--font-mono)">
           {peak}
         </text>
       </g>

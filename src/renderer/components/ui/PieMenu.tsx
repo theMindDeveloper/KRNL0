@@ -31,6 +31,16 @@ const R0 = 36;
 const R1 = 112;
 const GAP = 1.8;
 
+/** `text` cut to `maxPx` at the 11 px floor (sans ≈ 6.2 px a letter). */
+function fitLabel(text: string, maxPx: number): string {
+  const n = Math.max(3, Math.floor(maxPx / 6.2));
+  return text.length > n ? `${text.slice(0, n - 1)}…` : text;
+}
+
+/** The wedge's outer corner (6° in from its trailing edge), in radians: the
+ *  shortcut letter sits there, clear of the label in the middle of the wedge. */
+const cornerA = (a1: number): number => ((a1 - 6 - 90) * Math.PI) / 180;
+
 function sector(r0: number, r1: number, a0: number, a1: number): string {
   const rad = (d: number) => ((d - 90) * Math.PI) / 180;
   const p = (r: number, d: number) => `${(r * Math.cos(rad(d))).toFixed(2)},${(r * Math.sin(rad(d))).toFixed(2)}`;
@@ -115,12 +125,13 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
               </path>
               {it.icon && glyph(it.icon, it.swatch ? '#1a1814' : ink, px, py - (it.swatch ? 0 : 6))}
               {!it.swatch && (
-                <text x={px} y={py + 14} textAnchor="middle" fontSize={8.5} fontFamily="var(--font-sans)" fontWeight={600} fill={ink} pointerEvents="none">
-                  {it.label.length > 10 ? `${it.label.slice(0, 9)}…` : it.label}
+                <text x={px} y={py + 15} textAnchor="middle" fontSize={11} fontFamily="var(--font-sans)" fontWeight={600} fill={ink} pointerEvents="none">
+                  {/* the wedge's width at the label, less a little air */}
+                  {fitLabel(it.label, Math.min(84, ((a1 - a0) * Math.PI / 180) * rm - 8))}
                 </text>
               )}
               {it.shortcut && (
-                <text x={(R1 - 12) * Math.cos(mid)} y={(R1 - 12) * Math.sin(mid) + 3} textAnchor="middle" fontSize={8} fontFamily="var(--font-mono)" fill={ink} opacity={0.4} pointerEvents="none">{it.shortcut}</text>
+                <text x={(R1 - 11) * Math.cos(cornerA(a1))} y={(R1 - 11) * Math.sin(cornerA(a1)) + 4} textAnchor="middle" fontSize={11} fontFamily="var(--font-mono)" fill={ink} opacity={0.6} pointerEvents="none">{it.shortcut}</text>
               )}
               {it.children?.length ? (
                 <circle cx={(R0 + 6) * Math.cos(mid)} cy={(R0 + 6) * Math.sin(mid)} r={1.8} fill={ink} opacity={0.7} pointerEvents="none" />
@@ -145,7 +156,7 @@ export function PieMenu({ x, y, items, onClose, testId = 'pie-menu', center }: {
           <title>{nested ? 'Back' : center ? center.label : 'Close (Esc)'}</title>
         </circle>
         {hover
-          ? <text y={4} textAnchor="middle" fontSize={9} fontFamily="var(--font-sans)" fontWeight={600} fill="#e8ebee" pointerEvents="none">{hover.slice(0, 11)}</text>
+          ? <text y={4} textAnchor="middle" fontSize={11} fontFamily="var(--font-sans)" fontWeight={600} fill="#e8ebee" pointerEvents="none">{fitLabel(hover, R_C * 2 - 6)}</text>
           : glyph(nested ? BACK : center?.icon ?? CLOSE, '#e8ebee', 0, 0)}
       </svg>
     </div>,

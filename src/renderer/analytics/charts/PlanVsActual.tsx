@@ -89,21 +89,21 @@ export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tas
             {/* full-row hit target */}
             <rect x={0} y={y - 4} width={width} height={rowH} fill="transparent" />
             {t.done && <path d={narrow ? `M1 ${textY - 4}l2.5 2.5L8 ${textY - 8}` : `M2 ${textY - 4}l2.5 2.5L9 ${textY - 8}`} stroke={COLOR_LABEL} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-            <text x={narrow ? (t.done ? 11 : 0) : labelW - 6} y={textY} textAnchor={narrow ? 'start' : 'end'} fontSize={10.5} fill={COLOR_LABEL} fontFamily="var(--font-sans)" opacity={t.deleted ? 0.6 : 1}>
+            <text x={narrow ? (t.done ? 11 : 0) : labelW - 6} y={textY} textAnchor={narrow ? 'start' : 'end'} fontSize={11} fill={COLOR_LABEL} fontFamily="var(--font-sans)" opacity={t.deleted ? 0.6 : 1}>
               {label}
             </text>
             {t.plannedMin > 0 && (
               <rect x={labelW} y={barY} width={Math.max(2, x(t.plannedMin))} height={barH} rx={2} fill={COLOR_PLANNED} opacity={0.9} />
             )}
             <rect x={labelW} y={barY + barH + 2} width={Math.max(t.trackedMin > 0 ? 2 : 0, x(t.trackedMin))} height={barH} rx={2} fill={COLOR_TRACKED} opacity={0.9} />
-            <text x={width - 2} y={textY} textAnchor="end" fontSize={10} fontFamily="var(--font-mono)" fill={over > 0 ? COLOR_TRACKED : COLOR_LABEL}>
+            <text x={width - 2} y={textY} textAnchor="end" fontSize={11} fontFamily="var(--font-mono)" fill={over > 0 ? COLOR_TRACKED : COLOR_LABEL}>
               {fmtMinutes(t.trackedMin)} / {fmtMinutes(t.plannedMin)}
             </text>
           </g>
         );
       })}
       {hiddenCount > 0 && (
-        <text data-testid="analytics-estimate-more" x={narrow ? 0 : labelW - 6} textAnchor={narrow ? 'start' : 'end'} y={rows.length * rowH + 4 + 12} fontSize={9.5} fill={COLOR_AXIS} fontFamily="var(--font-mono)">
+        <text data-testid="analytics-estimate-more" x={narrow ? 0 : labelW - 6} textAnchor={narrow ? 'start' : 'end'} y={rows.length * rowH + 4 + 12} fontSize={11} fill={COLOR_AXIS} fontFamily="var(--font-mono)">
           +{hiddenCount} more
           <title>{`${hiddenCount} more task${hiddenCount === 1 ? '' : 's'} — make the window taller, or: krnl analytics show --view estimates`}</title>
         </text>
@@ -128,7 +128,7 @@ export function DailyPlanActual({ days, width, height }: { days: readonly DayPla
       {gridSteps.map((g) => (
         <g key={g}>
           <line x1={pad.left} x2={pad.left + innerW} y1={y(max * g)} y2={y(max * g)} stroke={COLOR_GRID} strokeWidth={0.5} />
-          <text x={pad.left - 4} y={y(max * g) + 3} textAnchor="end" fontSize={8} fill={COLOR_LABEL} fontFamily="var(--font-mono)">{fmtMinutes(max * g)}</text>
+          <text x={pad.left - 4} y={y(max * g) + 3} textAnchor="end" fontSize={11} fill={COLOR_LABEL} fontFamily="var(--font-mono)">{fmtMinutes(max * g)}</text>
         </g>
       ))}
       <line x1={pad.left} x2={pad.left + innerW} y1={pad.top + innerH} y2={pad.top + innerH} stroke={COLOR_AXIS} strokeWidth={0.5} />
@@ -145,7 +145,7 @@ export function DailyPlanActual({ days, width, height }: { days: readonly DayPla
               <rect x={cx + 1} y={y(d.workedMin)} width={barW} height={pad.top + innerH - y(d.workedMin)} rx={Math.min(2, barW / 2)} fill={COLOR_TRACKED} opacity={0.9} />
             )}
             {i % labelEvery === 0 && (
-              <text x={cx} y={height - 5} textAnchor="middle" fontSize={8} fill={COLOR_LABEL} fontFamily="var(--font-mono)">{d.date.slice(5)}</text>
+              <text x={cx} y={height - 5} textAnchor="middle" fontSize={11} fill={COLOR_LABEL} fontFamily="var(--font-mono)">{d.date.slice(5)}</text>
             )}
           </g>
         );

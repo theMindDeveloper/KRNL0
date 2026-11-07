@@ -42,7 +42,7 @@ export const COLOR_LABEL = 'var(--k-an-ink-2, #c8cdd3)';
 /** Clearance (px) every label keeps from any edge of its container. */
 export const TEXT_INSET = 3;
 /** Smallest font a chart label may shrink to before it is hidden instead. */
-export const MIN_LABEL_FONT = 8;
+export const MIN_LABEL_FONT = 11;
 
 /** Conservative width (px) of a monospace label. Measured JetBrains Mono
  *  advance is 0.62–0.63em; 0.66 leaves headroom for the wider pixel fonts

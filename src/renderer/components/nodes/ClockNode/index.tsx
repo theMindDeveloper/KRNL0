@@ -1030,8 +1030,8 @@ export function ClockNode({
               textAnchor="middle"
               dominantBaseline="central"
               fontFamily="var(--k-clock-font, var(--font-mono))"
-              fontSize={8}
-              letterSpacing="1.4"
+              fontSize={9}
+              letterSpacing="1"
               fill="var(--k-clock-readout, var(--ink-4))"
               style={{ pointerEvents: 'none', textTransform: 'uppercase' }}
             >

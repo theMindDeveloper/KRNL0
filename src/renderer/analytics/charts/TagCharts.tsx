@@ -6,7 +6,7 @@ import type { TagDay, TagSlice } from '../tags';
 import { fmtMinutes } from './PlanVsActual';
 import { TEXT_INSET, textWidth } from './common';
 
-const AXIS_FONT = 8.5;
+const AXIS_FONT = 11;
 
 const COLOR_LABEL = 'var(--k-an-ink-3, #aab0b7)';
 const COLOR_GRID = 'var(--k-an-grid, #2a2e33)';
@@ -92,7 +92,7 @@ export function TagDailyBars({
               );
             })}
             {i % labelEvery === 0 && (
-              <text x={x + barW / 2} y={height - 6} textAnchor="middle" fontSize={8.5} fontFamily="var(--font-mono)" fill={COLOR_LABEL}>
+              <text x={x + barW / 2} y={height - 6} textAnchor="middle" fontSize={11} fontFamily="var(--font-mono)" fill={COLOR_LABEL}>
                 {d.date.slice(5)}
               </text>
             )}
