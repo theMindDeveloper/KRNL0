@@ -1312,10 +1312,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const textual = detail === 'title' || detail === 'full';
       // The letter shows when it fits the bar; the tick under it when there is room.
       const blockH = Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP);
-      const letterFits = letter !== undefined && blockH >= 15 && widthPx >= letter.length * 7 + 4;
-      const tickFits = letterFits && blockH >= 34 && widthPx >= 12;
+      // A name too wide for the bar stands its letters one above the other
+      // (never rotated) when the bar is tall enough; 11px mono is ~6.6px a letter.
+      const letterRow = letter !== undefined && blockH >= 15 && widthPx >= letter.length * 6.6 + 3;
+      const letterStack = letter !== undefined && !letterRow && letter.length > 1 && widthPx >= 10 && blockH >= letter.length * 11 + 2;
+      const letterFits = letterRow || letterStack;
+      const tickFits = letterFits && blockH >= (letterStack ? letter.length * 11 + 18 : 34) && widthPx >= 12;
       // A short bar centres its letter; a tall one keeps it at the top, tick below.
-      const letterTop = blockH >= 30;
+      const letterTop = blockH >= (letterStack ? letter.length * 11 + 14 : 30);
 
       return (
         <div
@@ -1448,7 +1452,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           {/* Label — only what fits (see `detail`). Everything else is in the
               hover title and the click popup. */}
           {detail === 'letter' && letterFits && (
-            <span data-testid={`task-letter-${task.id}`} className="cal-letter" aria-hidden>{letter}</span>
+            <span data-testid={`task-letter-${task.id}`} className={`cal-letter${letterStack ? ' cal-letter--stack' : ''}`} aria-hidden>{letter}</span>
           )}
           {detail === 'letter' && tickFits && isDone && !isContinuation && (
             <span aria-hidden style={{ color: 'var(--acid-ink, var(--acid))', lineHeight: 0, position: 'relative', zIndex: 1 }}><CalIcon name="check" size={10} /></span>

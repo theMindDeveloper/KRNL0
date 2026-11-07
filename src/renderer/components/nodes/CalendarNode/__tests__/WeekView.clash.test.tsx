@@ -149,6 +149,29 @@ describe('WeekView — clashing plans as letter bars (F28)', () => {
     expect(document.querySelectorAll('.cal-block[data-plan-state="missed"]').length).toBe(3);
   });
 
+  it('a bar too narrow for "RA" in a row stands the letters one above the other — never an unnamed bar', () => {
+    // Measure the calendar as a narrow Station week (each column ~64px).
+    const RO = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(private cb: ResizeObserverCallback) {}
+      observe() { this.cb([{ contentRect: { width: 500 } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
+      unobserve() { /* none */ }
+      disconnect() { /* none */ }
+    } as unknown as typeof ResizeObserver;
+    try {
+      seed(three());
+      render(<WeekView state={{ ...state, zoom: 2 }} config={config} onCommand={() => undefined} />);
+      for (const id of ['t-a', 't-b', 't-c']) {
+        const el = document.querySelector('[data-testid="task-letter-' + id + '"]');
+        expect(el, id).toBeTruthy();
+      }
+      expect(document.querySelector('[data-testid="task-letter-t-a"]')!.className).toContain('cal-letter--stack');
+      expect(document.querySelector('[data-testid="task-letter-t-a"]')!.textContent).toBe('RA');
+    } finally {
+      globalThis.ResizeObserver = RO;
+    }
+  });
+
   it('two plans in a wide day keep their names (no letters)', () => {
     seed(three().slice(0, 2));
     render(<WeekView state={{ ...state, anchorDate: '2026-05-14' }} config={config} onCommand={() => undefined} singleDay />);

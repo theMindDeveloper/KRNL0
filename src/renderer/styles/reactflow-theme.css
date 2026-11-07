@@ -289,6 +289,7 @@
   position: relative; z-index: 1; font-family: var(--font-mono); font-size: 11px; font-weight: 700;
   line-height: 14px; color: var(--ink); letter-spacing: 0; pointer-events: none; white-space: nowrap;
 }
+.cal-letter--stack { writing-mode: horizontal-tb; width: 1ch; white-space: normal; word-break: break-all; line-height: 11px; text-align: center; }
 .cal-block[data-plan-state="missed"] .cal-letter { color: color-mix(in srgb, var(--rust) 70%, var(--ink)); }
 .cal-block[data-plan-state="done"] .cal-letter { color: var(--ink-2); }
 .cal-lineup {
