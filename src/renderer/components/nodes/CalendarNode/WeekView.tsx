@@ -2719,7 +2719,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 <span style={{ fontSize: 11, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 3 }}><span aria-hidden style={{ width: 5, height: 5, borderRadius: 999, background: 'currentColor' }} />LIVE</span>
               )}
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>tracked reality</span>
+              <span style={{ fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>recorded</span>
             </div>
             {/* #207 — click a time to change it (where I really stopped); a
                 running session's "now" becomes "Stop at". */}
