@@ -61,10 +61,11 @@ const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as cons
 
 // Max task chips shown per cell before "+N more" overflow label.
 const MAX_CHIPS = 3;
-// Readable chip row height (10px text + padding) and the cell chrome above /
-// below the chips (day number, habit dots, padding).
-const CHIP_ROW_PX = 15;
-const CELL_CHROME_PX = 26;
+// Chip row height as drawn (11 px text at line-height 1.3, 2 px padding, 1 px
+// gap) and the cell chrome above / below the chips (day number, the habit-dot
+// row, padding). Measured: with less, the "+N more" line ran into the dots.
+const CHIP_ROW_PX = 18;
+const CELL_CHROME_PX = 34;
 
 /**
  * How many chips a cell can show without squashing: whole rows only, and one

@@ -6,7 +6,7 @@
 // done tick, 7-day mini strip with the two-color trick, foot with streak
 // and cadence text, drop-hint that fades in while dragging.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
@@ -119,10 +119,19 @@ export function HabitLaneNode({
   // Cleanup is not a user action: no undo slot (undoing to it re-created the
   // orphan, which deleted itself again and cleared redo — a stuck undo), and
   // it is saved so the orphan doesn't come back from board.json.
+  // Only while the lane is still on the board, and once: the canvas can keep
+  // this component mounted a moment after the removal, and writing a fresh
+  // board each render re-rendered it into the same write — an endless loop
+  // that took the whole app down when a habit (or all habits) was deleted.
+  const cleaned = useRef(false);
   useEffect(() => {
     if (!board) return; // wait until store hydrates
-    if (habit) return;
-    useBoardStore.setState((s) => (s.board ? { board: { ...s.board, nodes: s.board.nodes.filter((n) => n.id !== node.id) } } : s));
+    if (habit || cleaned.current) return;
+    if (!board.nodes.some((n) => n.id === node.id)) return;
+    cleaned.current = true;
+    useBoardStore.setState((s) => (s.board && s.board.nodes.some((n) => n.id === node.id)
+      ? { board: { ...s.board, nodes: s.board.nodes.filter((n) => n.id !== node.id) } }
+      : s));
     const next = useBoardStore.getState().board;
     if (next) void saveBoard(next);
   }, [board, habit, node.id]);

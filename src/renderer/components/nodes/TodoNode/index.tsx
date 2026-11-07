@@ -677,7 +677,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             {disp ? (
               <>
                 <span aria-hidden style={{ width: 5, height: 5, borderRadius: '50%', background: disp.color, flexShrink: 0 }} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{disp.label}</span>
+                <span className="todo-tag__label" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{disp.label}</span>
               </>
             ) : '+'}
           </button>

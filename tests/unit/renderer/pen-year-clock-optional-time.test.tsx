@@ -86,7 +86,9 @@ describe('optional task time', () => {
 describe('month cell chips', () => {
   it('shows only whole chips and keeps a row for +N', () => {
     expect(chipsThatFit(80, 2)).toEqual({ shown: 2, overflow: 0 });
-    expect(chipsThatFit(60, 5)).toEqual({ shown: 1, overflow: 4 });
+    // One row (18 px) left after the chrome: it goes to "+5", never a chip squeezed over the dots.
+    expect(chipsThatFit(60, 5)).toEqual({ shown: 0, overflow: 5 });
+    expect(chipsThatFit(78, 5)).toEqual({ shown: 1, overflow: 4 });
     expect(chipsThatFit(30, 5)).toEqual({ shown: 0, overflow: 5 });
   });
 });
