@@ -1350,7 +1350,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // A name too wide for the bar stands its letters one above the other
       // (never rotated) when the bar is tall enough; 11px mono is ~6.6px a letter.
       const letterRow = letter !== undefined && blockH >= 12 && widthPx >= letter.length * 6.6 + 3;
-      const letterStack = letter !== undefined && !letterRow && letter.length > 1 && widthPx >= 10 && blockH >= letter.length * 11 + 2;
+      const letterStack = letter !== undefined && !letterRow && letter.length > 1 && widthPx >= 7 && blockH >= letter.length * 11 + 2;
       const letterFits = letterRow || letterStack;
       const tickFits = letterFits && blockH >= (letterStack ? letter.length * 11 + 18 : 34) && widthPx >= 12;
       // Whole lines the time row may use under the title (never a sliver of a
