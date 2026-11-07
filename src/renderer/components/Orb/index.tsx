@@ -17,6 +17,7 @@
  *   movement and krnl command execution.
  */
 
+import { LineGlyph } from '../ui/LineGlyph';
 import {
   useState,
   useEffect,
@@ -28,6 +29,14 @@ import {
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../renderer/store/boardStore';
 import { isFreshBoard } from './freshBoard';
+
+const FIRST_DAY_KEY = 'krnl0-first-day-offered';
+function firstDayOffered(): boolean {
+  try { return localStorage.getItem(FIRST_DAY_KEY) === '1'; } catch { return true; }
+}
+function markFirstDayOffered(): void {
+  try { localStorage.setItem(FIRST_DAY_KEY, '1'); } catch { /* no storage */ }
+}
 import { voicePlayer } from '../Assistant/VoicePlayer';
 import { ScriptRunner } from '../Assistant/ScriptRunner';
 import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
@@ -37,6 +46,7 @@ import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
 import { launchClaudeInTerminal } from '../../store/claudeLaunch';
 import { TOURS } from '../Tour/tours';
+import { useTourAnchor } from '../Tour/tourAnchor';
 
 /** Voice flows not offered in the chat for now. */
 const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
@@ -213,6 +223,15 @@ export function Orb() {
 
   // ── Drag state ────────────────────────────────────────────────────────────
   const [pos, setPos]           = useState<OrbPos>(loadPos);
+  // During a guided tour the orb itself rides on the tour card (no copy).
+  const tourAt = useTourAnchor((s) => s.at);
+  const [tourGlide, setTourGlide] = useState(false);
+  useEffect(() => {
+    // Glide while a tour moves it and on the way back home, never while dragging.
+    setTourGlide(true);
+    const t = window.setTimeout(() => setTourGlide(tourAt !== null), 520);
+    return () => window.clearTimeout(t);
+  }, [tourAt]);
   const [settleKey, setSettleKey] = useState(0);
   const draggingRef    = useRef(false);
   const dragMovedRef   = useRef(false);
@@ -381,10 +400,18 @@ export function Orb() {
       return;
     }
 
+    // engagement.md F12 — the promised tour: the first click on a fresh
+    // board starts "Your first day" instead of opening the menu (once).
+    if (!open && isFreshBoard(useBoardStore.getState().board) && !firstDayOffered()) {
+      markFirstDayOffered();
+      startTour('first-day');
+      return;
+    }
+
     // Play a random acknowledgment clip and toggle the panel.
     voicePlayer.playRandom(CLICK_CLIPS).catch(() => {});
     setOpen((o) => !o);
-  }, [activeFlowId]);
+  }, [activeFlowId, open]);
 
   // ── Flow launcher ─────────────────────────────────────────────────────────
   const launchFlow = useCallback((flow: Flow) => {
@@ -500,7 +527,7 @@ export function Orb() {
     display: 'block',
     filter: glowFilter,
     animation: (open || activeFlowId) ? 'none' : 'ai-float 6s ease-in-out infinite',
-    transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease',
+    transition: 'transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), filter 0.25s ease',
     willChange: 'filter, transform',
   };
 
@@ -533,17 +560,22 @@ export function Orb() {
       )}
     <div
       key={settleKey}
+      data-orb-root
       style={{
         position: 'fixed',
-        left: pos.x,
-        top: pos.y,
-        zIndex: Z.widget,
+        left: tourAt ? tourAt.x : pos.x,
+        top: tourAt ? tourAt.y : pos.y,
+        zIndex: tourAt ? Z.tour + 1 : Z.widget,
         fontFamily: 'var(--font-mono)',
-        animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+        transform: tourAt ? 'scale(0.6)' : 'none',
+        transition: tourGlide
+          ? 'left 460ms cubic-bezier(0.22, 1, 0.36, 1), top 460ms cubic-bezier(0.22, 1, 0.36, 1), transform 460ms cubic-bezier(0.22, 1, 0.36, 1)'
+          : 'none',
+        animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.22, 1, 0.36, 1)' : 'none',
       }}
     >
       {/* Voice caption — shown during flows */}
-      {caption !== null && !open && (
+      {caption !== null && !open && !tourAt && (
         <div
           style={{
             position: 'absolute',
@@ -563,18 +595,18 @@ export function Orb() {
             lineHeight: 1.5,
             pointerEvents: 'none',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            animation: 'ai-panel-in 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+            animation: 'ai-panel-in 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           <span style={{ color: isRunning ? '#c9f158' : 'var(--accent-on-dark)', marginRight: 6, opacity: 0.8 }}>
-            {isRunning ? '▶' : '◆'}
+            <LineGlyph name={isRunning ? 'play' : 'diamond'} size={9} />
           </span>
           {caption}
         </div>
       )}
 
       {/* Chat panel */}
-      {open && (
+      {open && !tourAt && (
         <div
           data-testid="orb-chat-panel"
           style={{
@@ -595,7 +627,7 @@ export function Orb() {
               '0 20px 60px rgba(0, 0, 0, 0.6)',
               '0 0 80px rgba(201, 241, 88, 0.15)',
             ].join(', '),
-            animation: 'ai-panel-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            animation: 'ai-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           {/* Panel header */}
@@ -606,7 +638,7 @@ export function Orb() {
               justifyContent: 'space-between',
               padding: '10px 14px',
               borderBottom: '1px solid rgba(201, 241, 88, 0.15)',
-              fontSize: 10.5,
+              fontSize: 11,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: '#8a8270',
@@ -657,7 +689,7 @@ export function Orb() {
                       marginBottom: 4,
                     }}
                   >
-                    {'▸ commander · plan a session'}
+                    <><LineGlyph name="chevron" size={10} /> commander · plan a session</>
                   </button>
                   {/* Claude Code in the board terminal, permission prompts off (#206). */}
                   <button
@@ -685,7 +717,7 @@ export function Orb() {
                       boxShadow: '0 0 10px rgba(217,119,87,0.35), inset 0 0 8px rgba(217,119,87,0.12)',
                     }}
                   >
-                    {'▸ claude code'}
+                    <><LineGlyph name="chevron" size={10} /> claude code</>
                   </button>
                   {/* Voice flows are hidden until proper voice tutorials exist — the
                       text Tutorials below replace them (maintainer, 2026-11-05). */}
@@ -710,9 +742,28 @@ export function Orb() {
                     </button>
                   ))}
                   {/* Guided tours — one short text tutorial per part of the app. */}
-                  <div style={{ marginTop: 8, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8270' }}>Tutorials</div>
+                  <div style={{ marginTop: 8, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8270' }}>Tutorials</div>
+                  {/* engagement.md F12 — the whole loop, first. */}
+                  <button
+                    type="button"
+                    data-testid="orb-tour-first-day"
+                    onClick={() => { setOpen(false); startTour('first-day'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%', boxSizing: 'border-box',
+                      background: 'rgba(201, 241, 88, 0.12)', border: '1px solid rgba(201, 241, 88, 0.4)', color: '#d4cfc0',
+                      padding: '8px 10px', borderRadius: 8, fontFamily: 'inherit', cursor: 'pointer',
+                    }}
+                  >
+                    <span aria-hidden style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--accent-on-dark)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="#0e1012"><path d="M8 5v14l11-7z" /></svg>
+                    </span>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>Start here · Your first day</span>
+                      <span style={{ fontSize: 11, color: '#8a8270' }}>plan one real thing and do it · 4 min</span>
+                    </span>
+                  </button>
                   <div data-testid="orb-tours" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4 }}>
-                    {TOURS.map((t) => (
+                    {TOURS.filter((t) => t.id !== 'first-day').map((t) => (
                       <button
                         key={t.id}
                         type="button"
@@ -771,7 +822,7 @@ export function Orb() {
               background: 'rgba(0, 0, 0, 0.2)',
             }}
           >
-            <span style={{ color: 'var(--accent-on-dark)', fontWeight: 700 }}>›</span>
+            <span style={{ color: 'var(--accent-on-dark)', fontWeight: 700 }}><LineGlyph name="chevron" /></span>
             <input
               ref={inputRef}
               data-testid="orb-chat-input"

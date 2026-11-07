@@ -19,6 +19,7 @@ import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
 import { HabitIcon } from '../HabitNode/HabitIcon';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 const LANE_WIDTH = 280;
 
@@ -49,7 +50,7 @@ function lastSevenDays(today: string): string[] {
 // "TUE", "SET ↘ DAY" style. SET ↘ DAY is the "unscheduled" placeholder so
 // the user knows there's no schedule yet.
 function cadenceTag(schedule: HabitSchedule | null | undefined): string {
-  if (!schedule) return 'SET ↘ DAY';
+  if (!schedule) return 'SET A DAY';
   if (schedule.kind === 'daily') return 'DAILY';
   if (schedule.kind === 'weekdays') return 'WEEKDAYS';
   if (schedule.kind === 'weekly') {
@@ -176,19 +177,19 @@ export function HabitLaneNode({
           alignItems: 'center',
           gap: 6,
           fontFamily: 'var(--font-mono)',
-          fontSize: 10,
+          fontSize: 11,
           color: 'var(--ink-3)',
           textTransform: 'uppercase',
           letterSpacing: '0.06em',
         }}
       >
-        <span style={{ color: `var(--${color})`, fontSize: 11 }}>●</span>
+        <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, background: `var(--${color})`, display: 'inline-block' }} />
         <span>HABIT</span>
         {seqLabel && (
           <span style={{ color: 'var(--ink-2)' }}>{`· ${seqLabel}`}</span>
         )}
         <span style={{ marginLeft: 'auto', color: 'var(--ink-3)' }}>
-          {'↻ '}
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
           {cadHeader}
         </span>
       </div>
@@ -211,7 +212,7 @@ export function HabitLaneNode({
             flexShrink: 0,
           }}
         >
-          <HabitIcon icon={habit.icon} size={15} fallback="▲" />
+          <HabitIcon icon={habit.icon} size={15} fallback="" />
         </div>
 
         {/* Name */}
@@ -259,7 +260,7 @@ export function HabitLaneNode({
             flexShrink: 0,
           }}
         >
-          {doneToday ? '✓' : ''}
+          {doneToday ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : null}
         </button>
       </div>
 
@@ -302,15 +303,15 @@ export function HabitLaneNode({
           alignItems: 'center',
           justifyContent: 'space-between',
           fontFamily: 'var(--font-mono)',
-          fontSize: 9,
+          fontSize: 11,
           letterSpacing: '0.04em',
         }}
       >
-        <span style={{ color: streak > 0 ? 'var(--rust)' : 'var(--ink-4)' }}>
-          {streak > 0 ? `▲ ${streak}d streak` : 'no streak'}
+        <span style={{ color: streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', fontWeight: streak > 0 ? 600 : 400 }}>
+          {streak > 0 ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>{streak}d streak</> : 'no streak'}
         </span>
         <span style={{ color: 'var(--ink-3)' }}>
-          {'↻ '}
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
           {cadFoot}
         </span>
       </div>
@@ -328,7 +329,7 @@ export function HabitLaneNode({
           bottom: -22,
           textAlign: 'center',
           fontFamily: 'var(--font-mono)',
-          fontSize: 9,
+          fontSize: 11,
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
           color: 'var(--acid-ink, var(--acid))',
@@ -337,7 +338,7 @@ export function HabitLaneNode({
           pointerEvents: 'none',
         }}
       >
-        {'↘ drop on a calendar day'}
+        <LineGlyph name="arrowDownRight" size={11} /> drop on a calendar day
       </div>
 
       {menuOpen && (

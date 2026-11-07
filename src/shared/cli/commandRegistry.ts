@@ -223,6 +223,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'view', usage: 'cal view <day|week|month|year> [--date YYYY-MM-DD]', summary: 'Switch the Calendar view (year = 12 mini-months with focus heat)' },
       { name: 'zoom', usage: 'cal zoom <1-6>', summary: 'Week / day view hour height (1 = hourly grid … 6 = 5-minute grid), as the zoom buttons'},
+      { name: 'layers', usage: 'cal layers [recorded|habits on|off] [--json]', summary: 'Show or hide the recorded rail and the habit pills over the plan, as the header switches' },
+      { name: 'lineup', usage: 'cal lineup <task> <task> [...] [--json]', summary: 'Put plans that clash one after another, in start order, from the first (never in the past), as the Line up button on a calendar shelf' },
       { name: 'show', usage: 'cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]', summary: 'List all scheduled task placements, sorted by time' },
     ],
   },
@@ -263,6 +265,39 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'finished',
+    summary: 'Finished task cards on the canvas (same as Settings → Finished cards)',
+    subcommands: [
+      { name: 'status', usage: 'finished status', summary: 'When finished cards leave the board, and whether they are shown anyway' },
+      { name: 'policy', usage: 'finished <overnight|hour|keep>', summary: 'Leave the board overnight, after 1 hour, or keep them' },
+      { name: 'show', usage: 'finished show', summary: 'Show finished cards on the board anyway' },
+      { name: 'hide', usage: 'finished hide', summary: 'Hide finished cards again (the policy applies)' },
+    ],
+  },
+  {
+    group: 'recap',
+    summary: 'Close the day — the day recap, yesterday, last week',
+    subcommands: [
+      { name: 'today', usage: 'recap [today]', summary: 'Today: tasks done, planned done, recorded time, top streak' },
+      { name: 'yesterday', usage: 'recap yesterday', summary: 'The same for yesterday (the morning line)' },
+      { name: 'week', usage: 'recap week', summary: 'Last week, Monday to Sunday, and its best day' },
+      { name: 'show', usage: 'recap show', summary: 'Open the day recap card in the window' },
+    ],
+  },
+  {
+    group: 'sound',
+    summary: 'UI sounds — the pack, volume and on/off (same as Settings → Sounds)',
+    subcommands: [
+      { name: 'status', usage: 'sound status', summary: 'On or off, the pack, the volume (default when no subcommand)' },
+      { name: 'list', usage: 'sound list', summary: 'The packs (snd01, zen, crisp) and the moments' },
+      { name: 'pack', usage: 'sound pack <snd01|zen|crisp>', summary: 'Choose the sound pack' },
+      { name: 'volume', usage: 'sound volume <0-100>', summary: 'Set the UI sound volume' },
+      { name: 'on', usage: 'sound on', summary: 'Turn UI sounds on' },
+      { name: 'off', usage: 'sound off', summary: 'Turn UI sounds off' },
+      { name: 'play', usage: 'sound play <moment>', summary: 'Play one moment in the current pack (add, done, start, …)' },
+    ],
+  },
+  {
     group: 'radio',
     summary: 'Ambient Radio — the sound mix in the open window',
     subcommands: [
@@ -285,11 +320,64 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'mini',
+    summary: 'The floating timer: the Pomo node over other apps while KRNL0 is minimised',
+    subcommands: [
+      { name: 'status', usage: 'mini status [--json]', summary: 'On or off, showing or hidden, collapsed, and whether a session runs (default)' },
+      { name: 'show', usage: 'mini show', summary: 'Show it now, even with KRNL0 open, while a session runs' },
+      { name: 'hide', usage: 'mini hide', summary: 'Hide it until KRNL0 is minimised again' },
+      { name: 'on', usage: 'mini on', summary: 'Turn the floating timer on' },
+      { name: 'off', usage: 'mini off', summary: 'Turn the floating timer off' },
+      { name: 'look', usage: 'mini look [dial|capsule|box]', summary: 'How it looks: a round dial (default), a capsule, or the Pomo node as a box'},
+    ],
+  },
+  {
+    group: 'whatsnew',
+    summary: "What's new in this version (the box shown once after a feature update)",
+    subcommands: [
+      { name: 'print', usage: 'whatsnew [--json]', summary: 'Print the newest release notes (default)' },
+      { name: 'show', usage: 'whatsnew show', summary: "Open the What's new box in the KRNL0 window" },
+    ],
+  },
+  {
+    group: 'feedback',
+    summary: 'Send feedback: a filled-in GitHub issue the user posts themselves',
+    subcommands: [
+      { name: 'open', usage: 'feedback ["title"] [--kind bug|idea|question|love] [--link]', summary: 'Open Send feedback with the title filled in (or print the GitHub link with --link / without a window)' },
+    ],
+  },
+  {
+    group: 'catchup',
+    summary: 'Welcome back: what slipped while KRNL0 was closed',
+    subcommands: [
+      { name: 'print', usage: 'catchup [--json]', summary: 'Tasks past their planned day (chains grouped under their first task) and habit streaks (default)' },
+      { name: 'show', usage: 'catchup show', summary: 'Open the Welcome back dialog in the window, even when nothing slipped' },
+    ],
+  },
+  {
+    group: 'share',
+    summary: 'Milestone cards: habit streaks and focus sessions, as an image to save or share',
+    subcommands: [
+      { name: 'list', usage: 'share list [--json]', summary: 'Streaks and focus sessions, and the next milestone of each (default)' },
+      { name: 'streak', usage: 'share streak ["habit"]', summary: 'Open the card for a habit streak (longest one when no name is given)' },
+      { name: 'sessions', usage: 'share sessions', summary: 'Open the card for your focus sessions' },
+    ],
+  },
+  {
+    group: 'app',
+    summary: 'The app itself: version, board backups, time away, celebrations',
+    subcommands: [
+      { name: 'status', usage: 'app status [--json]', summary: 'Version, the version it updated from, backups, time away, settings (default)' },
+      { name: 'backups', usage: 'app backups [--json]', summary: 'The board copies made before each update, and their folder' },
+      { name: 'celebrations', usage: 'app celebrations [on|off]', summary: 'Milestone cards on or off (shows the setting without an argument)' },
+    ],
+  },
+  {
     group: 'tour',
     summary: 'Guided tutorials — one per part of the app',
     subcommands: [
       { name: 'list', usage: 'tour list', summary: 'List the tutorials' },
-      { name: 'start', usage: 'tour start <id>', summary: 'Start a tutorial in the KRNL0 window (welcome, pomo, todo, calendar, clock, habits, analytics, terminal)' },
+      { name: 'start', usage: 'tour start <id>', summary: 'Start a tutorial in the KRNL0 window (first-day, welcome, pomo, todo, calendar, clock, habits, analytics, terminal)' },
     ],
   },
   {

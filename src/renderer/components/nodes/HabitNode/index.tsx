@@ -13,6 +13,8 @@
 //   single onClick reads `data-date` from the target. 371 cells per
 //   habit → 1 listener.
 
+import { LineGlyph } from '../../ui/LineGlyph';
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -36,7 +38,14 @@ import {
   getYearGridCells,
   isDayScheduled,
 } from './types';
-import { calcStreak } from './commands';
+import { bestStreak, calcStreak, milestoneReached, nextMilestone, repairableDay } from './commands';
+
+/** YYYY-MM-DD plus `n` days (local). */
+function addDaysLocal(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { HabitPopover } from './HabitPopover';
@@ -44,6 +53,7 @@ import { HabitContextMenu } from './HabitContextMenu';
 import { HabitIcon } from './HabitIcon';
 import { Z } from '../../ui/layers';
 import { undoable } from '../../../store/undoNotice';
+import { openShare } from '../../../launch/launchStore';
 
 function getISOWeek(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -199,7 +209,7 @@ export function HabitNode({
             padding: '7px 10px 6px 16px',
             borderBottom: '1px solid var(--paper-3)',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
@@ -208,7 +218,7 @@ export function HabitNode({
             gap: 6,
           }}
         >
-          <span style={{ color: 'var(--rust)' }}>●</span>
+          <span style={{ color: 'var(--rust)', display: 'inline-flex' }}><LineGlyph name="dot" size={10} /></span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {titleByView[view]}
           </span>
@@ -230,12 +240,14 @@ export function HabitNode({
               borderRadius: 3,
             }}
           >
-            ⚙
+            <SettingsIcon name="settings" size={12} />
           </button>
         </div>
 
         {/* Body */}
-        <div ref={bodyRef} style={{ padding: '14px 16px', position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {/* nowheel: the wheel scrolls a long habit list instead of zooming the
+            canvas — without it the habits below the fold were out of reach. */}
+        <div ref={bodyRef} className="nowheel" style={{ padding: '14px 16px', position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
           {view === 'week' && (
             <WeekView
               habits={visibleHabits}
@@ -371,7 +383,7 @@ export function HabitNode({
             <span
               aria-hidden
               style={{
-                fontSize: 10, color: 'var(--ink-4)', background: 'var(--paper-2)',
+                fontSize: 11, color: 'var(--ink-4)', background: 'var(--paper-2)',
                 border: '1px solid var(--paper-3)', padding: '1px 4px', borderRadius: 3, flexShrink: 0,
               }}
             >
@@ -380,11 +392,11 @@ export function HabitNode({
             </div>
             {newRepeat && !repeatAt && (
               isRepeatValid(newRepeat) ? (
-                <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
+                <div style={{ marginTop: 5, fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
                   {describeRepeat(newRepeat)} · press Enter to add
                 </div>
               ) : (
-                <div data-testid="habit-add-repeat-invalid" style={{ marginTop: 5, fontSize: 10.5, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
+                <div data-testid="habit-add-repeat-invalid" style={{ marginTop: 5, fontSize: 11, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
                   Repeat isn't finished (days, time or minutes) — open it to fix, or Esc to clear
                 </div>
               )
@@ -492,8 +504,8 @@ function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextM
                 width: WEEK_CELL_SIZE,
                 textAlign: 'center',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 8.5,
-                color: 'var(--ink-4)',
+                fontSize: 11,
+                color: 'var(--ink-3)',
                 letterSpacing: '0.04em',
               }}
             >
@@ -539,6 +551,14 @@ const WeekRow = memo(function WeekRow({
     () => calcStreak(habit.log, today, habit.schedule),
     [habit.log, today, habit.schedule],
   );
+  const best = useMemo(() => bestStreak(habit.log, habit.schedule), [habit.log, habit.schedule]);
+  const milestone = milestoneReached(streak);
+  const nextMs = nextMilestone(streak);
+  const toNext = nextMs !== null ? nextMs - streak : null;
+  const [repairHidden, setRepairHidden] = useState(false);
+  const repairCandidate = useMemo(() => repairableDay(habit.log, today, habit.schedule), [habit.log, today, habit.schedule]);
+  const repairDay = repairCandidate !== null && !repairHidden && !repairDismissed(habit.id, repairCandidate) ? repairCandidate : null;
+  const repairLabel = repairDay === null ? '' : repairDay === addDaysLocal(today, -1) ? 'yesterday' : new Date(`${repairDay}T00:00:00`).toLocaleDateString('en', { weekday: 'long' });
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -667,17 +687,99 @@ const WeekRow = memo(function WeekRow({
         style={{
           marginTop: 3,
           paddingLeft: 22,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
           fontFamily: 'var(--font-mono)',
-          fontSize: 9.5,
-          color: 'var(--rust)',
-          letterSpacing: '0.04em',
+          fontSize: 11,
+          color: 'var(--ink-3)',
+          letterSpacing: '0.02em',
+          minWidth: 0,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
         }}
       >
-        {`▲ ${streak} day streak`}
+        {streak > 0
+          ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--acid-ink, var(--acid))', fontWeight: 600 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>
+              {`${streak} day${streak === 1 ? '' : 's'}`}
+            </span>
+          )
+          : <span>{best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
+        {milestone !== null && (
+          <button
+            type="button"
+            data-testid={`habit-milestone-${habit.id}`}
+            title="Open the card to save or share"
+            className="nodrag"
+            onClick={(e) => {
+              e.stopPropagation();
+              openShare({ id: `share:${habit.id}`, kind: 'streak', value: streak, habit: habit.name, best: streak >= best, log: habit.log, total: new Set(habit.log).size });
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 16, padding: '0 7px', border: 0, borderRadius: 999, background: 'var(--acid)', color: 'var(--ink-on-bright)', fontWeight: 700, font: 'inherit', fontSize: 'inherit', cursor: 'pointer' }}
+          >
+            {milestone}-day card
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M8 16 16 8M9 8h7v7" /></svg>
+          </button>
+        )}
+        {toNext !== null && streak > 0 && milestone === null && (
+          <span>· {toNext} to {nextMs}</span>
+        )}
+        {best > streak && <span data-testid={`habit-best-${habit.id}`}>· best {best}</span>}
       </div>
+
+      {/* engagement.md F17 — a missed day can be repaired, not a silent reset. */}
+      {repairDay !== null && (
+        <div
+          data-testid={`habit-repair-${habit.id}`}
+          className="nodrag"
+          style={{
+            marginTop: 6, marginLeft: 22, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 5px 5px 10px', borderRadius: 8,
+            background: 'var(--paper-2)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', minWidth: 0,
+          }}
+        >
+          <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`Missed ${repairLabel}? Tick it if you did it.`}>
+            Did it {repairLabel}?
+          </span>
+          <button
+            type="button"
+            data-testid={`habit-repair-yes-${habit.id}`}
+            onClick={(e) => { e.stopPropagation(); onToggle(habit.id, repairDay); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            title={`Tick ${repairLabel} — your streak carries on`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 22, padding: '0 9px', borderRadius: 6, cursor: 'pointer', border: 0, background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, flexShrink: 0 }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            Yes
+          </button>
+          <button
+            type="button"
+            data-testid={`habit-repair-no-${habit.id}`}
+            onClick={(e) => { e.stopPropagation(); dismissRepair(habit.id, repairDay); setRepairHidden(true); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            title="No — start fresh"
+            aria-label="No, start fresh"
+            style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: 6, cursor: 'pointer', border: 0, background: 'transparent', color: 'var(--ink-3)', flexShrink: 0 }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 });
+
+const REPAIR_KEY = 'krnl0-habit-repair-dismissed';
+function repairDismissed(habitId: string, day: string): boolean {
+  try { return (JSON.parse(localStorage.getItem(REPAIR_KEY) ?? '{}') as Record<string, string>)[habitId] === day; } catch { return false; }
+}
+function dismissRepair(habitId: string, day: string): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(REPAIR_KEY) ?? '{}') as Record<string, string>;
+    localStorage.setItem(REPAIR_KEY, JSON.stringify({ ...all, [habitId]: day }));
+  } catch { /* no storage */ }
+}
 
 // ── Month view ──────────────────────────────────────────────────────────
 
@@ -816,16 +918,7 @@ const MonthRow = memo(function MonthRow({
         >
           {habit.name}
         </div>
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
-            color: 'var(--rust)',
-            letterSpacing: '0.04em',
-          }}
-        >
-          {`▲ ${streak}`}
-        </div>
+        <StreakBadge streak={streak} />
       </div>
 
       <div
@@ -1025,16 +1118,7 @@ const YearRow = memo(function YearRow({
         >
           {habit.name}
         </div>
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
-            color: 'var(--rust)',
-            letterSpacing: '0.04em',
-          }}
-        >
-          {`▲ ${streak}`}
-        </div>
+        <StreakBadge streak={streak} />
       </div>
 
       {/* Canvas-based year grid — replaces 371 cell divs with one canvas.
@@ -1056,3 +1140,21 @@ const YearRow = memo(function YearRow({
     </div>
   );
 });
+
+
+/** The streak in Month and Year views: the week view's flame and count. */
+function StreakBadge({ streak }: { streak: number }) {
+  return (
+    <div
+      title={streak > 0 ? `${streak} day${streak === 1 ? '' : 's'} in a row` : 'No streak yet'}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+        color: streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
+      }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>
+      {streak}
+    </div>
+  );
+}

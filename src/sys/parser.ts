@@ -44,6 +44,8 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'now' }
   | { kind: 'clock'; sub: 'week'; arg: string | undefined }
   | { kind: 'cal'; sub: 'zoom'; zoom: number | undefined }
+  | { kind: 'cal'; sub: 'layers'; layer: string | undefined; on: string | undefined; json: boolean }
+  | { kind: 'cal'; sub: 'lineup'; refs: string[]; json: boolean }
   // Decision 35 — durable time log reads (time-log F13)
   | { kind: 'time'; sub: 'log'; from: string | undefined; to: string | undefined; json: boolean }
   | { kind: 'time'; sub: 'report'; month: string | undefined; by: string | undefined; json: boolean }
@@ -72,6 +74,20 @@ export type SysCommand =
   | { kind: 'info'; json: boolean }
   | { kind: 'update'; sub: 'status' | 'check'; json: boolean }
   | { kind: 'update'; sub: 'install' | 'open' }
+  | { kind: 'mini'; sub: 'status'; json: boolean }
+  | { kind: 'mini'; sub: 'show' | 'hide' | 'on' | 'off' }
+  | { kind: 'mini'; sub: 'look'; look: string | undefined }
+  // Decision 38 — launch experience
+  | { kind: 'whatsnew'; sub: 'print'; json: boolean }
+  | { kind: 'whatsnew'; sub: 'show' }
+  | { kind: 'feedback'; title: string; feedbackKind: string | undefined; link: boolean }
+  | { kind: 'catchup'; sub: 'print'; json: boolean }
+  | { kind: 'catchup'; sub: 'show' }
+  | { kind: 'share'; sub: 'streak'; habit: string | undefined }
+  | { kind: 'share'; sub: 'sessions' }
+  | { kind: 'share'; sub: 'list'; json: boolean }
+  | { kind: 'app'; sub: 'status' | 'backups'; json: boolean }
+  | { kind: 'app'; sub: 'celebrations'; on: boolean | undefined }
   | { kind: 'settings'; sub: 'show'; json: boolean }
   | { kind: 'settings'; sub: 'mode'; mode: string | undefined }
   | { kind: 'settings'; sub: 'layout'; layout: string | undefined }
@@ -105,6 +121,13 @@ export type SysCommand =
   | { kind: 'sfx'; sub: 'play'; clipId: string | undefined }
   | { kind: 'sfx'; sub: 'stop' }
   | { kind: 'sfx'; sub: 'list' }
+  | { kind: 'finished'; sub: 'status' | 'show' | 'hide' }
+  | { kind: 'finished'; sub: 'policy'; policy: string }
+  | { kind: 'recap'; sub: 'today' | 'yesterday' | 'week' | 'show' }
+  | { kind: 'sound'; sub: 'status' | 'list' | 'on' | 'off' }
+  | { kind: 'sound'; sub: 'pack'; pack: string | undefined }
+  | { kind: 'sound'; sub: 'volume'; volume: number | undefined }
+  | { kind: 'sound'; sub: 'play'; moment: string | undefined }
   | { kind: 'radio'; sub: 'list' | 'status' | 'stop' }
   | { kind: 'radio'; sub: 'play'; preset: string | undefined }
   | { kind: 'radio'; sub: 'remove'; preset: string | undefined }
@@ -317,6 +340,56 @@ export class SysParser {
       return { kind: 'invalid', message: `Unknown subcommand: update ${sub}. Try: update status | check | install | open` };
     }
 
+    // Decision 37 — the floating pocket timer. Bare `mini` (or `mini --json`) = status.
+    if (cmd === 'mini') {
+      if (sub === undefined || sub.startsWith('--')) {
+        return { kind: 'mini', sub: 'status', json: hasFlag([sub ?? '', ...rest], 'json') };
+      }
+      if (sub === 'status') return { kind: 'mini', sub, json: hasFlag(rest, 'json') };
+      if (sub === 'show' || sub === 'hide' || sub === 'on' || sub === 'off') return { kind: 'mini', sub };
+      if (sub === 'look') return { kind: 'mini', sub: 'look', look: rest[0] };
+      return { kind: 'invalid', message: `Unknown subcommand: mini ${sub}. Try: mini status | show | hide | on | off | look <dial|capsule|box>` };
+    }
+
+    // Decision 38 — launch experience (launch-experience.md F7, F15, F19, F23, F24).
+    if (cmd === 'whatsnew') {
+      if (sub === undefined || sub.startsWith('--')) return { kind: 'whatsnew', sub: 'print', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'show') return { kind: 'whatsnew', sub: 'show' };
+      return { kind: 'invalid', message: `Unknown subcommand: whatsnew ${sub}. Try: whatsnew [--json] | whatsnew show` };
+    }
+    if (cmd === 'feedback') {
+      const args = [sub ?? '', ...rest].filter((a) => a !== '');
+      const words: string[] = [];
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i]!;
+        if (a === '--kind') { i++; continue; }
+        if (a.startsWith('--')) continue;
+        words.push(a);
+      }
+      return { kind: 'feedback', title: words.join(' '), feedbackKind: flag(args, 'kind'), link: hasFlag(args, 'link') };
+    }
+    if (cmd === 'catchup') {
+      if (sub === undefined || sub.startsWith('--')) return { kind: 'catchup', sub: 'print', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'show') return { kind: 'catchup', sub: 'show' };
+      return { kind: 'invalid', message: `Unknown subcommand: catchup ${sub}. Try: catchup [--json] | catchup show` };
+    }
+    if (cmd === 'share') {
+      if (sub === undefined || sub === 'list' || sub.startsWith('--')) return { kind: 'share', sub: 'list', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'streak') return { kind: 'share', sub: 'streak', habit: rest.filter((a) => !a.startsWith('--')).join(' ') || undefined };
+      if (sub === 'sessions') return { kind: 'share', sub: 'sessions' };
+      return { kind: 'invalid', message: `Unknown subcommand: share ${sub}. Try: share list | share streak ["habit"] | share sessions` };
+    }
+    if (cmd === 'app') {
+      if (sub === undefined || sub === 'status' || sub.startsWith('--')) return { kind: 'app', sub: 'status', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'backups') return { kind: 'app', sub: 'backups', json: hasFlag(rest, 'json') };
+      if (sub === 'celebrations') {
+        const v = rest[0];
+        if (v !== undefined && v !== 'on' && v !== 'off') return { kind: 'invalid', message: 'Usage: app celebrations [on|off]' };
+        return { kind: 'app', sub: 'celebrations', on: v === undefined ? undefined : v === 'on' };
+      }
+      return { kind: 'invalid', message: `Unknown subcommand: app ${sub}. Try: app status | backups | celebrations [on|off]` };
+    }
+
     if (cmd === 'settings') {
       if (sub === 'show' || sub === undefined) {
         return { kind: 'settings', sub: 'show', json: hasFlag(rest, 'json') };
@@ -490,6 +563,8 @@ export class SysParser {
 
     if (cmd === 'cal') {
       if (sub === 'view') return { kind: 'cal', sub: 'view', view: rest[0], date: flag(rest, 'date') };
+      if (sub === 'lineup') return { kind: 'cal', sub: 'lineup', refs: rest.filter((r) => !r.startsWith('--')), json: hasFlag(rest, 'json') };
+      if (sub === 'layers') return { kind: 'cal', sub: 'layers', layer: rest.find((r) => !r.startsWith('--')), on: rest.filter((r) => !r.startsWith('--'))[1], json: hasFlag(rest, 'json') };
       if (sub === 'zoom') {
         const z = rest[0] !== undefined ? Number(rest[0]) : NaN;
         return { kind: 'cal', sub: 'zoom', zoom: Number.isFinite(z) ? z : undefined };
@@ -871,6 +946,31 @@ export class SysParser {
       if (sub === 'play') return { kind: 'sfx', sub: 'play', clipId: rest[0] };
       if (sub === 'stop') return { kind: 'sfx', sub: 'stop' };
       if (sub === 'list') return { kind: 'sfx', sub: 'list' };
+    }
+
+    // Finished task cards on the canvas (engagement.md F6).
+    if (cmd === 'finished') {
+      if (sub === undefined || sub === 'status') return { kind: 'finished', sub: 'status' };
+      if (sub === 'show' || sub === 'hide') return { kind: 'finished', sub };
+      return { kind: 'finished', sub: 'policy', policy: sub };
+    }
+
+    // Close the day (engagement.md F11).
+    if (cmd === 'recap') {
+      if (sub === undefined || sub === 'today') return { kind: 'recap', sub: 'today' };
+      if (sub === 'yesterday' || sub === 'week' || sub === 'show') return { kind: 'recap', sub };
+    }
+
+    // UI sounds (docs/06-requirements/ui-sounds.md F7).
+    if (cmd === 'sound') {
+      if (sub === undefined || sub === 'status') return { kind: 'sound', sub: 'status' };
+      if (sub === 'list' || sub === 'on' || sub === 'off') return { kind: 'sound', sub };
+      if (sub === 'pack') return { kind: 'sound', sub: 'pack', pack: rest[0] };
+      if (sub === 'play') return { kind: 'sound', sub: 'play', moment: rest[0] };
+      if (sub === 'volume') {
+        const v = rest[0] !== undefined ? Number(rest[0]) : NaN;
+        return { kind: 'sound', sub: 'volume', volume: Number.isFinite(v) ? v : undefined };
+      }
     }
 
     // Ambient Radio — the mix in the open window.

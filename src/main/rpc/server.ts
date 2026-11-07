@@ -7,7 +7,9 @@
 import * as net from 'net';
 import * as os from 'os';
 import * as crypto from 'crypto';
-import { BrowserWindow } from 'electron';
+import { getMainWindow } from '../mainWindow';
+import { getPocket } from '../pocket';
+import { appStatePort } from '../appState';
 import { SysFacade } from '../../sys/SysFacade';
 import type { CliDispatchFn } from '../../sys/SysFacade';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
@@ -102,13 +104,16 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
         chain = chain.then(async () => {
           const dispatch = getDispatch?.() ?? null;
           const updater = getUpdater();
+          const pocket = getPocket();
           const facade = new SysFacade({
             boardPath,
-            hasOpenRenderer: () => BrowserWindow.getAllWindows().length > 0,
+            hasOpenRenderer: () => getMainWindow() !== null,
             onBoardChanged: notifyBoardChanged,
             viewSize: windowViewSize,
             ...(dispatch ? { cliDispatch: dispatch } : {}),
             ...(updater ? { updater } : {}),
+            ...(pocket ? { pocket } : {}),
+            appState: appStatePort,
           });
           let result: { ok: boolean; message?: string; exitCode?: unknown; data?: unknown };
           try {

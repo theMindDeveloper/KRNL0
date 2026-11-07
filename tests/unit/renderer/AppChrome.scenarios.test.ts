@@ -14,6 +14,7 @@
  *  - F7: Test that TopBar's FIT button calls fitView with correct options.
  */
 
+import { CANVAS_FIT_PADDING } from '../../../src/renderer/components/Canvas/fitPadding';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
@@ -93,16 +94,16 @@ describe('F1 — Topbar left content', () => {
     expect(screen.getByTestId('topbar-brand').textContent).toContain('KRNL0');
   });
 
-  it('renders breadcrumb text "∷ ~/krnl0 / canvas /"', () => {
+  it('renders breadcrumb text "~/krnl0 / canvas /"', () => {
     renderWithWrapper(React.createElement(TopBar));
     expect(screen.getByTestId('topbar-breadcrumb').textContent).toBe(
-      '∷ ~/krnl0 / canvas /'
+      '~/krnl0 / canvas /'
     );
   });
 
-  it('renders badge text "◆ live"', () => {
+  it('renders badge text "live" with a dot (no glyph)', () => {
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-live-badge').textContent).toBe('◆ live');
+    expect(screen.getByTestId('topbar-live-badge').textContent).toBe('live');
   });
 });
 
@@ -261,17 +262,19 @@ describe('F6 — Theme toggle persists to localStorage', () => {
     expect(toggleBtn.textContent).toContain('LIGHT');
   });
 
-  it('button label shows ☾ DARK when theme is dark', () => {
+  it('button label shows a moon icon and DARK when theme is dark', () => {
     localStorage.setItem('krnl0-theme', 'dark');
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('☾');
+    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('DARK');
+    expect(screen.getByTestId('topbar-theme-toggle').querySelector('svg')).not.toBeNull();
   });
 
-  it('button label shows ☀ LIGHT when theme is light', () => {
+  it('button label shows a sun icon and LIGHT when theme is light', () => {
     localStorage.setItem('krnl0-theme', 'light');
     document.documentElement.setAttribute('data-theme', 'light');
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('☀');
+    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('LIGHT');
+    expect(screen.getByTestId('topbar-theme-toggle').querySelector('svg')).not.toBeNull();
   });
 });
 
@@ -302,10 +305,10 @@ describe('F7 — FIT button calls fitView', () => {
     mockFitView.mockClear();
   });
 
-  it('calls rf.fitView with { padding: 0.2, duration: 300 }', () => {
+  it('calls rf.fitView with the canvas padding (clear of the tool rail) and duration 300', () => {
     renderWithWrapper(React.createElement(TopBar));
     fireEvent.click(screen.getByTestId('topbar-fit'));
-    expect(mockFitView).toHaveBeenCalledWith({ padding: 0.2, duration: 300 });
+    expect(mockFitView).toHaveBeenCalledWith({ padding: CANVAS_FIT_PADDING, duration: 300 });
   });
 });
 

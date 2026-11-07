@@ -96,7 +96,7 @@
 /* ── Wedge label (A2 §8) — white, sized to fit inside the wedge ─────────── */
 .radial-wedge-label {
   font-family: var(--font-mono, monospace);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   pointer-events: none;
@@ -133,7 +133,7 @@
 }
 
 .radial-chooser-animate {
-  animation: radial-appear 180ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: radial-appear 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   transform-origin: center;
 }
 

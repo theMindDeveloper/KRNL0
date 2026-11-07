@@ -2,6 +2,7 @@
 // with a delete button each. Tiny or misclicked spans that are hard to hit on
 // the Calendar/Clock are easy to find and remove here.
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import { useState } from 'react';
 import type { PomoSessionRecord } from './types';
 import type { TagDef } from '../../../../shared/tags/classify';
@@ -39,14 +40,14 @@ export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLo
 
   return (
     <div data-testid="pomo-log" onMouseDown={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, minHeight: 240 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        <button type="button" aria-label="Previous day" onClick={() => setDayOffset((d) => d + 1)} style={navBtn}>‹</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <button type="button" aria-label="Previous day" onClick={() => setDayOffset((d) => d + 1)} style={navBtn}><LineGlyph name="chevronLeft" /></button>
         <span style={{ flex: 1, textAlign: 'center' }}>{dayOffset === 0 ? 'today' : dayOffset === 1 ? 'yesterday' : day} · {rows.length} spans</span>
-        <button type="button" aria-label="Next day" disabled={dayOffset === 0} onClick={() => setDayOffset((d) => Math.max(0, d - 1))} style={{ ...navBtn, opacity: dayOffset === 0 ? 0.3 : 1 }}>›</button>
+        <button type="button" aria-label="Next day" disabled={dayOffset === 0} onClick={() => setDayOffset((d) => Math.max(0, d - 1))} style={{ ...navBtn, opacity: dayOffset === 0 ? 0.3 : 1 }}><LineGlyph name="chevron" /></button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', maxHeight: 300 }}>
         {rows.length === 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-4)', padding: '12px 0', textAlign: 'center' }}>nothing recorded</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', padding: '12px 0', textAlign: 'center' }}>nothing recorded</span>
         )}
         {rows.map((r) => {
           const start = Date.parse(r.startedAt);
@@ -59,7 +60,7 @@ export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLo
             <div
               key={r.id}
               data-testid="pomo-log-row"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, background: 'var(--paper-2)', fontFamily: 'var(--font-mono)', fontSize: 10 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, background: 'var(--paper-2)', fontFamily: 'var(--font-mono)', fontSize: 11 }}
             >
               {isBreak
                 ? <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0, background: 'repeating-linear-gradient(135deg, var(--ink-3) 0 1px, transparent 1px 3px)' }} />
@@ -77,11 +78,11 @@ export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLo
                   onClick={() => onName(r.id)}
                   style={{
                     flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-                    fontFamily: 'var(--font-mono)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    color: unnamed ? 'var(--acid)' : 'var(--ink)', textDecoration: unnamed ? 'underline dotted' : 'none',
+                    fontFamily: 'var(--font-mono)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    color: unnamed ? 'var(--acid-ink, var(--acid))' : 'var(--ink)', textDecoration: unnamed ? 'underline dotted' : 'none',
                   }}
                 >
-                  {r.taskId ? '☐ ' : ''}{name}{cat ? <span style={{ color: 'var(--ink-3)' }}> · {cat.label}</span> : null}
+                  {r.taskId ? <><LineGlyph name="task" size={10} /> </> : ''}{name}{cat ? <span style={{ color: 'var(--ink-3)' }}> · {cat.label}</span> : null}
                 </button>
               )}
               <span style={{ color: 'var(--ink-3)', flexShrink: 0 }}>{fmtDur(end - start)}</span>
@@ -93,7 +94,7 @@ export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLo
                 onClick={() => onDelete(r.id)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', lineHeight: 1 }}
               >
-                ✕
+                <LineGlyph name="close" size={10} />
               </button>
             </div>
           );

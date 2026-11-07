@@ -5,7 +5,7 @@
 import type { CSSProperties } from 'react';
 import type { AnalyticsCardId } from './types';
 
-export type PageId = 'summary' | 'activity' | 'year' | 'hours' | 'estimates' | 'tags' | 'log' | 'insights' | 'habits';
+export type PageId = 'summary' | 'activity' | 'year' | 'hours' | 'estimates' | 'tags' | 'log' | 'insights' | 'spread' | 'habits';
 
 export interface AnalyticsPage {
   id: PageId;
@@ -21,6 +21,7 @@ export const PAGES: readonly AnalyticsPage[] = [
   { id: 'tags',      label: 'Time by tag' },
   { id: 'log',       label: 'Time per task' },
   { id: 'insights',  label: 'Insights' },
+  { id: 'spread',    label: 'Day to day' },
   { id: 'habits',    label: 'Habits' },
 ];
 
@@ -46,12 +47,14 @@ const LAYOUT: Partial<Record<AnalyticsCardId | 'summary', Slot>> = {
   'time.list':                   { page: 'tags',      row: 0, rows: 1, col: 3, cols: 4 },
   'time.daily':                  { page: 'tags',      row: 1, rows: 1, col: 1, cols: 6 },
   'time.log':                    { page: 'log',       row: 0, rows: 2, col: 1, cols: 6 },
-  'insights.radar':              { page: 'insights',  row: 0, rows: 1, col: 1, cols: 2 },
-  'insights.donutSessionsByDay': { page: 'insights',  row: 0, rows: 1, col: 3, cols: 2 },
-  'insights.donutSources':       { page: 'insights',  row: 0, rows: 1, col: 5, cols: 2 },
-  'insights.scatterTasksFocus':  { page: 'insights',  row: 1, rows: 1, col: 1, cols: 2 },
-  'insights.histogramFocus':     { page: 'insights',  row: 1, rows: 1, col: 3, cols: 2 },
-  'insights.histogramTasks':     { page: 'insights',  row: 1, rows: 1, col: 5, cols: 2 },
+  // Two cards a row at most: three across left each chart ~110 px in a
+  // station-sized window (cut titles, labels off the card).
+  'insights.radar':              { page: 'insights',  row: 0, rows: 1, col: 1, cols: 3 },
+  'insights.donutSources':       { page: 'insights',  row: 0, rows: 1, col: 4, cols: 3 },
+  'insights.scatterTasksFocus':  { page: 'insights',  row: 1, rows: 1, col: 1, cols: 3 },
+  'insights.donutSessionsByDay': { page: 'insights',  row: 1, rows: 1, col: 4, cols: 3 },
+  'insights.histogramFocus':     { page: 'spread',    row: 0, rows: 1, col: 1, cols: 6 },
+  'insights.histogramTasks':     { page: 'spread',    row: 1, rows: 1, col: 1, cols: 6 },
   'sources.streaks':             { page: 'habits',    row: 0, rows: 2, col: 1, cols: 3 },
   'sources.list':                { page: 'habits',    row: 0, rows: 2, col: 4, cols: 3 },
 };

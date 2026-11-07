@@ -84,7 +84,7 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
           role="presentation"
           style={{
             padding: '5px 14px 6px',
-            fontSize: 10,
+            fontSize: 11,
             color: 'var(--ink-3)',
             letterSpacing: '0.04em',
             whiteSpace: 'nowrap',

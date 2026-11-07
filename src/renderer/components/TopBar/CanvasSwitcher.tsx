@@ -3,6 +3,7 @@
 // confirm. Mother nodes and their data are shared, so deleting a canvas only
 // removes its free nodes and drawings. CLI twin: `krnl canvas …`.
 
+import { LineGlyph } from '../ui/LineGlyph';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
@@ -66,12 +67,13 @@ export function CanvasSwitcher() {
         onClick={() => (open ? close() : setOpen(true))}
         style={{
           background: 'transparent', border: '1px solid var(--paper-3)', borderRadius: 'var(--radius)',
-          padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10.5,
+          padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11,
           color: 'var(--ink-2, var(--ink))', letterSpacing: '0.03em', whiteSpace: 'nowrap',
-          maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis',
+          maxWidth: 180, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
         }}
       >
-        {active?.name ?? DEFAULT_CANVAS_NAME} <span style={{ color: 'var(--ink-4)' }}>▾</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{active?.name ?? DEFAULT_CANVAS_NAME}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: 'var(--ink-3)', flexShrink: 0 }}><path d="M6 9l6 6 6-6" /></svg>
       </button>
       <Popover anchor={anchor.current} open={open} onClose={close} minWidth={220}>
         <div data-testid="canvas-switcher-list" style={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
@@ -92,7 +94,7 @@ export function CanvasSwitcher() {
             if (confirmDel === c.id) {
               return (
                 <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 6px' }}>
-                  <span style={{ flex: 1, color: 'var(--ink-3)', fontSize: 10.5 }}>Delete “{c.name}” and its content?</span>
+                  <span style={{ flex: 1, color: 'var(--ink-3)', fontSize: 11 }}>Delete “{c.name}” and its content?</span>
                   <button
                     type="button" data-testid={`canvas-delete-confirm-${c.id}`}
                     style={{ ...rowBtn, color: 'var(--rust)', fontWeight: 700 }}
@@ -126,7 +128,7 @@ export function CanvasSwitcher() {
                   color: 'var(--ink)', fontWeight: isActive ? 700 : 400,
                 }}
               >
-                <span style={{ width: 12, color: 'var(--acid-ink, var(--acid))' }}>{isActive ? '✓' : ''}</span>
+                <span style={{ width: 12, color: 'var(--acid-ink, var(--acid))' }}>{isActive ? <LineGlyph name="check" size={11} /> : null}</span>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
                 <button
                   type="button" title="Rename" aria-label={`Rename ${c.name}`} style={rowBtn}
@@ -136,7 +138,7 @@ export function CanvasSwitcher() {
                   <button
                     type="button" title="Delete" aria-label={`Delete ${c.name}`} data-testid={`canvas-delete-${c.id}`} style={rowBtn}
                     onClick={(e) => { e.stopPropagation(); setConfirmDel(c.id); }}
-                  >✕</button>
+                  ><LineGlyph name="close" size={10} /></button>
                 )}
               </div>
             );

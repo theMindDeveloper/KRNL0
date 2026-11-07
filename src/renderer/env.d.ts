@@ -55,6 +55,25 @@ interface KrnlBridge {
   updateInstall?: () => Promise<{ ok: boolean; message: string }>
   updateOpenRelease?: () => Promise<{ ok: boolean; message: string }>
   onUpdateState?: (callback: (state: unknown) => void) => () => void
+  // Decision 37 — pocket timer. Use renderer/pocket/*, not these directly.
+  pocketSendState?: (snapshot: unknown) => void
+  onPocketRun?: (callback: (command: string, args?: unknown) => void) => () => void
+  pocketGet?: () => Promise<unknown>
+  onPocketSnapshot?: (callback: (snapshot: unknown) => void) => () => void
+  onPocketPrefs?: (callback: (prefs: unknown) => void) => () => void
+  pocketCommand?: (command: string, args?: unknown) => Promise<{ ok: boolean; message: string }>
+  pocketOpenMain?: () => void
+  pocketCollapse?: (collapsed: boolean) => void
+  pocketResize?: (size: { width: number; height: number }) => void
+  onPocketHover?: (callback: (over: boolean) => void) => () => void
+  pocketLookSet?: (look: string) => Promise<{ ok: boolean; message: string }>
+  pocketSettingsGet?: () => Promise<unknown>
+  pocketSettingsSet?: (on: boolean) => Promise<{ ok: boolean; message: string }>
+  // Decision 38 — launch experience. Use renderer/launch/*, not these directly.
+  appLaunch?: () => Promise<unknown>
+  appPrefsSet?: (patch: unknown) => Promise<unknown>
+  appBackupsOpen?: () => Promise<{ ok: boolean; message: string }>
+  appOpenExternal?: (url: string) => Promise<{ ok: boolean; message: string }>
 }
 
 interface Window {
@@ -69,3 +88,9 @@ declare module '*?url' {
 
 /** App version from package.json, injected by electron-vite `define`. */
 declare const __APP_VERSION__: string | undefined;
+
+// Images imported as URLs (Vite asset handling).
+declare module '*.webp' {
+  const src: string;
+  export default src;
+}

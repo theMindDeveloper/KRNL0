@@ -19,7 +19,7 @@ export function UnknownNode({ node }: NodeProps) {
       }}
     >
       <div style={{ marginBottom: 4 }}>? UNKNOWN KIND</div>
-      <div style={{ fontSize: 10, opacity: 0.8, textTransform: 'none', letterSpacing: 0 }}>
+      <div style={{ fontSize: 11, opacity: 0.8, textTransform: 'none', letterSpacing: 0 }}>
         {node.kind}
       </div>
     </div>

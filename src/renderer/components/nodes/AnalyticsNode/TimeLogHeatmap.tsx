@@ -8,6 +8,7 @@
 //   - bottom: per-day totals, then "By tag" — the share of time per tag
 // Built once per open / range change — no animation.
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import { useEffect, useMemo, useState } from 'react';
 import { foldTimeLog, type TimeLogEntry, type TimeLogFold } from '../../../../shared/timelog';
 import { queryTimeLog } from '../../../store/timeLog';
@@ -46,7 +47,7 @@ function shift(span: Span, anchor: Date, dir: -1 | 1): Date {
 }
 
 const segBtn = (on: boolean): React.CSSProperties => ({
-  fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.04em',
+  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em',
   padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
   border: `1px solid ${on ? 'var(--k-an-ink-1, var(--ink))' : 'var(--k-an-line, var(--paper-3))'}`,
   background: on ? 'var(--k-an-ink-1, var(--ink))' : 'transparent', color: on ? 'var(--k-an-bg, var(--paper))' : 'var(--k-an-ink-2, var(--ink-2))',
@@ -105,10 +106,17 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
         <button type="button" style={segBtn(span === 'week')} onClick={() => setSpan('week')}>Week</button>
         <button type="button" style={segBtn(span === 'month')} onClick={() => setSpan('month')}>Month</button>
         <span style={{ flex: 1 }} />
-        <button type="button" aria-label="Earlier" style={segBtn(false)} onClick={() => setAnchor(shift(span, anchor, -1))}>‹</button>
-        <span data-testid="time-log-range" style={{ minWidth: 130, textAlign: 'center', color: ink1, fontSize: 12 }}>{r.title}</span>
-        <button type="button" aria-label="Later" style={segBtn(false)} onClick={() => setAnchor(shift(span, anchor, 1))}>›</button>
-        <button type="button" style={segBtn(false)} onClick={() => setAnchor(new Date())}>This {span}</button>
+        {/* The arrows and the range wrap as one unit, never "›" alone on a line. */}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+          <button type="button" aria-label="Earlier" style={{ ...segBtn(false), display: 'inline-grid', placeItems: 'center' }} onClick={() => setAnchor(shift(span, anchor, -1))}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+          <span data-testid="time-log-range" style={{ minWidth: 110, textAlign: 'center', color: ink1, fontSize: 12 }}>{r.title}</span>
+          <button type="button" aria-label="Later" style={{ ...segBtn(false), display: 'inline-grid', placeItems: 'center' }} onClick={() => setAnchor(shift(span, anchor, 1))}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 5l7 7-7 7" /></svg>
+          </button>
+          <button type="button" style={segBtn(false)} onClick={() => setAnchor(new Date())}>This {span}</button>
+        </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 22, fontWeight: 700, color: ink1, fontFamily: 'var(--font-sans)' }}>{fold ? fmt(fold.totalMin) : '…'}</span>
@@ -121,7 +129,7 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
         <div style={{ color: ink3, padding: '16px 0' }}>Nothing recorded this {span}. Start a session on the Pomo, or log past time from the Calendar.</div>
       ) : (
         <div role="table" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div role="row" style={{ display: 'flex', alignItems: 'center', height: 16, color: ink3, fontSize: 9.5 }}>
+          <div role="row" style={{ display: 'flex', alignItems: 'center', height: 16, color: ink3, fontSize: 11 }}>
             <span style={{ width: NAME_W, flexShrink: 0 }} />
             {days.map((d) => {
               const dt = new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
@@ -156,7 +164,7 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
                       title={m ? `${t.taskText || 'untagged'} · ${d} · ${fmt(m)}` : undefined}
                       style={{
                         width: cellW, height: ROW_H - 4, marginRight: GAP, borderRadius: 4, flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 600,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600,
                         background: m ? `color-mix(in srgb, ${color} ${strength}%, transparent)` : 'var(--k-an-tile, rgba(255,255,255,0.03))',
                         color: strength > 60 ? 'var(--k-an-bg, #111)' : ink1,
                         overflow: 'hidden', whiteSpace: 'nowrap',
@@ -169,15 +177,15 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
                 <span style={{ width: TOTAL_W, flexShrink: 0, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                   <span style={{ color: ink1, fontWeight: 600 }}>{fmt(t.totalMin)}</span>
                   {t.plannedMin ? <span style={{ color: t.totalMin > t.plannedMin ? 'var(--rust)' : ink3 }}> / {fmt(t.plannedMin)}</span> : null}
-                  {t.done && <span style={{ color: 'var(--acid-ink, var(--acid))' }}> ✓</span>}
+                  {t.done && <span style={{ color: 'var(--acid-ink, var(--acid))', marginLeft: 4 }}><LineGlyph name="check" size={10} /></span>}
                 </span>
               </div>
             );
           })}
           {rows.length > shown.length && (
-            <div style={{ color: ink3, fontSize: 10 }}>+{rows.length - shown.length} more — make the window taller to see them</div>
+            <div style={{ color: ink3, fontSize: 11 }}>+{rows.length - shown.length} more — make the window taller to see them</div>
           )}
-          <div role="row" style={{ display: 'flex', alignItems: 'center', height: 18, color: 'var(--k-an-ink-2, var(--ink-2))', fontSize: 9.5, borderTop: '1px solid var(--k-an-line, var(--paper-3))', paddingTop: 4 }}>
+          <div role="row" style={{ display: 'flex', alignItems: 'center', height: 18, color: 'var(--k-an-ink-2, var(--ink-2))', fontSize: 11, borderTop: '1px solid var(--k-an-line, var(--paper-3))', paddingTop: 4 }}>
             <span style={{ width: NAME_W, flexShrink: 0 }}>per day</span>
             {days.map((d) => (
               <span key={d} style={{ width: cellW, marginRight: GAP, flexShrink: 0, textAlign: 'center', fontWeight: 600 }}>
@@ -190,13 +198,13 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
 
       {tagEntries.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: ink3 }}>By tag · on the days worked</span>
+          <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: ink3 }}>By tag · on the days worked</span>
           <div style={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden', background: 'var(--k-an-tile, rgba(255,255,255,0.03))' }}>
             {tagEntries.map(([id, v]) => (
               <span key={id} title={`${tagInfo(id)?.label ?? 'untagged'} · ${fmt(v.totalMin)}`} style={{ width: `${(v.totalMin / tagTotal) * 100}%`, background: tagInfo(id)?.color ?? 'var(--k-an-ink-3, var(--ink-3))' }} />
             ))}
           </div>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 10.5 }}>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11 }}>
             {tagEntries.slice(0, 8).map(([id, v]) => {
               const ti = tagInfo(id);
               return (

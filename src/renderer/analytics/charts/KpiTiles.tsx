@@ -67,7 +67,7 @@ const tileStyle = (accent: string): React.CSSProperties => ({
 
 const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 9,
+  fontSize: 11,
   color: 'var(--k-an-ink-3, #9aa1a8)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
@@ -90,7 +90,7 @@ const valueStyle: React.CSSProperties = {
 };
 
 const unitStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 11,
   color: 'var(--k-an-ink-4, #7d848b)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
@@ -98,7 +98,7 @@ const unitStyle: React.CSSProperties = {
 
 const hintStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 9,
+  fontSize: 11,
   color: 'var(--k-an-ink-4, #7d848b)',
 };
 
@@ -106,12 +106,11 @@ function DeltaBadge({ pct }: { pct: number | undefined }) {
   if (pct === undefined) return null;
   const up = pct >= 0;
   const color = up ? 'var(--acid)' : 'var(--k-an-warm, #ff8e64)';
-  const sign = up ? '▲' : '▼';
   return (
     <span
       style={{
         fontFamily: 'var(--font-mono)',
-        fontSize: 9,
+        fontSize: 11,
         color,
         background: up ? 'rgba(201,241,88,0.12)' : 'rgba(255,142,100,0.12)',
         border: `1px solid ${up ? 'rgba(201,241,88,0.35)' : 'rgba(255,142,100,0.35)'}`,
@@ -121,7 +120,7 @@ function DeltaBadge({ pct }: { pct: number | undefined }) {
         fontWeight: 600,
       }}
     >
-      {sign} {Math.abs(pct).toFixed(0)}%
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.05em', marginRight: 3 }}><path d={up ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6'} /></svg>{Math.abs(pct).toFixed(0)}%
     </span>
   );
 }

@@ -8,7 +8,7 @@ import { openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
 
 const link: CSSProperties = {
   background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-  fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.06em',
+  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em',
   color: 'var(--ink-3)', textDecoration: 'underline', textUnderlineOffset: 2,
 };
 

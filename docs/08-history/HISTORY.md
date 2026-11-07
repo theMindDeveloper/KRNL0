@@ -1238,3 +1238,408 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Type:** Chore (CI)
 **Files changed:** `.github/workflows/release.yml`, `docs/releases/RELEASING.md`, `docs/releases/v0.10.1.md`, `docs/08-history/HISTORY.md`
 **Summary:** The `macos-15` job of the v0.10.1 tag build sat queued for a shared GitHub Mac runner. By the maintainer's choice the release workflow now builds Windows only (the macOS entry is kept as a comment to restore). The maintainer builds the `.dmg` on a Mac from the same tag and attaches it with `gh release upload` (RELEASING.md → "macOS build"); macOS is notify-only, so no metadata file has to match. The unpublished `v0.10.1` tag moves to this commit.
+
+---
+
+## [2026-11-06] — Pocket timer: the Pomo node floats over other apps
+
+**Type:** Feature
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/main/pocket/index.ts`, `src/main/mainWindow.ts`, `src/main/index.ts`, `src/main/preload.ts`, `src/main/ipc/handlers.ts`, `src/main/rpc/server.ts`, `src/main/boardIo.ts`, `src/shared/pocket.ts`, `src/renderer/pocket/*`, `src/renderer/index.tsx`, `src/renderer/App.tsx`, `src/renderer/env.d.ts`, `src/renderer/components/nodes/PomoNode/derive.ts`, `PomoNode/index.tsx`, `src/renderer/components/TopBar/PocketSection.tsx`, `TopBar/index.tsx`, `src/sys/commands/mini.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, tests (`PomoNode.derive`, `shared/pocket`, `sys/mini.cli`), `docs/06-requirements/pocket-timer.md`, `docs/03-architecture/decisions.md` (Decision 37)
+**Summary:** Minimising KRNL0 while the Pomo node is timing now shows a small always-on-top window with the node in its current mode: Pomodoro (the user's timer face counting down, session pips, Stop · Break · Pause, the "Are you done?" Extend · Break · Stop) or Observe (count-up, today's spans on the day strip, Work today / Breaks / Spans, Break · Stop, Back to work). It collapses to one line, drags anywhere (position remembered and kept on a visible screen), and hides when KRNL0 comes back. It is a view only: the main window sends it a snapshot and runs its buttons through the node's own command path; main forwards only the node's control commands. The node's timing and control rules moved to `PomoNode/derive.ts`, shared by both. The main window is now tracked by name, so CLI dispatch, second-launch focus and app activation never target the pocket. Settings → Floating timer switch; CLI `krnl mini status|show|hide|on|off`. Preferences live in `userData/pocket.json`, not the board. Out of scope: the Observe tagger in the pocket (menu bar / taskbar time shipped in the entry below).
+
+## [2026-11-06] — Launch experience: splash, What's new, board backups, welcome back, feedback, milestones, taskbar time
+
+**Type:** Feature
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/main/appState.ts`, `src/main/taskbar.ts`, `src/main/index.ts`, `src/main/preload.ts`, `src/main/pocket/index.ts`, `src/main/ipc/handlers.ts`, `src/main/rpc/server.ts`, `src/shared/appState.ts`, `src/shared/whatsnew.ts`, `src/shared/feedback.ts`, `src/shared/systemTimer.ts`, `src/renderer/index.html`, `src/renderer/splash.ts`, `src/renderer/launch/*`, `src/renderer/components/Launch/*`, `src/renderer/components/TopBar/LaunchSettings.tsx`, `TopBar/index.tsx`, `src/renderer/components/ui/UpdateNoticeBar.tsx`, `StatusBar/index.tsx`, `src/renderer/store/updateStore.ts`, `src/renderer/store/useCliDispatch.ts`, `src/renderer/styles/launch.css`, `src/renderer/assets/launch/*`, `PomoNode/ObserveDash.tsx`, `src/sys/commands/launch.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, `.github/ISSUE_TEMPLATE/*`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, tests, `docs/06-requirements/launch-experience.md`, `docs/03-architecture/decisions.md` (Decision 38)
+**Summary:** Built the launch designs. A splash card paints before any script loads and lists what is really happening (board, counts, canvas; after an update `Updated · a → b` and `backup saved`), then fades as soon as the board is on screen. Before a new version opens the board, main copies `board.json` into `backups/` (newest 3 kept; Settings › Updates › Show folder). After a feature update a What's new box (draft A) shows three highlights once; after a patch a small "Updated to x.y.z" notice fades after 5 s. Update states follow the designs: download meter in the status bar, "ready" waits while a Pomo session runs, Skip version on Mac/Linux, Retry after a failed manual check, recent versions in Settings. Windows shows Pomo progress on the taskbar icon with Pause / Break / Stop in the preview; macOS shows the time in the menu bar with the same controls. Welcome back lists what slipped after 2+ days away (only the first task of a chain gets buttons: Today, Tomorrow, Unplan, Move all to today) and habit streaks. A Help menu (?) adds Send feedback — a filled-in GitHub issue the user posts themselves — and Copy diagnostics. Milestone cards (streaks 7/30/100/365, focus sessions 10/100/500) render a 1080 px image to save or copy, with a Celebrations switch. The Observe day strip draws breaks as a thin line instead of hatching. App state lives in `userData/app-state.json` (Decision 38). New CLI: `krnl whatsnew [show]`, `krnl feedback`, `krnl catchup [show]`, `krnl share list|streak|sessions`, `krnl app status|backups|celebrations`. Repo: issue forms, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT. Previews: `KRNL0_SIMULATE_UPDATE=feature|patch`, `KRNL0_SIMULATE_AWAY_DAYS=n`.
+
+## [2026-11-06] — Floating timer looks (dial, capsule, box); tour orb; Help › Catch up and Share a milestone
+
+**Type:** Feature + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/pocket.ts`, `src/main/pocket/index.ts`, `src/main/preload.ts`, `src/renderer/env.d.ts`, `src/renderer/pocket/{PocketApp,DialView,CapsuleView,model,parts}.tsx`, `PomoNode/daySpans.ts`, `PomoNode/ObserveDash.tsx`, `TopBar/PocketSection.tsx`, `src/sys/commands/mini.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, `src/renderer/components/Tour/{TourHost.tsx,tourAnchor.ts}`, `src/renderer/components/Orb/index.tsx`, `Launch/HelpMenu.tsx`, `styles/launch.css`, tests, `docs/06-requirements/pocket-timer.md`, `launch-experience.md`
+**Summary:** The floating timer now has all three designed looks, chosen in Settings → Floating timer or with `krnl mini look`: a round **Dial** (the new default; ring = time left in Pomodoro, the day with today's spans in Observe; hover for controls; collapses to a small tab), a **Capsule** pill (hover opens a card with details and controls) and the **Box** (the node itself). The pocket window is transparent and sized to the look; main watches the pointer for hover because drag regions hide it from the page. Bug fix: a guided tour no longer shows a second, fake assistant orb — the real orb glides onto the tour card's corner and back home when the tour ends. Help menu gains **Catch up** (Welcome back any time) and **Share a milestone** (a card for the longest streak, or focus sessions).
+
+## [2026-11-06] — Milestone cards as designed, share window, Settings redesign, pocket shadows
+
+**Type:** Feature + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/launch/{milestoneCard,milestones,launchStore}.ts`, `src/renderer/components/Launch/{MilestoneNotice,ShareDialog,HelpMenu,LaunchHost}.tsx`, `src/renderer/store/useCliDispatch.ts`, `src/renderer/assets/launch/cube-paper.webp`, `src/renderer/components/TopBar/{SettingsModal,index,PocketSection,UpdatesSection,LaunchSettings}.tsx`, `src/renderer/pocket/*`, `src/renderer/index.tsx`, `src/renderer/styles/launch.css`
+**Summary:** The milestone cards are now drawn exactly as the design board: the cream streak card (cube, big number, habit in serif, 4-week day grid), the LCD sessions card (glowing number, 12 weekly bars) and a 1080 × 1920 story card. The in-app notice is the compact designed one (badge, one line, Save image · Copy · Not now, "See card"). A new Share a milestone window (Help menu, the notice, `krnl share`) shows every card full size, with Square / Story, Save image and Copy. Settings is redesigned: a section list with line icons (General, Floating timer, Celebrations, Updates, Reset) and the section on the right in cards; it opens on General so the guided tour still finds Mode; Help › Check for updates opens Updates. Fix: the floating timer's shadow no longer shows as a grey box around the dial and capsule — the transparent window is only 8 px bigger than the shape, so all looks now use one small shadow that fits inside it, and the page is transparent from its first frame.
+
+## [2026-11-06] — Send feedback by email
+
+**Type:** Feature
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/feedback.ts`, `src/main/appState.ts`, `src/renderer/components/Launch/FeedbackDialog.tsx`, `src/sys/commands/launch.ts`, `tests/unit/shared/launch.rules.test.ts`, `docs/06-requirements/launch-experience.md`
+**Summary:** Send feedback gains **Send by email** next to Continue on GitHub, for people without a GitHub account: it opens the user's mail app with the report (kind, title, text, version and system, recent errors if ticked) addressed to theminddevlab@gmail.com; nothing is sent until they press Send. The link is kept under 1,900 characters. Main lets only that mailto address through besides the project's GitHub pages. `krnl feedback --link` prints both links.
+
+## [2026-11-06] — UI sounds: three sound packs, volume and on/off
+
+**Type:** Feature
+**Requirements:** [docs/06-requirements/ui-sounds.md](../06-requirements/ui-sounds.md)
+**Files changed:** `src/renderer/sfx/{soundPacks,soundSettings,soundMoments,uiSounds,soundCli}.ts`, `src/renderer/sfx/packs/` (audio + `CREDITS.md`), `src/renderer/components/Canvas/commandDispatch.ts`, `src/renderer/components/TopBar/{index,SoundSection}.tsx`, `src/sys/{parser,SysFacade}.ts`, `src/renderer/store/useCliDispatch.ts`, `src/shared/cli/commandRegistry.ts`, `docs/06-requirements/{ui-sounds,ai-full-visibility-cli}.md`, `tests/unit/renderer/uiSounds.test.ts`
+**Summary:** Short sounds now confirm actions: add, plan on the Calendar, timer start / pause / resume / break / stop, a finished pomodoro, task done / reopened, habit check-in / removal, delete. Three bundled free packs, picked by ear on `docs/research/free-kits.html`: **SND01 · Sine** (default, snd.dev), **Zen** (UI SFX, CC0) and **Crisp** (Anipixels, CC BY 4.0, credited in Settings and `CREDITS.md`). The moment is read from what changed on the board (`soundMoments.ts`), hooked once in `makeCommandHandler`, so every UI path for the same action sounds the same; view changes and per-second time keeping never take the snapshot. Web Audio engine with decode-on-first-use, a per-pack warm-up and an 80 ms repeat guard. Settings → Sounds: on/off switch, volume 0–100, pack buttons that play a sample. Settings are per install in `localStorage` (`krnl0-sound`), not board data. CLI: `krnl sound status|list|pack <id>|volume <0-100>|on|off|play <moment>`.
+
+---
+
+## [2026-11-06] — Finished tasks read neutrally; Easy calls the timer "Record"
+
+**Type:** Feature (UI copy) + Chore
+**Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/Station/StationToolbar.tsx`, `src/renderer/components/Tour/{TourHost.tsx,tours.ts}`, `src/renderer/components/Assistant/VoicePlayer.ts`, `src/renderer/sfx/{sfxEngine,uiSounds}.ts`, `docs/research/engagement-and-onboarding.md`
+**Summary:** From the engagement research (C6, C11). A task that is done no longer shows the rust "+28m OVER": the card reads `PLAN 1H · TOOK 1H 28` in neutral ink, and its calendar block reads "· took 1h 28" with no rust strip; open tasks still show overruns. In Easy mode the panel toolbar names the Pomo **Record**, and tours write `{pomo}`, shown as "Record" in Easy and "Pomo" in Advanced. The sound and voice loaders use Vite's `query: '?url'` glob form (the `as: 'url'` deprecation warning is gone). Voice reactions were dropped by the maintainer; the research report records it and the final sound choice.
+
+---
+
+## [2026-11-06] — Engagement: finish, close the day, first-day tour
+
+**Type:** Feature
+**Requirements:** [docs/06-requirements/engagement.md](../06-requirements/engagement.md) F1–F19 (designs picked from the "KRNL0 Engagement Drafts" canvas: 1A, 2A+2C, 3A+3B+3C, 4A, 5A+5B, 6A+6B, 7A+7C, 8A)
+**Files changed:**
+- New: `src/renderer/store/{finishedCards,dayRecap,dayProgress,engagementCli}.ts`, `src/renderer/components/{DayMoments,PlanGuide}/index.tsx`, `src/renderer/components/TopBar/FinishedSection.tsx`
+- Changed: `TaskNode`, `TodoNode`, `HabitNode` (+ `commands.ts`), `ClockNode`, `CalendarNode/WeekView.tsx`, `Canvas/CanvasFlow.tsx`, `Orb`, `Tour/{TourHost,tours}`, `ui/Popover.tsx`, `App.tsx`, `styles/tokens.css`, `src/sys/{parser,SysFacade}.ts`, `useCliDispatch.ts`, `commandRegistry.ts`
+- Tests: `tests/unit/renderer/engagement.test.ts`, Todo test updates
+
+**Summary:**
+- **Finishing a task:** a ticked task becomes the **done card** (design 9B, same 220×120 box): how long it took as the big number, what was planned, when it was finished, and a ring for today's planned tasks. Ticking plays a one-shot reward (check pop, a burst of 8 dots, a border glow).
+- **Finished cards leave the canvas:** they go overnight by default, with "after 1 hour" and "keep" as the other options and a "show finished" switch in Settings. A chain, or a task with its subtasks, leaves together when all of it is done. Hiding is render-only, so nothing is deleted.
+- **Only "Done today":** the Todo list keeps today's done items in a "Done today" fold; older ones leave the list (Analytics and `todo list --archived` keep them). The "ARCHIVE DONE" button is gone.
+- **Closing the day:** a recap card appears once a day, when the plan is all done or from 21:00. A morning line reads "yesterday: 4 done · 3h 10m", and a Monday look-back covers last week.
+- **"Your first day" tour:** 16 steps through the whole loop, started by the orb's first click on a fresh board and listed first in the orb menu as "Start here".
+- **Adding and planning to-dos:** estimate chips (15m–2h) appear after a to-do's name. A PLAN button on unplanned rows teaches drag and drop with one small one-shot animation (`components/PlanGuide`): a ghost of the task glides once onto the Calendar, its edge pulses once, and a tiny chip beside the row says "drag it onto the Calendar". Nothing covers the Calendar or repeats.
+- **Habit streaks:** the streak line shows the next milestone and best streak, with a seal at 7/30/100/365 days. A "Missed yesterday? I DID IT" repair replaces the silent reset.
+- **Clock:** an outer ring closes as the day's planned blocks are done, and seven week marks sit under the dial.
+- **Missed calendar blocks:** a dashed outline and a ↻ REPLAN corner badge at any size; REPLAN makes the block hop once with a tiny "drag to a new time" chip beside it.
+- **CLI:** `krnl finished …` and `krnl recap …`.
+- **Fix:** nested popovers (a TimeField inside a popover) no longer close their parent.
+
+## [2026-11-06] — Merge: engagement (sounds, done card, close the day) joined with the launch work
+
+**Type:** Merge + Polish
+**Branch:** `feat/pocket-pomo` (merged `feat/engagement-sounds-done-card`)
+**Files changed:** `src/renderer/components/TopBar/{SettingsModal,SoundSection,FinishedSection}.tsx`, `src/renderer/components/ui/SettingsIcons.tsx`, `src/renderer/launch/{catchup,milestones,launchStore}.ts`, `src/renderer/components/DayMoments/index.tsx`, `src/renderer/components/nodes/HabitNode/index.tsx`, `src/renderer/components/nodes/TaskNode/DoneCard.tsx`, `src/renderer/components/PlanGuide/index.tsx`, `src/renderer/components/Launch/HelpMenu.tsx`, `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/index.tsx`, `src/renderer/styles/launch.css`
+**Summary:** The engagement branch (UI sound packs, the done card, finished cards leaving the board, close the day, the first-day tour, PLAN/REPLAN hints, habit streak repair) is merged into the launch work. Joined so nothing is duplicated or fights: Sounds and Finished cards are sections of the new Settings window, restyled as its cards with line icons and a styled volume slider; one best-streak rule and one milestone list (the Habit node's), and the habit's milestone seal opens the share card; the day recap and morning line wait while a launch dialog is open, and the morning line stays quiet right after Welcome back; the tour host keeps the real orb on the tour card and the `{pomo}` naming; Help › Take the tour starts the first-day tour. Polish: the done card reads as finished (light acid wash, "1h 20m", "done 19:16", softer title); a habit with no streak says "tick today to start a streak" (or "start a new streak today · best N") instead of a rust "▲ 0 day streak"; the PLAN hint's chip sits under its row inside the Todo panel on a solid background instead of over the neighbouring window. The temporary "What's new" review tour from the engagement branch is still in and must be removed before this reaches main.
+
+## [2026-11-06] — Close-the-day redesign; tour, sound and visibility fixes
+
+**Type:** Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/DayMoments/index.tsx`, `src/renderer/styles/launch.css`, `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/components/Orb/index.tsx`, `src/renderer/sfx/{uiSounds,soundPacks}.ts`, `tests/unit/renderer/uiSounds.test.ts`
+**Summary:** The day recap, last-week card and morning line are redesigned in the launch design language: the paper dialog with a scrim, an acid kicker, a serif headline, a done ring and number tiles, one plan-vs-recorded meter with a plan marker and a blame-free verdict ("right on plan", "40m less than planned"), a week of rounded bars with values and the best day in acid, three tiles (done, focused, active days), and a footer with the button on the right; the morning line is a pill with a sun icon. Fixes: a tour step about the orb (or its menu) no longer makes the card and the orb chase each other; a tour's words show as soon as the target holds still (3 px tolerance, at most 0.5 s instead of 1.2 s); a step about a window brings it back if it was hidden from the toolbar and switches the canvas layers on; every UI sound hit fades in (4 ms) and out (14 ms), and pitched-up hits are rolled off above 7 kHz, which removes the glitchy click on ticks; the task-done sparkle is pitched lower.
+
+## [2026-11-06] — Fix: habits below the fold, tour card covering its target
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitNode/index.tsx`, `src/renderer/components/Tour/TourHost.tsx`, `tests/unit/renderer/tourPlaceCard.test.ts`
+**Summary:** Habits lower in the list (e.g. "No sugar") couldn't be reached: the new streak and repair lines made rows taller, the list scrolls, but the wheel over it zoomed the canvas instead. The habit list now keeps the wheel (`nowheel`, contained overscroll), like the Calendar and notes. The tour's guide card no longer covers what it talks about: when no side of the target has room (a tall Settings section), it takes the spot on screen that overlaps it least.
+
+## [2026-11-06] — Fix: tour steps find what they talk about, wherever it is
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/styles/launch.css`, `tests/unit/renderer/tourPlaceCard.test.ts`
+**Summary:** A tour step used the first element matching its selector, wherever it sat — a Calendar block hidden under the grid's header, or a REPLAN badge inside a hidden panel — so the ring pointed at empty spots. Targets are now found by what they are, never by position: of all matches, the most visible one wins (inside the window, not hidden, clipped by every scrolling ancestor), preferring those inside the window the step is about; a match scrolled out of sight is scrolled into view once; if nothing is visible the ring goes around the window itself. A floating panel lying on top of the target (the ambient radio, a chat panel) fades aside for that step and comes back after.
+
+## [2026-11-06] — Tour engine rules: right Settings page, named items, no dimming while waiting, every needed window shown
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Tour/{TourHost,tours}.ts(x)`, `src/renderer/components/TopBar/SettingsModal.tsx`, `tests/unit/renderer/tourRules.test.tsx`
+**Summary:** Four rules in the tour engine, so these bugs can't come back step by step: (1) a step that opens Settings opens it on the page that holds what it talks about (Sounds, Finished cards, Floating timer…), so the card no longer sits on an empty General page over the thing it describes; (2) a step can name its item (`targetText`) and the spotlight lands on that item, or on the button in that item's row (Demo · tick me, Demo · plan me, Demo · gym, Demo · read); (3) while a step waits for the user to act, nothing is dimmed, so what they must click never looks disabled; (4) a step lists every window it needs (`also`, e.g. Todo and Calendar for a drag) — each is un-hidden, and a floating panel covering any of them steps aside for that step.
+
+
+## [2026-11-06] — Calendar rebuilt, one task card, Welcome back, pocket span naming, line icons
+
+**Type:** Feature + Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{WeekView.tsx,dayBlockLayout.ts}`, `src/renderer/components/nodes/TaskNode/{index,DoneCard,CardParts}.tsx`, `src/renderer/components/Launch/WelcomeBack.tsx`, `src/renderer/launch/{catchup,launchStore}.ts`, `src/renderer/styles/{launch,reactflow-theme}.css`, `src/renderer/components/nodes/{TodoNode,HabitNode,PomoNode,AnalyticsNode,ClockNode}/index.tsx`, `src/renderer/components/{TopBar/index,AmbientRadio/index,ui/SettingsIcons}.tsx`, `src/renderer/pocket/{PocketApp,parts,usePocketBridge}.ts(x)`, `src/main/{pocket/index,preload}.ts`, `src/renderer/env.d.ts`, `src/renderer/App.tsx`, `src/renderer/components/Tour/tours.ts`, removed `src/renderer/dev/whatsNewDemo.ts`; docs `calendar-clock-visuals.md` F15, `task-node.md` F1/F16, `pocket-timer.md` F13; tests for each.
+**Summary:** Calendar: blocks are only the plan; what was recorded is a thin rail inside each day's left edge (breaks are its gaps); habits are clickable pills on the right edge that tick the habit; Recorded and Habits switch on and off in the header. After review it was rebuilt to fix real layout bugs, checked by measuring every block: text is never rotated (narrow lanes used to show titles sideways), at most 2 tasks side by side in the week and 4 in the day with a "+N" chip for the rest, a 3 px gap between blocks that touch in time, the grid opens and pages on whole hours and never on a block cut in half, a missed task says "Missed" once (the dashed border, REPLAN pill and sentence are gone; replan shows on hover), done tasks stay readable with a check, line icons replace ↑ ↓ ✓ ↻ ← → ▦. Task card: open, running, paused, missed and done share one 220×120 frame, so nothing moves under the click; "#03 L0" and the corner timer are gone. Welcome back: the days away as calendar columns, loose ends with Today and icon buttons, habit weeks. Todo "Done today" pages straight to the done items; habit rows say "N days" with a flame and a plain repair row. The floating timer asks "What were those 25m?" after an Observe span, one click on a category names it (only `pomo.retagSegment` with checked arguments may come from the pocket). The top bar, node headers and Todo use line icons instead of ⚙ ☾ ☀ ☰ ⏱. The temporary branch-review tour and its demo data are removed.
+
+## [2026-11-06] — UI loop batch 1: Analytics fits small windows, Todo and Pomo readable in light mode
+
+**Type:** Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/index.tsx`, `src/renderer/analytics/charts/PlanVsActual.tsx`, `src/renderer/components/nodes/TodoNode/index.tsx`, `src/renderer/components/nodes/PomoNode/index.tsx`, `src/renderer/styles/reactflow-theme.css`
+**Summary:** Found by rendering every window in light and dark and measuring clipped text, contrast and overlaps. Analytics: the "Plan vs actual" tiles cut their text ("ACCU ×1 task") in a small window; they now fit the room they have (four in a row, 2×2, or a plain label/value list). "Estimate vs actual" in a narrow card stacks name and value over full-width bars instead of drawing the value on the bars. The header's chips give way to the window's width (done, then focus) so the gear never leaves the window; the streak value uses the dark acid in light mode. Todo: a task whose planned time passed was faded like a done one; it now stays fully readable (the overdue dot marks it). Time and tag text is 10.5 px at readable contrast, tags are the task card's tinted chips, the overdue dot keeps its slot on every row so checkboxes line up, and the header says "7 overdue". Pomo: the cycles counter was lime on a pale strip (1.2:1) in light mode; it uses the dark acid with readable labels; the task picker's ☐/☑ characters are line icons.
+
+## [2026-11-06] — UI loop batch 2: habit days read right, Welcome back copy, top bar, Settings never blank
+
+**Type:** Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/styles/{tokens,launch,reactflow-theme}.css`, `src/renderer/components/Launch/WelcomeBack.tsx`, `src/renderer/components/TopBar/{index,CanvasSwitcher,PocketSection,LaunchSettings}.tsx`, `src/renderer/dev/previewBridge.ts`, `tests/unit/renderer/AppChrome.scenarios.test.ts`
+**Summary:** Habit week grid: a habit ticked today looked unticked (the "today" rule cleared the fill); done days were a framed two-colour cell that read as an empty box; future days were darker than past ones in light mode. Now done is a solid block in the habit's colour, today is an outline (filled when ticked), a missed day is grey, and future days are a faint empty outline, in both themes. Welcome back says "1 day, still going" (not "1 days") and the "was Tue 3" date is readable on the light dialog. Top bar: the path no longer wraps onto two lines (it hides on narrower windows so the canvas name keeps its room), the canvas name no longer shrinks to "Ma…", and ∷ ◆ ▾ are drawn shapes. Settings: Floating timer and Celebrations never show an empty card (the celebrations switch shows its default until read; the floating timer says it lives in the desktop app when there is none). Dev: `?fixture=rich` preview board with habits in every state and slipped tasks, for render checks.
+
+## [2026-11-06] — UI loop batch 3: calendar header and habit pills at any size, recap wording
+
+**Type:** Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/DayMoments/index.tsx`, `src/renderer/styles/reactflow-theme.css`
+**Summary:** In a small Calendar window (the station layout) the header wrapped "Week of November 2" onto three lines and the zoom "+" sat on the next arrow; the header now gives way to its width ("Week of" goes first, then the layer labels — their icons stay — then the zoom) and never wraps; its labels are 10 px. Habit pills on the calendar: text is always ink (the done pill was dark text on dark teal, 3.4:1); done is the habit's colour as a tint with a check, open is an outline; in narrow day columns a habit is a round icon with its name in the tooltip instead of "R…". The first-day tour was walked step by step headless: the card never covers its target and never leaves the window. Day recap: the ring says "of the plan done" (next to "3 done" it read as a contradiction) and the streak uses the flame icon, not ▲.
+
+## [2026-11-06] — Bug hunt batch 1: safe settings writes, strict external links, calendar layers in the board and the CLI
+
+**Type:** Bug Fix + Feature (CLI parity)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/main/appState.ts`, `src/main/pocket/index.ts`, `src/shared/feedback.ts`, `src/renderer/components/nodes/CalendarNode/{types,commands,WeekView}.ts(x)`, `src/renderer/components/Canvas/commandDispatch.ts`, `src/sys/{parser,SysFacade}.ts`, `src/sys/commands/cal.ts`, `src/shared/cli/commandRegistry.ts`, `docs/06-requirements/calendar-clock-visuals.md` F16, tests `tests/unit/shared/externalUrl.test.ts`, `tests/unit/sys/cal.layers.test.ts`
+**Summary:** `app-state.json` (what's new seen, celebrations, last active) and the floating timer's prefs were written in place; a crash or power cut mid-write left a broken file and the app silently fell back to defaults. Both now use the board's atomic write (temp file, then rename, retried on Windows locks). The "open in browser" check matched by prefix, so `…/KRNL0-anything` or a look-alike host passed; it now parses the URL and allows only `https://github.com/theMindDeveloper/KRNL0[/…]` and the feedback mail. The Calendar's Recorded / Habits switches were kept in the browser's localStorage, out of the store and out of reach of the CLI (rules 5 and 8); they are now calendar state set through `calendar.setLayers`, with `krnl cal layers [recorded|habits on|off] [--json]`. Older boards (no `layers`) show both.
+
+## [2026-11-06] — Bug hunt batch 2: Welcome back never hides a slipped task; milestones survive a jump
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/launch/{catchup,milestones}.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `docs/06-requirements/launch-experience.md` F20, tests `launch.catchup`, `launch.dialogs`
+**Summary:** Welcome back hid every task that had a predecessor, expecting it to come along with its head — but when the head was already done, or not due yet, the slipped task was shown nowhere. A slipped task is now listed under a head only when an earlier task in its chain slipped too; otherwise it is a head itself. A follower that slipped carries its time, and "Today", "Tomorrow", "Unplan" and "Bring all" move it with its head (same day, its own time), so it doesn't come back on the next launch. Milestones fired only when a count was exactly 7, 30, 100…; a repaired day (1 → 8) or logged past time (99 → 101) skipped the card for good. Now the highest milestone reached within 3 days / 5 sessions shows, once; an old long streak does not replay earlier ones.
+
+## [2026-11-06] — Bug hunt batch 3: feedback reports don't publish your account name
+
+**Type:** Bug Fix (privacy)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/feedback.ts`, `tests/unit/shared/externalUrl.test.ts`
+**Summary:** Send feedback can attach the session's recent errors to a public GitHub issue. Error lines often hold file paths such as `C:\Users\<name>\Documents\krnl0\board.json`, which would publish the user's account name. Paths under a home folder now read `~` (Windows, macOS and Linux forms) and email addresses read `<email>`, in both the issue link and "Copy diagnostics".
+
+## [2026-11-06] — UI loop batch 4: Clock schedule readable, last glyphs gone
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`
+**Summary:** The Clock's schedule faded rows that were over to 42 % opacity (3.7:1); they now keep full opacity in a quieter ink, with their colour bar at half strength. Times and durations are 10 px at readable contrast, the active PM/AM chip uses the deeper rust so its label reads in light mode, and the header's ◉ / ▦ / ◷ characters are a dot and line icons. All nine Analytics pages were rendered in both themes and at the small station size; the Insights page still squeezes three cards across a very narrow window (noted for a follow-up: the page grid needs to reflow by width).
+
+## [2026-11-06] — UI loop batch 5: month and year views readable, Pomo chips, steadier test runs
+
+**Type:** Polish + Chore
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{MonthView,YearView}.tsx`, `src/renderer/components/nodes/PomoNode/index.tsx`, `vitest.config.ts`, `tests/unit/renderer/launch.dialogs.test.tsx`
+**Summary:** Month view: days of the neighbouring months were ink-4 at 35 % (2.8:1); now quieter but readable. Year view: days with a light acid fill kept light text (1.1:1); dark text now starts at about a third of the fill. Pomo: the active POMO/OBSERVE and session-length chips use the deeper rust so their paper-coloured label reads in light mode (3.9 → 5:1). Tests: render tests that cold-load the whole station took 15–18 s under a full parallel run with the dev app open and timed out at random; the timeout is 30 s, and the new Welcome back test loads its command module up front.
+
+## [2026-11-06] — UI loop batch 6: Analytics Insights fits a small window
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/{guide,PageNav}.ts(x)`, `src/renderer/analytics/charts/Radar.tsx`
+**Summary:** The Insights page put three charts in a row; in a station-sized Analytics window each was ~110 px wide, so titles were cut ("MULTIVARIATI…") and the radar's and the pie's labels ran off the card. Insights now holds four charts two by two (radar, sources split, tasks × focus, focus by weekday) and the two distributions moved to a new **Day to day** page, one full-width chart per row. The radar keeps every label inside the chart: side labels grow away from the centre, small charts use short names (Streak, Active, Focus; the full name is the tooltip) and leave more room around the shape. Easy mode's page order is unchanged.
+
+## [2026-11-07] — UI loop batch 7: launch dialogs — share list, icons on buttons, readable numerals
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Launch/{ShareDialog,FeedbackDialog}.tsx`, `src/renderer/launch/milestones.ts`, `src/renderer/styles/launch.css`
+**Summary:** Share a milestone: the chosen card wasn't marked (the list uses `aria-checked`, the shared style only knew `aria-pressed`) — it now has a background and an outline; habits with a 0-day streak are no longer offered as cards; Copy and Save image have icons. Send feedback: Copy diagnostics, Send by email and Continue on GitHub have line icons. What's new: the outlined 01/02/03 numbers use ink-3, and the current one the dark acid, so they read on the light dialog.
+
+## [2026-11-07] — UI loop batch 8: Easy mode pass, time log navigation, habit month/year
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/TimeLogHeatmap.tsx`, `src/renderer/components/nodes/HabitNode/{index,HabitPopover}.tsx`
+**Summary:** The whole station was rendered in Easy mode in both themes. Analytics › Time per task: in a small window the week navigation wrapped "›" onto a line of its own, away from the dates; the arrows, the range and "This week" now wrap as one unit, with line chevrons. Habits in Month and Year view showed the streak as a rust "▲ 7"; they use the week view's flame and count (acid when going, grey at 0). The habit view popover now closes with Escape like every other popover.
+
+## [2026-11-07] — UI loop batch 9: task card in light mode
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`
+**Summary:** The task card's open, missed and done states were rendered in light mode: one shape, readable. The missed card's "Was Tue 3 · 18:00" used plain rust (3.9:1 on the light card) and now uses the same darker rust as Welcome back. The first-day tour was walked again in light mode: 14 steps, the card never covers its target, its text reads on the light card.
+
+## [2026-11-07] — UI loop batch 10: line icons in the assistant menu and the ambient radio
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/ui/LineGlyph.tsx` (new), `src/renderer/components/{AmbientRadio/index,Orb/index,Assistant/Commander}.tsx`
+**Summary:** The assistant menu's ▸, the orb's ▶/◆ and the ambient radio's ▶ ★ ☆ ♪ were text characters (the OS symbol font, off the baseline, ignoring the app's stroke). They are now line icons from one small shared `LineGlyph` (play, star, star outline, note, chevron, diamond) that follow the text colour; the radio's empty-saves hint says "tap the star".
+
+## [2026-11-07] — UI loop batch 11: floating timer captions without glyphs
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/pocket/{DialView,CapsuleView,PocketApp}.tsx`
+**Summary:** The dial's caption read "▶ Start", "● Working", "❚❚ Paused" in the OS symbol font; it now says Start, Working, Paused (the ring and colour already show the state). The capsule's Observe count-up arrow is a drawn arrow with an accessible name, and the collapsed box says "time log" without the ↑ character.
+
+## [2026-11-07] — UI loop batch 12: drawn ticks, crosses and dots
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/ui/LineGlyph.tsx`, `src/renderer/components/nodes/{TaskNode/DoneCard,TodoNode/index,HabitNode/index}.tsx`, `src/renderer/components/{StatusBar/index,TopBar/CanvasSwitcher}.tsx`
+**Summary:** The tick inside every done checkbox (Todo rows and the done task card) was the ✓ character; it is now a drawn tick that sits centred in the box in both themes. The Todo row's remove ✕, the canvas switcher's ✓ and ✕, and the ● dots in the Todo and Habit headers and the status bar's "connected" are drawn too (`LineGlyph` gained check, close, dot and an optional stroke weight).
+
+## [2026-11-07] — UI loop batch 13: Pomo pickers and span log
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/ui/{LineGlyph,TaskInfoPopup,TaskTagPicker}.tsx`, `src/renderer/components/nodes/PomoNode/{DoingPicker,SpanLabeler,SpanLog}.tsx`, `src/renderer/components/nodes/TodoNode/TagPicker.tsx`, `src/renderer/components/nodes/AnalyticsNode/TimeLogHeatmap.tsx`
+**Summary:** The Pomo pickers, span labeller and span log used ✕ ☑ ☐ ✓ characters; they are drawn icons now. A span or choice linked to a task shows a small task mark (it used ☐/☑, which read as "done"), and a ticked choice shows a drawn tick. In the span log the unnamed span's "name it…" was lime on a light row (1:1 in light mode) and now uses the dark acid. The tag pickers, the task popup's DONE and the time log's done mark are drawn too.
+
+## [2026-11-07] — UI loop batch 14: capsule card dots
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/pocket/CapsuleView.tsx`
+**Summary:** The floating capsule's hover card labelled "● Time log", "● working" and "● Deep work · pomo.025" with the ● character; the dots are drawn, in the label's colour, on the text's baseline.
+
+## [2026-11-07] — UI loop batch 15: no low-contrast text left on the main screen
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/styles/tokens.css`, `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/components/nodes/{TodoNode/index,AnalyticsNode/index,CalendarNode/WeekView}.tsx`
+**Summary:** The design checker's run on the live app went from 10 low-contrast texts this evening to 0: placeholders now follow the theme (the browser's grey was 3.9:1 on dark windows), and the ambient radio's "v03", "tap a chip to layer" and "tap to layer" are readable. The smallest labels grew about a point: Todo's PLAN (9 → 10 px), Analytics' range chips (9 → 10), the calendar's day headers and hour labels (9 → 10) and half-hour labels (7.5 → 8.5), all still fitting their space.
+
+## [2026-11-07] — UI loop batch 16: the canvas opens clear of the tool rail
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Canvas/fitPadding.ts` (new), `src/renderer/App.tsx`, `src/renderer/components/TopBar/index.tsx`, `docs/06-requirements/app-chrome.md` F7, `tests/unit/renderer/AppChrome.scenarios.test.ts`
+**Summary:** Fitting the board to the window used an even padding, so the left column of cards opened under the floating tool rail (the design checker flagged their "Not started" lines as a third covered). The opening fit and the FIT button now use one padding that leaves 104 px on the left for the rail.
+
+## [2026-11-07] — UI loop batch 17: last contrast misses
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/{AmbientRadio/index,StatusBar/index}.tsx`, `src/renderer/components/nodes/{ClockNode/index,TodoNode/index}.tsx`
+**Summary:** A full re-audit of the canvas, Todo, Habit, Pomo and Calendar in both themes found the last texts under 4.5:1 and fixed them: the ambient radio's unselected chips, header buttons and volume number; the Clock's active AM chip (now the deeper rust, like PM); the Todo's over-plan time; and the status bar's Pomo value in light mode. Only disabled buttons stay dim, as intended.
+
+## [2026-11-07] — UI loop batch 18: nothing opens under the minimap
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Canvas/fitPadding.ts`, `docs/06-requirements/app-chrome.md` F7
+**Summary:** After the tool-rail fix, the design checker's last covered text was a task card's time under the minimap in the bottom-right corner. The fit padding now also leaves the minimap's width on the right; the live page has no covered text left.
+
+## [2026-11-07] — UI loop batch 19: Clock rows lose their left bars
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`
+**Summary:** Each Clock schedule row was marked by a 4 px colour bar on its left edge (the design checker's "side-tab"; our rule is no left accent bars). The task's colour is now a dot, as in the Todo rows, so the same task looks the same in both windows.
+
+## [2026-11-07] — UI loop batch 20: analytics change arrows
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/SummaryHero.tsx`, `src/renderer/analytics/charts/KpiTiles.tsx`
+**Summary:** The change against the previous period read "▲ 217%" / "▼ 12%" with text triangles; it is now a drawn up or down arrow in the same colour. With this the live design check of the main screen has no low-contrast text, no covered text and no left stripes left (184 findings this evening → 156; what remains is the app's 10–10.5 px label size, a design decision to review, not a bug).
+
+## [2026-11-07] — UI loop batch 21: habit lane icons
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`
+**Summary:** The habit lane (a habit placed on the canvas) used ● ✓ ▲ ↻ characters for its colour, today's tick, its streak and its cadence; they are drawn now, and the streak uses the flame like every other habit view. Covered by the lane's tests; not render-checked (the preview board has no lane).
+
+## [2026-11-07] — UI loop batch 22: habit lane checked on screen
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`, `src/renderer/dev/previewBridge.ts`
+**Summary:** The rich preview board now has a habit lane, so batch 21's icons were rendered and checked in both themes. Its running streak was rust; it is acid like every other habit view (grey at 0).
+
+## [2026-11-07] — UI loop batch 23: the morning greeting no longer covers windows
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/DayMoments/index.tsx`, `src/renderer/styles/launch.css`
+**Summary:** "Good morning." floated at the top centre over the Todo and Habit windows (it covered a Todo row and the Habits header) and stayed until dismissed or the board changed. It now sits bottom centre above the status bar and goes by itself after 15 seconds. Its entrance used the shared rise animation, whose transform dropped the -50% centring, so it slid in diagonally from the right; it has its own keyframes now and none under reduced motion.
+
+## [2026-11-07] — UI loop batch 24: an 11px floor for all functional text
+
+**Type:** Polish (readability)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** ~70 renderer files (`fontSize` 9 / 9.5 / 10 / 10.5 → 11 in style objects, `font-size` in CSS), `src/renderer/components/nodes/{PomoNode,TodoNode,AnalyticsNode}/index.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/pocket/parts.tsx`, `src/renderer/styles/reactflow-theme.css`, `docs/04-visual-system/design-tokens.md`
+**Summary:** The app's labels, meta rows, chips and buttons were 9–10.5 px, which the design checker counted as 147 legibility failures on the main screen. All functional text is now at least 11 px; only the Calendar's half-hour ruler marks stay at 10 px to fit their gutter, and SVG chart axes are unchanged. Done in stages with a backup, each measured: no clipped text, no overlapping controls, the Calendar layout check still passes, the tour still never covers its target, the top bar fits at 1280 px. Where bigger text crowded a layout, the layout gave way: the Pomo header keeps one line (the session code shortens first), Todo titles keep at least 72 px (PLAN becomes its icon and tag chips narrow in a small window), and Analytics card toolbars wrap under their title. The light Box look's skip button follows the theme. Live design check: 184 findings this evening → 12 (no low contrast, no covered text, no left stripes, no undersized functional text). The rule is now in design-tokens.md.
+
+## [2026-11-07] — UI loop batch 25: every Pomo timer face checked at the new size
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/variants/{Mac,Outline}.tsx`, `src/renderer/dev/previewBridge.ts`
+**Summary:** After the 11 px floor, all seven timer faces were rendered (`?face=` on the preview board). The Mac face's last axis label wrapped "25 / min" onto two lines; it stays on one. The Outline face's dimension line read "◄ 0 … 25 MIN ►" with text arrows; it reads "0 … 25 MIN". The ASCII face keeps its characters — text art is that face's identity.
+
+## [2026-11-07] — UI loop batch 26: every frame style checked at the new size
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/index.tsx`
+**Summary:** All eight frame styles (Pro, Classic, Synthesizer, Telemetry, KRNL dock, Blueprint, Macintosh, Submarine) were rendered after the 11 px floor: no clipped text. In the narrower Synthesizer frame the Pomo mode switch was squeezed to "OBSERV"; the switch no longer shrinks (the window title gives way instead) and its letter spacing is tighter now that the text is larger.
+
+## [2026-11-07] — UI loop batch 27: the live design check is clean
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/index.tsx`, `src/renderer/analytics/charts/PlanVsActual.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/PomoNode/variants/Blocks.tsx`, `src/renderer/components/{AmbientRadio/index,Assistant/Commander,Orb/index,ChassisLayer/SynthesizerChrome}.tsx`, `src/renderer/components/ui/RadialChooser/RadialChooser.css`, `src/renderer/styles/chassis.css`, `docs/04-visual-system/design-tokens.md`
+**Summary:** The last 12 findings of the design check on the live app are fixed; it now reports none (184 at the start of the evening). Analytics charts were cards inside the window's card; they are sections with a hairline on top (acid when pinned). Chart legends and the time mix are 12 px body text. The Calendar's gutter is 40 px so its half-hour marks are 11 px like everything else. Blurred zero-offset glows (the Blocks face's "now" bar, the radio's slider and dots) are crisp rings or none, and every overshooting "bounce" easing (orb, assistant panel, radio panel, radial chooser, Synthesizer chrome) eases out instead. The rules are in design-tokens.md.
+
+## [2026-11-07] — Bug hunt batch 4: the rest of today's back end
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/{appState,whatsnew}.ts`, `src/main/{taskbar,pocket/index}.ts`, `tests/unit/shared/launch.rules.test.ts`
+**Summary:** Reviewed every main/shared/sys file changed today (app state, backups, taskbar and menu bar, system timer, What's new, pocket window, main-window lookup, IPC and RPC, mini and launch CLI, the finished-cards sweep). Fixed: the board backup's file name was built from versions read out of app-state.json without checking them, so a damaged file could put a path (`../`) into it — only version characters are kept now. The taskbar reset its "what changed" key on every Pomo snapshot, so the thumbnail buttons were rebuilt whenever the snapshot changed but the controls didn't — measured in the real app: 9 rebuilds during three light/dark switches while a timer ran (flicker), 0 after the fix (a Todo edit alone does not change the snapshot, so it never triggered this); it resets only when the buttons are cleared. The floating timer grew down and right without re-fitting the screen, so near the bottom edge its hover controls or the "what was this?" card opened off-screen; it re-fits after every resize, and a first-time pocket opens on the primary display instead of the first one in the list. The 0.11 What's new lists today's visible changes (calendar layers, one task card shape, three pocket looks, readability).
+
+## [2026-11-07] — UI loop batch 28: START is never cut off; nothing clipped at the bottom of a card
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/{index,FaceFit}.tsx`, `src/renderer/analytics/charts/PlanVsActual.tsx`, `tests/unit/renderer/pomoFaceFit.test.ts`
+**Summary:** A new render check (text partly hidden by its clipping container) found that in the default station layout the Pomo's content was taller than its slot: the task picker was cut in half and **START was hidden** — 148 px below the edge at 1280×800, 113 px at 1440×900, still just under it at 1920×1080 (it was like this before today too). Now a short slot sheds secondary rows first ("log past time", then the cycles strip, then the session dots; set by the slot's height, tested) and the timer face is fitted to the room left (scaled as a whole, never below 45 %), so the face, the time, the task picker and START always show — checked with the Blocks, Vapor and LCD faces and in Observe. "Log past time" stays on the Calendar and in the CLI. The same check found "Where the time went" cutting its last line in a narrow Analytics card; there it is one line per part (On a task / Untagged / Break and the share, minutes in the tooltip).
+
+## [2026-11-07] — UI loop batch 29: nothing cut off in a small Analytics window
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/SummaryHero.tsx`, `src/renderer/analytics/charts/TagCharts.tsx`, `src/renderer/components/nodes/PomoNode/FaceFit.tsx`
+**Summary:** The cut-off check, run on every Analytics page at the station size, found the Summary's last sentence cut and the tag ranking wrapping its count onto a second line. The Summary's four tiles are a 2 × 2 grid in a narrow window (never 3 + 1, never "6h / 15m" on two lines) and its sentences scroll inside the card with a soft fade at the edge; each tag's "1h40 · 27% · 2" stays on one line (task count spelled out in the tooltip). The fitted Pomo face keeps 4 px spare so big digits never touch its edge. Every screen now passes the cut-off check (the Calendar's scrolled hour labels under the sticky header are by design).
+
+## [2026-11-07] — Loop close-out: last hour labels, and tests that guard what can't be screenshotted
+
+**Type:** Bug Fix + Tests
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, tests `tests/unit/main/taskbar.test.ts` (new), `tests/unit/shared/pocket.test.ts`, `tests/unit/renderer/uiSounds.test.ts`
+**Summary:** The Calendar's hour window shows whole hours plus a leftover slice, and the slice's hour label ("13", "09") was cut in half at the bottom edge — on the first page, after paging and after wheel paging. Only whole hours in the window are labelled now (the slice keeps its lines); checked by paging through every window at three sizes with the pager and the wheel. Three fixes that a screenshot can't show now have tests, each confirmed to fail against the old code: the Windows taskbar sets its thumbnail buttons once per state (not on every snapshot) and restores them after a stop (also checked in the real built app through a test harness: 9 → 0 rebuilds during three theme switches while timing); a pocket that grows near the screen edge, opens for the first time or was left on an unplugged monitor is placed on screen; every UI sound hit starts at 0, reaches its level 4 ms later and ramps out at its end, and every hit played faster than 1.15× goes through a 7 kHz low-pass (the click-free tick).
+
+## [2026-11-07] — Verified in the real app: taskbar, floating timer, click-free sound
+
+**Type:** Verification (no code change)
+**Branch:** `feat/pocket-pomo`
+**Summary:** The fixes a screenshot can't show were checked against the real thing, each with the old code as a control. **Taskbar** — the built app run through an Electron test harness (isolated board and profile, `KRNL0_BOARD_DIR` / `KRNL0_USER_DATA`), recording every taskbar call: START sets the thumbnail buttons once (Break, Stop), STOP clears them, START again restores them; three light/dark switches while timing rebuilt them 9 times with the old code and 0 times with the fix. **Floating timer** — same harness: it opens on the primary display; parked at the bottom edge and grown by hover (200 → 256 px) it moves up and stays inside the work area; with the old code it ended at y = −248, off screen. **Sound** — the real sound engine rendered in Chromium through an OfflineAudioContext and measured: the first/last 0.18 ms of every hit stay within 5–11 % of peak with the fades, against 47–89 % (audible clicks) with the fades removed.
+
+## [2026-11-07] — macOS menu bar covered
+
+**Type:** Tests
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `tests/unit/main/taskbar.test.ts`
+**Summary:** The menu-bar timer can't be run on this Windows machine, so its code path is exercised with the platform set to macOS and the Electron `Tray` recorded: the time shows while timing and counts down every second, the menu has the state line, the controls, the Floating timer switch and Open KRNL0, the menu is rebuilt only when the state changes (an open menu isn't closed every second), the paused title changes, and the menu-bar item goes away when the timer stops. Only Apple's own drawing of it is left unchecked.
+
+## [2026-11-07] — Calendar: the shelf, drag to unschedule, line up, and a track for tracked time
+
+**Type:** Feature + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{WeekView.tsx,dayBlockLayout.ts,lineUp.ts}`, `src/renderer/styles/reactflow-theme.css`, `src/sys/{parser.ts,SysFacade.ts,commands/cal.ts}`, `src/shared/cli/commandRegistry.ts`, `src/renderer/components/ui/LineGlyph.tsx`, `src/renderer/components/Tour/tours.ts`, 21 renderer files (11 px floor, drawn arrows), `docs/06-requirements/calendar-clock-visuals.md` (F15, F16, F28, F29), tests (`WeekView.shelf.test.tsx`, `dayBlockLayout.test.ts`, `calendar.lineUp.test.ts`, `cal.lineup.test.ts`)
+**Summary:** The user's report: the "+2" tile looked bugged, and a task hidden in it could not be dragged out. Four drafts were put on the design canvas (A shelf + rail, B spread + day rings, C line up + day tape, D lens + "did" lane); this builds A plus C's line-up. **Shelf (F28):** a clash whose lanes would be under 96 px is one block over the clash's time with a named row per plan (dot, full name, done tick / missed ring) — every row clickable and draggable; rows tighten, then the header goes, before the shelf ever grows over the next plan; no row is ever hidden; a Station-width day draws rows as colour bars. The "+N" chip is gone. **Unschedule:** dragging any plan from the calendar shows "Drop here to unschedule" at the bottom; dropping there sends it back to Todo. **Line up:** when two or more chains in a shelf are still ahead, the header offers Line up — back to back in start order, never before now, a chain moving as one (found by testing: chain followers have no time of their own). CLI twin: `krnl cal lineup <task> <task> [...]`. **Tracked time (F29):** a track on each day's right edge that fills with recorded spans (running span: crawling stripes), and the day's total in the header. **Rule sweep:** every functional label under 11 px raised to 11 (21 files) and text arrows (‹ › ▾ ← → ↘ ↑ ◀ ★ ◆) in controls replaced with drawn icons. Verified in the browser: drag-to-unschedule clears the task's time; line-up gives 15:00 chain, Physics 16:30; measured no cut names, no hidden rows, no overlaps, contrast passes in both themes.
+
+## [2026-11-07] — Year view fits any panel; last contrast fix
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/YearView.tsx`, `src/renderer/components/nodes/TodoNode/index.tsx`, `tests/unit/renderer/calendar.yearLayout.test.ts`
+**Summary:** Found by the post-sweep audit: the year view drew 7.5 px day numbers in 365 cells (some at 1.1:1 contrast) and laid months out 7 + 5. Cells are now a plain heat map (date, minutes and plans in the tooltip and aria-label), and `yearLayout` measures the panel and picks 2, 3, 4 or 6 months across with the biggest square cells that fit both ways — measured at six panel sizes, no month outside the box; the weekday letters (11 px) hide below 12 px cells. The Todo "N overdue" badge mixes rust toward the ink so it passes 4.5:1 in both themes.
+
+## [2026-11-07] — Bug hunt: stuck unschedule strip, "Bring to today" landing in the past
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/launch/catchup.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `docs/06-requirements/launch-experience.md` (F27), tests
+**Summary:** Sweep of every screen (all panels, calendar views, help menu, settings, tour, analytics pages, both layouts) with console capture: no errors. Code review found two bugs. (1) Dropping a plan on another hour can unmount the element it was dragged from, so no `dragend` arrives and the unschedule strip stayed up — any drop or dragend in the window now ends the drag. (2) Welcome back moved slipped tasks to today at their old time: back at 19:00, a 09:00 task landed in the past and read "Missed" at once. `landingTimes` now lines those up from the next quarter hour, in order, each as long as its plan; times still ahead are kept; Tomorrow keeps every time (F27).
+
+## [2026-11-07] — Calendar: clashing plans as letter bars; tracked-time track at the left
+
+**Type:** Feature (revision)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{WeekView.tsx,dayBlockLayout.ts,clashLabels.ts}`, `src/renderer/styles/reactflow-theme.css`, `src/renderer/components/Tour/tours.ts`, `docs/06-requirements/calendar-clock-visuals.md` (F15, F16, F28, F29), tests (`WeekView.clash.test.tsx`, `dayBlockLayout.test.ts`, `calendar.clashLabels.test.ts`, `schedule-menu-parity.test.tsx`)
+**Summary:** The user's direction after seeing the shelf: no "N at once" list — clashing plans side by side as in draft C, named by their first character, with the rail at the left as in draft A. The shelf is gone: a clash too narrow for names keeps every plan as its own slim bar at its own time, labelled by `clashLabels` (first character; plans of one clash that share it add the first letter of their last word — RA, RB, RC — then more letters, then a number; never two equal names; skips symbols, works for any script). Letters show only where they fit (one line tall, wide enough), centred in short bars. Line up is a tab above the clash (or below), drawn only where it covers no plan or habit pill. The tracked-time track moved to the left and sits 9 px from the day line, 2 px from its own plans, so it reads as part of its own day (the user found the right-edge rail ambiguous). Also: a habit pill cut by the edge of the shown hours waits for its page instead of hiding under the hour pager. Measured at 1100, 1800 and Station width, dark and light: no cut letters (both directions), no overlapping plans, the tab covers nothing, the track never under a plan.
+
+## [2026-11-07] — Tracked-time lane as a slot; Station calendar readable; pocket stays on screen
+
+**Type:** Bug Fix + polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/styles/reactflow-theme.css`, `src/main/pocket/index.ts`, `docs/06-requirements/calendar-clock-visuals.md` (F29), `tests/unit/renderer/schedule-menu-parity.test.tsx`
+**Summary:** The user asked for draft A's rail look back, on the left, "with a hole for the lane": the track is now a recessed slot (darker than the day, inner shadow, hairline edge) 4 px in from the day line, filled by the day's spans 2 px inside its walls; plans start 3 px after it. Station-width days (under 70 px): a 6 px slot, letter bars 1 px apart instead of 2 + 3 px, day names shortened to "S 7" (full names ran into each other), and a block too narrow for a name shows its first character instead of "O…" — measured: no bar under 6 px, no cut letters. Back-end review of the day's main-process work (pocket, app state, taskbar, IPC, CLI): one gap fixed — the floating timer is pulled back on screen when a monitor is removed or the display layout changes.

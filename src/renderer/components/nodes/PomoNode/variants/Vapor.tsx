@@ -74,7 +74,7 @@ export function Vapor({ m, s, remainingPct, total = 25 }: TimerFaceProps) {
 
         <div
           style={{
-            fontSize: 9.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',

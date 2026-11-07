@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KRNL0 Free Sound Kits</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: kit picker cards on top; a moments x kits matrix to compare; then every sound of the picked kit. */
+:root{
+  --paper:#ebe1c2; --paper-2:#ddd0a7; --ink:#1a1612; --ink-2:#38302a; --ink-3:#554b38;
+  --acid:#c9f158; --acid-ink:#3f5c0a; --line:rgba(26,22,18,.16); --card:#f3ecd6;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --serif:'Instrument Serif',Georgia,serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#131210; --paper-2:#1f1d18; --ink:#f4efe2; --ink-2:#ddd6c6; --ink-3:#b3aa94;
+  --acid-ink:#c9f158; --line:rgba(244,239,226,.14); --card:#1a1915; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.5}
+.wrap{max-width:1280px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-left)) 72px;display:grid;gap:26px}
+h1{font-family:var(--serif);font-weight:400;font-size:clamp(34px,5vw,50px);line-height:1;margin:0}
+h1 em{color:var(--acid-ink)}
+h2{font-family:var(--serif);font-weight:400;font-size:26px;margin:0}
+h3{font-family:var(--serif);font-weight:400;font-size:21px;margin:0;line-height:1.1}
+p{margin:0;max-width:78ch;color:var(--ink-2)}
+a{color:var(--ink)}
+.lab{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.row{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center}
+.btn{all:unset;cursor:pointer;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border-radius:8px;border:1px solid var(--ink)}
+.btn:hover{background:var(--paper-2)}
+.btn.primary{background:var(--acid);color:#1a1612;border-color:#1a1612}
+.btn:focus-visible,.pb:focus-visible,.cell:focus-visible,.kc:focus-visible,input:focus-visible{outline:2px solid var(--acid-ink);outline-offset:2px}
+label.k{display:flex;gap:8px;align-items:center}
+input[type=range]{accent-color:var(--acid-ink);width:130px}
+.caption{min-height:1.5em;font-size:12px;color:var(--ink-3)}
+.group{display:grid;gap:8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.kc{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:12px 14px;display:grid;gap:6px;align-content:start}
+.kc:hover{border-color:var(--ink)}
+.kc.sel{border-color:#1a1612;box-shadow:0 0 0 2px var(--acid)}
+.kc .meta{font-size:11px;color:var(--ink-3)}
+.tag{display:inline-block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;border:1px solid var(--line);margin-right:4px}
+.tag.ok{background:var(--acid);color:#1a1612;border-color:#1a1612}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+th{font-weight:500;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);background:var(--paper-2)}
+th.kh{cursor:pointer;text-align:center}
+th.kh.sel{background:var(--acid);color:#1a1612}
+td.c{text-align:center}
+tbody tr:last-child td{border-bottom:0}
+td.m{position:sticky;left:0;background:var(--card);font-size:12px}
+th.m{position:sticky;left:0;z-index:1}
+.cell{all:unset;cursor:pointer;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--paper);display:inline-grid;place-items:center;font-size:9px}
+.cell.on,.pb.on{background:var(--acid);color:#1a1612}
+.cell.na{background:transparent;color:var(--ink-3);cursor:default}
+.rowplay{all:unset;cursor:pointer;font-size:10px;color:var(--ink-3);margin-left:6px;text-decoration:underline}
+.pb{all:unset;cursor:pointer;display:inline-flex;gap:8px;align-items:center;padding:5px 10px 5px 6px;border-radius:99px;border:1px solid var(--line);background:var(--paper)}
+.pb:hover{border-color:var(--ink)}
+.pb i{width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-style:normal;font-size:9px}
+.grid{display:flex;flex-wrap:wrap;gap:6px}
+.panel{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px;display:grid;gap:10px}
+.status{font-size:11px;color:var(--ink-3)}
+ul{margin:0;padding-left:18px;color:var(--ink-2);display:grid;gap:4px;max-width:90ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <div class="lab">KRNL0 · sound research · round 7: every free kit, playable here</div>
+    <h1>Free kits, <em>side by side</em></h1>
+    <p>Every kit on this page is free to use in KRNL0, and they all play right here: no websites, no sign-ups. Pick a kit card to hear it across all of KRNL0's moments, or use the table to compare one moment across every kit.</p>
+    <div class="row">
+      <button class="btn primary" id="day" type="button">▶ A day in the picked kit</button>
+      <button class="btn" id="stop" type="button">■ Stop</button>
+      <label class="k" for="vol"><span class="lab">Volume</span><input id="vol" type="range" min="0" max="1" step="0.01" value="0.7"></label>
+      <label class="k" for="warm"><span class="lab">Warmth</span><input id="warm" type="range" min="2000" max="20000" step="100" value="20000"></label>
+      <label class="k" for="low"><span class="lab">Low boost</span><input id="low" type="range" min="0" max="12" step="0.5" value="0"></label>
+    </div>
+    <div class="caption" id="caption" aria-live="polite">Loading…</div>
+  </header>
+
+  <section class="group" aria-labelledby="k-h">
+    <h2 id="k-h">1 · Pick a kit</h2>
+    <div class="lab">Best bets for "cozy, warm, soft"</div>
+    <div class="cards" id="cardsTop"></div>
+    <div class="lab" style="margin-top:6px">Also free, worth a listen</div>
+    <div class="cards" id="cardsMore"></div>
+  </section>
+
+  <section class="group" aria-labelledby="m-h">
+    <h2 id="m-h">2 · KRNL0's moments in every kit</h2>
+    <p>Each row is something that happens in the app. Click a dot to play it, click a column header to pick that kit, or use "play row" to hear one moment in every kit, one after another.</p>
+    <div class="tw"><table>
+      <thead id="mhead"></thead>
+      <tbody id="mbody"></tbody>
+    </table></div>
+  </section>
+
+  <section class="group" aria-labelledby="a-h">
+    <h2 id="a-h">3 · Every sound in <span id="selName">the picked kit</span></h2>
+    <div class="panel"><div class="status" id="selStatus"></div><div class="grid" id="all"></div></div>
+  </section>
+
+  <section class="group" aria-labelledby="o-h">
+    <h2 id="o-h">Free too, but not playable here</h2>
+    <ul>
+      <li><b>Itmeo UI Sounds</b> (Dane Whisper): 180 sounds, free for commercial use. Downloading needs a free account, so you'd have to grab the zip yourself; then I add it here.</li>
+      <li><b>Universal UI Soundpack</b> (Nathan Gibson, itch.io): free, needs a credit line. It's a 4.4 MB zip; say the word and I'll download it and add it here.</li>
+      <li><b>ZapSplat UI Kit</b>: free with a basic account (I can't create one).</li>
+      <li><b>Left out on purpose:</b> UI SFX's Arcade, Sci-fi, Cinematic and Mechanical packs (game and machine sounds), SND03 Industrial, and Kenney (the recordings you didn't like).</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function(){
+  const SND = 'https://cdn.jsdelivr.net/npm/snd-lib@1.2.4/assets/sounds/sprite/';
+  const UISFX = 'https://cdn.jsdelivr.net/npm/uisfx@0.4.0/sounds/';
+  const CRISP = 'https://cdn.jsdelivr.net/gh/Anipixels/crisp-ui-sounds-free@a763e26608b9e02410f9b1b00c18176b261ee9b8/addons/crisp_ui_sounds_free/sounds/';
+  const MIX = (id) => 'https://assets.mixkit.co/active_storage/sfx/' + id + '/' + id + '-preview.mp3';
+
+  // Moments: key, label. Each kit maps key -> sound name in that kit.
+  const MOMENTS = [
+    ['add','Add a to-do'],['plan','Drop onto the Calendar'],['start','Start the timer'],['break','Take a break'],
+    ['back','Back to work'],['stop','Stop & save'],['done','Task done'],['reopen','Reopen a task'],
+    ['habit','Tick a habit'],['streak','7-day streak'],['day','Day complete'],['missed','Planned block missed'],
+    ['nudge','Gentle nudge'],['cant',"Can't do that"],['delete','Delete'],['open','Open a panel'],['close','Close a panel'],['typing','Typing']
+  ];
+  const UIMAP = { add:'press', plan:'drop', start:'start', break:'pause', back:'play', stop:'stop', done:'complete', reopen:'uncheck',
+    habit:'check', streak:'streak', day:'achievement', missed:'warning', nudge:'notification', cant:'blocked', delete:'delete', open:'open', close:'close', typing:'typing' };
+  const UICUES = ['hover','press','release','double-click','focus','long-press','select','deselect','toggle-on','toggle-off','check','uncheck','delete','cancel','undo','redo','copy','paste','open','close','back','forward','expand','collapse','drag-start','drop','snap','swipe','reorder','invalid-drop','send','receive','notification','mention','typing','reaction','success','error','warning','info','blocked','retry','start','stop','progress-step','complete','queued','checkpoint','play','pause','seek','volume-change','skip-next','skip-previous','connect','disconnect','lock','unlock','wake','sleep','reward','level-up','achievement','streak','badge','bonus'];
+  const uisfx = (pack, label, vibe, top) => ({ id:'ui-' + pack, short:label, name:'UI SFX · ' + label, by:'Romain Simon · uisfx', vibe, licence:'CC0, no credit needed', count:'78 sounds', top,
+    kind:'files', url:(n) => UISFX + pack + '/' + n + '.mp3', map:UIMAP, all:UICUES });
+  const SNDMAP = { add:'tap_01', plan:'swipe_02', start:'transition_up', break:'transition_down', back:'toggle_on', stop:'button', done:'select', reopen:'toggle_off',
+    habit:'tap_03', streak:'celebration', day:'celebration', missed:'caution', nudge:'notification', cant:'disabled', delete:'swipe_05', open:'swipe_01', close:'swipe_03', typing:'type_01' };
+  const CRISPMAP = { add:'click_soft_01', plan:'click_wood_01', start:'menu_open', break:'menu_close', back:'toggle_on', stop:'confirm_01', done:'coin_ping_01', reopen:'toggle_off',
+    habit:'gem_01', streak:'level_up', day:'achievement', missed:'cancel_01', nudge:'notification_03', cant:'error_01', delete:'pop_down_01', open:'pop_up_01', close:'pop_down_01', typing:'typing_01' };
+  const CRISPALL = ['click_soft_01','click_wood_01','hover_soft_01','pop_up_01','pop_down_01','toggle_on','toggle_off','confirm_01','cancel_01','error_01','notification_03','menu_open','menu_close','achievement','level_up','coin_ping_01','gem_01','purchase','text_blip_mid_01','typing_01'];
+  const MIXMAP = { add:'1124', plan:'1530', start:'2574', break:'2575', back:'2573', stop:'1120', done:'2865', reopen:'2576',
+    habit:'1112', streak:'3193', day:'600', missed:'2569', nudge:'2354', cant:'1110', delete:'2996', open:'1107', close:'1108', typing:'2533' };
+  const MIXALL = { '1124':'Plastic bubble click','1109':'Select click','2568':'Cool interface click tone','1117':'Classic click','1116':'Single classic click','1126':'Interface click','1112':'Positive interface click','1127':'Interface click hover','1129':'Click melodic tone','1130':'Slide click','1128':'Pebbles click','1120':'Modern click box check','2585':'Light switch tap','2582':'Quick switch click','1125':'Typewriter soft click','2580':'Light button',
+    '2574':'Interface start','2575':'Interface back','2573':'Option select','2576':'Interface remove','2578':'Opening software','2569':'Negative tone tap','1110':'Click error','2577':'Device click',
+    '1107':'Page forward chime','1108':'Page back chime','1106':'Page turn chime','1530':'Paper slide','1104':'Page turn','2380':'Paper quick move','2996':'Paper crumple',
+    '2865':'Success software tone','2870':'Correct answer tone','2867':'Confirmation tone','2869':'Access allowed','951':'Positive notification','2354':'Message pop alert','2356':'Dry pop-up','2357':'Bubble pop-up','2358':'Long pop','933':'Bell notification','937':'Happy bells','592':'Notification bell','600':'Achievement bell','3193':'Bubbly achievement','3109':'Relaxing bell chime','2820':'Magic marimba',
+    '2533':'Single key type','2541':'Single key press','2542':'Hard key press','2364':'Hard pop click','2925':'Soap bubble' };
+
+  const KITS = [
+    { id:'snd01', short:'SND01', name:'SND01 · Sine', by:'Yasuhiro Tsuchiya · snd.dev', vibe:'Clean, soft electronic. Your favourite so far.', licence:'Free for commercial use; designer keeps copyright', count:'~30 sounds', top:true, kind:'sprite', sprite:'01', map:SNDMAP },
+    uisfx('soft','Soft','Rounded felt, warm and reassuring.',true),
+    uisfx('zen','Zen','Pure tones, dry wood, a little paper.',true),
+    uisfx('organic','Organic','Wood, water, breath and small stones.',true),
+    uisfx('studio','Studio','Tactile, precise, warm restraint.',true),
+    uisfx('minimal','Minimal','Dry, precise, almost invisible.',true),
+    { id:'snd02', short:'SND02', name:'SND02 · Piano', by:'Ayako Taniguchi · snd.dev', vibe:'Warm, acoustic, musical.', licence:'Free for commercial use; designer keeps copyright', count:'~30 sounds', top:false, kind:'sprite', sprite:'02', map:SNDMAP },
+    uisfx('glass','Glass','Bright, crystalline, premium.',false),
+    uisfx('dreamy','Dreamy','Airy blooms, slow sparkle.',false),
+    uisfx('rubber','Rubber','Elastic taps, quick rebound.',false),
+    { id:'crisp', short:'Crisp', name:'Crisp UI Sounds', by:'Anipixels', vibe:'Small, crisp, slightly game-like.', licence:'CC BY 4.0, needs a credit line', count:'20 sounds', top:false, kind:'files', url:(n) => CRISP + n + '.ogg', map:CRISPMAP, all:CRISPALL },
+    { id:'mix', short:'Mixkit', name:'Mixkit picks', by:'Mixkit (Envato) · various designers', vibe:'Mixed hand-picked UI sounds, not one family.', licence:'Mixkit free SFX licence (free, incl. commercial)', count:Object.keys(MIXALL).length + ' picked', top:false, kind:'files', url:(n) => MIX(n), map:MIXMAP, all:Object.keys(MIXALL), label:(n) => MIXALL[n] || n }
+  ];
+
+  const $ = (id) => document.getElementById(id), cap = $('caption');
+  let ctx = null, master, lp, shelf, sel = 'snd01';
+  const sprites = {}, cache = {};
+
+  function audio(){
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return ctx; }
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'playback' });
+    master = ctx.createGain(); master.gain.value = +$('vol').value;
+    lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = +$('warm').value; lp.Q.value = 0.5;
+    shelf = ctx.createBiquadFilter(); shelf.type = 'lowshelf'; shelf.frequency.value = 220; shelf.gain.value = +$('low').value;
+    shelf.connect(lp); lp.connect(master); master.connect(ctx.destination);
+    return ctx;
+  }
+  const decoder = () => new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100, 44100);
+  async function loadSprite(k){
+    if (sprites[k.sprite]) return sprites[k.sprite];
+    const map = (await (await fetch(SND + k.sprite + '/audioSprite.json')).json()).spritemap;
+    const buffer = await decoder().decodeAudioData(await (await fetch(SND + k.sprite + '/audioSprite.mp3')).arrayBuffer());
+    return (sprites[k.sprite] = { map, buffer });
+  }
+  function getFile(url){
+    if (!cache[url]) cache[url] = fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then((b) => decoder().decodeAudioData(b));
+    return cache[url];
+  }
+  const kitOf = (id) => KITS.find((k) => k.id === id);
+  const nice = (k, n) => (k.label ? k.label(n) : n.replace(/[_-]/g, ' '));
+
+  async function play(kid, name, el){
+    const k = kitOf(kid); if (!k || !name) return 0;
+    const c = audio(), src = c.createBufferSource();
+    let off = 0, dur;
+    try {
+      if (k.kind === 'sprite') {
+        const s = (await loadSprite(k)).map[name]; if (!s) return 0;
+        src.buffer = sprites[k.sprite].buffer; off = s.start; dur = Math.min(s.end - s.start, name.endsWith('_loop') ? 2.5 : 6);
+      } else {
+        src.buffer = await getFile(k.url(name)); dur = Math.min(src.buffer.duration, 6);
+      }
+    } catch (e) { cap.textContent = k.name + ' · ' + nice(k, name) + ': could not load'; return 0; }
+    src.connect(shelf); src.start(c.currentTime + 0.01, off, dur);
+    if (el){ el.classList.add('on'); setTimeout(() => el.classList.remove('on'), Math.max(250, dur * 1000)); }
+    return dur;
+  }
+
+  function card(k){
+    return '<button class="kc' + (k.id === sel ? ' sel' : '') + '" type="button" data-pick="' + k.id + '"><h3>' + k.name + '</h3><div class="meta">' + k.by + '</div><div>' + k.vibe + '</div>' +
+      '<div><span class="tag ok">Free</span><span class="tag">' + k.count + '</span></div><div class="meta">' + k.licence + '</div></button>';
+  }
+  function renderCards(){
+    $('cardsTop').innerHTML = KITS.filter((k) => k.top).map(card).join('');
+    $('cardsMore').innerHTML = KITS.filter((k) => !k.top).map(card).join('');
+  }
+  function renderTable(){
+    $('mhead').innerHTML = '<tr><th class="m">Moment</th>' + KITS.map((k) => '<th class="kh' + (k.id === sel ? ' sel' : '') + '" data-pick="' + k.id + '" title="' + k.name + '">' + k.short + '</th>').join('') + '</tr>';
+    $('mbody').innerHTML = MOMENTS.map(([key, label]) => '<tr><td class="m">' + label + '<button class="rowplay" type="button" data-row="' + key + '">play row</button></td>' +
+      KITS.map((k) => { const n = k.map[key]; return '<td class="c">' + (n ? '<button class="cell" type="button" data-k="' + k.id + '" data-s="' + n + '" data-m="' + label + '" title="' + k.name + ' · ' + nice(k, n) + '">▶</button>' : '<span class="cell na">·</span>') + '</td>'; }).join('') + '</tr>').join('');
+  }
+  async function renderAll(){
+    const k = kitOf(sel); $('selName').textContent = k.name;
+    let names = k.all;
+    if (k.kind === 'sprite') { $('selStatus').textContent = 'loading…'; try { names = Object.keys((await loadSprite(k)).map); } catch (e) { $('selStatus').textContent = 'Could not load (offline?)'; return; } }
+    $('selStatus').textContent = names.length + ' sounds · ' + k.licence;
+    $('all').innerHTML = names.map((n) => '<button class="pb" type="button" data-k="' + k.id + '" data-s="' + n + '"><i>▶</i>' + nice(k, n) + '</button>').join('');
+  }
+  function pick(id){ sel = id; renderCards(); renderTable(); renderAll(); cap.textContent = 'Picked ' + kitOf(id).name + '.'; }
+
+  let timers = [];
+  const clear = () => { timers.forEach(clearTimeout); timers = []; };
+  document.addEventListener('click', (e) => {
+    const p = e.target.closest('[data-pick]'); if (p) { pick(p.dataset.pick); return; }
+    const r = e.target.closest('[data-row]');
+    if (r) {
+      audio(); clear();
+      const label = MOMENTS.find((m) => m[0] === r.dataset.row)[1];
+      KITS.forEach((k, i) => { const n = k.map[r.dataset.row]; if (!n) return;
+        timers.push(setTimeout(() => { cap.textContent = label + ' · ' + k.name; play(k.id, n, document.querySelector('.cell[data-k="' + k.id + '"][data-s="' + n + '"][data-m="' + label + '"]')); }, i * 1100)); });
+      return;
+    }
+    const b = e.target.closest('.cell[data-k], .pb'); if (!b) return;
+    const k = kitOf(b.dataset.k);
+    play(b.dataset.k, b.dataset.s, b);
+    cap.textContent = (b.dataset.m ? b.dataset.m + ' · ' : '') + k.name + ' · ' + nice(k, b.dataset.s);
+  });
+  $('day').addEventListener('click', () => {
+    audio(); clear();
+    const k = kitOf(sel), order = ['add','plan','start','break','back','stop','done','habit','nudge','missed','day'];
+    let t = 0;
+    order.forEach((key) => { const label = MOMENTS.find((m) => m[0] === key)[1];
+      timers.push(setTimeout(() => { cap.textContent = 'A day in ' + k.name + ' · ' + label; play(k.id, k.map[key]); }, t)); t += key === 'day' ? 2200 : 1000; });
+  });
+  $('stop').addEventListener('click', () => { clear(); cap.textContent = 'Stopped.'; });
+  $('vol').addEventListener('input', () => { if (master) master.gain.value = +$('vol').value; });
+  $('warm').addEventListener('input', () => { if (lp) lp.frequency.value = +$('warm').value; });
+  $('low').addEventListener('input', () => { if (shelf) shelf.gain.value = +$('low').value; });
+
+  renderCards(); renderTable(); renderAll();
+  cap.textContent = KITS.length + ' free kits ready. Click anything to play (sounds load on first click).';
+})();
+</script>
+</body>
+</html>

@@ -142,17 +142,19 @@ describe('Calendar ↔ Clock right-click parity', () => {
 });
 
 describe('Calendar pomo spans as background highlights', () => {
-  it('renders behind tasks and never takes pointer events', () => {
+  it('fills a thin track beside the plan and never takes pointer events', () => {
     seed();
     render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
     const band = document.querySelector('[data-testid="calendar-reality-block"]') as HTMLElement;
     expect(band).toBeTruthy();
     expect(band.style.pointerEvents).toBe('none');
-    expect(band.style.zIndex).toBe('0');
+    // The recorded rail sits in its own lane beside the plan blocks (z 1), never under them.
+    expect(band.style.zIndex).toBe('1');
     expect(band.getAttribute('data-reality-kind')).toBe('work');
-    // Full plan-area width, not a thin rail.
-    expect(band.style.left).toBe('0px');
-    expect(band.style.right).toBe('0px');
+    // Recorded time fills a thin track at the day's left, beside its own plans (calendar F29).
+    expect(band.style.left).toBe('7px');
+    expect(band.style.width).toBe('10px');
+    expect(document.querySelector('[data-testid="calendar-reality-track"]')).toBeTruthy();
   });
 
   it('focus and break read differently', () => {
@@ -165,6 +167,7 @@ describe('Calendar pomo spans as background highlights', () => {
     const [work, brk] = Array.from(document.querySelectorAll('[data-testid="calendar-reality-block"]')) as HTMLElement[];
     expect(brk!.getAttribute('data-reality-kind')).toBe('break');
     expect(work!.style.background).not.toEqual(brk!.style.background);
-    expect(brk!.style.background).toMatch(/repeating-linear-gradient/);
+    // A break is the gap in the rail: nothing is drawn (no stripes).
+    expect(brk!.style.background).toBe('transparent');
   });
 });

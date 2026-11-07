@@ -1,0 +1,15 @@
+name: An idea
+description: Suggest something KRNL0 should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like KRNL0 to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter to your day?
+      description: The problem behind the idea helps more than a finished design.

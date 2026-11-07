@@ -1,4 +1,7 @@
-import { app, ipcMain, BrowserWindow, clipboard } from 'electron';
+import { app, ipcMain, clipboard } from 'electron';
+import { getMainWindow } from '../mainWindow';
+import { getPocket } from '../pocket';
+import { appStatePort } from '../appState';
 import { existsSync } from 'fs';
 import { join, sep } from 'path';
 import { homedir } from 'os';
@@ -39,6 +42,11 @@ const APP_VERSION: string = (() => {
 const BOARD_DIR = process.env.KRNL0_BOARD_DIR
   ?? join(homedir(), 'Documents', app.getName());
 const BOARD_PATH = join(BOARD_DIR, 'board.json');
+
+/** The folder that holds this run's board.json (per worktree in dev). */
+export function getBoardDir(): string {
+  return BOARD_DIR;
+}
 
 // Expose the resolved path to SysFacade and CLI invocations (sys habit ...)
 // so they read/write the same board.json the renderer does.
@@ -145,7 +153,7 @@ export function backfillTimeLogAtStartup(): number {
 }
 
 function hasOpenRenderer(): boolean {
-  return BrowserWindow.getAllWindows().length > 0;
+  return getMainWindow() !== null;
 }
 
 export function registerHandlers(rpcServer?: RpcServer): void {
@@ -217,6 +225,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
 
   ipcMain.handle('sys:run', async (_event, argv: string[]) => {
     const updater = getUpdater();
+    const pocket = getPocket();
     const facade = new SysFacade({
       boardPath: BOARD_PATH,
       hasOpenRenderer,
@@ -224,6 +233,8 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       viewSize: windowViewSize,
       ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
       ...(updater ? { updater } : {}),
+      ...(pocket ? { pocket } : {}),
+            appState: appStatePort,
     });
     try {
       const result = await facade.run(argv);
@@ -257,8 +268,9 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     command: string,
     args: Record<string, unknown>,
   ): Promise<{ ok: boolean; message: string; exitCode?: number }> {
-    const windows = BrowserWindow.getAllWindows();
-    if (windows.length === 0) {
+    // The main window by name: the pocket timer (Decision 37) never runs commands.
+    const target = getMainWindow();
+    if (!target) {
       return {
         ok: false,
         message: `${command} requires an open renderer window`,
@@ -267,7 +279,6 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     }
     const id = randomUUID();
     // One window only: broadcasting ran the command once per window.
-    const target = BrowserWindow.getFocusedWindow() ?? windows[0]!;
     const result = await new Promise<{ ok: boolean; message: string }>((resolve) => {
       const timer = setTimeout(() => {
         pendingCliDispatches.delete(id);

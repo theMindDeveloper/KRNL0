@@ -92,7 +92,7 @@ function PillSegment({ label, active, testId, onClick, borderLeft }: PillSegment
         padding: '4px 9px',
         cursor: active ? 'default' : 'pointer',
         fontFamily: 'var(--font-mono)',
-        fontSize: 10.5,
+        fontSize: 11,
         color: active ? 'var(--ink)' : 'var(--ink-4)',
         letterSpacing: '0.04em',
         textTransform: 'uppercase' as const,

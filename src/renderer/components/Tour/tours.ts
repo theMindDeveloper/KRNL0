@@ -5,7 +5,7 @@
 // action (`waitFor`). Steps that only exist in one mode (`onlyIn`) are
 // skipped in the other, so a tour never points at something that isn't there.
 // `**word**` in a step's text is shown highlighted (what to look at / press);
-// `{mode}` becomes the user's own mode.
+// `{mode}` becomes the user's own mode; `{pomo}` the timer's name (Record in Easy, Pomo in Advanced).
 //
 // Started from the Orb ("Tutorials") or `krnl tour start <id>`.
 
@@ -22,6 +22,13 @@ export interface TourStep {
   target?: string;
   /** Bring this mother window into view first (canvas: move the camera; Station: show its panel). */
   node?: string;
+  /** Of the elements matching `target`, the one whose text contains this
+   *  (e.g. the task the step names). Rule: when the words name an item, the
+   *  spotlight is on that item. */
+  targetText?: string;
+  /** Other windows the step needs on screen, e.g. the Calendar when the step
+   *  says to drag a Todo row onto it. They are un-hidden too. */
+  also?: string[];
   /** Wait for the user to do it (else a Next button). */
   waitFor?: TourWait;
   /** Shown under the text while waiting. */
@@ -36,6 +43,8 @@ export interface TourStep {
   /** The guide presses this for the user on entering the step (e.g. opens
    *  Settings to show where something lives); closed again on the next step. */
   press?: string;
+  /** A window event fired on entering the step (e.g. `krnl:recap-show`). */
+  event?: string;
   /** Buttons that end the tour by choosing a mode (replace Next). */
   choices?: ReadonlyArray<{ label: string; mode: 'easy' | 'advanced' }>;
 }
@@ -86,13 +95,38 @@ const GEAR = '[data-testid="topbar-settings"]';
 const MODE = '[role="radiogroup"][aria-label="Easy or Advanced"]';
 
 export const TOURS: readonly Tour[] = [
+  // engagement.md F12 — one story through the whole loop. The orb's first
+  // click on a fresh board starts it; the menu lists it first ("Start here").
+  {
+    id: 'first-day',
+    title: 'Your first day',
+    summary: 'Plan one real thing and do it — about 4 minutes',
+    steps: [
+      { text: "Let's plan **one real thing** and do it together. It takes about 4 minutes. **Next** (or Enter) goes on, **Esc** stops." },
+      { node: 'mother-todo', target: '.todo-add', badge: 'TYPE', text: "Add something you'll do today: click **add task**, type it, press **Enter** — then pick **how long** you guess it takes (or Enter to skip).", waitFor: { board: newTask }, hint: 'Waiting for a new task…' },
+      { target: '[data-testid="todo-item-breakdown"]', node: 'mother-todo', badge: 'YOUR GUESS', text: "That's your **guess**. Click it to change it any time. Once you record time it reads **worked / planned**." },
+      { target: '[data-testid="task-node-root"]', badge: 'SAME TASK', text: 'That card on the board is **the same task**. Tick it here or in the list — both stay in step.' },
+      { node: 'mother-calendar', also: ['mother-todo'], target: '[data-testid="calendar-grid-body"]', badge: 'PLAN IT', text: 'Now **plan it**: drag the task from the Todo onto a time today — now is fine. Not sure how? Press **PLAN** on its row and I show you.', waitFor: { board: taskScheduled }, hint: 'Waiting for the task to land on the Calendar…' },
+      { node: 'mother-clock', target: CLOCK, badge: 'CLOCK', text: 'Your plan is on the **Clock** too, around the edge. Every window shows the same day.' },
+      { node: 'mother-pomo', target: '[data-testid="pomo-primary"]', badge: 'PRESS', text: 'When you start working, press **START**. The {pomo} timer records what you really do.', waitFor: { board: (now) => pomoRunning(now) }, hint: 'Waiting for START…' },
+      { target: '[data-testid="pomo-break"]', badge: 'PRESS', text: 'Need a pause? **BREAK**. Your work so far is saved, and the break is timed on its own.', waitFor: { board: (now) => pomoOnBreak(now) }, hint: 'Waiting for BREAK…' },
+      { target: '[data-testid="pomo-resume"]', node: 'mother-pomo', badge: 'PRESS', text: 'Back? **BACK TO WORK**.', waitFor: { board: (now) => !pomoOnBreak(now) }, hint: 'Waiting for BACK TO WORK…' },
+      { target: '[data-testid="pomo-primary"]', badge: 'PRESS', text: 'Finished for now? **STOP**. Break = pause and come back; Stop = done for now, saved.', waitFor: { board: (now) => pomoStopped(now) }, hint: 'Waiting for STOP…' },
+      { node: 'mother-calendar', target: CAL, badge: 'PLAN VS REAL', text: "Your recorded time sits **under the plan**. That's how you see how the day really went." },
+      { node: 'mother-todo', target: `${TODO} .todo-check`, badge: 'TICK', text: 'Done with it? **Tick it.**', waitFor: { board: taskDone }, hint: 'Waiting for a tick…' },
+      { node: 'mother-habit', target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'One last thing: add a **habit** you want to keep (reading, a walk…) and press **Enter**.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
+      { target: `${HABIT} .habit-cell--today`, node: 'mother-habit', badge: 'TICK TODAY', text: "Did it today? Click **today's square**.", waitFor: { board: habitTicked }, hint: "Waiting for today's square…" },
+      { event: 'krnl:recap-show', text: "Every evening ends like this: **what you did today**, in one card. Close it when you're ready." },
+      { target: ORB, badge: 'MORE', text: "That's the whole loop. Each window has a **short tour** in my menu." },
+    ],
+  },
   {
     id: 'welcome',
     title: 'Welcome tour',
     summary: 'What each window is for, in one minute',
     steps: [
       { text: "Hi — I'm your guide. KRNL0 is **one board** with a window for each part of your day. Press **Next** (or Enter) to go on, **Esc** to stop any time." },
-      { node: 'mother-pomo', target: POMO, badge: 'POMO · RECORD', text: '**Pomo** records what you actually do. Start it when you begin, stop it when you finish — **only recorded time counts** as time spent.' },
+      { node: 'mother-pomo', target: POMO, badge: 'POMO · RECORD', text: '**{pomo}** records what you actually do. Start it when you begin, stop it when you finish — **only recorded time counts** as time spent.' },
       { node: 'mother-todo', target: TODO, badge: 'TODO · TASKS', text: '**Todo** is your list. Each task has an **estimate**, and shows the time you really spent on it.' },
       { node: 'mother-calendar', target: CAL, badge: 'CALENDAR · PLAN', text: '**Calendar** is your plan: **drag tasks onto it**. Recorded time sits next to the plan, so you see how the day really went.' },
       { node: 'mother-clock', target: CLOCK, badge: 'CLOCK · TODAY', text: '**Clock** shows today on a dial — the **plan around the edge**, what you did as **coloured wedges**.' },
@@ -107,7 +141,7 @@ export const TOURS: readonly Tour[] = [
     title: 'Pomo — record your time',
     summary: 'Start, take a break, stop — try it for real',
     steps: [
-      { node: 'mother-pomo', target: POMO, badge: 'POMO', text: "The Pomo records **what you really do**. Let's record a short session together — it takes a few seconds." },
+      { node: 'mother-pomo', target: POMO, badge: 'POMO', text: "The {pomo} timer records **what you really do**. Let's record a short session together — it takes a few seconds." },
       { onlyIn: 'advanced', target: '[data-testid="pomo-now"]', badge: 'WHAT AM I DOING', text: 'Here you say **what you are doing**: pick a task, or a category like "Code" — the time then counts toward it.' },
       { target: '[data-testid="pomo-primary"]', badge: 'PRESS', text: 'Press **START**.', waitFor: { board: (now) => pomoRunning(now) }, hint: 'Waiting for START…' },
       { target: '[data-testid="pomo-discard"]', badge: 'HOLD', text: "It's running. Started by mistake? **Hold the trash icon** and nothing is saved. Don't do it now." },
@@ -128,7 +162,7 @@ export const TOURS: readonly Tour[] = [
       { target: '[data-testid="todo-item-breakdown"]', badge: 'ESTIMATE', text: 'This is **how long you think it takes**. Click it to change it — **0** means "no set time". Once you record time it reads **⏱ worked / planned**.' },
       { onlyIn: 'advanced', target: '[data-testid^="todo-tag-"]', badge: 'TAG', text: 'The **tag** (Code, Study…) groups time in Analytics. Click it to change it.' },
       { target: `${TODO} .todo-check`, badge: 'TICK', text: 'Done? **Tick the box.**', waitFor: { board: taskDone }, hint: 'Waiting for a tick…' },
-      { node: 'mother-todo', target: TODO, text: 'Done tasks move down to **Done**, then to the **Archive** — their recorded time stays in Analytics. **Untick** to reopen.' },
+      { node: 'mother-todo', target: TODO, text: 'Done tasks fold into **Done today**. The next day they leave the list — their recorded time stays in Analytics. **Untick** to reopen.' },
     ],
   },
   {
@@ -136,10 +170,10 @@ export const TOURS: readonly Tour[] = [
     title: 'Calendar — plan vs reality',
     summary: 'Plan a task, read what really happened',
     steps: [
-      { node: 'mother-calendar', target: CAL, badge: 'CALENDAR', text: 'The Calendar holds your **plan** (outlined blocks) and **what really happened** (filled bands).' },
+      { node: 'mother-calendar', target: CAL, badge: 'CALENDAR', text: 'The Calendar holds your **plan** (blocks) and **what really happened** (the thin track at the left of each day).' },
       { target: '[data-testid="calendar-grid-body"]', badge: 'DROP HERE', text: '**Drag a task** from the Todo onto a time here to plan it.', waitFor: { board: taskScheduled }, hint: 'Waiting for you to drop a task on the grid…' },
       { onlyIn: 'advanced', target: '[data-testid="calendar-grid-body"]', badge: 'HOW IT WENT', text: 'Once you work on it, the planned block says how it went: **"started 20m late"**, **"+30m over"**.' },
-      { target: '[data-testid="calendar-reality-block"]', node: 'mother-calendar', badge: 'RECORDED', text: 'Filled bands are **recorded time**. Click one to see it; **double-click** its start or end time to fix it.' },
+      { target: '[data-testid="calendar-reality-block"]', node: 'mother-calendar', badge: 'RECORDED', text: 'The thin track at the left of each day fills with **recorded time**. Click a filled stretch to see it; **double-click** its start or end time to fix it.' },
       { target: '[data-testid="calendar-grid-body"]', badge: 'RIGHT-CLICK', text: 'Forgot to record something? **Right-click** an empty time and choose **Log time here…**' },
     ],
   },
@@ -188,7 +222,7 @@ export const TOURS: readonly Tour[] = [
     steps: [
       { text: "KRNL0 has **two modes** on the same board and the same data — only what you see changes. You're in **{mode}** mode right now." },
       { press: GEAR, target: MODE, badge: 'SWITCH HERE', text: 'This is where you switch: **Settings → Mode**. **Easy** keeps it simple. **Advanced** connects tasks, categories and focus. Let me show you both.' },
-      { mode: 'easy', node: 'mother-pomo', target: POMO, badge: 'EASY', text: 'In **Easy**, the Pomo is a plain **stopwatch**: Start, Break, Stop. Nothing to set up, nothing to name.' },
+      { mode: 'easy', node: 'mother-pomo', target: POMO, badge: 'EASY', text: 'In **Easy**, the timer is called **Record**: a plain **stopwatch** with Start, Break, Stop. Nothing to set up, nothing to name.' },
       { mode: 'advanced', node: 'mother-pomo', target: '[aria-label="Pomo mode"]', badge: 'NEW IN ADVANCED', text: "I've switched to **Advanced** — this switch appeared. **POMO** gives classic 25-minute sessions with breaks; **OBSERVE** keeps the stopwatch." },
       { mode: 'advanced', node: 'mother-pomo', target: '[data-testid="pomo-log-toggle"]', badge: 'MORE IN ADVANCED', text: 'Recorded sessions can be **named**: give each one a task or a category, so you know what the time was for.' },
       { mode: 'advanced', node: 'mother-todo', target: '[data-testid^="todo-tag-"]', badge: 'NEW IN ADVANCED', text: 'Tasks get **tags** (Code, Study…). **Right-click** a task for **Focus / Start pomo**.' },

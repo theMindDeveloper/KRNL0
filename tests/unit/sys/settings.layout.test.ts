@@ -77,4 +77,16 @@ describe('clock half / cal zoom', () => {
     expect(node('mother-calendar').state['zoom']).toBe(4);
     expect((await facade().run(['cal', 'zoom', '9'])).ok).toBe(false);
   });
+
+  it('cal layers shows and switches the recorded rail and habit pills', async () => {
+    seed();
+    const changed = vi.fn();
+    expect((await facade().run(['cal', 'layers'])).message).toBe('recorded on · habits on');
+    const off = await facade(changed).run(['cal', 'layers', 'habits', 'off']);
+    expect(off.ok).toBe(true);
+    expect(node('mother-calendar').state['layers']).toEqual({ recorded: true, habits: false });
+    expect(changed).toHaveBeenCalled();
+    expect((await facade().run(['cal', 'layers', 'habits', 'maybe'])).ok).toBe(false);
+    expect((await facade().run(['cal', 'layers', 'pomo', 'on'])).ok).toBe(false);
+  });
 });

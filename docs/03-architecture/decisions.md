@@ -2496,3 +2496,48 @@ Every new version meant: open GitHub, download the installer, uninstall, reinsta
 - Every release is a version bump: patch (`0.10.x`) for fixes, minor (`0.x.0`) for feature releases (RELEASING.md).
 - A newer app must keep opening an older `board.json`; the board migrations already guarantee that and stay mandatory for every schema change.
 - The update can't be proven end to end until two updater-enabled releases are published.
+
+---
+
+## Decision 37 — A floating "pocket" Pomo window, a view of the node, never a second timer (2026-11-06)
+
+**Status:** Accepted (maintainer, 2026-11-06). Requirements: docs/06-requirements/pocket-timer.md.
+
+### Context
+Minimising KRNL0 hides the running timer. Users wanted the Pomo node visible over other apps, in both of its modes (Pomodoro and Observe). Electron can show a second, always-on-top window; the risk is a second copy of the timer logic and a second writer of `board.json`.
+
+### Decision
+- **A second `BrowserWindow`, same bundle.** Main opens a frameless, non-resizable, `alwaysOnTop('floating')`, `skipTaskbar` window that loads the renderer with `?pocket=1`. `index.tsx` mounts `PocketApp` for that URL instead of `App`, and skips everything that loads, saves or logs the board.
+- **Snapshot in, commands out.** The main window's renderer sends a snapshot of the Pomo mother (state, config, tag colours, face, theme, easy, away) over `pocket:state`; main keeps the last one and forwards it. Pocket buttons send `pocket:command`; main accepts only `pomo.start|pause|resume|break|stop|discard|extend` and relays them to the main window, which runs them through `makeCommandHandler(pomoMotherId)` — the node's own path.
+- **One derivation.** Live work time, remaining time, break time, the done prompt, today's cycle count and the control set per mode/status move into `PomoNode/derive.ts`, used by the node and the pocket.
+- **Time is computed in the pocket** from the snapshot's timestamps, so it stays exact while the minimised main window is throttled. The main window keeps default background throttling: its board save and done notification may lag by up to a minute while minimised, which is acceptable for a save that is already debounced and a prompt the pocket shows on time.
+- **Main window is explicit.** `src/main/mainWindow.ts` holds the main window; CLI dispatch, second-instance focus, `activate`, window-size queries and update broadcasts use it instead of `getAllWindows()[0]` / the focused window. Closing it closes the pocket.
+- **Preferences outside the board** in `userData/pocket.json` (`enabled`, `x`, `y`, `collapsed`), per worktree in dev.
+- **CLI** `krnl mini status|show|hide|on|off` through a `PocketPort` injected into `SysFacade`, like the updater.
+
+### Consequences
+- The pocket can never write the board or disagree with the node about time or controls.
+- The Observe "what was this?" tagger and the menu bar / taskbar extras are follow-ups; the node still asks when KRNL0 is opened.
+
+## Decision 38 — Launch experience: app state outside the board, a backup before every new version (2026-11-06)
+
+**Status:** Accepted (maintainer, 2026-11-06). Requirements: docs/06-requirements/launch-experience.md.
+
+### Context
+The splash, What's new, the patch notice, Welcome back and milestone cards all need to know things about the *app* across launches: which version last opened this board, when KRNL0 was last used, which release notes were read, whether celebrations are on. None of it is board data. Separately, Windows now installs updates silently on quit (Decision 36), so a bad migration would reach every user with no copy of their board from before it ran.
+
+### Decision
+- **`userData/app-state.json`, owned by main** (`src/main/appState.ts`, pure rules in `src/shared/appState.ts`): `lastVersion`, `lastActiveAt`, `whatsNewSeen`, `celebrations`, `milestonesSeen`, `skippedVersion`. Not `localStorage`: the packaged renderer origin is `127.0.0.1:<random port>`, so origin storage is not guaranteed to survive a restart. Per worktree in dev (rule 10), like `pocket.json`.
+- **Runs first.** `initAppState(boardDir)` is called at startup before the time-log backfill, the RPC handlers and the window, so the board is copied before any code path can load-and-save it. A changed version copies `board.json` to `<board dir>/backups/board-v<prev>-before-v<cur>.json` (never overwritten, newest 3 kept).
+- **One read for the window.** `app:launch` returns `LaunchInfo` (version, previous version, update kind feature/patch/same/first-run/downgrade, backup file, backups, time away, system, prefs). The renderer asks once; prefs changes go through `app:prefs:set`, which only accepts the renderer-owned fields.
+- **Last use** is written on main-window focus / blur, every 5 minutes while focused, and on quit — not on every board change.
+- **Release notes are code** (`src/shared/whatsnew.ts`), keyed by major.minor; a feature release adds an entry in its release PR.
+- **Outside links** (`app:open-external`) are limited to `https://github.com/theMindDeveloper/KRNL0…`.
+- **Taskbar / menu bar** (`src/main/taskbar.ts`) are views of the same Pomo snapshot as the pocket (Decision 37), with the pure `systemTimerView`, and send only the node's control commands.
+- **Previews** use `KRNL0_SIMULATE_UPDATE=feature|patch` and `KRNL0_SIMULATE_AWAY_DAYS=<n>`; they fake the launch info only.
+- **CLI** `krnl whatsnew|feedback|catchup|share|app` through an `AppStatePort` injected into `SysFacade`; anything that opens a dialog goes to the window via `cliDispatch`.
+
+### Consequences
+- An update can always be rolled back by hand from `backups/`.
+- Deleting `app-state.json` is harmless: the next launch treats the board as updated (one extra backup) and may show What's new again.
+- Welcome back measures "away" from the last time the window was used, so a crash or a sleeping laptop with KRNL0 open still counts the days correctly from the last focus.

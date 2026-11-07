@@ -74,11 +74,15 @@ function renderTaskNode(
 
 // ── F8 — Opacity on done ──────────────────────────────────────────────────────
 
-describe('F8 — TaskNode card opacity is 0.4 when done', () => {
-  it('root element opacity is 0.4 when done = true', () => {
-    renderTaskNode(makeTaskState({ done: true }));
+describe('F8 — a done task shows the done card (engagement.md F2)', () => {
+  it('a done task renders as the 220 × 120 done card with its plan', () => {
+    renderTaskNode(makeTaskState({ done: true, plannedMin: 60 }));
     const root = screen.getByTestId('task-node-root') as HTMLElement;
-    expect(root.style.opacity).toBe('0.4');
+    expect(root.dataset.doneCard).toBe('true');
+    expect(root.style.width).toBe('220px');
+    expect(root.style.height).toBe('120px');
+    expect(screen.getByTestId('done-card-took').textContent).toBe('Done');
+    expect(root.textContent).toContain('1h planned');
   });
 
   it('root element opacity is 1 when done = false', () => {
@@ -87,10 +91,9 @@ describe('F8 — TaskNode card opacity is 0.4 when done', () => {
     expect(root.style.opacity).toBe('1');
   });
 
-  it('cursor is "default" when done (not clickable pointer)', () => {
+  it('the done card keeps a checkbox that reopens the task', () => {
     renderTaskNode(makeTaskState({ done: true }));
-    const root = screen.getByTestId('task-node-root') as HTMLElement;
-    expect(root.style.cursor).toBe('default');
+    expect(screen.getByRole('button', { name: 'Mark undone' })).toBeTruthy();
   });
 
   it('cursor is "pointer" when not done', () => {

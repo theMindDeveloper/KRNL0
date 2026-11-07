@@ -24,7 +24,7 @@ export function fmtMinutes(min: number): string {
 
 export function Legend({ items }: { items: Array<{ label: string; color: string; hollow?: boolean; hatch?: boolean }> }) {
   return (
-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 9.5, color: COLOR_LABEL }}>
+    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 12, color: COLOR_LABEL }}>
       {items.map((it) => (
         <span key={it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <span
@@ -51,7 +51,11 @@ export function Legend({ items }: { items: Array<{ label: string; color: string;
  */
 export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tasks: readonly TaskEstimate[]; width: number; height?: number; maxRows?: number }) {
   // Given a box height, rows grow to fill it (and as many rows fit as room allows).
-  const fitRows = boxH ? Math.max(1, Math.floor(boxH / 26)) : maxRows;
+  // Narrow card: name and value share a line, the bars run full width under it
+  // (side by side, the value text would sit on the bars).
+  const narrow = width < 300;
+  const minRowH = narrow ? 38 : 26;
+  const fitRows = boxH ? Math.max(1, Math.floor(boxH / minRowH)) : maxRows;
   const capacity = Math.min(fitRows, boxH ? 30 : maxRows);
   // More tasks than rows: the last row becomes "+N more" instead of the
   // extra tasks silently not being there.
@@ -59,43 +63,47 @@ export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tas
   const rows = tasks.slice(0, overflowing ? Math.max(1, capacity - 1) : capacity);
   const hiddenCount = tasks.length - rows.length;
   const MORE_H = hiddenCount > 0 ? 18 : 0;
-  const labelW = Math.min(150, Math.max(90, width * 0.32));
-  const valueW = 92;
-  const rowH = boxH && rows.length > 0 ? Math.max(26, Math.min(64, (boxH - 4 - MORE_H) / rows.length)) : 26;
-  const barH = Math.max(8, Math.min(18, Math.round(rowH * 0.3)));
-  const plotW = Math.max(40, width - labelW - valueW - 8);
+  const labelW = narrow ? 0 : Math.min(150, Math.max(90, width * 0.32));
+  const valueW = narrow ? 0 : 92;
+  const rowH = boxH && rows.length > 0 ? Math.max(minRowH, Math.min(64, (boxH - 4 - MORE_H) / rows.length)) : minRowH;
+  const barH = narrow ? Math.max(6, Math.min(10, Math.round((rowH - 18) / 2.4))) : Math.max(8, Math.min(18, Math.round(rowH * 0.3)));
+  const plotW = narrow ? Math.max(40, width - 4) : Math.max(40, width - labelW - valueW - 8);
   const max = Math.max(1, ...rows.map((t) => Math.max(t.plannedMin, t.trackedMin)));
   const x = (v: number) => (v / max) * plotW;
   const height = rows.length * rowH + 4 + MORE_H;
   if (rows.length === 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: COLOR_AXIS, padding: 8 }}>No tracked or finished tasks in this range yet. Tag a pomo session with a task to start comparing.</div>;
+    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_AXIS, padding: 8 }}>No tracked or finished tasks in this range yet. Tag a pomo session with a task to start comparing.</div>;
   }
   return (
     <svg data-testid="analytics-estimate-bars" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       {rows.map((t, i) => {
         const y = i * rowH + 4;
         const over = t.trackedMin - t.plannedMin;
-        const label = t.text.length > 22 ? `${t.text.slice(0, 21)}…` : t.text;
+        const maxChars = narrow ? Math.max(6, Math.floor((width - 70) / 6)) : 22;
+        const label = t.text.length > maxChars ? `${t.text.slice(0, maxChars - 1)}…` : t.text;
+        const barY = narrow ? y + 13 : y;
+        const textY = narrow ? y + 8 : y + barH + 3;
         return (
           <g key={t.taskId}>
             <title>{`${t.text}${t.deleted ? ' (deleted)' : ''} · planned ${fmtMinutes(t.plannedMin)} · tracked ${fmtMinutes(t.trackedMin)}${t.plannedMin > 0 ? ` · ${Math.round(t.ratio * 100)}%` : ''}`}</title>
             {/* full-row hit target */}
             <rect x={0} y={y - 4} width={width} height={rowH} fill="transparent" />
-            <text x={labelW - 6} y={y + barH + 3} textAnchor="end" fontSize={10} fill={COLOR_LABEL} fontFamily="var(--font-sans)" opacity={t.deleted ? 0.6 : 1}>
-              {t.done ? '✓ ' : ''}{label}
+            {t.done && <path d={narrow ? `M1 ${textY - 4}l2.5 2.5L8 ${textY - 8}` : `M2 ${textY - 4}l2.5 2.5L9 ${textY - 8}`} stroke={COLOR_LABEL} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+            <text x={narrow ? (t.done ? 11 : 0) : labelW - 6} y={textY} textAnchor={narrow ? 'start' : 'end'} fontSize={10.5} fill={COLOR_LABEL} fontFamily="var(--font-sans)" opacity={t.deleted ? 0.6 : 1}>
+              {label}
             </text>
             {t.plannedMin > 0 && (
-              <rect x={labelW} y={y} width={Math.max(2, x(t.plannedMin))} height={barH} rx={2} fill={COLOR_PLANNED} opacity={0.9} />
+              <rect x={labelW} y={barY} width={Math.max(2, x(t.plannedMin))} height={barH} rx={2} fill={COLOR_PLANNED} opacity={0.9} />
             )}
-            <rect x={labelW} y={y + barH + 2} width={Math.max(t.trackedMin > 0 ? 2 : 0, x(t.trackedMin))} height={barH} rx={2} fill={COLOR_TRACKED} opacity={0.9} />
-            <text x={width - 2} y={y + barH + 3} textAnchor="end" fontSize={9.5} fontFamily="var(--font-mono)" fill={over > 0 ? COLOR_TRACKED : COLOR_LABEL}>
+            <rect x={labelW} y={barY + barH + 2} width={Math.max(t.trackedMin > 0 ? 2 : 0, x(t.trackedMin))} height={barH} rx={2} fill={COLOR_TRACKED} opacity={0.9} />
+            <text x={width - 2} y={textY} textAnchor="end" fontSize={10} fontFamily="var(--font-mono)" fill={over > 0 ? COLOR_TRACKED : COLOR_LABEL}>
               {fmtMinutes(t.trackedMin)} / {fmtMinutes(t.plannedMin)}
             </text>
           </g>
         );
       })}
       {hiddenCount > 0 && (
-        <text data-testid="analytics-estimate-more" x={labelW - 6} y={rows.length * rowH + 4 + 12} textAnchor="end" fontSize={9.5} fill={COLOR_AXIS} fontFamily="var(--font-mono)">
+        <text data-testid="analytics-estimate-more" x={narrow ? 0 : labelW - 6} textAnchor={narrow ? 'start' : 'end'} y={rows.length * rowH + 4 + 12} fontSize={9.5} fill={COLOR_AXIS} fontFamily="var(--font-mono)">
           +{hiddenCount} more
           <title>{`${hiddenCount} more task${hiddenCount === 1 ? '' : 's'} — make the window taller, or: krnl analytics show --view estimates`}</title>
         </text>
@@ -155,7 +163,7 @@ export function FocusMix({ mix, width }: { mix: { taggedWorkMin: number; untagge
     { key: 'break', label: 'Break', min: mix.breakMin, color: COLOR_BREAK, hatch: true },
   ];
   if (total <= 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: COLOR_AXIS, padding: 8 }}>No pomo time recorded in this range.</div>;
+    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: COLOR_AXIS, padding: 8 }}>No pomo time recorded in this range.</div>;
   }
   let cursor = 0;
   const barH = 16;
@@ -180,7 +188,20 @@ export function FocusMix({ mix, width }: { mix: { taggedWorkMin: number; untagge
           );
         })}
       </svg>
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 9.5, color: COLOR_LABEL }}>
+      {width < 240 ? (
+        // Narrow card: one line per part — short name, then the share; the
+        // minutes are in the tooltip (a wrapped legend ran out of room).
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 12, color: COLOR_LABEL }}>
+          {segs.map((s) => (
+            <span key={s.key} title={`${s.label} · ${fmtMinutes(s.min)}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0, background: s.hatch ? `repeating-linear-gradient(135deg, ${s.color} 0 2px, transparent 2px 4px)` : s.color, border: s.hatch ? `1px solid ${s.color}` : 'none' }} />
+              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.key === 'tagged' ? 'On a task' : s.key === 'untagged' ? 'Untagged' : 'Break'}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.round((s.min / total) * 100)}%</span>
+            </span>
+          ))}
+        </div>
+      ) : (
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 12, color: COLOR_LABEL }}>
         {segs.map((s) => (
           <span key={s.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, background: s.hatch ? `repeating-linear-gradient(135deg, ${s.color} 0 2px, transparent 2px 4px)` : s.color, border: s.hatch ? `1px solid ${s.color}` : 'none' }} />
@@ -188,6 +209,7 @@ export function FocusMix({ mix, width }: { mix: { taggedWorkMin: number; untagge
           </span>
         ))}
       </div>
+      )}
     </div>
   );
 }

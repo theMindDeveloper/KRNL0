@@ -1,11 +1,11 @@
 // Observe mode face — the running time of the current span, today's spans on
-// a day strip (work in its category / task colour, breaks hatched) and three
-// small totals. Replaces the pomodoro timer faces, which assume a session
+// a day strip (work as rounded segments in its category / task colour, breaks
+// as a thin quiet line in the gap) and three small totals. Replaces the pomodoro timer faces, which assume a session
 // length Observe mode doesn't have.
 
 import type { PomoState } from './types';
 import type { TagDef } from '../../../../shared/tags/classify';
-import { spanTone } from '../../../store/spanTags';
+import { fmtMin, todaySpans } from './daySpans';
 
 export interface ObserveDashProps {
   state: PomoState;
@@ -17,45 +17,10 @@ export interface ObserveDashProps {
   plain?: boolean;
 }
 
-const HATCH = 'repeating-linear-gradient(135deg, var(--ink-3) 0 1px, transparent 1px 3px)';
 
-function fmtMin(ms: number): string {
-  const min = Math.floor(ms / 60_000);
-  return min < 60 ? `${min}m` : `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, '0')}m`;
-}
 
 export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: ObserveDashProps) {
-  const dayStart = new Date(nowMs);
-  dayStart.setHours(0, 0, 0, 0);
-  const d0 = dayStart.getTime();
-  const DAY = 86_400_000;
-
-  // Today's spans, clipped to the day, plus the live one.
-  const spans: Array<{ id: string; start: number; end: number; break: boolean; color: string }> = [];
-  for (const r of state.history) {
-    const start = Math.max(d0, Date.parse(r.startedAt));
-    const end = Math.min(d0 + DAY, Date.parse(r.endedAt));
-    if (!(end > start)) continue;
-    const color = spanTone(library, r, plain);
-    spans.push({ id: r.id, start, end, break: r.kind === 'break', color });
-  }
-  const live = (state.status === 'running' || state.status === 'break') && state.startedAt !== null;
-  if (live) {
-    const start = Math.max(d0, Date.parse(state.startedAt as string));
-    if (nowMs > start) {
-      spans.push({
-        id: 'live', start, end: nowMs, break: state.status === 'break',
-        color: spanTone(library, { kind: 'work', taskId: state.activeTaskId, tag: state.tag ?? null }, plain),
-      });
-    }
-  }
-  let workMs = 0;
-  let breakMs = 0;
-  let workSpans = 0;
-  for (const s of spans) {
-    if (s.break) breakMs += s.end - s.start;
-    else { workMs += s.end - s.start; workSpans++; }
-  }
+  const { d0, spans, workMs, breakMs, workSpans, live } = todaySpans(state, library, nowMs, plain);
 
   // Show the waking part of the day: 06–22 by default, widened to fit spans.
   const firstH = Math.min(6, ...spans.map((s) => Math.floor((s.start - d0) / 3_600_000)));
@@ -85,9 +50,9 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
           <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink-3)', marginLeft: 2 }}>
             :{String(s).padStart(2, '0')}
           </span>
-          <span style={{ ...mono, fontSize: 9, color: 'var(--ink-4)', marginLeft: 8 }}>{h > 0 ? 'h:m:s' : 'min:s'}</span>
+          <span style={{ ...mono, fontSize: 11, color: 'var(--ink-4)', marginLeft: 8 }}>{h > 0 ? 'h:m:s' : 'min:s'}</span>
         </div>
-        <span style={{ ...mono, fontSize: 9, color: statusColor, display: 'inline-flex', alignItems: 'center', gap: 5, paddingBottom: 4 }}>
+        <span style={{ ...mono, fontSize: 11, color: statusColor, display: 'inline-flex', alignItems: 'center', gap: 5, paddingBottom: 4 }}>
           <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: statusColor, boxShadow: state.status === 'running' ? '0 0 6px var(--acid)' : 'none' }} />
           {status}
         </span>
@@ -95,23 +60,36 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
 
       {/* Today on a strip: where the time went. */}
       <div>
-        <div style={{ position: 'relative', height: 14, background: 'var(--paper-2)', border: '1px solid var(--paper-3)', borderRadius: 3, overflow: 'hidden' }}>
-          {spans.map((sp) => (
-            <span
-              key={sp.id}
-              style={{
-                position: 'absolute', top: 0, bottom: 0, left: pct(sp.start),
-                width: `max(2px, ${((sp.end - sp.start) / (hi - lo)) * 100}%)`,
-                background: sp.break ? HATCH : sp.color,
-                opacity: sp.break ? 0.8 : 0.9,
-              }}
-            />
-          ))}
-          <span aria-hidden style={{ position: 'absolute', top: -1, bottom: -1, left: pct(nowMs), width: 1.5, background: 'var(--rust)' }} />
+        <div data-testid="pomo-observe-strip" style={{ position: 'relative', height: 10, background: 'var(--paper-2)', borderRadius: 999 }}>
+          {spans.map((sp) => {
+            const w = ((sp.end - sp.start) / (hi - lo)) * 100;
+            // Work: a rounded segment, 1px clear of its neighbours so spans
+            // read as separate pieces. Break: a thin line through the gap.
+            return sp.break ? (
+              <span
+                key={sp.id}
+                data-span="break"
+                style={{
+                  position: 'absolute', top: 4, height: 2, left: pct(sp.start),
+                  width: `max(2px, ${w}%)`, borderRadius: 999, background: 'var(--ink-4)',
+                }}
+              />
+            ) : (
+              <span
+                key={sp.id}
+                data-span="work"
+                style={{
+                  position: 'absolute', top: 0, bottom: 0, left: `calc(${pct(sp.start)} + 1px)`,
+                  width: `max(4px, calc(${w}% - 2px))`, borderRadius: 999, background: sp.color,
+                }}
+              />
+            );
+          })}
+          <span aria-hidden style={{ position: 'absolute', top: -3, bottom: -3, left: pct(nowMs), width: 2, marginLeft: -1, borderRadius: 999, background: 'var(--ink)' }} />
         </div>
         <div style={{ position: 'relative', height: 12, marginTop: 3 }}>
           {ticks.map((t) => (
-            <span key={t} style={{ ...mono, position: 'absolute', left: pct(d0 + t * 3_600_000), transform: 'translateX(-50%)', fontSize: 8, color: 'var(--ink-4)', letterSpacing: 0 }}>
+            <span key={t} style={{ ...mono, position: 'absolute', left: pct(d0 + t * 3_600_000), transform: 'translateX(-50%)', fontSize: 11, color: 'var(--ink-4)', letterSpacing: 0 }}>
               {String(t).padStart(2, '0')}
             </span>
           ))}
@@ -125,7 +103,7 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
           ['spans', String(workSpans)],
         ].map(([label, value]) => (
           <div key={label} style={{ padding: '6px 8px', background: 'var(--paper-2)', borderRadius: 4 }}>
-            <div style={{ ...mono, fontSize: 8, color: 'var(--ink-4)' }}>{label}</div>
+            <div style={{ ...mono, fontSize: 11, color: 'var(--ink-4)' }}>{label}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{value}</div>
           </div>
         ))}

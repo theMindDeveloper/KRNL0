@@ -9,6 +9,7 @@ import { toneVarForTask } from '../../../utils/taskColor';
 import { TimeField } from '../../ui/TimeField';
 import { CloseButton } from '../../ui/CloseButton';
 import { Z } from '../../ui/layers';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 export interface TaskPopupTask {
   id: string;
@@ -123,7 +124,7 @@ export function TaskPopup(p: Props) {
                 onEscape={p.onClose}
               />
             </div>
-            <span aria-hidden style={{ color: 'var(--ink-4)', paddingBottom: 9, fontSize: 13 }}>→</span>
+            <span aria-hidden style={{ color: 'var(--ink-3)', paddingBottom: 9, display: 'inline-flex' }}><LineGlyph name="chevron" size={12} /></span>
             <div style={field}>
               <span style={fieldLabel}>End</span>
               <div style={{ ...input, color: dur > 0 ? 'var(--ink-2)' : 'var(--ink-4)', background: 'transparent' }}>{dur > 0 ? addMin(p.time, dur) : '—'}</div>
@@ -181,7 +182,7 @@ export function TaskPopup(p: Props) {
 }
 
 const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 };
-const fieldLabel: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--ink-4)' };
+const fieldLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--ink-4)' };
 const input: React.CSSProperties = {
   fontFamily: 'var(--font-mono)', fontSize: 14, padding: '7px 9px', borderRadius: 8, height: 34,
   border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)', boxSizing: 'border-box',

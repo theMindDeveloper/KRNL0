@@ -9,6 +9,11 @@ import { TOURS } from '../renderer/components/Tour/tours';
 const EOL = String.fromCharCode(10);
 import { timeLog, timeReport } from './commands/time';
 import * as habit from './commands/habit';
+import * as miniCmd from './commands/mini';
+import * as launchCmd from './commands/launch';
+import type { CatchupBoard } from '../renderer/launch/catchup';
+import type { AppStatePort } from '../shared/appState';
+import type { PocketPort } from '../shared/pocket';
 import * as todo from './commands/todo';
 import * as task from './commands/task';
 import * as boardCmd from './commands/board';
@@ -82,6 +87,10 @@ export interface SysFacadeDeps {
   viewSize?: () => { width: number; height: number } | null;
   /** Decision 36: the app's updater (main only; absent in tests / headless). */
   updater?: UpdaterPort;
+  /** Decision 37: the floating pocket timer (main only; absent in tests / headless). */
+  pocket?: PocketPort;
+  /** Decision 38: launch info and app prefs (main only; absent in tests / headless). */
+  appState?: AppStatePort;
 }
 
 function defaultBoardPath(): string {
@@ -128,8 +137,43 @@ export class SysFacade {
       ...(deps?.cliDispatch ? { cliDispatch: deps.cliDispatch } : {}),
       ...(deps?.viewSize ? { viewSize: deps.viewSize } : {}),
       ...(deps?.updater ? { updater: deps.updater } : {}),
+      ...(deps?.pocket ? { pocket: deps.pocket } : {}),
+      ...(deps?.appState ? { appState: deps.appState } : {}),
     };
     this.version = readVersion();
+  }
+
+  /** Opens something in the window, or explains that it needs one. */
+  private inWindow(command: string, args: Record<string, unknown>): Promise<SysResult> | SysResult {
+    if (!this.deps.hasOpenRenderer() || !this.deps.cliDispatch) {
+      return { ok: false, message: "This opens in the KRNL0 window — run it in KRNL0's terminal with the app open.", data: { exitCode: 2 } };
+    }
+    return this.deps.cliDispatch(command, args);
+  }
+
+  private async runLaunch(command: Extract<SysCommand, { kind: 'whatsnew' | 'feedback' | 'catchup' | 'share' | 'app' }>): Promise<SysResult> {
+    const board = (): CatchupBoard => {
+      const b = loadBoardFrom(this.deps.boardPath) as Partial<CatchupBoard> | null;
+      return { nodes: b?.nodes ?? [], edges: b?.edges ?? [] };
+    };
+    switch (command.kind) {
+      case 'whatsnew':
+        return command.sub === 'show' ? this.inWindow('whatsnew.show', {}) : launchCmd.whatsnewPrint(command.json);
+      case 'feedback':
+        if (command.link || !this.deps.hasOpenRenderer() || !this.deps.cliDispatch) return launchCmd.feedbackLink(command.title, command.feedbackKind);
+        return this.inWindow('feedback.open', { title: command.title, kind: command.feedbackKind ?? 'bug' });
+      case 'catchup':
+        return command.sub === 'show' ? this.inWindow('catchup.show', {}) : launchCmd.catchupPrint(board(), command.json);
+      case 'share':
+        if (command.sub === 'list') return launchCmd.shareList(board().nodes, command.json);
+        return this.inWindow('share.show', command.sub === 'streak' ? { kind: 'streak', habit: command.habit ?? '' } : { kind: 'sessions' });
+      case 'app': {
+        const port = this.deps.appState;
+        if (!port) return { ok: false, message: 'This belongs to the running KRNL0 app — run it in its terminal.', data: { exitCode: 2 } };
+        if (command.sub === 'celebrations') return launchCmd.appCelebrations(port, command.on);
+        return command.sub === 'backups' ? launchCmd.appBackups(port, command.json) : launchCmd.appStatus(port, command.json);
+      }
+    }
   }
 
   /** light / dark as the open window shows it; undefined when headless.
@@ -300,6 +344,27 @@ export class SysFacade {
         case 'install': return updateCmd.updateInstall(updater);
         case 'open':    return updateCmd.updateOpen(updater);
       }
+    }
+
+    // ── Floating pocket timer (Decision 37) ─────────────────────────────────
+    if (command.kind === 'mini') {
+      const pocket = this.deps.pocket;
+      if (!pocket) {
+        return { ok: false, message: 'The floating timer belongs to the running KRNL0 app — run this in its terminal.', data: { exitCode: 2 } };
+      }
+      switch (command.sub) {
+        case 'status': return miniCmd.miniStatus(pocket, command.json);
+        case 'show':   return miniCmd.miniShow(pocket);
+        case 'hide':   return miniCmd.miniHide(pocket);
+        case 'on':     return miniCmd.miniSetEnabled(pocket, true);
+        case 'off':    return miniCmd.miniSetEnabled(pocket, false);
+        case 'look':   return miniCmd.miniLook(pocket, command.look);
+      }
+    }
+
+    // ── Launch experience (Decision 38) ───────────────────────────────────────
+    if (command.kind === 'whatsnew' || command.kind === 'feedback' || command.kind === 'catchup' || command.kind === 'share' || command.kind === 'app') {
+      return this.runLaunch(command);
     }
 
     if (command.kind === 'whoami') {
@@ -557,6 +622,36 @@ export class SysFacade {
       if (command.sub === 'list') return this.deps.cliDispatch('sfx.list', {});
     }
 
+    if (command.kind === 'finished' || command.kind === 'recap') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: `${command.kind} requires an open renderer window`, data: { exitCode: 2 } };
+      }
+      if (command.kind === 'finished' && command.sub === 'policy') {
+        return this.deps.cliDispatch('finished.policy', { policy: command.policy });
+      }
+      return this.deps.cliDispatch(`${command.kind}.${command.sub}`, {});
+    }
+
+    if (command.kind === 'sound') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'sound requires an open renderer window', data: { exitCode: 2 } };
+      }
+      switch (command.sub) {
+        case 'pack':
+          if (!command.pack) return { ok: false, message: 'sound pack requires <id> (see: krnl sound list)' };
+          return this.deps.cliDispatch('sound.pack', { pack: command.pack });
+        case 'volume':
+          if (command.volume === undefined || command.volume < 0 || command.volume > 100) {
+            return { ok: false, message: 'sound volume requires a number from 0 to 100' };
+          }
+          return this.deps.cliDispatch('sound.volume', { volume: command.volume });
+        case 'play':
+          if (!command.moment) return { ok: false, message: 'sound play requires <moment> (see: krnl sound list)' };
+          return this.deps.cliDispatch('sound.play', { moment: command.moment });
+        default: return this.deps.cliDispatch(`sound.${command.sub}`, {});
+      }
+    }
+
     if (command.kind === 'radio') {
       if (!this.deps.cliDispatch) {
         return { ok: false, message: 'radio requires an open renderer window', data: { exitCode: 2 } };
@@ -724,6 +819,21 @@ export class SysFacade {
         return calCmd.calZoom(
           { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
           command.zoom,
+        );
+      }
+      if (command.sub === 'lineup') {
+        return calCmd.calLineup(
+          { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+          command.refs,
+          command.json,
+        );
+      }
+      if (command.sub === 'layers') {
+        return calCmd.calLayers(
+          { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+          command.layer,
+          command.on,
+          command.json,
         );
       }
       if (command.sub === 'view') {

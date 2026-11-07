@@ -187,12 +187,49 @@ function stressBoard(): Json {
   };
 }
 
-const FIXTURES: Record<string, () => Json> = { stress: stressBoard };
+/** `?fixture=rich` — the stress board plus habits in every state (streak,
+ *  broken, missed yesterday → repair row, a 7-day milestone, never started). */
+function richBoard(): Json {
+  const b = stressBoard();
+  const ymd = (back: number) => { const d = new Date(); d.setDate(d.getDate() - back); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const run = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => ymd(from + i));
+  const nodes = b['nodes'] as Json[];
+  // Loose ends for Welcome back: planned on earlier days, never done, one chain.
+  const todo = nodes.find((n) => n['id'] === 'mother-todo')!;
+  const items = ((todo['state'] as Json)['items'] ?? []) as Json[];
+  addTask(nodes, items, 't-slip-thesis', 'Outline thesis chapter 3', 90, at(9, 30, -3), { tag: 'study' });
+  addTask(nodes, items, 't-slip-draft', 'Draft section 3.1', 60, undefined, { tag: 'writing' });
+  addTask(nodes, items, 't-slip-dentist', 'Call the dentist', 15, at(14, 0, -2), { tag: 'admin' });
+  addTask(nodes, items, 't-slip-tax', 'Send the tax form to Anna before Friday', 30, at(17, 30, -1), { tag: 'admin' });
+  chain(b['edges'] as Json[], 't-slip-thesis', 't-slip-draft');
+  const habit = nodes.find((n) => n['id'] === 'mother-habit')!;
+  const created = new Date(Date.now() - 40 * 864e5).toISOString();
+  habit['state'] = {
+    habits: [
+      { id: 'h-run', name: 'Morning run', icon: 'run', createdAt: created, log: run(0, 6), archived: false, color: 'acid', schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 30 } },
+      { id: 'h-read', name: 'Read 20 pages', icon: 'book', createdAt: created, log: run(2, 12), archived: false, color: 'cyan', schedule: { kind: 'daily', timeOfDay: '21:00', durationMin: 20 } },
+      { id: 'h-water', name: 'Drink water', icon: 'water', createdAt: created, log: [...run(0, 0), ...run(2, 4)], archived: false, color: 'rust' },
+      { id: 'h-sugar', name: 'No sugar', icon: 'food', createdAt: created, log: run(1, 3), archived: false, color: 'acid' },
+      { id: 'h-med', name: 'Meditate', icon: 'meditate', createdAt: created, log: [], archived: false, color: 'cyan', schedule: { kind: 'daily', timeOfDay: '13:00', durationMin: 10 } },
+    ],
+  };
+  // A habit placed on the canvas (habit lane), for render checks.
+  nodes.push({ id: 'lane-run', kind: 'habit.lane', position: { x: -840, y: 1500 }, isMother: false, state: { habitId: 'h-run' }, config: {} });
+  return b;
+}
+
+const FIXTURES: Record<string, () => Json> = { stress: stressBoard, rich: richBoard };
 
 export function installPreviewBridge(): void {
   const name = new URLSearchParams(location.search).get('fixture') ?? 'stress';
   const build = FIXTURES[name] ?? stressBoard;
   let board: unknown = build();
+  // `?face=lcd` — show the Pomo with that timer face (render checks).
+  const face = new URLSearchParams(location.search).get('face');
+  if (face) {
+    const pomo = ((board as Json)['nodes'] as Json[]).find((n) => n['kind'] === 'pomo');
+    if (pomo) pomo['config'] = { ...(pomo['config'] as Json), face };
+  }
   const noop = async () => {};
   const bridge = {
     boardLoad: async () => board,

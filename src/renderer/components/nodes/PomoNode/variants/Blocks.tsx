@@ -69,7 +69,8 @@ export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
               background: 'var(--acid)',
               borderRadius: 1,
               height: '100%',
-              boxShadow: '0 0 10px var(--acid)',
+              // The blink marks "now"; a crisp edge instead of a blurred glow.
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--acid-ink, var(--acid)) 55%, transparent)',
               animation: 'pomo-blink 1.4s ease infinite',
               transition: 'background 0.2s, height 0.4s ease',
             };
@@ -128,7 +129,7 @@ export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
           className="label"
           style={{
             marginLeft: 'auto',
-            fontSize: 9.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',

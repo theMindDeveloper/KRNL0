@@ -22,7 +22,7 @@ const cellStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 9,
+  fontSize: 11,
   color: 'var(--ink-4)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
@@ -38,7 +38,7 @@ const valueStyle: React.CSSProperties = {
 
 const subStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 9,
+  fontSize: 11,
   color: 'var(--ink-3)',
 };
 

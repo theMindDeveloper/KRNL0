@@ -27,6 +27,8 @@
 
 import { useBoardStore, pushHistory } from '../../store/boardStore';
 import { emit, saveBoard } from '../../store/eventLog';
+import { commandCanSound, momentFromChange, soundSnapshot } from '../../sfx/soundMoments';
+import { uiSounds } from '../../sfx/uiSounds';
 
 /** Dispatch `krnl:ensure-visible` so CanvasFlow can pan the camera if the
  *  spawned rect sits outside the current viewport. No-op outside a browser
@@ -142,7 +144,7 @@ import {
   calendarSetView,
   calendarSelectDate,
   calendarSetAnchor,
-  calendarSetZoom,
+  calendarSetZoom, calendarSetLayers,
 } from '../nodes/CalendarNode/commands';
 import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types';
 
@@ -431,6 +433,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: calendarSetAnchor(calState, args as never) };
         case 'calendar.setZoom':
           return { state: calendarSetZoom(calState, args as never) };
+        case 'calendar.setLayers':
+          return { state: calendarSetLayers(calState, args) };
         // calendar.schedule: cross-node router (handled in makeCommandHandler).
         // applyCommand returns null here so the router path intercepts it and
         // dispatches task.setSchedule to the target task node.
@@ -774,7 +778,14 @@ function stopPomoOnFinishedTask(taskId: string): void {
 export function makeCommandHandler(nodeId: string) {
   return (command: string, args: Args = {}): void => {
     try {
+      // UI sounds (docs/06-requirements/ui-sounds.md F3): compare the board
+      // before and after, and play the moment that actually happened.
+      const before = commandCanSound(command) ? soundSnapshot(useBoardStore.getState().board) : null;
       _dispatch(nodeId, command, args);
+      if (before) {
+        const moment = momentFromChange(before, soundSnapshot(useBoardStore.getState().board));
+        if (moment) uiSounds.play(moment);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       emit('sys.error', `dispatch '${command}' on ${shortId(nodeId)} failed: ${msg}`, {

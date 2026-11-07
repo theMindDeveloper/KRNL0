@@ -62,7 +62,7 @@ export function TaskTimeline({ taskId }: { taskId: string }): JSX.Element | null
   if (!items || items.length === 0) return null;
   const color = { work: 'var(--ink-2)', plan: 'var(--ink-3)', done: 'var(--acid-ink, var(--acid))' } as const;
   return (
-    <div data-testid="task-timeline" style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 0', fontSize: 9.5, marginBottom: 10, lineHeight: 1.5 }}>
+    <div data-testid="task-timeline" style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 0', fontSize: 11, marginBottom: 10, lineHeight: 1.5 }}>
       {items.slice(-8).map((it, i) => (
         <span key={it.key} style={{ color: color[it.tone], whiteSpace: 'nowrap' }}>
           {i > 0 && <span style={{ color: 'var(--ink-4)', margin: '0 5px' }}>·</span>}

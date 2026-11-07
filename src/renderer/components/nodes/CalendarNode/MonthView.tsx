@@ -16,6 +16,7 @@ import { useLocalDay } from '../../../hooks/useLocalDay';
 import { selectPomoReality } from '../../../store/pomoReality';
 import { fmtMinutes } from '../ClockNode/dayModel';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 interface ScheduledTask {
   id: string;
@@ -317,7 +318,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
-          ←
+          <LineGlyph name="chevronLeft" size={13} />
         </button>
         <span
           data-testid="month-label"
@@ -338,7 +339,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
-          →
+          <LineGlyph name="chevron" size={13} />
         </button>
       </div>
 
@@ -364,7 +365,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
             <span
               style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: 9,
+                fontSize: 11,
                 color: 'var(--ink-3)',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
@@ -388,7 +389,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                   title={t.text}
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
+                    fontSize: 11,
                     color: 'var(--ink-2)',
                     background: 'var(--paper-2)',
                     borderRadius: 2,
@@ -407,7 +408,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                 <span
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 9,
+                    fontSize: 11,
                     color: 'var(--ink-3)',
                     flexShrink: 0,
                   }}
@@ -434,7 +435,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
             key={day}
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 9,
+              fontSize: 11,
               color: 'var(--ink-3)',
               letterSpacing: '0.1em',
               textAlign: 'center',
@@ -559,7 +560,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                 <span
                   data-testid={`month-hours-${ymd}`}
                   title="Recorded work this day"
-                  style={{ position: 'absolute', top: 3, left: 4, zIndex: 1, fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}
+                  style={{ position: 'absolute', top: 3, left: 4, zIndex: 1, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}
                 >
                   {fmtMinutes(focusByDay.get(ymd) ?? 0)}
                 </span>
@@ -576,8 +577,9 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     ? '#1a1814'
                     : inCurrentMonth
                       ? 'var(--ink-1)'
-                      : 'var(--ink-4)',
-                  opacity: inCurrentMonth ? 1 : 0.35,
+                      : 'var(--ink-3)',
+                  // Other months: quieter ink, still readable (was ink-4 at 35 %).
+                  opacity: inCurrentMonth ? 1 : 0.7,
                   textAlign: 'right',
                   lineHeight: 1,
                   marginBottom: 2,
@@ -616,7 +618,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                       onClick={(e) => { e.stopPropagation(); setTaskPopup({ taskId: task.id, x: e.clientX, y: e.clientY }); }}
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
+                        fontSize: 11,
                         color: 'var(--ink-1)',
                         background: 'var(--paper-3)',
                         flexShrink: 0,
@@ -637,7 +639,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     <div
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 9,
+                        fontSize: 11,
                         color: 'var(--ink-3)',
                         lineHeight: '1.3',
                         flexShrink: 0,
@@ -683,7 +685,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     <span
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 8,
+                        fontSize: 11,
                         color: isToday ? '#1a1814' : 'var(--ink-3)',
                         lineHeight: 1,
                       }}

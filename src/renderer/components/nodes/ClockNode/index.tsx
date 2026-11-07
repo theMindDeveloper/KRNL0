@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useContext } from 'react';
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
 import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
@@ -11,6 +12,7 @@ import type { PomoState } from '../PomoNode/types';
 import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
+import { dayProgress, progressRatio, weekProgress } from '../../../store/dayProgress';
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
@@ -36,6 +38,7 @@ import {
   planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, type TaskEntry,
 } from './dayModel';
 import { halfOf, startupFollow, rolloverFollow, claimStartup, type ClockNowMark } from './follow';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 // CX / CY / R_FACE and the arc helpers live in dialGeometry.ts (shared with
@@ -355,6 +358,12 @@ export function ClockNode({
   // mode fixed mother (540px) — scale the dial up so it fills the space
   // instead of leaving a strip of empty card around a tiny 244px square.
   const inStation = useContext(MotherFrameStationContext);
+  // engagement.md F18 — the outer ring closes as the day's planned blocks are
+  // ticked; under the dial, one small ring per day of this week.
+  const dayDone = useMemo(() => dayProgress(board0, selectedDate), [board0, selectedDate]);
+  const weekMarks = useMemo(() => weekProgress(board0, todayLocalYMD()), [board0]);
+  const ringR = trackOuterEdge + 6;
+  const ringC = 2 * Math.PI * ringR;
 
   return (
     <MotherFrame
@@ -384,13 +393,13 @@ export function ClockNode({
             alignItems: 'center',
             justifyContent: 'space-between',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-2)' }}>
-            <span style={{ color: isToday ? 'var(--cyan)' : 'var(--ink-4)', fontSize: 9 }}>◉</span>
+            <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: isToday ? 'var(--cyan)' : 'var(--ink-4)', boxShadow: isToday ? '0 0 0 2px color-mix(in srgb, var(--cyan) 25%, transparent)' : 'none' }} />
             {isToday ? 'Today · Schedule' : 'Day · Schedule'}
           </span>
           <span style={{ display: 'flex', gap: 6 }}>
@@ -405,10 +414,11 @@ export function ClockNode({
               background: weekView ? 'var(--acid)' : 'transparent',
               color: weekView ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
               border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
-              fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
             }}
           >
-            {weekView ? '◷ DAY' : '▦ WEEK'}
+            {weekView ? <><SettingsIcon name="clock" size={11} /> DAY</> : <><SettingsIcon name="dial" size={11} /> WEEK</>}
           </button>
           <button
             type="button"
@@ -422,10 +432,10 @@ export function ClockNode({
               background: dialOnly ? 'var(--acid)' : 'transparent',
               color: dialOnly ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
               border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
-              fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
             }}
           >
-            {dialOnly ? '☰ SCHEDULE' : '⤢ BIG CLOCK'}
+            {dialOnly ? <><SettingsIcon name="menu" size={11} /> SCHEDULE</> : <><SettingsIcon name="expand" size={11} /> BIG CLOCK</>}
           </button>
           </span>
         </div>
@@ -454,7 +464,7 @@ export function ClockNode({
             gap: 4,
             padding: '2px 0',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: '0.04em',
             userSelect: 'none',
           }}
@@ -466,9 +476,7 @@ export function ClockNode({
             onClick={() => onCommand('clock.advanceDay', { delta: -1 })}
             title="Previous day"
             aria-label="Previous day"
-          >
-            ‹
-          </button>
+          ><LineGlyph name="chevronLeft" /></button>
           {/* Static date label.
               The native <input type="date"> picker was removed in favour of
               the canonical day-selection path: click a day in the Calendar
@@ -515,9 +523,7 @@ export function ClockNode({
             onClick={() => onCommand('clock.advanceDay', { delta: 1 })}
             title="Next day"
             aria-label="Next day"
-          >
-            ›
-          </button>
+          ><LineGlyph name="chevron" /></button>
         </div>
 
         {/* 12-hour window toggle bar — prominent, above the clock face.
@@ -531,7 +537,7 @@ export function ClockNode({
             gap: 6,
             padding: '4px 0 2px',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             userSelect: 'none',
@@ -543,9 +549,9 @@ export function ClockNode({
             onClick={() => onCommand('clock.setViewWindow', { window: 0 })}
             style={{
               padding: '3px 10px',
-              background: viewWindow === 0 ? 'var(--rust)' : 'transparent',
+              background: viewWindow === 0 ? 'var(--rust-deep, var(--rust))' : 'transparent',
               color: viewWindow === 0 ? 'var(--paper)' : 'var(--ink-3)',
-              border: `1px solid ${viewWindow === 0 ? 'var(--rust)' : 'var(--paper-3)'}`,
+              border: `1px solid ${viewWindow === 0 ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'inherit',
@@ -581,9 +587,10 @@ export function ClockNode({
             onClick={() => onCommand('clock.setViewWindow', { window: 1 })}
             style={{
               padding: '3px 10px',
-              background: viewWindow === 1 ? 'var(--rust)' : 'transparent',
+              // rust-deep: the paper-coloured label reads on it in both themes.
+              background: viewWindow === 1 ? 'var(--rust-deep, var(--rust))' : 'transparent',
               color: viewWindow === 1 ? 'var(--paper)' : 'var(--ink-3)',
-              border: `1px solid ${viewWindow === 1 ? 'var(--rust)' : 'var(--paper-3)'}`,
+              border: `1px solid ${viewWindow === 1 ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'inherit',
@@ -642,13 +649,26 @@ export function ClockNode({
             viewBox={(() => {
               // Grow the drawing area with the plan lanes so many parallel
               // tasks are never clipped by the panel (240 = the base dial).
-              const half = Math.max(120, Math.ceil(trackOuterEdge + 4));
+              const half = Math.max(120, Math.ceil(trackOuterEdge + (dayDone.planned > 0 ? 10 : 4)));
               return `${CX - half} ${CY - half} ${half * 2} ${half * 2}`;
             })()}
             style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
           >
             {/* Frame-style bezel (ADR 0009) — under everything, Classic draws none. */}
             <ClockBezel kind={clockSkin.bezel} outerR={trackOuterEdge} />
+
+            {dayDone.planned > 0 && (
+              <g data-testid="clock-done-ring" data-done={dayDone.done} data-planned={dayDone.planned} pointerEvents="none">
+                <title>{`${dayDone.done} of ${dayDone.planned} planned done`}</title>
+                <circle cx={CX} cy={CY} r={ringR} fill="none" stroke="var(--paper-3)" strokeWidth={2.5} />
+                <circle
+                  cx={CX} cy={CY} r={ringR} fill="none" stroke="var(--acid)" strokeWidth={2.5} strokeLinecap="round"
+                  strokeDasharray={`${(progressRatio(dayDone) * ringC).toFixed(2)} ${ringC.toFixed(2)}`}
+                  transform={`rotate(-90 ${CX} ${CY})`}
+                  style={{ transition: 'stroke-dasharray 400ms cubic-bezier(0.32, 0.72, 0, 1)' }}
+                />
+              </g>
+            )}
 
             <defs>
               <pattern id="clock-break-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -1059,6 +1079,40 @@ export function ClockNode({
               paints behind the hour/minute/second hands. */}
         </div>
 
+        {/* engagement.md F18 — this week, one ring per day (planned blocks done). */}
+        <div
+          data-testid="clock-week-marks"
+          style={{ display: dialOnly ? 'none' : 'flex', justifyContent: 'center', gap: 6, width: '100%' }}
+        >
+          {weekMarks.map((d) => {
+            const isToday = d.date === today;
+            const ratio = progressRatio(d);
+            const full = d.planned > 0 && d.done === d.planned;
+            const dow = new Date(`${d.date}T00:00:00`).toLocaleDateString('en', { weekday: 'narrow' });
+            return (
+              <button
+                key={d.date}
+                type="button"
+                data-testid={`clock-week-mark-${d.date}`}
+                title={d.planned > 0 ? `${d.done} of ${d.planned} planned done` : 'nothing planned'}
+                onClick={() => onCommand('clock.setSelectedDate', { date: d.date })}
+                style={{ all: 'unset', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 24 }}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+                  {isToday && <circle cx="10" cy="10" r="9.3" fill="none" stroke="var(--ink-3)" strokeWidth="0.8" />}
+                  <circle cx="10" cy="10" r="7" fill="none" stroke="var(--paper-3)" strokeWidth="2.4" strokeDasharray={d.planned > 0 ? undefined : '1.6 2'} />
+                  {ratio > 0 && (
+                    <circle cx="10" cy="10" r="7" fill="none" stroke="var(--acid)" strokeWidth="2.4" strokeLinecap="round"
+                      strokeDasharray={`${(ratio * 2 * Math.PI * 7).toFixed(2)} 44`} transform="rotate(-90 10 10)" />
+                  )}
+                  {full && <path d="M6.6 10.2l2.2 2.2 4.4-4.6" fill="none" stroke="var(--acid-ink, var(--acid))" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />}
+                </svg>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: isToday ? 'var(--ink)' : 'var(--ink-3)', textTransform: 'uppercase' }}>{dow}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Now-playing strip */}
         <div
           style={{
@@ -1071,7 +1125,7 @@ export function ClockNode({
             border: '1px solid var(--paper-3)',
             borderRadius: 5,
             fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
+            fontSize: 11,
             position: 'relative',
             overflow: 'hidden',
             boxSizing: 'border-box',
@@ -1109,7 +1163,7 @@ export function ClockNode({
                   fontWeight: 600,
                   letterSpacing: '0.04em',
                   textTransform: 'uppercase',
-                  fontSize: 10.5,
+                  fontSize: 11,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -1122,7 +1176,7 @@ export function ClockNode({
                 style={{
                   marginLeft: 'auto',
                   color: 'var(--ink-3)',
-                  fontSize: 9.5,
+                  fontSize: 11,
                   letterSpacing: '0.04em',
                   flexShrink: 0,
                 }}
@@ -1147,7 +1201,7 @@ export function ClockNode({
                   color: 'var(--ink-3)',
                   textTransform: 'none',
                   fontWeight: 400,
-                  fontSize: 10.5,
+                  fontSize: 11,
                 }}
               >
                 {isToday
@@ -1193,26 +1247,29 @@ export function ClockNode({
                   alignItems: 'center',
                   gap: 8,
                   padding: '4px 0',
-                  opacity: ended ? 0.42 : 1,
+                  // Over: quieter ink, never faded below readable.
+                  opacity: 1,
                   position: 'relative',
                 }}
               >
-                {/* Color bar */}
+                {/* The task's colour as a dot, as in the Todo rows (no left bar). */}
                 <span
+                  aria-hidden
                   style={{
-                    width: 4,
-                    height: 16,
-                    borderRadius: 1,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
                     background: t.colorVar,
                     display: 'inline-block',
                     alignSelf: 'center',
+                    opacity: ended ? 0.5 : 1,
                   }}
                 />
                 {/* Start time */}
                 <span
                   style={{
-                    color: on ? 'var(--rust)' : 'var(--ink-3)',
-                    fontSize: 9.5,
+                    color: on ? 'color-mix(in srgb, var(--rust) 75%, var(--ink))' : 'var(--ink-3)',
+                    fontSize: 11,
                     letterSpacing: '0.02em',
                     whiteSpace: 'nowrap',
                   }}
@@ -1222,7 +1279,7 @@ export function ClockNode({
                 {/* Name */}
                 <span
                   style={{
-                    color: 'var(--ink)',
+                    color: ended ? 'var(--ink-3)' : 'var(--ink)',
                     fontSize: 12,
                     fontFamily: 'var(--font-sans)',
                     fontWeight: on ? 600 : 400,
@@ -1238,8 +1295,8 @@ export function ClockNode({
                 {/* Duration */}
                 <span
                   style={{
-                    color: 'var(--ink-4)',
-                    fontSize: 9.5,
+                    color: 'var(--ink-3)',
+                    fontSize: 11,
                     letterSpacing: '0.02em',
                   }}
                 >
@@ -1283,7 +1340,7 @@ export function ClockNode({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: spanTone(tagLibrary, realityPopup.seg, easy) }} />
               <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? (!easy && !realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}</span>
-              {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>◆ LIVE</span>}
+              {realityPopup.seg.live && <span style={{ fontSize: 11, color: 'var(--acid-ink, var(--acid))', display: 'inline-flex', alignItems: 'center', gap: 4 }}><LineGlyph name="dot" size={8} />LIVE</span>}
             </div>
             {/* #207 — click a time to change it; a running session's "now" becomes "Stop at". */}
             <SpanTimeEditor
@@ -1294,7 +1351,7 @@ export function ClockNode({
                 else setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, startMs, endMs } });
               }}
             />
-            <div style={{ color: 'var(--ink-3)', fontSize: 10, letterSpacing: '0.04em' }}>
+            <div style={{ color: 'var(--ink-3)', fontSize: 11, letterSpacing: '0.04em' }}>
               {realityPopup.seg.live ? 'So far · ' : 'Duration · '}
               {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
             </div>
@@ -1313,7 +1370,7 @@ export function ClockNode({
                 type="button"
                 data-testid="clock-reality-delete"
                 onClick={() => { deleteClockSegment(realityPopup.seg.id); setRealityPopup(null); }}
-                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: 'var(--rust)', background: 'transparent', border: '1px solid var(--rust)', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--rust)', background: 'transparent', border: '1px solid var(--rust)', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
               >
                 Delete segment
               </button>

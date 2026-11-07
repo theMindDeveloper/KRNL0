@@ -17,8 +17,9 @@
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
 
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import { TimeLogHeatmap } from './TimeLogHeatmap';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { HoldButton } from '../../ui/HoldButton';
@@ -72,6 +73,7 @@ import {
   defaultAnalyticsState,
 } from './types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 // The page each (older) view name opens: `krnl analytics show --view …` and
 // the saved view land on their page instead of always on Summary.
@@ -182,7 +184,7 @@ const titlebarStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--k-an-line, #0a0c0e)',
   boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: 11,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
   color: 'var(--k-an-ink-2, #c8cdd3)',
@@ -198,13 +200,15 @@ const dotStyle: React.CSSProperties = {
 
 const summaryChipStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 9.5,
+  fontSize: 11,
   letterSpacing: '0.06em',
   padding: '2px 8px',
   border: '1px solid var(--k-an-line-2, #2a2e33)',
   borderRadius: 999,
   background: 'var(--k-an-bg-3, rgba(20,22,24,0.6))',
   color: 'var(--k-an-ink-1, #eef1f4)',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 };
 
 const gearBtnStyle = (active: boolean): React.CSSProperties => ({
@@ -233,7 +237,7 @@ const toolbarStyle: React.CSSProperties = {
 
 const tabPill = (active: boolean): React.CSSProperties => ({
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   padding: '5px 11px',
@@ -250,7 +254,7 @@ const tabPill = (active: boolean): React.CSSProperties => ({
 
 const chipBtn = (active: boolean): React.CSSProperties => ({
   fontFamily: 'var(--font-mono)',
-  fontSize: 9,
+  fontSize: 11,
   letterSpacing: '0.04em',
   padding: '3px 8px',
   border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),
@@ -319,12 +323,13 @@ function ChartCard({
   if (hidden) return <div data-card-id={cardId} data-hidden-card aria-hidden style={{ ...cardPlacement(cardId, easy), minHeight: 0 }} />;
 
   const cardStyle: React.CSSProperties = {
-    background: 'linear-gradient(180deg, var(--k-an-bg-2b, #1a1d20) 0%, var(--k-an-bg, #131517) 100%)',
-    border: `1px solid ${pinned ? 'rgba(201,241,88,0.45)' : 'var(--k-an-line, #23262a)'}`,
-    // Flat cards: no blurred drop shadow.
-    boxShadow: pinned ? '0 0 0 1px rgba(201,241,88,0.18) inset' : 'none',
-    borderRadius: 8,
-    padding: '10px 12px 12px',
+    // A section of the window, not a card inside a card: a hairline on top
+    // (acid when pinned), spacing does the rest.
+    background: 'transparent',
+    borderTop: `1px solid ${pinned ? 'var(--acid-ink, var(--acid))' : 'var(--k-an-line, #23262a)'}`,
+    boxShadow: 'none',
+    borderRadius: 0,
+    padding: '10px 2px 6px',
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
@@ -340,11 +345,12 @@ function ChartCard({
 
   return (
     <div data-card-id={cardId} data-pinned={pinned || undefined} style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 18 }}>
+      {/* The toolbar wraps under the title when both don't fit: the title is read in full. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 18, flexWrap: 'wrap', rowGap: 6 }}>
         <span
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
+            fontSize: 11,
             color: pinned ? 'var(--acid)' : 'var(--k-an-ink-3, #9aa1a8)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
@@ -357,11 +363,11 @@ function ChartCard({
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
             minWidth: 0,
-            flexShrink: 1,
+            flex: '1 1 140px',
           }}
           title={title}
         >
-          {pinned ? '★ ' : ''}{title}
+          {pinned && <><LineGlyph name="star" size={10} />{' '}</>}{title}
         </span>
         <div style={{ flex: 1 }} />
         {toolbar}
@@ -577,23 +583,23 @@ export function AnalyticsNode({
       {/* Titlebar — the shared header class, so every frame style's header
           skin (Macintosh title bar, Submarine module tag, …) reaches it as it
           does the other mother windows. */}
-      <div className="krnl-node-header" style={titlebarStyle}>
+      <div className="krnl-node-header an-head" style={titlebarStyle}>
         <span style={dotStyle} aria-hidden />
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
         <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
-        <span style={{ color: 'var(--k-an-ink-2b, #aab0b7)' }}>{sources.length} sources</span>
+        <span style={{ color: 'var(--k-an-ink-2b, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{sources.length} sources</span>
         <div style={{ flex: 1 }} />
-        <span style={summaryChipStyle}>
+        <span className="an-chip an-chip--done" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>done </span>
           <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.tasksDone}</span>
         </span>
-        <span style={summaryChipStyle}>
+        <span className="an-chip an-chip--focus" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>focus </span>
           <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin}m</span>
         </span>
-        <span style={summaryChipStyle}>
+        <span className="an-chip an-chip--streak" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>streak </span>
-          <span style={{ color: 'var(--acid, #c9f158)' }}>{streaks.longestHabitStreak}d</span>
+          <span style={{ color: 'var(--acid-ink, var(--acid, #c9f158))', fontWeight: 600 }}>{streaks.longestHabitStreak}d</span>
         </span>
         <button
           type="button"
@@ -604,7 +610,7 @@ export function AnalyticsNode({
           style={gearBtnStyle(settingsOpen)}
           title={settingsOpen ? 'Done curating' : 'Pin or hide cards'}
         >
-          {settingsOpen ? '✓' : '⚙'}
+          {settingsOpen ? <SettingsIcon name="check" size={12} /> : <SettingsIcon name="settings" size={12} />}
         </button>
       </div>
 
@@ -756,7 +762,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
   const tile = (label: string, value: string, sub: string, testId: string) => (
     // containerType lets the number scale with the tile's own width (cqi), so it never spills out.
     <div data-testid={testId} style={{ minWidth: 0, minHeight: 0, padding: '10px 12px', border: '1px solid var(--k-an-line, #2a2e33)', borderRadius: 10, background: 'var(--k-an-tile, rgba(255,255,255,0.02))', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden', containerType: 'inline-size' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</div>
       <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(16px, 17cqi, 28px)', fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
       <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--k-an-ink-3, #aab0b7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
     </div>
@@ -781,14 +787,37 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
     [
       {
         cardId: 'estimates.kpis' as const,
-        render: () => card('estimates.kpis', `Plan vs actual · last ${state.rangeDays}d`, 3, 96, () => (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: 'minmax(0, 1fr)', gap: 10, width: '100%', height: '100%' }}>
-            {tile('Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy')}
-            {tile('Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned')}
-            {tile('Tracked', fmtMinutes(k.trackedMin), `${k.overCount} over · ${k.underCount} within plan`, 'estimates-kpi-tracked')}
-            {tile('On a task', k.taggedShare === null ? '—' : `${Math.round(k.taggedShare * 100)}%`, 'of pomo work linked to a task', 'estimates-kpi-tagged')}
-          </div>
-        )),
+        render: () => card('estimates.kpis', `Plan vs actual · last ${state.rangeDays}d`, 3, 96, (size) => {
+          const kpis: Array<[string, string, string, string]> = [
+            ['Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy'],
+            ['Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned'],
+            ['Tracked', fmtMinutes(k.trackedMin), `${k.overCount} over · ${k.underCount} within plan`, 'estimates-kpi-tracked'],
+            ['On a task', k.taggedShare === null ? '—' : `${Math.round(k.taggedShare * 100)}%`, 'of pomo work linked to a task', 'estimates-kpi-tagged'],
+          ];
+          // Fit the room the card has: one row of four, a 2×2 grid, or — when
+          // a tile would be too small for its three lines — a plain list.
+          const w = size.width || 600;
+          const h = size.height || 96;
+          const cols = w >= 520 ? 4 : 2;
+          const rowH = (h - (4 / cols - 1) * 10) / (4 / cols);
+          if (rowH < 68 || w / cols < 120) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, width: '100%' }}>
+                {kpis.map(([label, value, sub, id]) => (
+                  <div key={id} data-testid={id} title={sub} style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0, padding: '3px 0', borderBottom: '1px solid var(--k-an-line, #2a2e33)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--k-an-ink-3, #aab0b7)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(0, 1fr)', gap: 10, width: '100%', height: '100%' }}>
+              {kpis.map(([label, value, sub, id]) => <Fragment key={id}>{tile(label, value, sub, id)}</Fragment>)}
+            </div>
+          );
+        }),
       },
       {
         cardId: 'estimates.perTask' as const,
@@ -1442,7 +1471,7 @@ function ViewBody(props: ViewBodyProps) {
               style={{
                 width: '100%',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontSize: 11,
                 color: 'var(--k-an-ink-1, #eef1f4)',
                 borderCollapse: 'collapse',
               }}
@@ -1487,7 +1516,7 @@ function ViewBody(props: ViewBodyProps) {
                 style={{
                   width: '100%',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 10,
+                  fontSize: 11,
                   color: 'var(--k-an-ink-1, #eef1f4)',
                   borderCollapse: 'collapse',
                 }}

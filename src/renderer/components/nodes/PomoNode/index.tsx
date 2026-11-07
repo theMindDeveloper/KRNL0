@@ -1,4 +1,5 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { SettingsIcon } from '../../ui/SettingsIcons';
 import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
 import type { PomoConfig, PomoState, TimerFace } from './types';
@@ -11,6 +12,7 @@ import type { TaskState } from '../TaskNode/types';
 import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
+import { FaceFit, compactLevelFor } from './FaceFit';
 import { Vapor } from './variants/Vapor';
 import { Vu } from './variants/Vu';
 import { Outline } from './variants/Outline';
@@ -30,6 +32,8 @@ import { ObserveDash } from './ObserveDash';
 import { useAwayGap } from './useAwayGap';
 import { Switch } from '../../ui/Switch';
 import { calcRemainingPct, primaryButtonLabel, primaryTooltip, pipState } from './display';
+import { formatRemaining, isObserve, isPromptDone, pomoClock, stopCommand, todayCycles } from './derive';
+import { setPocketAway } from '../../../pocket/pocketAway';
 
 const TICK_MS = 500;
 
@@ -43,14 +47,6 @@ const spanText = (ms: number): string => {
   const min = Math.round(ms / 60_000);
   return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m` : `${min}m`;
 };
-
-function formatRemaining(ms: number): string {
-  const safe = Math.max(0, ms);
-  const totalSec = Math.ceil(safe / 1000);
-  const mm = Math.floor(totalSec / 60);
-  const ss = totalSec % 60;
-  return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
-}
 
 export function PomoNode({
   node,
@@ -68,6 +64,24 @@ export function PomoNode({
   // controls all fit without spilling past the panel's overflow:hidden edge.
   const inStation = useContext(MotherFrameStationContext);
   const bodyPadding = inStation ? '10px 14px 12px' : '18px 18px 16px';
+  // A short station slot sheds secondary rows before the face shrinks, so the
+  // time and START always show: 1 = no "log past time", 2 = no cycles strip,
+  // 3 = no session dots. Set from the slot's height only (no feedback loop).
+  // A callback ref: the body remounts when the span log opens and closes.
+  const [bodyEl, setBodyEl] = useState<HTMLDivElement | null>(null);
+  const [compact, setCompact] = useState(0);
+  useLayoutEffect(() => {
+    const el = bodyEl;
+    if (!inStation || !el || typeof ResizeObserver === 'undefined') { setCompact(0); return; }
+    const measure = (): void => {
+      const h = el.clientHeight;
+      setCompact(compactLevelFor(h));
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, [inStation, bodyEl]);
   const bodyGap = inStation ? 8 : 14;
 
   // Gear panel local UI state (Decision 22 F9).
@@ -91,28 +105,20 @@ export function PomoNode({
   // carries accumulated work across pause gaps so the threshold is correct.
   // An Observe span leaves the day-long OBSERVE_SPAN_MIN in state until the
   // next Start; Pomodoro mode shows the configured session length meanwhile.
-  const sessionMin = state.durationMin === OBSERVE_SPAN_MIN ? config.sessionMin : state.durationMin;
-  const thresholdMs = sessionMin * 60_000;
-  const liveWorkMs =
-    state.status === 'running' && state.startedAt !== null
-      ? state.sessionWorkSec * 1000 + (Date.now() - Date.parse(state.startedAt))
-      : state.status === 'paused'
-        ? state.sessionWorkSec * 1000 + state.pausedElapsedMs
-        : 0;
-  const remainingMs = Math.max(0, thresholdMs - liveWorkMs);
-  const breakElapsedMs =
-    state.status === 'break' && state.startedAt !== null
-      ? Date.now() - Date.parse(state.startedAt)
-      : 0;
+  // derive.ts holds these rules so the pocket window (Decision 37) shares them.
+  const clock = pomoClock(state, config, Date.now());
+  const { sessionMin, thresholdMs, liveWorkMs, remainingMs, breakElapsedMs } = clock;
   // The "Are you done?" prompt fires once the work threshold is reached. The
   // timer keeps running (arc keeps growing) — NO auto-break, NO auto-stop.
   // Observe mode: no threshold, so no prompt — the timer just counts up.
   // Easy mode is always Observe and never asks, names or links anything.
   const easy = useEasyMode();
-  const observe = easy || config.mode === 'observe';
+  const observe = isObserve(config, easy);
   // Time the app couldn't see (sleep / closed app) is asked about, not booked.
   const { gap: away, dismiss: dismissAway } = useAwayGap(state.status, state.startedAt);
-  const promptDone = !away && !observe && state.status === 'running' && liveWorkMs >= thresholdMs;
+  const promptDone = isPromptDone(observe, away !== null, state.status, clock);
+  // The pocket window shows "open KRNL0" instead of controls while this is asked (pocket F11).
+  useEffect(() => { setPocketAway(away !== null); }, [away]);
 
   // Issue #166 slice 5 — OS notification when threshold is first reached.
   // Fires once per transition false→true; uses Web Notification API (works
@@ -169,19 +175,7 @@ export function PomoNode({
   // falls on the local date today. A full cycle = `longBreakEvery` sessions
   // (e.g. 4 default), so `cyclesToday = floor(sessionsToday / longBreakEvery)`.
   // Distinct from the per-task pip counter (which is per-task progress).
-  const { cyclesToday, sessionsToday, progressToNext } = (() => {
-    const today = new Date().toLocaleDateString('en-CA');
-    let count = 0;
-    for (const rec of state.history) {
-      if (!rec.completed || !rec.endedAt) continue;
-      if (new Date(rec.endedAt).toLocaleDateString('en-CA') === today) count++;
-    }
-    return {
-      cyclesToday: Math.floor(count / config.longBreakEvery),
-      sessionsToday: count,
-      progressToNext: count % config.longBreakEvery,
-    };
-  })();
+  const { cyclesToday, sessionsToday, progressToNext } = todayCycles(state.history, config.longBreakEvery, Date.now());
 
   // Issue #166 — observer-model controls (dispatch the new verbs).
   const handlePrimary = () => {
@@ -193,7 +187,7 @@ export function PomoNode({
   const handleBreak = () => onCommand('pomo.break');
   // One Stop button: records the session so far, or discards it when
   // "Count stopped sessions" is off in the Pomo settings.
-  const handleStop = () => onCommand(!observe && config.countStopped === false ? 'pomo.discard' : 'pomo.stop');
+  const handleStop = () => onCommand(stopCommand(observe, config));
 
   // Observe mode — "what was this?" whenever a work span closes (Stop or
   // Break) untagged: free text + a tag (ADR 0016). A span already tagged with
@@ -408,7 +402,7 @@ export function PomoNode({
           alignItems: 'center',
           gap: 8,
           fontFamily: 'var(--font-mono)',
-          fontSize: 10.5,
+          fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
@@ -424,11 +418,14 @@ export function PomoNode({
           style={{
             color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-2)',
             fontWeight: 500,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
           }}
         >
           {headerLeft}
         </span>
-        <span style={{ color: 'var(--ink-3)' }}>{headerRight}</span>
+        {/* The session code gives way first: one line, never wrapped. */}
+        <span style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{headerRight}</span>
         {/* A.1 — spacer pushes gear to the right */}
         <span style={{ flex: 1 }} />
         {/* Span log — every recorded span, to find and delete misclicks. */}
@@ -442,14 +439,15 @@ export function PomoNode({
           onMouseDown={(e) => e.stopPropagation()}
           style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid-ink, var(--acid))', borderColor: 'var(--acid-ink, var(--acid))' } : {}) }}
         >
-          {logOpen ? '✕' : '☰'}
+          {logOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="menu" size={12} />}
         </button>
         {/* Mode switch — Pomodoro rhythm, or just observe where the time goes.
             Locked while a span is in flight, like the gear. Hidden in Easy mode. */}
         {!easy && <div
           role="group"
           aria-label="Pomo mode"
-          style={{ display: 'flex', border: '1px solid var(--paper-3)', borderRadius: 4, overflow: 'hidden' }}
+          // Never shrinks: the title on the left gives way instead.
+          style={{ display: 'flex', border: '1px solid var(--paper-3)', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {(['pomodoro', 'observe'] as const).map((m) => {
@@ -469,12 +467,15 @@ export function PomoNode({
                 onClick={(e) => { e.stopPropagation(); if (!active) onCommand('pomo.setConfig', { config: { mode: m } }); }}
                 style={{
                   padding: '2px 7px',
-                  background: active ? 'var(--rust)' : 'transparent',
+                  flexShrink: 0,
+                  // rust-deep: the paper-coloured label stays readable in light mode.
+                  background: active ? 'var(--rust-deep, var(--rust))' : 'transparent',
                   color: active ? 'var(--paper)' : 'var(--ink-3)',
                   border: 'none',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
-                  letterSpacing: '0.06em',
+                  fontSize: 11,
+                  letterSpacing: '0.01em',
+                  whiteSpace: 'nowrap',
                   cursor: gearDisabled ? 'not-allowed' : 'pointer',
                   opacity: gearDisabled && !active ? 0.4 : 1,
                 }}
@@ -501,7 +502,7 @@ export function PomoNode({
           onMouseDown={(e) => e.stopPropagation()}
           style={{ fontSize: 11 }}
         >
-          {gearOpen ? '✕' : '⚙'}
+          {gearOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="settings" size={12} />}
         </button>}
       </div>
 
@@ -519,7 +520,7 @@ export function PomoNode({
         >
           <div style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
@@ -588,12 +589,12 @@ export function PomoNode({
                   style={{
                     flex: 1,
                     padding: '5px 2px',
-                    background: isActive ? 'var(--rust)' : 'transparent',
+                    background: isActive ? 'var(--rust-deep, var(--rust))' : 'transparent',
                     color: isActive ? 'var(--paper)' : 'var(--ink-3)',
-                    border: `1px solid ${isActive ? 'var(--rust)' : 'var(--paper-3)'}`,
+                    border: `1px solid ${isActive ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
                     borderRadius: 4,
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 9,
+                    fontSize: 11,
                     cursor: 'pointer',
                     letterSpacing: '0.02em',
                     textTransform: 'uppercase',
@@ -671,15 +672,18 @@ export function PomoNode({
               data-testid="pomo-dev-demo"
               onClick={() => { onCommand('pomo.devSeedSegment', { kind: 'work', minutes: 30, agoMin: 0, label: '' }); setLogOpen(false); }}
               onMouseDown={(e) => e.stopPropagation()}
-              style={{ marginTop: 8, width: '100%', padding: '5px', background: 'transparent', border: '1px dashed var(--ink-4)', borderRadius: 4, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 9, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+              style={{ marginTop: 8, width: '100%', padding: '5px', background: 'transparent', border: '1px dashed var(--ink-4)', borderRadius: 4, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
             >
               dev · + 30 min demo span
             </button>
           )}
         </div>
       ) : (
-        <div style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap }}>
-          {/* PR4 — timer face switch: swap inner face without touching outer chrome */}
+        <div ref={setBodyEl} style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap, ...(inStation ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
+          {/* PR4 — timer face switch: swap inner face without touching outer chrome.
+              In a station slot the face is fitted to the room left, so the
+              controls below it (START, task) are never cut off. */}
+          <FaceWrap fit={inStation}>
           {observe ? (
             <ObserveDash state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} plain={easy} />
           ) : (<>
@@ -705,20 +709,21 @@ export function PomoNode({
             <Mac m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           </>)}
+          </FaceWrap>
 
           {/* Today's full-cycle counter — distinct visual from the session pips
               (squares + numeric badge + acid glow) so it reads as "achievement"
               not "in-progress session". Always rendered so the user gets a
               live count even at 0 cycles. Tooltip carries the breakdown. */}
           {observe ? null : (<>
-          <CycleCounter
+          {compact < 2 && <CycleCounter
             cyclesToday={cyclesToday}
             sessionsToday={sessionsToday}
             progressToNext={progressToNext}
             longBreakEvery={config.longBreakEvery}
-          />
+          />}
 
-          <div
+          {compact < 3 && <div
             className="pomo-pips"
             data-testid="pomo-pips"
             style={{ display: 'flex', gap: 4, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: 10 }}
@@ -750,7 +755,7 @@ export function PomoNode({
                 data-testid="pomo-pips-overflow"
                 style={{
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 9.5,
+                  fontSize: 11,
                   color: 'var(--ink-3)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.1em',
@@ -763,14 +768,14 @@ export function PomoNode({
             <span style={{
               marginLeft: 'auto',
               fontFamily: 'var(--font-mono)',
-              fontSize: 9.5,
+              fontSize: 11,
               color: 'var(--ink-3)',
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
             }}>
               session {sessionsForDisplay} / {pipCount}
             </span>
-          </div>
+          </div>}
           </>)}
 
           {/* Issue #166 — observer-model controls. Every control carries a
@@ -814,12 +819,12 @@ export function PomoNode({
               border: `1px solid ${isTaskMode ? 'var(--acid)' : 'var(--paper-3)'}`,
               borderRadius: 5,
               fontFamily: 'var(--font-mono)',
-              fontSize: 10,
+              fontSize: 11,
               letterSpacing: '0.06em',
               color: 'var(--ink-3)',
             }}
           >
-            <span aria-hidden style={{ color: isTaskMode ? 'var(--acid)' : 'var(--ink-4)' }}>{isTaskMode ? '☑' : '☐'}</span>
+            <span aria-hidden style={{ color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', lineHeight: 0 }}><SettingsIcon name={isTaskMode ? 'finished' : 'box'} size={12} /></span>
             <span>TASK</span>
             <AppSelect
               ariaLabel="Link this session to a task"
@@ -834,7 +839,7 @@ export function PomoNode({
                 // The running session can only be on an open task (a done one is reopened first).
                 ...tagOptions.filter((o) => !o.done).map((o) => ({ value: o.id, label: truncate(o.text, 28) })),
               ]}
-              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 10.5, padding: '2px 0' }}
+              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 11, padding: '2px 0' }}
             />
           </label>
           )}
@@ -1024,7 +1029,7 @@ export function PomoNode({
             </div>
           )}
           {/* #207 — fix recorded time where it happens: stop at the real time, or add forgotten time. */}
-          <PomoTimeLinks state={state} />
+          {compact < 1 && <PomoTimeLinks state={state} />}
 
         </div>
       )}
@@ -1085,9 +1090,8 @@ function CycleCounter({
         <span
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 7.5,
-            color: 'var(--ink-4)',
-            letterSpacing: '0.08em',
+            fontSize: 11,
+            color: 'var(--ink-3)',
           }}
         >
           ×
@@ -1100,8 +1104,8 @@ function CycleCounter({
             fontVariantNumeric: 'tabular-nums',
             fontWeight: 700,
             lineHeight: 1,
-            color: cellColor,
-            textShadow: hasAny ? '0 0 6px color-mix(in srgb, var(--acid) 50%, transparent)' : 'none',
+            // acid-ink: lime text is unreadable on a light pomo.
+            color: hasAny ? 'var(--acid-ink, var(--acid))' : cellColor,
           }}
         >
           {cyclesToday}
@@ -1119,7 +1123,7 @@ function CycleCounter({
               height: 7,
               background: 'var(--acid)',
               transform: 'rotate(45deg)',
-              boxShadow: '0 0 5px color-mix(in srgb, var(--acid) 50%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--acid-ink, var(--acid)) 60%, transparent)',
               flexShrink: 0,
             }}
           />
@@ -1129,7 +1133,7 @@ function CycleCounter({
             data-testid="pomo-cycles-overflow"
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 8.5,
+              fontSize: 11,
               color: 'var(--acid-ink, var(--acid))',
               letterSpacing: '0.06em',
               marginLeft: 1,
@@ -1172,15 +1176,14 @@ function CycleCounter({
       <span
         style={{
           fontFamily: 'var(--font-mono)',
-          fontSize: 8,
-          color: 'var(--ink-4)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
+          fontSize: 11,
+          color: 'var(--ink-3)',
+          letterSpacing: '0.02em',
           flexShrink: 0,
           whiteSpace: 'nowrap',
         }}
       >
-        cycles · today
+        cycles today
       </span>
     </div>
   );
@@ -1201,4 +1204,9 @@ function PomoIcon({ kind }: { kind: 'play' | 'pause' | 'stop' | 'break' | 'skip'
       </svg>
     );
   }
+}
+
+/** The face, fitted to the room left in a station slot; as-is elsewhere. */
+function FaceWrap({ fit, children }: { fit: boolean; children: React.ReactNode }) {
+  return fit ? <FaceFit>{children}</FaceFit> : <>{children}</>;
 }

@@ -274,31 +274,11 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
     });
   });
 
-  // ── F6 — Archive done (was "clear done") ─────────────────────────────────
-  // ADR 0016: the header button now archives instead of deleting.
-  describe('F6 — Archive done dispatches todo.archiveDone', () => {
-    it('shows the clear done button when at least one item is done', () => {
-      const state = makeBackground();
-      renderTodoNode(state);
-      const btn = screen.getByTestId('clear-done-btn');
-      expect(btn).not.toBeNull();
-    });
-
-    it('dispatches todo.archiveDone when the button is activated', () => {
-      const onCommand = vi.fn();
-      const state = makeBackground();
-      renderTodoNode(state, onCommand);
-      const btn = screen.getByTestId('clear-done-btn');
-      fireEvent.click(btn);
-      expect(onCommand).toHaveBeenCalledWith('todo.archiveDone');
-    });
-
-    it('does not show the clear done button when no items are done', () => {
-      let s = defaultTodoState();
-      s = todoAdd(s, { text: 'undone' }, envAt(T1, 'id-a'));
-      renderTodoNode(s);
-      const btn = screen.queryByTestId('clear-done-btn');
-      expect(btn).toBeNull();
+  // ── F6 — engagement.md F7: one Done list, no "archive done" button ─────
+  describe('F6 — no archive step in the UI', () => {
+    it('does not show an archive button, even with done items', () => {
+      renderTodoNode(makeBackground());
+      expect(screen.queryByTestId('clear-done-btn')).toBeNull();
     });
   });
 

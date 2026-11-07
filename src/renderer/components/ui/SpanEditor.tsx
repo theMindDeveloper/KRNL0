@@ -29,6 +29,7 @@ import { boardTagLibrary } from '../../store/spanTags';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { Popover } from './Popover';
 import { retagSegment } from '../../store/scheduleActions';
+import { LineGlyph } from './LineGlyph';
 
 const chip = (active: boolean, accent = false): CSSProperties => ({
   fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums', padding: '3px 8px', borderRadius: 4,
@@ -37,7 +38,7 @@ const chip = (active: boolean, accent = false): CSSProperties => ({
   color: accent ? 'var(--ink-on-bright)' : 'var(--ink)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
 });
 const btn = (primary: boolean, disabled = false): CSSProperties => ({
-  fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase',
+  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
   padding: '5px 10px', borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1,
   border: `1px solid ${primary ? 'var(--ink)' : 'var(--paper-3)'}`,
   background: primary ? 'var(--ink)' : 'transparent', color: primary ? 'var(--paper)' : 'var(--ink-2)',
@@ -168,10 +169,10 @@ export function SpanTimeEditor({ seg, onSaved, testIdPrefix = 'span', autoEdit, 
         )}
       </div>
       {error && (
-        <div role="alert" data-testid={`${testIdPrefix}-problem`} style={{ fontSize: 10, color: 'var(--rust)', marginTop: 4 }}>{error}</div>
+        <div role="alert" data-testid={`${testIdPrefix}-problem`} style={{ fontSize: 11, color: 'var(--rust)', marginTop: 4 }}>{error}</div>
       )}
       {editing && !error && (
-        <div style={{ fontSize: 9, color: 'var(--ink-4)', marginTop: 4 }}>
+        <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
           {seg.live && editing === 'end' ? 'Enter stops the session at this time · Esc cancels' : 'Enter saves · Esc cancels'}
         </div>
       )}
@@ -221,7 +222,7 @@ export function TaskPickButton({ value, onChange, testId, emptyLabel = 'untagged
         {value && <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(value) }} />}
         {category && <CategoryIcon id={category.id} color={category.color} size={11} />}
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-        <span aria-hidden style={{ opacity: 0.6, fontSize: 8 }}>▾</span>
+        <span aria-hidden style={{ opacity: 0.6, fontSize: 11 }}><LineGlyph name="caretDown" size={9} /></span>
       </button>
       <Popover anchor={anchorRef.current} open={open} onClose={() => setOpen(false)} minWidth={260}>
         <TaskTagPicker
@@ -433,7 +434,7 @@ export function CountsToward({ segId, taskId, taskName, onChanged, testId = 'spa
 }): JSX.Element {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.caption }}>
-      <span style={{ fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Counts toward</span>
+      <span style={{ fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Counts toward</span>
       <TaskPickButton
         testId={testId}
         value={taskId}

@@ -50,7 +50,7 @@ export function Mac({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
             />
           )}
         </div>
-        <div style={{ position: 'relative', height: 14, marginTop: 3, fontSize: 9, color: 'var(--ink-3)' }}>
+        <div style={{ position: 'relative', height: 14, marginTop: 3, fontSize: 11, color: 'var(--ink-3)' }}>
           {SCALE.map((v) => (
             <span
               key={v}
@@ -58,6 +58,7 @@ export function Mac({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
                 position: 'absolute',
                 left: `${(v / TOTAL) * 100}%`,
                 transform: v === 0 ? 'none' : v === TOTAL ? 'translateX(-100%)' : 'translateX(-50%)',
+                whiteSpace: 'nowrap',
               }}
             >
               {v === TOTAL ? `${v} min` : v}

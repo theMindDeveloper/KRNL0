@@ -39,7 +39,7 @@ export function AppSelect({ value, options, onChange, testId, ariaLabel, style }
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', textAlign: 'left',
           background: 'var(--paper-2)', color: 'var(--ink)', border: '1px solid var(--paper-3)', borderRadius: 4,
-          fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', textTransform: 'none',
+          fontFamily: 'var(--font-mono)', fontSize: 11, padding: '2px 6px', textTransform: 'none',
           ...style,
         }}
       >

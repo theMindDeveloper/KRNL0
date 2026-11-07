@@ -18,6 +18,7 @@ import type { NodeKind, Node } from '../../../shared/types/node';
 import type { MotherNodeConfig, StationGeometry } from '../../../shared/types';
 import { SLOT_DEFAULTS } from './SlotResolver';
 import { isStationHidden } from './stationVisibility';
+import { useEasyMode } from '../../store/uiMode';
 
 interface MotherEntry {
   kind: NodeKind;
@@ -145,7 +146,7 @@ function ToolbarBtn({
         border: `1px solid ${active ? 'var(--paper-3)' : 'transparent'}`,
         borderRadius: 3,
         fontFamily: 'var(--font-mono)',
-        fontSize: 10,
+        fontSize: 11,
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
         cursor: 'pointer',
@@ -167,6 +168,8 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
   const board = useBoardStore((s) => s.board);
   const updateNode = useBoardStore((s) => s.updateNode);
   const setLayoutGeometry = useBoardStore((s) => s.setLayoutGeometry);
+  // Easy mode names the Pomo for what it does there: it records (research C6).
+  const easy = useEasyMode();
 
   if (!board) return null;
 
@@ -222,7 +225,7 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
         <span
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 9,
+            fontSize: 11,
             letterSpacing: '0.18em',
             textTransform: 'uppercase',
             color: 'var(--ink-3)',
@@ -239,7 +242,7 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           <ToolbarBtn
             key={m.kind}
             active={active}
-            label={m.label}
+            label={easy && m.kind === 'pomo' ? 'Record' : m.label}
             onClick={() => toggleMother(m.kind)}
           >
             <Glyph kind={m.kind} active={active} />

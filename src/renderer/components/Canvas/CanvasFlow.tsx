@@ -53,6 +53,7 @@ import type { TextLook } from '../nodes/TextNode/types';
 import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
+import { finishedClockKey, finishedTaskIds, useFinishedCards } from '../../store/finishedCards';
 import { ContextMenu } from '../ContextMenu';
 import { ingestImageFile, imageRejectReason, initialDisplaySize } from './dropImage';
 import { classifyFile, classifyUrl } from './dropMedia';
@@ -84,7 +85,7 @@ import { undoable } from '../../store/undoNotice';
 const MOTHER_ROW_START_X = -1400;
 const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
-import { FOCUS_NODE_EVENT } from '../../store/scheduleActions';
+import { FIT_NODES_EVENT, FOCUS_NODE_EVENT } from '../../store/scheduleActions';
 import { activeCanvasOf, edgesOnCanvas, isOnCanvas, isSharedNode, isStrokeOnCanvas, visibleNodeIds } from '../../../shared/canvas';
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
@@ -492,6 +493,17 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const layerTasks = useLayerVisibility((s) => s.tasks);
   const layerTexts = useLayerVisibility((s) => s.texts);
   const layerImages = useLayerVisibility((s) => s.images);
+  // Finished task cards leave the canvas (engagement.md F4): the policy, the
+  // "show finished" switch, and a coarse clock (day / 5 min) to re-check on.
+  const finishedPolicy = useFinishedCards((s) => s.policy);
+  const showFinished = useFinishedCards((s) => s.showFinished);
+  const [finishedClock, setFinishedClock] = useState(() => finishedClockKey(finishedPolicy, Date.now()));
+  useEffect(() => {
+    const check = () => setFinishedClock(finishedClockKey(finishedPolicy, Date.now()));
+    check();
+    const t = setInterval(check, 60_000);
+    return () => clearInterval(t);
+  }, [finishedPolicy]);
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
@@ -974,8 +986,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       else setCenter(at.x + 110, at.y + 80, { duration: 400, zoom: 0.9 });
     };
     window.addEventListener(FOCUS_NODE_EVENT, onFocus);
-    return () => window.removeEventListener(FOCUS_NODE_EVENT, onFocus);
-  }, [setCenter, getNodes]);
+    // The plan guide fits the Todo and the Calendar on screen together, so a
+    // row can be dragged onto the grid (engagement.md F14).
+    const onFit = (e: Event) => {
+      const ids = (e as CustomEvent<{ nodeIds?: string[] }>).detail?.nodeIds ?? [];
+      if (ids.length) fitView({ nodes: ids.map((id) => ({ id })), padding: 0.08, duration: 400, maxZoom: 1 });
+    };
+    window.addEventListener(FIT_NODES_EVENT, onFit);
+    return () => {
+      window.removeEventListener(FOCUS_NODE_EVENT, onFocus);
+      window.removeEventListener(FIT_NODES_EVENT, onFit);
+    };
+  }, [setCenter, getNodes, fitView]);
 
   const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number }; look?: TextLook }) => {
     // Auto-enable the layer filter for the spawned kind so the new node is
@@ -1462,9 +1484,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // whose kind has a registered layer (tasks / texts / images) are affected;
     // mothers + frames + habits stay visible regardless. Spread-clone only the
     // ones that need `hidden:true` so identity is preserved for unaffected nodes.
+    const leftBoard = showFinished ? new Set<string>() : finishedTaskIds(board, finishedPolicy, Date.now());
     const filteredBase = baseNodes.map((rf, idx) => {
       const node = sourceNodes[idx];
       if (!node) return rf;
+      if (leftBoard.has(node.id)) return { ...rf, hidden: true };
       const layer = kindToLayer(node.kind);
       if (!layer) return rf;
       const visible = layer === 'tasks' ? layerTasks
@@ -1476,7 +1500,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
     const strokeNodes = (board.drawings ?? []).filter((d) => isStrokeOnCanvas(d, canvasId)).map(strokeRfNode);
     return [...filteredBase, ...swapNodes, ...strokeNodes];
-  }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation]);
+  }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation, finishedPolicy, showFinished, finishedClock]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
   // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that
