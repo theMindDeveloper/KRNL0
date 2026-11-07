@@ -17,6 +17,20 @@
  *   movement and krnl command execution.
  */
 
+import { useLaunchStore } from '../../launch/launchStore';
+
+/** Lines that only make sense after a real absence. */
+const AWAY_LINES = new Set(['pa_been_a_minute', 'pa_welcome_back']);
+/**
+ * The opening line: "been a minute" / "welcome back" only after 4 h or more
+ * away (said 30 s after a restart they read as a mistake). `r` in [0, 1).
+ */
+export function pickGreeting<T extends { clip: string }>(pool: readonly T[], awayMs: number | null, r: number): T {
+  const longAway = awayMs !== null && awayMs >= 4 * 3_600_000;
+  const fits = longAway ? pool : pool.filter((p) => !AWAY_LINES.has(p.clip));
+  const from = fits.length > 0 ? fits : pool;
+  return from[Math.min(from.length - 1, Math.floor(r * from.length))]!;
+}
 import { LineGlyph } from '../ui/LineGlyph';
 import {
   useState,
@@ -303,7 +317,7 @@ export function Orb() {
       // not "welcome back". Read here: the board loads after the orb mounts.
       const pick = isFreshBoard(useBoardStore.getState().board)
         ? { clip: 'intro_01', text: "Welcome to KRNL0. I'm your system assistant. Click me for a tour." }
-        : pool[Math.floor(Math.random() * pool.length)]!;
+        : pickGreeting(pool, useLaunchStore.getState().info?.awayMs ?? null, Math.random());
       setOrbState('speaking');
       setCaption(pick.text);
       voicePlayer.play(pick.clip).catch(() => { /* missing clip → caption only */ });

@@ -1804,3 +1804,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/shared/whatsnew.ts`
 **Summary:** The 0.11 notes (`krnl whatsnew`) still described recorded time as "a thin bar beside each day". They now describe the Clock rail (a track at the left of each day that fills up to now), the letter bars with Line up and the drag-to-unschedule strip, and the month view that never hides a plan behind "+N". Main-process changes from today (taskbar button flicker fix, safe backup names, pocket refit) were re-read in the sweep; no issues.
+
+## [2026-11-07] — The orb's greeting fits how long you were away
+
+**Type:** Bug Fix (copy)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Orb/index.tsx`, `tests/unit/renderer/orb.greeting.test.ts` (new)
+**Summary:** The opening line was drawn at random from a pool that includes "been a minute." and "welcome back. the board's where you left it." — so it could say so 30 seconds after a restart. Those two lines now come up only after 4 hours or more away (`awayMs` from the launch info); otherwise one of the others ("hey.", "need anything?", …). `pickGreeting` is pure and tested.
