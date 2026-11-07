@@ -188,6 +188,19 @@ export function FocusMix({ mix, width }: { mix: { taggedWorkMin: number; untagge
           );
         })}
       </svg>
+      {width < 240 ? (
+        // Narrow card: one line per part — short name, then the share; the
+        // minutes are in the tooltip (a wrapped legend ran out of room).
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 12, color: COLOR_LABEL }}>
+          {segs.map((s) => (
+            <span key={s.key} title={`${s.label} · ${fmtMinutes(s.min)}`} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0, background: s.hatch ? `repeating-linear-gradient(135deg, ${s.color} 0 2px, transparent 2px 4px)` : s.color, border: s.hatch ? `1px solid ${s.color}` : 'none' }} />
+              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.key === 'tagged' ? 'On a task' : s.key === 'untagged' ? 'Untagged' : 'Break'}</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.round((s.min / total) * 100)}%</span>
+            </span>
+          ))}
+        </div>
+      ) : (
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 12, color: COLOR_LABEL }}>
         {segs.map((s) => (
           <span key={s.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -196,6 +209,7 @@ export function FocusMix({ mix, width }: { mix: { taggedWorkMin: number; untagge
           </span>
         ))}
       </div>
+      )}
     </div>
   );
 }

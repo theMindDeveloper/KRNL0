@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { NumberStepper } from '../../ui/NumberStepper';
 import type { NodeProps } from '../types';
@@ -12,6 +12,7 @@ import type { TaskState } from '../TaskNode/types';
 import { Ascii } from './variants/Ascii';
 import { Lcd } from './variants/Lcd';
 import { Blocks } from './variants/Blocks';
+import { FaceFit, compactLevelFor } from './FaceFit';
 import { Vapor } from './variants/Vapor';
 import { Vu } from './variants/Vu';
 import { Outline } from './variants/Outline';
@@ -63,6 +64,24 @@ export function PomoNode({
   // controls all fit without spilling past the panel's overflow:hidden edge.
   const inStation = useContext(MotherFrameStationContext);
   const bodyPadding = inStation ? '10px 14px 12px' : '18px 18px 16px';
+  // A short station slot sheds secondary rows before the face shrinks, so the
+  // time and START always show: 1 = no "log past time", 2 = no cycles strip,
+  // 3 = no session dots. Set from the slot's height only (no feedback loop).
+  // A callback ref: the body remounts when the span log opens and closes.
+  const [bodyEl, setBodyEl] = useState<HTMLDivElement | null>(null);
+  const [compact, setCompact] = useState(0);
+  useLayoutEffect(() => {
+    const el = bodyEl;
+    if (!inStation || !el || typeof ResizeObserver === 'undefined') { setCompact(0); return; }
+    const measure = (): void => {
+      const h = el.clientHeight;
+      setCompact(compactLevelFor(h));
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, [inStation, bodyEl]);
   const bodyGap = inStation ? 8 : 14;
 
   // Gear panel local UI state (Decision 22 F9).
@@ -660,8 +679,11 @@ export function PomoNode({
           )}
         </div>
       ) : (
-        <div style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap }}>
-          {/* PR4 — timer face switch: swap inner face without touching outer chrome */}
+        <div ref={setBodyEl} style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap, ...(inStation ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
+          {/* PR4 — timer face switch: swap inner face without touching outer chrome.
+              In a station slot the face is fitted to the room left, so the
+              controls below it (START, task) are never cut off. */}
+          <FaceWrap fit={inStation}>
           {observe ? (
             <ObserveDash state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} plain={easy} />
           ) : (<>
@@ -687,20 +709,21 @@ export function PomoNode({
             <Mac m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           </>)}
+          </FaceWrap>
 
           {/* Today's full-cycle counter — distinct visual from the session pips
               (squares + numeric badge + acid glow) so it reads as "achievement"
               not "in-progress session". Always rendered so the user gets a
               live count even at 0 cycles. Tooltip carries the breakdown. */}
           {observe ? null : (<>
-          <CycleCounter
+          {compact < 2 && <CycleCounter
             cyclesToday={cyclesToday}
             sessionsToday={sessionsToday}
             progressToNext={progressToNext}
             longBreakEvery={config.longBreakEvery}
-          />
+          />}
 
-          <div
+          {compact < 3 && <div
             className="pomo-pips"
             data-testid="pomo-pips"
             style={{ display: 'flex', gap: 4, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: 10 }}
@@ -752,7 +775,7 @@ export function PomoNode({
             }}>
               session {sessionsForDisplay} / {pipCount}
             </span>
-          </div>
+          </div>}
           </>)}
 
           {/* Issue #166 — observer-model controls. Every control carries a
@@ -1006,7 +1029,7 @@ export function PomoNode({
             </div>
           )}
           {/* #207 — fix recorded time where it happens: stop at the real time, or add forgotten time. */}
-          <PomoTimeLinks state={state} />
+          {compact < 1 && <PomoTimeLinks state={state} />}
 
         </div>
       )}
@@ -1181,4 +1204,9 @@ function PomoIcon({ kind }: { kind: 'play' | 'pause' | 'stop' | 'break' | 'skip'
       </svg>
     );
   }
+}
+
+/** The face, fitted to the room left in a station slot; as-is elsewhere. */
+function FaceWrap({ fit, children }: { fit: boolean; children: React.ReactNode }) {
+  return fit ? <FaceFit>{children}</FaceFit> : <>{children}</>;
 }
