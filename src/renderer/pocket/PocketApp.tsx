@@ -123,15 +123,21 @@ export function PocketApp() {
   }
 
   // Observe: ask what the span that just ended was (pocket-timer.md F13).
+  // Hide the card at once; if KRNL0 could not take the name (closing, or the
+  // span changed meanwhile), bring it back so the name isn't lost silently.
+  const nameSpan = (id: string, t: { id: string; label: string }): void => {
+    setSkipped((cur) => new Set(cur).add(id));
+    const sent = window.krnl?.pocketCommand?.(POCKET_LABEL_COMMAND, { id, taskId: null, label: t.label, tag: t.id });
+    void Promise.resolve(sent).then((r) => {
+      if (!r || r.ok === false) setSkipped((cur) => { const next = new Set(cur); next.delete(id); return next; });
+    }, () => setSkipped((cur) => { const next = new Set(cur); next.delete(id); return next; }));
+  };
   const askRec = !snap.away && isObserveMode(snap.config, snap.easy) && !snap.easy ? spanToName(snap.state.history, now) : null;
   const askCard = askRec && !skipped.has(askRec.id) ? (
       <AskWhat
         minutes={Math.max(1, Math.round((Date.parse(askRec.endedAt) - Date.parse(askRec.startedAt)) / 60_000))}
         tags={snap.library.slice(0, 5)}
-        onPick={(t) => {
-          void window.krnl?.pocketCommand?.(POCKET_LABEL_COMMAND, { id: askRec.id, taskId: null, label: t.label, tag: t.id });
-          setSkipped((cur) => new Set(cur).add(askRec.id));
-        }}
+        onPick={(t) => nameSpan(askRec.id, t)}
         onSkip={() => setSkipped((cur) => new Set(cur).add(askRec.id))}
       />
   ) : null;
@@ -141,10 +147,7 @@ export function PocketApp() {
       themed
       minutes={Math.max(1, Math.round((Date.parse(askRec.endedAt) - Date.parse(askRec.startedAt)) / 60_000))}
       tags={snap.library.slice(0, 5)}
-      onPick={(t) => {
-        void window.krnl?.pocketCommand?.(POCKET_LABEL_COMMAND, { id: askRec.id, taskId: null, label: t.label, tag: t.id });
-        setSkipped((cur) => new Set(cur).add(askRec.id));
-      }}
+      onPick={(t) => nameSpan(askRec.id, t)}
       onSkip={() => setSkipped((cur) => new Set(cur).add(askRec.id))}
     />
   ) : null;
