@@ -315,6 +315,11 @@
 
 /* A tracked span still running: its stripes crawl while it grows. */
 /* 8px stripes at 135deg repeat every 8 * sqrt(2) = 11.31px down the bar. */
+/* The Clock rail's track (calendar F29): the Clock's ring track, one shade
+   lighter than the day; on light paper that shade is halved so the empty
+   track stays a quiet line, not a bar. */
+.cal-rail { background: var(--paper-3); }
+[data-theme="light"] .cal-rail { background: color-mix(in srgb, var(--paper-3) 45%, transparent); }
 .cal-live-seg { animation: cal-live-crawl 1.4s linear infinite; }
 @keyframes cal-live-crawl { to { background-position: 0 11.31px; } }
 @media (prefers-reduced-motion: reduce) { .cal-live-seg { animation: none; } }

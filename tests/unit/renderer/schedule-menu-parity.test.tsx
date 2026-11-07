@@ -151,10 +151,21 @@ describe('Calendar pomo spans as background highlights', () => {
     // The recorded rail sits in its own lane beside the plan blocks (z 1), never under them.
     expect(band.style.zIndex).toBe('1');
     expect(band.getAttribute('data-reality-kind')).toBe('work');
-    // Recorded time is a strip flush on the day's own left line — no slot, no gap (calendar F29).
-    expect(band.style.left).toBe('0px');
-    expect(band.style.width).toBe('6px');
-    expect(document.querySelector('[data-testid="calendar-reality-track"]')).toBeNull();
+    // The Clock rail (calendar F29): the fill rides its track inside the day,
+    // 4 px from the day line, as wide as the track, with round caps.
+    const track = document.querySelector('[data-testid="calendar-reality-track"]') as HTMLElement;
+    expect(track).toBeTruthy();
+    expect(band.style.left).toBe('4px');
+    expect(track.style.left).toBe('4px');
+    expect(band.style.width).toBe(track.style.width);
+    expect(band.style.borderRadius).toBe(`${parseFloat(track.style.width) / 2}px`);
+  });
+
+  it('today has one "now" mark: the knob on the track (the now line drops its own dot)', () => {
+    seed();
+    render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
+    expect(document.querySelectorAll('[data-testid="calendar-reality-now"]').length).toBe(1);
+    expect(document.querySelector('[data-testid="now-line-dot"]')).toBeNull();
   });
 
   it('focus and break read differently', () => {

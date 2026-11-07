@@ -241,14 +241,24 @@ function CalIcon({ name, size = 11 }: { name: keyof typeof CAL_ICONS; size?: num
   );
 }
 
-/** Where the tracked-time track sits in a day, and the lane it keeps (px). */
-// The tracked-time lane (F29, draft A): a recessed slot at the day's left,
-// wide enough to read as its own lane. A day under 70 px wide (the Station
-// week) gets a slimmer slot so plans keep their room. Plans start 3 px after it.
-// F29 — recorded time is a strip flush on the day's own left line (no slot,
-// no gap), so it can only belong to that day. Plans start 3 px after it.
-const TRACK_W = (singleDay: boolean, tiny = false): number => (singleDay ? 6 : tiny ? 4 : 5);
-const RAIL_PX = (singleDay: boolean, tiny = false): number => TRACK_W(singleDay, tiny) + 3;
+/**
+ * F29 — the Clock rail: recorded time as a track that fills up, drawn with
+ * the Clock's own parts — a track one shade LIGHTER than the day
+ * (--paper-3, the Clock's ring track), round-capped fills riding on it at
+ * the same width, and today's "now" as a knob on the track.
+ *   A1 ring track · A2 + hour marks · A3 thin ring · A4 track only up to now
+ */
+type RailStyle = 'A1' | 'A2' | 'A3' | 'A4';
+const RAIL_STYLE = 'A4' as RailStyle;
+/** Gap from the day's own line to its track. */
+const TRACK_LEFT = (tiny = false): number => (tiny ? 3 : 4);
+const TRACK_W = (singleDay: boolean, tiny = false): number => {
+  if (RAIL_STYLE === 'A3') return tiny ? 3 : 4;
+  if (RAIL_STYLE === 'A4') return singleDay ? 6 : tiny ? 4 : 5;
+  return singleDay ? 8 : tiny ? 5 : 7;
+};
+/** Plans start 5 px after the track (3 px in a Station-width day). */
+const RAIL_PX = (singleDay: boolean, tiny = false): number => TRACK_LEFT(tiny) + TRACK_W(singleDay, tiny) + (tiny ? 3 : 5);
 
 type HabitScheduleKind = 'weekly' | 'daily';
 
@@ -1779,24 +1789,57 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     });
   }
 
-  // What really happened (F16, F29): a strip of colour flush on the day's
-  // left line, only where you tracked time — nothing is drawn where you did
-  // not. It sits beside the plans, never on them. A running span has moving
-  // stripes and grows; a break is a gap.
+  // What really happened (F16, F29): the Clock rail (see RAIL_STYLE). A
+  // break is a gap in the fill; a running span has moving stripes and grows
+  // to the knob. The rail sits beside the plans, never under them.
   const trackW = TRACK_W(singleDay, tinyDays);
+  const trackLeft = TRACK_LEFT(tinyDays);
   function renderRealityBlocks(dayYMD: string) {
     if (!layers.recorded) return null;
     const segs = realityByDay.get(dayYMD) ?? [];
-    return segs.map((seg, i) => {
+    const todayYMD = toYMD(new Date());
+    const nowD = new Date();
+    const nowPx = ((nowD.getHours() * 60 + nowD.getMinutes()) / 60) * rowHeight;
+    const dayPx = rowCount * rowHeight;
+    // A4: the track only covers time that has passed — the whole day before
+    // today, up to now today, nothing on days still ahead.
+    const trackEnd = RAIL_STYLE !== 'A4' || dayYMD < todayYMD ? dayPx - 3 : dayYMD === todayYMD ? nowPx : 0;
+    const out: ReactNode[] = [];
+    if (trackEnd > 3) {
+      out.push(
+        <div
+          key="reality-track"
+          data-testid="calendar-reality-track"
+          className="cal-rail"
+          aria-hidden
+          style={{
+            position: 'absolute', top: 3, height: trackEnd - 3, left: trackLeft, width: trackW,
+            borderRadius: trackW / 2, pointerEvents: 'none', zIndex: 0,
+          }}
+        />,
+      );
+    }
+    if (RAIL_STYLE === 'A2') {
+      for (let h = 1; h < rowCount; h++) {
+        if (h * rowHeight >= trackEnd) break;
+        out.push(
+          <div key={`reality-hour-${h}`} aria-hidden style={{
+            position: 'absolute', top: h * rowHeight - 0.5, height: 1, left: trackLeft, width: trackW,
+            background: 'var(--node-bg, var(--paper))', pointerEvents: 'none', zIndex: 2,
+          }} />,
+        );
+      }
+    }
+    segs.forEach((seg, i) => {
       const topPx = (seg.startMin / 60) * rowHeight;
-      const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
+      const heightPx = ((seg.endMin - seg.startMin) / 60) * rowHeight;
       const isWork = seg.kind === 'work';
       const raw = spanTone(tagLibrary, seg, easy);
-      // Bright acid vanishes on light paper: a 5 px strip needs the deeper mix
-      // there (dark mode maps --acid-ink straight back to --acid).
+      // Bright acid vanishes on light paper: the deeper mix there (dark mode
+      // maps --acid-ink straight back to --acid).
       const tone = raw === 'var(--acid)' ? 'color-mix(in srgb, var(--acid) 55%, var(--acid-ink, var(--acid)))' : raw;
       const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
-      return (
+      out.push(
         <div
           key={`reality-${seg.id}-${i}`}
           data-testid="calendar-reality-block"
@@ -1813,21 +1856,38 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={{
             position: 'absolute',
             top: topPx + 1,
-            // Flush on the day line; rounded only on the side facing the plans.
-            left: 0,
+            left: trackLeft,
             width: trackW,
-            height: Math.max(2, heightPx - 2),
+            // Never shorter than its round caps.
+            height: Math.max(trackW, heightPx - 2),
             pointerEvents: 'none',
             zIndex: 1,
-            borderRadius: '0 3px 3px 0',
-            // A break draws nothing: it is the gap in the track (hover keeps its title).
+            borderRadius: trackW / 2,
+            // A break draws nothing: it is the empty track (hover keeps its title).
             background: !isWork ? 'transparent'
               : seg.live ? `repeating-linear-gradient(135deg, ${tone} 0 4px, color-mix(in srgb, ${tone} 50%, transparent) 4px 8px)`
               : tone,
           }}
-        />
+        />,
       );
     });
+    // Today's "now": a knob on the track, like the tip of the Clock's hand.
+    if (dayYMD === todayYMD) {
+      const k = trackW + 4;
+      out.push(
+        <div
+          key="reality-now"
+          data-testid="calendar-reality-now"
+          aria-hidden
+          style={{
+            position: 'absolute', top: nowPx - k / 2, left: trackLeft + trackW / 2 - k / 2, width: k, height: k,
+            borderRadius: '50%', background: 'var(--node-bg, var(--paper))', boxShadow: 'inset 0 0 0 2px var(--k-now, #ef4444)',
+            pointerEvents: 'none', zIndex: 7,
+          }}
+        />,
+      );
+    }
+    return out;
   }
 
   // ── Habit block renderer (ADR 0002 §6) ──────────────────────────────────────
@@ -2408,6 +2468,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               rowHeight={rowHeight}
               columnWidth={NOMINAL_COLUMN_WIDTH}
               gutterWidth={0}
+              // The Clock rail's knob marks now on today's track (F29).
+              showDot={!layers.recorded}
             />
           )}
         </div>
