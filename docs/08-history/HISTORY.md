@@ -1560,3 +1560,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/PomoNode/index.tsx`
 **Summary:** All eight frame styles (Pro, Classic, Synthesizer, Telemetry, KRNL dock, Blueprint, Macintosh, Submarine) were rendered after the 11 px floor: no clipped text. In the narrower Synthesizer frame the Pomo mode switch was squeezed to "OBSERV"; the switch no longer shrinks (the window title gives way instead) and its letter spacing is tighter now that the text is larger.
+
+## [2026-11-07] — UI loop batch 27: the live design check is clean
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/index.tsx`, `src/renderer/analytics/charts/PlanVsActual.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/PomoNode/variants/Blocks.tsx`, `src/renderer/components/{AmbientRadio/index,Assistant/Commander,Orb/index,ChassisLayer/SynthesizerChrome}.tsx`, `src/renderer/components/ui/RadialChooser/RadialChooser.css`, `src/renderer/styles/chassis.css`, `docs/04-visual-system/design-tokens.md`
+**Summary:** The last 12 findings of the design check on the live app are fixed; it now reports none (184 at the start of the evening). Analytics charts were cards inside the window's card; they are sections with a hairline on top (acid when pinned). Chart legends and the time mix are 12 px body text. The Calendar's gutter is 40 px so its half-hour marks are 11 px like everything else. Blurred zero-offset glows (the Blocks face's "now" bar, the radio's slider and dots) are crisp rings or none, and every overshooting "bounce" easing (orb, assistant panel, radio panel, radial chooser, Synthesizer chrome) eases out instead. The rules are in design-tokens.md.

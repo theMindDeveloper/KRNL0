@@ -188,7 +188,9 @@ These override visual rules that depend on color cues, replacing them with geome
 - Node headers are **always monospace, always uppercase, always `--ink-3`**. No exceptions.
 - No system fonts — all three families are loaded from Google Fonts (or bundled subset).
 - `JetBrains Mono` carries `font-variant-numeric: tabular-nums` on timers.
-- **Readable floor (2026-11-07):** functional text — labels, meta rows, chips, buttons, times — is **at least 11px**. The only exceptions are ruler ticks that must fit a fixed gutter (the Calendar's half-hour marks, 10px) and chart axis text drawn inside SVG. When a bigger label doesn't fit, the layout gives way (ellipsis, an icon-only button, a toolbar that wraps under its title) — never the text size.
+- **Readable floor (2026-11-07):** functional text — labels, meta rows, chips, buttons, times — is **at least 11px**. The Calendar's gutter is 40px so its half-hour marks meet the floor too; only chart axis text drawn inside SVG is smaller. When a bigger label doesn't fit, the layout gives way (ellipsis, an icon-only button, a toolbar that wraps under its title) — never the text size.
+- No blurred zero-offset glows (use a crisp 1–2px ring) and no overshooting "bounce" easing — motion eases out (`cubic-bezier(0.22, 1, 0.36, 1)`).
+- Inside a window, sections are separated by space and a hairline, not by cards inside the window's card.
 - Text contrast is at least 4.5:1 against what is actually behind it, in both themes (3:1 for 14px bold / 18px+). Disabled controls are the only dim text.
 
 ---

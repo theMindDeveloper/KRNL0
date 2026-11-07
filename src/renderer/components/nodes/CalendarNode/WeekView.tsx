@@ -207,7 +207,7 @@ interface WeekViewProps {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const GUTTER_WIDTH = 36; // px — time gutter width
+const GUTTER_WIDTH = 40; // px — time gutter width (fits "00:30" at the 11px text floor)
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
 const MIN_BLOCK_PX = 14; // px — a planned block is never thinner than one text line
 /** Space between two blocks that touch in time. */
@@ -2121,7 +2121,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                       top: (min / 60) * rowHeight - 4,
                       right: 4,
                       fontFamily: 'var(--font-mono)',
-                      fontSize: 10,
+                      fontSize: 11,
                       color: 'var(--ink-4)',
                       lineHeight: 1,
                     }}

@@ -322,12 +322,13 @@ function ChartCard({
   if (hidden) return <div data-card-id={cardId} data-hidden-card aria-hidden style={{ ...cardPlacement(cardId, easy), minHeight: 0 }} />;
 
   const cardStyle: React.CSSProperties = {
-    background: 'linear-gradient(180deg, var(--k-an-bg-2b, #1a1d20) 0%, var(--k-an-bg, #131517) 100%)',
-    border: `1px solid ${pinned ? 'rgba(201,241,88,0.45)' : 'var(--k-an-line, #23262a)'}`,
-    // Flat cards: no blurred drop shadow.
-    boxShadow: pinned ? '0 0 0 1px rgba(201,241,88,0.18) inset' : 'none',
-    borderRadius: 8,
-    padding: '10px 12px 12px',
+    // A section of the window, not a card inside a card: a hairline on top
+    // (acid when pinned), spacing does the rest.
+    background: 'transparent',
+    borderTop: `1px solid ${pinned ? 'var(--acid-ink, var(--acid))' : 'var(--k-an-line, #23262a)'}`,
+    boxShadow: 'none',
+    borderRadius: 0,
+    padding: '10px 2px 6px',
     display: 'flex',
     flexDirection: 'column',
     gap: 10,

@@ -527,7 +527,7 @@ export function Orb() {
     display: 'block',
     filter: glowFilter,
     animation: (open || activeFlowId) ? 'none' : 'ai-float 6s ease-in-out infinite',
-    transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease',
+    transition: 'transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), filter 0.25s ease',
     willChange: 'filter, transform',
   };
 
@@ -571,7 +571,7 @@ export function Orb() {
         transition: tourGlide
           ? 'left 460ms cubic-bezier(0.22, 1, 0.36, 1), top 460ms cubic-bezier(0.22, 1, 0.36, 1), transform 460ms cubic-bezier(0.22, 1, 0.36, 1)'
           : 'none',
-        animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+        animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.22, 1, 0.36, 1)' : 'none',
       }}
     >
       {/* Voice caption — shown during flows */}
@@ -595,7 +595,7 @@ export function Orb() {
             lineHeight: 1.5,
             pointerEvents: 'none',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            animation: 'ai-panel-in 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+            animation: 'ai-panel-in 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           <span style={{ color: isRunning ? '#c9f158' : 'var(--accent-on-dark)', marginRight: 6, opacity: 0.8 }}>
@@ -627,7 +627,7 @@ export function Orb() {
               '0 20px 60px rgba(0, 0, 0, 0.6)',
               '0 0 80px rgba(201, 241, 88, 0.15)',
             ].join(', '),
-            animation: 'ai-panel-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            animation: 'ai-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           {/* Panel header */}

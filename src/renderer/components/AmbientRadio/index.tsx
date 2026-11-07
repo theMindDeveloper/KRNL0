@@ -367,7 +367,7 @@ function MiniSlider({ value, min, max, step, color, rgb, onChange, testId, compa
           position: 'absolute', top: 0, bottom: 0, left: 0,
           width: `${pct * 100}%`, borderRadius: 2,
           background: color,
-          boxShadow: `0 0 6px rgba(${rgb},.5)`,
+          boxShadow: 'none',
         }} />
         <div style={{
           position: 'absolute', top: '50%',
@@ -375,7 +375,7 @@ function MiniSlider({ value, min, max, step, color, rgb, onChange, testId, compa
           transform: `translate(-50%, -50%) scale(${active ? 1.25 : 1})`,
           width: thumbSize, height: thumbSize, borderRadius: '50%',
           background: color,
-          boxShadow: `0 0 10px rgba(${rgb},.8), 0 1px 3px rgba(0,0,0,.5)`,
+          boxShadow: `0 0 0 2px rgba(${rgb},.35), 0 1px 3px rgba(0,0,0,.5)`,
           border: '1px solid rgba(255,255,255,.22)',
           pointerEvents: 'none',
           transition: 'transform .12s ease',
@@ -1024,7 +1024,7 @@ export function AmbientRadio() {
     fontFamily: "'JetBrains Mono', ui-monospace, monospace",
     transition: isDragging
       ? 'transform .12s ease'
-      : 'left .42s cubic-bezier(0.34, 1.3, 0.4, 1), top .42s cubic-bezier(0.34, 1.3, 0.4, 1), transform .18s ease, box-shadow .25s ease',
+      : 'left .42s cubic-bezier(0.22, 1, 0.36, 1), top .42s cubic-bezier(0.22, 1, 0.36, 1), transform .18s ease, box-shadow .25s ease',
     transform: isDragging ? 'scale(1.018)' : 'scale(1)',
     userSelect: 'none',
     willChange: 'left, top, transform',
@@ -1121,7 +1121,7 @@ export function AmbientRadio() {
             <span style={{
               width: 6, height: 6, borderRadius: '50%',
               background: focusedPreset.col,
-              boxShadow: `0 0 7px ${focusedPreset.col}`,
+              boxShadow: 'none',
               flexShrink: 0,
               transition: 'background .2s, box-shadow .2s',
             }} />
@@ -1561,7 +1561,7 @@ export function AmbientRadio() {
                           transition: 'background .12s',
                         }}
                       >
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.col, boxShadow: `0 0 5px ${p.col}`, flexShrink: 0 }} />
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.col, flexShrink: 0 }} />
                         <span style={{
                           fontSize: 8.5, color: p.col,
                           textTransform: 'uppercase', letterSpacing: '0.06em',

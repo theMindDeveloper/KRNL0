@@ -94,7 +94,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             '0 24px 80px rgba(0, 0, 0, 0.6)',
             '0 0 100px rgba(201, 241, 88, 0.18)',
           ].join(', '),
-          animation: 'ai-panel-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          animation: 'ai-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
           fontFamily: 'var(--font-mono)',
           color: '#d4cfc0',
         }}
