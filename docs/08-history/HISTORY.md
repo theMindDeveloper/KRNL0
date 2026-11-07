@@ -1832,3 +1832,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
 **Summary:** Calendar bug hunt. Dragging a block's top edge and typing an exact time in the task popup wrote the task directly: a chained task was still pushed back behind its predecessor (the same "doesn't move" bug as the drag, fixed earlier today only for drags), and the Todo row kept its old time. Both now set the length on the task and the time through `calendar.schedule`, like a drag. Checked live: typing 08:00 on "Physics exercises" (chained after Physics, 09:30–11:30) lands it at 08:00 and its Todo row reads 08:00 (before: pushed to 11:30, row unchanged). Follow-up (real board, Station width): two-letter names ("TI") in a five-way clash were blank because the stacked-letter check wanted 10 px of estimated width while the bars render ~11 px from an estimate of ~8; stacking now starts at 7 px (one 11 px letter is 6.6 px). A 15-minute chip in such a clash is still too small for two letters either way; its name stays in the tooltip and the right-click list.
+
+## [2026-11-07] — Week header totals count only each day's part of a session over midnight
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.dayTotal.test.tsx` (new)
+**Summary:** Found on the user's board: Monday read "3h48" in the week header and "3h 18m" in the month cell. A session over midnight is split into one piece per day, but each piece keeps the whole session's start and end; the week header summed those, so the session counted in full on both days. It now sums each day's own piece (as the month view does). Test fails on the old code ("2h" instead of "1h").

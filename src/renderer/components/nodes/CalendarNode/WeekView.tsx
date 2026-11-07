@@ -2243,7 +2243,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 if (!layers.recorded) return null;
                 const colPxH = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
                 if (colPxH < 110) return null;
-                const min = Math.round((realityByDay.get(dayYMD) ?? []).filter((s) => s.kind === 'work').reduce((a, s) => a + (s.endMs - s.startMs), 0) / 60_000);
+                const min = Math.round((realityByDay.get(dayYMD) ?? []).filter((s) => s.kind === 'work').reduce((a, s) => a + (s.endMin - s.startMin), 0));
+                // ^ this day's piece only: a span over midnight counts on each day for its own part
                 if (min <= 0) return null;
                 return <span data-testid={`week-col-tracked-${dayYMD}`} title="Tracked this day" style={{ marginLeft: 6, letterSpacing: 0, textTransform: 'none', color: 'var(--ink-2)' }}>{fmtDur(min)}</span>;
               })()}
