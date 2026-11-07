@@ -26,6 +26,9 @@ describe('feedback diagnostics are scrubbed before they go public', () => {
     expect(scrubDiagnosticLine('ENOENT C:\\Users\\momo\\Documents\\krnl0\\board.json')).toBe('ENOENT ~\\Documents\\krnl0\\board.json');
     expect(scrubDiagnosticLine('at /Users/ana/Library/x.js and /home/bob/.config')).toBe('at ~/Library/x.js and ~/.config');
     expect(scrubDiagnosticLine('sent to someone@example.com')).toBe('sent to <email>');
+    // A name with a space is taken out whole, not just its first word.
+    expect(scrubDiagnosticLine('ENOENT C:\\Users\\John Smith\\Documents\\board.json')).toBe('ENOENT ~\\Documents\\board.json');
+    expect(scrubDiagnosticLine('at /Users/Ana Maria/Library/x.js')).toBe('at ~/Library/x.js');
   });
   it('diagnosticsText uses the scrubbed lines', () => {
     const t = diagnosticsText({ version: '0.11.0', os: 'Windows 11', errors: ['C:/Users/momo/x failed'] });

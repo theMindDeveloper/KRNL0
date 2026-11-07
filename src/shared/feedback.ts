@@ -36,8 +36,10 @@ export interface Diagnostics {
  */
 export function scrubDiagnosticLine(line: string): string {
   return line
-    .replace(/[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s'"]+/gi, '~')
-    .replace(/\/(?:Users|home)\/[^/\s'"]+/g, '~')
+    // Account names may hold spaces ("John Smith"): take everything up to the
+    // next separator, so no part of the name is left behind.
+    .replace(/[A-Za-z]:[\\/]+Users[\\/]+[^\\/'"\n]+/gi, '~')
+    .replace(/\/(?:Users|home)\/[^/'"\n]+/g, '~')
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '<email>');
 }
 
