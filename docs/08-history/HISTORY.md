@@ -1692,3 +1692,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
 **Summary:** Line-by-line review of the session's WeekView changes (drag lifecycle, letter labelling and fit, Line up placement and chain units, track geometry): one flaw — the 3 px overrun strip took half of a 6 px Station letter bar; it now shows on bars 12 px and wider (the tooltip still says "+X over"). Also this session, checked with no change needed: every day-based view rolls over at midnight with the app open; every button, field and image on the main screens and today's dialogs has an accessible name.
+
+## [2026-11-07] — Front-end review: finished cards, day recap, pocket bridge, launch flow; share on a new board
+
+**Type:** Bug Fix + review
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/launch/milestones.ts`, `src/renderer/components/Launch/HelpMenu.tsx`, `src/renderer/styles/launch.css`, `tests/unit/renderer/launch.catchup.test.ts`
+**Summary:** Read through today's logic modules: finished-cards grouping (union-find, all-done rule), the day recap (once a minute, not on every edit), the pocket bridge (sends only when the Pomo, Todo or mode changes), the launch flow (one dialog at a time; milestones can't fire twice) — correct. One finding: on a new board Share offered a "0 focus sessions" card; it now needs at least one session, and with nothing to share the Help menu says "after a streak or focus session" on a disabled item instead of a button that does nothing.

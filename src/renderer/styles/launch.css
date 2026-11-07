@@ -59,6 +59,9 @@
 .ln-menu__item { appearance: none; border: 0; font: inherit; background: transparent; color: var(--ink); text-align: left; cursor: pointer;
   display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 10px; border-radius: 6px; font-size: 12px; }
 .ln-menu__item:hover, .ln-menu__item:focus-visible { background: var(--paper-2); outline: none; }
+/* Not available yet: muted, still readable, no hover. */
+.ln-menu__item:disabled { cursor: default; color: var(--ink-3); }
+.ln-menu__item:disabled:hover { background: transparent; }
 .ln-menu__item > span:last-child { margin-left: auto; color: var(--ink-4); font-size: 11px; }
 .ln-menu__rule { height: 1px; background: var(--paper-3); margin: 4px 6px; }
 

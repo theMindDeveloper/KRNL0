@@ -1,7 +1,7 @@
 /** Decision 38 — Welcome back and milestones (launch-experience.md F12–F15, F20–F23). */
 import { describe, it, expect } from 'vitest';
 import { bestStreak, computeCatchup, describeCatchup, isEmptyCatchup, landingTimes, movedSchedule } from '../../../src/renderer/launch/catchup';
-import { findNewMilestone, focusStats, milestoneLine, shareCardFor } from '../../../src/renderer/launch/milestones';
+import { allShareCards, findNewMilestone, focusStats, milestoneLine, shareCardFor } from '../../../src/renderer/launch/milestones';
 
 const TODAY = '2026-11-06';
 
@@ -164,5 +164,15 @@ describe('landing times when moving slipped tasks (F27)', () => {
     const at = landingTimes(items, '2026-11-07', '2026-11-07', night);
     for (const v of at.values()) expect(new Date(v).getTime()).toBeGreaterThanOrEqual(night);
     expect(at.get('early')).toBe('2026-11-08T00:00');
+  });
+});
+
+describe('share cards on a new board', () => {
+  it('no streak and no focus session: nothing to share (no "0 sessions" card)', () => {
+    const nodes = [
+      { id: 'mother-pomo', kind: 'pomo', isMother: true, state: { history: [] } },
+      { id: 'mother-habit', kind: 'habit', isMother: true, state: { habits: [{ id: 'h', name: 'Run', log: [], createdAt: '2026-11-01T00:00:00.000Z' }] } },
+    ];
+    expect(allShareCards(nodes as never, '2026-11-07')).toEqual([]);
   });
 });

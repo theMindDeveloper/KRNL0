@@ -158,7 +158,8 @@ export function allShareCards(nodes: readonly NodeLike[], today: string, nowMs =
     if (h.current < 1) continue; // nothing to share yet
     out.push({ id: `share:${h.id}`, kind: 'streak', value: h.current, habit: h.name, best: h.current >= h.best, log: h.log, total: new Set(h.log).size });
   }
+  // No card for zero sessions: a brand-new board has nothing to share yet.
   const s = shareCardFor(nodes, today, { kind: 'sessions' }, nowMs);
-  if (s) out.push(s);
+  if (s && s.value > 0) out.push(s);
   return out;
 }

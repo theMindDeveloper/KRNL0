@@ -5,7 +5,9 @@
 import { useRef, useState } from 'react';
 import { Popover } from '../ui/Popover';
 import { startTour } from '../Tour/TourHost';
-import { openFeedback, openShare, openWelcomeBack, openWhatsNew, useLaunchStore } from '../../launch/launchStore';
+import { openFeedback, openShare, openWelcomeBack, openWhatsNew, todayYMD, useLaunchStore } from '../../launch/launchStore';
+import { allShareCards } from '../../launch/milestones';
+import { useBoardStore } from '../../store/boardStore';
 import { latestNotes } from '../../../shared/whatsnew';
 import { REPO_URL, diagnosticsText } from '../../../shared/feedback';
 import { checkForUpdates } from '../../store/updateStore';
@@ -19,6 +21,8 @@ export function HelpMenu() {
   const anchor = useRef<HTMLButtonElement>(null);
   const version = useLaunchStore((s) => s.info?.version) ?? APP_VERSION;
   const notes = latestNotes();
+  const board = useBoardStore((s) => s.board);
+  const canShare = open && board ? allShareCards(board.nodes, todayYMD()).length > 0 : true;
 
   const run = (fn: () => void) => () => { setOpen(false); setNote(null); fn(); };
   const copyDiagnostics = (): void => {
@@ -57,8 +61,9 @@ export function HelpMenu() {
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { openWelcomeBack(true, null); })} data-testid="help-catchup">
             <span>Catch up</span><span>what slipped</span>
           </button>
-          <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { openShare(); })} data-testid="help-share">
-            <span>Share a milestone</span><span>cards</span>
+          {/* Nothing to share yet (no streak, no focus session): say so instead of a button that does nothing. */}
+          <button type="button" role="menuitem" className="ln-menu__item" onClick={canShare ? run(() => { openShare(); }) : undefined} aria-disabled={!canShare} disabled={!canShare} data-testid="help-share">
+            <span>Share a milestone</span><span>{canShare ? 'cards' : 'after a streak or focus session'}</span>
           </button>
           <div className="ln-menu__rule" />
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => openFeedback('bug'))} data-testid="help-feedback">
