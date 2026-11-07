@@ -822,7 +822,7 @@ export function Orb() {
               background: 'rgba(0, 0, 0, 0.2)',
             }}
           >
-            <span style={{ color: 'var(--accent-on-dark)', fontWeight: 700 }}>›</span>
+            <span style={{ color: 'var(--accent-on-dark)', fontWeight: 700 }}><LineGlyph name="chevron" /></span>
             <input
               ref={inputRef}
               data-testid="orb-chat-input"

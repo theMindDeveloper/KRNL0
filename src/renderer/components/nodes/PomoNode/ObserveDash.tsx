@@ -89,7 +89,7 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
         </div>
         <div style={{ position: 'relative', height: 12, marginTop: 3 }}>
           {ticks.map((t) => (
-            <span key={t} style={{ ...mono, position: 'absolute', left: pct(d0 + t * 3_600_000), transform: 'translateX(-50%)', fontSize: 8, color: 'var(--ink-4)', letterSpacing: 0 }}>
+            <span key={t} style={{ ...mono, position: 'absolute', left: pct(d0 + t * 3_600_000), transform: 'translateX(-50%)', fontSize: 11, color: 'var(--ink-4)', letterSpacing: 0 }}>
               {String(t).padStart(2, '0')}
             </span>
           ))}
@@ -103,7 +103,7 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
           ['spans', String(workSpans)],
         ].map(([label, value]) => (
           <div key={label} style={{ padding: '6px 8px', background: 'var(--paper-2)', borderRadius: 4 }}>
-            <div style={{ ...mono, fontSize: 8, color: 'var(--ink-4)' }}>{label}</div>
+            <div style={{ ...mono, fontSize: 11, color: 'var(--ink-4)' }}>{label}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{value}</div>
           </div>
         ))}

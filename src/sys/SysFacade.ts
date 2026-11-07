@@ -821,6 +821,13 @@ export class SysFacade {
           command.zoom,
         );
       }
+      if (command.sub === 'lineup') {
+        return calCmd.calLineup(
+          { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },
+          command.refs,
+          command.json,
+        );
+      }
       if (command.sub === 'layers') {
         return calCmd.calLayers(
           { ...ctx, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) },

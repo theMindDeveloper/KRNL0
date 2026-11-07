@@ -73,6 +73,7 @@ import {
   defaultAnalyticsState,
 } from './types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 // The page each (older) view name opens: `krnl analytics show --view …` and
 // the saved view land on their page instead of always on Summary.
@@ -366,7 +367,7 @@ function ChartCard({
           }}
           title={title}
         >
-          {pinned ? '★ ' : ''}{title}
+          {pinned && <><LineGlyph name="star" size={10} />{' '}</>}{title}
         </span>
         <div style={{ flex: 1 }} />
         {toolbar}

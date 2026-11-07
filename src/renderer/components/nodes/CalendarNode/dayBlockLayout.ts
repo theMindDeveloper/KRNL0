@@ -1,29 +1,36 @@
-// Readable parallel tasks — decides which overlapping task blocks get their own
-// lane in a Calendar day column, and which collapse into a "+N" chip.
+// Readable parallel tasks — decides which overlapping task blocks sit side by
+// side in a Calendar day column, and which clashes become a shelf.
 //
 // The lane packer (store/laneLayout.ts) puts every task of an overlap cluster
-// side by side. In a narrow week column that makes 4–5 parallel tasks thin,
-// unreadable slivers (and sideways text). So: two parallel tasks always sit
-// side by side; beyond that, lanes are what fits at a readable width, capped
-// per view (week 2, day 4 — LANE_CAP). Text is never rotated.
-// Over the cap:
-//   - lanes ≥ 2: the first (maxLanes − 1) lanes show; the rest collapse into a
-//     chip in the last lane.
-//   - lanes = 1 (a column narrower than two readable lanes): lane 0 shows at
-//     full width and the rest collapse into a compact chip pinned to the
-//     block's top-right corner.
+// side by side. In a narrow week column that makes parallel tasks thin,
+// cut-off slivers. So lanes are only what fits at a readable width
+// (READABLE_LANE_PX), capped per view (week 2, day 4 — LANE_CAP). Text is
+// never rotated.
+//
+// A clash that needs more lanes than fit becomes a SHELF (calendar-clock-
+// visuals.md F28): one block over the clash's whole time span with one named
+// row per plan. Nothing is hidden behind a count — every plan stays readable,
+// clickable and draggable (the old "+N" chip hid them, and a hidden plan could
+// not be dragged).
 // Text rule (docs/04-visual-system/design-tokens.md): a block is never
 // narrower than MIN_LANE_PX, so its title always fits with an inset on both
 // sides and ellipsizes instead of touching the edge.
 
 /** Narrowest lane that still carries a readable, ellipsized title. */
 export const MIN_LANE_PX = 64;
-/** Parallel tasks that always get their own lane, however narrow the column. */
-export const MIN_SIDE_BY_SIDE = 2;
+/**
+ * Narrowest lane worth drawing side by side: a usual plan name ("Read chapter B")
+ * fits whole. A clash whose lanes would be narrower becomes a shelf (F28).
+ */
+export const READABLE_LANE_PX = 96;
 /** Most lanes a day column shows: the week is an overview, the day has room. */
 export const LANE_CAP = { week: 2, day: 4 } as const;
 /** Padding between block text and the block edge (both sides). */
 export const BLOCK_TEXT_INSET = 4;
+/** Shelf geometry (px): header row, one row per plan, bottom padding. */
+export const SHELF_HEAD_PX = 20;
+export const SHELF_ROW_PX = 21;
+export const SHELF_PAD_PX = 5;
 
 export interface LanePlacement {
   colIndex: number;
@@ -37,20 +44,20 @@ export interface DayBlockSlice {
   endMin: number;
 }
 
-export interface OverflowGroup<T extends DayBlockSlice> {
+/** A clash shown as one block with a row per plan. */
+export interface ShelfGroup<T extends DayBlockSlice> {
   startMin: number;
+  endMin: number;
+  /** In start order (then shorter first, then id). */
   slices: T[];
-  /** Fraction of the plan area where the chip starts (lane mode). */
-  leftFrac: number;
-  /** True when the column has a single lane: the chip overlays the block's corner. */
-  compact: boolean;
 }
 
 export interface DayBlockLayout<T extends DayBlockSlice> {
   maxLanes: number;
   placements: Map<string, LanePlacement>;
-  hidden: Set<string>;
-  overflow: OverflowGroup<T>[];
+  /** Ids drawn inside a shelf instead of as their own block. */
+  inShelf: Set<string>;
+  shelves: ShelfGroup<T>[];
 }
 
 /** Lanes that fit in a plan area `planPx` wide. Always at least 1. */
@@ -59,66 +66,55 @@ export function readableLaneCount(planPx: number, minLanePx = MIN_LANE_PX): numb
   return Math.max(1, Math.floor(planPx / minLanePx));
 }
 
+/** Height a shelf needs to show all its rows. */
+export function shelfNeedPx(rows: number): number {
+  return SHELF_HEAD_PX + rows * SHELF_ROW_PX + SHELF_PAD_PX;
+}
+
+/**
+ * `minSpanMin`: the shortest a block is drawn (in minutes), so two short
+ * plans that touch on screen count as one clash, as the lane packer does.
+ */
 export function layoutDayBlocks<T extends DayBlockSlice>(
   slices: readonly T[],
   raw: ReadonlyMap<string, LanePlacement>,
   planPx: number,
   minLanePx = MIN_LANE_PX,
   cap: number = LANE_CAP.day,
+  minSpanMin = 0,
 ): DayBlockLayout<T> {
-  const maxLanes = Math.max(MIN_SIDE_BY_SIDE, Math.min(cap, readableLaneCount(planPx, minLanePx)));
-  const placements = new Map<string, LanePlacement>();
-  const hiddenSlices: T[] = [];
-  for (const sl of slices) {
-    const pl = raw.get(sl.id) ?? { colIndex: 0, colCount: 1, span: 1 };
-    if (pl.colCount <= maxLanes) {
-      placements.set(sl.id, pl);
-    } else if (maxLanes === 1) {
-      if (pl.colIndex === 0) placements.set(sl.id, { colIndex: 0, colCount: 1, span: 1 });
-      else hiddenSlices.push(sl);
-    } else if (pl.colIndex >= maxLanes - 1) {
-      hiddenSlices.push(sl);
+  const maxLanes = Math.max(1, Math.min(cap, readableLaneCount(planPx, minLanePx)));
+  const drawnEnd = (s: T) => Math.max(s.endMin, s.startMin + minSpanMin);
+  const order = (a: T, b: T) => a.startMin - b.startMin || (a.endMin - a.startMin) - (b.endMin - b.startMin) || a.id.localeCompare(b.id);
+
+  // Overlap clusters (a run of slices that touch on screen).
+  const clusters: T[][] = [];
+  let clusterEnd = -Infinity;
+  for (const sl of [...slices].sort(order)) {
+    const last = clusters[clusters.length - 1];
+    if (last && sl.startMin < clusterEnd) {
+      last.push(sl);
+      clusterEnd = Math.max(clusterEnd, drawnEnd(sl));
     } else {
-      placements.set(sl.id, {
-        colIndex: pl.colIndex,
-        colCount: maxLanes,
-        span: Math.max(1, Math.min(pl.span, maxLanes - 1 - pl.colIndex)),
-      });
+      clusters.push([sl]);
+      clusterEnd = drawnEnd(sl);
     }
   }
 
-  // One chip per run of hidden slices that overlap in time.
-  const groups: T[][] = [];
-  for (const sl of [...hiddenSlices].sort((a, b) => a.startMin - b.startMin)) {
-    const last = groups[groups.length - 1];
-    const lastEnd = last ? Math.max(...last.map((x) => x.endMin)) : -1;
-    if (last && sl.startMin < lastEnd) last.push(sl);
-    else groups.push([sl]);
-  }
-  const compact = maxLanes === 1;
-  const overflow = groups.map((g) => ({
-    startMin: g[0]!.startMin,
-    slices: g,
-    leftFrac: compact ? 0 : (maxLanes - 1) / maxLanes,
-    compact,
-  }));
-
-  // Widen each visible block over the lanes to its right that stay free for
-  // its whole time — the chip's lane is only taken where hidden tasks are.
-  const byId = new Map(slices.map((sl) => [sl.id, sl] as const));
-  const overlaps = (a: DayBlockSlice, s0: number, e0: number) => a.startMin < e0 && s0 < a.endMin;
-  for (const [id, pl] of placements) {
-    if (pl.colCount !== maxLanes) continue;
-    const me = byId.get(id)!;
-    let span = 1;
-    for (let lane = pl.colIndex + 1; lane < maxLanes; lane++) {
-      const taken = [...placements].some(([oid, op]) => oid !== id && op.colIndex <= lane && lane < op.colIndex + (oid === id ? 1 : op.span) && overlaps(byId.get(oid)!, me.startMin, me.endMin))
-        || (lane === maxLanes - 1 && overflow.some((o) => o.slices.some((h) => overlaps(h, me.startMin, me.endMin))));
-      if (taken) break;
-      span++;
+  const placements = new Map<string, LanePlacement>();
+  const shelves: ShelfGroup<T>[] = [];
+  const inShelf = new Set<string>();
+  for (const cl of clusters) {
+    const lanes = Math.max(...cl.map((sl) => raw.get(sl.id)?.colCount ?? 1));
+    if (cl.length > 1 && lanes > maxLanes) {
+      shelves.push({ startMin: cl[0]!.startMin, endMin: Math.max(...cl.map((s) => s.endMin)), slices: cl });
+      for (const sl of cl) inShelf.add(sl.id);
+    } else if (cl.length === 1) {
+      // Alone in its time: the whole width, whatever the packer counted.
+      placements.set(cl[0]!.id, { colIndex: 0, colCount: 1, span: 1 });
+    } else {
+      for (const sl of cl) placements.set(sl.id, raw.get(sl.id) ?? { colIndex: 0, colCount: 1, span: 1 });
     }
-    placements.set(id, { ...pl, span });
   }
-
-  return { maxLanes, placements, hidden: new Set(hiddenSlices.map((s) => s.id)), overflow };
+  return { maxLanes, placements, inShelf, shelves };
 }

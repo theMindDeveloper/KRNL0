@@ -94,12 +94,12 @@ export function TagPicker({ x, y, item, state, onPick, onDismiss }: TagPickerPro
       <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
       <span style={{ flex: 1 }}>{t.label}</span>
       {item.tag === t.id && <span style={{ fontSize: 11, color: 'var(--acid-ink, var(--acid))', display: 'inline-flex' }}><LineGlyph name="check" size={11} /></span>}
-      {hint && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-4)', letterSpacing: '0.06em' }}>{hint}</span>}
+      {hint && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.06em' }}>{hint}</span>}
     </button>
   );
 
   const sectionLabel = (text: string) => (
-    <div style={{ padding: '6px 10px 2px', fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-4)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+    <div style={{ padding: '6px 10px 2px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
       {text}
     </div>
   );

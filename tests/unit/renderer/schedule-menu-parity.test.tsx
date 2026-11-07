@@ -142,7 +142,7 @@ describe('Calendar ↔ Clock right-click parity', () => {
 });
 
 describe('Calendar pomo spans as background highlights', () => {
-  it('is a thin rail beside the plan and never takes pointer events', () => {
+  it('fills a thin track beside the plan and never takes pointer events', () => {
     seed();
     render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
     const band = document.querySelector('[data-testid="calendar-reality-block"]') as HTMLElement;
@@ -151,9 +151,10 @@ describe('Calendar pomo spans as background highlights', () => {
     // The recorded rail sits in its own lane beside the plan blocks (z 1), never under them.
     expect(band.style.zIndex).toBe('1');
     expect(band.getAttribute('data-reality-kind')).toBe('work');
-    // Recorded time is a thin rail inside the day's left edge (calendar F-layers), not a full-width band.
-    expect(band.style.left).toBe('5px');
-    expect(band.style.width).toBe('4px');
+    // Recorded time fills a thin track on the day's right edge (calendar F29), not a full-width band.
+    expect(band.style.right).toBe('4px');
+    expect(band.style.width).toBe('8px');
+    expect(document.querySelector('[data-testid="calendar-reality-track"]')).toBeTruthy();
   });
 
   it('focus and break read differently', () => {

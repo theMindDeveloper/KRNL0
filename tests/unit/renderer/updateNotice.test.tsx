@@ -135,7 +135,9 @@ describe('Status bar version item (F4)', () => {
     expect(screen.getByTestId('statusbar-version').textContent).toMatch(/^v\d+\.\d+\.\d+$/);
     act(() => useUpdateStore.setState({ state: { ...ready, status: 'downloading', percent: 42 } }));
     expect(screen.getByTestId('statusbar-version').textContent).toContain('42%');
-    expect(screen.getByTestId('statusbar-version').textContent).toContain('↓ 0.11.0');
+    expect(screen.getByTestId('statusbar-version').textContent).toContain(' 0.11.0');
+    // Downloading is a drawn arrow icon, not a text glyph.
+    expect(screen.getByTestId('statusbar-version').querySelector('svg')).toBeTruthy();
     act(() => useUpdateStore.setState({ state: ready }));
     expect(screen.getByTestId('statusbar-version').textContent).toContain('→ 0.11.0');
     expect(screen.getByTestId('statusbar-version').tagName).toBe('BUTTON');

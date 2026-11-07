@@ -131,7 +131,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
             {current ? current.label : 'pick or type what you’re doing…'}
           </span>
           {curCat && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{curCat.label}</span>}
-          <span aria-hidden style={{ opacity: 0.6, fontSize: 8, color: 'var(--ink-3)' }}>▾</span>
+          <span aria-hidden style={{ opacity: 0.6, fontSize: 11, color: 'var(--ink-3)' }}><LineGlyph name="caretDown" size={9} /></span>
         </button>
         {current && (
           <button

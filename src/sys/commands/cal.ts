@@ -10,6 +10,9 @@ import type { Board } from '../../shared/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode } from '../../shared/dispatch/types';
 import { isValidYMD } from '../../shared/ymd';
+import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
+import { lineUp } from '../../renderer/components/nodes/CalendarNode/lineUp';
+import { taskSchedule } from './task';
 import { calendarSetLayers, calendarSetZoom } from '../../renderer/components/nodes/CalendarNode/commands';
 import { calendarLayersOf } from '../../renderer/components/nodes/CalendarNode/types';
 import { CAL_ZOOM_MAX, CAL_ZOOM_MIN, granularityFor, type CalendarState } from '../../renderer/components/nodes/CalendarNode/types';
@@ -171,4 +174,46 @@ export function calView(
   saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
   ctx.onBoardChanged?.();
   return { ok: true, message: `calendar → ${view}${date ? ` (${date})` : ''}` };
+}
+
+/**
+ * `krnl cal lineup <task> <task> [...] [--json]` (calendar-clock-visuals F28)
+ * Puts the plans one after another, in start order, from the first of them
+ * (never before now), as the Calendar shelf's "Line up" button. A chain moves
+ * as one (its anchor carries the time); a done plan stays where it is.
+ */
+export async function calLineup(
+  ctx: CalCtx & { onBoardChanged?: () => void },
+  refs: string[],
+  json = false,
+  nowMs: number = Date.now(),
+): Promise<SysResult> {
+  if (refs.length < 2) return { ok: false, message: 'cal lineup needs at least two tasks: cal lineup <task> <task> [...]' };
+  const board = loadBoard(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const placements = selectSchedule(board).placements;
+  const items: Array<{ taskId: string; startMs: number; lengthMin: number }> = [];
+  for (const ref of refs) {
+    const r = resolveNodeRef(board as never, ref, 'todo.task');
+    if (!r.ok) return { ok: false, message: `cal lineup: no single task matches "${ref}"` };
+    const node = board.nodes.find((n) => n.id === r.id);
+    const p = placements.get(r.id);
+    if (!node || !p) return { ok: false, message: `cal lineup: "${ref}" is not on the calendar` };
+    if ((node.state as TaskState).done) continue;
+    // A chain moves as one: its anchor carries the time, its followers come along.
+    const anchor = p.anchorTaskId;
+    if (items.some((it) => it.taskId === anchor)) continue;
+    const members = [...placements.values()].filter((q) => q.anchorTaskId === anchor);
+    const startMs = Math.min(...members.map((q) => new Date(q.startISO).getTime()));
+    const endMs = Math.max(...members.map((q) => new Date(q.endISO).getTime()));
+    items.push({ taskId: anchor, startMs, lengthMin: Math.round((endMs - startMs) / 60_000) });
+  }
+  const moves = lineUp(items, nowMs);
+  for (const mv of moves) {
+    const res = await taskSchedule({ boardPath: ctx.boardPath }, mv.taskId, mv.scheduledFor);
+    if (!res.ok) return res;
+  }
+  if (moves.length) ctx.onBoardChanged?.();
+  const text = moves.length === 0 ? 'Already lined up.' : moves.map((m) => `${m.taskId.slice(0, 8)} -> ${m.scheduledFor.replace('T', ' ')}`).join('\n');
+  return { ok: true, message: json ? JSON.stringify(moves) : text, data: moves };
 }

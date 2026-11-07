@@ -21,6 +21,7 @@ import { stepsFor, tourById, type Tour } from './tours';
 import { setTourAnchor } from './tourAnchor';
 import { settingsSectionFor } from '../TopBar/SettingsModal';
 import { useLayerVisibility } from '../../store/layerVisibility';
+import { LineGlyph } from '../ui/LineGlyph';
 
 export const TOUR_EVENT = 'krnl:tour';
 
@@ -515,7 +516,7 @@ export function TourHost(): JSX.Element | null {
             ))
             : step.waitFor && !revisit
               ? <button type="button" data-testid="tour-skip" style={btn(false)} onClick={next}>Skip</button>
-              : <button type="button" data-testid="tour-next" style={btn(true)} onClick={next}>{last ? 'Done' : 'Next →'}</button>}
+              : <button type="button" data-testid="tour-next" style={btn(true)} onClick={next}>{last ? 'Done' : <>Next <LineGlyph name="chevron" size={11} /></>}</button>}
         </div>
       </div>
     </>,

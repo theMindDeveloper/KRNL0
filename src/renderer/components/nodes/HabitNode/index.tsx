@@ -504,8 +504,8 @@ function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextM
                 width: WEEK_CELL_SIZE,
                 textAlign: 'center',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 8.5,
-                color: 'var(--ink-4)',
+                fontSize: 11,
+                color: 'var(--ink-3)',
                 letterSpacing: '0.04em',
               }}
             >

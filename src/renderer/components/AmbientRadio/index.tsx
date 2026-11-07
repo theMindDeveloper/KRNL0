@@ -1112,7 +1112,7 @@ export function AmbientRadio() {
             data-testid="ambient-radio-edge-tab-right"
             style={{ ...edgeTab, left: -PEEK_PX, borderRight: 'none', borderRadius: '6px 0 0 6px' }}
             onClick={restoreFromEdge}
-          >◀</div>
+          ><LineGlyph name="chevronLeft" size={12} /></div>
         )}
 
         <div style={node}>
@@ -1222,7 +1222,7 @@ export function AmbientRadio() {
                     borderRadius: 5,
                     color: 'rgba(255,255,255,.8)',
                     fontFamily: 'inherit',
-                    fontSize: 8,
+                    fontSize: 11,
                     padding: '5px 7px',
                     outline: 'none',
                   }}
@@ -1259,7 +1259,7 @@ export function AmbientRadio() {
                     border: `1px solid rgba(244,63,94,${favsOpen ? '.55' : '.2'})`,
                     borderRadius: 5,
                     color: favsOpen ? '#f43f5e' : 'rgba(244,63,94,.55)',
-                    fontSize: 8,
+                    fontSize: 11,
                     padding: '5px 7px',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
@@ -1268,7 +1268,7 @@ export function AmbientRadio() {
                     letterSpacing: '0.04em',
                     transition: 'background .15s, color .15s, border-color .15s',
                   }}
-                >{ytFavs.length}<span style={{ fontSize: 7 }}>{favsOpen ? '▴' : '▾'}</span></button>
+                >{ytFavs.length}<span style={{ display: 'inline-flex', transform: favsOpen ? 'rotate(180deg)' : undefined }}><LineGlyph name="caretDown" size={9} /></span></button>
                 <button
                   type="button"
                   onClick={onYtLoad}
@@ -1277,7 +1277,7 @@ export function AmbientRadio() {
                     border: '1px solid rgba(244,63,94,.3)',
                     borderRadius: 5,
                     color: '#f43f5e',
-                    fontSize: 8,
+                    fontSize: 11,
                     padding: '5px 10px',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
@@ -1299,7 +1299,7 @@ export function AmbientRadio() {
                   }}
                 >
                   {ytFavs.length === 0 ? (
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,.3)', letterSpacing: '0.04em', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '0.04em', textAlign: 'center' }}>
                       no saved videos — load one, then tap the star
                     </div>
                   ) : ytFavs.map((fav) => {
@@ -1373,7 +1373,7 @@ export function AmbientRadio() {
             }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase',
+                fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
                 color: focusedPreset.col, marginBottom: 8,
               }}>
                 <span>{focusedPreset.name} settings</span>
@@ -1461,7 +1461,7 @@ export function AmbientRadio() {
                                 onClick={() => onSettingChange(key, on ? 0 : 1)}
                                 style={{
                                   fontFamily: 'inherit',
-                                  fontSize: 8,
+                                  fontSize: 11,
                                   letterSpacing: '0.04em',
                                   padding: '2px 7px',
                                   border: `1px solid ${on ? focusedPreset.col : 'rgba(255,255,255,.12)'}`,
@@ -1563,7 +1563,7 @@ export function AmbientRadio() {
                       >
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.col, flexShrink: 0 }} />
                         <span style={{
-                          fontSize: 8.5, color: p.col,
+                          fontSize: 11, color: p.col,
                           textTransform: 'uppercase', letterSpacing: '0.06em',
                           minWidth: 40, flexShrink: 0,
                         }}>{p.name}</span>
@@ -1575,7 +1575,7 @@ export function AmbientRadio() {
                           onChange={(v) => onLayerVolumeChange(id, v)}
                           testId={`ambient-radio-layer-vol-${id}`}
                         />
-                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,.35)', minWidth: 18, textAlign: 'right', flexShrink: 0 }}>{vol}</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', minWidth: 18, textAlign: 'right', flexShrink: 0 }}>{vol}</span>
                         <button
                           type="button"
                           data-testid={`ambient-radio-layer-remove-${id}`}

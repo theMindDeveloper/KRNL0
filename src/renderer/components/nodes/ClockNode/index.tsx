@@ -38,6 +38,7 @@ import {
   planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, type TaskEntry,
 } from './dayModel';
 import { halfOf, startupFollow, rolloverFollow, claimStartup, type ClockNowMark } from './follow';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 // ── Geometry constants ─────────────────────────────────────────────────────────
 // CX / CY / R_FACE and the arc helpers live in dialGeometry.ts (shared with
@@ -475,9 +476,7 @@ export function ClockNode({
             onClick={() => onCommand('clock.advanceDay', { delta: -1 })}
             title="Previous day"
             aria-label="Previous day"
-          >
-            ‹
-          </button>
+          ><LineGlyph name="chevronLeft" /></button>
           {/* Static date label.
               The native <input type="date"> picker was removed in favour of
               the canonical day-selection path: click a day in the Calendar
@@ -524,9 +523,7 @@ export function ClockNode({
             onClick={() => onCommand('clock.advanceDay', { delta: 1 })}
             title="Next day"
             aria-label="Next day"
-          >
-            ›
-          </button>
+          ><LineGlyph name="chevron" /></button>
         </div>
 
         {/* 12-hour window toggle bar — prominent, above the clock face.
@@ -1110,7 +1107,7 @@ export function ClockNode({
                   )}
                   {full && <path d="M6.6 10.2l2.2 2.2 4.4-4.6" fill="none" stroke="var(--acid-ink, var(--acid))" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />}
                 </svg>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8.5, color: isToday ? 'var(--ink)' : 'var(--ink-3)', textTransform: 'uppercase' }}>{dow}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: isToday ? 'var(--ink)' : 'var(--ink-3)', textTransform: 'uppercase' }}>{dow}</span>
               </button>
             );
           })}
@@ -1343,7 +1340,7 @@ export function ClockNode({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: spanTone(tagLibrary, realityPopup.seg, easy) }} />
               <span style={{ fontSize: 12, fontWeight: 700 }}>{realityPopup.seg.kind === 'work' ? (!easy && !realityPopup.seg.taskId && realityPopup.seg.label) || 'Focus session' : 'Break'}</span>
-              {realityPopup.seg.live && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>◆ LIVE</span>}
+              {realityPopup.seg.live && <span style={{ fontSize: 11, color: 'var(--acid-ink, var(--acid))', display: 'inline-flex', alignItems: 'center', gap: 4 }}><LineGlyph name="dot" size={8} />LIVE</span>}
             </div>
             {/* #207 — click a time to change it; a running session's "now" becomes "Stop at". */}
             <SpanTimeEditor

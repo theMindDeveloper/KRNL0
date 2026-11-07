@@ -133,7 +133,7 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: info.done ? 'line-through' : 'none' }}>
           {info.text || 'Untitled task'}
         </span>
-        {info.done && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }} ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><LineGlyph name="check" size={9} weight={2.6} />DONE</span></span>}
+        {info.done && <span style={{ fontSize: 11, color: 'var(--acid-ink, var(--acid))' }} ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><LineGlyph name="check" size={9} weight={2.6} />DONE</span></span>}
       </div>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>{when}</div>
       {!easy && <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--ink-2)', marginBottom: 10, flexWrap: 'wrap' }}>
@@ -175,7 +175,7 @@ function HabitInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: `var(--${info.color})` }} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
-        <span style={{ fontSize: 8, color: 'var(--ink-4)', letterSpacing: '0.08em' }}>HABIT</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.08em' }}>HABIT</span>
       </div>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>
         {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''} · `}

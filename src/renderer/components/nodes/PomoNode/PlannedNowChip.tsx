@@ -38,7 +38,7 @@ export function PlannedNowChip({ state, easy, onCommand }: {
         color: 'var(--ink-2)', minWidth: 0,
       }}
     >
-      <span style={{ color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 8.5, flexShrink: 0 }}>Planned now</span>
+      <span style={{ color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 11, flexShrink: 0 }}>Planned now</span>
       <span title={planned.text} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)' }}>
         {planned.text}
       </span>

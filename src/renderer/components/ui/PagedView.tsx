@@ -18,6 +18,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { LineGlyph } from './LineGlyph';
 
 const PAGER_H = 22;
 const WHEEL_COOLDOWN_MS = 320;
@@ -218,7 +219,7 @@ export function PagedView({
             fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)',
           }}
         >
-          <PagerBtn label="Previous page" disabled={current === 0} onClick={() => go(-1)}>‹</PagerBtn>
+          <PagerBtn label="Previous page" disabled={current === 0} onClick={() => go(-1)}><LineGlyph name="chevronLeft" /></PagerBtn>
           {Array.from({ length: pages }, (_, i) => (
             <button
               key={i}
@@ -234,7 +235,7 @@ export function PagedView({
               }}
             />
           ))}
-          <PagerBtn label="Next page" disabled={current === pages - 1} onClick={() => go(1)}>›</PagerBtn>
+          <PagerBtn label="Next page" disabled={current === pages - 1} onClick={() => go(1)}><LineGlyph name="chevron" /></PagerBtn>
         </div>
       )}
     </div>

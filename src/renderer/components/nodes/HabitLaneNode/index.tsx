@@ -19,6 +19,7 @@ import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
 import { HabitIcon } from '../HabitNode/HabitIcon';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 const LANE_WIDTH = 280;
 
@@ -49,7 +50,7 @@ function lastSevenDays(today: string): string[] {
 // "TUE", "SET ↘ DAY" style. SET ↘ DAY is the "unscheduled" placeholder so
 // the user knows there's no schedule yet.
 function cadenceTag(schedule: HabitSchedule | null | undefined): string {
-  if (!schedule) return 'SET ↘ DAY';
+  if (!schedule) return 'SET A DAY';
   if (schedule.kind === 'daily') return 'DAILY';
   if (schedule.kind === 'weekdays') return 'WEEKDAYS';
   if (schedule.kind === 'weekly') {
@@ -337,7 +338,7 @@ export function HabitLaneNode({
           pointerEvents: 'none',
         }}
       >
-        {'↘ drop on a calendar day'}
+        <LineGlyph name="arrowDownRight" size={11} /> drop on a calendar day
       </div>
 
       {menuOpen && (

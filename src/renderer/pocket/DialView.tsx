@@ -6,6 +6,7 @@
 import { fmtMin } from '../components/nodes/PomoNode/daySpans';
 import { ACID, COAL, CYAN, DRAG, EDGE, INK, INK3, MONO, MUTED, NO_DRAG, POCKET_SHADOW, openMain, setCollapsed, type PocketModel } from './model';
 import { ControlRow, DayRing, Icon, RoundButton, Ring, Ticks, cardStyle, labelStyle } from './parts';
+import { LineGlyph } from '../components/ui/LineGlyph';
 
 const SIZE = 184;
 
@@ -33,7 +34,7 @@ export function DialTab({ m }: { m: PocketModel }) {
             ? <span style={{ width: 8, height: 8, borderRadius: 999, background: m.onBreak ? 'transparent' : ACID, boxShadow: m.onBreak ? `inset 0 0 0 1.5px ${MUTED}` : '0 0 0 3px rgba(201,241,88,.18)' }} />
             : <Ring size={18} stroke={3} fraction={m.onBreak ? m.breakUsed : m.remaining} color={m.tone} />}
           <span style={{ fontFamily: MONO, fontSize: m.observe ? 13 : 15, fontWeight: 500 }}>{minutes}</span>
-          <span style={{ ...labelStyle, fontSize: 8.5 }}>{m.observe ? '↑' : m.onBreak ? 'break' : 'left'}</span>
+          <span style={{ ...labelStyle, fontSize: 11 }}>{m.observe ? <LineGlyph name="arrowUp" size={10} /> : m.onBreak ? 'break' : 'left'}</span>
         </button>
       </div>
     </div>

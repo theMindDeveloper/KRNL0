@@ -189,7 +189,7 @@ function VersionItem() {
     return (
       <StatusItem testId="statusbar-version">
         <span title={`Downloading KRNL0 ${state.latestVersion ?? ''} in the background`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          ↓ {state.latestVersion}
+          <LineGlyph name="caretDown" size={10} /> {state.latestVersion}
           <span aria-hidden style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--paper-3)', overflow: 'hidden', display: 'inline-block' }}>
             <span style={{ display: 'block', height: '100%', width: `${Math.round(state.percent ?? 0)}%`, background: 'var(--acid)', borderRadius: 2 }} />
           </span>

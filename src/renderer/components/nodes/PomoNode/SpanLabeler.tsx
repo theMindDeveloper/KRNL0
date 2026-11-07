@@ -102,7 +102,7 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {task ? 'task' : tag ? tag.label : 'category'}
           </span>
-          <span aria-hidden style={{ opacity: 0.6, fontSize: 8 }}>▾</span>
+          <span aria-hidden style={{ opacity: 0.6, fontSize: 11 }}><LineGlyph name="caretDown" size={9} /></span>
         </button>
         <button
           type="button"

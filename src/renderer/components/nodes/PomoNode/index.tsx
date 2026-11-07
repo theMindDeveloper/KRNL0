@@ -1133,7 +1133,7 @@ function CycleCounter({
             data-testid="pomo-cycles-overflow"
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 8.5,
+              fontSize: 11,
               color: 'var(--acid-ink, var(--acid))',
               letterSpacing: '0.06em',
               marginLeft: 1,

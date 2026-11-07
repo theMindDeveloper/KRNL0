@@ -18,7 +18,8 @@ import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange, selectSchedule } from '../../../store/scheduleSelector';
 import { packLanes } from '../../../store/laneLayout';
-import { layoutDayBlocks, BLOCK_TEXT_INSET, LANE_CAP, MIN_LANE_PX } from './dayBlockLayout';
+import { layoutDayBlocks, shelfNeedPx, BLOCK_TEXT_INSET, LANE_CAP, READABLE_LANE_PX, SHELF_HEAD_PX, SHELF_ROW_PX } from './dayBlockLayout';
+import { lineUp } from './lineUp';
 import { AppSelect } from '../../ui/AppSelect';
 import { SpanTimeEditor, CountsToward, openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
 import { SPACE, popupColumn } from '../../ui/spacing';
@@ -120,6 +121,7 @@ interface ScheduledTask {
   scheduledDurationMin: number; // calendar block duration (fallback: plannedMin or durationMin)
   plannedMin: number;           // for drag payload
   isAnchor: boolean;            // ADR 0003: true iff the user explicitly anchored this task
+  anchorTaskId: string;         // the chain's anchor (itself when it has its own time)
   kind: TaskKind;               // Decision 28: 'focus' | 'event'
   breakdown: PomoBreakdown | null; // Decision 28: null iff kind === 'event'
   timeOpen: boolean;            // no duration set — drawn open-ended (fades out)
@@ -221,6 +223,11 @@ const CAL_ICONS = {
   prev: 'M15 5l-7 7 7 7',
   next: 'M9 5l7 7-7 7',
   grid: 'M4 4h16v16H4zM4 9.5h16M4 15h16M9.5 4v16',
+  list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+  clash: 'M4 4h10v10H4zM10 10h10v10H10z',
+  stairs: 'M3 6h6v6h6v6h6M17 14l4 4-4 4',
+  grip: 'M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01',
+  tray: 'M3 14h5l1.5 3h5l1.5-3h5M3 14l2.5-8h13l2.5 8v6H3zM12 2.5v7M9 7l3 3 3-3',
 } as const;
 
 function CalIcon({ name, size = 11 }: { name: keyof typeof CAL_ICONS; size?: number }) {
@@ -589,6 +596,19 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // A task row dragged out of the layer picker: the picker goes see-through so
   // the drop reaches the grid underneath, and closes when the drag ends.
   const [layerDragging, setLayerDragging] = useState(false);
+  // A plan being dragged from this calendar: shows the unschedule drop zone.
+  const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [unschedHot, setUnschedHot] = useState(false);
+  const beginTaskDrag = (e: DragEvent<HTMLDivElement>, task: ScheduledTask) => {
+    setTaskPopup(null);
+    // The payload carries WORK time (plannedMin), not block height: the
+    // selector adds breaks on top, so the block height would grow every nudge.
+    e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: task.id, durationMin: task.plannedMin }));
+    e.dataTransfer.effectAllowed = 'move';
+    // After the drag has begun: changing the DOM inside dragstart cancels it.
+    window.setTimeout(() => setDragTaskId(task.id), 0);
+  };
+  const endTaskDrag = () => { setDragTaskId(null); setUnschedHot(false); };
   // Right-click menu (shared with the Clock — ContextMenu/scheduleMenus.ts).
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const openItemMenu = (item: LayerItem, x: number, y: number) => {
@@ -659,6 +679,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           scheduledDurationMin: blockDurationMin,
           plannedMin,
           isAnchor: p.isAnchor,
+          anchorTaskId: p.anchorTaskId,
           kind: p.kind,
           breakdown: p.breakdown,
           timeOpen: st.timeOpen === true,
@@ -1026,67 +1047,156 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
     const rawLayout = computeColumnLayout(slices, (MIN_BLOCK_PX / rowHeight) * 60);
 
-    // Readable parallel tasks: only as many lanes as fit at MIN_LANE_PX; the
-    // rest of a busy cluster collapses into a "+N" chip that lists them (and
-    // lets each be dragged out). A single-lane column shows the first task at
-    // full width with a compact chip on its corner — never slivers.
+    // Readable parallel tasks: only as many lanes as fit at MIN_LANE_PX. A
+    // clash that needs more becomes a shelf (F28): one block over the clash's
+    // time with a named, draggable row per plan — nothing hidden behind a count.
     const colPxAll = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-    const planPx = colPxAll;
+    const railNumAll = singleDay ? 14 : 10;
     const dayLayout = layoutDayBlocks(
       slices.map((sl) => ({ id: sl.task.id, startMin: sl.sliceStartMin, endMin: sl.sliceEndMin, slice: sl })),
       rawLayout,
-      planPx - (singleDay ? 14 : 10),
-      MIN_LANE_PX,
+      colPxAll - railNumAll,
+      READABLE_LANE_PX,
       singleDay ? LANE_CAP.day : LANE_CAP.week,
+      (MIN_BLOCK_PX / rowHeight) * 60,
     );
     const colLayout = dayLayout.placements;
-    const hiddenIds = dayLayout.hidden;
-    const overflowChips = dayLayout.overflow.map((og) => {
-      const g = og.slices.map((x) => x.slice);
-      const start = og.startMin;
+    const shelfEls = dayLayout.shelves.map((sh) => {
+      const g = sh.slices.map((x) => x.slice);
+      const first = g[0]!;
+      const spanPx = ((sh.endMin - sh.startMin) / 60) * rowHeight - BLOCK_GAP;
+      const need = shelfNeedPx(g.length);
+      // Grow to show every row, but never into the next plan below it.
+      const nextStart = Math.min(1440, ...slices.filter((s) => s.sliceStartMin >= sh.endMin).map((s) => s.sliceStartMin));
+      const roomPx = ((nextStart - sh.startMin) / 60) * rowHeight - BLOCK_GAP;
+      // Short of room, in this order: rows tighten (to 15 px), the header row
+      // goes, and only then does the shelf grow over the plan below. A row is
+      // never hidden.
+      const avail = Math.max(spanPx, Math.min(need, roomPx));
+      const n = g.length;
+      let showHead = true;
+      let rowPx = SHELF_ROW_PX;
+      let heightPx = avail;
+      if (need > avail) {
+        if (SHELF_HEAD_PX + n * 15 + 4 <= avail) {
+          rowPx = Math.min(SHELF_ROW_PX, Math.floor((avail - SHELF_HEAD_PX - 4) / n));
+        } else if (n * 14 + 4 <= avail) {
+          showHead = false;
+          rowPx = Math.min(SHELF_ROW_PX, Math.floor((avail - 4) / n));
+        } else {
+          rowPx = 15;
+          heightPx = SHELF_HEAD_PX + n * rowPx + 4;
+        }
+      }
+      heightPx = Math.max(heightPx, SHELF_HEAD_PX + SHELF_ROW_PX);
+      const open = g.filter((x) => !x.isContinuation && !x.task.done && new Date(x.task.startISO).getTime() >= nowMs);
+      const canLineUp = new Set(open.map((x) => x.task.anchorTaskId)).size >= 2;
+      const narrowShelf = colPxAll - railNumAll < 150;
+      // A Station-width day (~30 px): rows become colour bars, still grabbable.
+      const tinyShelf = colPxAll - railNumAll < 80;
+      // A chain moves as one: its anchor carries the time, its followers come
+      // along. So line up the chains (anchors) of the open rows, each as long
+      // as its whole chain. Parallel branches of one chain stay parallel.
+      const lineUpShelf = () => {
+        const anchors = [...new Set(open.map((x) => x.task.anchorTaskId))];
+        const units = anchors.map((a) => {
+          const members = scheduledTasks.filter((t) => t.anchorTaskId === a);
+          const s0 = Math.min(...members.map((t) => new Date(t.startISO).getTime()));
+          const e0 = Math.max(...members.map((t) => new Date(t.startISO).getTime() + t.scheduledDurationMin * 60_000));
+          return { taskId: a, startMs: s0, lengthMin: Math.round((e0 - s0) / 60_000) };
+        });
+        for (const mv of lineUp(units, Date.now())) onCommand('calendar.schedule', { taskId: mv.taskId, scheduledFor: mv.scheduledFor });
+      };
+      // A plan dropped on the shelf lands on the slot under the pointer.
+      const dropOnShelf = (e: DragEvent<HTMLDivElement>) => {
+        if (!Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const raw = e.dataTransfer.getData('application/krnl-task');
+        endTaskDrag();
+        if (!raw) return;
+        const payload = JSON.parse(raw) as { taskId?: string; durationMin: number };
+        if (!payload.taskId) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const relY = Math.max(0, (Number.isFinite(e.clientY) ? e.clientY : 0) - (Number.isFinite(rect.top) ? rect.top : 0)) / screenScale(e.currentTarget);
+        const abs = sh.startMin + Math.min(sh.endMin - sh.startMin, (relY / rowHeight) * 60);
+        const snapped = Math.max(0, Math.min(1440 - gran, Math.floor(abs / gran) * gran));
+        scheduleTask(payload.taskId, `${dayYMD}T${String(Math.floor(snapped / 60)).padStart(2, '0')}:${String(snapped % 60).padStart(2, '0')}`, payload.durationMin);
+      };
       return (
-        <button
-          key={`overflow-${g[0]!.task.id}`}
-          type="button"
-          data-testid="calendar-overflow-chip"
-          data-compact={og.compact ? 'true' : undefined}
-          title={g.map((x) => x.task.text).join(', ')}
-          onClick={(e) => {
-            e.stopPropagation();
-            setLayerMenu({ x: e.clientX, y: e.clientY, items: g.map((x) => ({ kind: 'task' as const, task: x.task })) });
+        <div
+          key={`shelf-${first.task.id}`}
+          data-testid={`calendar-shelf-${first.task.id}`}
+          className={`cal-shelf${tinyShelf ? ' cal-shelf--tiny' : ''}`}
+          title={`${g.length} plans at once · ${fmtMinOfDay(sh.startMin)}–${fmtMinOfDay(sh.endMin)}`}
+          onClick={(e) => e.stopPropagation()}
+          onDragOver={(e) => {
+            if (!Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
           }}
+          onDrop={dropOnShelf}
           style={{
             position: 'absolute',
-            top: (start / 60) * rowHeight + (og.compact ? 2 : 0),
-            ...(og.compact
-              ? { right: 5, minWidth: 30, padding: '0 4px' }
-              : { left: `calc(${rail} + (100% - ${rail}) * ${og.leftFrac} + 4px)`, right: 3 }),
-            height: og.compact ? 18 : Math.max(20, Math.min(28, rowHeight / 2)),
+            top: (sh.startMin / 60) * rowHeight + BLOCK_GAP / 2,
+            left: 2,
+            right: `calc(${rail} + 3px)`,
+            height: heightPx,
             zIndex: 3,
-            boxShadow: og.compact ? '0 1px 3px rgba(0,0,0,0.35)' : undefined,
-            border: '1px solid var(--paper-3)',
-            borderRadius: 4,
-            background: 'var(--paper-2)',
-            color: 'var(--ink)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 3,
           }}
         >
-          {g.slice(0, og.compact ? 1 : 3).map((x) => (
-            <span key={x.task.id} aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: toneVarForTask(x.task.id) }} />
-          ))}
-          +{g.length}
-        </button>
+          {showHead && <div className="cal-shelf__head">
+            {!tinyShelf && <CalIcon name="clash" />}
+            <span className="cal-shelf__count">{tinyShelf ? g.length : `${g.length} at once`}</span>
+            {!tinyShelf && !(canLineUp && narrowShelf) && <span className="cal-shelf__time">{fmtMinOfDay(sh.startMin)}</span>}
+            {canLineUp && !tinyShelf && (
+              <button
+                type="button"
+                className="nodrag cal-shelf__lineup"
+                data-testid={`calendar-shelf-lineup-${first.task.id}`}
+                title="Line them up: one after another"
+                aria-label="Line them up"
+                draggable={false}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); lineUpShelf(); }}
+              >
+                <CalIcon name="stairs" />{!narrowShelf && 'Line up'}
+              </button>
+            )}
+          </div>}
+          <div className="cal-shelf__rows" style={{ overflow: 'hidden', paddingTop: showHead ? undefined : 2, ['--row-h' as string]: `${rowPx}px` }}>
+            {g.map((x) => {
+              const t = x.task;
+              const endMs = new Date(t.startISO).getTime() + t.scheduledDurationMin * 60_000;
+              const missed = !t.done && endMs <= nowMs;
+              const st = new Date(t.startISO);
+              const s0 = st.getHours() * 60 + st.getMinutes();
+              return (
+                <div
+                  key={`${t.id}-${x.isContinuation ? 'cont' : 'head'}`}
+                  data-testid={`calendar-shelf-row-${t.id}`}
+                  data-plan-state={t.done ? 'done' : missed ? 'missed' : 'planned'}
+                  className="cal-shelf__row"
+                  draggable={!x.isContinuation}
+                  onDragStart={x.isContinuation ? undefined : (e) => beginTaskDrag(e, t)}
+                  onDragEnd={endTaskDrag}
+                  onClick={(e) => { e.stopPropagation(); setTaskPopup({ task: t, x: e.clientX, y: e.clientY }); }}
+                  title={`${t.text} · ${fmtMinOfDay(s0)}–${fmtMinOfDay(s0 + t.scheduledDurationMin)}${missed ? ' · missed' : ''}${t.done ? ' · done' : ''} — drag to move, or onto the bottom strip to unschedule`}
+                >
+                  <span className="cal-shelf__grip" aria-hidden><CalIcon name="grip" size={10} /></span>
+                  <span className="cal-shelf__dot" aria-hidden style={{ background: toneVarForTask(t.id) }} />
+                  <span className="cal-shelf__title">{t.text}</span>
+                  {t.done ? <span className="cal-shelf__ok" aria-label="done"><CalIcon name="check" size={10} /></span>
+                    : missed ? <span className="cal-shelf__miss" aria-label="missed" /> : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       );
     });
 
-    const blocks = slices.filter((sl) => !hiddenIds.has(sl.task.id)).map((slice) => {
+    const blocks = slices.filter((sl) => !dayLayout.inShelf.has(sl.task.id)).map((slice) => {
       const { task, sliceStartMin, sliceEndMin, isContinuation, hasContinuation } = slice;
 
       // #7 — apply a live resize draft (if this block is being dragged) so it
@@ -1148,17 +1258,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         : ` · started ${fmtDur(Math.abs(startDeltaMin))} ${startDeltaMin > 0 ? 'late' : 'early'}`;
 
       const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
-        setTaskPopup(null);
-        // BUGFIX: drag payload must carry WORK-time (plannedMin), not block
-        // height. scheduledDurationMin on focus tasks is treated as work-time
-        // override by the selector, which then adds breaks on top. Using the
-        // block height (which already includes breaks) caused exponential
-        // growth on every nudge.
-        e.dataTransfer.setData(
-          'application/krnl-task',
-          JSON.stringify({ taskId: task.id, durationMin: task.plannedMin }),
-        );
-        e.dataTransfer.effectAllowed = 'move';
+        beginTaskDrag(e, task);
         e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
       };
 
@@ -1265,6 +1365,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           data-testid={`task-block-${task.id}${isContinuation ? '-cont' : ''}`}
           draggable={!isContinuation}
           onDragStart={isContinuation ? undefined : handleBlockDragStart}
+          onDragEnd={endTaskDrag}
           onDragOver={handleBlockDragOver}
           onDrop={handleDropOnBlock}
           onClick={handleBlockClick}
@@ -1282,8 +1383,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             // A fixed gap between stacked blocks so back-to-back tasks never
             // read as one slab.
             top: topPx + BLOCK_GAP / 2,
-            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 2px)`,
-            right: `calc((100% - ${rail}) * ${rightFrac} + 3px)`,
+            // Plans fill the column; the tracked-time rail keeps the right edge.
+            left: `calc((100% - ${rail}) * ${leftFrac} + 2px)`,
+            right: `calc(${rail} + (100% - ${rail}) * ${rightFrac} + 3px)`,
             height: Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP),
             // Calm by default: a tinted card with a solid colour edge. Done
             // fades; missed is a lighter tint; overrun is a rust strip on the
@@ -1388,7 +1490,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             <span
               style={{
                 fontFamily: 'var(--font-sans)',
-                fontSize: detail === 'full' ? 11.5 : 10,
+                fontSize: detail === 'full' ? 11.5 : 11,
                 fontWeight: 600,
                 color: isDone ? 'var(--ink-2)' : 'var(--ink)',
                 textDecoration: 'none',
@@ -1469,7 +1571,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         </div>
       );
     });
-    return [...blocks, ...overflowChips];
+    return [...blocks, ...shelfEls];
   }
 
   // ── Agenda (narrow day view) ────────────────────────────────────────────────
@@ -1640,7 +1742,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               />
             ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-4)', marginTop: 3 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', marginTop: 3 }}>
             <span>{fmtMinOfDay(stripStart)}</span>
             <span>{fmtMinOfDay(stripStart + stripLen / 2)}</span>
             <span>24:00</span>
@@ -1702,11 +1804,27 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     });
   }
 
+  // What really happened (F16, F29): a track on the right edge of every day
+  // that fills, like the Clock's ring but straight, with what you tracked.
+  // It sits beside the plans, never on them. A running span has moving
+  // stripes and grows; a break is a gap.
+  const trackW = singleDay ? 8 : 5;
+  const trackRight = singleDay ? 4 : 3;
   function renderRealityBlocks(dayYMD: string) {
     if (!layers.recorded) return null;
-    const segs = realityByDay.get(dayYMD);
-    if (!segs || segs.length === 0) return null;
-    return segs.map((seg, i) => {
+    const segs = realityByDay.get(dayYMD) ?? [];
+    const track = (
+      <div
+        key="reality-track"
+        data-testid="calendar-reality-track"
+        aria-hidden
+        style={{
+          position: 'absolute', top: 0, bottom: 0, right: trackRight, width: trackW, borderRadius: 999,
+          background: 'color-mix(in srgb, var(--ink) 4%, transparent)', pointerEvents: 'none', zIndex: 0,
+        }}
+      />
+    );
+    return [track, ...segs.map((seg, i) => {
       const topPx = (seg.startMin / 60) * rowHeight;
       const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
@@ -1725,24 +1843,24 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               : `${spanTitle(seg, 'Focus')} ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)}, ${minutes} minutes`
           }
           title={isWork ? `Recorded: ${spanTitle(seg, 'Focus')} · ${fmtHM(seg.startMs)}–${seg.live ? 'now' : fmtHM(seg.endMs)}` : `Break · ${minutes}m`}
+          className={isWork && seg.live ? 'cal-live-seg' : undefined}
           style={{
-            // What really happened: a rail at the left edge of the day,
-            // beside the plan, never on top of it. A break is a gap.
             position: 'absolute',
             top: topPx + 1,
-            left: singleDay ? 5 : 4,
-            width: singleDay ? 4 : 3,
+            right: trackRight,
+            width: trackW,
             height: Math.max(2, heightPx - 2),
             pointerEvents: 'none',
             zIndex: 1,
-            borderRadius: 999,
-            background: isWork ? tone : 'transparent',
-            // A break draws nothing: it is the gap in the rail (hover keeps its title).
-            boxShadow: isWork && seg.live ? `0 0 0 2px color-mix(in srgb, ${tone} 35%, transparent)` : 'none',
+            borderRadius: 3,
+            // A break draws nothing: it is the gap in the track (hover keeps its title).
+            background: !isWork ? 'transparent'
+              : seg.live ? `repeating-linear-gradient(135deg, ${tone} 0 4px, color-mix(in srgb, ${tone} 50%, transparent) 4px 8px)`
+              : tone,
           }}
         />
       );
-    });
+    })];
   }
 
   // ── Habit block renderer (ADR 0002 §6) ──────────────────────────────────────
@@ -2036,6 +2154,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               }}
             >
               {DAY_LABELS[ymdToIsoDow(dayYMD) - 1]} {dayNum}
+              {(() => {
+                // The day's tracked total, beside its name (F29) — when it fits.
+                if (!layers.recorded) return null;
+                const colPxH = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
+                if (colPxH < 110) return null;
+                const min = Math.round((realityByDay.get(dayYMD) ?? []).filter((s) => s.kind === 'work').reduce((a, s) => a + (s.endMs - s.startMs), 0) / 60_000);
+                if (min <= 0) return null;
+                return <span data-testid={`week-col-tracked-${dayYMD}`} title="Tracked this day" style={{ marginLeft: 6, letterSpacing: 0, textTransform: 'none', color: 'var(--ink-2)' }}>{fmtDur(min)}</span>;
+              })()}
             </div>
           );
         })}
@@ -2047,9 +2174,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           type="button"
           data-testid="calendar-show-list"
           onClick={() => setLayoutPref('list')}
-          style={{ position: 'absolute', right: 8, bottom: 40, zIndex: 5, fontFamily: 'var(--font-mono)', fontSize: 11, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer' }}
+          style={{ position: 'absolute', right: 8, bottom: 40, zIndex: 5, display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 11, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer' }}
         >
-          ≡ list
+          <CalIcon name="list" /> list
         </button>
       )}
 
@@ -2263,7 +2390,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                         top: 0,
                         left: 2,
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: 700,
                         color: 'var(--ink-on-bright)',
                         background: 'var(--acid)',
@@ -2307,12 +2434,42 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           }}
         >
           <button type="button" aria-label="Earlier hours" disabled={win.startHour === 0}
-            onClick={() => flipHours(-1)} style={hourPagerBtn(win.startHour === 0)}>‹</button>
+            onClick={() => flipHours(-1)} style={hourPagerBtn(win.startHour === 0)}><CalIcon name="prev" size={10} /></button>
           <span style={{ fontVariantNumeric: 'tabular-nums', padding: '0 2px' }}>
             {String(win.startHour).padStart(2, '0')}–{String(win.endHour).padStart(2, '0')}
           </span>
           <button type="button" aria-label="Later hours" disabled={win.endHour >= rowCount}
-            onClick={() => flipHours(1)} style={hourPagerBtn(win.endHour >= rowCount)}>›</button>
+            onClick={() => flipHours(1)} style={hourPagerBtn(win.endHour >= rowCount)}><CalIcon name="next" size={10} /></button>
+        </div>
+      )}
+
+      {/* F28 — while a plan from this calendar is dragged: drop it here to
+          take it off the calendar (it goes back to Todo). */}
+      {dragTaskId && !useAgenda && (
+        <div
+          data-testid="calendar-unschedule-drop"
+          className={`cal-unsched${unschedHot ? ' is-hot' : ''}`}
+          onDragOver={(e) => {
+            if (!Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (!unschedHot) setUnschedHot(true);
+            if (snapPreview) setSnapPreview(null);
+          }}
+          onDragLeave={() => setUnschedHot(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const raw = e.dataTransfer.getData('application/krnl-task');
+            let id: string | null = dragTaskId;
+            try { id = raw ? ((JSON.parse(raw) as { taskId?: string }).taskId ?? id) : id; } catch { /* keep the dragged id */ }
+            endTaskDrag();
+            if (id) void unscheduleTask(id);
+          }}
+          style={{ position: 'absolute', left: GUTTER_WIDTH + 8, right: 8, bottom: 8, zIndex: 8 }}
+        >
+          <CalIcon name="tray" size={16} />
+          <span className="cal-unsched__text"><b>Drop here to unschedule</b><span>It goes back to Todo</span></span>
         </div>
       )}
 
@@ -2386,7 +2543,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               fontFamily: 'var(--font-mono)',
             }}
           >
-            <div style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '3px 6px 5px' }}>
+            <div style={{ fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '3px 6px 5px' }}>
               {layerMenu.items.length} items here
             </div>
             {layerMenu.items.map((item, i) => {
@@ -2494,10 +2651,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 {spanTitle(realityPopup.seg, 'Focus session')}
               </span>
               {realityPopup.seg.live && (
-                <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 3 }}><span aria-hidden style={{ width: 5, height: 5, borderRadius: 999, background: 'currentColor' }} />LIVE</span>
+                <span style={{ fontSize: 11, color: 'var(--acid-ink, var(--acid))', letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 3 }}><span aria-hidden style={{ width: 5, height: 5, borderRadius: 999, background: 'currentColor' }} />LIVE</span>
               )}
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 8, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>tracked reality</span>
+              <span style={{ fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>tracked reality</span>
             </div>
             {/* #207 — click a time to change it (where I really stopped); a
                 running session's "now" becomes "Stop at". */}

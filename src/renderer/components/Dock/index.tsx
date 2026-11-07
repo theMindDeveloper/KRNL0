@@ -48,7 +48,7 @@ export function anchorFor(x: number, y: number, w: number, h: number): DockAncho
 function KeyHint({ k }: { k: string }) {
   return (
     <span aria-hidden style={{
-      position: 'absolute', right: 3, bottom: 1, fontFamily: 'var(--font-mono)', fontSize: 8, lineHeight: 1,
+      position: 'absolute', right: 3, bottom: 1, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1,
       opacity: 0.38, pointerEvents: 'none', color: 'currentColor',
     }}>{k}</span>
   );

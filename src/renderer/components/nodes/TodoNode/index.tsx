@@ -1023,7 +1023,7 @@ function SectionToggle({
           textAlign: 'left',
         }}
       >
-        <span style={{ display: 'inline-block', width: 8, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.12s' }}>▸</span>
+        <span style={{ display: 'inline-block', width: 8, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.12s' }}><LineGlyph name="chevron" size={9} /></span>
         {label} ({count})
       </button>
       {action && (

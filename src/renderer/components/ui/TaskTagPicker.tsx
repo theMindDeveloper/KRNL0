@@ -40,7 +40,7 @@ export interface TaskTagPickerProps {
 
 const MAX_OPEN = 6;
 const MAX_DONE = 3;
-const caption: CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 8.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-4)', padding: '6px 8px 2px' };
+const caption: CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-4)', padding: '6px 8px 2px' };
 
 type Item =
   | { key: string; kind: 'task'; id: string; label: string; done: boolean }

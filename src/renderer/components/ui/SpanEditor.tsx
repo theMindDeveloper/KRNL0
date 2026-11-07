@@ -29,6 +29,7 @@ import { boardTagLibrary } from '../../store/spanTags';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { Popover } from './Popover';
 import { retagSegment } from '../../store/scheduleActions';
+import { LineGlyph } from './LineGlyph';
 
 const chip = (active: boolean, accent = false): CSSProperties => ({
   fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums', padding: '3px 8px', borderRadius: 4,
@@ -221,7 +222,7 @@ export function TaskPickButton({ value, onChange, testId, emptyLabel = 'untagged
         {value && <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(value) }} />}
         {category && <CategoryIcon id={category.id} color={category.color} size={11} />}
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-        <span aria-hidden style={{ opacity: 0.6, fontSize: 8 }}>▾</span>
+        <span aria-hidden style={{ opacity: 0.6, fontSize: 11 }}><LineGlyph name="caretDown" size={9} /></span>
       </button>
       <Popover anchor={anchorRef.current} open={open} onClose={() => setOpen(false)} minWidth={260}>
         <TaskTagPicker

@@ -9,6 +9,7 @@ import { toneVarForTask } from '../../../utils/taskColor';
 import { TimeField } from '../../ui/TimeField';
 import { CloseButton } from '../../ui/CloseButton';
 import { Z } from '../../ui/layers';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 export interface TaskPopupTask {
   id: string;
@@ -123,7 +124,7 @@ export function TaskPopup(p: Props) {
                 onEscape={p.onClose}
               />
             </div>
-            <span aria-hidden style={{ color: 'var(--ink-4)', paddingBottom: 9, fontSize: 13 }}>→</span>
+            <span aria-hidden style={{ color: 'var(--ink-3)', paddingBottom: 9, display: 'inline-flex' }}><LineGlyph name="chevron" size={12} /></span>
             <div style={field}>
               <span style={fieldLabel}>End</span>
               <div style={{ ...input, color: dur > 0 ? 'var(--ink-2)' : 'var(--ink-4)', background: 'transparent' }}>{dur > 0 ? addMin(p.time, dur) : '—'}</div>

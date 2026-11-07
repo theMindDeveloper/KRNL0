@@ -20,8 +20,8 @@
 | F12 | Calendar day view narrower than 360 px switches to an **agenda**: a day strip (plan line + reality line) and one full-width row per task or habit (start/end, title, planned/tracked, +over, missed, "overlaps N"). It has a NOW divider, opens at now, and accepts drops (placed after the row dropped on). "▦ time grid" / "≡ list" toggle the layout. |
 | F13 | Calendar time grid: blocks show only what fits their measured size (bar / title / title + time). Lanes are packed by drawn height. Lane capping follows F15. The default scale is 56 px per hour, and the grid opens scrolled to now. |
 | F14 | Clock list: only done tasks are struck through. Past open tasks are dimmed. |
-| F15 | **Readable parallel tasks.** Two parallel tasks always sit side by side. Beyond that a day column shows what fits at 64 px a lane, capped at **2 lanes in the week** (an overview) and **4 in the day** (`CalendarNode/dayBlockLayout.ts`, `LANE_CAP`). Tasks beyond the cap collapse into a "+N" chip in the last lane, with the hidden tasks' colour dots; clicking it lists them and each row can be dragged back onto the grid. A block widens over lanes to its right that stay free for its whole time. **Text is never rotated**: a lane too narrow for a title is a plain bar with its name in the tooltip. Blocks that touch in time keep a 3 px gap. The grid opens (and pages) on whole hours and never on a block cut in half. A missed task says so once ("Missed · 10:00–11:00", lighter fill); its replan button shows on hover. Done tasks stay readable, with a check. Breaks on the recorded rail are gaps, not boxes. |
-| F16 | **Plan, recorded and habits are separate layers.** Only the plan draws blocks. Recorded focus is a thin rail inside each day's left edge (breaks are its gaps); habits are small pills at their time on the right edge, clickable to tick (`habit.toggleDay`). The rail takes no pointer events. **Recorded** and **Habits** switch on and off in the header; the choice is calendar state (`calendar.setLayers`, `layers: {recorded, habits}`, missing = both on), so `krnl cal layers [recorded\|habits on\|off]` does the same. |
+| F15 | **Readable parallel tasks.** A day column draws parallel tasks side by side only while each lane stays readable: at least 96 px (`READABLE_LANE_PX`), capped at **2 lanes in the week** and **4 in the day** (`CalendarNode/dayBlockLayout.ts`, `LANE_CAP`). A clash that needs more lanes becomes a **shelf** (F28); nothing collapses into a "+N" count. **Text is never rotated.** Blocks that touch in time keep a 3 px gap. The grid opens (and pages) on whole hours and never on a block cut in half. A missed task says so once ("Missed · 10:00–11:00", lighter fill); its replan button shows on hover. Done tasks stay readable, with a check. |
+| F16 | **Plan, recorded and habits are separate layers.** Only the plan draws blocks. Recorded focus fills a track on each day's right edge (F29; breaks are its gaps); habits are small pills at their time, clickable to tick (`habit.toggleDay`). The track takes no pointer events. **Recorded** and **Habits** switch on and off in the header; the choice is calendar state (`calendar.setLayers`, `layers: {recorded, habits}`, missing = both on), so `krnl cal layers [recorded\|habits on\|off]` does the same. |
 | F17 | **Right-click menus.** Right-clicking a day column hit-tests every layer at that minute. One hit opens its menu; several open the picker, and picking a row opens that row's menu. Segment menu: header (kind · times · minutes), **Tag → <task>** for up to 6 root tasks, **Untag** (when tagged), **Details…**, **Delete segment** (disabled for the live span). Task menu: header (title · times), **Details…**, **Start focus**, **Mark done / Mark not done**, **Show on canvas**, **Unschedule**. Menus stay on screen. |
 | F18 | **Clock parity.** The Clock day view offers the same menus from the same builder (`ContextMenu/scheduleMenus.ts`): right-click a task arc or a task-list row for the task menu, and a pomo wedge for the segment menu. The Clock has no task details popup, so its task menu has no **Details…**. |
 | F19 | **CLI twins.** Tag / Untag → `pomo retag <seg> <task|none>`. Delete segment → `pomo delete-segment <seg>`. Start focus → `task pomo <ref>`. Mark done → `task toggle <ref>`. Unschedule → `task unschedule <ref>`. `pomo segments [--date] [--json]` lists segment ids. |
@@ -33,6 +33,8 @@
 | F25 | **One popup for recorded time** (#207, time-log F15): left- and right-click open the same popup on Calendar and Clock; times are edited by double-clicking them; Counts toward uses the compact picker (time-log F16). Right-click on empty time offers **Log time here…** (Calendar) / **Log time at HH:MM…** (Clock). |
 | F26 | **Plan vs reality on the block** (#207, storyboard B): a planned block with tagged work on its day reads "started 20m late / 10m early / on time" next to "+X over" / "X tracked". |
 | F27 | **App open/close markers** (time-log F14) and **month hours** (Calendar month cells show the day's recorded work, top-left). |
+| F28 | **The shelf: plans that clash, all of them named.** A clash that does not fit side by side (F15) is one block over the clash's whole time with a row per plan, in start order (shorter first on a tie): colour dot, full name, and a tick (done) or a rust ring (missed). Every row can be clicked (task popup) and **dragged** like a block. Short of room, rows tighten to 15 px, then the header goes, and only then does the shelf grow over the plan below; a row is never hidden. A Station-width day (under 80 px) draws rows as colour bars, still draggable. **While any plan from the calendar is dragged, a drop zone appears at the bottom: "Drop here to unschedule"** — dropping there takes it off the calendar and back to Todo (`unscheduleTask`, CLI `task unschedule`). When two or more chains in a shelf are still ahead, the header offers **Line up**: they are put one after another in start order from the first start, never before now; a chain moves as one (its anchor carries the time). CLI: `krnl cal lineup <task> <task> [...]`. |
+| F29 | **Tracked time is a track that fills.** Each day has a thin track on its right edge (5 px week, 8 px day), always drawn while Recorded is on, filling with the day's focus spans in their tag colour, like the Clock's ring but straight. A span still running has crawling stripes (they stand still under reduced motion). Plans never sit under the track. The day header shows the day's tracked total when the column has room (≥ 110 px). |
 
 ## Gherkin Scenarios (ATDD)
 
@@ -59,16 +61,34 @@ Tests: `tests/unit/renderer/laneLayout.test.ts`, `src/renderer/components/nodes/
 ```gherkin
 Feature: Readable parallel tasks and pomo highlights
 
-  Scenario: F15 — five parallel tasks in a narrow week column
-    Given five tasks overlap between 10:00 and 11:30 in a 90 px week column
-    Then the first task is drawn at full width with its title
-    And a "+4" chip sits on its top-right corner
-    When I click the chip
-    Then the four hidden tasks are listed and each can be dragged onto the grid
+  Scenario: F28 — five parallel tasks in a narrow week column
+    Given five tasks overlap between 10:00 and 11:30 in a 136 px week column
+    Then one shelf covers 10:00 to 11:30
+    And it lists all five tasks by name, none cut off and none hidden
+    And there is no "+N" chip
+
+  Scenario: F28 — drag a plan out of the shelf to unschedule it
+    Given a shelf with "Call with Sam"
+    When I start dragging its row
+    Then "Drop here to unschedule" appears at the bottom of the calendar
+    When I drop it there
+    Then "Call with Sam" has no time and is back in Todo
+    And the drop zone is gone
+
+  Scenario: F28 — line up plans that clash
+    Given Email, Pay rent and Plan week all start tomorrow at 14:00 (20, 20 and 30 minutes)
+    When I click "Line up" on their shelf
+    Then Email is at 14:00, Pay rent at 14:20 and Plan week at 14:40
+    And `krnl cal lineup Email "Pay rent" "Plan week"` does the same
+
+  Scenario: F29 — tracked time fills a track
+    Given 2h35 of focus recorded on Saturday
+    Then Saturday's track on its right edge is filled where I worked
+    And the header reads "SAT 7 2h35"
 
   Scenario: F15 — no block narrower than a readable lane
     Given any column width
-    Then every drawn task block is at least 64 px wide (or the full column, if narrower)
+    Then every drawn task block is at least 96 px wide, or a shelf row (F28)
 
   Scenario: F16 — pomo spans sit behind the plan
     Given a 25 minute focus span and a 5 minute break
