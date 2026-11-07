@@ -555,9 +555,11 @@ const WeekRow = memo(function WeekRow({
   const milestone = milestoneReached(streak);
   const nextMs = nextMilestone(streak);
   const toNext = nextMs !== null ? nextMs - streak : null;
-  const [repairHidden, setRepairHidden] = useState(false);
+  // The day the user said "no" to (not a plain flag): a new missed day the
+  // next morning — app left open overnight — asks again.
+  const [repairHiddenDay, setRepairHiddenDay] = useState<string | null>(null);
   const repairCandidate = useMemo(() => repairableDay(habit.log, today, habit.schedule), [habit.log, today, habit.schedule]);
-  const repairDay = repairCandidate !== null && !repairHidden && !repairDismissed(habit.id, repairCandidate) ? repairCandidate : null;
+  const repairDay = repairCandidate !== null && repairCandidate !== repairHiddenDay && !repairDismissed(habit.id, repairCandidate) ? repairCandidate : null;
   const repairLabel = repairDay === null ? '' : repairDay === addDaysLocal(today, -1) ? 'yesterday' : new Date(`${repairDay}T00:00:00`).toLocaleDateString('en', { weekday: 'long' });
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
@@ -756,7 +758,7 @@ const WeekRow = memo(function WeekRow({
           <button
             type="button"
             data-testid={`habit-repair-no-${habit.id}`}
-            onClick={(e) => { e.stopPropagation(); dismissRepair(habit.id, repairDay); setRepairHidden(true); }}
+            onClick={(e) => { e.stopPropagation(); dismissRepair(habit.id, repairDay); setRepairHiddenDay(repairDay); }}
             onMouseDown={(e) => e.stopPropagation()}
             title="No — start fresh"
             aria-label="No, start fresh"

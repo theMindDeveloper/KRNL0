@@ -1678,3 +1678,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/PomoNode/FaceFit.tsx`, `src/renderer/components/nodes/PomoNode/variants/*.tsx`, `src/renderer/components/nodes/PomoNode/ObserveDash.tsx`
 **Summary:** A face shown between 85 % and 100 % size still drew its 11 px labels at 9–10 px (and Vapor's glass ticks were 7.5 px). The fitter now sets `--face-label` to 11 px ÷ scale, and the faces' labels (17 places) use it, so after the scale they read at 11 px while the big digits scale. Measured every face at 1280×720, 1440×900, 1920×1080: no label under 11 px, the scale holds one value (the bigger labels do not feed back), START always visible.
+
+## [2026-11-07] — Habit repair asks again the next day
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitNode/index.tsx`, `tests/unit/renderer/HabitNode.repair.test.tsx`
+**Summary:** Review of the "Did it yesterday?" row: saying no hid the row with a plain flag that was never reset, so with KRNL0 left open overnight the next missed day was never offered. It now remembers the day that was declined; a later missed day asks again. Test walks the sequence across midnight (fails on the old code).
