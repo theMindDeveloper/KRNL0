@@ -80,6 +80,9 @@ export function FaceFit({ children, compact }: { children: ReactNode; compact?: 
           alignSelf: 'flex-start',
           transform: scale < 1 ? `scale(${scale})` : undefined,
           transformOrigin: 'top center',
+          // Labels inside the face are drawn at 11 px / scale, so after the
+          // scale they still read at the 11 px floor (the big digits scale).
+          ['--face-label' as string]: `${(11 / scale).toFixed(2)}px`,
         }}
       >
         {children}

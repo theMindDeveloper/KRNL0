@@ -74,7 +74,7 @@ export function Vapor({ m, s, remainingPct, total = 25 }: TimerFaceProps) {
 
         <div
           style={{
-            fontSize: 11,
+            fontSize: 'var(--face-label, 11px)',
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
@@ -85,7 +85,7 @@ export function Vapor({ m, s, remainingPct, total = 25 }: TimerFaceProps) {
 
         <div
           style={{
-            fontSize: 11,
+            fontSize: 'var(--face-label, 11px)',
             // Text on the node's paper: --acid is unreadable on light paper.
             color: 'var(--acid-ink, var(--acid))',
             textShadow: '0 0 8px color-mix(in srgb, var(--acid) 40%, transparent)',
@@ -196,7 +196,7 @@ export function Vapor({ m, s, remainingPct, total = 25 }: TimerFaceProps) {
             justifyContent: 'space-between',
             padding: '8px 0',
             fontFamily: 'var(--font-mono)',
-            fontSize: 7.5,
+            fontSize: 'var(--face-label, 11px)',
             color: 'var(--ink-3)',
             letterSpacing: '0.06em',
             pointerEvents: 'none',
