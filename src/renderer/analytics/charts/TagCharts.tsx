@@ -13,7 +13,7 @@ const COLOR_GRID = 'var(--k-an-grid, #2a2e33)';
 
 export function TagList({ tags, width = 320 }: { tags: readonly TagSlice[]; width?: number }) {
   if (tags.length === 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: COLOR_LABEL }}>No completed tasks in this range yet.</div>;
+    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_LABEL }}>No completed tasks in this range yet.</div>;
   }
   const max = Math.max(...tags.map((t) => t.minutes), 1);
   return (
@@ -27,7 +27,7 @@ export function TagList({ tags, width = 320 }: { tags: readonly TagSlice[]; widt
           <span style={{ height: 8, borderRadius: 4, background: COLOR_GRID, overflow: 'hidden' }}>
             <span style={{ display: 'block', height: '100%', width: `${(t.minutes / max) * 100}%`, background: t.color, borderRadius: 4 }} />
           </span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: COLOR_LABEL, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_LABEL, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
             {fmtMinutes(t.minutes)} · {Math.round(t.share * 100)}% · {t.count}
           </span>
         </div>

@@ -364,7 +364,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
             <span
               style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: 9,
+                fontSize: 11,
                 color: 'var(--ink-3)',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
@@ -388,7 +388,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                   title={t.text}
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
+                    fontSize: 11,
                     color: 'var(--ink-2)',
                     background: 'var(--paper-2)',
                     borderRadius: 2,
@@ -407,7 +407,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                 <span
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 9,
+                    fontSize: 11,
                     color: 'var(--ink-3)',
                     flexShrink: 0,
                   }}
@@ -434,7 +434,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
             key={day}
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 9,
+              fontSize: 11,
               color: 'var(--ink-3)',
               letterSpacing: '0.1em',
               textAlign: 'center',
@@ -617,7 +617,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                       onClick={(e) => { e.stopPropagation(); setTaskPopup({ taskId: task.id, x: e.clientX, y: e.clientY }); }}
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
+                        fontSize: 11,
                         color: 'var(--ink-1)',
                         background: 'var(--paper-3)',
                         flexShrink: 0,
@@ -638,7 +638,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     <div
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 9,
+                        fontSize: 11,
                         color: 'var(--ink-3)',
                         lineHeight: '1.3',
                         flexShrink: 0,

@@ -183,7 +183,7 @@ const titlebarStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--k-an-line, #0a0c0e)',
   boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: 11,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
   color: 'var(--k-an-ink-2, #c8cdd3)',
@@ -199,7 +199,7 @@ const dotStyle: React.CSSProperties = {
 
 const summaryChipStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 9.5,
+  fontSize: 11,
   letterSpacing: '0.06em',
   padding: '2px 8px',
   border: '1px solid var(--k-an-line-2, #2a2e33)',
@@ -236,7 +236,7 @@ const toolbarStyle: React.CSSProperties = {
 
 const tabPill = (active: boolean): React.CSSProperties => ({
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
   padding: '5px 11px',
@@ -253,7 +253,7 @@ const tabPill = (active: boolean): React.CSSProperties => ({
 
 const chipBtn = (active: boolean): React.CSSProperties => ({
   fontFamily: 'var(--font-mono)',
-  fontSize: 10,
+  fontSize: 11,
   letterSpacing: '0.04em',
   padding: '3px 8px',
   border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),
@@ -343,11 +343,12 @@ function ChartCard({
 
   return (
     <div data-card-id={cardId} data-pinned={pinned || undefined} style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 18 }}>
+      {/* The toolbar wraps under the title when both don't fit: the title is read in full. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 18, flexWrap: 'wrap', rowGap: 6 }}>
         <span
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
+            fontSize: 11,
             color: pinned ? 'var(--acid)' : 'var(--k-an-ink-3, #9aa1a8)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
@@ -360,7 +361,7 @@ function ChartCard({
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
             minWidth: 0,
-            flexShrink: 1,
+            flex: '1 1 140px',
           }}
           title={title}
         >
@@ -759,7 +760,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
   const tile = (label: string, value: string, sub: string, testId: string) => (
     // containerType lets the number scale with the tile's own width (cqi), so it never spills out.
     <div data-testid={testId} style={{ minWidth: 0, minHeight: 0, padding: '10px 12px', border: '1px solid var(--k-an-line, #2a2e33)', borderRadius: 10, background: 'var(--k-an-tile, rgba(255,255,255,0.02))', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden', containerType: 'inline-size' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</div>
       <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(16px, 17cqi, 28px)', fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
       <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--k-an-ink-3, #aab0b7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
     </div>
@@ -1468,7 +1469,7 @@ function ViewBody(props: ViewBodyProps) {
               style={{
                 width: '100%',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontSize: 11,
                 color: 'var(--k-an-ink-1, #eef1f4)',
                 borderCollapse: 'collapse',
               }}
@@ -1513,7 +1514,7 @@ function ViewBody(props: ViewBodyProps) {
                 style={{
                   width: '100%',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 10,
+                  fontSize: 11,
                   color: 'var(--k-an-ink-1, #eef1f4)',
                   borderCollapse: 'collapse',
                 }}

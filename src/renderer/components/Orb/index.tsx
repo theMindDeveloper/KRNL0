@@ -638,7 +638,7 @@ export function Orb() {
               justifyContent: 'space-between',
               padding: '10px 14px',
               borderBottom: '1px solid rgba(201, 241, 88, 0.15)',
-              fontSize: 10.5,
+              fontSize: 11,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: '#8a8270',
@@ -742,7 +742,7 @@ export function Orb() {
                     </button>
                   ))}
                   {/* Guided tours — one short text tutorial per part of the app. */}
-                  <div style={{ marginTop: 8, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8270' }}>Tutorials</div>
+                  <div style={{ marginTop: 8, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8270' }}>Tutorials</div>
                   {/* engagement.md F12 — the whole loop, first. */}
                   <button
                     type="button"
@@ -759,7 +759,7 @@ export function Orb() {
                     </span>
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                       <span style={{ fontSize: 12, fontWeight: 700 }}>Start here · Your first day</span>
-                      <span style={{ fontSize: 10, color: '#8a8270' }}>plan one real thing and do it · 4 min</span>
+                      <span style={{ fontSize: 11, color: '#8a8270' }}>plan one real thing and do it · 4 min</span>
                     </span>
                   </button>
                   <div data-testid="orb-tours" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4 }}>

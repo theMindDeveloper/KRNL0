@@ -7,10 +7,10 @@ import { setAppPrefs, useLaunchStore } from '../../launch/launchStore';
 import { RELEASES } from '../../../shared/whatsnew';
 import { BACKUPS_KEPT } from '../../../shared/appState';
 
-const head: React.CSSProperties = { fontSize: 9.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 };
+const head: React.CSSProperties = { fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 };
 const small: React.CSSProperties = { fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 };
 const button: React.CSSProperties = {
-  padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em',
+  padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em',
   textTransform: 'uppercase', border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', whiteSpace: 'nowrap',
 };
 
@@ -34,7 +34,7 @@ export function BackupsSection() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span style={head}>Recent versions</span>
         {RELEASES.slice(0, 3).map((r) => (
-          <div key={r.minor} style={{ display: 'flex', gap: 10, fontSize: 10.5, alignItems: 'baseline' }}>
+          <div key={r.minor} style={{ display: 'flex', gap: 10, fontSize: 11, alignItems: 'baseline' }}>
             <span style={{ width: 40, color: info.version.startsWith(`${r.minor}.`) ? 'var(--acid-ink, var(--acid))' : 'var(--ink)', fontWeight: 700 }}>{r.minor}</span>
             <span style={{ width: 72, color: 'var(--ink-3)' }}>{r.date}</span>
             <span style={{ color: 'var(--ink-2)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.summary}</span>

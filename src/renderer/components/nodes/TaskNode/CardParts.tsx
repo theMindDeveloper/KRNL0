@@ -68,7 +68,7 @@ export function CardIcon({ name, size = 12 }: { name: CardIconName; size?: numbe
 /** Row 2: the tag (its colour dot) and when — always in the same place. */
 export function CardMetaRow({ tag, tone, icon, when, whenColor }: { tag: string; tone: string; icon: CardIconName; when: string; whenColor?: string | undefined }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 10.5 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
       {tag && (
         <span
           className="task-tag"
@@ -99,7 +99,7 @@ export function CardMeter({ ratio, color, left, right, leftTestId, rightNode }: 
       <div style={{ height: 4, borderRadius: 2, background: 'var(--paper-3)', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${Math.max(0, Math.min(1, ratio)) * 100}%`, background: color, borderRadius: 2, transition: 'width 0.3s' }} />
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', marginTop: 5, fontFamily: 'var(--font-mono)', fontSize: 10.5, fontVariantNumeric: 'tabular-nums', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', marginTop: 5, fontFamily: 'var(--font-mono)', fontSize: 11, fontVariantNumeric: 'tabular-nums', gap: 8 }}>
         <span data-testid={leftTestId} style={{ color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{left}</span>
         <span style={{ marginLeft: 'auto', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{rightNode ?? right}</span>
       </div>

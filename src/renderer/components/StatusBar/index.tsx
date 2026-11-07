@@ -89,7 +89,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
         gap: 14,
         flexShrink: 0,
         fontFamily: 'var(--font-mono)',
-        fontSize: 10.5,
+        fontSize: 11,
         letterSpacing: '0.04em',
         textTransform: 'uppercase' as const,
         zIndex: Z.chrome,
@@ -115,7 +115,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
             data-testid="statusbar-station-fallback"
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 10.5,
+              fontSize: 11,
               color: 'var(--k-status-label, #8a8270)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase' as const,

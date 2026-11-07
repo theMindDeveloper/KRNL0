@@ -268,7 +268,7 @@ function truncate(s: string, n: number): string {
 
 function modeChip(observe: boolean): CSSProperties {
   return {
-    fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', padding: '3px 6px', borderRadius: 4,
+    fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em', padding: '3px 6px', borderRadius: 4,
     color: observe ? 'var(--rust)' : 'var(--acid-ink, var(--acid))',
     background: observe ? 'color-mix(in srgb, var(--rust) 16%, transparent)' : 'color-mix(in srgb, var(--acid) 14%, transparent)',
   };
@@ -281,7 +281,7 @@ const shell: CSSProperties = {
   width: '100%', boxSizing: 'border-box', background: 'var(--node-bg)', color: 'var(--ink)',
   fontFamily: 'var(--font-mono)', overflow: 'hidden', userSelect: 'none',
 };
-const label: CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)' };
+const label: CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)' };
 const btn: CSSProperties = {
   ...NO_DRAG, flex: 1, height: 34, borderRadius: 5, fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em',
   textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap',

@@ -392,7 +392,7 @@ export function ClockNode({
             alignItems: 'center',
             justifyContent: 'space-between',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
           }}
@@ -413,7 +413,7 @@ export function ClockNode({
               background: weekView ? 'var(--acid)' : 'transparent',
               color: weekView ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
               border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
-              fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 5,
             }}
           >
@@ -431,7 +431,7 @@ export function ClockNode({
               background: dialOnly ? 'var(--acid)' : 'transparent',
               color: dialOnly ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
               border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
-              fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
             }}
           >
             {dialOnly ? <><SettingsIcon name="menu" size={11} /> SCHEDULE</> : <><SettingsIcon name="expand" size={11} /> BIG CLOCK</>}
@@ -463,7 +463,7 @@ export function ClockNode({
             gap: 4,
             padding: '2px 0',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: '0.04em',
             userSelect: 'none',
           }}
@@ -540,7 +540,7 @@ export function ClockNode({
             gap: 6,
             padding: '4px 0 2px',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             userSelect: 'none',
@@ -1128,7 +1128,7 @@ export function ClockNode({
             border: '1px solid var(--paper-3)',
             borderRadius: 5,
             fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
+            fontSize: 11,
             position: 'relative',
             overflow: 'hidden',
             boxSizing: 'border-box',
@@ -1166,7 +1166,7 @@ export function ClockNode({
                   fontWeight: 600,
                   letterSpacing: '0.04em',
                   textTransform: 'uppercase',
-                  fontSize: 10.5,
+                  fontSize: 11,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -1179,7 +1179,7 @@ export function ClockNode({
                 style={{
                   marginLeft: 'auto',
                   color: 'var(--ink-3)',
-                  fontSize: 9.5,
+                  fontSize: 11,
                   letterSpacing: '0.04em',
                   flexShrink: 0,
                 }}
@@ -1204,7 +1204,7 @@ export function ClockNode({
                   color: 'var(--ink-3)',
                   textTransform: 'none',
                   fontWeight: 400,
-                  fontSize: 10.5,
+                  fontSize: 11,
                 }}
               >
                 {isToday
@@ -1272,7 +1272,7 @@ export function ClockNode({
                 <span
                   style={{
                     color: on ? 'color-mix(in srgb, var(--rust) 75%, var(--ink))' : 'var(--ink-3)',
-                    fontSize: 10,
+                    fontSize: 11,
                     letterSpacing: '0.02em',
                     whiteSpace: 'nowrap',
                   }}
@@ -1299,7 +1299,7 @@ export function ClockNode({
                 <span
                   style={{
                     color: 'var(--ink-3)',
-                    fontSize: 10,
+                    fontSize: 11,
                     letterSpacing: '0.02em',
                   }}
                 >
@@ -1354,7 +1354,7 @@ export function ClockNode({
                 else setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, startMs, endMs } });
               }}
             />
-            <div style={{ color: 'var(--ink-3)', fontSize: 10, letterSpacing: '0.04em' }}>
+            <div style={{ color: 'var(--ink-3)', fontSize: 11, letterSpacing: '0.04em' }}>
               {realityPopup.seg.live ? 'So far · ' : 'Duration · '}
               {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
             </div>
@@ -1373,7 +1373,7 @@ export function ClockNode({
                 type="button"
                 data-testid="clock-reality-delete"
                 onClick={() => { deleteClockSegment(realityPopup.seg.id); setRealityPopup(null); }}
-                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, color: 'var(--rust)', background: 'transparent', border: '1px solid var(--rust)', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--rust)', background: 'transparent', border: '1px solid var(--rust)', borderRadius: 4, padding: '5px 8px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
               >
                 Delete segment
               </button>

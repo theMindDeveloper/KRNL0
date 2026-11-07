@@ -553,7 +553,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               onBlur={commitEtaEdit}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              style={{ width: 54, background: 'var(--paper-2)', border: '1px solid var(--ink-3)', borderRadius: 4, outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink)', textAlign: 'right', padding: '1px 4px' }}
+              style={{ width: 54, background: 'var(--paper-2)', border: '1px solid var(--ink-3)', borderRadius: 4, outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)', textAlign: 'right', padding: '1px 4px' }}
             />
           ) : (
             <span

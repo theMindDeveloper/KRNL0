@@ -49,7 +49,7 @@ export function addDaysYMD(ymd: string, n: number): string {
 }
 
 const chip = (on = false): React.CSSProperties => ({
-  fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 9px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap',
+  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '4px 9px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap',
   border: `1px solid ${on ? 'var(--ink)' : 'var(--paper-3)'}`, background: on ? 'var(--ink)' : 'transparent', color: on ? 'var(--paper)' : 'var(--ink-2)',
 });
 
@@ -192,7 +192,7 @@ export function LogTimeGaps({ dayYMD, onChange }: { dayYMD: string; onChange: (s
   if (gaps.length === 0) return null;
   return (
     <div data-testid="log-time-quick" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>Fill a gap:</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>Fill a gap:</span>
       {gaps.map((g) => (
         <button key={g.startMin} type="button" data-testid="log-time-gap" style={chip()} onClick={() => onChange(toHM(g.startMin), toHM(g.endMin))}>
           {toHM(g.startMin)}–{toHM(g.endMin)}

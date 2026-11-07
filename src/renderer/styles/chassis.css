@@ -199,7 +199,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 .md-synth-top .brand .n { color: var(--acid); text-shadow: 0 0 6px rgba(201,241,88,0.6); }
 .md-synth-top .model {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   color: rgba(212,207,192, 0.79);
   text-transform: uppercase;
@@ -207,7 +207,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 .md-synth-top .pwr {
   display: flex; align-items: center; gap: 6px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   color: var(--acid);
   text-transform: uppercase;
@@ -233,7 +233,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 .md-synth-top .grow { flex: 1; }
 .md-synth-top .hp {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   color: rgba(212,207,192, 0.69);
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -822,7 +822,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   text-overflow: ellipsis;
 }
 .md-tel-bay .name {
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--acid);
   text-shadow: 0 0 4px rgba(201,241,88,0.4);
@@ -915,7 +915,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.25;
   letter-spacing: 0.04em;
   color: rgba(212,207,192, 0.74);
@@ -1145,7 +1145,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
   color: var(--ink-3);
@@ -1403,7 +1403,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   color: #1a1c18;
   text-shadow: 0 1px 0 rgba(122,126,114,0.5), 0 -1px 0 rgba(0,0,0,0.38);
   user-select: none;
-  font-size: 9px;
+  font-size: 11px;
   left: 50%;
   transform: translateX(-50%);
 }
@@ -1566,7 +1566,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-variant-numeric: tabular-nums;
 }
 .dk-cell-unit {
-  font-size: 10px; color: var(--dk-phos-dim);
+  font-size: 11px; color: var(--dk-phos-dim);
   margin-left: 2px; letter-spacing: 0.1em; text-shadow: none;
 }
 .dk-cell-meter {
@@ -2134,7 +2134,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .dk-traffic span:nth-child(2) { background: #d9a23a; }
 .dk-traffic span:nth-child(3) { background: #5a9a3a; }
 .dk-term-title {
-  font-size: 9px; letter-spacing: 0.16em; color: #a6aa9c;
+  font-size: 11px; letter-spacing: 0.16em; color: #a6aa9c;
   margin-left: 4px;
 }
 .dk-term-title .dk-dot { color: #3a3d36; margin: 0 4px; }
@@ -2152,7 +2152,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .dk-term-body {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.35;
   color: var(--dk-phos);
   padding: 5px 10px;
@@ -2495,13 +2495,13 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   color: var(--bp-line);
   white-space: nowrap;
 }
 .md-bp-dim-arrow {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--bp-line);
   line-height: 1;
 }
@@ -2723,7 +2723,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: var(--bp-accent);
   font-weight: 600;
@@ -2734,7 +2734,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   width: 16px; height: 16px;
   display: grid; place-items: center;
   border-radius: 50%;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -3610,7 +3610,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   opacity: 0.78;
 }
 .md-sub-plate-row .v {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
@@ -3639,7 +3639,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 .dock-chassis .md-sub-credit { pointer-events: auto; }
 .md-sub-credit {
-  font-size: 9px;
+  font-size: 11px;
   color: #1a1408;
   text-decoration: none;
   font-weight: 600;
@@ -3861,7 +3861,7 @@ body { counter-reset: krnl-mother; }
 [data-dock="submarine"] .krnl-node-header::before {
   content: counter(krnl-mother, decimal-leading-zero);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #1a1408;

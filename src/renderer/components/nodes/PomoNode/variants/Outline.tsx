@@ -45,8 +45,8 @@ export function Outline({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
         </div>
         {/* Dimension line: ◄ 0 ───── 25 MIN ► */}
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 8, height: 1, background: 'var(--ink-3)' }} />
-        <span style={{ position: 'absolute', left: 0, bottom: -4, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)' }}>◄ 0</span>
-        <span style={{ position: 'absolute', right: 0, bottom: -4, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)' }}>{TOTAL} MIN ►</span>
+        <span style={{ position: 'absolute', left: 0, bottom: -4, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>◄ 0</span>
+        <span style={{ position: 'absolute', right: 0, bottom: -4, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{TOTAL} MIN ►</span>
       </div>
       <Readout m={m} s={s} minute={minsElapsed + 1} total={TOTAL} />
     </div>

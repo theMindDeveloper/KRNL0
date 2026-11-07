@@ -115,7 +115,7 @@ export function Lcd({ m, s, running, total = 25 }: TimerFaceProps) {
           justifyContent: 'space-between',
           alignItems: 'center',
           fontFamily: 'var(--font-mono)',
-          fontSize: 9.5,
+          fontSize: 11,
           color: 'var(--ink-3)',
           letterSpacing: '0.1em',
           textTransform: 'uppercase',

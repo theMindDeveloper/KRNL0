@@ -227,7 +227,7 @@ export function ImageNode({
               position: 'absolute', left: 8, right: 8, bottom: 8,
               padding: '5px 8px', borderRadius: 6,
               background: 'var(--paper-2)', border: '1px solid var(--rust)',
-              color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 10.5,
+              color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 11,
               pointerEvents: 'none',
             }}
           >

@@ -190,7 +190,7 @@ export function TopBar() {
           className="krnl-breadcrumb"
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             letterSpacing: '0.03em',
             userSelect: 'none',
@@ -208,7 +208,7 @@ export function TopBar() {
           className="krnl-live-badge"
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
+            fontSize: 11,
             color: 'var(--acid-ink, var(--acid))',
             letterSpacing: '0.04em',
             userSelect: 'none',
@@ -274,7 +274,7 @@ function TopBarButton({ label, title, onClick, testId }: TopBarButtonProps) {
         alignItems: 'center',
         gap: 6,
         fontFamily: 'var(--font-mono)',
-        fontSize: 10.5,
+        fontSize: 11,
         color: 'var(--ink-3)',
         letterSpacing: '0.04em',
         textTransform: 'uppercase' as const,

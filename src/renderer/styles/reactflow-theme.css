@@ -297,3 +297,11 @@
 @container (max-width: 600px) { .cal-weekof { display: none; } }
 @container (max-width: 470px) { .cal-layer-label { display: none; } }
 @container (max-width: 400px) { .cal-zoom { display: none; } }
+
+/* Todo rows in a narrow window: the title keeps its room; PLAN becomes its
+   icon and the tag chip narrows before the title is cut to one letter. */
+.todo-item { container-type: inline-size; }
+@container (max-width: 420px) {
+  .todo-plan__label { display: none; }
+  .todo-tag { max-width: 72px !important; }
+}

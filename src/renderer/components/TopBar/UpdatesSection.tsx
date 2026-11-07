@@ -26,7 +26,7 @@ export function UpdatesSection() {
         <span style={{ fontWeight: 700 }}>KRNL0 v{state?.currentVersion ?? APP_VERSION}</span>
         <span
           data-testid="settings-updates-state"
-          style={{ fontSize: 10, color: state?.status === 'error' ? 'var(--rust)' : 'var(--ink-3)', lineHeight: 1.4 }}
+          style={{ fontSize: 11, color: state?.status === 'error' ? 'var(--rust)' : 'var(--ink-3)', lineHeight: 1.4 }}
         >
           {line}
         </span>
@@ -64,6 +64,6 @@ export function UpdatesSection() {
 
 const button: React.CSSProperties = {
   flex: 1, padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
-  fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase',
+  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
   border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)',
 };

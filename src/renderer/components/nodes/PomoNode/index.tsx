@@ -383,7 +383,7 @@ export function PomoNode({
           alignItems: 'center',
           gap: 8,
           fontFamily: 'var(--font-mono)',
-          fontSize: 10.5,
+          fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
@@ -399,11 +399,14 @@ export function PomoNode({
           style={{
             color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-2)',
             fontWeight: 500,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
           }}
         >
           {headerLeft}
         </span>
-        <span style={{ color: 'var(--ink-3)' }}>{headerRight}</span>
+        {/* The session code gives way first: one line, never wrapped. */}
+        <span style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{headerRight}</span>
         {/* A.1 — spacer pushes gear to the right */}
         <span style={{ flex: 1 }} />
         {/* Span log — every recorded span, to find and delete misclicks. */}
@@ -449,7 +452,7 @@ export function PomoNode({
                   color: active ? 'var(--paper)' : 'var(--ink-3)',
                   border: 'none',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
+                  fontSize: 11,
                   letterSpacing: '0.06em',
                   cursor: gearDisabled ? 'not-allowed' : 'pointer',
                   opacity: gearDisabled && !active ? 0.4 : 1,
@@ -495,7 +498,7 @@ export function PomoNode({
         >
           <div style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
@@ -569,7 +572,7 @@ export function PomoNode({
                     border: `1px solid ${isActive ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
                     borderRadius: 4,
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 9,
+                    fontSize: 11,
                     cursor: 'pointer',
                     letterSpacing: '0.02em',
                     textTransform: 'uppercase',
@@ -647,7 +650,7 @@ export function PomoNode({
               data-testid="pomo-dev-demo"
               onClick={() => { onCommand('pomo.devSeedSegment', { kind: 'work', minutes: 30, agoMin: 0, label: '' }); setLogOpen(false); }}
               onMouseDown={(e) => e.stopPropagation()}
-              style={{ marginTop: 8, width: '100%', padding: '5px', background: 'transparent', border: '1px dashed var(--ink-4)', borderRadius: 4, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 9, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+              style={{ marginTop: 8, width: '100%', padding: '5px', background: 'transparent', border: '1px dashed var(--ink-4)', borderRadius: 4, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}
             >
               dev · + 30 min demo span
             </button>
@@ -726,7 +729,7 @@ export function PomoNode({
                 data-testid="pomo-pips-overflow"
                 style={{
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 9.5,
+                  fontSize: 11,
                   color: 'var(--ink-3)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.1em',
@@ -739,7 +742,7 @@ export function PomoNode({
             <span style={{
               marginLeft: 'auto',
               fontFamily: 'var(--font-mono)',
-              fontSize: 9.5,
+              fontSize: 11,
               color: 'var(--ink-3)',
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
@@ -790,7 +793,7 @@ export function PomoNode({
               border: `1px solid ${isTaskMode ? 'var(--acid)' : 'var(--paper-3)'}`,
               borderRadius: 5,
               fontFamily: 'var(--font-mono)',
-              fontSize: 10,
+              fontSize: 11,
               letterSpacing: '0.06em',
               color: 'var(--ink-3)',
             }}
@@ -810,7 +813,7 @@ export function PomoNode({
                 // The running session can only be on an open task (a done one is reopened first).
                 ...tagOptions.filter((o) => !o.done).map((o) => ({ value: o.id, label: truncate(o.text, 28) })),
               ]}
-              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 10.5, padding: '2px 0' }}
+              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 11, padding: '2px 0' }}
             />
           </label>
           )}
@@ -1061,7 +1064,7 @@ function CycleCounter({
         <span
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             color: 'var(--ink-3)',
           }}
         >
@@ -1147,7 +1150,7 @@ function CycleCounter({
       <span
         style={{
           fontFamily: 'var(--font-mono)',
-          fontSize: 10,
+          fontSize: 11,
           color: 'var(--ink-3)',
           letterSpacing: '0.02em',
           flexShrink: 0,

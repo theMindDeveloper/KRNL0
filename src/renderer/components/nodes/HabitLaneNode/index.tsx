@@ -176,7 +176,7 @@ export function HabitLaneNode({
           alignItems: 'center',
           gap: 6,
           fontFamily: 'var(--font-mono)',
-          fontSize: 10,
+          fontSize: 11,
           color: 'var(--ink-3)',
           textTransform: 'uppercase',
           letterSpacing: '0.06em',
@@ -302,7 +302,7 @@ export function HabitLaneNode({
           alignItems: 'center',
           justifyContent: 'space-between',
           fontFamily: 'var(--font-mono)',
-          fontSize: 9,
+          fontSize: 11,
           letterSpacing: '0.04em',
         }}
       >
@@ -328,7 +328,7 @@ export function HabitLaneNode({
           bottom: -22,
           textAlign: 'center',
           fontFamily: 'var(--font-mono)',
-          fontSize: 9,
+          fontSize: 11,
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
           color: 'var(--acid-ink, var(--acid))',

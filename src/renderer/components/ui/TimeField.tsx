@@ -114,7 +114,7 @@ function Column({ label, items, selected, onPick }: { label: string; items: numb
   }, []);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 54 }}>
-      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-4)', padding: '4px 6px 4px', textAlign: 'center' }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', padding: '4px 6px 4px', textAlign: 'center' }}>{label}</span>
       <div ref={list} style={{ maxHeight: 216, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1, position: 'relative', scrollbarWidth: 'thin' }}>
         {items.map((n) => {
           const on = n === selected;

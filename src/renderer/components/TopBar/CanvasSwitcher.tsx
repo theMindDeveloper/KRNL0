@@ -67,7 +67,7 @@ export function CanvasSwitcher() {
         onClick={() => (open ? close() : setOpen(true))}
         style={{
           background: 'transparent', border: '1px solid var(--paper-3)', borderRadius: 'var(--radius)',
-          padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10.5,
+          padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11,
           color: 'var(--ink-2, var(--ink))', letterSpacing: '0.03em', whiteSpace: 'nowrap',
           maxWidth: 180, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
         }}
@@ -94,7 +94,7 @@ export function CanvasSwitcher() {
             if (confirmDel === c.id) {
               return (
                 <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 6px' }}>
-                  <span style={{ flex: 1, color: 'var(--ink-3)', fontSize: 10.5 }}>Delete “{c.name}” and its content?</span>
+                  <span style={{ flex: 1, color: 'var(--ink-3)', fontSize: 11 }}>Delete “{c.name}” and its content?</span>
                   <button
                     type="button" data-testid={`canvas-delete-confirm-${c.id}`}
                     style={{ ...rowBtn, color: 'var(--rust)', fontWeight: 700 }}

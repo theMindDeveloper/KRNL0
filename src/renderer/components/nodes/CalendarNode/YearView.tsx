@@ -42,7 +42,7 @@ export function YearView({ state, onCommand }: Props) {
         <span data-testid="calendar-year-label" style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', letterSpacing: '0.06em' }}>{year}</span>
         <button type="button" aria-label="Next year" onClick={() => stepYear(1)} style={navBtn}>›</button>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 9, color: 'var(--ink-4)', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 11, color: 'var(--ink-4)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: 'color-mix(in srgb, var(--acid) 70%, transparent)' }} /> focus
           <span aria-hidden style={{ width: 4, height: 4, borderRadius: 999, background: 'var(--cyan)', marginLeft: 6 }} /> planned
         </span>
@@ -65,7 +65,7 @@ export function YearView({ state, onCommand }: Props) {
           for (let d = 1; d <= days; d++) cells.push(`${year}-${pad(m + 1)}-${pad(d)}`);
           return (
             <div key={name} data-testid={`calendar-year-month-${m + 1}`} style={{ minHeight: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700, color: today.startsWith(`${year}-${pad(m + 1)}`) ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{name}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: today.startsWith(`${year}-${pad(m + 1)}`) ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{name}</span>
               <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: '1fr', gap: 2 }}>
                 {DOW.map((d, i) => (
                   <span key={`h${i}`} aria-hidden style={{ fontFamily: 'var(--font-mono)', fontSize: 7.5, color: 'var(--ink-4)', textAlign: 'center' }}>{d}</span>

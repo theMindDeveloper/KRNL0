@@ -43,7 +43,7 @@ export function UndoNoticeBar() {
           flexShrink: 0, height: 24, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
           border: '1px solid var(--btn-primary-ring)',
           background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)',
-          fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.08em',
+          fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
         }}
       >
         UNDO

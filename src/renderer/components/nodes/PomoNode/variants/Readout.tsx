@@ -21,7 +21,7 @@ export function Readout({ m, s, minute, total }: { m: string; s: string; minute:
       <span
         style={{
           marginLeft: 'auto',
-          fontSize: 9.5,
+          fontSize: 11,
           color: 'var(--ink-3)',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',

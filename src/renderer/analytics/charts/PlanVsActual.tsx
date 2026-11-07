@@ -24,7 +24,7 @@ export function fmtMinutes(min: number): string {
 
 export function Legend({ items }: { items: Array<{ label: string; color: string; hollow?: boolean; hatch?: boolean }> }) {
   return (
-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 9.5, color: COLOR_LABEL }}>
+    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_LABEL }}>
       {items.map((it) => (
         <span key={it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <span
@@ -72,7 +72,7 @@ export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tas
   const x = (v: number) => (v / max) * plotW;
   const height = rows.length * rowH + 4 + MORE_H;
   if (rows.length === 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: COLOR_AXIS, padding: 8 }}>No tracked or finished tasks in this range yet. Tag a pomo session with a task to start comparing.</div>;
+    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_AXIS, padding: 8 }}>No tracked or finished tasks in this range yet. Tag a pomo session with a task to start comparing.</div>;
   }
   return (
     <svg data-testid="analytics-estimate-bars" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
@@ -163,7 +163,7 @@ export function FocusMix({ mix, width }: { mix: { taggedWorkMin: number; untagge
     { key: 'break', label: 'Break', min: mix.breakMin, color: COLOR_BREAK, hatch: true },
   ];
   if (total <= 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: COLOR_AXIS, padding: 8 }}>No pomo time recorded in this range.</div>;
+    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_AXIS, padding: 8 }}>No pomo time recorded in this range.</div>;
   }
   let cursor = 0;
   const barH = 16;
@@ -188,7 +188,7 @@ export function FocusMix({ mix, width }: { mix: { taggedWorkMin: number; untagge
           );
         })}
       </svg>
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 9.5, color: COLOR_LABEL }}>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_LABEL }}>
         {segs.map((s) => (
           <span key={s.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, background: s.hatch ? `repeating-linear-gradient(135deg, ${s.color} 0 2px, transparent 2px 4px)` : s.color, border: s.hatch ? `1px solid ${s.color}` : 'none' }} />

@@ -181,7 +181,7 @@ export function TaskPopup(p: Props) {
 }
 
 const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 };
-const fieldLabel: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--ink-4)' };
+const fieldLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--ink-4)' };
 const input: React.CSSProperties = {
   fontFamily: 'var(--font-mono)', fontSize: 14, padding: '7px 9px', borderRadius: 8, height: 34,
   border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)', boxSizing: 'border-box',

@@ -537,9 +537,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           onClick={(e) => e.stopPropagation()}
           style={{
             flex: 1,
-            // Let a long title shrink (ellipsis) so the PLAN / tag buttons
-            // after it stay inside the window.
-            minWidth: 0,
+            // A long title shrinks (ellipsis) so the buttons after it stay in
+            // the window — but never below a readable start (see todo-item CSS).
+            minWidth: 72,
             fontFamily: 'var(--font-sans)',
             fontSize: 12.5,
             color: item.done ? 'var(--ink-4)' : 'var(--ink)',
@@ -589,7 +589,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               borderRadius: 3,
               outline: 'none',
               fontFamily: 'var(--font-mono)',
-              fontSize: 9.5,
+              fontSize: 11,
               color: 'var(--ink-3)',
               textAlign: 'right',
               padding: '1px 4px',
@@ -613,7 +613,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 cursor: item.done ? 'default' : 'pointer',
                 flexShrink: 0,
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10.5,
+                fontSize: 11,
                 color: 'var(--ink-3)',
                 letterSpacing: '0.02em',
                 whiteSpace: 'nowrap',
@@ -659,7 +659,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--font-mono)',
-              fontSize: 10.5,
+              fontSize: 11,
               // Same chip as the task card: the tag's colour, tinted; text mixed toward ink.
               color: disp ? `color-mix(in srgb, ${disp.color} 45%, var(--ink))` : 'var(--ink-3)',
               background: disp ? `color-mix(in srgb, ${disp.color} 16%, transparent)` : 'transparent',
@@ -700,11 +700,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           style={{
             flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, height: 19, padding: '0 7px',
             borderRadius: 999, border: '1px solid var(--paper-3)', background: 'transparent', cursor: 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.04em', color: 'var(--ink-3)',
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--ink-3)',
           }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
-          PLAN
+          <span className="todo-plan__label">PLAN</span>
         </button>
       )}
 
@@ -720,7 +720,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           background: 'transparent',
           border: 'none',
           fontFamily: 'var(--font-mono)',
-          fontSize: 10,
+          fontSize: 11,
           color: 'var(--ink-4)',
           cursor: 'pointer',
           padding: '0 2px',
@@ -752,7 +752,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             padding: '7px 10px 6px',
             borderBottom: '1px solid var(--paper-3)',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
@@ -773,7 +773,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                   color: 'var(--rust)',
                   marginLeft: 8,
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 10.5,
+                  fontSize: 11,
                   letterSpacing: '0.02em',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -838,7 +838,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             data-testid="todo-estimate-chips"
             style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: '8px 14px 0', borderTop: '1px dashed var(--paper-3)' }}
           >
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)', marginRight: 2 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)', marginRight: 2 }}>
               how long? (your guess)
             </span>
             {([15, 30, 60, 120] as const).map((m) => (
@@ -931,7 +931,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             data-testid="enter-hint"
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 10,
+              fontSize: 11,
               color: 'var(--ink-4)',
               background: 'var(--paper-2)',
               border: '1px solid var(--paper-3)',
@@ -1016,7 +1016,7 @@ function SectionToggle({
           padding: 0,
           cursor: 'pointer',
           fontFamily: 'var(--font-mono)',
-          fontSize: 9.5,
+          fontSize: 11,
           color: 'var(--ink-3)',
           textTransform: 'uppercase',
           letterSpacing: '0.06em',
@@ -1037,7 +1037,7 @@ function SectionToggle({
             background: 'transparent',
             border: 'none',
             fontFamily: 'var(--font-mono)',
-            fontSize: 9,
+            fontSize: 11,
             color: 'var(--ink-4)',
             cursor: 'pointer',
             letterSpacing: '0.04em',

@@ -51,12 +51,12 @@ export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byD
               data-testid={`analytics-summary-stat-${s.key}`}
               style={{ background: 'var(--k-an-tile, rgba(255,255,255,0.03))', border: '1px solid var(--k-an-line, #23262a)', borderRadius: 8, padding: '8px 10px', minWidth: 0 }}
             >
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #9aa1a8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #9aa1a8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {s.label}
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--k-an-ink, #f4f6f8)', fontVariantNumeric: 'tabular-nums' }}>{s.value}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: tone, whiteSpace: 'nowrap' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tone, whiteSpace: 'nowrap' }}>
                   {d === null ? '—' : <><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.05em', marginRight: 3 }}><path d={d >= 0 ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6'} /></svg>{Math.abs(d)}%</>}
                 </span>
               </div>

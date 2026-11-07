@@ -239,7 +239,7 @@ export function DonutChart({
             gap: '4px 10px',
             justifyContent: 'center',
             fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
+            fontSize: 11,
             color: 'var(--k-an-ink-2, #c8cdd3)',
           }}
         >

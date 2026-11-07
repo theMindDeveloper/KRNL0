@@ -323,7 +323,7 @@ export function HabitContextMenu({
               borderRadius: 3,
               color: 'var(--ink-3)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 10,
+              fontSize: 11,
               cursor: 'pointer',
             }}
           >
@@ -391,7 +391,7 @@ export function HabitContextMenu({
                 borderRadius: 3,
                 color: 'var(--ink-3)',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontSize: 11,
                 cursor: 'pointer',
               }}
             >
@@ -410,7 +410,7 @@ export function HabitContextMenu({
                 borderRadius: 3,
                 color: 'var(--acid-ink, var(--acid))',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontSize: 11,
                 cursor: 'pointer',
               }}
             >

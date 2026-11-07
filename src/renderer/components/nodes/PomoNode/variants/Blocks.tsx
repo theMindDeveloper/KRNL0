@@ -128,7 +128,7 @@ export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
           className="label"
           style={{
             marginLeft: 'auto',
-            fontSize: 9.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',

@@ -214,7 +214,7 @@ function AudioPlayer({ url, tone }: { url: string; tone: string }) {
           onChange={(e) => { const a = ref.current; if (a) a.currentTime = Number(e.target.value); }}
           style={{ width: '100%', accentColor: tone, height: 4 }}
         />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: error ? 'var(--rust)' : 'var(--ink-3)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: error ? 'var(--rust)' : 'var(--ink-3)' }}>
           {error ? "Can't play this audio format here" : `${fmt(t)} / ${fmt(dur)}`}
         </span>
       </div>
@@ -236,7 +236,7 @@ function WebPreview({ url }: { url: string }) {
         referrerPolicy="no-referrer"
         style={{ flex: 1, border: 'none', background: '#fff' }}
       />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
         <img alt="" width={12} height={12} src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} style={{ borderRadius: 3 }} />
         <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{url}</span>
         <span style={{ opacity: 0.7 }}>blank? use ↗</span>
@@ -257,7 +257,7 @@ function FileCard({ name, size, tone }: { name: string; size: number | undefined
       </div>
       <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>{fmtBytes(size) || 'file'} · download from ↓</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{fmtBytes(size) || 'file'} · download from ↓</span>
       </div>
     </div>
   );

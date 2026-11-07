@@ -175,10 +175,10 @@ These override visual rules that depend on color cues, replacing them with geome
 
 | Element | Size | Weight | Font | Case |
 |---|---|---|---|---|
-| Node header | 10.5px | 500 | mono | UPPER |
+| Node header | 11px | 500 | mono | UPPER |
 | Topbar brand | 12.5px | 600 | mono | UPPER |
 | Buttons | 11px | 400 | mono | lower |
-| Status bar | 10.5px | 400 | mono | — |
+| Status bar | 11px | 400 | mono | — |
 | Body text (todos, habits) | 13–14px | 400 | sans | — |
 | Pomodoro clock (default) | 64px | 300 | mono | — |
 | Terminal body | 11.5px | 400 | mono | — |
@@ -188,6 +188,8 @@ These override visual rules that depend on color cues, replacing them with geome
 - Node headers are **always monospace, always uppercase, always `--ink-3`**. No exceptions.
 - No system fonts — all three families are loaded from Google Fonts (or bundled subset).
 - `JetBrains Mono` carries `font-variant-numeric: tabular-nums` on timers.
+- **Readable floor (2026-11-07):** functional text — labels, meta rows, chips, buttons, times — is **at least 11px**. The only exceptions are ruler ticks that must fit a fixed gutter (the Calendar's half-hour marks, 10px) and chart axis text drawn inside SVG. When a bigger label doesn't fit, the layout gives way (ellipsis, an icon-only button, a toolbar that wraps under its title) — never the text size.
+- Text contrast is at least 4.5:1 against what is actually behind it, in both themes (3:1 for 14px bold / 18px+). Disabled controls are the only dim text.
 
 ---
 

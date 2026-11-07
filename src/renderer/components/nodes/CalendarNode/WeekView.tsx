@@ -1409,7 +1409,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             </span>
           )}
           {detail === 'full' && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
               {isMissed && !isContinuation && <span style={{ color: 'var(--ink-2)', fontWeight: 600 }}>Missed · </span>}
               {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : `${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)}`}
               {startNote && <span data-testid={`task-start-delta-${task.id}`}>{startNote}</span>}
@@ -1557,9 +1557,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           }
         }}
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: 'var(--rust)' }}>{fmtMinOfDay(nowMin)}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--rust)' }}>{fmtMinOfDay(nowMin)}</span>
         <span style={{ flex: 1, height: 2, background: 'var(--rust)', borderRadius: 1 }} />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--rust)', letterSpacing: '0.08em' }}>NOW</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--rust)', letterSpacing: '0.08em' }}>NOW</span>
       </div>
     );
     for (const it of items) {
@@ -1589,14 +1589,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         >
           <div style={{ fontFamily: 'var(--font-mono)', textAlign: 'right', lineHeight: 1.3 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--acid)' : 'var(--ink)' }}>{fmtMinOfDay(it.startMin)}</div>
-            <div style={{ fontSize: 9.5, color: 'var(--ink-4)' }}>{fmtMinOfDay(it.endLabelMin)}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{fmtMinOfDay(it.endLabelMin)}</div>
           </div>
           <div style={{ position: 'relative', paddingLeft: 14, minWidth: 0 }}>
             <span aria-hidden style={{ position: 'absolute', left: 2, top: 5, width: 7, height: 7, borderRadius: 999, background: it.tone }} />
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.25, wordBreak: 'break-word' }}>
               {it.done && <span style={{ color: 'var(--acid-ink, var(--acid))', marginRight: 4, display: 'inline-block', verticalAlign: '-1px' }}><CalIcon name="check" size={10} /></span>}{it.title}
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 3, fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 3, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
               <span>{it.habit ? `habit · ${fmtDur(it.plannedMin)}` : `${fmtDur(it.plannedMin)} planned`}</span>
               {it.trackedMin > 0 && <span>· {fmtDur(it.trackedMin)} tracked</span>}
               {over > 0 && <span style={{ color: 'var(--rust)', fontWeight: 700 }}>+{fmtDur(over)} over</span>}
@@ -1617,7 +1617,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       <div data-testid="calendar-agenda" style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '8px 10px 4px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
         {/* Day strip: plan line + reality line across the day */}
         <div style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)', marginBottom: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>
             <span>{fmtDur(plannedDayMin)} planned</span>
             <span style={{ color: 'var(--ink-2)' }}>{fmtDur(trackedDayMin)} tracked</span>
           </div>
@@ -1640,7 +1640,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               />
             ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 8.5, color: 'var(--ink-4)', marginTop: 3 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-4)', marginTop: 3 }}>
             <span>{fmtMinOfDay(stripStart)}</span>
             <span>{fmtMinOfDay(stripStart + stripLen / 2)}</span>
             <span>24:00</span>
@@ -1649,7 +1649,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
         <div onDragOver={allowDrop} onDrop={dropAfter(null)} style={{ minHeight: 40, flex: '1 1 0', display: 'flex', flexDirection: 'column' }}>
           {items.length === 0 && (
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)', padding: '16px 4px' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', padding: '16px 4px' }}>
               Nothing planned. Drag a task here to plan it next.
             </div>
           )}
@@ -1663,7 +1663,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           type="button"
           data-testid="calendar-show-grid"
           onClick={() => setLayoutPref('grid')}
-          style={{ marginTop: 10, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer' }}
+          style={{ marginTop: 10, fontFamily: 'var(--font-mono)', fontSize: 11, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer' }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><CalIcon name="grid" size={11} />Time grid</span>
         </button>
@@ -1816,7 +1816,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             cursor: isFuture ? 'default' : 'pointer',
             font: 'inherit',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 600,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -1915,7 +1915,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 onClick={() => toggleLayer(k)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px', borderRadius: 999, cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.02em', flexShrink: 0,
+                  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.02em', flexShrink: 0,
                   border: `1px solid ${layers[k] ? 'color-mix(in srgb, var(--acid) 45%, var(--paper-3))' : 'var(--paper-3)'}`,
                   background: layers[k] ? 'color-mix(in srgb, var(--acid) 10%, var(--paper-2))' : 'transparent',
                   color: layers[k] ? 'var(--ink)' : 'var(--ink-4)',
@@ -1937,7 +1937,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             title="Jump to this week"
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 10,
+              fontSize: 11,
               letterSpacing: '0.02em',
               color: 'var(--ink-2)',
               background: 'var(--paper-2)',
@@ -1972,7 +1972,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               data-testid="week-zoom-level"
               style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontSize: 11,
                 color: 'var(--ink-3)',
                 minWidth: 28,
                 textAlign: 'center',
@@ -2028,7 +2028,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 textAlign: 'center',
                 padding: '4px 0 3px',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontSize: 11,
                 color: isToday ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
@@ -2047,7 +2047,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           type="button"
           data-testid="calendar-show-list"
           onClick={() => setLayoutPref('list')}
-          style={{ position: 'absolute', right: 8, bottom: 40, zIndex: 5, fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer' }}
+          style={{ position: 'absolute', right: 8, bottom: 40, zIndex: 5, fontFamily: 'var(--font-mono)', fontSize: 11, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--paper-3)', background: 'var(--paper)', color: 'var(--ink-2)', cursor: 'pointer' }}
         >
           ≡ list
         </button>
@@ -2104,7 +2104,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                     top: 1,
                     right: 4,
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
+                    fontSize: 11,
                     color: 'var(--ink-3)',
                     lineHeight: 1,
                   }}
@@ -2121,7 +2121,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                       top: (min / 60) * rowHeight - 4,
                       right: 4,
                       fontFamily: 'var(--font-mono)',
-                      fontSize: 8.5,
+                      fontSize: 10,
                       color: 'var(--ink-4)',
                       lineHeight: 1,
                     }}
@@ -2259,7 +2259,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                         top: 0,
                         left: 2,
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 8.5,
+                        fontSize: 10,
                         fontWeight: 700,
                         color: 'var(--ink-on-bright)',
                         background: 'var(--acid)',
@@ -2298,7 +2298,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             display: 'flex', alignItems: 'center', gap: 2,
             background: 'color-mix(in srgb, var(--paper) 88%, transparent)',
             border: '1px solid var(--paper-3)', borderRadius: 999, padding: '1px 4px',
-            fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-2)',
+            fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)',
             boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
           }}
         >
@@ -2326,7 +2326,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             transform: 'translateY(-50%)',
             textAlign: 'center',
             fontFamily: 'var(--font-mono)',
-            fontSize: 9,
+            fontSize: 11,
             color: 'var(--ink-4)',
             letterSpacing: '0.08em',
             opacity: 0.85,
@@ -2421,7 +2421,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                     cursor: 'pointer',
                     color: 'var(--ink)',
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 10.5,
+                    fontSize: 11,
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
@@ -2505,7 +2505,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 else setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, startMs, endMs } });
               }}
             />
-            <div style={{ color: 'var(--ink-3)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <div style={{ color: 'var(--ink-3)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               {realityPopup.seg.live ? 'So far · ' : 'Duration · '}
               {Math.max(1, Math.round((realityPopup.seg.endMs - realityPopup.seg.startMs) / 60_000))} min
             </div>
@@ -2531,7 +2531,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 style={{
                   width: '100%',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: 600,
                   color: 'var(--rust)',
                   background: 'transparent',

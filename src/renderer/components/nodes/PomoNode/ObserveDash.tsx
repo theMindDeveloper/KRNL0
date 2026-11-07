@@ -50,9 +50,9 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
           <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink-3)', marginLeft: 2 }}>
             :{String(s).padStart(2, '0')}
           </span>
-          <span style={{ ...mono, fontSize: 9, color: 'var(--ink-4)', marginLeft: 8 }}>{h > 0 ? 'h:m:s' : 'min:s'}</span>
+          <span style={{ ...mono, fontSize: 11, color: 'var(--ink-4)', marginLeft: 8 }}>{h > 0 ? 'h:m:s' : 'min:s'}</span>
         </div>
-        <span style={{ ...mono, fontSize: 9, color: statusColor, display: 'inline-flex', alignItems: 'center', gap: 5, paddingBottom: 4 }}>
+        <span style={{ ...mono, fontSize: 11, color: statusColor, display: 'inline-flex', alignItems: 'center', gap: 5, paddingBottom: 4 }}>
           <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: statusColor, boxShadow: state.status === 'running' ? '0 0 6px var(--acid)' : 'none' }} />
           {status}
         </span>

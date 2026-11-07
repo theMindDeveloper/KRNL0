@@ -9,12 +9,12 @@
 .ln-dialog { background: var(--paper); color: var(--ink); font-family: var(--font-mono); border-radius: 14px; overflow: hidden;
   box-shadow: inset 0 0 0 1px var(--paper-3), 0 32px 80px rgba(0,0,0,.5); max-width: 100%; max-height: calc(100vh - 48px);
   animation: lnRise 220ms cubic-bezier(.32,.72,0,1); }
-.ln-label { font-size: 10.5px; line-height: 16px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.ln-label { font-size: 11px; line-height: 16px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
 .ln-meta { font-size: 11.5px; line-height: 16px; color: var(--ink-3); }
 .ln-body { font-size: 13px; line-height: 20px; color: var(--ink-2); margin: 0; }
 .ln-display { font-family: var(--font-serif); font-weight: 400; letter-spacing: -.01em; line-height: .98; margin: 0; color: var(--ink); white-space: pre-line; }
 .ln-row { display: flex; align-items: center; gap: 12px; }
-.ln-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 10.5px;
+.ln-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 11px;
   letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; background: color-mix(in srgb, var(--acid) 16%, transparent); color: var(--acid-ink, var(--acid)); }
 [data-theme="dark"] .ln-chip { color: var(--acid); }
 .ln-dots { background-image: radial-gradient(color-mix(in srgb, var(--ink) 10%, transparent) 1px, transparent 1.5px); background-size: 24px 24px; }
@@ -59,7 +59,7 @@
 .ln-menu__item { appearance: none; border: 0; font: inherit; background: transparent; color: var(--ink); text-align: left; cursor: pointer;
   display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 10px; border-radius: 6px; font-size: 12px; }
 .ln-menu__item:hover, .ln-menu__item:focus-visible { background: var(--paper-2); outline: none; }
-.ln-menu__item > span:last-child { margin-left: auto; color: var(--ink-4); font-size: 10.5px; }
+.ln-menu__item > span:last-child { margin-left: auto; color: var(--ink-4); font-size: 11px; }
 .ln-menu__rule { height: 1px; background: var(--paper-3); margin: 4px 6px; }
 
 /* Forms */
@@ -187,11 +187,11 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 .dm-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-items: end; height: 132px; padding: 0 2px;
   box-shadow: inset 0 -1px 0 var(--paper-3); padding-bottom: 0; }
 .dm-week__col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%; position: relative; padding-bottom: 22px; }
-.dm-week__val { font-size: 10px; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dm-week__val { font-size: 11px; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .dm-week__bar { width: 100%; max-width: 40px; border-radius: 6px 6px 2px 2px; background: color-mix(in srgb, var(--ink) 22%, var(--paper-2)); }
 .dm-week__bar.is-best { background: var(--acid); }
 .dm-week__bar.is-empty { background: var(--paper-3); border-radius: 2px; }
-.dm-week__day { position: absolute; bottom: 0; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.dm-week__day { position: absolute; bottom: 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
 .dm-week__day.is-best { color: var(--acid-ink, var(--acid)); font-weight: 700; }
 .dm-foot { display: flex; align-items: center; gap: 12px; margin: 0 -28px; padding: 16px 28px 20px; box-shadow: inset 0 1px 0 var(--paper-3); }
 .dm-foot .ln-meta { flex: 1; min-width: 0; }
@@ -224,7 +224,7 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 .wb-days { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 .wb-day { display: flex; flex-direction: column; gap: 4px; padding: 10px 10px 9px; border-radius: 10px; background: var(--paper-2); }
 .wb-day.is-today { background: color-mix(in srgb, var(--acid) 12%, var(--paper-2)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 55%, transparent); }
-.wb-day__dow { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.wb-day__dow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
 .wb-day.is-today .wb-day__dow { color: var(--acid-ink, var(--acid)); }
 .wb-day__num { font-family: var(--font-serif); font-size: 26px; line-height: 1; color: var(--ink); }
 .wb-day__marks { display: flex; gap: 3px; min-height: 10px; align-items: center; }

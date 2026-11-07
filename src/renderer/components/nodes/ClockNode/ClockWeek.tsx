@@ -226,7 +226,7 @@ export function ClockWeek({ week, nowH: _nowH, onPick }: Props): JSX.Element {
   const grid = bestWeekGrid(size.width, size.height, week.length || 7);
   return (
     <div data-testid="clock-week" style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: '1 1 auto', minHeight: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', color: 'var(--ink-3)', textTransform: 'uppercase' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', color: 'var(--ink-3)', textTransform: 'uppercase' }}>
         <span>Last 7 days</span>
         <span data-testid="clock-week-total" style={{ color: 'var(--ink-2)' }}>{fmtMinutes(weekTotal)} focus</span>
       </div>
@@ -265,7 +265,7 @@ export function ClockWeek({ week, nowH: _nowH, onPick }: Props): JSX.Element {
             <MiniClock day={d} size={grid.ring} live={d.isToday} skin={skin} />
             <span
               title={d.top ? `${d.top.name} · ${fmtMinutes(d.top.min)}` : undefined}
-              style={{ fontSize: 10, color: d.top ? 'var(--ink-2)' : 'var(--ink-4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 5 }}
+              style={{ fontSize: 11, color: d.top ? 'var(--ink-2)' : 'var(--ink-4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 5 }}
             >
               {d.top && <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, background: d.top.tone, flexShrink: 0 }} />}
               {d.top ? d.top.name : 'nothing recorded'}

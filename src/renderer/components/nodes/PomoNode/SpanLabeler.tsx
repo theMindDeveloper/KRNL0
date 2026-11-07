@@ -27,7 +27,7 @@ export interface SpanLabelerProps {
 type Pick = { kind: 'tag'; id: string } | { kind: 'task'; id: string } | null;
 // The dropdown is the shared TaskTagPicker (search, tasks first, category chips).
 
-const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' };
+const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' };
 
 export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSave, onSkip, onAddCategory }: SpanLabelerProps) {
   const [text, setText] = useState(initialText);
@@ -95,7 +95,7 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: 120, padding: '0 8px', cursor: 'pointer',
             background: 'var(--paper-2)', border: `1px solid ${tag ? tag.color : 'var(--paper-3)'}`, borderRadius: 5,
-            color: tag || task ? 'var(--ink)' : 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 10,
+            color: tag || task ? 'var(--ink)' : 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11,
           }}
         >
           {task ? <span aria-hidden style={{ display: 'inline-flex' }}><LineGlyph name="task" size={11} /></span> : tag ? <CategoryIcon id={tag.id} color={tag.color} size={11} /> : null}

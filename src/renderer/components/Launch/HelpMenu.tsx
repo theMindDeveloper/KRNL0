@@ -38,7 +38,7 @@ export function HelpMenu() {
         onClick={() => setOpen((v) => !v)}
         style={{
           background: 'transparent', border: '1px solid var(--paper-3)', borderRadius: 'var(--radius)', padding: '4px 10px',
-          cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.04em',
+          cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.04em',
           WebkitAppRegion: 'no-drag',
         } as React.CSSProperties}
       >

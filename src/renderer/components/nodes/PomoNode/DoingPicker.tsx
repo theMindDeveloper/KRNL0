@@ -31,7 +31,7 @@ export interface DoingPickerProps {
   onClear: () => void;
 }
 
-const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' };
+const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' };
 
 export function DoingPicker({ caption, current, recents, tasks, library, onPick, onClear }: DoingPickerProps) {
   const anchor = useRef<HTMLButtonElement>(null);
@@ -66,7 +66,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
     return (
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '1px 6px', borderRadius: 999,
-        fontSize: 9, color: t.color, background: `color-mix(in srgb, ${t.color} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${t.color} 45%, transparent)`,
+        fontSize: 11, color: t.color, background: `color-mix(in srgb, ${t.color} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${t.color} 45%, transparent)`,
       }}>
         <CategoryIcon id={t.id} color={t.color} size={9} />{t.label}
       </span>
@@ -123,14 +123,14 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
           style={{
             flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: '100%', padding: 0,
             background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-            fontFamily: 'var(--font-mono)', fontSize: 10.5, color: current ? 'var(--ink)' : 'var(--ink-4)',
+            fontFamily: 'var(--font-mono)', fontSize: 11, color: current ? 'var(--ink)' : 'var(--ink-4)',
           }}
         >
           {current && icon(current)}
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {current ? current.label : 'pick or type what you’re doing…'}
           </span>
-          {curCat && <span style={{ fontSize: 9, color: 'var(--ink-3)' }}>{curCat.label}</span>}
+          {curCat && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{curCat.label}</span>}
           <span aria-hidden style={{ opacity: 0.6, fontSize: 8, color: 'var(--ink-3)' }}>▾</span>
         </button>
         {current && (
@@ -179,7 +179,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
               style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(t.id), opacity: 0.5 }} />
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'line-through' }}>{t.text}</span>
-              <span style={{ fontSize: 9, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>↺ reopen &amp; track</span>
+              <span style={{ fontSize: 11, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>↺ reopen &amp; track</span>
             </button>
           ))}
           {cats.length > 0 && <span style={{ ...mono, padding: '8px 8px 4px' }}>{q ? `"${typed.trim()}" as category` : 'Or track a category'}</span>}
@@ -194,7 +194,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
                   onClick={() => pick({ label: q ? typed.trim() : t.label, tag: t.id, taskId: null })}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, cursor: 'pointer', padding: '4px 6px', borderRadius: 6,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-2)',
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)',
                     background: `color-mix(in srgb, ${t.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${t.color} 40%, transparent)`,
                   }}
                 >

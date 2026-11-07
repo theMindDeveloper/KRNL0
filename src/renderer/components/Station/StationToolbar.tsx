@@ -146,7 +146,7 @@ function ToolbarBtn({
         border: `1px solid ${active ? 'var(--paper-3)' : 'transparent'}`,
         borderRadius: 3,
         fontFamily: 'var(--font-mono)',
-        fontSize: 10,
+        fontSize: 11,
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
         cursor: 'pointer',
@@ -225,7 +225,7 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
         <span
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 9,
+            fontSize: 11,
             letterSpacing: '0.18em',
             textTransform: 'uppercase',
             color: 'var(--ink-3)',

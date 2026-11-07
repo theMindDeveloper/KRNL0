@@ -172,7 +172,7 @@ export function DayRing({ size, stroke, day, now }: { size: number; stroke: numb
   );
 }
 
-export const labelStyle: CSSProperties = { fontFamily: MONO, fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: INK3 };
+export const labelStyle: CSSProperties = { fontFamily: MONO, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: INK3 };
 export const cardStyle: CSSProperties = {
   background: COAL, borderRadius: 14, boxShadow: `inset 0 0 0 1px ${EDGE}, ${POCKET_SHADOW}`, color: INK, fontFamily: MONO,
 };
@@ -200,7 +200,15 @@ export function AskWhat({ minutes, tags, onPick, onSkip, themed = false }: {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 12.5, color: themed ? 'var(--ink)' : INK, flex: 1 }}>What were those {minutes}m?</span>
-        <RoundButton title="Skip — name it later in KRNL0" onClick={onSkip} size={24}><Icon name="close" size={12} /></RoundButton>
+        {themed ? (
+          // Box look follows the app theme: an ink-coloured skip button.
+          <button type="button" className="pk-btn" title="Skip — name it later in KRNL0" aria-label="Skip — name it later in KRNL0" onClick={onSkip}
+            style={{ ...NO_DRAG, width: 24, height: 24, borderRadius: 999, border: 0, background: 'transparent', color: 'var(--ink-3)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <Icon name="close" size={12} />
+          </button>
+        ) : (
+          <RoundButton title="Skip — name it later in KRNL0" onClick={onSkip} size={24}><Icon name="close" size={12} /></RoundButton>
+        )}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {tags.map((t) => (

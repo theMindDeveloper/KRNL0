@@ -60,7 +60,7 @@ export function DialView({ m, hover }: { m: PocketModel; hover: boolean }) {
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center' }}>
           <span style={{ fontFamily: MONO, fontSize: m.observe ? 30 : 36, fontWeight: 300, letterSpacing: '-0.02em', lineHeight: 1, color: m.paused ? INK3 : INK, fontVariantNumeric: 'tabular-nums' }}>{m.time}</span>
           <span style={{ ...labelStyle, color }}>{text}</span>
-          {m.observe && <span style={{ fontFamily: MONO, fontSize: 10, color: INK3 }}>{fmtMin(m.day.workMs)} today</span>}
+          {m.observe && <span style={{ fontFamily: MONO, fontSize: 11, color: INK3 }}>{fmtMin(m.day.workMs)} today</span>}
         </div>
       </div>
       {hover && (

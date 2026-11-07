@@ -63,7 +63,7 @@ export function MotdBanner({ version, sessionId, bodyHeightPx }: MotdBannerProps
           background: 'var(--term-bg, #05040a)',
           color: ACID,
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10,
+          fontSize: 11,
           padding: '6px 12px 6px',
           borderBottom: '1px solid #2a241c',
           whiteSpace: 'nowrap',
@@ -91,7 +91,7 @@ export function MotdBanner({ version, sessionId, bodyHeightPx }: MotdBannerProps
         style={{
           color: ACID,
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 9,
+          fontSize: 11,
           lineHeight: 1.05,
           margin: 0,
           fontWeight: 600,
@@ -106,7 +106,7 @@ export function MotdBanner({ version, sessionId, bodyHeightPx }: MotdBannerProps
         style={{
           color: ACID,
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10,
+          fontSize: 11,
           marginTop: 4,
           letterSpacing: '0.02em',
         }}
@@ -118,7 +118,7 @@ export function MotdBanner({ version, sessionId, bodyHeightPx }: MotdBannerProps
         style={{
           color: DIM,
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10,
+          fontSize: 11,
           marginTop: 2,
           letterSpacing: '0.02em',
         }}

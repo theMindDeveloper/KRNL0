@@ -209,7 +209,7 @@ export function HabitNode({
             padding: '7px 10px 6px 16px',
             borderBottom: '1px solid var(--paper-3)',
             fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
+            fontSize: 11,
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
@@ -383,7 +383,7 @@ export function HabitNode({
             <span
               aria-hidden
               style={{
-                fontSize: 10, color: 'var(--ink-4)', background: 'var(--paper-2)',
+                fontSize: 11, color: 'var(--ink-4)', background: 'var(--paper-2)',
                 border: '1px solid var(--paper-3)', padding: '1px 4px', borderRadius: 3, flexShrink: 0,
               }}
             >
@@ -392,11 +392,11 @@ export function HabitNode({
             </div>
             {newRepeat && !repeatAt && (
               isRepeatValid(newRepeat) ? (
-                <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
+                <div style={{ marginTop: 5, fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
                   {describeRepeat(newRepeat)} · press Enter to add
                 </div>
               ) : (
-                <div data-testid="habit-add-repeat-invalid" style={{ marginTop: 5, fontSize: 10.5, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
+                <div data-testid="habit-add-repeat-invalid" style={{ marginTop: 5, fontSize: 11, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
                   Repeat isn't finished (days, time or minutes) — open it to fix, or Esc to clear
                 </div>
               )
@@ -691,7 +691,7 @@ const WeekRow = memo(function WeekRow({
           alignItems: 'center',
           gap: 6,
           fontFamily: 'var(--font-mono)',
-          fontSize: 10,
+          fontSize: 11,
           color: 'var(--ink-3)',
           letterSpacing: '0.02em',
           minWidth: 0,
@@ -736,7 +736,7 @@ const WeekRow = memo(function WeekRow({
           className="nodrag"
           style={{
             marginTop: 6, marginLeft: 22, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 5px 5px 10px', borderRadius: 8,
-            background: 'var(--paper-2)', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-2)', minWidth: 0,
+            background: 'var(--paper-2)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', minWidth: 0,
           }}
         >
           <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`Missed ${repairLabel}? Tick it if you did it.`}>
@@ -748,7 +748,7 @@ const WeekRow = memo(function WeekRow({
             onClick={(e) => { e.stopPropagation(); onToggle(habit.id, repairDay); }}
             onMouseDown={(e) => e.stopPropagation()}
             title={`Tick ${repairLabel} — your streak carries on`}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 22, padding: '0 9px', borderRadius: 6, cursor: 'pointer', border: 0, background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, flexShrink: 0 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 22, padding: '0 9px', borderRadius: 6, cursor: 'pointer', border: 0, background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, flexShrink: 0 }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
             Yes
@@ -1149,7 +1149,7 @@ function StreakBadge({ streak }: { streak: number }) {
       title={streak > 0 ? `${streak} day${streak === 1 ? '' : 's'} in a row` : 'No streak yet'}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-        fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600,
+        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
         color: streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
       }}
     >

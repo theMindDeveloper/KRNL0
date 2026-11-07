@@ -149,7 +149,7 @@ export function PlanGuide() {
           position: 'absolute', left: chipLeft, top: chipTop, height: 22, padding: '0 9px', borderRadius: 999,
           display: 'flex', alignItems: 'center', gap: 6,
           background: 'var(--paper)', border: '1px solid color-mix(in srgb, var(--acid) 55%, var(--paper-3))', boxShadow: 'var(--shadow-1)',
-          fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink)', whiteSpace: 'nowrap',
+          fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)', whiteSpace: 'nowrap',
           animation: `krnl-guide-chip ${SHOW_MS}ms ease 1 both`,
         }}
       >

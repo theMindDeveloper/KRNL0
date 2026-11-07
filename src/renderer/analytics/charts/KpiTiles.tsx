@@ -67,7 +67,7 @@ const tileStyle = (accent: string): React.CSSProperties => ({
 
 const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 9,
+  fontSize: 11,
   color: 'var(--k-an-ink-3, #9aa1a8)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
@@ -90,7 +90,7 @@ const valueStyle: React.CSSProperties = {
 };
 
 const unitStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 11,
   color: 'var(--k-an-ink-4, #7d848b)',
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
@@ -98,7 +98,7 @@ const unitStyle: React.CSSProperties = {
 
 const hintStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 9,
+  fontSize: 11,
   color: 'var(--k-an-ink-4, #7d848b)',
 };
 
@@ -110,7 +110,7 @@ function DeltaBadge({ pct }: { pct: number | undefined }) {
     <span
       style={{
         fontFamily: 'var(--font-mono)',
-        fontSize: 9,
+        fontSize: 11,
         color,
         background: up ? 'rgba(201,241,88,0.12)' : 'rgba(255,142,100,0.12)',
         border: `1px solid ${up ? 'rgba(201,241,88,0.35)' : 'rgba(255,142,100,0.35)'}`,
