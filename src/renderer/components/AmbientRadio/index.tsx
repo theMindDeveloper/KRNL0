@@ -131,6 +131,8 @@ export const RADIO_FRAME_MS = 16;
 const POS_KEY    = 'krnl0-ambient-radio-pos';
 const PARAMS_KEY = 'krnl0-ambient-radio-params';
 const STATE_KEY  = 'krnl0-ambient-radio-state';
+/** Docked to an edge ('left' | 'right') or floating ('none') — kept across launches. */
+const EDGE_KEY   = 'krnl0-ambient-radio-edge';
 const FAVS_KEY   = 'krnl0-ambient-radio-yt-favs';
 const FAVS_MAX   = 50;
 const Z = LAYERS.widget;
@@ -185,6 +187,27 @@ function loadPos(): Pos {
     }
   } catch { /* fall through */ }
   return { x: window.innerWidth - WIDTH - 20, y: 80 };
+}
+
+/**
+ * Where the radio starts. A first run (nothing saved) starts docked as a thin
+ * tab on the right edge: a floating panel there covered the Station's
+ * Calendar for every new user. A docked radio comes back docked, against the
+ * current window's edge (the window may have changed size since).
+ */
+function loadEdge(): EdgeState {
+  try {
+    const raw = localStorage.getItem(EDGE_KEY);
+    if (raw === 'left' || raw === 'right' || raw === 'none') return raw;
+    if (localStorage.getItem(POS_KEY) === null) return 'right';
+  } catch { /* fall through */ }
+  return 'none';
+}
+
+function placeForEdge(edge: EdgeState, p: Pos): Pos {
+  if (edge === 'right') return { x: window.innerWidth - PEEK_PX, y: p.y };
+  if (edge === 'left') return { x: -(WIDTH - PEEK_PX), y: p.y };
+  return p;
 }
 
 function savePos(p: Pos): void {
@@ -395,8 +418,11 @@ export function AmbientRadio() {
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(initState.masterVolume);
 
-  const [edge, setEdge] = useState<EdgeState>('none');
-  const [pos, setPos] = useState<Pos>(loadPos);
+  const [edge, setEdge] = useState<EdgeState>(loadEdge);
+  const [pos, setPos] = useState<Pos>(() => placeForEdge(loadEdge(), loadPos()));
+  useEffect(() => {
+    try { localStorage.setItem(EDGE_KEY, edge); } catch { /* quota */ }
+  }, [edge]);
   const [isDragging, setIsDragging] = useState(false);
   // Visual-only hide. Keeps the YT iframe and audio engine alive so music
   // continues playing while the panel disappears (driven by the Jen bridge).
@@ -1161,7 +1187,9 @@ export function AmbientRadio() {
 
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
               <button type="button" data-testid="ambient-radio-gear" title="Settings" onClick={() => setSettingsOpen((o) => !o)} style={headerBtn(settingsOpen)}><SettingsIcon name="settings" size={12} /></button>
-              <button type="button" title="Snap to edge" onClick={snapToNearestEdge} style={headerBtn(false)}>−</button>
+              <button type="button" title="Tuck to the edge" aria-label="Tuck to the edge" onClick={snapToNearestEdge} style={headerBtn(false)}>
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden><path d="M2.5 6h7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+              </button>
             </div>
           </div>
 

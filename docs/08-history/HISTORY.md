@@ -1713,3 +1713,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/PomoNode/display.ts`, `tests/unit/renderer/pomoFaceFit.test.ts`
 **Summary:** Pass over the presentational files changed today (pocket views and model, settings sections, launch dialogs) for division by zero, unchecked indexing and date parsing. One finding, probed with a zero-length config: `calcRemainingPct` returned NaN for 0/0, which blanks every ring and fill in the faces and the floating timer. The UI and CLI clamp the session length to positive, but board.json loading accepts any number, so a hand-edited 0 could reach it; it now reads as nothing left (test). The rest guard their maths (`Math.max(1, …)`) and their lookups.
+
+## [2026-11-07] — Ambient Radio no longer covers the Calendar; tucking is remembered
+
+**Type:** Bug Fix (first run)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/AmbientRadio/index.tsx`
+**Summary:** Seen in the real-app capture with a fresh profile: the radio opened floating at the top right, exactly over the Station's Calendar, for every new user — and tucking it to the edge was not remembered (the edge state started as floating on every launch), so it came back over the Calendar after each restart. A first run now starts docked as the 14 px edge tab; the docked side is saved (`krnl0-ambient-radio-edge`) and restored against the current window's edge. The header's "−" text glyph is a drawn icon ("Tuck to the edge"). Checked in the preview: first run docked and clear of the Calendar; open → floating; tuck → reload → still tucked.
