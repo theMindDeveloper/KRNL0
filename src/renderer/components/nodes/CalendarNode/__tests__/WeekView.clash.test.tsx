@@ -150,11 +150,11 @@ describe('WeekView — clashing plans as letter bars (F28)', () => {
   });
 
   it('a bar too narrow for "RA" in a row stands the letters one above the other — never an unnamed bar', () => {
-    // Measure the calendar as a narrow Station week (each column ~64px).
+    // Measure the calendar as a narrow Station week (each column ~60px).
     const RO = globalThis.ResizeObserver;
     globalThis.ResizeObserver = class {
       constructor(private cb: ResizeObserverCallback) {}
-      observe() { this.cb([{ contentRect: { width: 500 } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
+      observe() { this.cb([{ contentRect: { width: 460 } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
       unobserve() { /* none */ }
       disconnect() { /* none */ }
     } as unknown as typeof ResizeObserver;

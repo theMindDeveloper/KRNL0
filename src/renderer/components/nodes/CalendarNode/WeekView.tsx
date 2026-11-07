@@ -243,9 +243,10 @@ function CalIcon({ name, size = 11 }: { name: keyof typeof CAL_ICONS; size?: num
 // The tracked-time lane (F29, draft A): a recessed slot at the day's left,
 // wide enough to read as its own lane. A day under 70 px wide (the Station
 // week) gets a slimmer slot so plans keep their room. Plans start 3 px after it.
-const TRACK_LEFT = (singleDay: boolean, tiny = false): number => (singleDay ? 5 : tiny ? 3 : 4);
-const TRACK_W = (singleDay: boolean, tiny = false): number => (singleDay ? 14 : tiny ? 6 : 11);
-const RAIL_PX = (singleDay: boolean, tiny = false): number => TRACK_LEFT(singleDay, tiny) + TRACK_W(singleDay, tiny) + 1;
+// F29 — recorded time is a strip flush on the day's own left line (no slot,
+// no gap), so it can only belong to that day. Plans start 3 px after it.
+const TRACK_W = (singleDay: boolean, tiny = false): number => (singleDay ? 6 : tiny ? 4 : 5);
+const RAIL_PX = (singleDay: boolean, tiny = false): number => TRACK_W(singleDay, tiny) + 3;
 
 type HabitScheduleKind = 'weekly' | 'daily';
 
@@ -1314,7 +1315,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const blockH = Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP);
       // A name too wide for the bar stands its letters one above the other
       // (never rotated) when the bar is tall enough; 11px mono is ~6.6px a letter.
-      const letterRow = letter !== undefined && blockH >= 15 && widthPx >= letter.length * 6.6 + 3;
+      const letterRow = letter !== undefined && blockH >= 12 && widthPx >= letter.length * 6.6 + 3;
       const letterStack = letter !== undefined && !letterRow && letter.length > 1 && widthPx >= 10 && blockH >= letter.length * 11 + 2;
       const letterFits = letterRow || letterStack;
       const tickFits = letterFits && blockH >= (letterStack ? letter.length * 11 + 18 : 34) && widthPx >= 12;
@@ -1776,34 +1777,22 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     });
   }
 
-  // What really happened (F16, F29): a track on the left edge of every day
-  // that fills, like the Clock's ring but straight, with what you tracked.
-  // It sits beside the plans, never on them. A running span has moving
+  // What really happened (F16, F29): a strip of colour flush on the day's
+  // left line, only where you tracked time — nothing is drawn where you did
+  // not. It sits beside the plans, never on them. A running span has moving
   // stripes and grows; a break is a gap.
-  // The lane is a slot carved into its own day (inner shadow, its own edge),
-  // so it reads as part of that day, not as the line between two days.
   const trackW = TRACK_W(singleDay, tinyDays);
-  const trackLeft = TRACK_LEFT(singleDay, tinyDays);
   function renderRealityBlocks(dayYMD: string) {
     if (!layers.recorded) return null;
     const segs = realityByDay.get(dayYMD) ?? [];
-    const track = (
-      <div
-        key="reality-track"
-        data-testid="calendar-reality-track"
-        className="cal-lane"
-        aria-hidden
-        style={{
-          position: 'absolute', top: 2, bottom: 2, left: trackLeft, width: trackW, borderRadius: 6,
-          pointerEvents: 'none', zIndex: 0,
-        }}
-      />
-    );
-    return [track, ...segs.map((seg, i) => {
+    return segs.map((seg, i) => {
       const topPx = (seg.startMin / 60) * rowHeight;
       const heightPx = Math.max(3, ((seg.endMin - seg.startMin) / 60) * rowHeight);
       const isWork = seg.kind === 'work';
-      const tone = spanTone(tagLibrary, seg, easy);
+      const raw = spanTone(tagLibrary, seg, easy);
+      // Bright acid vanishes on light paper: a 5 px strip needs the deeper mix
+      // there (dark mode maps --acid-ink straight back to --acid).
+      const tone = raw === 'var(--acid)' ? 'color-mix(in srgb, var(--acid) 55%, var(--acid-ink, var(--acid)))' : raw;
       const minutes = Math.max(1, Math.round((seg.endMs - seg.startMs) / 60_000));
       return (
         <div
@@ -1822,13 +1811,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={{
             position: 'absolute',
             top: topPx + 1,
-            // Inside the slot, 2 px from its walls.
-            left: trackLeft + 2,
-            width: trackW - 4,
+            // Flush on the day line; rounded only on the side facing the plans.
+            left: 0,
+            width: trackW,
             height: Math.max(2, heightPx - 2),
             pointerEvents: 'none',
             zIndex: 1,
-            borderRadius: 4,
+            borderRadius: '0 3px 3px 0',
             // A break draws nothing: it is the gap in the track (hover keeps its title).
             background: !isWork ? 'transparent'
               : seg.live ? `repeating-linear-gradient(135deg, ${tone} 0 4px, color-mix(in srgb, ${tone} 50%, transparent) 4px 8px)`
@@ -1836,7 +1825,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           }}
         />
       );
-    })];
+    });
   }
 
   // ── Habit block renderer (ADR 0002 §6) ──────────────────────────────────────

@@ -1734,3 +1734,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/styles/reactflow-theme.css`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.clash.test.tsx`, `docs/06-requirements/calendar-clock-visuals.md` (F28)
 **Summary:** Seen in a 700 px and a 520 px calendar render: in a Station-width week the clash bars "RA" and "RB" were ~16 px wide, under the 18 px the old check asked for two letters, so they showed as empty bars. The width check now uses the real 11 px mono letter width (6.6 px), and a name still too wide stands its letters one above the other (never rotated) when the bar is tall enough. Checked in the preview at both widths: every bar named. Test stubs a 500 px calendar and fails on the old code.
+
+## [2026-11-07] — Recorded time: a strip on the day line, no dark lane, no gap
+
+**Type:** UI Change
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/styles/reactflow-theme.css`, `tests/unit/renderer/schedule-menu-parity.test.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.clash.test.tsx`, `docs/06-requirements/calendar-clock-visuals.md` (F29)
+**Summary:** User feedback: the recessed dark lane looked heavy, and the 4 px gap before it made it unclear which day it belonged to. Four drafts went to the design canvas ("Recorded time · four ways"); this builds the part drafts A and C share — tracked time is a 5 px strip of colour flush on the day's own left line (6 px day, 4 px Station), drawn only where time was tracked, with no slot and no gap. Plans now start 8 px from the day line (was 16). Untagged time uses a deeper lime in light mode (pale acid vanished on paper). Short 12 px bars now show their letter too ("Call the dentist" was a blank bar). Checked in the preview: wide and narrow week, light and dark — every strip at 0 px from its day line.
