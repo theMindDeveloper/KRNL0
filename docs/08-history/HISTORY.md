@@ -1790,3 +1790,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `docs/research/design-usecase-review-2026-11-07.md` (new)
 **Summary:** After the user found that repeating habits cannot be untimed (#217), every feature's data model and commands were checked against how people actually plan, not only against their specs. Main findings: time is mandatory where life has none (untimed habits, date-only plans — a Month drop invents 09:00 and the plan reads "missed"), no deadlines or repeating tasks, habits cannot be "3× a week" or have amounts or rest days, the UI can only hard-delete a habit (archive is CLI-only), and there are no reminders. A proposed priority order is in the doc; each item needs an ADR, a requirements doc, a migration and CLI commands.
+
+## [2026-11-07] — CLI sweep: `task list` shows when each task is planned
+
+**Type:** Bug Fix (CLI)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/sys/commands/task.ts`, `tests/unit/sys/task.list.schedule.test.ts` (new)
+**Summary:** End-to-end run of today's CLI commands on a first-run board (`todo add`, `task schedule`, `cal lineup`, `habit add/archive`, `feedback`): all behaved, and bad input was refused with clear messages. One gap: `task list` never said when a task was planned, so a `task schedule` or `cal lineup` could not be checked from the CLI. Each row now ends with `@ YYYY-MM-DD HH:MM` when scheduled. Also found: there is no `habit unarchive` — noted with the "habit archive in the UI" item from the design review.

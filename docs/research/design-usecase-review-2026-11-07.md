@@ -33,7 +33,7 @@ The habit bug is one case of a pattern: **every plan and every routine must have
 | 3.1 | "Gym 3× a week, any days" | `daily`, `weekdays`, or fixed `weekly` days | A flexible target is impossible; fixing days makes streaks break on a good week | **High** |
 | 3.2 | "8 glasses of water", "20 pages", "10k steps" | `log: string[]` — a date is done or not | No amount, no partial progress | Medium |
 | 3.3 | Sick / travelling / rest day | Only a one-day "did it yesterday?" repair | A planned break kills the streak; people stop using it after one bad week | Medium |
-| 3.4 | Stop a habit but keep its history | The settings popover can only **hard-delete** (F13); archive exists in the CLI only | Years of history gone with one click | **High** |
+| 3.4 | Stop a habit but keep its history | The settings popover can only **hard-delete** (F13); archive exists in the CLI only | Years of history gone with one click; and an archived habit can never come back (no `habit unarchive`, CLI or UI) | **High** |
 | 3.5 | "No sugar" — a habit to *avoid* | Same tick as "do" habits | Works, but the wording ("Start again today") assumes a do-habit; no "slipped" logging | Low |
 | 3.6 | A Pomo session finishing ticks a habit | The edge now targets a habit **lane** (one habit each) and ticks that habit — correct. `habit-node.md` F7 still says "the first habit" | Doc only: F7 is stale and should be rewritten | Low |
 

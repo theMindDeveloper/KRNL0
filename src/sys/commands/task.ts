@@ -1073,7 +1073,9 @@ export async function taskList(
     const ts = n.state as TaskState;
     const status = ts.done ? '[x]' : '[ ]';
     const indent = '  '.repeat(ts.layer);
-    return `${status} ${short.get(n.id)}  ${indent}#${ts.sequenceNumber} L${ts.layer} — ${ts.text}`;
+    // When it is planned, so `task schedule` / `cal lineup` can be checked here.
+    const when = typeof ts.scheduledFor === 'string' && ts.scheduledFor ? `  @ ${ts.scheduledFor.replace('T', ' ')}` : '';
+    return `${status} ${short.get(n.id)}  ${indent}#${ts.sequenceNumber} L${ts.layer} — ${ts.text}${when}`;
   });
 
   return {
