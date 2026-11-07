@@ -18,7 +18,8 @@ import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange, selectSchedule } from '../../../store/scheduleSelector';
 import { packLanes } from '../../../store/laneLayout';
-import { layoutDayBlocks, shelfNeedPx, BLOCK_TEXT_INSET, LANE_CAP, READABLE_LANE_PX, SHELF_HEAD_PX, SHELF_ROW_PX } from './dayBlockLayout';
+import { layoutDayBlocks, BLOCK_TEXT_INSET, LANE_CAP, READABLE_LANE_PX } from './dayBlockLayout';
+import { clashLabels } from './clashLabels';
 import { lineUp } from './lineUp';
 import { AppSelect } from '../../ui/AppSelect';
 import { SpanTimeEditor, CountsToward, openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
@@ -238,6 +239,10 @@ function CalIcon({ name, size = 11 }: { name: keyof typeof CAL_ICONS; size?: num
   );
 }
 
+/** Where the tracked-time track sits in a day, and the lane it keeps (px). */
+const TRACK_LEFT = (singleDay: boolean): number => (singleDay ? 11 : 9);
+const RAIL_PX = (singleDay: boolean): number => TRACK_LEFT(singleDay) + (singleDay ? 6 : 4);
+
 type HabitScheduleKind = 'weekly' | 'daily';
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -251,7 +256,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // blocks next to the plan. Minutes live in the hover / click popup.
   // Pomo spans are background highlights now, so blocks need no rail gutter.
   // The recorded rail's lane: inset from the day line, then the plan blocks.
-  const rail = singleDay ? '14px' : '10px';
+  const rail = `${RAIL_PX(singleDay)}px`;
   // Layers live in the calendar's state (calendar.setLayers / `krnl cal layers`).
   const layers: CalLayers = calendarLayersOf(state);
   const toggleLayer = (k: keyof CalLayers): void => {
@@ -1059,11 +1064,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
     const rawLayout = computeColumnLayout(slices, (MIN_BLOCK_PX / rowHeight) * 60);
 
-    // Readable parallel tasks: only as many lanes as fit at MIN_LANE_PX. A
-    // clash that needs more becomes a shelf (F28): one block over the clash's
-    // time with a named, draggable row per plan — nothing hidden behind a count.
+    // Readable parallel tasks: names only where lanes are READABLE_LANE_PX wide.
+    // A clash narrower than that is slim letter bars (F28) — every plan still
+    // its own block at its own time, nothing hidden behind a count.
     const colPxAll = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-    const railNumAll = singleDay ? 14 : 10;
+    const railNumAll = RAIL_PX(singleDay);
     const dayLayout = layoutDayBlocks(
       slices.map((sl) => ({ id: sl.task.id, startMin: sl.sliceStartMin, endMin: sl.sliceEndMin, slice: sl })),
       rawLayout,
@@ -1073,44 +1078,37 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       (MIN_BLOCK_PX / rowHeight) * 60,
     );
     const colLayout = dayLayout.placements;
-    const shelfEls = dayLayout.shelves.map((sh) => {
-      const g = sh.slices.map((x) => x.slice);
-      const first = g[0]!;
-      const spanPx = ((sh.endMin - sh.startMin) / 60) * rowHeight - BLOCK_GAP;
-      const need = shelfNeedPx(g.length);
-      // Grow to show every row, but never into the next plan below it.
-      const nextStart = Math.min(1440, ...slices.filter((s) => s.sliceStartMin >= sh.endMin).map((s) => s.sliceStartMin));
-      const roomPx = ((nextStart - sh.startMin) / 60) * rowHeight - BLOCK_GAP;
-      // Short of room, in this order: rows tighten (to 15 px), the header row
-      // goes, and only then does the shelf grow over the plan below. A row is
-      // never hidden.
-      const avail = Math.max(spanPx, Math.min(need, roomPx));
-      const n = g.length;
-      let showHead = true;
-      let rowPx = SHELF_ROW_PX;
-      let heightPx = avail;
-      if (need > avail) {
-        if (SHELF_HEAD_PX + n * 15 + 4 <= avail) {
-          rowPx = Math.min(SHELF_ROW_PX, Math.floor((avail - SHELF_HEAD_PX - 4) / n));
-        } else if (n * 14 + 4 <= avail) {
-          showHead = false;
-          rowPx = Math.min(SHELF_ROW_PX, Math.floor((avail - 4) / n));
-        } else {
-          rowPx = 15;
-          heightPx = SHELF_HEAD_PX + n * rowPx + 4;
-        }
-      }
-      heightPx = Math.max(heightPx, SHELF_HEAD_PX + SHELF_ROW_PX);
+    // F28 — a clash too narrow for names: every plan stays its own slim bar at
+    // its real time, named by a letter. A clash still ahead gets a Line up tab,
+    // placed above it (or below) only where it covers nothing.
+    const letterOf = new Map<string, string>();
+    const lineUpTabs: ReactNode[] = [];
+    const isoDowT = ymdToIsoDow(dayYMD);
+    const habitMins = layers.habits
+      ? scheduledHabits.filter((h) => habitScheduledOnDow(h.schedule, isoDowT)).map((h) => {
+          const [hh, mm] = h.schedule.timeOfDay.split(':');
+          return parseInt(hh ?? '0', 10) * 60 + parseInt(mm ?? '0', 10);
+        })
+      : [];
+    for (const cg of dayLayout.clashes) {
+      const g = cg.slices.map((x) => x.slice);
+      const labels = clashLabels(g.map((x) => x.task.text));
+      g.forEach((x, i) => letterOf.set(x.task.id, labels[i]!));
       const open = g.filter((x) => !x.isContinuation && !x.task.done && new Date(x.task.startISO).getTime() >= nowMs);
-      const canLineUp = new Set(open.map((x) => x.task.anchorTaskId)).size >= 2;
-      const narrowShelf = colPxAll - railNumAll < 150;
-      // A Station-width day (~30 px): rows become colour bars, still grabbable.
-      const tinyShelf = colPxAll - railNumAll < 80;
-      // A chain moves as one: its anchor carries the time, its followers come
-      // along. So line up the chains (anchors) of the open rows, each as long
-      // as its whole chain. Parallel branches of one chain stay parallel.
-      const lineUpShelf = () => {
-        const anchors = [...new Set(open.map((x) => x.task.anchorTaskId))];
+      const anchors = [...new Set(open.map((x) => x.task.anchorTaskId))];
+      if (anchors.length < 2) continue;
+      const TAB = 18;
+      const startPx = (cg.startMin / 60) * rowHeight;
+      const endPx = (cg.endMin / 60) * rowHeight;
+      // What else is drawn in this column, in px: other plans and habit pills.
+      const others: Array<[number, number]> = [
+        ...slices.filter((s) => !g.includes(s)).map((s) => [(s.sliceStartMin / 60) * rowHeight, (s.sliceEndMin / 60) * rowHeight] as [number, number]),
+        ...habitMins.map((m) => [(m / 60) * rowHeight - 12, (m / 60) * rowHeight + 12] as [number, number]),
+      ];
+      const free = (a: number, b: number) => a >= 0 && b <= 24 * rowHeight && others.every(([o0, o1]) => b <= o0 || a >= o1);
+      const top = free(startPx - TAB - 2, startPx - 1) ? startPx - TAB - 1 : free(endPx + 1, endPx + TAB + 2) ? endPx + 1 : null;
+      if (top === null) continue;
+      const lineUpClash = () => {
         const units = anchors.map((a) => {
           const members = scheduledTasks.filter((t) => t.anchorTaskId === a);
           const s0 = Math.min(...members.map((t) => new Date(t.startISO).getTime()));
@@ -1119,96 +1117,26 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         });
         for (const mv of lineUp(units, Date.now())) onCommand('calendar.schedule', { taskId: mv.taskId, scheduledFor: mv.scheduledFor });
       };
-      // A plan dropped on the shelf lands on the slot under the pointer.
-      const dropOnShelf = (e: DragEvent<HTMLDivElement>) => {
-        if (!Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const raw = e.dataTransfer.getData('application/krnl-task');
-        endTaskDrag();
-        if (!raw) return;
-        const payload = JSON.parse(raw) as { taskId?: string; durationMin: number };
-        if (!payload.taskId) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const relY = Math.max(0, (Number.isFinite(e.clientY) ? e.clientY : 0) - (Number.isFinite(rect.top) ? rect.top : 0)) / screenScale(e.currentTarget);
-        const abs = sh.startMin + Math.min(sh.endMin - sh.startMin, (relY / rowHeight) * 60);
-        const snapped = Math.max(0, Math.min(1440 - gran, Math.floor(abs / gran) * gran));
-        scheduleTask(payload.taskId, `${dayYMD}T${String(Math.floor(snapped / 60)).padStart(2, '0')}:${String(snapped % 60).padStart(2, '0')}`, payload.durationMin);
-      };
-      return (
-        <div
-          key={`shelf-${first.task.id}`}
-          data-testid={`calendar-shelf-${first.task.id}`}
-          className={`cal-shelf${tinyShelf ? ' cal-shelf--tiny' : ''}`}
-          title={`${g.length} plans at once · ${fmtMinOfDay(sh.startMin)}–${fmtMinOfDay(sh.endMin)}`}
-          onClick={(e) => e.stopPropagation()}
-          onDragOver={(e) => {
-            if (!Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-          }}
-          onDrop={dropOnShelf}
-          style={{
-            position: 'absolute',
-            top: (sh.startMin / 60) * rowHeight + BLOCK_GAP / 2,
-            left: 2,
-            right: `calc(${rail} + 3px)`,
-            height: heightPx,
-            zIndex: 3,
-          }}
+      const roomy = colPxAll - railNumAll >= 110;
+      lineUpTabs.push(
+        <button
+          key={`lineup-${g[0]!.task.id}`}
+          type="button"
+          className="nodrag cal-lineup"
+          data-testid={`calendar-lineup-${g[0]!.task.id}`}
+          title={`Line them up: ${g.map((x) => x.task.text).join(', ')} — one after another`}
+          aria-label="Line them up"
+          draggable={false}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); lineUpClash(); }}
+          style={{ position: 'absolute', top, right: 3, height: TAB, zIndex: 5 }}
         >
-          {showHead && <div className="cal-shelf__head">
-            {!tinyShelf && <CalIcon name="clash" />}
-            <span className="cal-shelf__count">{tinyShelf ? g.length : `${g.length} at once`}</span>
-            {!tinyShelf && !(canLineUp && narrowShelf) && <span className="cal-shelf__time">{fmtMinOfDay(sh.startMin)}</span>}
-            {canLineUp && !tinyShelf && (
-              <button
-                type="button"
-                className="nodrag cal-shelf__lineup"
-                data-testid={`calendar-shelf-lineup-${first.task.id}`}
-                title="Line them up: one after another"
-                aria-label="Line them up"
-                draggable={false}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); lineUpShelf(); }}
-              >
-                <CalIcon name="stairs" />{!narrowShelf && 'Line up'}
-              </button>
-            )}
-          </div>}
-          <div className="cal-shelf__rows" style={{ overflow: 'hidden', paddingTop: showHead ? undefined : 2, ['--row-h' as string]: `${rowPx}px` }}>
-            {g.map((x) => {
-              const t = x.task;
-              const endMs = new Date(t.startISO).getTime() + t.scheduledDurationMin * 60_000;
-              const missed = !t.done && endMs <= nowMs;
-              const st = new Date(t.startISO);
-              const s0 = st.getHours() * 60 + st.getMinutes();
-              return (
-                <div
-                  key={`${t.id}-${x.isContinuation ? 'cont' : 'head'}`}
-                  data-testid={`calendar-shelf-row-${t.id}`}
-                  data-plan-state={t.done ? 'done' : missed ? 'missed' : 'planned'}
-                  className="cal-shelf__row"
-                  draggable={!x.isContinuation}
-                  onDragStart={x.isContinuation ? undefined : (e) => beginTaskDrag(e, t)}
-                  onDragEnd={endTaskDrag}
-                  onClick={(e) => { e.stopPropagation(); setTaskPopup({ task: t, x: e.clientX, y: e.clientY }); }}
-                  title={`${t.text} · ${fmtMinOfDay(s0)}–${fmtMinOfDay(s0 + t.scheduledDurationMin)}${missed ? ' · missed' : ''}${t.done ? ' · done' : ''} — drag to move, or onto the bottom strip to unschedule`}
-                >
-                  <span className="cal-shelf__grip" aria-hidden><CalIcon name="grip" size={10} /></span>
-                  <span className="cal-shelf__dot" aria-hidden style={{ background: toneVarForTask(t.id) }} />
-                  <span className="cal-shelf__title">{t.text}</span>
-                  {t.done ? <span className="cal-shelf__ok" aria-label="done"><CalIcon name="check" size={10} /></span>
-                    : missed ? <span className="cal-shelf__miss" aria-label="missed" /> : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+          <CalIcon name="stairs" />{roomy && 'Line up'}
+        </button>,
       );
-    });
+    }
 
-    const blocks = slices.filter((sl) => !dayLayout.inShelf.has(sl.task.id)).map((slice) => {
+    const blocks = slices.map((slice) => {
       const { task, sliceStartMin, sliceEndMin, isContinuation, hasContinuation } = slice;
 
       // #7 — apply a live resize draft (if this block is being dragged) so it
@@ -1363,13 +1291,24 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // How much text fits: measured column width × this block's lanes.
       // Unmeasured (tests / first paint) counts as roomy.
       const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-      const railNum = singleDay ? 14 : 10;
+      const railNum = RAIL_PX(singleDay);
       const widthPx = ((colPx - railNum) * span) / colCount - 3;
       // Text is never rotated: a lane too narrow for a title is a plain bar
       // (its name is in the tooltip); short blocks show the title on one line.
-      const detail: 'none' | 'vertical' | 'title' | 'full' =
-        heightPx < 14 || widthPx < 34 ? 'none'
+      // F28 — a plan in a clash too narrow for names is a slim bar with its
+      // letter (the name is in the tooltip and the popup).
+      const letter = letterOf.get(task.id);
+      const detail: 'none' | 'letter' | 'title' | 'full' =
+        letter !== undefined ? 'letter'
+        : heightPx < 14 || widthPx < 34 ? 'none'
         : widthPx < 110 || heightPx < 40 ? 'title' : 'full';
+      const textual = detail === 'title' || detail === 'full';
+      // The letter shows when it fits the bar; the tick under it when there is room.
+      const blockH = Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP);
+      const letterFits = letter !== undefined && blockH >= 15 && widthPx >= letter.length * 7 + 4;
+      const tickFits = letterFits && blockH >= 34 && widthPx >= 12;
+      // A short bar centres its letter; a tall one keeps it at the top, tick below.
+      const letterTop = blockH >= 30;
 
       return (
         <div
@@ -1395,9 +1334,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             // A fixed gap between stacked blocks so back-to-back tasks never
             // read as one slab.
             top: topPx + BLOCK_GAP / 2,
-            // Plans fill the column; the tracked-time rail keeps the right edge.
-            left: `calc((100% - ${rail}) * ${leftFrac} + 2px)`,
-            right: `calc(${rail} + (100% - ${rail}) * ${rightFrac} + 3px)`,
+            // The tracked-time rail keeps the left edge; plans fill the rest.
+            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 2px)`,
+            right: `calc((100% - ${rail}) * ${rightFrac} + 3px)`,
             height: Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP),
             // Calm by default: a tinted card with a solid colour edge. Done
             // fades; missed is a lighter tint; overrun is a rust strip on the
@@ -1416,31 +1355,32 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             cursor: isContinuation ? 'pointer' : 'grab',
             overflow: 'hidden',
             zIndex: 2,
-            padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : 0,
+            padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : detail === 'letter' ? (letterTop ? '3px 0 0' : 0) : 0,
             opacity: 1,
             boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
             display: 'flex',
             flexDirection: 'column',
             // A one-line title sits centred in short blocks instead of being
             // clipped at the top.
-            justifyContent: detail === 'title' ? 'center' : 'flex-start',
+            justifyContent: detail === 'title' || (detail === 'letter' && !letterTop) ? 'center' : 'flex-start',
+            alignItems: detail === 'letter' ? 'center' : undefined,
             gap: 1,
           }}
         >
           {/* Continuation arrows — ↑ on continuation slices, ↓ on slices that
               spill into the next day. */}
-          {isContinuation && detail !== 'none' && (
+          {isContinuation && textual && (
             <span aria-hidden style={{ position: 'absolute', top: 3, left: 3, color: 'var(--ink-3)', lineHeight: 0, pointerEvents: 'none' }}>
               <CalIcon name="up" />
             </span>
           )}
-          {hasContinuation && detail !== 'none' && (
+          {hasContinuation && textual && (
             <span aria-hidden title="Continues tomorrow" style={{ position: 'absolute', bottom: 3, right: 3, color: 'var(--ink-3)', lineHeight: 0, pointerEvents: 'none' }}>
               <CalIcon name="down" />
             </span>
           )}
           {/* #171 — a done task shows a check, so it reads as finished. */}
-          {isDone && !isContinuation && detail !== 'none' && (
+          {isDone && !isContinuation && textual && (
             <span data-testid={`task-done-check-${task.id}`} aria-hidden style={{ position: 'absolute', top: detail === 'full' ? 4 : '50%', transform: detail === 'full' ? undefined : 'translateY(-50%)', right: 4, color: 'var(--acid-ink, var(--acid))', lineHeight: 0, pointerEvents: 'none' }}>
               <CalIcon name="check" />
             </span>
@@ -1498,6 +1438,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           )}
           {/* Label — only what fits (see `detail`). Everything else is in the
               hover title and the click popup. */}
+          {detail === 'letter' && letterFits && (
+            <span data-testid={`task-letter-${task.id}`} className="cal-letter" aria-hidden>{letter}</span>
+          )}
+          {detail === 'letter' && tickFits && isDone && !isContinuation && (
+            <span aria-hidden style={{ color: 'var(--acid-ink, var(--acid))', lineHeight: 0, position: 'relative', zIndex: 1 }}><CalIcon name="check" size={10} /></span>
+          )}
           {(detail === 'title' || detail === 'full') && (
             <span
               style={{
@@ -1537,7 +1483,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               block the question too. REPLAN shows how to drag it. */}
           {/* Only where it fits beside the title: in a small block the dashed
               outline says "missed" and the click popup offers the move. */}
-          {isMissed && !isContinuation && detail !== 'none' && (
+          {isMissed && !isContinuation && textual && (
             <button
               type="button"
               className="nodrag cal-replan"
@@ -1583,7 +1529,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         </div>
       );
     });
-    return [...blocks, ...shelfEls];
+    return [...blocks, ...lineUpTabs];
   }
 
   // ── Agenda (narrow day view) ────────────────────────────────────────────────
@@ -1816,12 +1762,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     });
   }
 
-  // What really happened (F16, F29): a track on the right edge of every day
+  // What really happened (F16, F29): a track on the left edge of every day
   // that fills, like the Clock's ring but straight, with what you tracked.
   // It sits beside the plans, never on them. A running span has moving
   // stripes and grows; a break is a gap.
-  const trackW = singleDay ? 8 : 5;
-  const trackRight = singleDay ? 4 : 3;
+  // Which day a track belongs to is read from spacing: well inside its own
+  // day, away from the day line, almost touching its own plans (week: 9 px from
+  // the line, 2 px from its plans; the previous day's plans are 13 px away).
+  const trackW = singleDay ? 6 : 4;
+  const trackLeft = TRACK_LEFT(singleDay);
   function renderRealityBlocks(dayYMD: string) {
     if (!layers.recorded) return null;
     const segs = realityByDay.get(dayYMD) ?? [];
@@ -1831,7 +1780,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         data-testid="calendar-reality-track"
         aria-hidden
         style={{
-          position: 'absolute', top: 0, bottom: 0, right: trackRight, width: trackW, borderRadius: 999,
+          position: 'absolute', top: 0, bottom: 0, left: trackLeft, width: trackW, borderRadius: 999,
           background: 'color-mix(in srgb, var(--ink) 4%, transparent)', pointerEvents: 'none', zIndex: 0,
         }}
       />
@@ -1859,7 +1808,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={{
             position: 'absolute',
             top: topPx + 1,
-            right: trackRight,
+            left: trackLeft,
             width: trackW,
             height: Math.max(2, heightPx - 2),
             pointerEvents: 'none',
@@ -1898,6 +1847,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
       const hoursFromStart = habitHour - hourRange.start + habitMin / 60;
       const topPx = Math.round(hoursFromStart * rowHeight);
+      // A pill cut by the edge of the shown hours waits for its page (the hour
+      // pager sits on that edge): never half a pill under the pager.
+      if (gridH > 0) {
+        const winTop = (win.startHour - hourRange.start) * rowHeight;
+        const winBottom = (win.endHour - hourRange.start) * rowHeight;
+        const straddles = (edge: number) => topPx - 12 < edge && topPx + 12 > edge;
+        if ((win.startHour > 0 && straddles(winTop)) || straddles(winBottom)) continue;
+      }
       const done = habit.log.includes(dayYMD);
       const colour = `var(--${habit.color})`;
       const titleSuffix = habit.schedule.durationMin ? ` (${habit.schedule.durationMin} min)` : '';

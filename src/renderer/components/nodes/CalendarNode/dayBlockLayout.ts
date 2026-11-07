@@ -1,5 +1,5 @@
 // Readable parallel tasks — decides which overlapping task blocks sit side by
-// side in a Calendar day column, and which clashes become a shelf.
+// side with their names, and which clashes become slim letter bars.
 //
 // The lane packer (store/laneLayout.ts) puts every task of an overlap cluster
 // side by side. In a narrow week column that makes parallel tasks thin,
@@ -7,30 +7,25 @@
 // (READABLE_LANE_PX), capped per view (week 2, day 4 — LANE_CAP). Text is
 // never rotated.
 //
-// A clash that needs more lanes than fit becomes a SHELF (calendar-clock-
-// visuals.md F28): one block over the clash's whole time span with one named
-// row per plan. Nothing is hidden behind a count — every plan stays readable,
-// clickable and draggable (the old "+N" chip hid them, and a hidden plan could
-// not be dragged).
-// Text rule (docs/04-visual-system/design-tokens.md): a block is never
-// narrower than MIN_LANE_PX, so its title always fits with an inset on both
-// sides and ellipsizes instead of touching the edge.
+// A clash whose lanes would be narrower than that keeps every plan as its own
+// slim bar at its real time, named by a letter (calendar-clock-visuals.md F28,
+// clashLabels.ts). Nothing is folded away behind a count, so every plan stays
+// clickable and draggable.
+// Text rule (docs/04-visual-system/design-tokens.md): a name is drawn only
+// where it fits whole; a letter bar carries its letter, the name is in the
+// tooltip and the popup.
 
 /** Narrowest lane that still carries a readable, ellipsized title. */
 export const MIN_LANE_PX = 64;
 /**
  * Narrowest lane worth drawing side by side: a usual plan name ("Read chapter B")
- * fits whole. A clash whose lanes would be narrower becomes a shelf (F28).
+ * fits whole. A clash whose lanes would be narrower becomes letter bars (F28).
  */
 export const READABLE_LANE_PX = 96;
 /** Most lanes a day column shows: the week is an overview, the day has room. */
 export const LANE_CAP = { week: 2, day: 4 } as const;
 /** Padding between block text and the block edge (both sides). */
 export const BLOCK_TEXT_INSET = 4;
-/** Shelf geometry (px): header row, one row per plan, bottom padding. */
-export const SHELF_HEAD_PX = 20;
-export const SHELF_ROW_PX = 21;
-export const SHELF_PAD_PX = 5;
 
 export interface LanePlacement {
   colIndex: number;
@@ -44,8 +39,8 @@ export interface DayBlockSlice {
   endMin: number;
 }
 
-/** A clash shown as one block with a row per plan. */
-export interface ShelfGroup<T extends DayBlockSlice> {
+/** A clash drawn as letter bars (lanes too narrow for names). */
+export interface ClashGroup<T extends DayBlockSlice> {
   startMin: number;
   endMin: number;
   /** In start order (then shorter first, then id). */
@@ -55,20 +50,15 @@ export interface ShelfGroup<T extends DayBlockSlice> {
 export interface DayBlockLayout<T extends DayBlockSlice> {
   maxLanes: number;
   placements: Map<string, LanePlacement>;
-  /** Ids drawn inside a shelf instead of as their own block. */
-  inShelf: Set<string>;
-  shelves: ShelfGroup<T>[];
+  /** Ids drawn as letter bars. */
+  lettered: Set<string>;
+  clashes: ClashGroup<T>[];
 }
 
 /** Lanes that fit in a plan area `planPx` wide. Always at least 1. */
 export function readableLaneCount(planPx: number, minLanePx = MIN_LANE_PX): number {
   if (!Number.isFinite(planPx) || planPx <= 0) return 1;
   return Math.max(1, Math.floor(planPx / minLanePx));
-}
-
-/** Height a shelf needs to show all its rows. */
-export function shelfNeedPx(rows: number): number {
-  return SHELF_HEAD_PX + rows * SHELF_ROW_PX + SHELF_PAD_PX;
 }
 
 /**
@@ -102,19 +92,21 @@ export function layoutDayBlocks<T extends DayBlockSlice>(
   }
 
   const placements = new Map<string, LanePlacement>();
-  const shelves: ShelfGroup<T>[] = [];
-  const inShelf = new Set<string>();
+  const clashes: ClashGroup<T>[] = [];
+  const lettered = new Set<string>();
   for (const cl of clusters) {
-    const lanes = Math.max(...cl.map((sl) => raw.get(sl.id)?.colCount ?? 1));
-    if (cl.length > 1 && lanes > maxLanes) {
-      shelves.push({ startMin: cl[0]!.startMin, endMin: Math.max(...cl.map((s) => s.endMin)), slices: cl });
-      for (const sl of cl) inShelf.add(sl.id);
-    } else if (cl.length === 1) {
+    if (cl.length === 1) {
       // Alone in its time: the whole width, whatever the packer counted.
       placements.set(cl[0]!.id, { colIndex: 0, colCount: 1, span: 1 });
-    } else {
-      for (const sl of cl) placements.set(sl.id, raw.get(sl.id) ?? { colIndex: 0, colCount: 1, span: 1 });
+      continue;
+    }
+    // Every plan of a clash keeps its lane (the packer's columns).
+    for (const sl of cl) placements.set(sl.id, raw.get(sl.id) ?? { colIndex: 0, colCount: 1, span: 1 });
+    const lanes = Math.max(...cl.map((sl) => raw.get(sl.id)?.colCount ?? 1));
+    if (lanes > maxLanes) {
+      clashes.push({ startMin: cl[0]!.startMin, endMin: Math.max(...cl.map((x) => x.endMin)), slices: cl });
+      for (const sl of cl) lettered.add(sl.id);
     }
   }
-  return { maxLanes, placements, inShelf, shelves };
+  return { maxLanes, placements, lettered, clashes };
 }

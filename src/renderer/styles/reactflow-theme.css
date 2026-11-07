@@ -283,52 +283,21 @@
 .cal-block:hover .cal-replan,
 .cal-block .cal-replan:focus-visible { opacity: 1; }
 
-/* Calendar shelf (calendar-clock-visuals.md F28): plans that clash, one named,
-   draggable row each. Nothing hides behind a count. */
-.cal-shelf {
-  display: flex; flex-direction: column; overflow: hidden; border-radius: 6px;
-  background: color-mix(in srgb, var(--paper-2) 92%, var(--ink) 3%);
-  box-shadow: inset 0 0 0 1px var(--paper-3), 0 1px 2px rgba(0, 0, 0, 0.25);
+/* Clashing plans (calendar-clock-visuals.md F28): slim bars side by side, each
+   named by a letter; a clash still ahead gets a Line up tab. */
+.cal-letter {
+  position: relative; z-index: 1; font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  line-height: 14px; color: var(--ink); letter-spacing: 0; pointer-events: none; white-space: nowrap;
 }
-.cal-shelf__head {
-  display: flex; align-items: center; gap: 5px; height: 20px; flex-shrink: 0; padding: 0 4px 0 7px;
-  font-family: var(--font-mono); font-size: 11px; white-space: nowrap; color: var(--ink-2);
+.cal-block[data-plan-state="missed"] .cal-letter { color: color-mix(in srgb, var(--rust) 70%, var(--ink)); }
+.cal-block[data-plan-state="done"] .cal-letter { color: var(--ink-2); }
+.cal-lineup {
+  display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border-radius: 5px; cursor: pointer;
+  font-family: var(--font-mono); font-size: 11px; white-space: nowrap; color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--acid) 50%, transparent);
+  background: color-mix(in srgb, var(--paper) 80%, var(--acid) 20%);
 }
-.cal-shelf__head > svg { color: var(--amber, #d9a55a); flex-shrink: 0; }
-.cal-shelf__count { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.cal-shelf__time { margin-left: auto; color: var(--ink-3); }
-.cal-shelf__lineup {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 4px; height: 16px; padding: 0 5px;
-  border: 0; border-radius: 4px; cursor: pointer; font: inherit; font-size: 11px;
-  color: var(--ink); background: color-mix(in srgb, var(--acid) 18%, transparent);
-}
-.cal-shelf__lineup:hover { background: color-mix(in srgb, var(--acid) 30%, transparent); }
-.cal-shelf__time + .cal-shelf__lineup { margin-left: 4px; }
-.cal-shelf__rows { display: flex; flex-direction: column; padding: 0 1px 3px; min-height: 0; scrollbar-width: thin; }
-.cal-shelf__row {
-  display: flex; align-items: center; gap: 5px; height: var(--row-h, 21px); flex-shrink: 0; padding: 0 4px 0 5px;
-  border-radius: 4px; cursor: grab; font-family: var(--font-sans); font-size: 11px; font-weight: 600; color: var(--ink);
-}
-.cal-shelf__row:nth-child(odd) { background: color-mix(in srgb, var(--ink) 3%, transparent); }
-.cal-shelf__row:hover { background: color-mix(in srgb, var(--acid) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 45%, transparent); }
-.cal-shelf__row[data-plan-state="missed"] .cal-shelf__title { color: var(--rust-ink, var(--rust)); }
-.cal-shelf__row[data-plan-state="done"] .cal-shelf__title { color: var(--ink-2); }
-[data-theme="light"] .cal-shelf__row[data-plan-state="missed"] .cal-shelf__title { color: var(--rust-deep); }
-[data-theme="light"] .cal-shelf__row[data-plan-state="done"] .cal-shelf__title { color: var(--ink); }
-.cal-shelf__dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.cal-shelf__grip { display: none; color: var(--ink-3); width: 7px; justify-content: center; flex-shrink: 0; }
-.cal-shelf__row:hover .cal-shelf__grip { display: inline-flex; }
-.cal-shelf__row:hover .cal-shelf__dot { display: none; }
-.cal-shelf__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cal-shelf__ok { color: var(--acid-ink, var(--acid)); display: inline-flex; flex-shrink: 0; }
-.cal-shelf__miss { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--rust); flex-shrink: 0; }
-.cal-shelf--tiny .cal-shelf__head { justify-content: center; padding: 0; }
-.cal-shelf--tiny .cal-shelf__count { font-weight: 700; color: var(--ink); }
-.cal-shelf--tiny .cal-shelf__row { padding: 0 2px; background: none; }
-.cal-shelf--tiny .cal-shelf__title, .cal-shelf--tiny .cal-shelf__ok, .cal-shelf--tiny .cal-shelf__miss, .cal-shelf--tiny .cal-shelf__grip { display: none !important; }
-.cal-shelf--tiny .cal-shelf__dot { display: block !important; flex: 1; height: calc(var(--row-h, 21px) - 6px); border-radius: 3px; }
-.cal-shelf--tiny .cal-shelf__row[data-plan-state="missed"] .cal-shelf__dot { box-shadow: inset 0 0 0 1.5px var(--rust); opacity: 0.75; }
-.cal-shelf--tiny .cal-shelf__row[data-plan-state="done"] .cal-shelf__dot { opacity: 0.55; }
+.cal-lineup:hover { background: color-mix(in srgb, var(--paper) 65%, var(--acid) 35%); }
 
 /* Unschedule drop zone, shown while a plan is dragged (F28). */
 .cal-unsched {

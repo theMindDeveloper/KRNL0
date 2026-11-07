@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * The shelf (calendar-clock-visuals.md F28): plans that clash where lanes would
- * be cut become one block with a named, draggable row per plan; a drop zone
- * unschedules; "Line up" puts open plans one after another. The tracked-time
- * track sits on the right edge (F29).
+ * Clashing plans (calendar-clock-visuals.md F28): where lanes are too narrow
+ * for names, every plan stays its own slim bar at its own time, named by a
+ * letter; a drop zone unschedules; "Line up" puts open plans one after another.
+ * The tracked-time track sits at the day's left (F29).
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, fireEvent, cleanup, act } from '@testing-library/react';
@@ -68,23 +68,24 @@ const three = () => [
   task('t-c', 'Call with Sam', '2026-05-14T10:15', 90),
 ];
 
-describe('WeekView — shelf (F28)', () => {
-  it('three plans that clash become one shelf with a named row each; no "+N" chip', () => {
+describe('WeekView — clashing plans as letter bars (F28)', () => {
+  it('three plans that clash in a narrow column: each its own bar, named by a letter; no "+N" chip, no hidden plan', () => {
     seed(three());
-    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const shelves = document.querySelectorAll('.cal-shelf');
-    expect(shelves).toHaveLength(1);
-    const rows = Array.from(document.querySelectorAll('[data-testid^="calendar-shelf-row-"]')).map((r) => r.textContent);
-    expect(rows).toEqual(['Read chapter B', 'Read chapter A', 'Call with Sam']);
+    // 2x zoom: a 30-minute bar is tall enough for its letter.
+    render(<WeekView state={{ ...state, zoom: 2 }} config={config} onCommand={() => undefined} />);
+    for (const id of ['t-a', 't-b', 't-c']) expect(document.querySelector('[data-testid="task-block-' + id + '"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="task-letter-t-a"]')!.textContent).toBe('RA');
+    expect(document.querySelector('[data-testid="task-letter-t-b"]')!.textContent).toBe('RB');
+    expect(document.querySelector('[data-testid="task-letter-t-c"]')!.textContent).toBe('C');
     expect(document.querySelector('[data-testid="calendar-overflow-chip"]')).toBeNull();
-    expect(document.querySelector('[data-testid="task-block-t-a"]')).toBeNull();
-    expect(shelves[0]!.textContent).toContain('3 at once');
+    // The full name is still on the bar (tooltip), for hover and screen readers.
+    expect(document.querySelector('[data-testid="task-block-t-c"]')!.getAttribute('title')).toContain('Call with Sam');
   });
 
-  it('every row is draggable, and dragging one shows the unschedule zone; dropping there unschedules it', async () => {
+  it('every bar is draggable, and dragging one shows the unschedule zone; dropping there unschedules it', async () => {
     seed(three());
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const row = document.querySelector('[data-testid="calendar-shelf-row-t-c"]') as HTMLElement;
+    const row = document.querySelector('[data-testid="task-block-t-c"]') as HTMLElement;
     expect(row.getAttribute('draggable')).toBe('true');
     const d = dt();
     fireEvent.dragStart(row, { dataTransfer: d });
@@ -103,7 +104,7 @@ describe('WeekView — shelf (F28)', () => {
   it('the zone also goes away when a drag ends anywhere else', async () => {
     seed(three());
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const row = document.querySelector('[data-testid="calendar-shelf-row-t-a"]') as HTMLElement;
+    const row = document.querySelector('[data-testid="task-block-t-a"]') as HTMLElement;
     fireEvent.dragStart(row, { dataTransfer: dt() });
     await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
     expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeTruthy();
@@ -114,7 +115,7 @@ describe('WeekView — shelf (F28)', () => {
   it('a drop anywhere else (the dragged row may be gone by then) also clears the zone', async () => {
     seed(three());
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const row = document.querySelector('[data-testid="calendar-shelf-row-t-b"]') as HTMLElement;
+    const row = document.querySelector('[data-testid="task-block-t-b"]') as HTMLElement;
     const d = dt();
     fireEvent.dragStart(row, { dataTransfer: d });
     await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
@@ -129,7 +130,7 @@ describe('WeekView — shelf (F28)', () => {
     seed(three());
     const onCommand = vi.fn();
     render(<WeekView state={state} config={config} onCommand={onCommand} />);
-    const btn = document.querySelector('[data-testid^="calendar-shelf-lineup-"]') as HTMLElement;
+    const btn = document.querySelector('[data-testid^="calendar-lineup-"]') as HTMLElement;
     expect(btn).toBeTruthy();
     fireEvent.click(btn);
     const calls = onCommand.mock.calls.filter((c) => c[0] === 'calendar.schedule').map((c) => c[1]);
@@ -144,14 +145,14 @@ describe('WeekView — shelf (F28)', () => {
     vi.setSystemTime(new Date('2026-05-20T08:00:00'));
     seed(three());
     render(<WeekView state={{ ...state, anchorDate: '2026-05-11' }} config={config} onCommand={() => undefined} />);
-    expect(document.querySelector('[data-testid^="calendar-shelf-lineup-"]')).toBeNull();
-    expect(document.querySelectorAll('[data-plan-state="missed"]').length).toBe(3);
+    expect(document.querySelector('[data-testid^="calendar-lineup-"]')).toBeNull();
+    expect(document.querySelectorAll('.cal-block[data-plan-state="missed"]').length).toBe(3);
   });
 
-  it('two plans that fit side by side stay as two blocks', () => {
+  it('two plans in a wide day keep their names (no letters)', () => {
     seed(three().slice(0, 2));
-    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    expect(document.querySelector('.cal-shelf')).toBeNull();
+    render(<WeekView state={{ ...state, anchorDate: '2026-05-14' }} config={config} onCommand={() => undefined} singleDay />);
+    expect(document.querySelector('.cal-letter')).toBeNull();
     expect(document.querySelector('[data-testid="task-block-t-a"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="task-block-t-b"]')).toBeTruthy();
   });
