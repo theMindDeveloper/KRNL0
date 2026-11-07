@@ -31,6 +31,11 @@ describe('clashLabels', () => {
     expect(l[0]!.length).toBeGreaterThan(0);
   });
 
+  it('two titles with no letter at all are numbered, not a crash (the Calendar showed its error screen)', () => {
+    expect(clashLabels(['🎉', '!!!'])).toEqual(['#1', '#2']);
+    expect(clashLabels(['🎉', '🎉', '🎉'])).toEqual(['#1', '#2', '#3']);
+  });
+
   it('non-Latin titles work', () => {
     expect(clashLabels(['読書', '運動'])).toEqual(['読', '運']);
   });

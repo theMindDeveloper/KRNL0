@@ -16,7 +16,9 @@ function words(s: string): string[] {
 function candidates(title: string): string[] {
   const t = title.trim();
   const f = firstChar(t);
-  if (!f) return ['', ''];
+  // No letter or digit at all ("🎉", "!!!"): every level is empty, and the
+  // numbering below names it "#1", "#2", …
+  if (!f) return ['', '', '', ''];
   const ws = words(t);
   const last = ws.length > 1 ? firstChar(ws[ws.length - 1]!) : '';
   const letters = [...t].filter((c) => /[\p{L}\p{N}]/u.test(c)).map((c) => c.toLocaleUpperCase());

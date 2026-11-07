@@ -160,6 +160,8 @@ export function landingTimes(
   day: string,
   today: string,
   nowMs: number,
+  /** Other plans already on that day (epoch-ms spans) that the moved tasks must not land on. */
+  others: ReadonlyArray<readonly [number, number]> = [],
 ): Map<string, string> {
   const out = new Map<string, string>();
   if (day !== today) {
@@ -167,12 +169,25 @@ export function landingTimes(
     return out;
   }
   const quarter = 15 * 60_000;
-  let cursor = Math.ceil(nowMs / quarter) * quarter;
+  const lenMs = (it: { lengthMin: number }) => Math.max(5, Math.round(it.lengthMin)) * 60_000;
+  // Plans still ahead keep their time; the ones that slipped fill free time
+  // after now, around them — landing never makes a new clash.
+  const busy: Array<[number, number]> = others.map(([a, b]) => [a, b]);
+  const slipped: Array<{ id: string; time: string; lengthMin: number }> = [];
   for (const it of [...items].sort((a, b) => a.time.localeCompare(b.time))) {
     const at = new Date(`${day}T${it.time}:00`).getTime();
-    if (Number.isFinite(at) && at >= nowMs) { out.set(it.id, `${day}T${it.time}`); continue; }
+    if (Number.isFinite(at) && at >= nowMs) { out.set(it.id, `${day}T${it.time}`); busy.push([at, at + lenMs(it)]); }
+    else slipped.push(it);
+  }
+  let cursor = Math.ceil(nowMs / quarter) * quarter;
+  for (const it of slipped) {
+    const len = lenMs(it);
+    for (let hit = busy.find(([a, b]) => cursor < b && a < cursor + len); hit; hit = busy.find(([a, b]) => cursor < b && a < cursor + len)) {
+      cursor = Math.ceil(hit[1] / (5 * 60_000)) * 5 * 60_000;
+    }
     out.set(it.id, localMinute(cursor));
-    cursor += Math.max(5, Math.round(it.lengthMin)) * 60_000;
+    busy.push([cursor, cursor + len]);
+    cursor += len;
   }
   return out;
 }

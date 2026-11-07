@@ -209,9 +209,14 @@ export async function calLineup(
     items.push({ taskId: anchor, startMs, lengthMin: Math.round((endMs - startMs) / 60_000) });
   }
   const moves = lineUp(items, nowMs);
-  for (const mv of moves) {
+  for (const [i, mv] of moves.entries()) {
     const res = await taskSchedule({ boardPath: ctx.boardPath }, mv.taskId, mv.scheduledFor);
-    if (!res.ok) return res;
+    if (!res.ok) {
+      // Moves before this one are already saved: show them, and say so.
+      if (i > 0) ctx.onBoardChanged?.();
+      const why = res.message ?? 'cal lineup: a move failed';
+      return { ok: false, message: i > 0 ? `${why} (${i} of ${moves.length} moved before this)` : why };
+    }
   }
   if (moves.length) ctx.onBoardChanged?.();
   const text = moves.length === 0 ? 'Already lined up.' : moves.map((m) => `${m.taskId.slice(0, 8)} -> ${m.scheduledFor.replace('T', ' ')}`).join('\n');

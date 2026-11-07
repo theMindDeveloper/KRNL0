@@ -52,10 +52,23 @@ function moving(tasks: readonly SlippedTask[]): Array<{ id: string; time: string
  * A follower that slipped too moves with its head. Moving to today never
  * lands on a time already past (F27): those line up from now.
  */
+/** The day's other open plans, as spans, so moved tasks land around them. */
+function plansOn(day: string, moving: ReadonlySet<string>): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const n of useBoardStore.getState().board?.nodes ?? []) {
+    if (n.kind !== 'todo.task' || moving.has(n.id)) continue;
+    const s = n.state as { scheduledFor?: unknown; done?: unknown };
+    if (s.done === true || typeof s.scheduledFor !== 'string' || !s.scheduledFor.startsWith(`${day}T`)) continue;
+    const at = new Date(s.scheduledFor).getTime();
+    if (Number.isFinite(at)) out.push([at, at + lengthOf(n.id) * 60_000]);
+  }
+  return out;
+}
+
 async function plan(tasks: readonly SlippedTask[], day: string | null): Promise<void> {
   const { makeCommandHandler } = await import('../Canvas/commandDispatch');
   const items = moving(tasks);
-  const at = day === null ? null : landingTimes(items, day, todayYMD(), Date.now());
+  const at = day === null ? null : landingTimes(items, day, todayYMD(), Date.now(), plansOn(day, new Set(items.map((i) => i.id))));
   for (const it of items) makeCommandHandler(it.id)('task.setSchedule', { scheduledFor: at === null ? null : at.get(it.id) ?? null });
   refreshWelcomeBack();
 }

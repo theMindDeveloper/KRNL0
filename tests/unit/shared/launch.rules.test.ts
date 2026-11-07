@@ -182,6 +182,18 @@ describe('feedback links stay openable with any title (F16, CLI too)', () => {
     expect(isAllowedExternalUrl(mail)).toBe(true);
     expect(new URL(issue).searchParams.get('title')!.length).toBeLessThanOrEqual('Bug: '.length + MAX_TITLE_LENGTH);
   });
+  it('an emoji right at the cut is kept whole or dropped, never split (a half emoji made the link throw)', () => {
+    for (let pad = 115; pad <= 121; pad++) {
+      const r = { kind: 'idea' as const, title: 'a'.repeat(pad) + '\u{1F600}'.repeat(10), text: 'x', diagnostics: null, includeErrors: false };
+      expect(() => buildIssueUrl(r)).not.toThrow();
+      expect(() => buildMailto(r)).not.toThrow();
+    }
+  });
+  it('a long body full of emoji is shortened without splitting one', () => {
+    const r = { kind: 'bug' as const, title: 't', text: '\u{1F600}'.repeat(4001) + 'x', diagnostics: null, includeErrors: false };
+    expect(() => buildIssueUrl(r)).not.toThrow();
+    expect(() => buildMailto(r)).not.toThrow();
+  });
 });
 
 describe('krnl feedback --kind', () => {

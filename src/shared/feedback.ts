@@ -75,9 +75,21 @@ export function issueBody(r: FeedbackReport): string {
 
 /** Titles longer than this are cut (the dialog stops at it; the CLI may not). */
 export const MAX_TITLE_LENGTH = 120;
+/**
+ * The first `max` UTF-16 units of `s`, cut on whole characters: half an emoji
+ * (a lone surrogate) makes encodeURIComponent throw, and the link never opens.
+ */
+function cutWhole(s: string, max: number): string {
+  let out = '';
+  for (const ch of s) {
+    if (out.length + ch.length > max) break;
+    out += ch;
+  }
+  return out;
+}
 const titleOf = (t: string): string => {
   const s = t.trim().replace(/\s+/g, ' ');
-  return s.length > MAX_TITLE_LENGTH ? `${s.slice(0, MAX_TITLE_LENGTH - 1)}…` : s;
+  return s.length > MAX_TITLE_LENGTH ? `${cutWhole(s, MAX_TITLE_LENGTH - 1)}…` : s;
 };
 
 /**
@@ -113,7 +125,7 @@ export function buildIssueUrl(r: FeedbackReport): string {
     url = make(rep);
   }
   while (url.length > MAX_URL_LENGTH && rep.text.length > 200) {
-    rep = { ...rep, text: `${rep.text.slice(0, Math.floor(rep.text.length * 0.8))}… (shortened)` };
+    rep = { ...rep, text: `${cutWhole(rep.text, Math.floor(rep.text.length * 0.8))}… (shortened)` };
     url = make(rep);
   }
   return url;
@@ -138,7 +150,7 @@ export function buildMailto(r: FeedbackReport): string {
     url = make(rep);
   }
   while (url.length > MAX_MAILTO_LENGTH && rep.text.length > 120) {
-    rep = { ...rep, text: `${rep.text.slice(0, Math.floor(rep.text.length * 0.8))}… (shortened)` };
+    rep = { ...rep, text: `${cutWhole(rep.text, Math.floor(rep.text.length * 0.8))}… (shortened)` };
     url = make(rep);
   }
   return url;

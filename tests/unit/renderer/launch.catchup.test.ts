@@ -159,6 +159,21 @@ describe('landing times when moving slipped tasks (F27)', () => {
     expect([...at.values()]).toEqual(['2026-11-08T09:00', '2026-11-08T11:00', '2026-11-08T21:00']);
   });
 
+  it('slipped tasks land around a plan still ahead, never on top of it', () => {
+    const at = landingTimes([
+      { id: 'slipped', time: '08:00', lengthMin: 60 },
+      { id: 'ahead', time: '19:30', lengthMin: 30 },
+    ], '2026-11-07', '2026-11-07', now);
+    expect(at.get('ahead')).toBe('2026-11-07T19:30');
+    expect(at.get('slipped')).toBe('2026-11-07T20:00');
+  });
+
+  it('…and around the day’s other plans that are not moving', () => {
+    const other = [[new Date('2026-11-07T19:15:00').getTime(), new Date('2026-11-07T20:10:00').getTime()]] as const;
+    const at = landingTimes([{ id: 'slipped', time: '08:00', lengthMin: 30 }], '2026-11-07', '2026-11-07', now, other);
+    expect(at.get('slipped')).toBe('2026-11-07T20:10');
+  });
+
   it('nothing ever lands in the past, even late at night (it runs on past midnight)', () => {
     const night = new Date('2026-11-07T23:50:00').getTime();
     const at = landingTimes(items, '2026-11-07', '2026-11-07', night);

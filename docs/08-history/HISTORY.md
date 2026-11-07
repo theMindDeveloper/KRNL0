@@ -1720,3 +1720,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/AmbientRadio/index.tsx`
 **Summary:** Seen in the real-app capture with a fresh profile: the radio opened floating at the top right, exactly over the Station's Calendar, for every new user — and tucking it to the edge was not remembered (the edge state started as floating on every launch), so it came back over the Calendar after each restart. A first run now starts docked as the 14 px edge tab; the docked side is saved (`krnl0-ambient-radio-edge`) and restored against the current window's edge. The header's "−" text glyph is a drawn icon ("Tuck to the edge"). Checked in the preview: first run docked and clear of the Calendar; open → floating; tuck → reload → still tucked.
+
+## [2026-11-07] — Sweep: emoji-safe feedback links, letterless clash names, Welcome back lands in free time
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/feedback.ts`, `src/renderer/components/nodes/CalendarNode/clashLabels.ts`, `src/renderer/launch/catchup.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `src/sys/commands/cal.ts`, tests (`launch.rules`, `calendar.clashLabels`, `launch.catchup`)
+**Summary:** Code sweep of today's merges. (1) Feedback links cut long titles and bodies by UTF-16 units, so an emoji at the cut was split in half and `encodeURIComponent` threw — the Send button did nothing; cuts now land on whole characters. (2) Two clashing plans whose titles have no letter or digit (an emoji-only title) crashed the Calendar's letter naming; they are now numbered `#1`, `#2`. (3) Welcome back's "move to today" lined slipped tasks up from the next quarter hour without looking at plans already there, so it could create a new clash; slipped tasks now land in free time around the day's other open plans. (4) `krnl cal lineup` now refreshes the board and says how many moves landed when a later move fails. Each fix has a test that fails on the old code.
