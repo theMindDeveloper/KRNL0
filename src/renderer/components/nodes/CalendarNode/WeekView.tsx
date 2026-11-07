@@ -18,7 +18,7 @@ import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange, selectSchedule } from '../../../store/scheduleSelector';
 import { packLanes } from '../../../store/laneLayout';
-import { layoutDayBlocks, BLOCK_TEXT_INSET, LANE_CAP, READABLE_LANE_PX } from './dayBlockLayout';
+import { layoutDayBlocks, BLOCK_TEXT_INSET, LANE_CAP, MIN_LANE_PX, READABLE_LANE_PX } from './dayBlockLayout';
 import { clashLabels } from './clashLabels';
 import { lineUp } from './lineUp';
 import { AppSelect } from '../../ui/AppSelect';
@@ -240,8 +240,12 @@ function CalIcon({ name, size = 11 }: { name: keyof typeof CAL_ICONS; size?: num
 }
 
 /** Where the tracked-time track sits in a day, and the lane it keeps (px). */
-const TRACK_LEFT = (singleDay: boolean): number => (singleDay ? 11 : 9);
-const RAIL_PX = (singleDay: boolean): number => TRACK_LEFT(singleDay) + (singleDay ? 6 : 4);
+// The tracked-time lane (F29, draft A): a recessed slot at the day's left,
+// wide enough to read as its own lane. A day under 70 px wide (the Station
+// week) gets a slimmer slot so plans keep their room. Plans start 3 px after it.
+const TRACK_LEFT = (singleDay: boolean, tiny = false): number => (singleDay ? 5 : tiny ? 3 : 4);
+const TRACK_W = (singleDay: boolean, tiny = false): number => (singleDay ? 14 : tiny ? 6 : 11);
+const RAIL_PX = (singleDay: boolean, tiny = false): number => TRACK_LEFT(singleDay, tiny) + TRACK_W(singleDay, tiny) + 1;
 
 type HabitScheduleKind = 'weekly' | 'daily';
 
@@ -256,7 +260,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // blocks next to the plan. Minutes live in the hover / click popup.
   // Pomo spans are background highlights now, so blocks need no rail gutter.
   // The recorded rail's lane: inset from the day line, then the plan blocks.
-  const rail = `${RAIL_PX(singleDay)}px`;
   // Layers live in the calendar's state (calendar.setLayers / `krnl cal layers`).
   const layers: CalLayers = calendarLayersOf(state);
   const toggleLayer = (k: keyof CalLayers): void => {
@@ -287,6 +290,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // #10 — day view anchors on anchorDate and shows one column; week view anchors
   // on the Monday and shows seven. dayCount drives the column grid throughout.
   const dayCount = singleDay ? 1 : 7;
+  const tinyDays = !singleDay && gridW > 0 && (gridW - GUTTER_WIDTH) / dayCount < 70;
+  const rail = `${RAIL_PX(singleDay, tinyDays)}px`;
   const mondayYMD = getMondayYMD(state.anchorDate);
   const baseYMD = singleDay ? state.anchorDate : mondayYMD;
 
@@ -1068,7 +1073,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     // A clash narrower than that is slim letter bars (F28) — every plan still
     // its own block at its own time, nothing hidden behind a count.
     const colPxAll = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-    const railNumAll = RAIL_PX(singleDay);
+    const railNumAll = RAIL_PX(singleDay, tinyDays);
     const dayLayout = layoutDayBlocks(
       slices.map((sl) => ({ id: sl.task.id, startMin: sl.sliceStartMin, endMin: sl.sliceEndMin, slice: sl })),
       rawLayout,
@@ -1291,13 +1296,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // How much text fits: measured column width × this block's lanes.
       // Unmeasured (tests / first paint) counts as roomy.
       const colPx = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-      const railNum = RAIL_PX(singleDay);
+      const railNum = RAIL_PX(singleDay, tinyDays);
       const widthPx = ((colPx - railNum) * span) / colCount - 3;
       // Text is never rotated: a lane too narrow for a title is a plain bar
       // (its name is in the tooltip); short blocks show the title on one line.
       // F28 — a plan in a clash too narrow for names is a slim bar with its
       // letter (the name is in the tooltip and the popup).
-      const letter = letterOf.get(task.id);
+      // A block alone but too narrow for a readable name (the Station week)
+      // follows the same rule: its first character, not "O…".
+      const letter = letterOf.get(task.id) ?? (widthPx < MIN_LANE_PX ? clashLabels([task.text])[0] : undefined);
       const detail: 'none' | 'letter' | 'title' | 'full' =
         letter !== undefined ? 'letter'
         : heightPx < 14 || widthPx < 34 ? 'none'
@@ -1335,8 +1342,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             // read as one slab.
             top: topPx + BLOCK_GAP / 2,
             // The tracked-time rail keeps the left edge; plans fill the rest.
-            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + 2px)`,
-            right: `calc((100% - ${rail}) * ${rightFrac} + 3px)`,
+            // Letter bars sit 1 px apart on each side (a 2 px gap) so narrow
+            // lanes keep their width; named blocks keep the roomier inset.
+            left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + ${detail === 'letter' ? 1 : 2}px)`,
+            right: `calc((100% - ${rail}) * ${rightFrac} + ${detail === 'letter' ? 1 : 3}px)`,
             height: Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP),
             // Calm by default: a tinted card with a solid colour edge. Done
             // fades; missed is a lighter tint; overrun is a rust strip on the
@@ -1766,11 +1775,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // that fills, like the Clock's ring but straight, with what you tracked.
   // It sits beside the plans, never on them. A running span has moving
   // stripes and grows; a break is a gap.
-  // Which day a track belongs to is read from spacing: well inside its own
-  // day, away from the day line, almost touching its own plans (week: 9 px from
-  // the line, 2 px from its plans; the previous day's plans are 13 px away).
-  const trackW = singleDay ? 6 : 4;
-  const trackLeft = TRACK_LEFT(singleDay);
+  // The lane is a slot carved into its own day (inner shadow, its own edge),
+  // so it reads as part of that day, not as the line between two days.
+  const trackW = TRACK_W(singleDay, tinyDays);
+  const trackLeft = TRACK_LEFT(singleDay, tinyDays);
   function renderRealityBlocks(dayYMD: string) {
     if (!layers.recorded) return null;
     const segs = realityByDay.get(dayYMD) ?? [];
@@ -1778,10 +1786,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       <div
         key="reality-track"
         data-testid="calendar-reality-track"
+        className="cal-lane"
         aria-hidden
         style={{
-          position: 'absolute', top: 0, bottom: 0, left: trackLeft, width: trackW, borderRadius: 999,
-          background: 'color-mix(in srgb, var(--ink) 4%, transparent)', pointerEvents: 'none', zIndex: 0,
+          position: 'absolute', top: 2, bottom: 2, left: trackLeft, width: trackW, borderRadius: 6,
+          pointerEvents: 'none', zIndex: 0,
         }}
       />
     );
@@ -1808,12 +1817,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           style={{
             position: 'absolute',
             top: topPx + 1,
-            left: trackLeft,
-            width: trackW,
+            // Inside the slot, 2 px from its walls.
+            left: trackLeft + 2,
+            width: trackW - 4,
             height: Math.max(2, heightPx - 2),
             pointerEvents: 'none',
             zIndex: 1,
-            borderRadius: 3,
+            borderRadius: 4,
             // A break draws nothing: it is the gap in the track (hover keeps its title).
             background: !isWork ? 'transparent'
               : seg.live ? `repeating-linear-gradient(135deg, ${tone} 0 4px, color-mix(in srgb, ${tone} 50%, transparent) 4px 8px)`
@@ -2122,7 +2132,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 animation: isToday ? 'krnl-today-pulse 2s ease-in-out infinite' : undefined,
               }}
             >
-              {DAY_LABELS[ymdToIsoDow(dayYMD) - 1]} {dayNum}
+              {/* A narrow day (the Station week) shows "S 7": full names would run into each other. */}
+              {tinyDays ? DAY_LABELS[ymdToIsoDow(dayYMD) - 1]!.slice(0, 1) : DAY_LABELS[ymdToIsoDow(dayYMD) - 1]} {dayNum}
               {(() => {
                 // The day's tracked total, beside its name (F29) — when it fits.
                 if (!layers.recorded) return null;

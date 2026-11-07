@@ -238,6 +238,12 @@ export function initPocket(options: PocketOptions): PocketPort {
   opts = options;
   prefs = loadPrefs();
 
+  // A monitor unplugged (a laptop undocked) or rearranged: pull the floating
+  // timer back onto a screen that still exists.
+  const refit = (): void => { if (pocket && !pocket.isDestroyed() && pocket.isVisible()) applySize(); };
+  screen.on('display-removed', refit);
+  screen.on('display-metrics-changed', refit);
+
   // The main window's renderer: the latest Pomo snapshot.
   ipcMain.on('pocket:state', (e, raw: unknown) => {
     if (!fromMain(e)) return;

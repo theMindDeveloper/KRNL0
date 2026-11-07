@@ -341,3 +341,15 @@
   .todo-tag { max-width: 72px !important; }
 }
 
+
+/* The tracked-time lane (calendar-clock-visuals F29): a slot carved into the
+   left of each day — darker than the day, an inner shadow at the top, a hairline
+   edge — that recorded focus fills. */
+.cal-lane {
+  background: color-mix(in srgb, var(--paper) 70%, #000 30%);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55), inset 0 0 0 1px color-mix(in srgb, var(--ink) 9%, transparent);
+}
+[data-theme="light"] .cal-lane {
+  background: color-mix(in srgb, var(--paper) 88%, #000 12%);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}

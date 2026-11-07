@@ -152,8 +152,8 @@ describe('Calendar pomo spans as background highlights', () => {
     expect(band.style.zIndex).toBe('1');
     expect(band.getAttribute('data-reality-kind')).toBe('work');
     // Recorded time fills a thin track at the day's left, beside its own plans (calendar F29).
-    expect(band.style.left).toBe('11px');
-    expect(band.style.width).toBe('6px');
+    expect(band.style.left).toBe('7px');
+    expect(band.style.width).toBe('10px');
     expect(document.querySelector('[data-testid="calendar-reality-track"]')).toBeTruthy();
   });
 
