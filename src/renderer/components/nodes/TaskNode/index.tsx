@@ -71,6 +71,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     if (!state.scheduledFor) return;
+    // Fresh clock on every (re)schedule: the card may have sat unscheduled
+    // since it mounted, and a plan put into a past slot reads "missed" at once.
+    setNowMs(Date.now());
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
   }, [state.scheduledFor]);

@@ -1699,3 +1699,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/launch/milestones.ts`, `src/renderer/components/Launch/HelpMenu.tsx`, `src/renderer/styles/launch.css`, `tests/unit/renderer/launch.catchup.test.ts`
 **Summary:** Read through today's logic modules: finished-cards grouping (union-find, all-done rule), the day recap (once a minute, not on every edit), the pocket bridge (sends only when the Pomo, Todo or mode changes), the launch flow (one dialog at a time; milestones can't fire twice) — correct. One finding: on a new board Share offered a "0 focus sessions" card; it now needs at least one session, and with nothing to share the Help menu says "after a streak or focus session" on a disabled item instead of a button that does nothing.
+
+## [2026-11-07] — Task card reads "missed" at once when planned into the past
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`
+**Summary:** Review of the task card: its minute clock only runs while the task has a time, and held the time the card mounted. A card unscheduled since the morning and then planned into an earlier slot showed as not missed for up to a minute. The clock is now refreshed on every (re)schedule. Rest of the card (pomo subscription by field, timers only while needed, the one-shot done pop) is correct.
