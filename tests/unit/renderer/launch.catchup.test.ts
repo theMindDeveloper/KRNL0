@@ -1,6 +1,6 @@
 /** Decision 38 — Welcome back and milestones (launch-experience.md F12–F15, F20–F23). */
 import { describe, it, expect } from 'vitest';
-import { bestStreak, computeCatchup, describeCatchup, isEmptyCatchup, movedSchedule } from '../../../src/renderer/launch/catchup';
+import { bestStreak, computeCatchup, describeCatchup, isEmptyCatchup, landingTimes, movedSchedule } from '../../../src/renderer/launch/catchup';
 import { findNewMilestone, focusStats, milestoneLine, shareCardFor } from '../../../src/renderer/launch/milestones';
 
 const TODAY = '2026-11-06';
@@ -136,5 +136,33 @@ describe('milestones (F20–F23)', () => {
     expect(shareCardFor(nodes, TODAY, { kind: 'streak' })).toMatchObject({ habit: 'Read 20 pages', value: 9 });
     expect(shareCardFor(nodes, TODAY, { kind: 'streak', habit: 'morning' })).toMatchObject({ habit: 'Morning run', value: 4 });
     expect(shareCardFor(nodes, TODAY, { kind: 'streak', habit: 'swim' })).toBeNull();
+  });
+});
+
+describe('landing times when moving slipped tasks (F27)', () => {
+  const items = [
+    { id: 'early', time: '09:00', lengthMin: 30 },
+    { id: 'mid', time: '11:00', lengthMin: 45 },
+    { id: 'late', time: '21:00', lengthMin: 60 },
+  ];
+  const now = new Date('2026-11-07T19:07:00').getTime();
+
+  it('to today: times already past line up from the next quarter hour, in order; later times stay', () => {
+    const at = landingTimes(items, '2026-11-07', '2026-11-07', now);
+    expect(at.get('early')).toBe('2026-11-07T19:15');
+    expect(at.get('mid')).toBe('2026-11-07T19:45');
+    expect(at.get('late')).toBe('2026-11-07T21:00');
+  });
+
+  it('to another day: every task keeps its time', () => {
+    const at = landingTimes(items, '2026-11-08', '2026-11-07', now);
+    expect([...at.values()]).toEqual(['2026-11-08T09:00', '2026-11-08T11:00', '2026-11-08T21:00']);
+  });
+
+  it('nothing ever lands in the past, even late at night (it runs on past midnight)', () => {
+    const night = new Date('2026-11-07T23:50:00').getTime();
+    const at = landingTimes(items, '2026-11-07', '2026-11-07', night);
+    for (const v of at.values()) expect(new Date(v).getTime()).toBeGreaterThanOrEqual(night);
+    expect(at.get('early')).toBe('2026-11-08T00:00');
   });
 });

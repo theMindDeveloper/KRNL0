@@ -609,6 +609,18 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     window.setTimeout(() => setDragTaskId(task.id), 0);
   };
   const endTaskDrag = () => { setDragTaskId(null); setUnschedHot(false); };
+  // A drop that moves the plan unmounts the element it was dragged from, and
+  // then no dragend reaches it — so any drop or dragend in the window ends it.
+  useEffect(() => {
+    if (!dragTaskId) return;
+    const end = () => { setDragTaskId(null); setUnschedHot(false); };
+    window.addEventListener('drop', end, true);
+    window.addEventListener('dragend', end, true);
+    return () => {
+      window.removeEventListener('drop', end, true);
+      window.removeEventListener('dragend', end, true);
+    };
+  }, [dragTaskId]);
   // Right-click menu (shared with the Clock — ContextMenu/scheduleMenus.ts).
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const openItemMenu = (item: LayerItem, x: number, y: number) => {

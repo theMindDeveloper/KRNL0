@@ -11,7 +11,8 @@ import { createPortal } from 'react-dom';
 import { Z } from '../ui/layers';
 import { CloseButton } from '../ui/CloseButton';
 import { closeWelcomeBack, refreshWelcomeBack, todayYMD, useLaunchStore } from '../../launch/launchStore';
-import { movedSchedule, type Catchup, type SlippedTask } from '../../launch/catchup';
+import { landingTimes, type Catchup, type SlippedTask } from '../../launch/catchup';
+import { useBoardStore } from '../../store/boardStore';
 import { focusNode } from '../../store/scheduleActions';
 import { toneVarForTask } from '../../utils/taskColor';
 
@@ -28,28 +29,38 @@ function dayParts(ymd: string): { dow: string; num: string } {
   return { dow: d.toLocaleDateString('en-GB', { weekday: 'short' }), num: String(d.getDate()) };
 }
 
-/** Re-plan a task through its own node's command (the store path, rule 5). */
-async function plan(task: SlippedTask, day: string | null): Promise<void> {
-  const { makeCommandHandler } = await import('../Canvas/commandDispatch');
-  makeCommandHandler(task.id)('task.setSchedule', { scheduledFor: day === null ? null : movedSchedule(task, day) });
-  // A follower that slipped too moves with its head (same day, its own time).
-  for (const f of task.followers) {
-    if (f.time !== undefined) makeCommandHandler(f.id)('task.setSchedule', { scheduledFor: day === null ? null : movedSchedule({ time: f.time }, day) });
+/** How long a task's block is, from the board (its plan, else 30 minutes). */
+function lengthOf(id: string): number {
+  const n = useBoardStore.getState().board?.nodes.find((x) => x.id === id);
+  const s = (n?.state ?? {}) as { scheduledDurationMin?: unknown; plannedMin?: unknown };
+  const v = typeof s.scheduledDurationMin === 'number' ? s.scheduledDurationMin : typeof s.plannedMin === 'number' ? s.plannedMin : 30;
+  return v > 0 ? v : 30;
+}
+
+/** Every task that moves: the heads, and the followers that slipped too. */
+function moving(tasks: readonly SlippedTask[]): Array<{ id: string; time: string; lengthMin: number }> {
+  const out: Array<{ id: string; time: string; lengthMin: number }> = [];
+  for (const t of tasks) {
+    out.push({ id: t.id, time: t.time, lengthMin: lengthOf(t.id) });
+    for (const f of t.followers) if (f.time !== undefined) out.push({ id: f.id, time: f.time, lengthMin: lengthOf(f.id) });
   }
+  return out;
+}
+
+/**
+ * Re-plan tasks through their own node's command (the store path, rule 5).
+ * A follower that slipped too moves with its head. Moving to today never
+ * lands on a time already past (F27): those line up from now.
+ */
+async function plan(tasks: readonly SlippedTask[], day: string | null): Promise<void> {
+  const { makeCommandHandler } = await import('../Canvas/commandDispatch');
+  const items = moving(tasks);
+  const at = day === null ? null : landingTimes(items, day, todayYMD(), Date.now());
+  for (const it of items) makeCommandHandler(it.id)('task.setSchedule', { scheduledFor: at === null ? null : at.get(it.id) ?? null });
   refreshWelcomeBack();
 }
 
-async function moveAll(tasks: readonly SlippedTask[]): Promise<void> {
-  const { makeCommandHandler } = await import('../Canvas/commandDispatch');
-  const today = todayYMD();
-  for (const t of tasks) {
-    makeCommandHandler(t.id)('task.setSchedule', { scheduledFor: movedSchedule(t, today) });
-    for (const f of t.followers) {
-      if (f.time !== undefined) makeCommandHandler(f.id)('task.setSchedule', { scheduledFor: movedSchedule({ time: f.time }, today) });
-    }
-  }
-  refreshWelcomeBack();
-}
+const moveAll = (tasks: readonly SlippedTask[]): Promise<void> => plan(tasks, todayYMD());
 
 const PATHS: Record<string, ReactNode> = {
   today: <><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></>,
@@ -155,9 +166,9 @@ export function WelcomeBack() {
                       ))}
                     </div>
                     <div className="wb-task__actions">
-                      <button type="button" className="ln-btn ln-btn--xs ln-btn--primary wb-ic" onClick={() => { void plan(t, today); }} title={`Plan it today at ${t.time}`}><Icon name="today" size={13} />Today</button>
-                      <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { void plan(t, addDays(today, 1)); }} title={`Tomorrow at ${t.time}`} aria-label="Tomorrow"><Icon name="tomorrow" size={14} /></button>
-                      <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { void plan(t, null); }} title="Take it off the calendar (it stays in your list)" aria-label="Unplan"><Icon name="unplan" size={14} /></button>
+                      <button type="button" className="ln-btn ln-btn--xs ln-btn--primary wb-ic" onClick={() => { void plan([t], today); }} title={`Plan it today at ${t.time} (or from now, if that time has passed)`}><Icon name="today" size={13} />Today</button>
+                      <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { void plan([t], addDays(today, 1)); }} title={`Tomorrow at ${t.time}`} aria-label="Tomorrow"><Icon name="tomorrow" size={14} /></button>
+                      <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { void plan([t], null); }} title="Take it off the calendar (it stays in your list)" aria-label="Unplan"><Icon name="unplan" size={14} /></button>
                       <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { closeWelcomeBack(); focusNode(t.id); }} title="Show it on the canvas" aria-label="Show on the canvas"><Icon name="locate" size={14} /></button>
                     </div>
                   </div>

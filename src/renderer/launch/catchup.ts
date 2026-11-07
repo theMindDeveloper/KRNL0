@@ -143,6 +143,40 @@ export function movedSchedule(task: Pick<SlippedTask, 'time'>, day: string): str
   return `${day}T${task.time}`;
 }
 
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+const localMinute = (ms: number): string => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+
+/**
+ * Where moved tasks land on `day` (launch-experience.md F27). Another day keeps
+ * each task's time. Today, a time already past would read "Missed" the moment
+ * it lands, so those tasks are lined up from the next quarter hour after now,
+ * in their old order, each as long as its plan; times still ahead are kept.
+ */
+export function landingTimes(
+  items: ReadonlyArray<{ id: string; time: string; lengthMin: number }>,
+  day: string,
+  today: string,
+  nowMs: number,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  if (day !== today) {
+    for (const it of items) out.set(it.id, `${day}T${it.time}`);
+    return out;
+  }
+  const quarter = 15 * 60_000;
+  let cursor = Math.ceil(nowMs / quarter) * quarter;
+  for (const it of [...items].sort((a, b) => a.time.localeCompare(b.time))) {
+    const at = new Date(`${day}T${it.time}:00`).getTime();
+    if (Number.isFinite(at) && at >= nowMs) { out.set(it.id, `${day}T${it.time}`); continue; }
+    out.set(it.id, localMinute(cursor));
+    cursor += Math.max(5, Math.round(it.lengthMin)) * 60_000;
+  }
+  return out;
+}
+
 /** Nothing slipped and no habit to mention: the dialog has nothing to say. */
 export function isEmptyCatchup(c: Catchup): boolean {
   return c.tasks.length === 0 && c.habits.length === 0;

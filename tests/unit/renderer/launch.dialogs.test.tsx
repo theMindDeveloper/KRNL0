@@ -92,14 +92,16 @@ describe('Welcome back (F13, F14)', () => {
 });
 
 describe('Welcome back moves a chain together (F14)', () => {
-  it('"Bring all" moves a follower that slipped too, keeping its time', async () => {
+  const runBringAll = async (clock: string) => {
     // Load the command module first: the dialog imports it on demand.
     await import('../../../src/renderer/components/Canvas/commandDispatch');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(clock));
     bridge();
     const board = {
       nodes: [
-        { id: 'a', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Head', done: false, scheduledFor: '2020-01-02T09:00' } },
-        { id: 'b', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Follower', done: false, scheduledFor: '2020-01-03T15:30' } },
+        { id: 'a', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Head', done: false, scheduledFor: '2020-01-02T09:00', plannedMin: 30 } },
+        { id: 'b', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Follower', done: false, scheduledFor: '2020-01-03T15:30', plannedMin: 45 } },
       ],
       edges: [{ id: 'e', from: { nodeId: 'a', event: 'task.next' }, to: { nodeId: 'b', command: 'task.activate' } }],
     };
@@ -107,11 +109,21 @@ describe('Welcome back moves a chain together (F14)', () => {
     act(() => { openWelcomeBack(true, 4 * 86_400_000); });
     render(<WelcomeBack />);
     fireEvent.click(screen.getByTestId('welcome-done'));
-    const st = (id: string) => (useBoardStore.getState().board!.nodes.find((n) => n.id === id)!.state as { scheduledFor?: string }).scheduledFor;
-    const today = new Date();
-    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    await vi.waitFor(() => expect(st('a')).toBe(`${ymd}T09:00`), { timeout: 5000 });
-    expect(st('b')).toBe(`${ymd}T15:30`);
+    return (id: string) => (useBoardStore.getState().board!.nodes.find((n) => n.id === id)!.state as { scheduledFor?: string }).scheduledFor;
+  };
+
+  it('"Bring all" moves a follower that slipped too, keeping its time when that is still ahead', async () => {
+    const st = await runBringAll('2026-11-07T06:00:00');
+    await vi.waitFor(() => expect(st('a')).toBe('2026-11-07T09:00'), { timeout: 5000 });
+    expect(st('b')).toBe('2026-11-07T15:30');
+    vi.useRealTimers();
+  }, 20_000);
+
+  it('"Bring all" late in the day: times already past line up from now, never land in the past (F27)', async () => {
+    const st = await runBringAll('2026-11-07T19:07:00');
+    await vi.waitFor(() => expect(st('a')).toBe('2026-11-07T19:15'), { timeout: 5000 });
+    expect(st('b')).toBe('2026-11-07T19:45');
+    vi.useRealTimers();
   }, 20_000);
 });
 

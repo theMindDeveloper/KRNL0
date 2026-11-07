@@ -52,6 +52,7 @@ Everything here is about the moments around using KRNL0: opening it, after an up
 
 **Pomo node**
 - **F26** The Observe day strip draws work as rounded segments with a clean gap between them, breaks as a thin line through the gap, and a small "now" marker — no hatching. The pocket timer shows the same strip.
+- **F27** Moving slipped tasks to **today** (Move all, Bring all, Today) never lands on a time already past: those tasks line up from the next quarter hour after now, in their old order, each as long as its plan (`landingTimes`); times still ahead today keep their time; Tomorrow keeps every time. Otherwise a task brought back at 19:00 for 09:00 would read "Missed" the moment it lands.
 
 ## Non-Functional Requirements
 

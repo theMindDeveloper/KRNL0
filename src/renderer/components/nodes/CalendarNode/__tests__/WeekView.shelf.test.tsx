@@ -111,6 +111,20 @@ describe('WeekView — shelf (F28)', () => {
     expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeNull();
   });
 
+  it('a drop anywhere else (the dragged row may be gone by then) also clears the zone', async () => {
+    seed(three());
+    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
+    const row = document.querySelector('[data-testid="calendar-shelf-row-t-b"]') as HTMLElement;
+    const d = dt();
+    fireEvent.dragStart(row, { dataTransfer: d });
+    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
+    expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeTruthy();
+    const cell = document.querySelector('[data-testid="week-cell-2026-05-15-09"]') as HTMLElement;
+    fireEvent.drop(cell, { dataTransfer: d });
+    expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeNull();
+    expect(unscheduleTask).not.toHaveBeenCalled();
+  });
+
   it('"Line up" puts the open plans one after another from the first start', () => {
     seed(three());
     const onCommand = vi.fn();

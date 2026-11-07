@@ -1622,3 +1622,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/YearView.tsx`, `src/renderer/components/nodes/TodoNode/index.tsx`, `tests/unit/renderer/calendar.yearLayout.test.ts`
 **Summary:** Found by the post-sweep audit: the year view drew 7.5 px day numbers in 365 cells (some at 1.1:1 contrast) and laid months out 7 + 5. Cells are now a plain heat map (date, minutes and plans in the tooltip and aria-label), and `yearLayout` measures the panel and picks 2, 3, 4 or 6 months across with the biggest square cells that fit both ways — measured at six panel sizes, no month outside the box; the weekday letters (11 px) hide below 12 px cells. The Todo "N overdue" badge mixes rust toward the ink so it passes 4.5:1 in both themes.
+
+## [2026-11-07] — Bug hunt: stuck unschedule strip, "Bring to today" landing in the past
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/launch/catchup.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `docs/06-requirements/launch-experience.md` (F27), tests
+**Summary:** Sweep of every screen (all panels, calendar views, help menu, settings, tour, analytics pages, both layouts) with console capture: no errors. Code review found two bugs. (1) Dropping a plan on another hour can unmount the element it was dragged from, so no `dragend` arrives and the unschedule strip stayed up — any drop or dragend in the window now ends the drag. (2) Welcome back moved slipped tasks to today at their old time: back at 19:00, a 09:00 task landed in the past and read "Missed" at once. `landingTimes` now lines those up from the next quarter hour, in order, each as long as its plan; times still ahead are kept; Tomorrow keeps every time (F27).
