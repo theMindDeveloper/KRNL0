@@ -1511,8 +1511,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               <CalIcon name="replan" />
             </button>
           )}
-          {/* Overrun at any size: a rust strip on the right edge. */}
-          {overrunMin > 0 && !isContinuation && (
+          {/* Overrun: a rust strip on the right edge — not on a bar under 12 px,
+              where it would be half the bar (the tooltip still says "+X over"). */}
+          {overrunMin > 0 && !isContinuation && widthPx >= 12 && (
             <span
               aria-hidden
               data-testid={detail === 'full' ? undefined : `task-overrun-${task.id}`}

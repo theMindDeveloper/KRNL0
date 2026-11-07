@@ -1685,3 +1685,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/HabitNode/index.tsx`, `tests/unit/renderer/HabitNode.repair.test.tsx`
 **Summary:** Review of the "Did it yesterday?" row: saying no hid the row with a plain flag that was never reset, so with KRNL0 left open overnight the next missed day was never offered. It now remembers the day that was declined; a later missed day asks again. Test walks the sequence across midnight (fails on the old code).
+
+## [2026-11-07] — Review of the calendar rework; overrun strip on narrow bars
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+**Summary:** Line-by-line review of the session's WeekView changes (drag lifecycle, letter labelling and fit, Line up placement and chain units, track geometry): one flaw — the 3 px overrun strip took half of a 6 px Station letter bar; it now shows on bars 12 px and wider (the tooltip still says "+X over"). Also this session, checked with no change needed: every day-based view rolls over at midnight with the app open; every button, field and image on the main screens and today's dialogs has an accessible name.
