@@ -170,9 +170,9 @@ export function TaskPopup(p: Props) {
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4"><circle cx="6" cy="6" r="4" /><circle cx="6" cy="6" r="1.2" fill="currentColor" /></svg>
             Find
           </button>
-          <button type="button" data-testid="calendar-task-unschedule" onClick={p.onUnschedule} title="Remove from the calendar (keeps the task)" style={{ ...actionBtn, color: 'var(--rust, #ff8e64)' }}>
+          <button type="button" data-testid="calendar-task-unschedule" onClick={p.onUnschedule} title="Take it off the calendar — the task stays in your Todo" style={actionBtn}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="1.5" y="2.5" width="9" height="8" rx="1.5" /><path d="M1.5 5h9M4.5 7l3 2M7.5 7l-3 2" /></svg>
-            Remove
+            Unschedule
           </button>
         </div>
       </div>
