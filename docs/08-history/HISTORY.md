@@ -1783,3 +1783,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/MonthView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/MonthView.test.tsx`
 **Summary:** Month view hid plans behind "+10 more" in a cell and "+9" in the TODAY strip, and habit dots behind "+2" — against the rule that every item stays readable and draggable. A full day now keeps every plan as its own chip in a list that scrolls inside the cell (fading at its foot when there is more); the TODAY strip shows every plan of today and scrolls sideways (fading at its right edge); every habit keeps its dot, wrapping to a second row. Days of the month get a faint fill so each cell — and the dots at its foot — reads as one day (before, a row of dots looked like it belonged to the next row's date). Checked at 1100 and 520 px, dark and light; tests updated.
+
+## [2026-11-07] — Design and use-case review of the whole app
+
+**Type:** Docs (research)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `docs/research/design-usecase-review-2026-11-07.md` (new)
+**Summary:** After the user found that repeating habits cannot be untimed (#217), every feature's data model and commands were checked against how people actually plan, not only against their specs. Main findings: time is mandatory where life has none (untimed habits, date-only plans — a Month drop invents 09:00 and the plan reads "missed"), no deadlines or repeating tasks, habits cannot be "3× a week" or have amounts or rest days, the UI can only hard-delete a habit (archive is CLI-only), and there are no reminders. A proposed priority order is in the doc; each item needs an ADR, a requirements doc, a migration and CLI commands.
