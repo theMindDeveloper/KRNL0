@@ -1797,3 +1797,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/sys/commands/task.ts`, `tests/unit/sys/task.list.schedule.test.ts` (new)
 **Summary:** End-to-end run of today's CLI commands on a first-run board (`todo add`, `task schedule`, `cal lineup`, `habit add/archive`, `feedback`): all behaved, and bad input was refused with clear messages. One gap: `task list` never said when a task was planned, so a `task schedule` or `cal lineup` could not be checked from the CLI. Each row now ends with `@ YYYY-MM-DD HH:MM` when scheduled. Also found: there is no `habit unarchive` — noted with the "habit archive in the UI" item from the design review.
+
+## [2026-11-07] — 0.11 "what's new" lines match what ships
+
+**Type:** Docs (user-facing text)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/whatsnew.ts`
+**Summary:** The 0.11 notes (`krnl whatsnew`) still described recorded time as "a thin bar beside each day". They now describe the Clock rail (a track at the left of each day that fills up to now), the letter bars with Line up and the drag-to-unschedule strip, and the month view that never hides a plan behind "+N". Main-process changes from today (taskbar button flicker fix, safe backup names, pocket refit) were re-read in the sweep; no issues.
