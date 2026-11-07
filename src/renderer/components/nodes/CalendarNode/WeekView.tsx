@@ -394,9 +394,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const m = newStartMin % 60;
       const scheduledFor = `${dayYMD}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       const durN = last.durationMin;
-      applyTaskState(task.id, (s) =>
-        taskSetSchedule(taskSetPlannedMin(s, { minutes: durN }), { scheduledFor, scheduledDurationMin: durN }),
-      );
+      // The length on the task, the time through the same path as a drag:
+      // the Todo row follows, and a chained task lands where it was put.
+      applyTaskState(task.id, (s) => taskSetPlannedMin(s, { minutes: durN }));
+      scheduleTaskRef.current(task.id, scheduledFor, durN);
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -427,6 +428,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // Dispatches via the store directly (not commandDispatch) to keep this heavy
   // module out of the calendar/clock render graph — importing it statically blew
   // render-only tests past their 5s timeout.
+  // Set below (scheduleTask is declared after the resize handler).
+  const scheduleTaskRef = useRef<(taskId: string, scheduledFor: string, durationMin: number) => void>(() => {});
   const applyTaskState = (taskId: string, fn: (s: TaskState) => TaskState) => {
     const st = useBoardStore.getState();
     const node = st.board?.nodes.find((n) => n.id === taskId);
@@ -558,6 +561,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       setPushNotice(`“${name}” placed at ${placed.startISO.slice(11, 16)} — after the task before it in its chain`);
     }
   };
+  scheduleTaskRef.current = scheduleTask;
 
   // Popup shown when a task block is clicked (PR #122).
   const [taskPopup, setTaskPopup] = useState<{
@@ -592,9 +596,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const min = m ? Math.min(59, Math.max(0, parseInt(m[2]!, 10))) : 0;
     const durN = Math.max(1, Math.round(Number(exactDur) || task.scheduledDurationMin));
     const scheduledFor = `${day}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-    applyTaskState(task.id, (s) =>
-      taskSetSchedule(taskSetPlannedMin(s, { minutes: durN }), { scheduledFor, scheduledDurationMin: durN }),
-    );
+    // Same path as a drag (Todo row follows; a chained task lands where put).
+    applyTaskState(task.id, (s) => taskSetPlannedMin(s, { minutes: durN }));
+    scheduleTask(task.id, scheduledFor, durN);
   };
 
   // #6 — info popup for a clicked tracked-reality (pomo) segment.

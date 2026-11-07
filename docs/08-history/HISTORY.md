@@ -1825,3 +1825,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
 **Summary:** Three reports from the user's board. (1) A plan showed a thick rust strip on its right edge with nothing saying why — it meant "tracked more than planned" (Thesis: 65 min tracked on 2 Nov against a 60 min plan on 6 Nov), while the block also said "Missed". The strip is gone; overrun is said in words ("+5m over" in the time line where it fits, and "(5m over plan)" in the tooltip). (2) Plans kept a 14 px gap at the day's left on days that draw no recorded-time track; the room is now kept only on days with a track (recorded time that day, or today), elsewhere plans start 4 px from the day line. (3) Right-clicking in a clash listed only the plans under the exact minute clicked ("4 items here" with 5 scheduled — a short "TS" chip beside them was left out); it now lists every plan of the clash, in time order. Checked in the preview.
+
+## [2026-11-07] — Resize and typed times go the same path as a drag
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+**Summary:** Calendar bug hunt. Dragging a block's top edge and typing an exact time in the task popup wrote the task directly: a chained task was still pushed back behind its predecessor (the same "doesn't move" bug as the drag, fixed earlier today only for drags), and the Todo row kept its old time. Both now set the length on the task and the time through `calendar.schedule`, like a drag. Checked live: typing 08:00 on "Physics exercises" (chained after Physics, 09:30–11:30) lands it at 08:00 and its Todo row reads 08:00 (before: pushed to 11:30, row unchanged).
