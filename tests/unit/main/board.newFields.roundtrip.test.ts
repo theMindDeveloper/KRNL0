@@ -1,7 +1,7 @@
 /**
  * Today's new fields are all optional and must survive a load through the
  * real loader (migrations included) — an update must never drop a user's
- * due dates, repeats, reminders, targets, amounts or rest days.
+ * due dates, old repeats (still loaded), reminders, targets, amounts or rest days.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';

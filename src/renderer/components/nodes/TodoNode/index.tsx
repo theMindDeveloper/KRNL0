@@ -25,17 +25,12 @@ import { toneVarForTask } from '../../../utils/taskColor';
 import { revertible, undoable } from '../../../store/undoNotice';
 import { DuePicker } from '../../ui/DuePicker';
 import { RemindPicker } from '../../ui/RemindPicker';
-import { TaskRepeatPicker } from '../../ui/TaskRepeatPicker';
-import { addDaysYMD } from '../../../../shared/ymd';
-import { describeTaskRepeat, isoDowOfYMD, nextRepeatDay, parseRepeat, repeatsBehind } from '../../../../shared/repeatTask';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
-import { scheduleTaskAt, setTaskReminder, spawnNextRepeat, unscheduleTask } from '../../../store/scheduleActions';
+import { scheduleTaskAt, setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
 import { describeQuickAdd, parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
 
 
-/** Repeats being brought forward right now (effects can run twice). */
-const catchingUp = new Set<string>();
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
   const config = rawConfig ?? defaultTodoConfig();
@@ -70,8 +65,6 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const [tagPicker, setTagPicker] = useState<{ x: number; y: number; itemId: string } | null>(null);
   // Review 2.1 — the due-day picker (row menu → "Due date…", or click the chip).
   const [duePick, setDuePick] = useState<{ x: number; y: number; itemId: string } | null>(null);
-  // Review 5.3 — repeat a plan (row menu → "Repeat…").
-  const [repeatPick, setRepeatPick] = useState<{ x: number; y: number; itemId: string; weekday: number } | null>(null);
   // Review 4.1 — reminder lead time per plan (row menu → "Remind me…").
   const [remindPick, setRemindPick] = useState<{ x: number; y: number; taskId: string; value: number | null } | null>(null);
   const remindByTask = useBoardStore(useShallow((s) => {
@@ -100,19 +93,6 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     // Mount-only by design: later adds/edits classify themselves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // A repeating plan whose day passed unticked brings its next one (on open
-  // and at midnight), so one missed day doesn't end the series.
-  useEffect(() => {
-    const behind = repeatsBehind(state.items, (id) => taskScheduledInfo.get(id)?.scheduledFor.slice(0, 10), todayYMD);
-    for (const id of behind) {
-      if (catchingUp.has(id)) continue;
-      catchingUp.add(id);
-      void spawnNextRepeat(id).finally(() => catchingUp.delete(id));
-    }
-    // Day changes and new repeats only; the scheduled map is read fresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayYMD, state.items]);
 
   const buckets = todoBuckets(state, nowMs);
   // One-click deletes say what went and offer UNDO (cascade included).
@@ -295,7 +275,6 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     if (item) {
       if (q.time && q.day && item.taskNodeId) void scheduleTaskAt(item.taskNodeId, `${q.day}T${q.time}`);
       else if (q.day && !q.time) onCommand('todo.setDue', { id: item.id, dueOn: q.day });
-      if (q.repeat) onCommand('todo.setRepeat', { id: item.id, repeat: q.repeat });
     }
     setPendingName('');
     setInputPhase('name');
@@ -307,7 +286,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       if (e.key === 'Enter') {
         const name = pendingName.trim();
         const q = name ? parseQuickAdd(name) : null;
-        if (q && (q.time || q.day || q.durationMin || q.repeat)) { quickSubmit(q); return; }
+        if (q && (q.time || q.day || q.durationMin)) { quickSubmit(q); return; }
         if (name) {
           setInputPhase('duration');
           setDurationValue('');
@@ -468,35 +447,15 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         },
       }] : []),
       ...(item && !item.done && item.droppedAt === undefined ? [{
-        label: item.repeat ? `Repeats ${describeTaskRepeat(item.repeat)}…` : 'Repeat…',
-        onSelect: () => {
-          // "Every <weekday>" offers the plan's own day: its Calendar day, its due day, or today.
-          const sched = item.taskNodeId ? taskScheduledInfo.get(item.taskNodeId)?.scheduledFor : item.scheduledFor;
-          const day = sched?.slice(0, 10) ?? item.dueOn ?? todayYMD;
-          if (ctxMenu) setRepeatPick({ x: ctxMenu.x, y: ctxMenu.y, itemId, weekday: isoDowOfYMD(day) });
-        },
-      }] : []),
-      ...(item && !item.done && item.droppedAt === undefined ? [{
-        // A repeating plan is skipped, not ended: the next one is made first
-        // (ending the series is "Repeat… → Off").
-        label: item.repeat ? 'Skip this time' : 'Drop (not doing it)',
+        label: 'Drop (not doing it)',
         onSelect: () => {
           // Off the Calendar too: a dropped plan is not "missed". Dropped
           // plans leave the list, so the notice offers UNDO (time put back).
           const taskId = item.taskNodeId;
           const was = taskId ? taskScheduledInfo.get(taskId)?.scheduledFor ?? null : null;
-          const repeat = item.repeat;
-          const before = new Set(state.items.map((i) => i.id));
-          if (repeat) void spawnNextRepeat(itemId); // reads this plan's time before it is unscheduled
           if (taskId) void unscheduleTask(taskId);
           onCommand('todo.drop', { id: itemId });
-          revertible(repeat ? `Skipped "${item.text}" this time` : `Dropped "${item.text}"`, () => {
-            if (repeat) {
-              // Take back the next one that the skip made, and give this one its repeat again.
-              const now = (useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined)?.items ?? [];
-              for (const it of now) if (!before.has(it.id) && it.text === item.text && !it.done) onCommand('todo.remove', { id: it.id });
-              onCommand('todo.setRepeat', { id: itemId, repeat });
-            }
+          revertible(`Dropped "${item.text}"`, () => {
             onCommand('todo.undrop', { id: itemId });
             if (taskId && was) void scheduleTaskAt(taskId, was);
           });
@@ -666,14 +625,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         </span>
       )}
 
-      {/* Review 5.3 / 4.1 — repeats and a reminder: one tight group of small marks. */}
-      {!item.done && (item.repeat || (item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined)) && (
+      {/* Review 4.1 — a reminder: a small mark. */}
+      {!item.done && item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined && (
         <span style={{ display: 'inline-flex', gap: 2, color: 'var(--ink-3)', flexShrink: 0 }}>
-          {item.repeat && (
-            <span data-testid={`todo-repeat-${item.id}`} title={`Repeats ${describeTaskRepeat(item.repeat)} — tick it off and the next one appears`} style={{ display: 'inline-flex' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" /></svg>
-            </span>
-          )}
           {item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined && (
             <span data-testid={`todo-remind-${item.id}`} title={`Reminder ${remindByTask[item.taskNodeId] === 0 ? 'at the start' : `${remindByTask[item.taskNodeId]} min before`}`} style={{ display: 'inline-flex' }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" /></svg>
@@ -1128,23 +1082,6 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       )}
 
       {/* ADR 0016 — tag picker (portal, like the context menu). */}
-      {repeatPick !== null && (
-        <TaskRepeatPicker
-          x={repeatPick.x}
-          y={repeatPick.y}
-          weekday={repeatPick.weekday}
-          value={parseRepeat(state.items.find((i) => i.id === repeatPick.itemId)?.repeat)}
-          onPick={(r) => {
-            onCommand('todo.setRepeat', { id: repeatPick.itemId, repeat: r });
-            // A plan with no day would repeat on none: give it its first matching day.
-            const it = state.items.find((i) => i.id === repeatPick.itemId);
-            const hasDay = !!it?.dueOn || (it?.taskNodeId ? taskScheduledInfo.has(it.taskNodeId) : false);
-            if (r && it && !hasDay) onCommand('todo.setDue', { id: it.id, dueOn: nextRepeatDay(r, addDaysYMD(todayYMD, -1), todayYMD) });
-            setRepeatPick(null);
-          }}
-          onClose={() => setRepeatPick(null)}
-        />
-      )}
       {remindPick !== null && (
         <RemindPicker
           x={remindPick.x}
@@ -1162,11 +1099,6 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           value={state.items.find((i) => i.id === duePick.itemId)?.dueOn ?? null}
           onPick={(dueOn) => { onCommand('todo.setDue', { id: duePick.itemId, dueOn }); setDuePick(null); }}
           onClose={() => setDuePick(null)}
-          canClear={(() => {
-            // A repeating plan with no Calendar time needs its day (Repeat… → Off ends it instead).
-            const it = state.items.find((i) => i.id === duePick.itemId);
-            return !(it?.repeat && !(it.taskNodeId && taskScheduledInfo.has(it.taskNodeId)));
-          })()}
         />
       )}
       {tagPicker !== null && (() => {

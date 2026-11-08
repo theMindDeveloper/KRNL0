@@ -3,9 +3,6 @@
 // the day, the time and the length out of the words. The Todo shows the
 // result under the field before Enter, so nothing happens unseen.
 
-import { describeTaskRepeat, nextRepeatDay, type TaskRepeat } from './repeatTask';
-import { addDaysYMD } from './ymd';
-
 export interface QuickAdd {
   /** The plan's name with the parsed words taken out. */
   text: string;
@@ -16,8 +13,6 @@ export interface QuickAdd {
   durationMin?: number;
   /** True when a time was given without a day and had already passed today. */
   rolledToTomorrow?: boolean;
-  /** "every day" / "every weekday" / "every sunday": a repeating plan. */
-  repeat?: TaskRepeat;
   /** Something typed that quick add can't do, said in words (nothing else is read then). */
   hint?: string;
 }
@@ -30,10 +25,11 @@ const DAY_RE = /\b(?:on\s+)?(next\s+)?(mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?
 export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   let s = ` ${raw} `;
   const out: QuickAdd = { text: raw.trim() };
-  // "every monday and thursday": a plan repeats on one weekday. Reading half
-  // of it would start the plan on the wrong day, so read none of it.
-  if (/\bevery\s+(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*(?:\s*(?:,|and|&|\+|or)\s*(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*)+/i.test(s)) {
-    return { text: raw.trim(), hint: 'a plan repeats on one weekday; for several days, add a routine in Habits' };
+  // "every day", "every monday": a plan happens once. Something that repeats
+  // is a habit with a time (ticked) or a routine (just happens), so read none
+  // of it rather than make a one-off plan that looks like a series.
+  if (/\bevery\s+(?:day|morning|evening|night|week|weekday|weekend|mon|tue|wed|thu|fri|sat|sun)/i.test(s)) {
+    return { text: raw.trim(), hint: 'a plan happens once. For something that repeats, add a habit with a time or a routine in Habits & Routines' };
   }
   const cut = (m: RegExpExecArray) => { s = s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length); };
 
@@ -101,19 +97,7 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   }
   if (out.durationMin !== undefined && !(out.durationMin >= 1 && out.durationMin <= 480)) delete out.durationMin;
 
-  // Repeat: "every day", "every weekday", "every sunday" (then the first one is the day).
   const today = ymd(now);
-  m = /\bevery\s+(day|weekday|weekdays|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/i.exec(s);
-  if (m) {
-    const w = m[1]!.toLowerCase();
-    if (w === 'day') out.repeat = { kind: 'daily' };
-    else if (w.startsWith('weekday')) out.repeat = { kind: 'weekdays' };
-    else {
-      const idx = DAYS.findIndex((d) => d.startsWith(w.slice(0, 3)));
-      out.repeat = { kind: 'weekly', day: idx === 0 ? 7 : idx };
-    }
-    cut(m);
-  }
 
   // Day.
   m = /\b(today|tonight)\b/i.exec(s);
@@ -133,13 +117,6 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   if (!out.day) {
     const dm = parseDate(s, now);
     if (dm) { out.day = dm.day; s = s.slice(0, dm.index) + ' ' + s.slice(dm.index + dm.length); }
-  }
-
-  // A repeat with no day: its first matching day from today (today counts
-  // unless its time has passed).
-  if (out.repeat && !out.day) {
-    const passed = out.time ? (() => { const [h, mm] = out.time!.split(':').map(Number) as [number, number]; return h * 60 + mm <= now.getHours() * 60 + now.getMinutes(); })() : false;
-    out.day = nextRepeatDay(out.repeat, passed ? today : addDaysYMD(today, -1), today);
   }
 
   // A time with no day: today, or tomorrow if it has passed.
@@ -211,6 +188,5 @@ export function describeQuickAdd(q: QuickAdd, now: Date = new Date()): string | 
     parts.push(q.time ? `${word} ${q.time}` : `due ${word}`);
   }
   if (q.durationMin) parts.push(q.durationMin % 60 === 0 && q.durationMin >= 60 ? `${q.durationMin / 60} h` : `${q.durationMin} min`);
-  if (q.repeat) parts.push(`repeats ${describeTaskRepeat(q.repeat)}`);
   return parts.length ? parts.join(' · ') : null;
 }

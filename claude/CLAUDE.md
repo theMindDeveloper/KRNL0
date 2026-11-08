@@ -129,7 +129,7 @@ krnl habit view week|month|year                        # change the displayed gr
 
 ### Routines and habits — two kinds (Decision 39)
 
-A **habit** is ticked; a **routine** (a class, a work shift, a weekly call) just happens at its time, sits on the Calendar every week and is **never ticked, counted or "missed"**. Ask the user which one they mean if it is not obvious: *"Do you want to tick it off?"* — yes = habit, no = routine.
+A **habit** is ticked; a **routine** (a class, a work shift, a weekly call) just happens at its time, sits on the Calendar every week and is **never ticked, counted or "missed"**. Ask the user which one they mean if it is not obvious: *"Do you want to tick it off?"* — yes = habit, no = routine. Something you do at a set time and tick (Gym at 18:00 every day) is a **habit with a time** (`habit schedule … --at 18:00`). Todo plans happen once; nothing in the Todo repeats.
 ```
 krnl routine add "Class" --days mon,wed --at 10:00 --for 120     # may run past midnight (a night shift)
 krnl routine list
@@ -235,8 +235,7 @@ krnl todo add "<text>" [--tag <label>]   # untagged adds are auto-tagged
                                            # reads day/time/length from the words:
                                            #   "Gym tomorrow 18:00 1h" -> on the Calendar; "Pay rent friday" -> due that day
 krnl todo due <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>   # deadline, apart from when it is planned
-krnl todo repeat <ref> <daily|weekdays|weekly|off>    # ticking it off adds the next one
-krnl todo drop <ref> / todo undrop <ref>   # "not doing it": to the Archive, not done, off the Calendar; a repeating plan is skipped (next one stays)
+krnl todo drop <ref> / todo undrop <ref>   # "not doing it": to the Archive, not done, off the Calendar
 krnl todo check <ref>                      # done -> "Done" today, "Archive" from tomorrow
 krnl todo list [--done|--archived|--all] [--json]   # default: open + done today
 krnl todo tag <ref> <tag|auto>             # hand-tag (unknown label = new custom tag); auto = classifier

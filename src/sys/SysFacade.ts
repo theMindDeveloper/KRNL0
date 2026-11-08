@@ -796,7 +796,6 @@ export class SysFacade {
         case 'due':   return todo.todoDue(ctx, command.ref, command.when);
         case 'drop':   return todo.todoDropCmd(ctx, command.ref, false);
         case 'undrop': return todo.todoDropCmd(ctx, command.ref, true);
-        case 'repeat': return todo.todoRepeat(ctx, command.ref, command.how);
         case 'tags': {
           const opts: Parameters<typeof todo.todoTags>[1] = { json: command.json };
           if (command.action !== undefined) opts.action = command.action;

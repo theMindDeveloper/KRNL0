@@ -1,4 +1,3 @@
-import { parseRepeat } from '../../../../shared/repeatTask';
 // Decision #10 — TodoNode FSM. Each handler is pure: (state, args) => state.
 // Time and id sources are injected so tests can pin them; the kernel passes
 // real Date.now and crypto.randomUUID at runtime.
@@ -102,20 +101,6 @@ export const todoSetDue = (
       if (item.id !== args.id) return item;
       if (args.dueOn === null) { const { dueOn: _drop, ...rest } = item; return rest; }
       return { ...item, dueOn: args.dueOn };
-    }),
-  };
-};
-
-// todo.setRepeat — review 5.3: every day / weekdays / every <weekday>, or null.
-export const todoSetRepeat = (state: TodoState, args: { id: string; repeat: unknown }): TodoState => {
-  const repeat = args.repeat === null ? null : parseRepeat(args.repeat);
-  if (args.repeat !== null && !repeat) return state;
-  return {
-    ...state,
-    items: state.items.map((item) => {
-      if (item.id !== args.id) return item;
-      if (!repeat) { const { repeat: _r, ...rest } = item; return rest; }
-      return { ...item, repeat };
     }),
   };
 };

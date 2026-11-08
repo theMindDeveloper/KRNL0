@@ -119,9 +119,8 @@ describe('Staying on track tour', () => {
   it('waits for a weekly target, a rest day, a due date and a reminder', () => {
     const t = tourById('on-track')!;
     const waits = t.steps.filter((s) => s.waitFor && 'board' in s.waitFor).map((s) => (s.waitFor as { board: (a: never, c: never) => boolean }).board);
-    expect(waits).toHaveLength(6);
-    const [target, amount, rest, due, repeat, remind] = waits as Array<(a: never, c: never) => boolean>;
-    expect(repeat!(b([], [{ id: 'a', repeat: { kind: 'daily' } }]), b([], [{ id: 'a' }]))).toBe(true);
+    expect(waits).toHaveLength(5);
+    const [target, amount, rest, due, remind] = waits as Array<(a: never, c: never) => boolean>;
     expect(amount!(b([{ id: 'w', amount: { target: 8, unit: 'glasses' } }]), b([{ id: 'w' }]))).toBe(true);
     expect(target!(b([{ id: 'g', perWeek: 3 }]), b([{ id: 'g' }]))).toBe(true);
     expect(rest!(b([{ id: 'g', rest: ['2026-11-08'] }]), b([{ id: 'g' }]))).toBe(true);
