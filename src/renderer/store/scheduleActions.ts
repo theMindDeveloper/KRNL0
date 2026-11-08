@@ -113,7 +113,7 @@ export async function spawnNextRepeat(itemId: string): Promise<void> {
   if (!item || !repeat) return;
   const place = item.taskNodeId ? placementOf(item.taskNodeId) : null;
   const task = item.taskNodeId ? board.nodes.find((n) => n.id === item.taskNodeId) : undefined;
-  const ts = task?.state as { plannedMin?: number; timeOpen?: boolean } | undefined;
+  const ts = task?.state as { plannedMin?: number; timeOpen?: boolean; remindMin?: number; kind?: string } | undefined;
   const pad = (n: number) => String(n).padStart(2, '0');
   const d = new Date();
   const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -128,6 +128,15 @@ export async function spawnNextRepeat(itemId: string): Promise<void> {
   run('todo.setRepeat', { id: added.id, repeat });
   run('todo.setRepeat', { id: item.id, repeat: null });
   if (item.tag) run('todo.setItemTag', { id: added.id, tag: item.tag });
+  // The next one keeps what the plan was: an event or a focus block, and its reminder.
+  if (added.taskNodeId) {
+    const runTask = makeCommandHandler(added.taskNodeId);
+    if (ts?.kind === 'event') {
+      const nt = useBoardStore.getState().board?.nodes.find((n) => n.id === added.taskNodeId);
+      if (nt) useBoardStore.getState().updateNode(nt.id, { state: { ...(nt.state as object), kind: 'event' } });
+    }
+    if (typeof ts?.remindMin === 'number') runTask('task.setRemind', { min: ts.remindMin });
+  }
   if (place && added.taskNodeId) await scheduleTaskAt(added.taskNodeId, `${next}T${place.startISO.slice(11, 16)}`);
   else run('todo.setDue', { id: added.id, dueOn: next });
 }

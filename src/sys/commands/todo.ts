@@ -316,7 +316,7 @@ async function nextRepeatFromCli(ctx: TodoCtx, itemId: string): Promise<string> 
   const repeat = parseRepeat(item?.repeat);
   if (!mother || !item || !repeat) return '';
   const task = item.taskNodeId ? board.nodes.find((n) => n.id === item.taskNodeId) : undefined;
-  const ts = task?.state as { scheduledFor?: string; plannedMin?: number; timeOpen?: boolean } | undefined;
+  const ts = task?.state as { scheduledFor?: string; plannedMin?: number; timeOpen?: boolean; remindMin?: number; kind?: string } | undefined;
   const base = ts?.scheduledFor?.slice(0, 10) ?? item.dueOn ?? localToday();
   const next = nextRepeatDay(repeat, base, localToday());
   const pair = createTodoTaskPair(board, { text: item.text, ...(item.tag ? { tag: item.tag } : {}), ...(ts?.plannedMin && !ts.timeOpen ? { plannedMin: ts.plannedMin } : {}) }, { uuid: () => randomUUID(), now: () => new Date().toISOString() });
@@ -329,6 +329,13 @@ async function nextRepeatFromCli(ctx: TodoCtx, itemId: string): Promise<string> 
   st = todoSetRepeat(st, { id: item.id, repeat: null });
   if (!ts?.scheduledFor) st = todoSetDue(st, { id: pair.todoItemId, dueOn: next });
   now.state = st;
+  // The next one keeps what the plan was: an event or a focus block, and its reminder.
+  const nextTask = board.nodes.find((n) => n.id === pair.taskNodeId);
+  if (nextTask && nextTask.state && typeof nextTask.state === 'object') {
+    const ns = nextTask.state as Record<string, unknown>;
+    if (ts?.kind === 'event') ns['kind'] = 'event';
+    if (typeof ts?.remindMin === 'number') ns['remindMin'] = ts.remindMin;
+  }
   saveBoard(ctx, board);
   if (ts?.scheduledFor) await taskSchedule({ boardPath: ctx.boardPath }, pair.taskNodeId, `${next}T${ts.scheduledFor.slice(11, 16)}`);
   return ` Next one: ${next}${ts?.scheduledFor ? ` ${ts.scheduledFor.slice(11, 16)}` : ''}.`;

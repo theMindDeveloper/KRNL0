@@ -2122,3 +2122,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `CalendarNode/WeekView.tsx`.
 **Summary:** A timed habit with an amount ("Meditate · 8 a day") showed only done / not done on the Calendar while a click there added one. The pill now shows the day's count ("3/8") until it is done. Checked in the preview.
+
+## [2026-11-08] — A repeat keeps its reminder and kind (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/scheduleActions.ts`, `sys/commands/todo.ts`; test `repeatTask.test.ts` (+1).
+**Summary:** Found by crossing two new features: "Team sync, every Monday, remind me 10 min before" lost its reminder on the second week, and an event came back as a focus block. The next one now keeps the reminder and the kind (in the app and through `krnl todo check`).

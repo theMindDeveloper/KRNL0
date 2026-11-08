@@ -77,4 +77,16 @@ describe('krnl todo repeat + check', () => {
     expect(list).toContain('repeats every day');
     expect(list).toMatch(/due \d{4}-\d{2}-\d{2}/);
   });
+  it('the next one keeps the reminder and the kind (event)', async () => {
+    await f.run(['todo', 'add', 'Team sync']);
+    const it0 = items().find((i) => i.text === 'Team sync')!;
+    await f.run(['task', 'kind', it0.taskNodeId!, 'event']);
+    await f.run(['task', 'remind', it0.taskNodeId!, '10']);
+    await f.run(['todo', 'repeat', it0.id, 'weekly']);
+    await f.run(['todo', 'check', it0.id]);
+    const next = items().find((i) => i.text === 'Team sync' && !i.done)!;
+    const task = (JSON.parse(readFileSync(boardPath, 'utf-8')).nodes as Array<{ id: string; state: { kind?: string; remindMin?: number } }>).find((n) => n.id === next.taskNodeId)!;
+    expect(task.state.kind).toBe('event');
+    expect(task.state.remindMin).toBe(10);
+  });
 });
