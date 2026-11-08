@@ -1915,3 +1915,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/routines`
 **Files changed:** `HabitNode/commands.ts` (`habitStreak`), `HabitNode/index.tsx` (Week, Month and Year rows), `HabitLaneNode/index.tsx`, `ui/TaskInfoPopup.tsx`, `CalendarNode/WeekView.tsx` (drop dialog), `sys/commands/habit.ts`; test `habit.restDays.test.ts` (+1).
 **Summary:** Found in review: weekly targets and rest days reached only the Week view's row and the CLI. The Month and Year rows, the habit lane, the plan popup and the Calendar's drop dialog still counted plain day streaks — mark a rest day, switch the node to Month, and the streak dropped back; a 3×-a-week habit showed a day streak on its lane. Every screen now asks one helper, `habitStreak(habit, today)` → current, best and unit (weeks for a target, rest days stepped over); the lane reads "3w streak", the popup "streak 3 weeks", the Month/Year badge "3w".
+
+## [2026-11-08] — Edit repeat… says why Save is off (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/RepeatEditor.tsx` (`endsPastMidnight`), test `HabitNode.addField.test.tsx`.
+**Summary:** The past-midnight guard also gates Edit repeat… and the Calendar drop dialog, where Save just turned grey with no reason (dropping a habit at 23:30 with the 60-minute default failed silently). The editor now says "Ends after midnight: start earlier or make it shorter." under the time. Habits & Routines tour re-run in the preview with the new add flow (Enter → No, it just happens → days, time, length → Add): it waits on the new routine and moves to the Calendar step. Full suite: 2,390 passing.

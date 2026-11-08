@@ -5,7 +5,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { HabitNode } from '../../../src/renderer/components/nodes/HabitNode';
 import { defaultHabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
 import { askMissing, askToAnswer, EMPTY_ASK } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
-import { isRepeatValid } from '../../../src/renderer/components/ui/RepeatEditor';
+import { endsPastMidnight, isRepeatValid } from '../../../src/renderer/components/ui/RepeatEditor';
 import type { Node } from '../../../src/shared/types/node';
 import type { HabitState, HabitConfig } from '../../../src/renderer/components/nodes/HabitNode/types';
 
@@ -104,6 +104,7 @@ describe('askMissing / askToAnswer', () => {
     expect(askMissing({ ...night, durationMin: 60 })).toBeNull();
     expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '23:00', durationMin: 120, itemKind: 'routine' })).toBe(false);
     expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '23:00', durationMin: 60, itemKind: 'routine' })).toBe(true);
+    expect(endsPastMidnight({ kind: 'daily', days: [], timeOfDay: '23:30', durationMin: 60 })).toBe(true);
   });
   it('a routine on all five weekdays is saved as weekdays', () => {
     const d = { ...EMPTY_ASK, kind: 'routine' as const, days: [1, 2, 3, 4, 5] as const, timeOfDay: '09:00', durationMin: 480 };

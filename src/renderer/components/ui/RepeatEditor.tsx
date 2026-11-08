@@ -33,6 +33,12 @@ const QUICK_LEN = [10, 15, 25, 30, 45, 60];
 /** Routines run longer: a call, a class, a shift. */
 const ROUTINE_LEN = [30, 60, 90, 120, 180, 240];
 
+/** A repeat is drawn inside one day: start + length past 24:00 would be cut. */
+export function endsPastMidnight(v: RepeatValue): boolean {
+  const m = /^(\d{2}):(\d{2})$/.exec(v.timeOfDay);
+  return !!m && Number(m[1]) * 60 + Number(m[2]) + v.durationMin > 24 * 60;
+}
+
 export function isRepeatValid(v: RepeatValue): boolean {
   const daysOk = v.kind !== 'weekly' || v.days.length > 0;
   if (isAnyTime(v)) return daysOk;
@@ -165,6 +171,13 @@ export function RepeatEditor({ value, onChange, testIdPrefix = 'repeat' }: Props
             <button type="button" data-testid={`${testIdPrefix}-anytime`} onClick={() => set({ anyTime: true })} style={seg(anyTime)}>Any time</button>
             <button type="button" data-testid={`${testIdPrefix}-attime`} onClick={() => set({ anyTime: false })} style={seg(!anyTime)}>At a time</button>
           </div>
+        </div>
+      )}
+
+      {/* Say why Save is off instead of a silent grey button. */}
+      {!anyTime && endsPastMidnight(value) && (
+        <div data-testid={`${testIdPrefix}-past-midnight`} style={{ fontSize: 12, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
+          Ends after midnight: start earlier or make it shorter.
         </div>
       )}
 
