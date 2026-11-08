@@ -2011,3 +2011,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
 **Summary:** "Call Sam at 3" was read as 03:00. A bare hour from 1 to 7 without am/pm now reads as afternoon (15:00); "at 9" stays 09:00, "3am" stays 03:00, and the line under the field still shows the result before Enter.
+
+## [2026-11-08] — Pickers take the keyboard focus (experimental)
+
+**Type:** Accessibility
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/DuePicker.tsx`, `ui/RemindPicker.tsx`, `ui/TaskRepeatPicker.tsx`.
+**Summary:** The due, reminder and repeat pickers opened without focus, so a keyboard user could not reach them (Esc worked, Tab went elsewhere). The current choice — or the first — now takes focus on open; Enter / Space pick, Tab moves through the rest.

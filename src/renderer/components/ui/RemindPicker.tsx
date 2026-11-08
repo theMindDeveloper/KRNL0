@@ -37,8 +37,8 @@ export function RemindPicker({ x, y, value, onPick, onClose }: Props) {
       >
         <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.4 }}>Remind me when it is on the Calendar</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {LEADS.map(([min, label]) => (
-            <button key={min} type="button" data-testid={`remind-${min}`} onClick={() => onPick(min)}
+          {LEADS.map(([min, label], i) => (
+            <button key={min} type="button" autoFocus={value === null ? i === 0 : value === min} data-testid={`remind-${min}`} onClick={() => onPick(min)}
               style={{
                 textAlign: 'left', height: 28, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, fontFamily: 'var(--font-sans)',
                 border: `1px solid ${value === min ? 'var(--acid)' : 'transparent'}`, background: value === min ? 'color-mix(in srgb, var(--acid) 14%, transparent)' : 'transparent', color: 'var(--ink)',

@@ -52,8 +52,8 @@ export function DuePicker({ x, y, today, value, onPick, onClose }: Props) {
       >
         <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>Due by</div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-          {quick.map(([label, ymd]) => (
-            <button key={label} type="button" data-testid={`due-quick-${label.toLowerCase().replace(/ /g, '-')}`} onClick={() => onPick(ymd)} style={chip(value === ymd)}>{label}</button>
+          {quick.map(([label, ymd], i) => (
+            <button key={label} type="button" autoFocus={i === 0} data-testid={`due-quick-${label.toLowerCase().replace(/ /g, '-')}`} onClick={() => onPick(ymd)} style={chip(value === ymd)}>{label}</button>
           ))}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>

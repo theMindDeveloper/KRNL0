@@ -40,8 +40,8 @@ export function TaskRepeatPicker({ x, y, weekday, value, onPick, onClose }: Prop
       >
         <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.4 }}>Repeat this plan. When you tick it off, the next one appears.</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {options.map((o) => (
-            <button key={o.kind} type="button" data-testid={`task-repeat-${o.kind}`} onClick={() => onPick(o)}
+          {options.map((o, i) => (
+            <button key={o.kind} type="button" autoFocus={value ? same(value, o) : i === 0} data-testid={`task-repeat-${o.kind}`} onClick={() => onPick(o)}
               style={{
                 textAlign: 'left', height: 28, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, fontFamily: 'var(--font-sans)',
                 border: `1px solid ${same(value, o) ? 'var(--acid)' : 'transparent'}`, background: same(value, o) ? 'color-mix(in srgb, var(--acid) 14%, transparent)' : 'transparent', color: 'var(--ink)',
