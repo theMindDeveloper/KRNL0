@@ -6,12 +6,12 @@
 // its own shape so it is told apart at a glance (task / habit / event):
 //
 //   habit: tinted in its colour, a        repeating event: a time tile on
-//   round tick, a stack of days behind    the left, like its Calendar block
+//   round tick                            the left, like its Calendar block
 //   ( ) Read …………………………… [⋯]             ┌─────┐ Class ……………………… [⋯]
 //   (● habit)  every day                   │  ↻  │ (event) Mon Wed
 //   ▬ ▬ ▬ ▬ ▬ ▬ [▬]                        │10:00│ ▬ · ▬ · · · ·
 //   5 days in a row        today open      │ 2 h │ Today          in 2 h
-//    └──────────────────────────┘           └─────┘
+//                                           └─────┘
 //
 // A habit is ticked (the box; an amount counts up and fills a meter). An
 // event is never ticked: a repeat mark and when it is next — while it
@@ -229,15 +229,6 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
       border: `1px solid color-mix(in srgb, ${color} ${doneToday ? 60 : 38}%, var(--paper-3))`,
       background: `color-mix(in srgb, ${color} ${doneToday ? 11 : 6}%, var(--node-bg))`,
     };
-  const sheet = (inset: number, drop: number, mix: number) => (
-    <span aria-hidden style={{
-      position: 'absolute', left: inset, right: inset, bottom: -drop, height: 14, zIndex: -1, pointerEvents: 'none',
-      borderRadius: '0 0 10px 10px', boxSizing: 'border-box',
-      border: `1px solid color-mix(in srgb, ${color} ${mix}%, var(--paper-3))`, borderTop: 'none',
-      background: `color-mix(in srgb, ${color} ${Math.round(mix / 6)}%, var(--node-bg))`,
-    }} />
-  );
-
   const content = (
     <>
       {/* Row 1: round tick or counter (habit) · name · its menu */}
@@ -315,12 +306,7 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>{content}</div>
         </>
       ) : (
-        <>
-          {/* A stack of days behind the card: a habit repeats. */}
-          {sheet(9, 5, 30)}
-          {sheet(18, 9, 18)}
-          {content}
-        </>
+content
       )}
 
 

@@ -2523,3 +2523,10 @@ Checked in the preview with a stand-in bridge (status line, Sign in, menu hide/s
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitLaneNode/index.tsx`, `tests/unit/renderer/boardCards.test.tsx`, `docs/06-requirements/board-cards.md`.
 **Summary:** The user found the three cards too alike. Same size, rows and ports still, but each kind now has its own shape: a **task** stays plain with a square box; a **habit** is tinted in its own colour, its tick (or counter) is round, and a stack of two sheets behind the card says "it repeats every day"; a **repeating event** has no box but a time tile on its left — repeat mark, start time large, length ("17:30 · 1.5 h") — like its block on the Calendar, so row 2 shows only its days and the bottom only the day ("Tomorrow · in 18 h"). Checked in the preview with all four next to each other.
+
+## [2026-11-08] — Habit card: the stack of sheets under it removed (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx`, `docs/06-requirements/board-cards.md`.
+**Summary:** The two sheets peeking out under a habit card (meant as "a stack of days") read as a rendering glitch. Removed; a habit is told apart by its colour tint and round tick.
