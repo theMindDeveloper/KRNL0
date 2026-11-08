@@ -231,10 +231,10 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
         </div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderTop: '1px solid var(--paper-3)', paddingTop: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderTop: '1px solid var(--paper-3)', paddingTop: 10 }}>
         {!initial && onCalendar
           ? <button type="button" data-testid="habit-ask-calendar" onClick={onCalendar} title="Something you don't tick, like a class: a repeating event on the Calendar"
-              style={{ padding: 0, border: 'none', background: 'transparent', color: 'var(--ink-4)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, whiteSpace: 'nowrap' }}>
+              style={{ padding: 0, border: 'none', background: 'transparent', color: 'var(--ink-4)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, lineHeight: '15px', textAlign: 'left', minWidth: 0, flex: '1 1 auto' }}>
               Not ticked? Calendar →
             </button>
           : <span />}
@@ -248,7 +248,8 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
             background: answer ? 'var(--btn-primary-bg)' : 'var(--paper-3)', color: answer ? 'var(--btn-primary-fg)' : 'var(--ink-4)',
             fontFamily: 'inherit', fontSize: 12, fontWeight: 650, whiteSpace: 'nowrap', marginLeft: 'auto',
             // The card never changes size with the words: a long summary is cut, not wrapped.
-            minWidth: 0, maxWidth: '100%', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis',
+            // One fixed size: the footer never reflows as the days change.
+            width: 184, flex: '0 0 184px', overflow: 'hidden', textOverflow: 'ellipsis',
           }}
           title={answer ? `${saveLabel ?? 'Add'} · ${cardSummary(d)}` : undefined}
         >

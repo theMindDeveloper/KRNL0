@@ -2377,3 +2377,4 @@ Checked in the preview as a user (plain Enter, card day/length/deadline, words f
 **Type:** Bug Fix
 **Branch:** `experiment/new-user-review`
 **Summary:** Picking six days made the Add button read every day and grow, resizing the whole habit card. Six days now read "all but Tue", and a long button label is cut instead of growing the card. (`HabitNode/HabitAddAsk.tsx`)
+Follow-up: the Add button now has one fixed size (184 px) and the footer never wraps, so the button no longer drops to its own line when the label gets longer; "Not ticked? Calendar →" sits on two lines beside it.
