@@ -253,7 +253,7 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-todo', target: TODO, badge: 'DUE BY', text: 'A plan can have a deadline apart from its time. **Right-click** a Todo row and choose **Due date…** — the row shows *due Fri*, the Calendar lists it on that day in its **DAY** line (drag it into the hours for a time), and the Clock lists what is due.', waitFor: { board: dueSet }, hint: 'Waiting for a due date… (or Skip)' },
       { node: 'mother-todo', target: TODO, badge: 'AGAIN', text: 'A plan that comes back — a weekly review, watering the plants? **Right-click** it and choose **Repeat…**. Tick it off and the next one appears.', waitFor: { board: repeatSet }, hint: 'Waiting for a repeat… (or Skip)' },
       { node: 'mother-todo', target: TODO, badge: 'REMIND ME', text: 'Want a nudge? **Right-click** a planned row and choose **Remind me…**. A notification comes before it starts, even with the window closed.', waitFor: { board: remindSet }, hint: 'Waiting for a reminder… (or Skip)' },
-      { node: 'mother-todo', target: TODO, badge: 'DROP IT', text: 'Not doing something any more? **Drop (not doing it)** moves it to the **Archive** — not done, not deleted, and its checkbox there brings it back.' },
+      { node: 'mother-todo', target: TODO, badge: 'DROP IT', text: 'Not doing something any more? **Drop (not doing it)** takes it off your list and the Calendar — not done and not missed. **UNDO** in the notice brings it back. On a repeating plan it reads **Skip this time**: this one goes, the next one stays.' },
     ],
   },
   {

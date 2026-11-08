@@ -29,7 +29,7 @@ import { TaskRepeatPicker } from '../../ui/TaskRepeatPicker';
 import { describeTaskRepeat, isoDowOfYMD, parseRepeat } from '../../../../shared/repeatTask';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
-import { scheduleTaskAt, setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
+import { scheduleTaskAt, setTaskReminder, spawnNextRepeat, unscheduleTask } from '../../../store/scheduleActions';
 import { describeQuickAdd, parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
@@ -460,15 +460,26 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         },
       }] : []),
       ...(item && !item.done && item.droppedAt === undefined ? [{
-        label: 'Drop (not doing it)',
+        // A repeating plan is skipped, not ended: the next one is made first
+        // (ending the series is "Repeat… → Off").
+        label: item.repeat ? 'Skip this time' : 'Drop (not doing it)',
         onSelect: () => {
           // Off the Calendar too: a dropped plan is not "missed". Dropped
           // plans leave the list, so the notice offers UNDO (time put back).
           const taskId = item.taskNodeId;
           const was = taskId ? taskScheduledInfo.get(taskId)?.scheduledFor ?? null : null;
+          const repeat = item.repeat;
+          const before = new Set(state.items.map((i) => i.id));
+          if (repeat) void spawnNextRepeat(itemId); // reads this plan's time before it is unscheduled
           if (taskId) void unscheduleTask(taskId);
           onCommand('todo.drop', { id: itemId });
-          revertible(`Dropped "${item.text}"`, () => {
+          revertible(repeat ? `Skipped "${item.text}" this time` : `Dropped "${item.text}"`, () => {
+            if (repeat) {
+              // Take back the next one that the skip made, and give this one its repeat again.
+              const now = (useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined)?.items ?? [];
+              for (const it of now) if (!before.has(it.id) && it.text === item.text && !it.done) onCommand('todo.remove', { id: it.id });
+              onCommand('todo.setRepeat', { id: itemId, repeat });
+            }
             onCommand('todo.undrop', { id: itemId });
             if (taskId && was) void scheduleTaskAt(taskId, was);
           });

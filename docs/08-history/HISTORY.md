@@ -2205,3 +2205,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/index.tsx`.
 **Summary:** Archiving a habit made the row vanish with no word about where it went. It now shows "Archived "…" · UNDO" like a delete. Deleting a routine said "Deleted habit"; it now says "Deleted routine".
+
+## [2026-11-08] — Dropping a repeating plan skips it instead of ending the series (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/index.tsx`, `Tour/tours.ts` (Staying on track, Drop step).
+**Summary:** The next copy of a repeating plan was only made on tick, so dropping one Monday's "Gym every Monday" silently ended the whole series. On a repeating plan the item now reads "Skip this time": it makes the next one (same time, same repeat), then drops this one; UNDO takes back both. Ending a series stays "Repeat… → Off". The tour's Drop step also said dropped plans could be brought back from an Archive the Todo never shows; it now names UNDO and Skip this time.
