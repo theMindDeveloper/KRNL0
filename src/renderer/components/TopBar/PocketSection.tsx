@@ -11,7 +11,7 @@ import { POCKET_LOOKS, POCKET_LOOK_LABEL, isPocketLook, type PocketLook } from '
 const LOOK_HINT: Record<PocketLook, string> = {
   dial: 'Round, with the Clock’s ticks. Hover for buttons.',
   capsule: 'A slim pill. Hover for the details.',
-  box: 'The Pomo node itself, with your timer face.',
+  box: 'The Pomo window itself, with your timer face.',
 };
 
 function read(v: unknown): { enabled: boolean; look: PocketLook } | null {

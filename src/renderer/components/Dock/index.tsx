@@ -421,7 +421,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         type="button"
         data-testid="dock-btn-image"
         title="Image / ASCII [I]"
-        aria-label="Add image node (I)"
+        aria-label="Add an image (I)"
         onClick={() => fireNode('image')}
         style={pressed === 'image' ? { ...btnBase, background: 'var(--paper-2)', color: 'var(--ink)' } : btnBase}
       >
@@ -480,7 +480,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
             data-testid="dock-btn-dock-style"
             className={`krnl-dock-style-btn${dockStyle !== 'classic' ? ' is-armed' : ''}${dockMenuOpen ? ' is-open' : ''}`}
             title={`Frame style: ${DOCK_REGISTRY[dockStyle].label} — click to change`}
-            aria-label="Pick mother-row frame style"
+            aria-label="Pick the window frame style"
             aria-expanded={dockMenuOpen}
             onClick={() => setDockMenuOpen((o) => !o)}
           >

@@ -267,7 +267,7 @@ function MotherDragHandle({ nodeId }: { nodeId: string }) {
   return (
     <div
       role="button"
-      aria-label="Drag to swap with another mother"
+      aria-label="Drag to swap with another window"
       className="station-drag-handle"
       onPointerDown={onPointerDown}
       onMouseDown={stop}

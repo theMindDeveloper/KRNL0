@@ -2032,3 +2032,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/HabitContextMenu.tsx`, `docs/research/new-user-review-2026-11-08.md`.
 **Summary:** "Pin as lane" / "Lane already pinned" / "Unpin lane (keep the habit)" used an internal word. Now: "Put a card on the canvas" / "Already on the canvas" / "Remove its canvas card (keep the habit)".
+
+## [2026-11-08] — "window", not "mother" or "node", in labels (experimental)
+
+**Type:** Copy
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ChassisLayer/TelemetryChrome.tsx`, `Dock/index.tsx`, `MotherFrame/index.tsx`, `TopBar/PocketSection.tsx`.
+**Summary:** A sweep of visible labels and screen-reader names for internal words: "Jump to the habit window", "Add an image (I)", "Pick the window frame style", "Drag to swap with another window", and the floating timer's Box look is "The Pomo window itself".
