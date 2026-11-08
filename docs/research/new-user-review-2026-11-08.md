@@ -69,6 +69,10 @@ Habits and routines: **amounts** ("8 glasses a day") · **night shifts** (a rout
 
 Tours: Staying on track (weekly targets, amounts, rest days, due dates, repeats, reminders, drop) and the Todo tour's quick-add step — both run end to end in the preview. Keyboard: the new pickers take focus.
 
+Second pass: **Free** opens on the first four windows at a readable size · a busy Todo row still fits · the Month view and Calendar pills show amounts and rest days · "Did it yesterday? Yes" fills an amount habit's day · an optional amount while adding a habit · quick add reads "every day / weekday / sunday" · **Analytics streaks agree with the Habit node** (its own copy ignored rest days and targets — fixed on `feat/routines` too) · `krnl todo list` / `habit list` show what the rows show · the in-app assistant's instructions know every new command.
+
+Structure: one home for local-date helpers (`shared/ymd.ts`) · the habit target / amount popovers in their own file.
+
 Preview: `?fixture=fresh` opens the board a new user gets.
 
 ## Proposed order for what is left
