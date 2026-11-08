@@ -207,7 +207,7 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-habit', target: HABIT, badge: 'HABITS', text: '**Habits** are the things you want to do regularly. **Tick them off** each day.' },
       { node: 'mother-analytics', target: ANALYTICS, badge: 'ANALYTICS', text: '**Analytics** answers "where did my time go" — **per day** and **per task**.' },
       { press: GEAR, target: MODE, badge: 'EASY / ADVANCED', text: "You're in **{mode}** mode. Switch here in **Settings → Mode** — Advanced connects tasks, categories and focus. The **Easy and Advanced** tour shows the difference." },
-      { target: ORB, badge: 'MORE TOURS', text: 'And this is me. Open me for **a short tour of each window**.' },
+      { target: ORB, badge: 'ASK ME', text: 'And this is me. **Ask me anything**: I answer with Claude Code and can change your board for you. My menu also has **a short tour of each window**.' },
     ],
   },
   {

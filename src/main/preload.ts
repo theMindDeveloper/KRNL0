@@ -74,6 +74,16 @@ contextBridge.exposeInMainWorld('krnl', {
   sysRun: (argv: string[]): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('sys:run', argv),
   clipboardWriteText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:writeText', text),
 
+  // Decision 41 — the orb asks Claude Code; the answer streams back as events.
+  assistantAsk: (id: string, prompt: string, resume?: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('assistant:ask', id, prompt, resume),
+  assistantCancel: (id: string): Promise<void> => ipcRenderer.invoke('assistant:cancel', id),
+  onAssistantEvent: (callback: (id: string, event: unknown) => void) => {
+    const listener = (_e: unknown, id: string, event: unknown) => callback(id, event)
+    ipcRenderer.on('assistant:event', listener)
+    return () => { ipcRenderer.removeListener('assistant:event', listener) }
+  },
+
   // Decision 35 — durable time log (renderer/store/timeLog.ts wraps these).
   timelogAppend: (entries: unknown[]): Promise<{ ok: boolean; written: number }> =>
     ipcRenderer.invoke('timelog:append', entries),

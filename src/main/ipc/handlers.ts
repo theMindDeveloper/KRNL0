@@ -22,6 +22,8 @@ import {
 import { TimeLogInputSchema, type TimeLogEntry, type TimeLogInput } from '../../shared/timelog';
 import { isValidYMD } from '../../shared/ymd';
 import type { RpcServer } from '../rpc/server';
+import { askClaude } from '../assistant/askClaude';
+import type { AskEvent } from '../../shared/assistant/claudeStream';
 
 // Read version once at module load (package.json is bundled into resources).
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -333,10 +335,51 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     clipboard.writeText(text);
   });
 
-  ipcMain.handle('brain:ask', async (_event, prompt: string) => {
-    // TODO (Week 5): route to active BrainProvider instance (created by BrainFactory)
-    void prompt;
-    return '';
+  // Decision 41 — the orb asks Claude Code. One question per id; its answer
+  // streams back as 'assistant:event' (text, tool, session, done | error).
+  // Same folder and environment as the terminal's Claude: the app's claude/
+  // folder (in-app instructions), krnl on PATH, the app's RPC credentials.
+  const asking = new Map<string, () => void>();
+  const claudeHomeDir = (): string => {
+    let home = process.env['KRNL0_CLAUDE_HOME'] ?? join(app.getAppPath(), 'claude');
+    const asar = `${sep}app.asar${sep}`;
+    if (home.includes(asar)) home = home.replace(asar, `${sep}app.asar.unpacked${sep}`);
+    try { if (existsSync(home)) return home; } catch { /* fall through */ }
+    return homedir();
+  };
+  const toolsEnv = (): Record<string, string> => {
+    const env: Record<string, string> = Object.fromEntries(
+      Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
+    );
+    const pathKey = process.platform === 'win32' ? 'Path' : 'PATH';
+    const cliDir = process.env['KRNL0_CLI_DIR'] ?? '';
+    if (cliDir) env[pathKey] = `${cliDir}${process.platform === 'win32' ? ';' : ':'}${process.env[pathKey] ?? process.env['PATH'] ?? ''}`;
+    if (rpcServer) {
+      env['KRNL0_RPC_SOCKET'] = rpcServer.socketPath;
+      env['KRNL0_RPC_TOKEN'] = rpcServer.token;
+    }
+    env['KRNL0_MAIN_PID'] = String(process.pid);
+    return env;
+  };
+  ipcMain.handle('assistant:ask', (event, id: unknown, prompt: unknown, resume: unknown) => {
+    if (typeof id !== 'string' || typeof prompt !== 'string' || !prompt.trim()) return { ok: false };
+    asking.get(id)?.();
+    const send = (e: AskEvent): void => {
+      if (!event.sender.isDestroyed()) event.sender.send('assistant:event', id, e);
+      if (e.type === 'done' || e.type === 'error') asking.delete(id);
+    };
+    const cancel = askClaude({
+      prompt: prompt.slice(0, 8000),
+      resume: typeof resume === 'string' ? resume : undefined,
+      cwd: claudeHomeDir(),
+      env: toolsEnv(),
+      onEvent: send,
+    });
+    asking.set(id, cancel);
+    return { ok: true };
+  });
+  ipcMain.handle('assistant:cancel', (_event, id: unknown) => {
+    if (typeof id === 'string') asking.get(id)?.();
   });
 
   ipcMain.handle('voice:startListening', async () => {

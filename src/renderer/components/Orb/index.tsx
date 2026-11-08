@@ -71,13 +71,15 @@ import { useTourAnchor } from '../Tour/tourAnchor';
 /** Voice flows not offered in the chat for now. */
 const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
 import { activeTour, startTour } from '../Tour/TourHost';
+import { askClaude } from '../../store/askClaude';
 import { launchDialogOpen } from '../../launch/launchStore';
 import { emit } from '../../store/eventLog';
 import { Z } from '../ui/layers';
 import { isTypingTarget, isControlTarget, isModalOpen } from '../../utils/keyboardTargets';
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'running';
-interface ChatMsg { role: 'user' | 'ai'; text: string }
+/** An answer may carry the krnl commands Claude ran (tools) and be an error. */
+interface ChatMsg { role: 'user' | 'ai'; text: string; tools?: string[]; error?: boolean }
 
 const MOCK_REPLIES: readonly string[] = [
   "noted — i'll surface that when the next pomo wraps.",
@@ -509,6 +511,38 @@ export function Orb() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [history.length, thinking]);
 
+  // Decision 41 — the answer comes from Claude Code (claude -p), streamed in.
+  const sessionRef = useRef<string | undefined>(undefined);
+  const askRef = useRef<{ cancel: () => void } | null>(null);
+  const updateLast = (f: (m: ChatMsg) => ChatMsg) =>
+    setHistory((h) => (h.length && h[h.length - 1]!.role === 'ai' ? [...h.slice(0, -1), f(h[h.length - 1]!)] : h));
+  const askClaudeNow = (text: string) => {
+    setHistory((h) => [...h, { role: 'ai', text: '' }]);
+    const handle = askClaude(text, sessionRef.current, (e) => {
+      if (e.type === 'session') sessionRef.current = e.sessionId;
+      else if (e.type === 'text') updateLast((m) => ({ ...m, text: m.text + e.text }));
+      else if (e.type === 'tool') updateLast((m) => ({ ...m, tools: [...(m.tools ?? []), e.label] }));
+      else if (e.type === 'done') {
+        if (e.sessionId) sessionRef.current = e.sessionId;
+        updateLast((m) => ({ ...m, text: m.text.trim() ? m.text : e.text }));
+        askRef.current = null;
+        setThinking(false);
+      } else if (e.type === 'error') {
+        updateLast((m) => (e.code === 'cancelled' && m.text.trim() ? { ...m, text: `${m.text}\n(stopped)` } : { ...m, text: e.message, error: e.code !== 'cancelled' }));
+        askRef.current = null;
+        setThinking(false);
+      }
+    });
+    if (!handle) {
+      updateLast((m) => ({ ...m, text: 'I answer through Claude Code in the KRNL0 desktop app.', error: true }));
+      setThinking(false);
+      return;
+    }
+    askRef.current = handle;
+  };
+  const stopAsking = () => { askRef.current?.cancel(); };
+  const newChat = () => { stopAsking(); sessionRef.current = undefined; setHistory([]); setThinking(false); };
+
   const submitMock = (text: string) => {
     setHistory((h) => [...h, { role: 'user', text }]);
     setInput('');
@@ -522,16 +556,16 @@ export function Orb() {
       said.includes(f.label.toLowerCase()) || said.includes(f.id.replace(/-/g, ' '))
     );
 
-    window.setTimeout(() => {
-      if (matchingFlow) {
+    // A built-in flow still starts locally; everything else goes to Claude.
+    if (matchingFlow) {
+      window.setTimeout(() => {
         setThinking(false);
         setHistory((h) => [...h, { role: 'ai', text: `launching: ${matchingFlow.label}` }]);
         setTimeout(() => launchFlow(matchingFlow), 400);
-      } else {
-        setHistory((h) => [...h, { role: 'ai', text: mockReply() }]);
-        setThinking(false);
-      }
-    }, 500 + Math.random() * 400);
+      }, 300);
+      return;
+    }
+    askClaudeNow(text);
   };
 
   const onSubmit = (e: FormEvent) => {
@@ -693,6 +727,12 @@ export function Orb() {
               </span>
               krnl0 · assistant
             </span>
+            {history.length > 0 && (
+              <button type="button" data-testid="orb-chat-new" onClick={newChat} title="Start a new conversation"
+                style={{ marginLeft: 'auto', marginRight: 8, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                New chat
+              </button>
+            )}
             <CloseButton tone="dark" testId="orb-chat-close" label="Close assistant" onClick={() => setOpen(false)} />
           </div>
 
@@ -826,15 +866,21 @@ export function Orb() {
                 </div>
               </div>
             )}
-            {history.map((m, i) => (
-              <div key={i} style={{ color: m.role === 'user' ? '#8a8270' : '#d4cfc0' }}>
-                <span style={{ color: m.role === 'user' ? '#8a8270' : 'var(--accent-on-dark)', marginRight: 4 }}>
+            {history.map((m, i) => (m.role === 'ai' && !m.text && !m.tools?.length ? null : (
+              <div key={i} data-testid={m.role === 'ai' ? 'orb-chat-answer' : 'orb-chat-question'} style={{ color: m.role === 'user' ? '#8a8270' : m.error ? '#ee8466' : '#d4cfc0', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                <span style={{ color: m.role === 'user' ? '#8a8270' : m.error ? '#ee8466' : 'var(--accent-on-dark)', marginRight: 4 }}>
                   {m.role === 'user' ? '›' : '◆'}
                 </span>
-                {m.text}
+                {m.text.replace(/\*\*(.+?)\*\*/g, '$1')}
+                {/* What it did on the board (the krnl commands it ran), quietly. */}
+                {m.tools && m.tools.length > 0 && (
+                  <div data-testid="orb-chat-tools" style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11, color: '#8a8270', fontFamily: 'var(--font-mono)' }}>
+                    {m.tools.map((t, j) => <span key={j} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>· {t}</span>)}
+                  </div>
+                )}
               </div>
-            ))}
-            {thinking && (
+            )))}
+            {thinking && !(history.length && history[history.length - 1]!.role === 'ai' && history[history.length - 1]!.text) && (
               <div data-testid="orb-chat-thinking">
                 <span style={{ color: 'var(--accent-on-dark)', marginRight: 6 }}>◆</span>
                 <span style={{ display: 'inline-flex', gap: 3, marginLeft: 4 }}>
@@ -871,7 +917,7 @@ export function Orb() {
               data-testid="orb-chat-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={thinking ? 'thinking…' : 'ask anything · hold Space to talk'}
+              placeholder={thinking ? 'thinking…' : 'ask anything'}
               disabled={thinking}
               autoComplete="off"
               spellCheck={false}
@@ -880,6 +926,12 @@ export function Orb() {
                 color: '#d4cfc0', fontFamily: 'inherit', fontSize: 12.5, padding: '4px 0',
               }}
             />
+            {thinking && (
+              <button type="button" data-testid="orb-chat-stop" onClick={stopAsking}
+                style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.35)', background: 'transparent', color: '#d4cfc0', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                Stop
+              </button>
+            )}
           </form>
         </div>
       )}

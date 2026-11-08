@@ -2585,3 +2585,25 @@ Only habits repeat, and a habit is always tickable and (ADR 0002) always timed. 
 ### Consequences
 - One editor (the When popover) replaces Edit time, Due date… and Reminder…; the Todo add flow has one step.
 - Board data is additive (`onDay`) plus one load-time migration; schemaVersion unchanged.
+
+---
+
+## Decision 41 — The orb answers through the Claude CLI (2026-11-08)
+
+**Status:** Accepted (maintainer, 2026-11-08: "when you go and ask anything, I want it to connect to the Claude CLI and take the output here as a text"). Requirements: docs/06-requirements/orb-ask.md. Issue: #224.
+
+### Context
+The orb's "ask anything" box answered with canned text (`submitMock`), and hold-Space-to-talk only animated the orb. The terminal already runs Claude Code inside the app's `claude/` folder (so it reads the in-app assistant instructions, `claude/CLAUDE.md`) with `krnl` on its PATH and the app's RPC credentials, so it can read and change the board.
+
+### Decision
+- A question typed in the orb runs **`claude -p`** in the main process, in the same folder and with the same environment as the terminal (`claude/`, `krnl` on PATH, RPC credentials). The answer streams back as text (`--output-format stream-json --include-partial-messages`) and is shown in the orb panel as it arrives.
+- **Tools:** only `Bash(krnl:*)` is allowed: Claude can read and change the board through `krnl`, nothing else on the computer. Each `krnl` call shows as a quiet line ("krnl todo list") under the answer.
+- **The prompt goes in on stdin**, never as a command-line argument (no quoting or shell-injection risk; on Windows `claude` is a `.cmd` and runs through the shell).
+- **A conversation** continues with `--resume <session id>` until the user starts a new one (×). One question at a time; Stop cancels it. 3-minute limit.
+- **Errors say what to do:** Claude Code not installed (link to install), not signed in (run `claude` once in the terminal), timed out, or failed (its last line).
+- **Local flows first:** a message that names a built-in flow ("focus session") still starts it without Claude.
+- Speech (hold Space) is a separate choice: no speech-to-text exists in the app yet (Whisper is a stub, Electron has no built-in recognition).
+
+### Consequences
+- The orb needs Claude Code installed and signed in; without it the orb says so instead of pretending to answer.
+- Answers cost the user's Claude usage; the orb never sends anything on its own.

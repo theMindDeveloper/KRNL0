@@ -45,6 +45,10 @@ interface KrnlBridge {
   clipboardReadText: () => Promise<string>
   clipboardWriteText: (text: string) => Promise<void>
   sysRun?: (argv: string[]) => Promise<{ ok: boolean; message: string }>
+  // Decision 41 — the orb asks Claude Code. Use renderer/store/askClaude.ts.
+  assistantAsk?: (id: string, prompt: string, resume?: string) => Promise<{ ok: boolean }>
+  assistantCancel?: (id: string) => Promise<void>
+  onAssistantEvent?: (callback: (id: string, event: unknown) => void) => () => void
   // Decision 35 — durable time log. Use renderer/store/timeLog.ts
   // (logTime / queryTimeLog), not these directly.
   timelogAppend?: (entries: unknown[]) => Promise<{ ok: boolean; written: number }>
