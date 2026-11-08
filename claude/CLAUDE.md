@@ -113,7 +113,7 @@ krnl habit schedule meditation --weekly --days 1,3,5 --at 07:00 --duration 15   
 krnl habit schedule meditation --weekdays --at 07:00 --duration 15              # Mon–Fri
 krnl habit unschedule meditation
 
-# Pin / unpin a lane on the canvas (right-click "Pin as lane" UI equivalent)
+# Pin / unpin a habit's card on the canvas (right-click "Put a card on the canvas")
 krnl habit pin meditation                              # requires open renderer
 krnl habit unpin meditation
 
@@ -125,6 +125,30 @@ krnl habit show meditation --json                      # full state incl. log + 
 krnl habit streak meditation
 krnl habit list --json
 krnl habit view week|month|year                        # change the displayed grid range
+```
+
+### Routines and habits — two kinds (Decision 39)
+
+A **habit** is ticked; a **routine** (a class, a work shift, a weekly call) just happens at its time, sits on the Calendar every week and is **never ticked, counted or "missed"**. Ask the user which one they mean if it is not obvious: *"Do you want to tick it off?"* — yes = habit, no = routine.
+```
+krnl routine add "Class" --days mon,wed --at 10:00 --for 120     # may run past midnight (a night shift)
+krnl routine list
+krnl routine skip|unskip|end "Class" [--on YYYY-MM-DD]            # one week / its end; history kept
+krnl routine move "Class" --on YYYY-MM-DD --at 13:30             # just that one
+krnl routine restart "Class"
+krnl routine remind "Class" 10|off                               # notification before each time
+krnl habit kind <ref> routine|habit
+krnl habit schedule <ref> --daily                                # no --at = "any time" (not on the Calendar)
+```
+
+Habits can also have:
+```
+krnl habit target <ref> 3|off          # "3 times a week, any days" — the streak counts weeks
+krnl habit amount <ref> 8 glasses|off  # "8 glasses a day" — each tick adds one; the day counts once reached
+krnl habit count <ref> 5 [--on YYYY-MM-DD]
+krnl habit rest <ref> [--on D] [--to D] [--off]   # sick / away: rest days never break a streak
+krnl habit archive <ref>               # hides it, keeps history — prefer this over remove
+krnl habit unarchive <ref>
 ```
 
 **Weekly `--days` is strict.** Tokens must be ISO 1–7 integers separated by commas. `mon`, `monday`, `0`, `8`, trailing commas — all rejected. Duplicates are tolerated (deduped + sorted by the handler).
@@ -197,6 +221,7 @@ krnl task parallel <id>                # canonical alias for sibling
 krnl task addNext <sourceRef> "<text>" [--duration <min>]   # add sequential next task
 krnl task schedule <ref> --at <YYYY-MM-DDTHH:MM> [--duration <min>]
 krnl task unschedule <ref>
+krnl task remind <ref> <minutes-before|off>   # system notification before it starts (0 = at the start)
 krnl task pomo <id>                    # load this task into PomoNode and start
 krnl task reset-pomo <id>
 krnl task delete <id>                  # cascades to descendants
@@ -207,6 +232,11 @@ krnl task chain <ref1> <ref2> [...]    # wire task.next → task.activate betwee
 ### Todos — items on the mother TodoNode
 ```
 krnl todo add "<text>" [--tag <label>]   # untagged adds are auto-tagged
+                                           # reads day/time/length from the words:
+                                           #   "Gym tomorrow 18:00 1h" -> on the Calendar; "Pay rent friday" -> due that day
+krnl todo due <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>   # deadline, apart from when it is planned
+krnl todo repeat <ref> <daily|weekdays|weekly|off>    # ticking it off adds the next one
+krnl todo drop <ref> / todo undrop <ref>   # "not doing it": to the Archive, not done, off the Calendar
 krnl todo check <ref>                      # done -> "Done" today, "Archive" from tomorrow
 krnl todo list [--done|--archived|--all] [--json]   # default: open + done today
 krnl todo tag <ref> <tag|auto>             # hand-tag (unknown label = new custom tag); auto = classifier
@@ -218,7 +248,9 @@ krnl analytics show --view tags [--range N] [--json]   # time by tag
 
 ### Habits — see "Habits" model above
 ```
-krnl habit add|done|streak|color|rename|icon|note|view|remove|archive|show
+krnl habit add|done|streak|color|rename|icon|note|view|remove|archive|unarchive|show
+krnl habit target|amount|count|rest|kind
+krnl routine add|list|skip|unskip|move|end|restart|remind
 krnl habit schedule|unschedule
 krnl habit pin|unpin                   # renderer-only
 krnl habit list [--json]

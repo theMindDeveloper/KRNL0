@@ -2073,3 +2073,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `sys/commands/todo.ts`, `sys/commands/habit.ts`; tests `repeatTask.test.ts`, `habit.amount.test.ts`.
 **Summary:** Rule 8 — the assistant works through `krnl`, so it must see what a person sees. `krnl todo list` now adds "· due 2026-11-13 · repeats every Sunday · reminder 10 min before · dropped" to a row where they apply; `krnl habit list` shows the streak in weeks for a weekly target ("▲2w"), "3× a week", "2 of 8 glasses today", "rest day today", and "routine" instead of a streak for routines (JSON gains the same fields).
+
+## [2026-11-08] — The in-app assistant knows the new commands (experimental)
+
+**Type:** Docs (assistant prompt)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `claude/CLAUDE.md`.
+**Summary:** The assistant's instructions predated routines and today's work, so it would reach for the old commands or say something cannot be done. It now has a "Routines and habits — two kinds" section (when to ask "do you want to tick it off?"), the routine commands, weekly targets / amounts / counts / rest days / archive–unarchive, quick add in `todo add`, `todo due|repeat|drop|undrop`, and `task remind`; "Pin as lane" reads "Put a card on the canvas".
