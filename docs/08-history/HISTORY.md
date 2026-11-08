@@ -2282,3 +2282,24 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `ui/DuePicker.tsx` (`canClear`), `TodoNode/index.tsx`.
 **Summary:** "No due date" on a repeating plan with no Calendar time made it repeat on no day again. The due picker no longer offers it there; the plan can move to another day, and Repeat… → Off ends the series.
+
+## [2026-11-08] — Repeating plans removed: something that repeats is a habit with a time or a routine (experimental)
+
+**Type:** Bug Fix (logic) · Removal
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/index.tsx`, `TodoNode/commands.ts`, `TodoNode/types.ts`, `Canvas/commandDispatch.ts`, `store/scheduleActions.ts`, `launch/catchup.ts`, `src/shared/quickAdd.ts`, `src/sys/commands/todo.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `Tour/tours.ts`, `claude/CLAUDE.md`; removed `src/shared/repeatTask.ts`, `ui/TaskRepeatPicker.tsx`, `repeatTask.test.ts`; tests `quickAdd.test.ts`, `dueOnDay.test.ts`, `tours.test.tsx`.
+**Summary:** Used for real, repeating plans broke: ticking one made the next copy at once, so the same daily plan could be ticked again and again on one day (22 times on the user's board); the Calendar showed only that one copy; dragging moved one copy with no series behind it; and it was a third kind of "repeating thing" next to habits and routines, which confused. Removed: Repeat… on a Todo row, "every …" in quick add (it now says "a plan happens once — add a habit with a time or a routine in Habits & Routines" and reads nothing else), `todo repeat`, Skip this time (Drop is plain Drop again, still with UNDO), making the next copy on open or at midnight, and the Welcome back exceptions. Old boards still load: a leftover `repeat` on an item is ignored, and ticking it makes no copy. Gym at 18:00 every day is a habit with a time; a class is a routine.
+
+## [2026-11-08] — Delete from the Calendar means gone everywhere; ended routines stay on their shelf (experimental)
+
+**Type:** Bug Fix (UX)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/TaskPopup.tsx`, `CalendarNode/WeekView.tsx`, `store/scheduleActions.ts` (`deletePlanOfTask`, `deleteRoutine`), `HabitNode/index.tsx`, `HabitNode/RoutineShelf.tsx`.
+**Summary:** Things the windows hid stayed on the Calendar with no way to remove them there: a routine's band only offered "End routine after this day", which kept it, and an ended routine vanished from Habits & Routines into the gear menu while its past days stayed on the Calendar. A plan's Calendar popup now has **Delete** (Todo, Calendar and canvas, with UNDO), a routine's band has **Delete routine** (with UNDO), "End" says it keeps the days before, and an ended routine stays on the Routines shelf marked "ended 2 Nov" with Restart and Delete in its menu.
+
+## [2026-11-08] — A plan's deadline shows in the DAY line even when it has a time (experimental)
+
+**Type:** Bug Fix (UX)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/dayOnly.ts`, `CalendarNode/DueFlag.tsx` (new), `CalendarNode/WeekView.tsx`, `CalendarNode/MonthView.tsx`; test `dayOnly.test.ts` (+1).
+**Summary:** A due date on a plan that already had a Calendar time was drawn nowhere. The DAY line (Week and Day) and the Month cell now show it on its due day with a small flag, dashed and not draggable (the block on the grid moves the plan); a plan planned on its own due day shows only its block. DAY-line chips wrap the whole name instead of cutting it to "du…".

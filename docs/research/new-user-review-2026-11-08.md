@@ -55,7 +55,7 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 
 - **5.1** Weekly-target habits show their week count only in the Week view; Month / Year still show a day badge. *Low* — use the week streak there too.
 - **5.2** Habit amounts ("8 glasses") — **built here**: Amount a day…, each click adds one, the day counts once reached.
-- **5.3** Repeating *plans* — **built here**: row menu **Repeat…** (every day, weekdays, every <its weekday>); ticking one off brings the next (same name, length, tag; same time on its next day, or due that day; never a backlog of past days); `krnl todo repeat`, and `todo check` does the same.
+- **5.3** Repeating *plans* — built here, then **removed** after the user used them (see "After the user's test" below). Something that repeats is a habit with a time (ticked) or a routine (just happens).
 - **5.4** Naming tracked time freely ("Gaming") already works: the span picker's **+ Add category** makes a custom category in one step, and `krnl pomo retag <seg> --text "…"` names one span. Kept as is; the user wanted to discuss it.
 
 ---
@@ -79,6 +79,21 @@ Logic fixes: **Drop offers UNDO** (and puts the Calendar time back) · Habit **A
 Structure: one home for local-date helpers (`shared/ymd.ts`) · the habit target / amount popovers in their own file.
 
 Preview: `?fixture=fresh` opens the board a new user gets.
+
+## After the user's test (8 Nov, afternoon)
+
+The user used the branch for real and found what the passes above missed. Every check above tested that the code did what was designed; none used a feature like a person over several days (tick, tick again, drag, delete, look at every view).
+
+| What the user did | What happened | Now |
+|---|---|---|
+| Set a plan to repeat every day, ticked it | The next copy appeared at once, so the same plan could be ticked again and again on one day (22 times on their board, some on future days) | **Repeating plans removed.** Repeat…, "every …" in quick add, `todo repeat`, Skip this time and the automatic copies are gone. Quick add says where repeating things go. Old boards load; a leftover repeat is ignored |
+| Looked at the Calendar | Only one copy showed, not every day | Same: a habit with a time, or a routine, shows on every day it happens |
+| Dragged the copy | It moved, the "series" did not | Same |
+| Wondered: habit, routine or repeating plan? | Three kinds of repeating thing | **Two:** a habit is ticked and may have a time (Gym at 18:00); a routine just happens (a class) |
+| Deleted everything in the windows | Routines and ticked plans stayed on the Calendar: "End" on a band kept the routine, an ended routine hid in the gear menu, a ticked plan had no Delete on the Calendar | **Delete** on a plan's Calendar popup and on a routine's band (both with UNDO); "End" says it keeps the days before; an ended routine stays on the shelf, marked ended, with Restart and Delete |
+| Gave a timed plan a due date | The deadline was drawn nowhere | It shows in the DAY line and the Month cell with a small flag |
+
+Rule kept from this: walk every feature as a user, over several days, in every view, before calling it done.
 
 ## Proposed order for what is left
 
