@@ -2101,3 +2101,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/HabitPopovers.tsx` (new: `TargetPopover`, `AmountPopover`), `HabitNode/index.tsx` (−60 lines).
 **Summary:** Structure: the "Times a week…" and "Amount a day…" popovers were inline portals in the 1,350-line Habit node. They are now two small components sharing one shell (Esc closes, focus on the current choice), and the amount editor keeps its own draft state. Same behaviour; the Staying on track tour ran 8/8 after the move.
+
+## [2026-11-08] — Month view shows amounts and rest days (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`.
+**Summary:** The Week view filled an amount habit's day from the bottom and hatched rest days; the Month view showed neither (a half-done "8 glasses" day looked untouched, a rest day looked missed). Month cells now read the same, with the same tooltips. Checked in the preview.

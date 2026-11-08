@@ -1066,16 +1066,22 @@ const MonthRow = memo(function MonthRow({
         {monthDays.map((dayStr) => {
           const done = logSet.has(dayStr);
           const scheduled = isDayScheduled(habit.schedule, dayStr);
-          const cls = cellClass(dayStr, today, done, 'month', scheduled);
-          const tip = scheduled
-            ? `${habit.name} ${dayStr}`
-            : `${habit.name} ${dayStr} — not scheduled`;
+          const resting = !done && (habit.rest ?? []).includes(dayStr);
+          const cls = cellClass(dayStr, today, done, 'month', scheduled) + (resting ? ' habit-cell--rest' : '');
+          // Amounts and rest days read the same as in the week view.
+          const cnt = habit.amount ? countOn(habit, dayStr) : 0;
+          const part = habit.amount && !done && cnt > 0 ? Math.min(1, cnt / habit.amount.target) : 0;
+          const tip = !scheduled
+            ? `${habit.name} ${dayStr} — not scheduled`
+            : resting ? `${habit.name} ${dayStr} — rest day`
+            : habit.amount ? `${habit.name} ${dayStr} — ${cnt} of ${habit.amount.target}${habit.amount.unit ? ` ${habit.amount.unit}` : ''}`
+            : `${habit.name} ${dayStr}`;
           return (
             <div
               key={dayStr}
               data-date={scheduled ? dayStr : undefined}
               className={cls}
-              style={cellStyle}
+              style={part > 0 ? { ...cellStyle, background: `linear-gradient(to top, color-mix(in srgb, var(--habit-color, var(--acid)) 75%, transparent) ${Math.round(part * 100)}%, transparent ${Math.round(part * 100)}%)` } : cellStyle}
               title={tip}
             />
           );
