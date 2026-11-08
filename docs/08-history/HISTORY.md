@@ -2059,3 +2059,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/routines` (and `experiment/new-user-review`)
 **Files changed:** `analytics/engine.ts`, `analytics/sources/habitSource.ts`, `analytics/types.ts`, `AnalyticsNode/index.tsx`; test `analytics/__tests__/streaks.sameEverywhere.test.ts` (new).
 **Summary:** Found in the new-user review: Analytics kept its own copy of the streak (`calcHabitStreak`), which knew nothing of rest days or weekly targets — a habit with a rest day read 2 days in Analytics and 4 in the Habit node. Analytics now asks `habitStreak` like every other screen; a weekly-target habit's streak is in weeks ("2w" in the per-habit list) and stays out of the "longest streak" figure, which is in days (as milestones do).
+
+## [2026-11-08] — "Did it yesterday? Yes" fills an amount habit (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`; test `HabitNode.repairAmount.test.tsx` (new).
+**Summary:** Found while checking amounts against the rest of the habit flow: on "8 glasses a day", answering **Yes** to "Did it yesterday?" used the grid's click — one more glass — so yesterday stayed undone and the card stayed. Yes now sets yesterday to the full amount.

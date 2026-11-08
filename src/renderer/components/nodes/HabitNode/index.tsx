@@ -197,6 +197,12 @@ export function HabitNode({
     [onCommand],
   );
 
+  // "Did it yesterday? Yes" on an amount habit means the whole amount, not one more glass.
+  const onFillDay = useCallback(
+    (habitId: string, date: string, count: number) => onCommand('habit.setCount', { id: habitId, date, count }),
+    [onCommand],
+  );
+
   const onRestDay = useCallback(
     (habitId: string, date: string) => onCommand('habit.setRest', { id: habitId, date, rest: true }),
     [onCommand],
@@ -322,6 +328,7 @@ export function HabitNode({
               habitMotherId={node.id}
               onToggle={onToggleCell}
               onRest={onRestDay}
+              onFill={onFillDay}
               onContextMenu={onContextMenu}
             />
           )}
@@ -630,10 +637,11 @@ interface WeekViewProps {
   habitMotherId: string;
   onToggle: (id: string, date: string) => void;
   onRest?: (id: string, date: string) => void;
+  onFill?: (id: string, date: string, count: number) => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
 }
 
-function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onRest, onContextMenu }: WeekViewProps) {
+function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onRest, onFill, onContextMenu }: WeekViewProps) {
   const gridWidth = WEEK_CELL_SIZE * 7 + WEEK_CELL_GAP * 6;
   return (
     <div data-view-week>
@@ -668,6 +676,7 @@ function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onRest, on
           habitMotherId={habitMotherId}
           onToggle={onToggle}
           {...(onRest ? { onRest } : {})}
+          {...(onFill ? { onFill } : {})}
           onContextMenu={onContextMenu}
         />
       ))}
@@ -678,6 +687,7 @@ function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onRest, on
 interface WeekRowProps extends RowCommonProps {
   weekDays: string[];
   onRest?: (id: string, date: string) => void;
+  onFill?: (id: string, date: string, count: number) => void;
 }
 
 const WeekRow = memo(function WeekRow({
@@ -689,6 +699,7 @@ const WeekRow = memo(function WeekRow({
   habitMotherId,
   onToggle,
   onRest = () => undefined,
+  onFill = () => undefined,
   onContextMenu,
 }: WeekRowProps) {
   const color = habitColor(habit.color);
@@ -918,7 +929,7 @@ const WeekRow = memo(function WeekRow({
           <button
             type="button"
             data-testid={`habit-repair-yes-${habit.id}`}
-            onClick={(e) => { e.stopPropagation(); onToggle(habit.id, repairDay); }}
+            onClick={(e) => { e.stopPropagation(); if (habit.amount) onFill(habit.id, repairDay, habit.amount.target); else onToggle(habit.id, repairDay); }}
             onMouseDown={(e) => e.stopPropagation()}
             title={`Tick ${repairLabel} — your streak carries on`}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 22, padding: '0 9px', borderRadius: 6, cursor: 'pointer', border: 0, background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, flexShrink: 0 }}
