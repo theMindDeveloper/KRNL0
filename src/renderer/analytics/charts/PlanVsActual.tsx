@@ -114,6 +114,11 @@ export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tas
 
 /** Planned block minutes vs worked minutes per day (two bars per day, one axis). */
 export function DailyPlanActual({ days, width, height }: { days: readonly DayPlanActual[]; width: number; height: number }) {
+  // Nothing planned or worked: say so, like the other cards (bare 30m / 15m
+  // axes read as a broken chart to a new user).
+  if (!days.some((d) => d.plannedMin > 0 || d.workedMin > 0)) {
+    return <div data-testid="analytics-daily-plan-actual-empty" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_AXIS, padding: 8 }}>Nothing planned on the Calendar or worked in this range yet. Plan a task on the Calendar and run a pomo on it to compare.</div>;
+  }
   const pad = { left: 30, right: 6, top: 8, bottom: 18 };
   const innerW = Math.max(20, width - pad.left - pad.right);
   const innerH = Math.max(20, height - pad.top - pad.bottom);

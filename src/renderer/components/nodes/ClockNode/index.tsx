@@ -15,6 +15,7 @@ import { todayLocalYMD } from './types';
 import { dayProgress, progressRatio, weekProgress } from '../../../store/dayProgress';
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
+import { dueOnDay } from '../../../../shared/dueOn';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import { selectPomoReality, pomoIsLive, type RealitySegment } from '../../../store/pomoReality';
 import type { TaskState } from '../TaskNode/types';
@@ -257,6 +258,8 @@ export function ClockNode({
   // currently selected day.
   const today = todayLocalYMD();
   const isToday = selectedDate === today;
+  // Review 4.3 — what is due that day (and, today, what is overdue).
+  const dueItems = useMemo(() => dueOnDay(board?.nodes ?? [], selectedDate, today), [board?.nodes, selectedDate, today]);
 
   // #201 — follow now by default (rules in follow.ts). Runs on mount (app
   // start, once per clock) and whenever the 30-second tick crosses midnight
@@ -1315,6 +1318,20 @@ export function ClockNode({
             );
           })}
         </PagedView>
+        {!dialOnly && dueItems.length > 0 && (
+          <div
+            data-testid="clock-due"
+            title="Due on this day (from the Todo list). Right-click a Todo row to change it."
+            style={{ width: '100%', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 8px', padding: '6px 0 2px', borderTop: '1px solid var(--paper-2)', fontSize: 11.5, fontFamily: 'var(--font-sans)', color: 'var(--ink-2)' }}
+          >
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.08em', color: 'var(--ink-4)' }}>DUE</span>
+            {dueItems.map((d) => (
+              <span key={d.id} data-testid="clock-due-item" style={{ color: d.overdue ? 'var(--rust)' : 'var(--ink-2)', whiteSpace: 'nowrap' }}>
+                {d.text}{d.overdue ? ` · was ${new Date(`${d.dueOn}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })}` : ''}
+              </span>
+            ))}
+          </div>
+        )}
         </div>
       </div>
 

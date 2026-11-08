@@ -13,8 +13,8 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 | 1.1 | Two buttons say **CANVAS** side by side in the top bar: one shows/hides the canvas panel, the other switches the whole layout | Same word, two meanings, one click apart; the layout one looks like a duplicate | **Fixed here** — the layout toggle now reads **Station / Free**, tooltip "Station: windows in fixed places · Free: put anything anywhere" |
 | 1.2 | Analytics greets with **streak 0d** | A zero streak on day one reads as failure before anything happened | **Fixed here** — the chip appears once there is a streak |
 | 1.3 | Todo says only *No todos yet* (Habits already explains itself) | Nothing says what to type, or that a plan gets its time by dragging it onto the Calendar | **Fixed here** — "Nothing planned yet. Type something you want to get done below and press Enter, then drag it onto the Calendar to give it a time." |
-| 1.4 | Analytics on an empty board is a wall of ~15 empty charts with axes ("30m / 15m", "1") | Empty axes look like broken charts; the one useful line ("Finish a task, run a pomo or check off a habit and this fills in") is lost among them | **Proposed** — on a range with no data at all, show only the summary card and one example card; the rest appear as data arrives |
-| 1.5 | The Calendar in its Station slot opens at zoom 2.0 on the hours around *now* — at 4 am that is 02:00–03:30, an empty night | A new user sees an empty strip, not a week | **Proposed** — a first-time Calendar starts at 1.0 and scrolls to 08:00 when the day has nothing yet |
+| 1.4 | Analytics on an empty board: three of the four cards in the open view say what to do, but **Planned vs worked** draws bare axes ("30m / 15m") | Empty axes read as a broken chart. (A first read of the page text suggested a wall of ~15 empty charts — that text included the views not on screen; only one view shows at a time.) | **Fixed here** — it says "Nothing planned on the Calendar or worked in this range yet. Plan a task on the Calendar and run a pomo on it to compare." |
+| 1.5 | The Calendar opens on the hours around *now* — at 4 am that is 02:00–03:30, an empty night | A new user sees an empty strip, not their day | **Fixed here** — before 06:00, with nothing planned within 3 h of now, it opens on the week's first plan or 08:00 (a night owl with plans at 3 am still opens near now) |
 | 1.6 | Recorded / Habits / Routines layer chips are icon-only circles in a narrow slot | Three unlabeled toggles; their meaning is in tooltips only | **Proposed** — label them when the Calendar is wide enough, and mention them in the Calendar tour |
 | 1.7 | Top bar path `~/krnl0 / canvas / Main` and a green **live** dot | Developer breadcrumb; "live" means nothing to most people (marketing is for everyone) | **Proposed** — show the canvas name only; explain "live" in a tooltip or drop it |
 
@@ -42,7 +42,7 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 |---|---|---|---|
 | 4.1 | "Remind me before the dentist call" | No reminders at all | **Fixed on `feat/routines`** — Remind me… (at start … 1 h before), system notification from the main process |
 | 4.2 | "Remind me before class" (a routine) | Routines could not remind | **Fixed here** — routine menu **Remind me…** (same picker), a notification before each time it happens, never on a skipped day; `krnl routine remind <id|name> <minutes|off>` |
-| 4.3 | "Something is due today" | The due chip shows only in the Todo row; the Today schedule and Welcome back don't mention it | **Proposed** — list due-today items under the Clock's Today list and in Welcome back |
+| 4.3 | "Something is due today" | The due chip showed only in the Todo row | **Fixed here (Clock)** — a **DUE** line under the Clock's list for the day you are viewing, overdue first in rust (it wraps; nothing is hidden). **Proposed:** the same in Welcome back |
 
 ## 5. Smaller logic notes
 
@@ -66,6 +66,5 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 ## Proposed order for what is left
 
 1. Date-only plans + an "Anytime" row (2.4) — pick a design first.
-2. Analytics empty state (1.4) and the Calendar's first view (1.5) — both are what every new user sees first.
-3. Due-today in the Clock list and Welcome back (4.3).
+2. Due-today in Welcome back (4.3).
 4. Overnight routines (2.3), habit amounts (5.2), repeating tasks (5.3).

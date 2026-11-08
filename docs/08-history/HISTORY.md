@@ -1922,3 +1922,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `ui/RepeatEditor.tsx` (`endsPastMidnight`), test `HabitNode.addField.test.tsx`.
 **Summary:** The past-midnight guard also gates Edit repeat… and the Calendar drop dialog, where Save just turned grey with no reason (dropping a habit at 23:30 with the 60-minute default failed silently). The editor now says "Ends after midnight: start earlier or make it shorter." under the time. Habits & Routines tour re-run in the preview with the new add flow (Enter → No, it just happens → days, time, length → Add): it waits on the new routine and moves to the Calendar step. Full suite: 2,390 passing.
+
+## [2026-11-08] — Due in the Clock; the Calendar's first view; an empty chart that says so (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/dueOn.ts` (new), `ClockNode/index.tsx`, `CalendarNode/WeekView.tsx`, `analytics/charts/PlanVsActual.tsx`, `docs/research/new-user-review-2026-11-08.md`; tests `dueOnDay.test.ts`, `analytics.dailyEmpty.test.tsx` (new).
+**Summary:** From the new-user review. (4.3) The Clock lists what is **DUE** on the day you view under its schedule, overdue first in rust; it wraps, nothing hides. (1.5) Opened at 4 am the Calendar showed an empty 02:00–03:30 night; before 06:00 with nothing planned within 3 h of now it opens on the week's first plan or 08:00. (1.4) "Planned vs worked" drew bare 30m / 15m axes on an empty range; it now says what to do, like the other cards. The review doc corrects its own first read (only one Analytics view shows at a time, not a wall of 15 charts).

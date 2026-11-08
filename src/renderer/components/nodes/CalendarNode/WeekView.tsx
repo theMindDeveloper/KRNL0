@@ -861,8 +861,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const todayYmd = todayYMD();
     if (weekDays.includes(todayYmd)) {
       const now = new Date();
-      // Today: start a little before now (what's next matters most).
-      target = Math.max(0, now.getHours() * 60 + now.getMinutes() - 90);
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      // Today: start a little before now (what's next matters most) — except
+      // in the small hours with nothing planned near now: a new user opening
+      // the app at 4 am saw an empty 02:00–03:30 strip, not their day.
+      const nearNow = (slicesByDay.get(todayYmd) ?? []).some((sl) => sl.sliceEndMin > nowMin - 180 && sl.sliceStartMin < nowMin + 180);
+      if (nowMin >= 6 * 60 || nearNow) target = Math.max(0, nowMin - 90);
     }
     // Open on a whole hour (the last page too — the browser would stop
     // mid-hour) and never on a block cut in half: step back to its start.
