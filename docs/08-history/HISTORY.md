@@ -1853,3 +1853,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/routines`
 **Files changed:** `src/renderer/components/nodes/HabitNode/HabitContextMenu.tsx`, `src/renderer/components/nodes/HabitNode/index.tsx`
 **Summary:** Found while capturing the routines walkthrough. Right-clicking a routine low in the node opened its menu off the bottom of the window (only Rename, Color, Icon and Add note showed; Edit repeat, Skip next, End routine and Turn into habit were cut off), and the Repeat popup for a routine (with its time and length rows) was cut off the same way. Both placed themselves from a fixed height guess; both now measure their real height once drawn, move up to fit, and scroll if the window is shorter than they are. Checked in the preview at 640 and 720 px tall.
+
+## [2026-11-08] — Overlapping routines sit side by side; a routine shows across the week it was added
+
+**Type:** Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/routineLanes.ts` (new), `CalendarNode/WeekView.tsx`, `HabitNode/types.ts` (`routineOccurrence`), tests `CalendarNode/__tests__/routineLanes.test.ts` (new), `tests/unit/sys/routines.test.ts`
+**Summary:** User report: two routines at 11:00 drew their bands and names on top of each other ("fgreg" over "hhrthtr6"). Overlapping routines on a day now get a lane each, side by side with a hairline between, and a click picks the routine in the lane clicked. In narrow lanes the name stays (with an ellipsis) down to 44 px; only the repeat icon goes. Also: a routine was hidden on days before the one it was added — a weekday routine added on a Sunday showed nothing that week. It now shows from the Monday of the week it was added. Checked in the preview at Station width.

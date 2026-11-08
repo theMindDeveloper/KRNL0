@@ -124,7 +124,9 @@ export interface RoutineOccurrence {
 export function routineOccurrence(h: Habit, date: string): RoutineOccurrence | null {
   if (!isRoutine(h) || h.archived || !hasTimeOfDay(h)) return null;
   if (!isDayScheduled(h.schedule, date)) return null;
-  if (date < isoToLocalYMD(h.createdAt)) return null;
+  // From the start of the week it was added: a routine added on a Sunday still
+  // shows across that week, not only from next Monday.
+  if (date < toYMD(getMondayOf(new Date(h.createdAt)))) return null;
   if (h.endsOn && date > h.endsOn) return null;
   const ex = h.exceptions?.find((e) => e.date === date);
   const at = ex?.at && isValidTimeOfDay(ex.at) ? ex.at : h.schedule.timeOfDay;

@@ -34,6 +34,7 @@ import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarLayers, CalendarState } from './types';
 import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularityFor } from './types';
 import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, type RoutineOccurrence } from '../HabitNode/types';
+import { routineLanes } from './routineLanes';
 import { TimeField } from '../../ui/TimeField';
 import { habitMotherCommand } from '../../../store/scheduleActions';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -768,13 +769,22 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     }
     return out;
   }, [boardForCal]);
-  const routineAt = (dayYMD: string, minute: number): { h: Habit; occ: RoutineOccurrence } | null => {
-    if (!layers.routines) return null;
+  // A day's routines with their lanes: overlapping ones sit side by side.
+  const routinesOnDay = (dayYMD: string): Array<{ h: Habit; occ: RoutineOccurrence; lane: number; lanes: number }> => {
+    const hits: Array<{ h: Habit; occ: RoutineOccurrence }> = [];
     for (const h of routinesForCal) {
       const occ = routineOccurrence(h, dayYMD);
-      if (occ && minute >= occ.startMin && minute < occ.endMin) return { h, occ };
+      if (occ) hits.push({ h, occ });
     }
-    return null;
+    const lanes = routineLanes(hits.map(({ h, occ }) => ({ id: h.id, startMin: occ.startMin, endMin: occ.endMin })));
+    return hits.map((r) => ({ ...r, ...(lanes.get(r.h.id) ?? { lane: 0, lanes: 1 }) }));
+  };
+  /** The routine under a click: by time, then by lane (xFrac = 0..1 across the day). */
+  const routineAt = (dayYMD: string, minute: number, xFrac = 0): { h: Habit; occ: RoutineOccurrence } | null => {
+    if (!layers.routines) return null;
+    const under = routinesOnDay(dayYMD).filter((r) => minute >= r.occ.startMin && minute < r.occ.endMin);
+    const hit = under.find((r) => xFrac >= r.lane / r.lanes && xFrac < (r.lane + 1) / r.lanes) ?? under[0];
+    return hit ? { h: hit.h, occ: hit.occ } : null;
   };
   const [routineMove, setRoutineMove] = useState<{ id: string; name: string; date: string; value: string; x: number; y: number } | null>(null);
   const routineMenuItems = (h: Habit, occ: RoutineOccurrence, x: number, y: number): ContextMenuItem[] => {
@@ -1111,7 +1121,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const x = e.clientX;
       const y = e.clientY;
       const future = clickMs > Date.now();
-      const r = routineAt(dayYMD, minute);
+      const r = routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width));
       setCtxMenu({
         x, y,
         items: [
@@ -1144,7 +1154,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       // Decision 39 — a click on a routine band: skip, move or end it.
       const rect = e.currentTarget.getBoundingClientRect();
       const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
-      const r = routineAt(dayYMD, minute);
+      const r = routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width));
       if (r) setCtxMenu({ x: e.clientX, y: e.clientY, items: routineMenuItems(r.h, r.occ, e.clientX, e.clientY) });
       return;
     }
@@ -1902,13 +1912,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     if (!layers.routines) return null;
     const out: ReactNode[] = [];
     const colPxB = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
-    for (const h of routinesForCal) {
-      const occ = routineOccurrence(h, dayYMD);
-      if (!occ) continue;
+    for (const { h, occ, lane, lanes } of routinesOnDay(dayYMD)) {
       const top = (occ.startMin / 60) * rowHeight;
       const height = Math.max(6, ((occ.endMin - occ.startMin) / 60) * rowHeight);
       const col = `var(--${h.color})`;
-      const narrow = colPxB < 96;
+      // The name with an ellipsis while it can show a few letters; initials
+      // only when the lane is truly tiny. The repeat icon needs the room.
+      const laneW = colPxB / lanes;
+      const narrow = laneW < 44;
+      const showIcon = laneW >= 96;
       const label = occ.skipped ? (narrow ? 'Skip' : `${h.name} · skipped`) : narrow ? clashLabels([h.name])[0] : h.name;
       out.push(
         <div
@@ -1918,7 +1930,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           aria-label={`${h.name}, routine${occ.skipped ? ', skipped this time' : ''}`}
           title={`${h.name} · routine${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
           style={{
-            position: 'absolute', left: 0, right: 0, top, height, zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box',
+            position: 'absolute', left: `${(lane / lanes) * 100}%`, width: `${100 / lanes}%`, top, height, zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box',
+            // Side by side: a hairline between lanes so they read as two.
+            ...(lane > 0 ? { borderLeft: `1px solid color-mix(in srgb, ${col} 45%, transparent)` } : {}),
             ...(occ.skipped
               ? { border: `1px dashed color-mix(in srgb, ${col} 55%, transparent)`, borderRadius: 4, background: 'transparent' }
               : {
@@ -1930,12 +1944,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         >
           {height >= 16 && (
             <span style={{
-              position: 'absolute', top: 2, left: railPxFor(dayYMD) + 2, right: 4, display: 'flex', alignItems: 'center', gap: 4,
+              position: 'absolute', top: 2, left: (lane === 0 ? railPxFor(dayYMD) : 0) + 4, right: 4, display: 'flex', alignItems: 'center', gap: 4,
               fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, lineHeight: '14px', whiteSpace: 'nowrap', overflow: 'hidden',
               color: `color-mix(in srgb, ${col} 70%, var(--ink))`, opacity: occ.skipped ? 0.8 : 1,
             }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-              {!narrow && <span style={{ marginLeft: 'auto', display: 'inline-flex', flexShrink: 0 }}><CalIcon name="repeat" size={11} /></span>}
+              {showIcon && <span style={{ marginLeft: 'auto', display: 'inline-flex', flexShrink: 0 }}><CalIcon name="repeat" size={11} /></span>}
             </span>
           )}
         </div>,

@@ -36,7 +36,10 @@ describe('model', () => {
     const h = routine();
     expect(routineOccurrence(h, '2026-11-02')).toMatchObject({ startMin: 600, endMin: 720, skipped: false }); // Mon
     expect(routineOccurrence(h, '2026-11-03')).toBeNull(); // Tue
-    expect(routineOccurrence(h, '2026-10-26')).toBeNull(); // before it existed
+    // Added on Sunday 1 Nov: it shows across that whole week (Mon 26 Oct)...
+    expect(routineOccurrence(h, '2026-10-26')).toMatchObject({ startMin: 600 });
+    // ...but not in the weeks before it.
+    expect(routineOccurrence(h, '2026-10-19')).toBeNull();
     const skipped = routineSkip(state(h), { id: 'r1', date: '2026-11-09' }).habits[0]!;
     expect(routineOccurrence(skipped, '2026-11-09')?.skipped).toBe(true);
     expect(routineOccurrence(skipped, '2026-11-16')?.skipped).toBe(false);
