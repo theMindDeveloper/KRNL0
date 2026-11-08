@@ -26,7 +26,7 @@ import { HoldButton } from '../../ui/HoldButton';
 import { PagedView } from '../../ui/PagedView';
 import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
-import { EASY_HIDDEN_PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
+import { EASY_HIDDEN_PAGES, PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
 import { useEasyMode } from '../../../store/uiMode';
 import { PageNav } from './PageNav';
 import { AnalyticsSettings } from './AnalyticsSettings';
@@ -587,7 +587,8 @@ export function AnalyticsNode({
         <span style={dotStyle} aria-hidden />
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
         <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
-        <span style={{ color: 'var(--k-an-ink-2b, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{sources.length} sources</span>
+        {/* The page you are on (the toolbar is icons only) — "3 sources" told a new user nothing. */}
+        <span data-testid="analytics-page-name" title={`${sources.length} data sources`} style={{ color: 'var(--k-an-ink-2b, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{PAGES.find((pg) => pg.id === currentPage)?.label ?? 'Summary'}</span>
         <div style={{ flex: 1 }} />
         <span className="an-chip an-chip--done" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>done </span>

@@ -1984,3 +1984,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `TopBar/index.tsx`, `CalendarNode/WeekView.tsx`, `styles/reactflow-theme.css`, `docs/06-requirements/app-chrome.md` (F1 + scenario), `docs/research/new-user-review-2026-11-08.md`; test `AppChrome.scenarios.test.ts`.
 **Summary:** New-user review 1.6 / 1.7. The top bar's green badge always read "live" and meant nothing; it now reads **saved** with the tooltip "Your board saves itself as you go — there is nothing to save by hand" (true: every change is written at once), and the path has a tooltip about the canvas switcher. In the Station slot the Calendar's week label was cut to "Nove…"; below 470 px it reads "Nov 2". The app-chrome requirement and its scenario were updated to match.
+
+## [2026-11-08] — Analytics names the page you are on (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `AnalyticsNode/index.tsx`, `docs/research/new-user-review-2026-11-08.md`.
+**Summary:** New-user review 1.9: the Analytics toolbar is ten icon buttons and the header read "· 3 SOURCES", so nothing on screen said which page was open. The header now names it ("PLANNED VS SPENT", "HABITS"…) and follows the toolbar; the source count is in its tooltip. Checked in the preview.
