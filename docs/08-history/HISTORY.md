@@ -2212,3 +2212,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `TodoNode/index.tsx`, `Tour/tours.ts` (Staying on track, Drop step).
 **Summary:** The next copy of a repeating plan was only made on tick, so dropping one Monday's "Gym every Monday" silently ended the whole series. On a repeating plan the item now reads "Skip this time": it makes the next one (same time, same repeat), then drops this one; UNDO takes back both. Ending a series stays "Repeat… → Off". The tour's Drop step also said dropped plans could be brought back from an Archive the Todo never shows; it now names UNDO and Skip this time.
+
+## [2026-11-08] — A missed day no longer ends a repeating plan (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/repeatTask.ts` (`repeatsBehind`), `TodoNode/index.tsx`; test `repeatTask.test.ts` (+1).
+**Summary:** The next copy of a repeating plan was only made on tick, so "Water plants every day" stopped for good the first time a day passed unticked. On open and at midnight, every open repeating plan whose day has passed now makes its next copy from today (same time, same repeat). The old one stays where it was, as missed, so nothing is hidden. A guard keeps a double-run effect from making two copies (checked in the preview: one copy).

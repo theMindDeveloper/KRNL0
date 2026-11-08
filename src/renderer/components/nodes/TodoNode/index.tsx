@@ -26,12 +26,15 @@ import { revertible, undoable } from '../../../store/undoNotice';
 import { DuePicker } from '../../ui/DuePicker';
 import { RemindPicker } from '../../ui/RemindPicker';
 import { TaskRepeatPicker } from '../../ui/TaskRepeatPicker';
-import { describeTaskRepeat, isoDowOfYMD, parseRepeat } from '../../../../shared/repeatTask';
+import { describeTaskRepeat, isoDowOfYMD, parseRepeat, repeatsBehind } from '../../../../shared/repeatTask';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { scheduleTaskAt, setTaskReminder, spawnNextRepeat, unscheduleTask } from '../../../store/scheduleActions';
 import { describeQuickAdd, parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
 
+
+/** Repeats being brought forward right now (effects can run twice). */
+const catchingUp = new Set<string>();
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
   const config = rawConfig ?? defaultTodoConfig();
@@ -96,6 +99,19 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     // Mount-only by design: later adds/edits classify themselves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A repeating plan whose day passed unticked brings its next one (on open
+  // and at midnight), so one missed day doesn't end the series.
+  useEffect(() => {
+    const behind = repeatsBehind(state.items, (id) => taskScheduledInfo.get(id)?.scheduledFor.slice(0, 10), todayYMD);
+    for (const id of behind) {
+      if (catchingUp.has(id)) continue;
+      catchingUp.add(id);
+      void spawnNextRepeat(id).finally(() => catchingUp.delete(id));
+    }
+    // Day changes and new repeats only; the scheduled map is read fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayYMD, state.items]);
 
   const buckets = todoBuckets(state, nowMs);
   // One-click deletes say what went and offer UNDO (cascade included).

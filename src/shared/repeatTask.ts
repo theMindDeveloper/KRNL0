@@ -47,3 +47,22 @@ export function describeTaskRepeat(r: TaskRepeat): string {
 }
 
 export { isoDow as isoDowOfYMD };
+
+/**
+ * Repeating plans whose day passed unticked: their next copy was never made
+ * (that only happens on tick), so the series would stop. The caller makes the
+ * next one from today; the old one stays as it was (missed, not hidden).
+ */
+export function repeatsBehind(
+  items: ReadonlyArray<{ id: string; done: boolean; droppedAt?: string; repeat?: unknown; dueOn?: string; taskNodeId: string | null }>,
+  scheduledDay: (taskNodeId: string) => string | undefined,
+  today: string,
+): string[] {
+  const out: string[] = [];
+  for (const it of items) {
+    if (it.done || it.droppedAt !== undefined || !parseRepeat(it.repeat)) continue;
+    const day = (it.taskNodeId ? scheduledDay(it.taskNodeId) : undefined) ?? it.dueOn;
+    if (day && day < today) out.push(it.id);
+  }
+  return out;
+}

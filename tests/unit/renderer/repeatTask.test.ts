@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { nextRepeatDay, parseRepeat, describeTaskRepeat } from '../../../src/shared/repeatTask';
+import { nextRepeatDay, parseRepeat, describeTaskRepeat, repeatsBehind } from '../../../src/shared/repeatTask';
 import { todoSetRepeat } from '../../../src/renderer/components/nodes/TodoNode/commands';
 import type { TodoItem } from '../../../src/renderer/components/nodes/TodoNode/types';
 import { SysFacade } from '../../../src/sys/SysFacade';
@@ -88,5 +88,22 @@ describe('krnl todo repeat + check', () => {
     const task = (JSON.parse(readFileSync(boardPath, 'utf-8')).nodes as Array<{ id: string; state: { kind?: string; remindMin?: number } }>).find((n) => n.id === next.taskNodeId)!;
     expect(task.state.kind).toBe('event');
     expect(task.state.remindMin).toBe(10);
+  });
+});
+
+describe('repeatsBehind', () => {
+  const sched: Record<string, string> = { t1: '2026-11-07T09:00', t2: '2026-11-08T09:00' };
+  const day = (id: string) => sched[id]?.slice(0, 10);
+  it('finds open repeating plans whose day passed, and only those', () => {
+    const items = [
+      { id: 'a', done: false, repeat: { kind: 'daily' }, taskNodeId: 't1' },                  // yesterday, unticked
+      { id: 'b', done: false, repeat: { kind: 'daily' }, taskNodeId: 't2' },                  // today
+      { id: 'c', done: true, repeat: { kind: 'daily' }, taskNodeId: 't1' },                   // ticked
+      { id: 'd', done: false, droppedAt: 'x', repeat: { kind: 'daily' }, taskNodeId: 't1' },  // dropped
+      { id: 'e', done: false, taskNodeId: 't1' },                                            // no repeat
+      { id: 'f', done: false, repeat: { kind: 'weekdays' }, dueOn: '2026-11-06', taskNodeId: null }, // due day passed
+      { id: 'g', done: false, repeat: { kind: 'daily' }, taskNodeId: null },                  // no day at all
+    ];
+    expect(repeatsBehind(items, day, '2026-11-08')).toEqual(['a', 'f']);
   });
 });
