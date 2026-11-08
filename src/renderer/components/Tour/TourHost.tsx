@@ -20,6 +20,14 @@ import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { stepsFor, tourById, type Tour } from './tours';
 import { setTourAnchor } from './tourAnchor';
+import { spokenText, voiceKey } from './tourVoice';
+import { voicePlayer } from '../Assistant/VoicePlayer';
+
+// The guide's recorded voice (tourVoice.ts): ./voice/<key>.mp3, bundled by Vite.
+const VOICE_CLIPS = import.meta.glob('./voice/*.mp3', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
+const clipFor = (key: string): string | undefined => VOICE_CLIPS[`./voice/${key}.mp3`];
+const VOICE_PREF = 'krnl:tour-voice';
+const readVoicePref = (): boolean => { try { return localStorage.getItem(VOICE_PREF) !== 'off'; } catch { return true; } };
 import { settingsSectionFor } from '../TopBar/SettingsModal';
 import { useLayerVisibility } from '../../store/layerVisibility';
 import { LineGlyph } from '../ui/LineGlyph';
@@ -265,6 +273,10 @@ export function TourHost(): JSX.Element | null {
   const [nudge, setNudge] = useState<string | null>(null);
   // The tour ended with practice items left: ask to remove or keep them.
   const [practiceEnd, setPracticeEnd] = useState<PracticeSummary | null>(null);
+  // The guide reads each step aloud (when a clip exists); the speaker on the card mutes it.
+  const [voiceOn, setVoiceOn] = useState<boolean>(readVoicePref);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const stopVoice = (): void => { const a = audioRef.current; audioRef.current = null; if (a) { a.pause(); a.src = ''; } };
   // The words show once the card has arrived at THIS step's target (or
   // straight away when the step points at nothing). Tracked per step, so the
   // next step's words never flash at the old spot.
@@ -298,6 +310,7 @@ export function TourHost(): JSX.Element | null {
     modeChosen.current = false;
     cardPos.current = null;
     rectRef.current = null;
+    stopVoice();
     setTour(null); setI(0); setRect(null); setRect2(null); setNudge(null); setReadyKey('');
     // Practice left behind? Ask (nothing made: just stop pausing the log).
     if (practiceActive()) {
@@ -454,6 +467,24 @@ export function TourHost(): JSX.Element | null {
     check(useBoardStore.getState().board);
     return useBoardStore.subscribe((s) => check(s.board));
   }, [step, revisit]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // the guide's voice: once this step's words show, read them (stops on the next step)
+  const voiceReady = !!tour && !!step && readyKey === `${tour.id}:${i}`;
+  useEffect(() => {
+    stopVoice();
+    if (!voiceReady || !voiceOn || !step) return;
+    const mode = (ownMode.current ?? uiMode) === 'easy' ? 'easy' : 'advanced';
+    const url = clipFor(voiceKey(spokenText(step.text, mode, step.say)));
+    if (!url) return;
+    // One voice at a time: the orb's own lines (its greeting) stop for the guide.
+    voicePlayer.stop();
+    const a = new Audio(url);
+    a.volume = 0.9;
+    audioRef.current = a;
+    void a.play().catch(() => { /* autoplay refused or no audio device: stay silent */ });
+    return () => stopVoice();
+  }, [voiceReady, voiceOn, i, tour?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => stopVoice(), []);
 
   // keys: Enter / → next (when not waiting), ← back, Esc ends
   useEffect(() => {
@@ -612,6 +643,14 @@ export function TourHost(): JSX.Element | null {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-mono)' }}>
           <span style={{ fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-2)', fontWeight: 700 }}>{tour.title}</span>
           <span style={{ flex: 1 }} />
+          <button type="button" data-testid="tour-voice" aria-pressed={voiceOn} aria-label={voiceOn ? 'Mute the guide' : 'Read steps aloud'} title={voiceOn ? 'Mute the guide' : 'Read steps aloud'}
+            onClick={() => { const on = !voiceOn; setVoiceOn(on); try { localStorage.setItem(VOICE_PREF, on ? 'on' : 'off'); } catch { /* private window */ } }}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, margin: '-6px 0', borderRadius: 7, border: 'none', background: 'transparent', color: voiceOn ? 'var(--ink-2)' : 'var(--ink-4)', cursor: 'pointer', padding: 0 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+              {voiceOn ? <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" />}
+            </svg>
+          </button>
           <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{i + 1} / {tour.steps.length}</span>
         </div>
         {/* progress */}

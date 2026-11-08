@@ -36,6 +36,7 @@ const P: Record<string, ReactNode> = {
   check: <path d="M4.5 12.5l5 5L19.5 7" />,
   event: <><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /><rect x="7" y="12.5" width="10" height="4.5" rx="1" fill="currentColor" stroke="none" opacity=".55" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
+  list: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
   canvas: <><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="M8 3v18M3 9h5" /></>,
 };
 

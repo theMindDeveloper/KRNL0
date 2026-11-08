@@ -819,6 +819,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const isoDow = ((new Date(`${dayYMD}T00:00:00`).getDay() + 6) % 7) + 1;
     setEventCard({ x, y, day: dayYMD, allowOnce: true, initial: { name: '', mode: 'once', days: [isoDow], time: at, lengthMin: 60 } });
   };
+  /** The Repeating button: the same card, already on Repeats (today's weekday, the next hour). */
+  const openNewRepeating = (x: number, y: number) => {
+    const now = new Date();
+    const day = todayYMD();
+    const isoDow = ((now.getDay() + 6) % 7) + 1;
+    const at = `${String(Math.min(23, now.getHours() + 1)).padStart(2, '0')}:00`;
+    setEventCard({ x, y, day, allowOnce: true, initial: { name: '', mode: 'repeat', days: [isoDow], time: at, lengthMin: 60 } });
+  };
   const submitEvent = (card: NonNullable<typeof eventCard>, d: EventDraft) => {
     setEventCard(null);
     if (d.mode === 'once') { void addPlanAt(d.name, card.day, d.time, d.lengthMin); return; }
@@ -1234,9 +1242,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
       const r = routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width));
       if (r) { setCtxMenu({ x: e.clientX, y: e.clientY, items: routineMenuItems(r.h, r.occ, e.clientX, e.clientY) }); return; }
-      // Decision 40 — a click on empty hours adds something there (like any
-      // calendar): a plan at that time, or a repeating event.
-      openNewAt(dayYMD, minute, e.clientX, e.clientY);
+      // A single click on empty hours does nothing: it got in the way of
+      // moving and selecting. Adding is a double-click (or + / right-click).
       return;
     }
     if (items.length === 1) {
@@ -1244,6 +1251,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       return;
     }
     setLayerMenu({ x: e.clientX, y: e.clientY, items, open: 'details' });
+  }
+
+  /** Double-click on empty hours: add a plan or a repeating event there. */
+  function handleColumnDoubleClick(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
+    if (layersAt(dayYMD, e).length > 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
+    if (routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width))) return;
+    openNewAt(dayYMD, minute, e.clientX, e.clientY);
   }
 
   // ── Task block renderer ─────────────────────────────────────────────────────
@@ -2350,7 +2366,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           <button
             type="button"
             data-testid="calendar-new"
-            title="Add a plan or a repeating event (or click empty hours)"
+            title="Add a plan or a repeating event (or double-click empty hours)"
             aria-label="Add to the Calendar"
             onClick={(e) => {
               const now = new Date();
@@ -2360,6 +2376,17 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 20, borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', background: 'color-mix(in srgb, var(--acid) 12%, transparent)', color: 'var(--ink)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
           >
             <MenuIcon name="plus" size={12} />
+          </button>
+
+          {/* Add a repeating event (a class, a shift) in one click. */}
+          <button
+            type="button"
+            data-testid="calendar-new-repeating"
+            title="Add a repeating event: a class, a shift, a weekly call"
+            onClick={(e) => openNewRepeating(e.clientX - 160, e.clientY + 14)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 11 }}
+          >
+            <MenuIcon name="repeat" size={12} /><span className="cal-repeating-label">Repeating</span>
           </button>
 
           {/* Decision 40 — every repeating event, ended ones too: their home now
@@ -2372,7 +2399,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             onClick={(e) => setEventsOpen({ x: e.clientX, y: e.clientY })}
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 20, borderRadius: 6, border: '1px solid var(--paper-3)', background: eventsOpen ? 'var(--paper-2)' : 'transparent', color: 'var(--ink-2)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
           >
-            <MenuIcon name="repeat" size={12} />
+            <MenuIcon name="list" size={12} />
           </button>
 
           {/* #9 — jump to the current week (like the clock's "now"). */}
@@ -2739,6 +2766,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 data-testid={`week-col-${dayYMD}`}
                 onContextMenu={(e) => handleColumnContextMenu(dayYMD, e)}
                 onClick={(e) => handleColumnClick(dayYMD, e)}
+                onDoubleClick={(e) => handleColumnDoubleClick(dayYMD, e)}
                 style={{
                   flex: 1,
                   position: 'relative',

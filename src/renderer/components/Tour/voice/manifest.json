@@ -1,0 +1,110 @@
+{
+  "83092497": {
+    "text": "[warmly] Hi! Let's plan one real thing... and actually do it, together. [Brief pause] It takes about four minutes. Press \"Next\", or Enter, to go on, and Escape whenever you want to stop.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "4ff89993": {
+    "text": "[friendly] First, add something you'll do today. Click \"add a plan\" and type it. [Brief pause] A small card shows its day, its time and how long it takes. Pick any of them... or just press Enter.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "6d48d447": {
+    "text": "[curious] See the little calendar icon on the row? It opens the plan card: the day, the time, how long it takes, and a reminder. [Brief pause] You can also right-click the row and choose \"When\".",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "edf57c96": {
+    "text": "[playfully] And that card on the board? It's the very same task. [soft chuckle] Tick it here or in the list... they always stay in step.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "f24b2564": {
+    "text": "[encouraging] Now, let's plan it. Drag the task from your Todo list onto today in the Calendar, at a time later than now. [Brief pause] Or open its card, and pick a time today.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "781d9987": {
+    "text": "[pleased] There it is, on the Clock too, around the edge. [Brief pause] Every window shows the same day.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "477cc0fb": {
+    "text": "[calm] When you start working, press \"Start\". [Brief pause] The Record timer records what you really do.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "26a54916": {
+    "text": "[casually] Need a pause? Press \"Break\". [Brief pause] Your work so far is saved, and the break is timed on its own.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "46cc0da8": {
+    "text": "[cheerfully] Back already? Press \"Back to work\".",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "0f5e386a": {
+    "text": "Finished for now? Press \"Stop\". [Brief pause] [thoughtfully] Remember: Break means pause, and come back. Stop means you're done for now... and it's saved.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "99c660f9": {
+    "text": "[thoughtfully] Look at the Calendar. Your recorded time sits right under the plan. [Brief pause] That's how you see how the day really went.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "eec77316": {
+    "text": "Done with it? [excited] Tick it!",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "400c1348": {
+    "text": "[warmly] One last thing. Add a habit you want to keep... reading, a walk, anything. [Brief pause] A card opens with every day, at any time. Just press Enter.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "8da22065": {
+    "text": "[happily] Did it today? Then click today's square.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "d79235fd": {
+    "text": "[softly] Every evening ends like this: what you did today, in one card. [Brief pause] Close it whenever you're ready.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "a593b6eb": {
+    "text": "[warmly] You're in Easy mode: plan it, do it, see how it went. Give it a few days. [Brief pause] When it feels easy, try Advanced. [excited] It adds tags and time by tag, focus sessions, naming what you recorded, planned versus spent, deadlines and weekly goals... and the terminal and AI. [Brief pause] You can switch here any time: Settings, then Mode.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "aef5ad13": {
+    "text": "[proudly] And that's the whole loop! [soft chuckle] Every window has its own short tour... you'll find them all in my menu.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "a38198f3": {
+    "text": "[calm] When you start working, press \"Start\". [Brief pause] The Pomo timer records what you really do.",
+    "tours": [
+      "first-day"
+    ]
+  }
+}

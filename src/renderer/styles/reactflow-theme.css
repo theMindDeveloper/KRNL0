@@ -343,9 +343,11 @@
 .cal-subhead { container-type: inline-size; }
 @container (max-width: 600px) { .cal-weekof { display: none; } }
 @container (max-width: 470px) { .cal-layer-label { display: none; } }
+/* The Repeating button keeps its icon and drops its word when the header is tight. */
+@container (max-width: 560px) { .cal-repeating-label { display: none; } }
 .cal-wl-short { display: none; }
 @container (max-width: 470px) { .cal-wl-long { display: none; } .cal-wl-short { display: inline; } }
-@container (max-width: 400px) { .cal-zoom { display: none; } }
+@container (max-width: 470px) { .cal-zoom { display: none !important; } } /* (its inline display would win otherwise) */
 
 /* Todo rows (Decision 40): a narrow row wraps its meta under the name instead
    of hiding parts of it; nothing here shrinks or hides. */

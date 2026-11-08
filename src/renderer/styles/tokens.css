@@ -889,3 +889,40 @@ select option { background: var(--paper); color: var(--ink); }
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--habit-color, var(--acid)) 30%, transparent);
   opacity: 0.9;
 }
+
+/* ── Click areas (hit-area audit, 8 Nov 2026) ─────────────────────────────────
+   Many controls were 12–22 px: a cursor a few pixels off missed them. Two fixes,
+   neither changes how anything looks:
+   1. Rows of segment buttons and header buttons get a real 24 px minimum height
+      (min-height wins over their inline height). An invisible margin there would
+      spill onto the neighbour and cause misclicks.
+   2. Small controls that stand alone get an invisible margin you can click
+      (an ::after layer). `:where()` keeps `position: relative` at zero weight,
+      so a control positioned by its own class or style keeps its position.
+   Dense grids (habit squares) keep their size: a margin would land on the
+   next square. */
+:where(
+  [data-testid^="habit-view-"], [data-testid^="analytics-range-"], [data-testid="week-today"],
+  [data-testid="calendar-new"], [data-testid="calendar-events-list"], [data-testid="calendar-new-repeating"],
+  [data-testid^="calendar-layer-"], [data-testid="clock-week-toggle"], [data-testid="clock-dial-only"],
+  [data-testid^="clock-window-"], [data-testid^="clock-day-"], [data-testid^="layout-toggle-"],
+  [data-testid="topbar-canvas-switcher"], [data-testid^="pomo-mode-"], [data-testid="week-prev"],
+  [data-testid="week-next"], [data-testid^="ambient-radio-preset-"], [data-testid="topbar-settings"],
+  [data-testid="pomo-tag-select"], [data-testid="habit-add-input"]
+) { min-height: 24px; box-sizing: border-box; }
+
+:where(
+  .task-check, [data-testid^="todo-plan-"], [data-testid="pomo-gear"], [data-habit-gear],
+  [data-testid="pomo-log-toggle"], [aria-label^="Earlier hours"], [aria-label^="Later hours"],
+  [data-testid="clock-window-swap"], [data-testid^="todo-when-"], [data-testid^="todo-due-"],
+  [data-testid="task-calendar-grip"], [data-testid^="todo-tag-"]
+) { position: relative; }
+:is(
+  .task-check, [data-testid^="todo-plan-"], [data-testid="pomo-gear"], [data-habit-gear],
+  [data-testid="pomo-log-toggle"], [aria-label^="Earlier hours"], [aria-label^="Later hours"],
+  [data-testid="clock-window-swap"], [data-testid="task-calendar-grip"]
+)::after { content: ''; position: absolute; inset: -7px; }
+/* Text buttons in a row (Tue 16:00 · by Fri · tag): taller, barely wider. */
+:is([data-testid^="todo-when-"], [data-testid^="todo-due-"], [data-testid^="todo-tag-"])::after { content: ''; position: absolute; inset: -6px -2px; }
+/* The windows' drag grip and the cards' connection dots. */
+.station-drag-handle::after, .react-flow__handle::after { content: ''; position: absolute; inset: -6px -8px; }
