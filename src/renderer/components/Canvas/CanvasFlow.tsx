@@ -1545,9 +1545,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       ? new Set(board.nodes.filter((n) => n.isMother).map((n) => n.id))
       : null;
     const onCanvas = edgesOnCanvas(board.edges, visibleNodeIds(board.nodes, activeCanvasOf(board)));
-    const visibleEdges = motherIds
+    const withoutMothers = motherIds
       ? onCanvas.filter((e) => !motherIds.has(e.from.nodeId) && !motherIds.has(e.to.nodeId))
       : onCanvas;
+    // Habit and event cards have no wire dots, so an old wire to one has
+    // nothing to attach to: it is not drawn (it still exists in the board).
+    const visibleEdges = withoutMothers.filter((e) => kindMap.get(e.from.nodeId) !== 'habit.lane' && kindMap.get(e.to.nodeId) !== 'habit.lane');
     return visibleEdges.map((edge) => {
       const srcKind = kindMap.get(edge.from.nodeId) ?? '';
       const tgtKind = kindMap.get(edge.to.nodeId) ?? '';

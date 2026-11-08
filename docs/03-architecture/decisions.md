@@ -2626,3 +2626,6 @@ Plans get a card on the board (TaskNode, CardParts: 220 × 120, name + box, kind
 ### Consequences
 - No new node kind and no migration: existing lanes redraw in the new style.
 - Older habits get their card only when pinned (nothing is added to boards on load).
+
+### Round two (2026-11-09)
+The user found the cards unclear (a bare "0" in a circle, no clear click target, an event with nothing to do, a time tile without a day) and questioned the wire dots. Picked draft A of "Habit and event cards, round two": **no wire dots** on either card (wires mean "this plan, then that one"; a habit or an event never sits in that order — old wires are not drawn but kept); the **habit** keeps its week as seven lettered squares and **today's square is the button** (tick, or "+1 · 1/2" for an amount); the **event** carries a calendar page with the **next date** it happens, its time span and rule, and two buttons — **Skip this one** (`habit.lane.skip|unskip`) and **Show** (rings its block on the Calendar; `krnl show <event>`).

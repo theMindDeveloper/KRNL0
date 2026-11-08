@@ -1214,6 +1214,15 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, { refId: habitId });
           break;
         }
+        // Repeating event: skip (or bring back) one date, from its board card.
+        case 'habit.lane.skip':
+        case 'habit.lane.unskip': {
+          const date = args['date'];
+          if (typeof date !== 'string') return;
+          const fn = command === 'habit.lane.skip' ? routineSkip : routineUnskip;
+          mutateMotherHabit(mother.id, (s) => fn(s as never, { id: habitId, date }) as never);
+          break;
+        }
         case 'habit.lane.rename': {
           const name = args['name'];
           if (typeof name !== 'string') return;

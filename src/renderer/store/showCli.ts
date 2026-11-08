@@ -7,6 +7,7 @@ import { clearHighlights, highlightElement, nodeElement } from './highlight';
 import { focusNode, showTask } from './scheduleActions';
 import { resolveNodeRef, resolveTodoItemRef } from '../../shared/dispatch/resolveRef';
 import type { BoardShape } from '../../shared/dispatch/types';
+import { routineOccurrence, toYMD, type Habit } from '../components/nodes/HabitNode/types';
 
 export type ShowScope = 'auto' | 'plan' | 'node' | 'day' | 'ui';
 
@@ -101,6 +102,60 @@ function showDay(day: string, note: string | undefined, ms: number | undefined):
   return { ok: true, message: `Highlighted ${day} on the Calendar` };
 }
 
+/**
+ * A repeating event on the Calendar: opens the week holding `date`, shows the
+ * events layer and rings that day's block (or the day, if the block is hidden).
+ */
+export function showEventOnCalendar(habitId: string, date: string, note?: string): ShowResult {
+  const board = useBoardStore.getState().board;
+  const cal = board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return { ok: false, message: 'No Calendar on the board' };
+  void import('../components/Canvas/commandDispatch').then(({ makeCommandHandler }) => {
+    const send = makeCommandHandler(cal.id);
+    const view = (cal.config as { view?: string }).view;
+    if (view !== 'week' && view !== 'day') send('calendar.setView', { view: 'week' });
+    send('calendar.setAnchor', { date });
+    if (canvasMode()) focusNode(cal.id);
+    window.dispatchEvent(new CustomEvent('krnl:calendar-show-routines'));
+    window.setTimeout(() => {
+      const band = document.querySelector<HTMLElement>(`[data-testid="calendar-routine-${CSS.escape(habitId)}"][data-date="${CSS.escape(date)}"]`);
+      const el = band ?? document.querySelector<HTMLElement>(`[data-testid="calendar-anytime-${CSS.escape(date)}"]`) ?? nodeElement(cal.id);
+      if (el) highlightElement(el, { note });
+    }, 500);
+  });
+  return { ok: true, message: `Highlighted it on the Calendar (${date})` };
+}
+
+/** A repeating event by exact name, or a unique part of it. */
+function findEvent(board: BoardShape, ref: string): { id: string; name: string } | 'ambiguous' | null {
+  const habits = board.nodes.filter((n) => n.kind === 'habit' && n.isMother)
+    .flatMap((n) => ((n.state as { habits?: Array<{ id: string; name: string; kind?: string; archived?: boolean }> } | null)?.habits ?? []))
+    .filter((h) => h.kind === 'routine' && !h.archived);
+  const want = ref.trim().toLowerCase();
+  const exact = habits.filter((h) => h.name.toLowerCase() === want || h.id === ref);
+  if (exact.length === 1) return { id: exact[0]!.id, name: exact[0]!.name };
+  const parts = habits.filter((h) => h.name.toLowerCase().includes(want));
+  if (parts.length === 1) return { id: parts[0]!.id, name: parts[0]!.name };
+  return parts.length > 1 ? 'ambiguous' : null;
+}
+
+/** The next date (today included) a repeating event happens, not skipped. */
+function nextEventDate(board: BoardShape, id: string): string | null {
+  for (const n of board.nodes) {
+    if (n.kind !== 'habit' || !n.isMother) continue;
+    const h = ((n.state as { habits?: Habit[] } | null)?.habits ?? []).find((x) => x.id === id);
+    if (!h) continue;
+    const d = new Date();
+    for (let i = 0; i < 56; i++) {
+      const ymd = toYMD(d);
+      const occ = routineOccurrence(h, ymd);
+      if (occ && !occ.skipped) return ymd;
+      d.setDate(d.getDate() + 1);
+    }
+  }
+  return null;
+}
+
 function showPlan(taskId: string, text: string, note: string | undefined): ShowResult {
   void showTask(taskId, note);
   return { ok: true, message: `Highlighted the plan "${text}" (its card, and its place on the Calendar if it has a day)` };
@@ -152,6 +207,14 @@ export function runShow(args: ShowArgs): ShowResult {
     if (plan === 'ambiguous') return { ok: false, message: `More than one plan matches "${ref}" — use more of its name or its id` };
     if (plan) return showPlan(plan.taskId, plan.text, note);
     if (scope === 'plan') return { ok: false, message: `No plan called "${ref}"` };
+  }
+  if (scope === 'auto') {
+    const ev = findEvent(board, ref);
+    if (ev === 'ambiguous') return { ok: false, message: `More than one event matches "${ref}" — use more of its name` };
+    if (ev) {
+      const date = nextEventDate(board, ev.id);
+      if (date) return showEventOnCalendar(ev.id, date, note);
+    }
   }
   if (scope === 'node' || scope === 'auto') {
     const n = resolveNodeRef(board, ref);

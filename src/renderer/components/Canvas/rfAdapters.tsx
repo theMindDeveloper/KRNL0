@@ -191,7 +191,9 @@ export function createNodeAdapter<S = unknown, C = unknown>(
     // Mother nodes don't connect — render zero handles. Children get
     // interactive handles so users can wire edges between them.
     // Analytics is a read-only dashboard — no edges, no handles.
-    const showHandles = !node.isMother && node.kind !== 'analytics';
+    // Habit and event cards neither: nothing runs "after" a habit or an
+    // event (board cards round two, Decision 42).
+    const showHandles = !node.isMother && node.kind !== 'analytics' && node.kind !== 'habit.lane';
     return (
       <>
         {showHandles && (

@@ -2022,6 +2022,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         <div
           key={`routine-${h.id}${occ.spill ? '-spill' : ''}`}
           data-testid={`calendar-routine-${h.id}${occ.spill ? '-spill' : ''}`}
+          data-date={occ.date}
           data-skipped={occ.skipped ? 'true' : undefined}
           aria-label={`${h.name}, repeating event${occ.skipped ? ', skipped this time' : ''}`}
           title={`${h.name} · repeating event${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}

@@ -14,7 +14,7 @@
 | F4 | Clicking a cell dispatches `habit.toggleDay` with `{ id, date: 'YYYY-MM-DD' }`; the cell renders as done after the round-trip |
 | F5 | The cell corresponding to today renders with an acid-colored outline ring (1px gap); only one cell is "today" per habit row |
 | F6 | Streak count is computed by walking backwards from today through consecutive done dates; it updates immediately after each toggle |
-| F7 | A Pomo session that finishes ticks today on the habit it is wired to: the edge targets a **habit lane** (`habit.lane`, one habit each), and that lane's habit gets `habit.markDone` for today. A routine is never ticked (Decision 39), so a lane is never made for one. *(Was: "the first habit" on the mother node — superseded by habit lanes.)* |
+| F7 | A Pomo session that finishes ticks today on the habit it is wired to: the edge targets a **habit lane** (`habit.lane`, one habit each), and that lane's habit gets `habit.markDone` for today. A routine is never ticked (Decision 39). Since board cards round two (Decision 42) habit cards have no wire dots, so this wiring is made with `krnl edge add`; old wires keep firing. *(Was: "the first habit" on the mother node — superseded by habit lanes.)* |
 | F8 | Future-dated cells are non-interactive at the UI level **and** rejected at the FSM level: `habit.toggleDay` with a future date is a no-op (Decision 14) |
 | F9 | The node header has a settings gear button (right-aligned); clicking toggles a popover that overlays the node body and clips to the card |
 | F10 | The popover contains a segmented view toggle (Week / Month / Year) that dispatches `habit.setView`; selection persists in `node.config.view` |

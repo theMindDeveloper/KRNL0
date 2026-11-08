@@ -24,36 +24,78 @@ const draw = (habitId: string) => render(<HabitLaneNode node={card(habitId) as n
 const lanes = () => (useBoardStore.getState().board?.nodes ?? []).filter((n) => n.kind === 'habit.lane');
 
 describe('the card (F1–F3)', () => {
-  it('F2: a habit has a tick box, its days and time, its week and streak', () => {
+  it('F2: a habit ticks on today’s square; its week, days and streak', () => {
     vi.useFakeTimers({ now: new Date(2026, 10, 8, 10, 0).getTime(), toFake: ['Date'] });
     seed([{ id: 'h1', name: 'Read', color: 'acid', createdAt: '2026-11-01T00:00:00.000Z', log: ['2026-11-07', '2026-11-06'], schedule: { kind: 'daily' } }]);
     draw('h1');
     expect(screen.getByTestId('habit-lane-root').getAttribute('data-card')).toBe('habit');
-    expect(screen.getByTestId('habit-card-tick')).toBeTruthy();
+    const week = screen.getByTestId('habit-card-week');
+    expect(week.children).toHaveLength(7);
+    // Sunday the 8th: today is the last square, and it is the button.
+    expect(week.children[6]).toBe(screen.getByTestId('habit-card-tick'));
+    expect(screen.getByTestId('habit-card-tick').getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByText('every day')).toBeTruthy();
-    expect(screen.getByTestId('habit-card-week').children).toHaveLength(7);
-    expect(screen.getByTestId('habit-card-left').textContent).toBe('2 days in a row');
+    expect(screen.getByTestId('habit-card-left').textContent).toBe('2 in a row');
   });
 
-  it('F2: an amount counts up instead of a tick', () => {
+  it('F2: an amount adds one on today’s square and shows how far (+1, 3/8)', () => {
     vi.useFakeTimers({ now: new Date(2026, 10, 8, 10, 0).getTime(), toFake: ['Date'] });
     seed([{ id: 'h2', name: 'Water', color: 'cyan', createdAt: '2026-11-01T00:00:00.000Z', log: [], schedule: { kind: 'daily' }, amount: { target: 8, unit: 'glasses' }, counts: { '2026-11-08': 3 } }]);
     draw('h2');
     expect(screen.queryByTestId('habit-card-tick')).toBeNull();
-    expect(screen.getByTestId('habit-card-add').textContent).toBe('3');
-    expect(screen.getByText('3 of 8 glasses today')).toBeTruthy();
+    expect(screen.getByTestId('habit-card-add').textContent).toBe('+13/8');
+    expect(screen.getByText('8 glasses a day')).toBeTruthy();
   });
 
-  it('F3: a repeating event is never ticked and says when it is next', () => {
+  it('F2: on a day it is not on, today’s square is disabled and the card says when it is next', () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 8, 10, 0).getTime(), toFake: ['Date'] }); // Sun
+    seed([{ id: 'h3', name: 'Milk', color: 'acid', createdAt: '2026-11-01T00:00:00.000Z', log: [], schedule: { kind: 'weekly', days: [1] }, amount: { target: 2 } }]);
+    draw('h3');
+    expect((screen.getByTestId('habit-card-add') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('habit-card-left').textContent).toBe('next: tomorrow');
+  });
+
+  it('F3: a repeating event is never ticked; its page shows the next date, its time span and rule', () => {
     vi.useFakeTimers({ now: new Date(2026, 10, 9, 8, 0).getTime(), toFake: ['Date'] }); // Mon 08:00
     seed([{ id: 'e1', name: 'Class', color: 'acid', kind: 'routine', createdAt: '2026-11-01T00:00:00.000Z', log: [], schedule: { kind: 'weekly', days: [1, 3], timeOfDay: '10:00', durationMin: 120 } }]);
     draw('e1');
     expect(screen.getByTestId('habit-lane-root').getAttribute('data-card')).toBe('event');
     expect(screen.queryByTestId('habit-card-tick')).toBeNull();
-    expect(screen.getByText('Mon Wed')).toBeTruthy();
-    // Its own shape: a time tile like its Calendar block (start and length).
-    expect(screen.getByTestId('event-card-time').textContent).toBe('10:002 h');
-    expect(screen.getByTestId('habit-card-left').textContent).toBe('Today');
+    expect(screen.getByTestId('event-card-date').textContent).toBe('TODAY9Nov');
+    expect(screen.getByTestId('event-card-time').textContent).toBe('10:00 – 12:00');
+    expect(screen.getByTestId('habit-card-left').textContent).toBe('Mon Wed · in 2 h');
+  });
+
+  it('F3: a weekly event shows the day it is next, not just a time', () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 9, 19, 0).getTime(), toFake: ['Date'] }); // Mon evening
+    seed([{ id: 'e2', name: 'Class', color: 'acid', kind: 'routine', createdAt: '2026-11-01T00:00:00.000Z', log: [], schedule: { kind: 'weekly', days: [3], timeOfDay: '17:00', durationMin: 80 } }]);
+    draw('e2');
+    expect(screen.getByTestId('event-card-date').textContent).toBe('WED11Nov');
+    expect(screen.getByTestId('event-card-time').textContent).toBe('17:00 – 18:20');
+    expect(screen.getByTestId('habit-card-left').textContent).toBe('Wed · in 2 days');
+  });
+
+  it('F6: Skip this one skips that date; Undo skip brings it back', () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 9, 19, 0).getTime(), toFake: ['Date'] });
+    seed([{ id: 'e3', name: 'Class', color: 'acid', kind: 'routine', createdAt: '2026-11-01T00:00:00.000Z', log: [], schedule: { kind: 'weekly', days: [3], timeOfDay: '17:00', durationMin: 80 } }]);
+    useBoardStore.getState().addNode(card('e3') as never);
+    const send = makeCommandHandler('lane-e3');
+    send('habit.lane.skip', { date: '2026-11-11' });
+    const ex = () => (useBoardStore.getState().board!.nodes.find((n) => n.id === 'mother-habit')!.state as { habits: Array<{ exceptions?: unknown[] }> }).habits[0]!.exceptions;
+    expect(ex()).toEqual([{ date: '2026-11-11', skip: true }]);
+    send('habit.lane.unskip', { date: '2026-11-11' });
+    expect(ex()).toBeUndefined();
+  });
+
+  it('F7: habit and event cards have no wire dots (task cards keep theirs)', async () => {
+    const { createNodeAdapter } = await import('../../../src/renderer/components/Canvas/rfAdapters');
+    seed([{ id: 'h9', name: 'Read', color: 'acid', createdAt: '2026-11-01T00:00:00.000Z', log: [], schedule: { kind: 'daily' } }]);
+    const Adapter = createNodeAdapter(HabitLaneNode as never);
+    render(<Adapter {...({ id: 'lane-h9', type: 'habit.lane', selected: false, dragging: false, zIndex: 0, isConnectable: true, positionAbsoluteX: 0, positionAbsoluteY: 0,
+      data: { node: card('h9'), onCommand: () => {}, onSelect: () => {} } } as never)} />);
+    expect(screen.getByTestId('habit-lane-root')).toBeTruthy();
+    expect(screen.queryByTestId('rf-handle-target-left')).toBeNull();
+    expect(screen.queryByTestId('rf-handle-source-right')).toBeNull();
   });
 });
 

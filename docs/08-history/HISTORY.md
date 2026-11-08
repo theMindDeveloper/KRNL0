@@ -2530,3 +2530,10 @@ Checked in the preview with a stand-in bridge (status line, Sign in, menu hide/s
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitLaneNode/index.tsx`, `docs/06-requirements/board-cards.md`.
 **Summary:** The two sheets peeking out under a habit card (meant as "a stack of days") read as a rendering glitch. Removed; a habit is told apart by its colour tint and round tick.
+
+## [2026-11-09] — Habit and event cards, round two: today's square, a date page, Skip and Show, no wire dots (Decision 42) (experimental)
+
+**Type:** Enhancement
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx`, `Canvas/commandDispatch.ts` (`habit.lane.skip|unskip`), `Canvas/rfAdapters.tsx`, `Canvas/CanvasFlow.tsx`, `CalendarNode/WeekView.tsx` (`data-date` on event blocks), `store/showCli.ts` (`showEventOnCalendar`, `krnl show <event>`), `Tour/tours.ts`, `docs/03-architecture/decisions.md`, `docs/06-requirements/board-cards.md`, `docs/06-requirements/habit-node.md`, `tests/unit/renderer/boardCards.test.tsx`.
+**Summary:** The user picked draft A of "Habit and event cards, round two" on the canvas. **Habit card:** name and streak ("4 in a row", or "next: Wed" on a day it isn't on), "habit · every day / 2 a day", and the week as seven lettered squares — **today's square is the button** (faint check in a bright outline, filled with the check once ticked; an amount shows "+1" and "1/2", filling from the bottom; disabled on a day it isn't on). The bare "0 in a circle" is gone. **Event card:** a calendar page with the **next date** it happens (WED 11 Nov / TODAY / NOW), the time span ("17:00 – 18:20"; past midnight it reads 01:16, not 00:00), "every Wed · in 3 days", and two buttons: **Skip this one** (that date only; then **Undo skip**) and **Show** (opens that week on the Calendar and rings the block). **No wire dots** on either card; old wires to habit cards are not drawn but kept (they still fire). `krnl show <event name>` rings an event's next block. Tour lines updated. Checked in the preview: tick, +1, disabled day, skip/undo, Show ringing Class on the Calendar, no handles.

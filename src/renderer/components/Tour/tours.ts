@@ -276,7 +276,7 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-habit', target: HABIT, badge: 'HABITS', text: 'Habits are things you want to do **regularly** — reading, exercise, a weekly review.' },
       { target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'Click **add a habit**, type one. A card opens: **every day, any time** unless you pick days or a time. Press **Enter** to add it.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
       { target: `${HABIT} .habit-cell--today`, node: 'mother-habit', badge: 'TICK TODAY', text: "Did it today? Click **today's square**.", waitFor: { board: habitTicked }, hint: "Waiting for today's square…" },
-      { target: '[data-card="habit"]', badge: 'ON THE BOARD', text: 'Your habit also has a **card on the board**, like your plans: tick it there too, and see your week and your streak.' },
+      { target: '[data-card="habit"]', badge: 'ON THE BOARD', text: 'Your habit also has a **card on the board**: its week, and **today’s square is the button**. Click it to tick today.' },
       { node: 'mother-habit', target: HABIT, badge: 'CHANGE IT LATER', text: '**Right-click** a habit: **Days & time…** changes its days and time; rename, recolour or archive it below.' },
     ],
   },
@@ -287,7 +287,7 @@ export const TOURS: readonly Tour[] = [
     steps: [
       { node: 'mother-calendar', target: CAL, badge: 'JUST HAPPENS', text: 'A class, a work shift, a weekly call: a **repeating event**. It sits on your Calendar every week and is never ticked or "missed". Habits are the things you tick.' },
       { node: 'mother-calendar', target: CAL, badge: 'ADD ONE', text: '**Double-click empty hours** (or the **+** in the header), name it **Class**, pick **Repeats** and its days, press **Enter**.', waitFor: { board: routineAdded }, hint: 'Waiting for a new repeating event…' },
-      { target: '[data-card="event"]', badge: 'ON THE BOARD', text: 'It has a **card on the board** too. It is never ticked: it says **when it is next**, and while it happens, how much is left.' },
+      { target: '[data-card="event"]', badge: 'ON THE BOARD', text: 'It has a **card on the board** too. It is never ticked: its page shows the **next date**, with **Skip this one** and **Show** on the Calendar.' },
       { node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'ON YOUR WEEK', text: 'It is a **hatched band** every week; your plans sit on top. The **Events** switch hides them, and the repeat button beside it lists them all.' },
       { node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'SKIP ONE', text: 'No class next time? **Click the band** and choose **Skip this one**. Only that day changes.', waitFor: { board: routineSkipped }, hint: 'Waiting for a skipped event…' },
       { node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'END, DON’T DELETE', text: 'Semester over? Click the band and choose **End after this day**: the days before stay. **Restart** is in the events list.', waitFor: { board: routineEnded }, hint: 'Waiting for an ended event… (or Skip)' },

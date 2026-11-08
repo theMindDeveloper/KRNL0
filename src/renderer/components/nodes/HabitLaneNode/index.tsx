@@ -2,20 +2,20 @@
 // canvas draft A "Same card"). It stores only { habitId } and reads the habit
 // from the Habits mother at render time (Decision 14.1).
 //
-// Same size and ports as a task card (TaskNode/CardParts), but each kind has
-// its own shape so it is told apart at a glance (task / habit / event):
+// Draft A of round two (canvas "Habit and event cards, round two"). Same size
+// as a task card but no wire dots: nothing runs "after" a habit or an event.
 //
-//   habit: tinted in its colour, a        repeating event: a time tile on
-//   round tick                            the left, like its Calendar block
-//   ( ) Read …………………………… [⋯]             ┌─────┐ Class ……………………… [⋯]
-//   (● habit)  every day                   │  ↻  │ (event) Mon Wed
-//   ▬ ▬ ▬ ▬ ▬ ▬ [▬]                        │10:00│ ▬ · ▬ · · · ·
-//   5 days in a row        today open      │ 2 h │ Today          in 2 h
-//                                           └─────┘
+//   habit (tinted in its colour)          repeating event
+//   Read ……………… 5 in a row [⋯]            ┌─────┐ Class ……………………… [⋯]
+//   (● habit)  every day                  │ WED │ 17:00 – 18:20
+//   [M][T][ ][T][F][S][✓ today]           │ 11  │ ↻ every Wed · in 3 days
+//                                         └─────┘
+//   today's square is the button:          [Skip this one] [Show]
+//   tick, or "+1 · 1/2" for an amount
 //
-// A habit is ticked (the box; an amount counts up and fills a meter). An
-// event is never ticked: a repeat mark and when it is next — while it
-// happens, how much is left.
+// A habit is ticked on today's square. An event is never ticked: the page
+// shows the next date it happens; Skip skips that one, Show finds it on the
+// Calendar; while it happens, how much is left.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
@@ -23,7 +23,7 @@ import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
 import type { Habit, HabitColor, HabitSchedule } from '../HabitNode/types';
 import { habitStreak } from '../HabitNode/commands';
-import { HABIT_COLORS, countOn, isDayScheduled, isRoutine, toYMD, weeklyTarget } from '../HabitNode/types';
+import { HABIT_COLORS, countOn, isDayScheduled, isRoutine, routineOccurrence, toYMD, weeklyTarget } from '../HabitNode/types';
 import { routineStatus } from '../HabitNode/RoutineShelf';
 import { useBoardStore } from '../../../store/boardStore';
 import { useLocalDay } from '../../../hooks/useLocalDay';
@@ -31,7 +31,8 @@ import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
 import { MenuIcon } from '../../ui/menuIcons';
-import { CardMetaRow, CardMeter, cardFrameStyle, type CardTone } from '../TaskNode/CardParts';
+import { CardMetaRow, cardFrameStyle, type CardTone } from '../TaskNode/CardParts';
+import { showEventOnCalendar } from '../../../store/showCli';
 
 const SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -68,13 +69,6 @@ function timeWords(h: Habit, event: boolean): string {
   // The start only: "every day · 17:00" fits; the end shows while it happens.
   void event;
   return t;
-}
-
-function dayName(ymd: string, today: string): string {
-  if (ymd === today) return 'Today';
-  const t = new Date(`${today}T00:00:00`); t.setDate(t.getDate() + 1);
-  if (toYMD(t) === ymd) return 'Tomorrow';
-  return new Date(`${ymd}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' });
 }
 
 /** The next day the habit is on, after today ("Mon", "tomorrow"). */
@@ -156,177 +150,217 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
   const tone: CardTone = event ? (status?.kind === 'now' ? 'running' : 'open') : doneToday ? 'done' : 'open';
   const canTick = scheduledToday || doneToday || !!weeklyTarget(habit);
 
-  // ── the bottom: the week (habit, event) or a meter (amount, event now) ──
-  const weekBars = (
-    <div data-testid="habit-card-week" style={{ display: 'flex', gap: 3 }}>
-      {week.map((ymd) => {
-        const on = event ? isDayScheduled(habit.schedule, ymd) : logSet.has(ymd);
-        const off = !isDayScheduled(habit.schedule, ymd) && !weeklyTarget(habit);
-        const isToday = ymd === today;
-        return (
-          <span key={ymd} title={ymd}
-            style={{
-              flex: 1, height: 8, borderRadius: 2,
-              // An event's days are quiet solid bars (stripes on every day read as a barcode).
-              background: event
-                ? (on ? 'color-mix(in srgb, var(--ink-3) 45%, transparent)' : 'transparent')
-                : on ? color : off ? 'transparent' : 'var(--paper-3)',
-              boxShadow: isToday ? '0 0 0 1px var(--acid)' : off || (event && !on) ? 'inset 0 0 0 1px var(--paper-3)' : 'none',
-              opacity: ymd > today && !event ? 0.55 : 1,
-            }} />
-        );
-      })}
-    </div>
+  const editButton = (
+    <button type="button" data-testid="habit-card-menu" className="nodrag task-card-action" aria-label={`${habit.name}: options`} title="Days, time, name, colour…"
+      onClick={openMenu} onMouseDown={(e) => e.stopPropagation()}
+      style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'pointer', border: 'none', padding: 0, color: 'var(--ink-3)', background: 'var(--paper-2)' }}>
+      <MenuIcon name="edit" size={13} />
+    </button>
   );
-  const labels = (left: string, right: string, leftColor = 'var(--ink)') => (
-    <div style={{ display: 'flex', alignItems: 'baseline', marginTop: 5, fontFamily: 'var(--font-mono)', fontSize: 11, gap: 8 }}>
-      <span data-testid="habit-card-left" style={{ color: leftColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{left}</span>
-      <span style={{ marginLeft: 'auto', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{right}</span>
-    </div>
+  const title = (
+    <span title={habit.name} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '18px', color: 'var(--ink)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      {habit.name}
+    </span>
+  );
+  const menu = menuOpen && (
+    <HabitContextMenu
+      habit={habit}
+      anchor={menuOpen}
+      onRename={(name) => onCommand('habit.lane.rename', { name })}
+      onSetColor={(c) => onCommand('habit.lane.setColor', { color: c })}
+      onSetIcon={(icon) => onCommand('habit.lane.setIcon', { icon })}
+      onSetNote={(note) => onCommand('habit.lane.setNote', { note })}
+      onDelete={() => undoable(`Deleted ${event ? 'event' : 'habit'} "${habit.name}"`, () => onCommand('habit.lane.removeHabit'))}
+      onUnpinLane={() => {
+        useBoardStore.getState().removeNode(node.id);
+        const next = useBoardStore.getState().board;
+        if (next) void saveBoard(next);
+      }}
+      onClose={() => setMenuOpen(null)}
+    />
   );
 
-  let bottom: React.ReactNode;
+  // ══ Repeating event: a calendar page with the next date ══════════════════
   if (event && status) {
-    const occStart = status.kind === 'today' || status.kind === 'next' ? status.at : 0;
-    if (status.kind === 'now') {
-      const t = (habit.schedule as HabitSchedule | undefined)?.timeOfDay ?? '00:00';
-      const [hh, mm] = t.split(':').map(Number) as [number, number];
-      const start = hh * 60 + mm;
-      const ratio = (nowMin - start) / Math.max(1, status.until - start);
-      const leftMin = Math.max(1, status.until - nowMin);
-      bottom = <CardMeter ratio={ratio} color="var(--acid)" left={`until ${hm(status.until)}`} right={leftMin >= 60 ? `${Math.round(leftMin / 60)} h left` : `${leftMin} min`} />;
-    } else {
-      // The time is on the tile; the label says the day.
-      const left = status.kind === 'today' ? 'Today'
-        : status.kind === 'next' ? dayName(status.date, today)
-        : status.kind === 'skipped' ? `Skipped ${dayName(status.date, today)}`
-        : status.kind === 'ended' ? 'Ended' : 'No more dates';
-      const days = status.kind === 'next' ? Math.round((new Date(`${status.date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000) : 0;
-      const right = status.kind === 'today' ? inWords(occStart - nowMin) : status.kind === 'next' ? inWords(days * 24 * 60 + occStart - nowMin) : '';
-      bottom = <div style={{ marginTop: 'auto' }}>{weekBars}{labels(left, right, 'var(--ink)')}</div>;
-    }
-  } else if (amount && !canTick) {
-    // Not one of its days: say when it is next, not "0 of 2 today · click to add one".
-    const next = nextHabitDay(habit, today);
-    bottom = <CardMeter ratio={0} color={color} left={next ? `Next: ${next}` : 'Not today'} right={`${amount.target}${amount.unit ? ` ${amount.unit}` : ''} a day`} />;
-  } else if (amount) {
-    bottom = <CardMeter ratio={count / Math.max(1, amount.target)} color={color} left={`${Math.min(count, amount.target)} of ${amount.target}${amount.unit ? ` ${amount.unit}` : ''} today`} right={count >= amount.target ? 'done' : 'click to add one'} />;
-  } else {
-    const left = streak > 0 ? `${streak} ${unit}${streak === 1 ? '' : 's'} in a row` : 'No streak yet';
-    const next = nextHabitDay(habit, today);
-    const right = doneToday ? 'done today' : scheduledToday || weeklyTarget(habit) ? 'today open' : next ? `next: ${next}` : 'not today';
-    bottom = <div style={{ marginTop: 'auto' }}>{weekBars}{labels(left, right, streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)')}</div>;
+    const now = status.kind === 'now';
+    // The date the page shows: today while it happens or later today, else the next one.
+    const date = status.kind === 'now' || status.kind === 'today' ? today
+      : status.kind === 'next' || status.kind === 'skipped' ? status.date : null;
+    const occ = date ? routineOccurrence(habit, date) : null;
+    const d = date ? new Date(`${date}T00:00:00`) : null;
+    const top = now ? 'NOW' : date === today ? 'TODAY' : d ? d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase() : 'ENDED';
+    const days = date ? Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000) : 0;
+    const when = now ? (() => { const left = Math.max(1, status.until - nowMin); return left >= 60 ? `${Math.round(left / 60)} h left` : `${left} min left`; })()
+      : status.kind === 'today' ? inWords(status.at - nowMin)
+      : status.kind === 'next' ? (days === 1 ? 'tomorrow' : inWords(days * 24 * 60 + status.at - nowMin))
+      : status.kind === 'skipped' ? 'skipped'
+      : status.kind === 'ended' ? 'ended' : 'no more dates';
+    // The end is the start + its length (past midnight it reads 01:16, not 00:00).
+    const len = Math.max(5, (habit.schedule as HabitSchedule | undefined)?.durationMin ?? 60);
+    const span = occ ? `${hm(occ.startMin)} – ${hm(occ.startMin + len)}` : (habit.schedule as HabitSchedule | undefined)?.timeOfDay ?? '';
+    const ratio = now && occ ? (nowMin - occ.startMin) / Math.max(1, occ.endMin - occ.startMin) : 0;
+    const pageInk = now || date === today ? 'var(--ink-on-bright, #111)' : `color-mix(in srgb, ${color} 55%, var(--ink))`;
+    const pageHead = now || date === today ? 'var(--acid)' : `color-mix(in srgb, ${color} 26%, var(--paper-3))`;
+    const smallBtn: React.CSSProperties = {
+      height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid var(--paper-3)', background: 'transparent',
+      color: 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 10.5, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5,
+    };
+    return (
+      <div data-testid="habit-lane-root" data-card="event" onContextMenu={openMenu}
+        style={{ ...cardFrameStyle(tone), cursor: 'grab', overflow: 'visible', ['--habit-color' as string]: color } as React.CSSProperties}>
+        <div style={{ display: 'flex', gap: 10, minWidth: 0 }}>
+          {/* The page: the next date it happens, like a little calendar. */}
+          <div data-testid="event-card-date" aria-label={date ? `Next: ${date}` : 'No more dates'}
+            style={{ width: 46, flexShrink: 0, borderRadius: 9, overflow: 'hidden', display: 'flex', flexDirection: 'column', textAlign: 'center', boxSizing: 'border-box',
+              border: `1px solid ${now ? 'var(--acid)' : `color-mix(in srgb, ${color} 30%, var(--paper-3))`}`, background: 'var(--paper-1, var(--node-bg))' }}>
+            <span style={{ background: pageHead, color: pageInk, fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', padding: '3px 0', lineHeight: 1.1 }}>{top}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 19, fontWeight: 600, color: status.kind === 'skipped' ? 'var(--ink-3)' : 'var(--ink)', padding: '4px 0 1px', lineHeight: 1, fontVariantNumeric: 'tabular-nums', textDecoration: status.kind === 'skipped' ? 'line-through' : 'none' }}>{d ? d.getDate() : '–'}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)', paddingBottom: 5, lineHeight: 1.2 }}>{d ? d.toLocaleDateString('en-GB', { month: 'short' }) : ''}</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>{title}{editButton}</div>
+            <span data-testid="event-card-time" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{span}</span>
+            <span data-testid="habit-card-left" style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 10.5, whiteSpace: 'nowrap', overflow: 'hidden', color: now ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>
+              {!now && <span style={{ display: 'inline-flex', flexShrink: 0 }}><MenuIcon name="repeat" size={10} /></span>}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{now ? when : `${daysWords(habit)} · ${when}`}</span>
+            </span>
+          </div>
+        </div>
+        {now ? (
+          <div style={{ marginTop: 'auto', height: 4, borderRadius: 2, background: 'var(--paper-3)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${Math.max(0, Math.min(1, ratio)) * 100}%`, background: 'var(--acid)', borderRadius: 2 }} />
+          </div>
+        ) : (
+          <div style={{ marginTop: 'auto', display: 'flex', gap: 6 }}>
+            {date && (status.kind === 'skipped' ? (
+              <button type="button" data-testid="event-card-unskip" className="nodrag" style={smallBtn}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onCommand('habit.lane.unskip', { date }); }}
+                title={`Bring back ${habit.name} on ${date}`}>
+                <MenuIcon name="undo" size={11} />Undo skip
+              </button>
+            ) : (
+              <button type="button" data-testid="event-card-skip" className="nodrag" style={smallBtn}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onCommand('habit.lane.skip', { date }); }}
+                title={`Skip ${habit.name} on ${date} only`}>
+                <MenuIcon name="skip" size={11} />Skip this one
+              </button>
+            ))}
+            <button type="button" data-testid="event-card-show" className="nodrag" style={smallBtn}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); showEventOnCalendar(habit.id, date ?? today); }}
+              title="Show it on the Calendar">
+              <MenuIcon name="show" size={11} />Show
+            </button>
+          </div>
+        )}
+        {menu}
+      </div>
+    );
   }
 
-  const now = status?.kind === 'now';
-  const time = (habit.schedule as HabitSchedule | undefined)?.timeOfDay;
-  const length = (habit.schedule as HabitSchedule | undefined)?.durationMin;
-  // A habit is tinted in its own colour; an event keeps the plain frame and
-  // gets the time tile instead.
-  const kindFrame: React.CSSProperties = event
-    ? { flexDirection: 'row', gap: 10, paddingLeft: 9 }
-    : {
-      border: `1px solid color-mix(in srgb, ${color} ${doneToday ? 60 : 38}%, var(--paper-3))`,
-      background: `color-mix(in srgb, ${color} ${doneToday ? 11 : 6}%, var(--node-bg))`,
-    };
-  const content = (
-    <>
-      {/* Row 1: round tick or counter (habit) · name · its menu */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-        {event ? null : amount ? (
-          <button type="button" data-testid="habit-card-add" className="nodrag"
-            disabled={!canTick}
-            onClick={(e) => { e.stopPropagation(); onCommand('habit.lane.toggleToday'); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            aria-label={`${habit.name}: add one (${count} of ${amount.target} today)`}
-            title={canTick ? 'Add one' : 'Not a day for this habit'}
-            style={{ minWidth: 17, height: 17, padding: '0 4px', borderRadius: 999, boxSizing: 'border-box', flexShrink: 0, cursor: canTick ? 'pointer' : 'default', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, lineHeight: 1, opacity: canTick ? 1 : 0.4,
-              border: `1.5px solid ${count >= amount.target ? color : 'var(--ink-4)'}`, background: count >= amount.target ? color : 'transparent', color: count >= amount.target ? 'var(--ink-on-bright, #111)' : 'var(--ink-2)' }}>
-            {count}
-          </button>
-        ) : (
-          <button type="button" data-testid="habit-card-tick" className={`task-check${doneToday ? ' task-check--done' : ''} nodrag`}
-            disabled={!canTick}
-            onClick={(e) => { e.stopPropagation(); onCommand('habit.lane.toggleToday'); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            aria-pressed={doneToday}
-            aria-label={`${habit.name} today ${doneToday ? 'done' : 'not done'}`}
-            title={canTick ? (doneToday ? 'Untick today' : 'Tick today') : 'Not a day for this habit'}
-            style={{ marginTop: 0, borderRadius: 999, opacity: canTick ? 1 : 0.4, ...(doneToday ? { background: color, borderColor: color } : {}) }}>
-            {doneToday && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--ink-on-bright, #111)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
-          </button>
-        )}
-        <span title={habit.name} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '18px', color: 'var(--ink)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {habit.name}
-        </span>
-        <button type="button" data-testid="habit-card-menu" className="nodrag task-card-action" aria-label={`${habit.name}: options`} title="Days, time, name, colour…"
-          onClick={openMenu} onMouseDown={(e) => e.stopPropagation()}
-          style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'pointer', border: 'none', padding: 0, color: 'var(--ink-3)', background: 'var(--paper-2)' }}>
-          <MenuIcon name="edit" size={13} />
-        </button>
-      </div>
-
-      {/* Row 2: what it is · when */}
-      <CardMetaRow tag={event ? (status?.kind === 'now' ? 'now' : 'event') : 'habit'} tone={event ? (status?.kind === 'now' ? 'var(--acid)' : 'var(--ink-3)') : color} icon="calendar"
-        // A habit at any time just says its days ("every day"); a time shows when it has one.
-        when={event || timeWords(habit, false) === 'any time' ? daysWords(habit) : `${daysWords(habit)} · ${timeWords(habit, event)}`} />
-
-      {bottom}
-    </>
+  // ══ Habit: its week, and today's square is the button ════════════════════
+  const target = amount?.target ?? 1;
+  const unitWords = amount ? `${amount.target}${amount.unit ? ` ${amount.unit}` : ''}` : '';
+  const dayWords = daysWords(habit);
+  const timeOfDay = timeWords(habit, false);
+  const meta = amount
+    ? (dayWords === 'every day' ? `${unitWords} a day` : `${dayWords} · ${unitWords}`)
+    : timeOfDay === 'any time' ? dayWords : `${dayWords} · ${timeOfDay}`;
+  const next = nextHabitDay(habit, today);
+  const notToday = !canTick && !doneToday;
+  const streakWords = unit === 'day' ? `${streak} in a row` : `${streak} ${unit}s in a row`;
+  const statusText = notToday ? (next ? `next: ${next}` : 'not today') : streak > 0 ? streakWords : '';
+  const tick = () => onCommand('habit.lane.toggleToday');
+  const checkMark = (stroke: string, size = 12) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
   );
+
+  const squares = week.map((ymd, i) => {
+    const isToday = ymd === today;
+    const future = ymd > today;
+    const onDay = isDayScheduled(habit.schedule, ymd) || !!weeklyTarget(habit);
+    const n = amount ? countOn(habit, ymd) : logSet.has(ymd) ? 1 : 0;
+    const full = amount ? n >= target : n > 0;
+    const part = amount && !full && n > 0 ? n / target : 0;
+    const base: React.CSSProperties = {
+      flex: 1, minWidth: 0, height: 30, borderRadius: 6, boxSizing: 'border-box', position: 'relative', overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+      fontFamily: 'var(--font-mono)', fontSize: 9.5, lineHeight: 1, padding: 0, border: 'none',
+    };
+    const fill = part > 0 && <span aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${part * 100}%`, background: `color-mix(in srgb, ${color} 55%, transparent)` }} />;
+    if (!isToday) {
+      return (
+        <span key={ymd} title={ymd} style={{
+          ...base,
+          background: full ? color : onDay ? 'var(--paper-2)' : 'transparent',
+          boxShadow: onDay ? 'none' : 'inset 0 0 0 1px var(--paper-3)',
+          color: full ? 'var(--ink-on-bright, #111)' : onDay ? 'var(--ink-3)' : 'var(--ink-4, var(--ink-3))',
+          opacity: future ? 0.5 : onDay ? 1 : 0.7,
+        }}>{fill}<span style={{ position: 'relative' }}>{LETTERS[i]}</span></span>
+      );
+    }
+    // Today: the button. Plain habit ticks; an amount adds one ("+1", 1/2).
+    const label = notToday ? `${habit.name} today: not one of its days${next ? `, next ${next}` : ''}`
+      : amount ? `${habit.name}: add one (${n} of ${target} today)` : `${habit.name} today ${full ? 'done' : 'not done'}`;
+    return (
+      <button key={ymd} type="button" data-testid={amount ? 'habit-card-add' : 'habit-card-tick'} className="nodrag"
+        disabled={notToday}
+        onClick={(e) => { e.stopPropagation(); tick(); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        aria-pressed={amount ? undefined : full}
+        aria-label={label}
+        title={notToday ? `Not a day for this habit${next ? ` (next: ${next})` : ''}` : amount ? (full ? 'Done for today (click to start again)' : 'Add one') : full ? 'Untick today' : 'Tick today'}
+        style={{
+          ...base,
+          cursor: notToday ? 'default' : 'pointer',
+          background: full ? color : notToday ? 'transparent' : `color-mix(in srgb, var(--acid) 8%, var(--paper-2))`,
+          boxShadow: full ? `0 0 0 1.5px ${color}` : notToday ? 'inset 0 0 0 1.5px var(--paper-3)' : 'inset 0 0 0 1.5px var(--acid)',
+          color: full ? 'var(--ink-on-bright, #111)' : notToday ? 'var(--ink-4, var(--ink-3))' : 'var(--acid-ink, var(--acid))',
+        }}>
+        {fill}
+        {notToday ? <span style={{ position: 'relative' }}>{LETTERS[i]}</span>
+          : full ? <span style={{ position: 'relative', display: 'inline-flex' }}>{checkMark('currentColor')}</span>
+          : amount ? (<>
+            <span style={{ position: 'relative', fontSize: 10, fontWeight: 700 }}>+1</span>
+            <span style={{ position: 'relative', fontSize: 8.5, color: 'var(--ink-2)' }}>{n}/{target}</span>
+          </>)
+          : <span style={{ position: 'relative', display: 'inline-flex', opacity: 0.85 }}>{checkMark('currentColor')}</span>}
+      </button>
+    );
+  });
 
   return (
     <div
       data-testid="habit-lane-root"
-      data-card={event ? 'event' : 'habit'}
+      data-card="habit"
       onContextMenu={openMenu}
-      style={{ ...cardFrameStyle(tone), ...kindFrame, cursor: 'grab', overflow: 'visible', ['--habit-color' as string]: color } as React.CSSProperties}
+      style={{
+        ...cardFrameStyle(tone), cursor: 'grab', overflow: 'visible', ['--habit-color' as string]: color,
+        // A habit is tinted in its own colour, so it reads apart from a task.
+        border: `1px solid color-mix(in srgb, ${color} ${doneToday ? 60 : 38}%, var(--paper-3))`,
+        background: `color-mix(in srgb, ${color} ${doneToday ? 11 : 6}%, var(--node-bg))`,
+      } as React.CSSProperties}
     >
-      {event ? (
-        <>
-          {/* The time tile: like the event's block on the Calendar. */}
-          <div data-testid="event-card-time" aria-label={time ? `Repeats, starts ${time}` : 'Repeats, all day'}
-            style={{
-              width: 50, flexShrink: 0, borderRadius: 9, boxSizing: 'border-box', padding: '8px 4px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
-              background: now ? 'color-mix(in srgb, var(--acid) 20%, var(--node-bg))' : `color-mix(in srgb, ${color} 13%, var(--paper-2))`,
-              border: `1px solid ${now ? 'var(--acid)' : `color-mix(in srgb, ${color} 30%, var(--paper-3))`}`,
-              color: now ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
-            }}>
-            <MenuIcon name="repeat" size={13} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: time ? 14 : 11, fontWeight: 600, lineHeight: 1, color: now ? 'var(--acid-ink, var(--acid))' : 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>
-              {time ?? 'all day'}
-            </span>
-            {length ? (
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: 1 }}>
-                {length >= 60 ? `${Math.round((length / 60) * 10) / 10} h` : `${length} min`}
-              </span>
-            ) : null}
-          </div>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>{content}</div>
-        </>
-      ) : (
-content
-      )}
+      {/* Row 1: name · streak (or when it is next) · its menu */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        {title}
+        {statusText && (
+          <span data-testid="habit-card-left" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, whiteSpace: 'nowrap', flexShrink: 0, color: notToday || streak === 0 ? 'var(--ink-3)' : 'var(--acid-ink, var(--acid))' }}>
+            {statusText}
+          </span>
+        )}
+        {editButton}
+      </div>
 
+      {/* Row 2: what it is · its days (and time, or amount) */}
+      <CardMetaRow tag="habit" tone={color} icon="calendar" when={meta} />
 
-      {menuOpen && (
-        <HabitContextMenu
-          habit={habit}
-          anchor={menuOpen}
-          onRename={(name) => onCommand('habit.lane.rename', { name })}
-          onSetColor={(c) => onCommand('habit.lane.setColor', { color: c })}
-          onSetIcon={(icon) => onCommand('habit.lane.setIcon', { icon })}
-          onSetNote={(note) => onCommand('habit.lane.setNote', { note })}
-          onDelete={() => undoable(`Deleted ${event ? 'event' : 'habit'} "${habit.name}"`, () => onCommand('habit.lane.removeHabit'))}
-          onUnpinLane={() => {
-            useBoardStore.getState().removeNode(node.id);
-            const next = useBoardStore.getState().board;
-            if (next) void saveBoard(next);
-          }}
-          onClose={() => setMenuOpen(null)}
-        />
-      )}
+      {/* Row 3: the week; today's square is the button */}
+      <div data-testid="habit-card-week" style={{ display: 'flex', gap: 4, marginTop: 'auto' }}>{squares}</div>
+
+      {menu}
     </div>
   );
 }
