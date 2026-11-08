@@ -5,6 +5,7 @@
 // (Week · Month · Year) moved to the window's header.
 
 import { useEffect, useRef, useState } from 'react';
+import { useDismissOutside } from '../../ui/useDismissOutside';
 import type { HabitView } from './types';
 import { HABIT_VIEWS } from './types';
 
@@ -31,13 +32,13 @@ export function HabitPopover({ view, onSetView, onClose, ended = [], onRestart, 
   const ref = useRef<HTMLDivElement>(null);
   // The archive can be long: shown on request, and it scrolls.
   const [showArchived, setShowArchived] = useState(false);
+  // The gear toggles the panel itself, so a click on it is not "outside".
+  useDismissOutside(true, [ref, '[data-habit-gear]'], onClose);
   void view; void onSetView; void VIEW_LABELS; void HABIT_VIEWS;
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (!ref.current) return;
-      if (!ref.current.contains(e.target as Node)) onClose();
-    };
+    // (Outside clicks: useDismissOutside below — it also sees clicks the canvas stops.)
+    const handler = (_e: MouseEvent) => {};
     // Escape closes it too, like every other popover.
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('mousedown', handler);

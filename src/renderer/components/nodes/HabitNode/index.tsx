@@ -13,6 +13,7 @@
 //   single onClick reads `data-date` from the target. 371 cells per
 //   habit → 1 listener.
 
+import { useDismissOutside } from '../../ui/useDismissOutside';
 import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -118,6 +119,9 @@ export function HabitNode({
   // Enter asks first (HabitAddAsk): habit or routine, then when. Nothing is
   // added with settings the user did not choose. null = the card is closed.
   const [ask, setAsk] = useState<{ left: number; right: number; top: number } | null>(null);
+  // A click elsewhere hides the add card; the name stays in the field and
+  // the card comes back on a click in it or more typing.
+  useDismissOutside(!!ask, ['[data-testid="habit-ask"]', '[data-testid="habit-add-input"]'], () => setAsk(null));
   const addRowRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -465,7 +469,13 @@ export function HabitNode({
               // selection ring flash. The input still receives focus and
               // typing works because React's stopPropagation is for SYNTHETIC
               // event bubbling, not DOM focus.
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (newName.trim() && !ask) {
+                  const r = addRowRef.current?.getBoundingClientRect();
+                  setAsk(r ? { left: r.left, right: r.right, top: r.top } : { left: 8, right: 360, top: window.innerHeight - 60 });
+                }
+              }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               style={{

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useDismissOutside } from '../../ui/useDismissOutside';
 import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
@@ -277,6 +278,10 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   // Decision 40 — the add card: what the card set wins over the words.
   const [planOv, setPlanOv] = useState<PlanOverrides>({});
   const addRowRef = useRef<HTMLDivElement>(null);
+  // A click elsewhere hides the add card; the typed name stays in the field,
+  // and the card comes back when you click it or type again.
+  const [addCardHidden, setAddCardHidden] = useState(false);
+  useDismissOutside(inputFocused && pendingName.trim() !== '' && !addCardHidden, ['[data-testid="when-popover"]', addRowRef], () => setAddCardHidden(true));
   // Easy: "by fri" sets no deadline (easy-mode D19).
   const fromWords = (q: QuickAdd): PlanDraft => ({ day: q.day ?? null, time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: easy ? null : q.deadline ?? null });
   const addPlan = (text: string, d: PlanDraft) => {
@@ -930,7 +935,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
         {/* Decision 40 — the add card: while typing, the plan's day, time, length and
             deadline, filled from the words; change any of them, or just press Enter. */}
-        {inputFocused && pendingName.trim() !== '' && (() => {
+        {inputFocused && pendingName.trim() !== '' && !addCardHidden && (() => {
           const q = parseQuickAdd(pendingName.trim());
           if (q.hint) {
             return (
@@ -988,12 +993,15 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               onChange={(e) => {
                 if (inputPhase === 'name') {
                   setPendingName(e.target.value);
+                  setAddCardHidden(false);
                 } else {
                   setDurationValue(e.target.value);
                   setDurationInvalid(false);
                 }
               }}
               onKeyDown={handleAddKeyDown}
+              onFocus={() => setAddCardHidden(false)}
+              onClick={() => setAddCardHidden(false)}
               onBlur={() => {
                 if (inputPhase === 'duration') {
                   // defensive: revert to name phase without submitting

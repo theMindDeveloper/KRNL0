@@ -2457,3 +2457,10 @@ Checked in the preview (auto start, the Advanced step, hand-over, once only). 2,
 - **Event card** in the habit card's style: the name as the title, Once / Repeats, the days as circles (or "On Wed 11, once"), labelled Time ("to 23:00") and Length rows, a full-width button; one fixed height.
 - **Click areas** (audit of every visible control under 24×24 px, both modes): rows of segment and header buttons now have a 24 px minimum height; small stand-alone controls (✓ boxes, the row's calendar icon, gears, earlier/later-hours arrows, the window grips, connection dots, the Todo row's When/deadline/tag) get an invisible click margin of 6–8 px, so they look the same and a near miss still hits. Dense grids (habit squares) are unchanged. The Calendar's zoom now really hides in a narrow window (its inline display beat the rule).
 2,476 tests and typecheck green.
+
+## [2026-11-08] — Pop-ups close on a click elsewhere; the pre-release list (experimental)
+
+**Type:** UX + Docs
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/useDismissOutside.ts` (new), `TodoNode/index.tsx`, `HabitNode/index.tsx`, `HabitNode/HabitPopover.tsx`, `docs/releases/pre-release-todo.md` (new).
+**Summary:** The add cards (a plan, a habit) and Habits settings stayed open when you clicked elsewhere — the canvas swallowed the click before their listener saw it. One hook, `useDismissOutside`, listens in the capture phase so every outside click closes them. The add cards hide but keep what you typed; a click in the field (or more typing) brings the card back. Clicks inside a card (a day, the time list) keep it open. Checked in the preview with every pop-up (plan, habit, repeating event, +, events list, settings, row menu, row plan card). The pre-release list (`docs/releases/pre-release-todo.md`) tracks #224 (orb answers through the Claude CLI), #225 (one voice for the orb), #226 (cursor stutter on cards), #227 (voice the other tours), #228 (Easy: task card tag), plus the release steps. 2,476 tests and typecheck green.
