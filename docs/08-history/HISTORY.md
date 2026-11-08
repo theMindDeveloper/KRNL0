@@ -2415,3 +2415,14 @@ Checked by walking the first-day tour in the preview (rings, wrong-day nudge, to
 - **The green bar on top of a part-done square** was the progress fill repeating into the square's 1 px border; it is painted from the border box and never repeats now.
 - **Days a habit isn't on** show a quiet **×** and can't be clicked (they were near-invisible squares).
 - **On a day the habit isn't on,** the row says "Next: tomorrow · 2 glasses a day" instead of "Tick today to start · 0 of 2 today".
+
+## [2026-11-08] — Habits window: view switch in the header, Month and Year that fit, a tidy archive (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`, `HabitNode/HabitPopover.tsx`, `styles/tokens.css`.
+**Summary:**
+- **Week · Month · Year** sits in the window's header now (it was inside Settings); titles are shorter ("HABITS — WEEK 45").
+- **Month** fits the window (square size from the space there is), groups days into weeks with a small gap, numbers each week's start (never two side by side), shows a quiet dot on days a habit isn't on, and fills part-done amounts without the stray top line.
+- **Year** fills the window's width (5–12 px squares), has month names above, keeps days before the habit existed and days it isn't on as small dots, and shows the days it is on as clear empty squares.
+- **Settings → Archived (N)** is folded by default with **Show / Hide**; a long archive scrolls inside a short list, and the panel never runs past the window's bottom (checked with 12 archived habits).

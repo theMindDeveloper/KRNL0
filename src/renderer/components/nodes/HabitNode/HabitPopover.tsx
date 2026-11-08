@@ -1,9 +1,10 @@
 // HabitNode settings popover — panel-wide settings only (Decision 14 + v2.1).
 // Per-habit color / icon / rename / delete moved to the right-click context
 // menu (HabitContextMenu). This panel only owns view selection so the gear
-// is a "settings for this node", not "settings for habits".
+// is a "settings for this node", not "settings for habits". The view
+// (Week · Month · Year) moved to the window's header.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { HabitView } from './types';
 import { HABIT_VIEWS } from './types';
 
@@ -28,6 +29,9 @@ const VIEW_LABELS: Record<HabitView, string> = {
 
 export function HabitPopover({ view, onSetView, onClose, ended = [], onRestart, archived = [], onUnarchive, onDeleteForever }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  // The archive can be long: shown on request, and it scrolls.
+  const [showArchived, setShowArchived] = useState(false);
+  void view; void onSetView; void VIEW_LABELS; void HABIT_VIEWS;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -58,65 +62,15 @@ export function HabitPopover({ view, onSetView, onClose, ended = [], onRestart, 
         padding: 10,
         zIndex: 15,
         fontFamily: 'var(--font-sans)',
+        // Never taller than the window it sits in (it was cut off at the bottom).
+        maxHeight: 'calc(100% - 44px)',
+        overflowY: 'auto',
+        boxSizing: 'border-box',
       }}
     >
+      {/* Week · Month · Year moved to the window's header. */}
       <div
         style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          color: 'var(--ink-4)',
-          marginBottom: 6,
-        }}
-      >
-        View
-      </div>
-      <div
-        role="tablist"
-        aria-label="habit view"
-        style={{
-          display: 'flex',
-          gap: 4,
-          border: '1px solid var(--paper-3)',
-          borderRadius: 4,
-          padding: 2,
-        }}
-      >
-        {HABIT_VIEWS.map((v) => {
-          const active = v === view;
-          return (
-            <button
-              key={v}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              data-view={v}
-              onClick={() => onSetView(v)}
-              style={{
-                flex: 1,
-                padding: '4px 6px',
-                background: active ? 'var(--paper-2)' : 'transparent',
-                border: 'none',
-                borderRadius: 3,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                color: active ? 'var(--ink-2)' : 'var(--ink-3)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                cursor: 'pointer',
-              }}
-            >
-              {VIEW_LABELS[v]}
-            </button>
-          );
-        })}
-      </div>
-      <div
-        style={{
-          marginTop: 10,
-          paddingTop: 8,
-          borderTop: '1px solid var(--paper-2)',
           color: 'var(--ink-4)',
           fontFamily: 'var(--font-mono)',
           fontSize: 11,
@@ -144,8 +98,12 @@ export function HabitPopover({ view, onSetView, onClose, ended = [], onRestart, 
       )}
       {archived.length > 0 && (
         <div data-testid="habit-archived" style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--paper-2)' }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-4)', marginBottom: 6 }}>Archived</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
+          <button type="button" data-testid="habit-archived-toggle" aria-expanded={showArchived} onClick={() => setShowArchived((v) => !v)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-3)', marginBottom: showArchived ? 6 : 0 }}>
+            <span style={{ flex: 1, textAlign: 'left' }}>Archived ({archived.length})</span>
+            <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--ink-2)' }}>{showArchived ? 'Hide' : 'Show'}</span>
+          </button>
+          {showArchived && <div data-testid="habit-archived-list" style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto', overscrollBehavior: 'contain' }}>
             {archived.map((r) => (
               <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${r.name} · ${r.days} days ticked`}>
@@ -161,7 +119,7 @@ export function HabitPopover({ view, onSetView, onClose, ended = [], onRestart, 
                 </button>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       )}
     </div>

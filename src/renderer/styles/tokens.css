@@ -661,6 +661,14 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   font: 600 12px/1 var(--font-mono);
   color: var(--ink-4);
 }
+/* Month view: 10 px cells — a small dot, not a row of crosses. */
+.habit-cell--month.habit-cell--unscheduled::before {
+  content: '';
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
 /* Year view: cells are 5 px — no room for a mark. */
 .habit-cell--year.habit-cell--unscheduled { opacity: 0.15; background: var(--paper-3); }
 .habit-cell--year.habit-cell--unscheduled::before { content: none; }

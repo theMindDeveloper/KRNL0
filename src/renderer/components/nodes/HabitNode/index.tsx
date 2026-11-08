@@ -24,7 +24,7 @@ import { MenuIcon } from '../../ui/menuIcons';
 import { FOCUS_NODE_EVENT } from '../../../store/scheduleActions';
 import { RemindPicker } from '../../ui/RemindPicker';
 import { AmountPopover, TargetPopover } from './HabitPopovers';
-import { countOn, weeklyTarget } from './types';
+import { HABIT_VIEWS, countOn, weeklyTarget } from './types';
 import { RoutineShelf, routineStatus } from './RoutineShelf';
 import { isRoutine } from './types';
 import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
@@ -78,6 +78,8 @@ const WEEK_CELL_SIZE = 18;
 const WEEK_CELL_GAP = 3;
 const MONTH_CELL_SIZE = 10;
 const MONTH_CELL_GAP = 1;
+/** Extra space before each Monday, so the month reads as weeks. */
+const MONTH_WEEK_GAP = 4;
 const YEAR_CELL_SIZE = 5;
 const YEAR_CELL_GAP = 1;
 
@@ -236,9 +238,9 @@ export function HabitNode({
   );
 
   const titleByView: Record<HabitView, string> = {
-    week: `HABITS — WEEK ${weekNum} · HBT.WEEK`,
-    month: `HABITS — ${MONTH_LABELS[now.getMonth()]} · HBT.MONTH`,
-    year: `HABITS — ${now.getFullYear()} · HBT.YEAR`,
+    week: `HABITS — WEEK ${weekNum}`,
+    month: `HABITS — ${MONTH_LABELS[now.getMonth()]}`,
+    year: `HABITS — ${now.getFullYear()}`,
   };
 
   const menuHabit = menu ? visibleHabits.find((h) => h.id === menu.habitId) ?? null : null;
@@ -310,6 +312,20 @@ export function HabitNode({
           <span style={{ color: 'var(--rust)', display: 'inline-flex' }}><LineGlyph name="dot" size={10} /></span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {titleByView[view]}
+          </span>
+          {/* Week · Month · Year right here, not inside Settings. */}
+          <span role="tablist" aria-label="Habit view" data-testid="habit-view-switch" className="nodrag"
+            style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 6, border: '1px solid var(--paper-3)', textTransform: 'none', flexShrink: 0 }}>
+            {HABIT_VIEWS.map((v) => (
+              <button key={v} type="button" role="tab" aria-selected={view === v} data-testid={`habit-view-${v}`}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={() => onCommand('habit.setView', { view: v })}
+                style={{ height: 20, padding: '0 7px', border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em',
+                  background: view === v ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent',
+                  color: view === v ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', fontWeight: view === v ? 650 : 500 }}>
+                {v === 'week' ? 'Week' : v === 'month' ? 'Month' : 'Year'}
+              </button>
+            ))}
           </span>
           <button
             type="button"
@@ -582,6 +598,7 @@ function cellClass(
   const isPast = !isToday && !isFuture;
   const classes = ['habit-cell'];
   if (viewMod === 'year') classes.push('habit-cell--year');
+  if (viewMod === 'month') classes.push('habit-cell--month');
   if (done) classes.push('habit-cell--done');
   if (isToday) classes.push('habit-cell--today');
   if (isPast) classes.push('habit-cell--past');
@@ -983,8 +1000,49 @@ interface MonthViewProps {
 }
 
 function MonthView({ habits, today, monthDays, habitMotherId, onToggle, onContextMenu }: MonthViewProps) {
+  // The month fits the window's width: square size from the space there is.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [cell, setCell] = useState(MONTH_CELL_SIZE);
+  const weekGaps = monthDays.filter((d) => new Date(`${d}T00:00:00`).getDay() === 1 && d.slice(8, 10) !== '01').length;
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const fit = () => {
+      const w = el.clientWidth;
+      if (w <= 0) return;
+      const n = monthDays.length;
+      const size = Math.floor((w - weekGaps * MONTH_WEEK_GAP + MONTH_CELL_GAP) / n) - MONTH_CELL_GAP;
+      setCell(Math.max(6, Math.min(16, size)));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [monthDays.length, weekGaps]);
+  // A number at each week's start (and the 1st), never two side by side.
+  let lastLabel = -9;
+  const labelled = monthDays.map((d, i) => {
+    const n = Number(d.slice(8, 10));
+    const monday = new Date(`${d}T00:00:00`).getDay() === 1;
+    const show = (monday || n === 1) && i - lastLabel >= 3;
+    if (show) lastLabel = i;
+    return show;
+  });
   return (
-    <div data-view-month>
+    <div data-view-month ref={wrapRef}>
+      <div aria-hidden style={{ display: 'flex', gap: MONTH_CELL_GAP, paddingLeft: 0, marginBottom: 6, height: 13 }}>
+        {monthDays.map((d, i) => {
+          const n = Number(d.slice(8, 10));
+          const monday = new Date(`${d}T00:00:00`).getDay() === 1;
+          return (
+            <span key={d} style={{ width: cell, flexShrink: 0, position: 'relative', marginLeft: monday && n !== 1 ? MONTH_WEEK_GAP : 0 }}>
+              {labelled[i] && (
+                <span style={{ position: 'absolute', left: 0, top: 0, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1, color: d === today ? 'var(--acid-ink, var(--acid))' : 'var(--ink-4)', whiteSpace: 'nowrap' }}>{n}</span>
+              )}
+            </span>
+          );
+        })}
+      </div>
       {habits.map((habit, habitIdx) => (
         <MonthRow
           key={habit.id}
@@ -993,6 +1051,7 @@ function MonthView({ habits, today, monthDays, habitMotherId, onToggle, onContex
           today={today}
           isLast={habitIdx === habits.length - 1}
           monthDays={monthDays}
+          cell={cell}
           habitMotherId={habitMotherId}
           onToggle={onToggle}
           onContextMenu={onContextMenu}
@@ -1004,6 +1063,8 @@ function MonthView({ habits, today, monthDays, habitMotherId, onToggle, onContex
 
 interface MonthRowProps extends RowCommonProps {
   monthDays: string[];
+  /** Square size that fits the window. */
+  cell: number;
 }
 
 const MonthRow = memo(function MonthRow({
@@ -1012,6 +1073,7 @@ const MonthRow = memo(function MonthRow({
   today,
   isLast,
   monthDays,
+  cell,
   habitMotherId,
   onToggle,
   onContextMenu,
@@ -1058,7 +1120,7 @@ const MonthRow = memo(function MonthRow({
     [habit.id, today, onToggle, habit.schedule],
   );
 
-  const cellStyle = { width: MONTH_CELL_SIZE, height: MONTH_CELL_SIZE };
+  const cellStyle = { width: cell, height: cell };
 
   return (
     <div
@@ -1127,12 +1189,14 @@ const MonthRow = memo(function MonthRow({
             : resting ? `${habit.name} ${dayStr} — rest day`
             : habit.amount ? `${habit.name} ${dayStr} — ${cnt} of ${habit.amount.target}${habit.amount.unit ? ` ${habit.amount.unit}` : ''}`
             : `${habit.name} ${dayStr}`;
+          const weekStart = new Date(`${dayStr}T00:00:00`).getDay() === 1 && dayStr.slice(8, 10) !== '01';
+          const base = weekStart ? { ...cellStyle, marginLeft: MONTH_WEEK_GAP } : cellStyle;
           return (
             <div
               key={dayStr}
               data-date={scheduled ? dayStr : undefined}
               className={cls}
-              style={part > 0 ? { ...cellStyle, background: `linear-gradient(to top, color-mix(in srgb, var(--habit-color, var(--acid)) 75%, transparent) ${Math.round(part * 100)}%, transparent ${Math.round(part * 100)}%)` } : cellStyle}
+              style={part > 0 ? { ...base, backgroundImage: `linear-gradient(to top, color-mix(in srgb, var(--habit-color, var(--acid)) 75%, transparent) ${Math.round(part * 100)}%, transparent ${Math.round(part * 100)}%)`, backgroundRepeat: 'no-repeat', backgroundOrigin: 'border-box' } : base}
               title={tip}
             />
           );
@@ -1199,6 +1263,35 @@ const YearRow = memo(function YearRow({
   const { current: streak, unit: streakUnit } = useMemo(() => habitStreak(habit, today), [habit, today]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // The squares fill the window's width (5–12 px), not a fixed 5 px strip.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [cell, setCell] = useState(YEAR_CELL_SIZE);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const fit = () => {
+      const w = el.clientWidth;
+      if (w > 0) setCell(Math.max(YEAR_CELL_SIZE, Math.min(12, Math.floor((w + YEAR_CELL_GAP) / YEAR_COLS) - YEAR_CELL_GAP)));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const gridW = YEAR_COLS * (cell + YEAR_CELL_GAP) - YEAR_CELL_GAP;
+  const gridH = YEAR_ROWS * (cell + YEAR_CELL_GAP) - YEAR_CELL_GAP;
+  // Month letters above the column where each month starts.
+  const monthMarks = useMemo(() => {
+    const out: Array<{ col: number; label: string }> = [];
+    let last = -1;
+    for (let c = 0; c < YEAR_COLS; c++) {
+      const d = yearGrid[0]?.[c] ?? yearGrid.map((r) => r[c]).find((x) => !!x) ?? null;
+      if (!d) continue;
+      const m = Number(d.slice(5, 7)) - 1;
+      if (m !== last) { if (last !== -1 || c < 2) out.push({ col: c, label: MONTH_LABELS[m]!.slice(0, 3) }); last = m; }
+    }
+    return out;
+  }, [yearGrid]);
 
   // Canvas redraw — 371 cells in one DOM node instead of 371 divs. Re-runs
   // only when log / color / today / yearGrid changes. Resolves CSS-var colors
@@ -1214,10 +1307,12 @@ const YearRow = memo(function YearRow({
     const doneColor = cs.getPropertyValue(`--${color}`).trim() || '#c9f158';
     const restColor = cs.getPropertyValue('--paper-3').trim() || '#3a3527';
     const todayBorder = cs.getPropertyValue('--ink-3').trim() || '#5a5244';
+    const dotColor = cs.getPropertyValue('--ink-4').trim() || '#8f8572';
 
     const dpr = window.devicePixelRatio || 1;
-    const W = YEAR_GRID_W;
-    const H = YEAR_GRID_H;
+    const W = gridW;
+    const H = gridH;
+    const started = habit.createdAt ? habit.createdAt.slice(0, 10) : '';
     if (canvas.width !== W * dpr) {
       canvas.width = W * dpr;
       canvas.height = H * dpr;
@@ -1228,7 +1323,7 @@ const YearRow = memo(function YearRow({
     ctx.clearRect(0, 0, W, H);
 
     const logSet = new Set(habit.log);
-    const step = YEAR_CELL_SIZE + YEAR_CELL_GAP;
+    const step = cell + YEAR_CELL_GAP;
     for (let r = 0; r < YEAR_ROWS; r++) {
       const rowArr = yearGrid[r];
       if (!rowArr) continue;
@@ -1243,24 +1338,32 @@ const YearRow = memo(function YearRow({
         if (done) {
           ctx.fillStyle = doneColor;
           if (!scheduled) ctx.globalAlpha = 0.35;
-          ctx.fillRect(x, y, YEAR_CELL_SIZE, YEAR_CELL_SIZE);
+          ctx.fillRect(x, y, cell, cell);
+          ctx.globalAlpha = 1;
+        } else if (scheduled && day >= started) {
+          // A day it was on and not done: a clear empty square.
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = restColor;
+          ctx.fillRect(x, y, cell, cell);
           ctx.globalAlpha = 1;
         } else {
-          // Past undone — faded rest color; non-scheduled extra-faded.
-          ctx.globalAlpha = scheduled ? 0.4 : 0.15;
-          ctx.fillStyle = restColor;
-          ctx.fillRect(x, y, YEAR_CELL_SIZE, YEAR_CELL_SIZE);
+          // Not one of its days (or before it existed): a small dot, so the
+          // weeks it is on stand out (1 px when the squares are small).
+          const dot = cell >= 7 ? 2 : 1;
+          ctx.globalAlpha = 0.6;
+          ctx.fillStyle = dotColor;
+          ctx.fillRect(x + Math.floor((cell - dot) / 2), y + Math.floor((cell - dot) / 2), dot, dot);
           ctx.globalAlpha = 1;
         }
         if (day === today) {
           ctx.strokeStyle = done ? doneColor : todayBorder;
           ctx.lineWidth = 1;
           // 0.5 offset → crisp 1 px stroke aligned to pixel grid.
-          ctx.strokeRect(x + 0.5, y + 0.5, YEAR_CELL_SIZE - 1, YEAR_CELL_SIZE - 1);
+          ctx.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1);
         }
       }
     }
-  }, [habit, color, today, yearGrid]);
+  }, [habit, color, today, yearGrid, cell, gridW, gridH]);
 
   // Year view is intentionally read-only (2026-05-15 product call). No
   // click/toggle from year view — feels noisy at 5 px cells; use the week or
@@ -1315,17 +1418,24 @@ const YearRow = memo(function YearRow({
           repaints only one canvas (this row's), not the whole grid tree.
           pointer-events:none — year view is read-only; toggles happen from
           the week/month views. */}
-      <canvas
-        ref={canvasRef}
-        data-testid={`habit-year-canvas-${habit.id}`}
-        style={{
-          display: 'block',
-          cursor: 'default',
-          pointerEvents: 'none',
-          width: YEAR_GRID_W,
-          height: YEAR_GRID_H,
-        }}
-      />
+      <div ref={wrapRef} style={{ width: '100%' }}>
+        <div aria-hidden style={{ position: 'relative', height: 14, width: gridW }}>
+          {monthMarks.map((m) => (
+            <span key={`${m.col}-${m.label}`} style={{ position: 'absolute', left: m.col * (cell + YEAR_CELL_GAP), top: 0, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1, color: 'var(--ink-4)' }}>{m.label}</span>
+          ))}
+        </div>
+        <canvas
+          ref={canvasRef}
+          data-testid={`habit-year-canvas-${habit.id}`}
+          style={{
+            display: 'block',
+            cursor: 'default',
+            pointerEvents: 'none',
+            width: gridW,
+            height: gridH,
+          }}
+        />
+      </div>
     </div>
   );
 });
