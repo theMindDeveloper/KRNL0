@@ -42,6 +42,12 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('Standup at 9 tomorrow', NOW).time).toBe('09:00');
     expect(parseQuickAdd('Flight at 3am tomorrow', NOW).time).toBe('03:00');
   });
+  it('"every …" makes a repeating plan, starting on its first day', () => {
+    expect(parseQuickAdd('Water plants every day', NOW)).toEqual({ text: 'Water plants', repeat: { kind: 'daily' }, day: '2026-11-08' });
+    expect(parseQuickAdd('Weekly review every sunday 18:00', NOW)).toEqual({ text: 'Weekly review', repeat: { kind: 'weekly', day: 7 }, day: '2026-11-08', time: '18:00' });
+    expect(parseQuickAdd('Standup every weekday 9:30', NOW)).toMatchObject({ text: 'Standup', repeat: { kind: 'weekdays' }, day: '2026-11-09', time: '09:30' });
+    expect(describeQuickAdd(parseQuickAdd('Weekly review every sunday 18:00', NOW), NOW)).toBe('today 18:00 · repeats every Sunday');
+  });
   it('plain names are left alone', () => {
     expect(parseQuickAdd('Read chapter 3', NOW)).toEqual({ text: 'Read chapter 3' });
     expect(parseQuickAdd('Buy 2 m cable', NOW)).toEqual({ text: 'Buy 2 m cable' });
@@ -81,5 +87,9 @@ describe('krnl todo add reads the words too', () => {
     await f.run(['todo', 'add', 'Pay rent friday']);
     const items = board().nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<{ text: string; dueOn?: string }>;
     expect(items.find((i) => i.text === 'Pay rent')?.dueOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const r2 = await f.run(['todo', 'add', 'Water plants every day']);
+    expect(r2.message).toContain('repeats every day');
+    const again = board().nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<{ text: string; repeat?: unknown }>;
+    expect(again.find((i) => i.text === 'Water plants')?.repeat).toEqual({ kind: 'daily' });
   });
 });

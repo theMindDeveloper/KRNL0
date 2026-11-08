@@ -75,10 +75,15 @@ export async function todoAdd(
   if (!pair) {
     return { ok: false, message: 'No todo mother node found in board.' };
   }
-  // A day without a time: a due day.
-  if (q.day && !q.time) {
+  // A day without a time: a due day. "every …": a repeating plan.
+  if ((q.day && !q.time) || q.repeat) {
     const mother = board.nodes.find((n) => n.kind === 'todo' && n.isMother === true);
-    if (mother) mother.state = todoSetDue(mother.state as TodoState, { id: pair.todoItemId, dueOn: q.day });
+    if (mother) {
+      let st = mother.state as TodoState;
+      if (q.day && !q.time) st = todoSetDue(st, { id: pair.todoItemId, dueOn: q.day });
+      if (q.repeat) st = todoSetRepeat(st, { id: pair.todoItemId, repeat: q.repeat });
+      mother.state = st;
+    }
   }
   saveBoard(ctx, board);
   // A day and a time: on the Calendar (same path as `task schedule`).
@@ -89,7 +94,7 @@ export async function todoAdd(
   } else if (q.day) when = ` · due ${q.day}`;
   return {
     ok: true,
-    message: `Added todo: "${q.text}"${tag ? ` [${tag}]` : ''}${when}${q.durationMin ? ` · ${q.durationMin} min` : ''} (task: ${pair.taskNodeId.slice(0, 13)}…)`,
+    message: `Added todo: "${q.text}"${tag ? ` [${tag}]` : ''}${when}${q.durationMin ? ` · ${q.durationMin} min` : ''}${q.repeat ? ` · repeats ${describeTaskRepeat(q.repeat)}` : ''} (task: ${pair.taskNodeId.slice(0, 13)}…)`,
     data: { id: pair.todoItemId, todoItemId: pair.todoItemId, taskNodeId: pair.taskNodeId, ...(q.day ? { day: q.day } : {}), ...(q.time ? { time: q.time } : {}), ...(q.durationMin ? { durationMin: q.durationMin } : {}) },
   };
 }

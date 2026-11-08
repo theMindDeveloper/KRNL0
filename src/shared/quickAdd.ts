@@ -3,6 +3,9 @@
 // the day, the time and the length out of the words. The Todo shows the
 // result under the field before Enter, so nothing happens unseen.
 
+import { describeTaskRepeat, nextRepeatDay, type TaskRepeat } from './repeatTask';
+import { addDaysYMD } from './ymd';
+
 export interface QuickAdd {
   /** The plan's name with the parsed words taken out. */
   text: string;
@@ -13,6 +16,8 @@ export interface QuickAdd {
   durationMin?: number;
   /** True when a time was given without a day and had already passed today. */
   rolledToTomorrow?: boolean;
+  /** "every day" / "every weekday" / "every sunday": a repeating plan. */
+  repeat?: TaskRepeat;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -54,8 +59,21 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   }
   if (out.durationMin !== undefined && !(out.durationMin >= 1 && out.durationMin <= 480)) delete out.durationMin;
 
-  // Day.
+  // Repeat: "every day", "every weekday", "every sunday" (then the first one is the day).
   const today = ymd(now);
+  m = /\bevery\s+(day|weekday|weekdays|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/i.exec(s);
+  if (m) {
+    const w = m[1]!.toLowerCase();
+    if (w === 'day') out.repeat = { kind: 'daily' };
+    else if (w.startsWith('weekday')) out.repeat = { kind: 'weekdays' };
+    else {
+      const idx = DAYS.findIndex((d) => d.startsWith(w.slice(0, 3)));
+      out.repeat = { kind: 'weekly', day: idx === 0 ? 7 : idx };
+    }
+    cut(m);
+  }
+
+  // Day.
   m = /\b(today|tonight)\b/i.exec(s);
   if (m) { out.day = today; cut(m); }
   else if ((m = /\b(tomorrow|tmrw|tmr)\b/i.exec(s))) {
@@ -65,6 +83,13 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
     let add = (want - now.getDay() + 7) % 7;
     if (m[1]) add += add === 0 ? 7 : 7; // "next friday" is the one after this week's
     const d = new Date(now); d.setDate(d.getDate() + add); out.day = ymd(d); cut(m);
+  }
+
+  // A repeat with no day: its first matching day from today (today counts
+  // unless its time has passed).
+  if (out.repeat && !out.day) {
+    const passed = out.time ? (() => { const [h, mm] = out.time!.split(':').map(Number) as [number, number]; return h * 60 + mm <= now.getHours() * 60 + now.getMinutes(); })() : false;
+    out.day = nextRepeatDay(out.repeat, passed ? today : addDaysYMD(today, -1), today);
   }
 
   // A time with no day: today, or tomorrow if it has passed.
@@ -90,5 +115,6 @@ export function describeQuickAdd(q: QuickAdd, now: Date = new Date()): string | 
     parts.push(q.time ? `${word} ${q.time}` : `due ${word}`);
   }
   if (q.durationMin) parts.push(q.durationMin % 60 === 0 && q.durationMin >= 60 ? `${q.durationMin / 60} h` : `${q.durationMin} min`);
+  if (q.repeat) parts.push(`repeats ${describeTaskRepeat(q.repeat)}`);
   return parts.length ? parts.join(' · ') : null;
 }

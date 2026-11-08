@@ -2108,3 +2108,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/index.tsx`.
 **Summary:** The Week view filled an amount habit's day from the bottom and hatched rest days; the Month view showed neither (a half-done "8 glasses" day looked untouched, a rest day looked missed). Month cells now read the same, with the same tooltips. Checked in the preview.
+
+## [2026-11-08] — Quick add understands "every …" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`, `TodoNode/index.tsx`, `sys/commands/todo.ts`, `Tour/tours.ts`; test `quickAdd.test.ts` (+1, CLI +1).
+**Summary:** "Weekly review every sunday 18:00", "Water plants every day", "Standup every weekday 9:30" now add a repeating plan in one line: the repeat is read from the words, the first one lands on its first matching day (today counts unless its time has passed), and the line under the field says so ("today 18:00 · repeats every Sunday"). Same in `krnl todo add`. The Todo tour's quick-add step names it.

@@ -278,6 +278,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     if (item) {
       if (q.time && q.day && item.taskNodeId) void scheduleTaskAt(item.taskNodeId, `${q.day}T${q.time}`);
       else if (q.day && !q.time) onCommand('todo.setDue', { id: item.id, dueOn: q.day });
+      if (q.repeat) onCommand('todo.setRepeat', { id: item.id, repeat: q.repeat });
     }
     setPendingName('');
     setInputPhase('name');
@@ -289,7 +290,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       if (e.key === 'Enter') {
         const name = pendingName.trim();
         const q = name ? parseQuickAdd(name) : null;
-        if (q && (q.time || q.day || q.durationMin)) { quickSubmit(q); return; }
+        if (q && (q.time || q.day || q.durationMin || q.repeat)) { quickSubmit(q); return; }
         if (name) {
           setInputPhase('duration');
           setDurationValue('');
