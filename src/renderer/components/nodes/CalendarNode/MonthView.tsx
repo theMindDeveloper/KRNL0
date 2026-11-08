@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
+import { dayOnlyPlans } from './dayOnly';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
@@ -230,6 +231,14 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
   );
 
   // Build a map from YYYY-MM-DD → ScheduledTask[] for O(1) cell lookup.
+  // Plans with a day but no time yet (due that day, not on the grid): shown
+  // in their day like the Week view's DAY line, dashed.
+  const boardNodes = useBoardStore((st) => st.board?.nodes);
+  const dayOnly = useMemo(
+    () => dayOnlyPlans(boardNodes ?? [], cells, new Set(scheduledTasks.map((t) => t.id)), todayYMD),
+    [boardNodes, cells, scheduledTasks, todayYMD],
+  );
+
   const tasksByDay = useMemo(() => {
     const map = new Map<string, ScheduledTask[]>();
     for (const task of scheduledTasks) {
@@ -635,6 +644,27 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     >
                       <span aria-hidden style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 999, background: toneVarForTask(task.id), marginRight: 4, verticalAlign: '1px' }} />
                       {truncateLabel(task.text)}
+                    </div>
+                  ))}
+                  {(dayOnly.get(ymd) ?? []).map((d) => (
+                    <div
+                      key={`day-${d.id}`}
+                      data-testid="month-day-only-chip"
+                      title={`${d.text} — due this day, no time yet. Drag it into a day of the week view to give it a time.`}
+                      draggable
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.setData('application/krnl-task', JSON.stringify(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin }));
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0, borderRadius: 2, padding: '0 3px', lineHeight: '1.3',
+                        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'grab',
+                        border: `1px dashed ${d.overdue ? 'color-mix(in srgb, var(--rust) 70%, transparent)' : 'var(--ink-4)'}`,
+                        color: d.overdue ? 'var(--rust)' : 'var(--ink-2)', background: 'transparent',
+                      }}
+                    >
+                      {truncateLabel(d.text)}
                     </div>
                   ))}
                 </div>

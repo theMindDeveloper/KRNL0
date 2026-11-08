@@ -2149,3 +2149,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/routines` (and `experiment/new-user-review`)
 **Files changed:** `Launch/HelpMenu.tsx`.
 **Summary:** Help offered only "Take the tour"; the other tutorials (Habits & Routines, Staying on track, Calendar, …) could be started only from the Orb, yet the 0.11 notes say "Help › Staying on track". Help now has **Tutorials** (N more), which opens the full list in place; each starts its tour, with its summary as the tooltip. Checked in the preview.
+
+## [2026-11-08] — Month view shows plans with a day but no time (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/MonthView.tsx`.
+**Summary:** The Week view's DAY line listed plans due a day with no time yet; the Month view did not, so "Pay rent friday" was invisible there. Month cells now list them after the timed plans, dashed (rust when overdue), draggable like the others, from the same `dayOnlyPlans`. In the short Station slot a cell shows only the chip's edge, like timed chips there; the name is in the tooltip.
