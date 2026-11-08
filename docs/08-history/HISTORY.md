@@ -2247,3 +2247,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `launch/catchup.ts`, `TodoNode/index.tsx` (hint wording), `Tour/tours.ts` (Rest step); test `dueOnDay.test.ts` (+1).
 **Summary:** Since a missed repeating plan now brings its next copy by itself, Welcome back listing the missed one with a "Today" button would have put a second copy on today. Missed copies whose series is still repeating (before or after the next copy is made) are no longer loose ends; plain missed plans still are. Also: the multi-day quick-add hint says "Will be added as typed", and the tour's Rest step asks for a habit not done today (a done day has no "Rest today").
+
+## [2026-11-08] — A plan with no day gets its first day when it starts repeating (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/index.tsx`, `src/sys/commands/todo.ts`; test `repeatTask.test.ts` (+1).
+**Summary:** Repeat… on a plan with no due day and no Calendar time made a plan that repeated on no day: nothing showed on the Calendar's DAY line or in the Clock, and the series only moved if it was ticked. It now gets its first matching day as a due day (on a Sunday, "every weekday" is due Monday). `todo repeat` does the same and says "first due …".

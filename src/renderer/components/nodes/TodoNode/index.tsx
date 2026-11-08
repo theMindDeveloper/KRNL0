@@ -26,7 +26,8 @@ import { revertible, undoable } from '../../../store/undoNotice';
 import { DuePicker } from '../../ui/DuePicker';
 import { RemindPicker } from '../../ui/RemindPicker';
 import { TaskRepeatPicker } from '../../ui/TaskRepeatPicker';
-import { describeTaskRepeat, isoDowOfYMD, parseRepeat, repeatsBehind } from '../../../../shared/repeatTask';
+import { addDaysYMD } from '../../../../shared/ymd';
+import { describeTaskRepeat, isoDowOfYMD, nextRepeatDay, parseRepeat, repeatsBehind } from '../../../../shared/repeatTask';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { scheduleTaskAt, setTaskReminder, spawnNextRepeat, unscheduleTask } from '../../../store/scheduleActions';
@@ -1133,7 +1134,14 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           y={repeatPick.y}
           weekday={repeatPick.weekday}
           value={parseRepeat(state.items.find((i) => i.id === repeatPick.itemId)?.repeat)}
-          onPick={(r) => { onCommand('todo.setRepeat', { id: repeatPick.itemId, repeat: r }); setRepeatPick(null); }}
+          onPick={(r) => {
+            onCommand('todo.setRepeat', { id: repeatPick.itemId, repeat: r });
+            // A plan with no day would repeat on none: give it its first matching day.
+            const it = state.items.find((i) => i.id === repeatPick.itemId);
+            const hasDay = !!it?.dueOn || (it?.taskNodeId ? taskScheduledInfo.has(it.taskNodeId) : false);
+            if (r && it && !hasDay) onCommand('todo.setDue', { id: it.id, dueOn: nextRepeatDay(r, addDaysYMD(todayYMD, -1), todayYMD) });
+            setRepeatPick(null);
+          }}
           onClose={() => setRepeatPick(null)}
         />
       )}

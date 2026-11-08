@@ -1,4 +1,4 @@
-import { todayYMD } from '../../shared/ymd';
+import { addDaysYMD, todayYMD } from '../../shared/ymd';
 import { parseQuickAdd } from '../../shared/quickAdd';
 import { describeTaskRepeat, isoDowOfYMD, nextRepeatDay, parseRepeat } from '../../shared/repeatTask';
 import { taskSchedule } from './task';
@@ -305,9 +305,16 @@ export async function todoRepeat(ctx: TodoCtx, ref?: string, how?: string): Prom
   const day = (task?.state as { scheduledFor?: string } | undefined)?.scheduledFor?.slice(0, 10) ?? item?.dueOn ?? localToday();
   const repeat = how === 'off' ? null : how === 'daily' ? { kind: 'daily' as const } : how === 'weekdays' ? { kind: 'weekdays' as const } : how === 'weekly' ? { kind: 'weekly' as const, day: isoDowOfYMD(day) } : undefined;
   if (repeat === undefined) return { ok: false, message: `todo repeat: "${how}" is not daily, weekdays, weekly or off` };
-  const m = mutateTodo(ctx, (st) => todoSetRepeat(st, { id: r.id.itemId, repeat }));
+  // A plan with no day would repeat on none: it gets its first matching day.
+  const undated = !(task?.state as { scheduledFor?: string } | undefined)?.scheduledFor && !item?.dueOn;
+  const first = repeat && undated ? nextRepeatDay(repeat, addDaysYMD(localToday(), -1), localToday()) : null;
+  const m = mutateTodo(ctx, (st) => {
+    const on = todoSetRepeat(st, { id: r.id.itemId, repeat });
+    return first ? todoSetDue(on, { id: r.id.itemId, dueOn: first }) : on;
+  });
   if (!m.ok) return m;
   saveBoard(ctx, m.board);
+  if (first && repeat) return { ok: true, message: `Todo "${item?.text ?? ref}" repeats ${describeTaskRepeat(repeat)}, first due ${first}: tick it off and the next one appears.`, data: { id: r.id.itemId, repeat, dueOn: first } };
   return { ok: true, message: repeat ? `Todo "${item?.text ?? ref}" repeats ${describeTaskRepeat(repeat)}: tick it off and the next one appears.` : `Todo "${item?.text ?? ref}" no longer repeats.`, data: { id: r.id.itemId, repeat } };
 }
 
