@@ -240,11 +240,13 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
       {body}
 
       {!initial && archivedMatch && onRestore && !dup && (
-        <div data-testid="habit-ask-archived" style={{ fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span><b style={{ color: 'var(--ink-2)' }}>{archivedMatch.name}</b> is in your archive, with its history.</span>
+        // One small line: an archived habit with this name can come back with its history.
+        <div data-testid="habit-ask-archived" style={{ display: 'flex' }}>
           <button type="button" data-testid="habit-ask-restore" onClick={() => onRestore(archivedMatch.id)}
-            style={{ height: 24, padding: '0 9px', borderRadius: 6, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', cursor: 'pointer', fontSize: 11.5, fontFamily: 'inherit' }}>
-            Restore it instead
+            title={`"${archivedMatch.name}" is in your archive: restore it with its history`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, maxWidth: '100%', padding: '0 9px', borderRadius: 999, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <MenuIcon name="restart" size={12} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Restore "{archivedMatch.name}" from the archive</span>
           </button>
         </div>
       )}

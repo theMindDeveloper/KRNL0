@@ -544,7 +544,7 @@ export function TourHost(): JSX.Element | null {
   const text = step.text.split('{mode}').join(ownLabel).split('{pomo}').join(ownEasy ? 'Record' : 'Pomo');
 
   const btn = (primary: boolean): React.CSSProperties => ({
-    fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.06em', padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+    fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.06em', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
     border: `1px solid ${primary ? 'var(--acid)' : 'var(--paper-3)'}`,
     background: primary ? 'var(--acid)' : 'transparent',
     color: primary ? 'var(--paper)' : 'var(--ink-2)', fontWeight: primary ? 700 : 500,
@@ -657,7 +657,15 @@ export function TourHost(): JSX.Element | null {
             ))
             : step.waitFor && !revisit
               ? <button type="button" data-testid="tour-skip" style={btn(false)} onClick={next}>Skip</button>
-              : <button type="button" data-testid="tour-next" style={btn(true)} onClick={next}>{last ? 'Done' : <>Next <LineGlyph name="chevron" size={11} /></>}</button>}
+              : <>
+                {step.then && (
+                  <button type="button" data-testid="tour-then" style={btn(false)}
+                    onClick={() => { const id = step.then!.tour; end(); window.setTimeout(() => startTour(id), 60); }}>
+                    {step.then.label}
+                  </button>
+                )}
+                <button type="button" data-testid="tour-next" style={btn(true)} onClick={next}>{last ? 'Done' : <>Next <LineGlyph name="chevron" size={11} /></>}</button>
+              </>}
         </div>
       </div>
     </>,

@@ -56,6 +56,8 @@ export interface TourStep {
   /** Said under the text when the user did it, but not the way the step needs
    *  (dropped on another day). Null = nothing to say. */
   nudge?: (now: Board, atStart: Board) => string | null;
+  /** A second button that ends this tour and starts another ("Show me Advanced"). */
+  then?: { label: string; tour: string };
 }
 
 export interface Tour {
@@ -175,6 +177,8 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-habit', target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'One last thing: add a **habit** you want to keep (reading, a walk…). A card opens with **every day, any time** — press **Enter**.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
       { target: `${HABIT} .habit-cell--today`, node: 'mother-habit', badge: 'TICK TODAY', text: "Did it today? Click **today's square**.", waitFor: { board: habitTicked }, hint: "Waiting for today's square…" },
       { event: 'krnl:recap-show', target: '[data-testid="day-recap"]', badge: 'YOUR DAY', text: "Every evening ends like this: **what you did today**, in one card. Close it when you're ready." },
+      // Easy first; Advanced once Easy feels easy (easy-mode.md, first run).
+      { onlyIn: 'easy', press: GEAR, target: MODE, badge: 'LATER: ADVANCED', text: "You're in **Easy** mode: plan it, do it, see how it went. Give it a few days. When it feels easy, try **Advanced**: tags and time by tag, focus sessions, naming what you recorded, planned vs spent, deadlines and weekly goals, the terminal and AI. Switch here any time: **Settings → Mode**.", then: { label: 'See Advanced', tour: 'modes' } },
       { target: ORB, badge: 'MORE', text: "That's the whole loop. Each window has a **short tour** in my menu." },
     ],
   },

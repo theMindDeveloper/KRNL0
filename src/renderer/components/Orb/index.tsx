@@ -51,6 +51,11 @@ function firstDayOffered(): boolean {
 function markFirstDayOffered(): void {
   try { localStorage.setItem(FIRST_DAY_KEY, '1'); } catch { /* no storage */ }
 }
+/** Automated browsers (our own UI checks) don't get the first-run tour unless asked (?firstrun). */
+function autoFirstRunAllowed(): boolean {
+  if (import.meta.env.MODE === 'test') return false;
+  try { return !navigator.webdriver || location.search.includes('firstrun'); } catch { return true; }
+}
 import { voicePlayer } from '../Assistant/VoicePlayer';
 import { ScriptRunner } from '../Assistant/ScriptRunner';
 import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
@@ -64,7 +69,8 @@ import { useTourAnchor } from '../Tour/tourAnchor';
 
 /** Voice flows not offered in the chat for now. */
 const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
-import { startTour } from '../Tour/TourHost';
+import { activeTour, startTour } from '../Tour/TourHost';
+import { launchDialogOpen } from '../../launch/launchStore';
 import { emit } from '../../store/eventLog';
 import { Z } from '../ui/layers';
 import { isTypingTarget, isControlTarget, isModalOpen } from '../../utils/keyboardTargets';
@@ -251,6 +257,27 @@ export function Orb() {
   const dragMovedRef   = useRef(false);
   const dragOffsetRef  = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const dragStartRef   = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // ── First run ─────────────────────────────────────────────────────────────
+  // A brand-new board starts "Your first day" by itself, once — after the
+  // window settles and no launch dialog (What's new, Welcome back) is open.
+  // Its first step says what it is; "End tour" says no. The orb menu always
+  // offers it again.
+  useEffect(() => {
+    if (!autoFirstRunAllowed() || firstDayOffered()) return;
+    let tries = 0;
+    const id = window.setInterval(() => {
+      tries++;
+      const board = useBoardStore.getState().board;
+      if (tries > 40 || firstDayOffered()) { window.clearInterval(id); return; }
+      if (!board || launchDialogOpen() || activeTour()) return;
+      window.clearInterval(id);
+      if (!isFreshBoard(board)) return;
+      markFirstDayOffered();
+      startTour('first-day');
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, []);
 
   // ── ScriptRunner ──────────────────────────────────────────────────────────
   const runnerRef = useRef<ScriptRunner | null>(null);

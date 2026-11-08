@@ -68,7 +68,7 @@ describe('a name already in the node', () => {
     const archived = { ...node, state: { habits: [{ id: 'g', name: 'Gym', createdAt: '2026-11-01T08:00:00.000Z', log: ['2026-11-01'], archived: true, color: 'acid' }] } } as unknown as typeof node;
     const { input, onCommand } = setup(archived);
     fireEvent.change(input, { target: { value: 'gym ' } });
-    expect(screen.getByTestId('habit-ask-archived').textContent).toContain('Gym is in your archive');
+    expect(screen.getByTestId('habit-ask-archived').textContent).toContain('Restore "Gym" from the archive');
     fireEvent.click(screen.getByTestId('habit-ask-restore'));
     expect(onCommand).toHaveBeenCalledWith('habit.unarchive', { id: 'g' });
   });

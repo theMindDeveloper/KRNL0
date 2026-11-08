@@ -2426,3 +2426,15 @@ Checked by walking the first-day tour in the preview (rings, wrong-day nudge, to
 - **Month** fits the window (square size from the space there is), groups days into weeks with a small gap, numbers each week's start (never two side by side), shows a quiet dot on days a habit isn't on, and fills part-done amounts without the stray top line.
 - **Year** fills the window's width (5–12 px squares), has month names above, keeps days before the habit existed and days it isn't on as small dots, and shows the days it is on as clear empty squares.
 - **Settings → Archived (N)** is folded by default with **Show / Hide**; a long archive scrolls inside a short list, and the panel never runs past the window's bottom (checked with 12 archived habits).
+
+## [2026-11-08] — First run starts the tour and ends on Advanced; Easy/Advanced review proposed (experimental)
+
+**Type:** UX + Docs
+**Branch:** `experiment/new-user-review`
+**Files changed:** `components/Orb/index.tsx`, `components/Tour/tours.ts`, `components/Tour/TourHost.tsx`, `HabitNode/HabitAddAsk.tsx`, `docs/06-requirements/easy-mode.md`, `tests/unit/renderer/HabitNode.addField.test.tsx`.
+**Summary:**
+- **First run:** a brand-new board starts "Your first day" by itself, once, after the window settles and never over What's new or Welcome back (it used to wait for a click on the orb). End tour says no; the orb keeps offering it.
+- **The tour ends on Advanced:** in Easy, a step before the last opens Settings → Mode and says what Advanced adds (tags and time by tag, focus sessions, naming recorded time, planned vs spent, deadlines and weekly goals, the terminal and AI), suggesting it after a few days. **See Advanced** hands over to the live "Easy and Advanced" tour. Tour buttons stay on one line.
+- **Easy/Advanced review** (`easy-mode.md`): what a beginner keeps, and proposed rows D19–D26 for Easy (Deadline, habit amounts and weekly goals, creating task chains, the Calendar's line-up/zoom tools, the Terminal, canvas wires/frames/canvases, fewer Settings pages, Station first), with open questions Q6–Q9. Not built: waiting for the user's OK.
+- **Habit card:** "X is in your archive" is one small pill now: **Restore "X" from the archive**.
+Checked in the preview (auto start, the Advanced step, hand-over, once only). 2,457 tests and typecheck green.
