@@ -15,7 +15,7 @@ import { tagDisplay } from '../../../shared/tags/classify';
 import { toneVarForTask } from '../../utils/taskColor';
 import type { TaskState } from '../nodes/TaskNode/types';
 import type { TodoState } from '../nodes/TodoNode/types';
-import { calcStreak } from '../nodes/HabitNode/commands';
+import { habitStreak } from '../nodes/HabitNode/commands';
 import { todayLocal, type HabitState } from '../nodes/HabitNode/types';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { useEasyMode } from '../../store/uiMode';
@@ -172,7 +172,7 @@ function HabitInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps
       const today = todayLocal();
       const date = startMs !== undefined ? ymdOf(startMs) : today;
       return {
-        name: h.name, color: h.color, doneToday: h.log.includes(today), streak: calcStreak(h.log, today, h.schedule),
+        name: h.name, color: h.color, doneToday: h.log.includes(today), streak: habitStreak(h, today).current, streakUnit: habitStreak(h, today).unit,
         routine: h.kind === 'routine', date, skipped: !!h.exceptions?.some((e) => e.date === date && e.skip),
       };
     }),
@@ -209,7 +209,7 @@ function HabitInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps
       </div>
       <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>
         {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''} · `}
-        streak {info.streak} day{info.streak === 1 ? '' : 's'}
+        streak {info.streak} {info.streakUnit ?? 'day'}{info.streak === 1 ? '' : 's'}
         {' · '}
         <span style={{ color: info.doneToday ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>{info.doneToday ? 'done today' : 'not done today'}</span>
       </div>

@@ -421,6 +421,21 @@ export function bestWeekStreak(log: string[], perWeek: number): number {
   return best;
 }
 
+/**
+ * The one streak every screen shows (node rows in every view, the lane, the
+ * plan popup, the Calendar drop dialog, the CLI): a weekly target counts
+ * weeks, everything else counts scheduled days; rest days never break it.
+ */
+export function habitStreak(
+  h: { log: string[]; schedule?: HabitSchedule | null; perWeek?: number; kind?: 'routine'; rest?: string[] },
+  today: string,
+): { current: number; best: number; unit: 'day' | 'week' } {
+  const target = h.kind !== 'routine' && typeof h.perWeek === 'number' && h.perWeek >= 1 && h.perWeek <= 6 ? h.perWeek : null;
+  if (target) return { current: calcWeekStreak(h.log, today, target, h.rest), best: bestWeekStreak(h.log, target), unit: 'week' };
+  const schedule = h.schedule ?? undefined;
+  return { current: calcStreak(h.log, today, schedule, h.rest), best: bestStreak(h.log, schedule, h.rest), unit: 'day' };
+}
+
 function prevDayStr(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() - 1);

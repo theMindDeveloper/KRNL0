@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { calcStreak, bestStreak, repairableDay, calcWeekStreak, habitSetRest } from '../../../src/renderer/components/nodes/HabitNode/commands';
+import { calcStreak, bestStreak, repairableDay, calcWeekStreak, habitSetRest, habitStreak } from '../../../src/renderer/components/nodes/HabitNode/commands';
 import type { Habit } from '../../../src/renderer/components/nodes/HabitNode/types';
 import { SysFacade } from '../../../src/sys/SysFacade';
 import { seedBoard } from '../../../src/main/persistence/board';
@@ -41,6 +41,15 @@ describe('rest days with a weekly target', () => {
     const log = ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-26', '2026-11-02', '2026-11-03', '2026-11-04'];
     expect(calcWeekStreak(log, TODAY, 3)).toBe(1);
     expect(calcWeekStreak(log, TODAY, 3, ['2026-10-28', '2026-10-29'])).toBe(2);
+  });
+});
+
+describe('habitStreak — the one streak every screen shows', () => {
+  it('steps over rest days, and counts weeks for a weekly target', () => {
+    const log = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-07', '2026-11-08'];
+    expect(habitStreak({ log, rest: ['2026-11-05', '2026-11-06'] }, TODAY)).toEqual({ current: 6, best: 6, unit: 'day' });
+    expect(habitStreak({ log, perWeek: 3 }, TODAY).unit).toBe('week');
+    expect(habitStreak({ log, perWeek: 3, kind: 'routine' }, TODAY).unit).toBe('day');
   });
 });
 

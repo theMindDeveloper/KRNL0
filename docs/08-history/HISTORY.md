@@ -1909,3 +1909,9 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/reminders.ts`, `HabitNode/types.ts` (`remindMin`), `HabitNode/commands.ts` (`habitSetRemind`), `HabitNode/index.tsx`, `Canvas/commandDispatch.ts` (`habit.setRemind`), `sys/commands/habit.ts` (`routine remind`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `reminders.test.ts` (+2).
 **Summary:** From the new-user review (4.2): "remind me before class". A routine's right-click menu has **Remind me…** (the same picker as plans); the main-process reminder loop now also shows a notification before each time a routine happens — never on a skipped day — and `krnl routine remind <id|name> <minutes|off>` sets it from the terminal. Full suite: 2,389 passing, typecheck 0.
+## [2026-11-08] — One streak on every screen (weekly targets and rest days everywhere)
+
+**Type:** Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/commands.ts` (`habitStreak`), `HabitNode/index.tsx` (Week, Month and Year rows), `HabitLaneNode/index.tsx`, `ui/TaskInfoPopup.tsx`, `CalendarNode/WeekView.tsx` (drop dialog), `sys/commands/habit.ts`; test `habit.restDays.test.ts` (+1).
+**Summary:** Found in review: weekly targets and rest days reached only the Week view's row and the CLI. The Month and Year rows, the habit lane, the plan popup and the Calendar's drop dialog still counted plain day streaks — mark a rest day, switch the node to Month, and the streak dropped back; a 3×-a-week habit showed a day streak on its lane. Every screen now asks one helper, `habitStreak(habit, today)` → current, best and unit (weeks for a target, rest days stepped over); the lane reads "3w streak", the popup "streak 3 weeks", the Month/Year badge "3w".
