@@ -103,6 +103,13 @@ const amountSet = (now: Board, start: Board) => amountsKey(now) !== amountsKey(s
 const dueSet = (now: Board, start: Board) => dueKey(now) !== dueKey(start) && todoItems(now).some((i) => !!i.dueOn);
 const remindSet = (now: Board, start: Board) => remindCount(now) > remindCount(start);
 const taskScheduled = (now: Board, start: Board) => scheduledCount(now) > scheduledCount(start);
+// Quick add ("Gym 18:00 1h") can put the new task on the Calendar before the
+// "plan it" step starts: then the newest task already being planned counts.
+const newestScheduled = (now: Board) => {
+  const newest = [...tasks(now)].sort((a, b) => String((b.state as { createdAt?: string }).createdAt ?? '').localeCompare(String((a.state as { createdAt?: string }).createdAt ?? '')))[0];
+  return !!newest && !!(newest.state as { scheduledFor?: string }).scheduledFor;
+};
+const planned = (now: Board, start: Board) => taskScheduled(now, start) || newestScheduled(now);
 
 const POMO = '[data-tour="mother-pomo"]';
 const TODO = '[data-tour="mother-todo"]';
@@ -127,7 +134,7 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-todo', target: '.todo-add', badge: 'TYPE', text: "Add something you'll do today: click **add task**, type it, press **Enter** — then pick **how long** you guess it takes (or Enter to skip).", waitFor: { board: newTask }, hint: 'Waiting for a new task…' },
       { target: '[data-testid="todo-item-breakdown"]', node: 'mother-todo', badge: 'YOUR GUESS', text: "That's your **guess**. Click it to change it any time. Once you record time it reads **worked / planned**." },
       { target: '[data-testid="task-node-root"]', badge: 'SAME TASK', text: 'That card on the board is **the same task**. Tick it here or in the list — both stay in step.' },
-      { node: 'mother-calendar', also: ['mother-todo'], target: '[data-testid="calendar-grid-body"]', badge: 'PLAN IT', text: 'Now **plan it**: drag the task from the Todo onto a time today — now is fine. Not sure how? Press **PLAN** on its row and I show you.', waitFor: { board: taskScheduled }, hint: 'Waiting for the task to land on the Calendar…' },
+      { node: 'mother-calendar', also: ['mother-todo'], target: '[data-testid="calendar-grid-body"]', badge: 'PLAN IT', text: 'Now **plan it**: drag the task from the Todo onto a time today — now is fine. Not sure how? Press **PLAN** on its row and I show you.', waitFor: { board: planned }, hint: 'Waiting for the task to land on the Calendar…' },
       { node: 'mother-clock', target: CLOCK, badge: 'CLOCK', text: 'Your plan is on the **Clock** too, around the edge. Every window shows the same day.' },
       { node: 'mother-pomo', target: '[data-testid="pomo-primary"]', badge: 'PRESS', text: 'When you start working, press **START**. The {pomo} timer records what you really do.', waitFor: { board: (now) => pomoRunning(now) }, hint: 'Waiting for START…' },
       { target: '[data-testid="pomo-break"]', badge: 'PRESS', text: 'Need a pause? **BREAK**. Your work so far is saved, and the break is timed on its own.', waitFor: { board: (now) => pomoOnBreak(now) }, hint: 'Waiting for BREAK…' },
@@ -135,7 +142,7 @@ export const TOURS: readonly Tour[] = [
       { target: '[data-testid="pomo-primary"]', badge: 'PRESS', text: 'Finished for now? **STOP**. Break = pause and come back; Stop = done for now, saved.', waitFor: { board: (now) => pomoStopped(now) }, hint: 'Waiting for STOP…' },
       { node: 'mother-calendar', target: CAL, badge: 'PLAN VS REAL', text: "Your recorded time sits **under the plan**. That's how you see how the day really went." },
       { node: 'mother-todo', target: `${TODO} .todo-check`, badge: 'TICK', text: 'Done with it? **Tick it.**', waitFor: { board: taskDone }, hint: 'Waiting for a tick…' },
-      { node: 'mother-habit', target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'One last thing: add a **habit** you want to keep (reading, a walk…) and press **Enter**.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
+      { node: 'mother-habit', target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'One last thing: add a **habit** you want to keep (reading, a walk…) and press **Enter**. Asked if you want to tick it off, say **Yes**, then how often.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
       { target: `${HABIT} .habit-cell--today`, node: 'mother-habit', badge: 'TICK TODAY', text: "Did it today? Click **today's square**.", waitFor: { board: habitTicked }, hint: "Waiting for today's square…" },
       { event: 'krnl:recap-show', text: "Every evening ends like this: **what you did today**, in one card. Close it when you're ready." },
       { target: ORB, badge: 'MORE', text: "That's the whole loop. Each window has a **short tour** in my menu." },
