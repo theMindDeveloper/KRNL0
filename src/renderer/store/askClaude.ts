@@ -38,3 +38,15 @@ export function askClaude(prompt: string, resume: string | undefined, onEvent: L
   });
   return { cancel: () => { void b.assistantCancel?.(id); } };
 }
+
+export type ClaudeStatus = 'ready' | 'not-installed' | 'not-signed-in' | 'unknown' | 'no-bridge';
+
+/** Is Claude Code installed and signed in? ('no-bridge' in the browser preview.) */
+export async function claudeStatus(): Promise<ClaudeStatus> {
+  const b = bridge();
+  if (!b?.assistantStatus) return 'no-bridge';
+  try {
+    const s = await b.assistantStatus();
+    return s === 'ready' || s === 'not-installed' || s === 'not-signed-in' ? s : 'unknown';
+  } catch { return 'unknown'; }
+}

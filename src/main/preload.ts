@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('krnl', {
   assistantAsk: (id: string, prompt: string, resume?: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('assistant:ask', id, prompt, resume),
   assistantCancel: (id: string): Promise<void> => ipcRenderer.invoke('assistant:cancel', id),
+  assistantStatus: (): Promise<string> => ipcRenderer.invoke('assistant:status'),
   onAssistantEvent: (callback: (id: string, event: unknown) => void) => {
     const listener = (_e: unknown, id: string, event: unknown) => callback(id, event)
     ipcRenderer.on('assistant:event', listener)

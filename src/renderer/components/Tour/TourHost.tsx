@@ -19,7 +19,7 @@ import { beginPractice, keepPractice, practiceActive, practiceSummary, removePra
 import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { stepsFor, tourById, type Tour } from './tours';
-import { setTourAnchor } from './tourAnchor';
+import { setGuideSpeaking, setTourActive, setTourAnchor } from './tourAnchor';
 import { spokenText, voiceKey } from './tourVoice';
 import { voicePlayer } from '../Assistant/VoicePlayer';
 
@@ -481,7 +481,11 @@ export function TourHost(): JSX.Element | null {
     const a = new Audio(url);
     a.volume = 0.9;
     audioRef.current = a;
-    void a.play().catch(() => { /* autoplay refused or no audio device: stay silent */ });
+    // The orb speaks while the guide talks.
+    a.addEventListener('playing', () => setGuideSpeaking(true));
+    a.addEventListener('ended', () => setGuideSpeaking(false));
+    a.addEventListener('pause', () => setGuideSpeaking(false));
+    void a.play().catch(() => { setGuideSpeaking(false); /* autoplay refused or no audio device: stay silent */ });
     return () => stopVoice();
   }, [voiceReady, voiceOn, i, tour?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => stopVoice(), []);
@@ -500,18 +504,14 @@ export function TourHost(): JSX.Element | null {
     return () => window.removeEventListener('keydown', on);
   });
 
-  // The real orb rides on the card's top-left corner (64 px orb, centred on
-  // it). After every render: the card's spot is worked out during render.
+  // The orb keeps its own place and size during a tour (it used to ride on
+  // the card's corner, small); it stays above the dimming and speaks.
   useEffect(() => {
-    if (!tour || !step) { setTourAnchor(null); return; }
-    // A step about the orb itself (or its menu) keeps the orb where it is:
-    // the card is placed by the orb there, so moving the orb would move the
-    // card, which would move the orb again — an endless chase.
-    const target = step.target ? document.querySelector(step.target) : null;
-    if (target?.closest('[data-orb-root]')) { setTourAnchor(null); return; }
-    setTourAnchor({ x: Math.round(anchorPos.current.left) - 32, y: Math.round(anchorPos.current.top) - 32 });
-  });
-  useEffect(() => () => setTourAnchor(null), []);
+    setTourAnchor(null);
+    setTourActive(!!tour);
+  }, [tour]);
+  useEffect(() => () => { setTourActive(false); setTourAnchor(null); }, []);
+  void anchorPos;
 
   if (!tour || !step) {
     if (!practiceEnd) return null;

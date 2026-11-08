@@ -158,7 +158,7 @@ export function TopBar() {
       } as React.CSSProperties}
     >
       {/* Left: brand + breadcrumb + live badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         {/* Brand mark — the "Lit Core" app icon (build/icon.svg): a dark 3×3
             voxel cube on a near-black tile, centre voxel lit acid on each
             face. The tile is dark in every theme so the mark matches the
@@ -234,13 +234,13 @@ export function TopBar() {
       {/* Centre: panel toggles (ADR 0009 F9) — in Station AND Canvas mode; a
           hidden mother disappears and the rest close the gap. */}
       {MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
-        <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center' }}>
           <StationToolbar variant="inline" />
         </div>
       )}
 
       {/* Right: action buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <LayoutModeToggle />
         <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
         <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />

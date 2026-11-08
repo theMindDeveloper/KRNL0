@@ -104,3 +104,38 @@ export function askClaude(o: AskClaudeOptions): () => void {
     try { child.kill(); } catch { /* already gone */ }
   };
 }
+
+export type ClaudeStatus = 'ready' | 'not-installed' | 'not-signed-in' | 'unknown';
+
+/**
+ * Is Claude Code here and signed in? `claude auth status --json` — free, no
+ * question asked. Only the status leaves this function (never the account).
+ */
+export function claudeStatus(o: { cwd: string; env: Record<string, string>; spawnFn?: AskClaudeOptions['spawnFn']; platform?: NodeJS.Platform; timeoutMs?: number }): Promise<ClaudeStatus> {
+  const spawnFn = o.spawnFn ?? ((cmd, args, opts) => nodeSpawn(cmd, args, opts));
+  const isWin = (o.platform ?? process.platform) === 'win32';
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (s: ClaudeStatus) => { if (!done) { done = true; clearTimeout(timer); resolve(s); } };
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      child = spawnFn('claude', ['auth', 'status', '--json'], { cwd: o.cwd, env: o.env, shell: isWin, windowsHide: true });
+    } catch { finish('not-installed'); return; }
+    const timer = setTimeout(() => { finish('unknown'); try { child.kill(); } catch { /* gone */ } }, o.timeoutMs ?? 15_000);
+    let out = '';
+    let err = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (c: string) => { out += c; });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (c: string) => { err += c; });
+    child.stdin.end();
+    child.on('error', (e: NodeJS.ErrnoException) => finish(e.code === 'ENOENT' ? 'not-installed' : 'unknown'));
+    child.on('close', () => {
+      if (/not recognized as an internal or external command|command not found/i.test(err + out)) { finish('not-installed'); return; }
+      try {
+        const j = JSON.parse(out.slice(out.indexOf('{'))) as { loggedIn?: unknown };
+        finish(j.loggedIn === true ? 'ready' : 'not-signed-in');
+      } catch { finish('unknown'); }
+    });
+  });
+}

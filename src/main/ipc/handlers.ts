@@ -22,7 +22,7 @@ import {
 import { TimeLogInputSchema, type TimeLogEntry, type TimeLogInput } from '../../shared/timelog';
 import { isValidYMD } from '../../shared/ymd';
 import type { RpcServer } from '../rpc/server';
-import { askClaude } from '../assistant/askClaude';
+import { askClaude, claudeStatus } from '../assistant/askClaude';
 import type { AskEvent } from '../../shared/assistant/claudeStream';
 
 // Read version once at module load (package.json is bundled into resources).
@@ -378,6 +378,8 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     asking.set(id, cancel);
     return { ok: true };
   });
+  // Is Claude Code installed and signed in? (the orb says so before you ask)
+  ipcMain.handle('assistant:status', () => claudeStatus({ cwd: claudeHomeDir(), env: toolsEnv() }));
   ipcMain.handle('assistant:cancel', (_event, id: unknown) => {
     if (typeof id === 'string') asking.get(id)?.();
   });

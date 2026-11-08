@@ -933,3 +933,10 @@ select option { background: var(--paper); color: var(--ink); }
 .react-flow__handle-right::after { left: 50%; }
 .react-flow__handle-top::after { bottom: 50%; }
 .react-flow__handle-bottom::after { top: 50%; }
+
+/* The whole top bar moves the window (frameless window); only its controls
+   don't, so you can grab the bar anywhere between them. Groups used to opt
+   out entirely, leaving a few small gaps to drag from. */
+[data-testid="topbar"] :is(button, a, input, select, textarea, [role="button"], [role="menu"], [role="menuitem"], [role="radiogroup"], [role="tablist"], [role="dialog"], [data-no-drag]) {
+  -webkit-app-region: no-drag;
+}

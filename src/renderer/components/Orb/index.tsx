@@ -71,7 +71,7 @@ import { useTourAnchor } from '../Tour/tourAnchor';
 /** Voice flows not offered in the chat for now. */
 const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
 import { activeTour, startTour } from '../Tour/TourHost';
-import { askClaude } from '../../store/askClaude';
+import { askClaude, claudeStatus, type ClaudeStatus } from '../../store/askClaude';
 import { launchDialogOpen } from '../../launch/launchStore';
 import { emit } from '../../store/eventLog';
 import { Z } from '../ui/layers';
@@ -240,6 +240,10 @@ export function Orb() {
   const [history, setHistory]   = useState<ChatMsg[]>([]);
   const [input, setInput]       = useState('');
   const [thinking, setThinking] = useState(false);
+  // The menu (tours, quick actions) shows before the chat starts; "Tours" brings it back.
+  const [showMenu, setShowMenu] = useState(false);
+  // Is Claude Code ready? Checked when the panel opens, so the orb says so before you ask.
+  const [claudeState, setClaudeState] = useState<ClaudeStatus | null>(null);
   const [caption, setCaption]   = useState<string | null>(null);
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
   const [commanderOpen, setCommanderOpen] = useState(false);
@@ -249,6 +253,8 @@ export function Orb() {
   const [pos, setPos]           = useState<OrbPos>(loadPos);
   // During a guided tour the orb itself rides on the tour card (no copy).
   const tourAt = useTourAnchor((s) => s.at);
+  const tourActive = useTourAnchor((s) => s.active);
+  const guideSpeaking = useTourAnchor((s) => s.speaking);
   const [tourGlide, setTourGlide] = useState(false);
   useEffect(() => {
     // Glide while a tour moves it and on the way back home, never while dragging.
@@ -495,6 +501,13 @@ export function Orb() {
     };
   }, [orbState, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void claudeStatus().then((st) => { if (live) setClaudeState(st); });
+    return () => { live = false; };
+  }, [open]);
+
   // Focus the chat input when panel opens.
   useEffect(() => {
     if (open) {
@@ -544,6 +557,7 @@ export function Orb() {
   const newChat = () => { stopAsking(); sessionRef.current = undefined; setHistory([]); setThinking(false); };
 
   const submitMock = (text: string) => {
+    setShowMenu(false);
     setHistory((h) => [...h, { role: 'user', text }]);
     setInput('');
     setThinking(true);
@@ -577,7 +591,8 @@ export function Orb() {
   // ── Visual state ──────────────────────────────────────────────────────────
   const isPurple  = orbState === 'thinking' || thinking;
   const isHot     = orbState === 'listening';
-  const isSpeaking = orbState === 'speaking';
+  // The tour guide's voice makes the orb speak too.
+  const isSpeaking = orbState === 'speaking' || guideSpeaking;
   const isRunning = orbState === 'running';
 
   const glowFilter = isHot
@@ -642,7 +657,8 @@ export function Orb() {
         position: 'fixed',
         left: tourAt ? tourAt.x : pos.x,
         top: tourAt ? tourAt.y : pos.y,
-        zIndex: tourAt ? Z.tour + 1 : Z.widget,
+        // Above a tour's dimming, at its own place and size.
+        zIndex: tourAt || tourActive ? Z.tour + 1 : Z.widget,
         fontFamily: 'var(--font-mono)',
         transform: tourAt ? 'scale(0.6)' : 'none',
         transition: tourGlide
@@ -652,7 +668,7 @@ export function Orb() {
       }}
     >
       {/* Voice caption — shown during flows */}
-      {caption !== null && !open && !tourAt && (
+      {caption !== null && !open && !tourAt && !tourActive && (
         <div
           style={{
             position: 'absolute',
@@ -728,8 +744,14 @@ export function Orb() {
               krnl0 · assistant
             </span>
             {history.length > 0 && (
+              <button type="button" data-testid="orb-chat-menu" onClick={() => setShowMenu((v) => !v)} aria-pressed={showMenu} title="Tours and quick actions"
+                style={{ marginLeft: 'auto', marginRight: 6, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: showMenu ? 'rgba(201,241,88,0.12)' : 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                Tours
+              </button>
+            )}
+            {history.length > 0 && (
               <button type="button" data-testid="orb-chat-new" onClick={newChat} title="Start a new conversation"
-                style={{ marginLeft: 'auto', marginRight: 8, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                style={{ marginRight: 8, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
                 New chat
               </button>
             )}
@@ -747,9 +769,28 @@ export function Orb() {
               lineHeight: 1.5,
             }}
           >
-            {/* Quick actions stay after the first message (they used to vanish
-                until a reload). */}
-            {!thinking && (
+            {/* Claude isn't ready: say so before anything is asked, with the way out. */}
+            {(claudeState === 'not-installed' || claudeState === 'not-signed-in') && (
+              <div data-testid="orb-claude-status" style={{ border: '1px solid rgba(238,132,102,0.45)', background: 'rgba(238,132,102,0.08)', borderRadius: 8, padding: '8px 10px', color: '#e8d9c6', fontSize: 12, lineHeight: 1.5 }}>
+                {claudeState === 'not-installed'
+                  ? <>Claude Code isn't installed, so I can't answer questions yet. Install it from <b>claude.com/claude-code</b>, then open me again.</>
+                  : <>Claude Code isn't signed in, so I can't answer questions yet. Sign in once in the Terminal.</>}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  {claudeState === 'not-signed-in' && (
+                    <button type="button" data-testid="orb-claude-signin" onClick={() => { setOpen(false); void launchClaudeInTerminal(false); }}
+                      style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.45)', background: 'rgba(201,241,88,0.12)', color: '#d4cfc0', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                      Sign in
+                    </button>
+                  )}
+                  <button type="button" data-testid="orb-claude-recheck" onClick={() => { setClaudeState(null); void claudeStatus().then(setClaudeState); }}
+                    style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                    Check again
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* The menu shows before the chat starts; during a chat "Tours" brings it back. */}
+            {!thinking && (history.length === 0 || showMenu) && (
               <div style={{ color: '#8a8270' }}>
                 <div style={{ marginBottom: 8 }}>how can i help?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

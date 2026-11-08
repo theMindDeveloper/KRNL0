@@ -48,6 +48,7 @@ interface KrnlBridge {
   // Decision 41 — the orb asks Claude Code. Use renderer/store/askClaude.ts.
   assistantAsk?: (id: string, prompt: string, resume?: string) => Promise<{ ok: boolean }>
   assistantCancel?: (id: string) => Promise<void>
+  assistantStatus?: () => Promise<string>
   onAssistantEvent?: (callback: (id: string, event: unknown) => void) => () => void
   // Decision 35 — durable time log. Use renderer/store/timeLog.ts
   // (logTime / queryTimeLog), not these directly.
