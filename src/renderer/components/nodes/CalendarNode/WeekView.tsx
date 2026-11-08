@@ -213,6 +213,8 @@ interface WeekViewProps {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
+/** Window event: scroll the hour window to this week's first routine (routines tour). */
+export const SHOW_ROUTINES_EVENT = 'krnl:calendar-show-routines';
 const GUTTER_WIDTH = 40; // px — time gutter width (fits "00:30" at the 11px text floor)
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
 const MIN_BLOCK_PX = 14; // px — a planned block is never thinner than one text line
@@ -894,6 +896,25 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     setGridTop(el.scrollTop);
   };
   const win = hourWindow(gridTop, gridH, rowHeight, rowCount);
+
+  // Decision 39 — the routines tour: bring this week's earliest routine into
+  // the hour window (a step says "your routine is now a band").
+  useEffect(() => {
+    const onShow = () => {
+      const el = gridBodyRef.current;
+      if (!el) return;
+      let first: number | null = null;
+      for (const ymd of weekDays) for (const h of routinesForCal) {
+        const o = routineOccurrence(h, ymd);
+        if (o && (first === null || o.startMin < first)) first = o.startMin;
+      }
+      if (first === null) return;
+      el.scrollTop = Math.max(0, Math.floor((first - 30) / 60)) * rowHeight;
+      setGridTop(el.scrollTop);
+    };
+    window.addEventListener(SHOW_ROUTINES_EVENT, onShow);
+    return () => window.removeEventListener(SHOW_ROUTINES_EVENT, onShow);
+  }, [weekDays, routinesForCal, rowHeight]);
 
   // "Show on calendar" (task right-click): scroll the hour window to the
   // task and pulse its block.

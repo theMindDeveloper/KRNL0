@@ -456,14 +456,15 @@ export function HabitNode({
             )}
             {repeatAt && newRepeat && createPortal(
               <>
-                <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
+                {/* Above a guided tour's card (Z.popover): a tour step asks the user to use this. */}
+                <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
                 <div
                   data-testid="habit-add-repeat-pop"
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                   style={{
-                    position: 'fixed', zIndex: Z.popup, width: 380, boxSizing: 'border-box',
+                    position: 'fixed', zIndex: Z.popover, width: 380, boxSizing: 'border-box',
                     left: Math.max(8, Math.min(repeatAt.x - 380, window.innerWidth - 388)),
                     top: Math.max(8, Math.min(repeatAt.y + 6, window.innerHeight - 330)),
                     padding: 16, borderRadius: 14, background: 'var(--paper)', color: 'var(--ink)',

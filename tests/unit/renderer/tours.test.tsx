@@ -52,7 +52,7 @@ describe('Easy and Advanced tour — a live demo', () => {
 
 describe('tour catalogue', () => {
   it('has a tour for each part of the app', () => {
-    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'analytics', 'modes', 'terminal']);
+    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'analytics', 'modes', 'terminal']);
     for (const t of TOURS) {
       expect(t.steps.length).toBeGreaterThan(1);
       for (const s of t.steps) expect(s.text.length).toBeGreaterThan(10);
@@ -104,5 +104,20 @@ describe('krnl tour', () => {
   it('parses list / start', () => {
     expect(SysParser.parse(['tour'])).toEqual({ kind: 'tour', sub: 'list' });
     expect(SysParser.parse(['tour', 'start', 'pomo'])).toEqual({ kind: 'tour', sub: 'start', id: 'pomo' });
+  });
+});
+
+describe('Habits & Routines tour (routines.md F13)', () => {
+  const boardWith = (habits: unknown[]) => ({ nodes: [{ id: 'mother-habit', kind: 'habit', isMother: true, state: { habits } }], edges: [] }) as never;
+  const routine = { id: 'r', kind: 'routine', log: [], schedule: { kind: 'weekly', days: [1], timeOfDay: '10:00', durationMin: 120 } };
+  it('waits for a routine to be added, a week skipped and a routine ended', () => {
+    const t = tourById('routines')!;
+    const waits = t.steps.filter((s) => s.waitFor && 'board' in s.waitFor).map((s) => (s.waitFor as { board: (a: never, b: never) => boolean }).board);
+    expect(waits).toHaveLength(3);
+    const [added, skipped, ended] = waits as [(a: never, b: never) => boolean, (a: never, b: never) => boolean, (a: never, b: never) => boolean];
+    expect(added(boardWith([routine]), boardWith([]))).toBe(true);
+    expect(added(boardWith([{ ...routine, kind: undefined }]), boardWith([]))).toBe(false); // a habit is not a routine
+    expect(skipped(boardWith([{ ...routine, exceptions: [{ date: '2026-11-09', skip: true }] }]), boardWith([routine]))).toBe(true);
+    expect(ended(boardWith([{ ...routine, endsOn: '2026-11-08' }]), boardWith([routine]))).toBe(true);
   });
 });

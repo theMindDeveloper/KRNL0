@@ -9,12 +9,12 @@ const base = { selectedDate: null, anchorDate: '2026-11-06' };
 
 describe('calendar layers', () => {
   it('default to both on when missing (older boards)', () => {
-    expect(calendarLayersOf(base)).toEqual({ recorded: true, habits: true });
+    expect(calendarLayersOf(base)).toEqual({ recorded: true, habits: true, routines: true });
   });
   it('setLayers changes only the layer given, and only with a boolean', () => {
     const off = calendarSetLayers(base, { habits: false });
-    expect(off.layers).toEqual({ recorded: true, habits: false });
-    expect(calendarSetLayers(off, { recorded: 'no' }).layers).toEqual({ recorded: true, habits: false });
+    expect(off.layers).toEqual({ recorded: true, habits: false, routines: true });
+    expect(calendarSetLayers(off, { recorded: 'no' }).layers).toEqual({ recorded: true, habits: false, routines: true });
   });
   it('the schema accepts boards with and without layers', () => {
     expect(CalendarStateSchema.safeParse(base).success).toBe(true);

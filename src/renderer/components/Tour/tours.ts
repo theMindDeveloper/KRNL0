@@ -63,7 +63,7 @@ export function stepsFor(tour: Tour, mode: 'easy' | 'advanced'): TourStep[] {
 
 // ── board predicates ───────────────────────────────────────────────────────
 type Item = { done?: boolean };
-type HabitLite = { log?: string[] };
+type HabitLite = { log?: string[]; kind?: string; exceptions?: unknown[]; endsOn?: string };
 const tasks = (b: Board) => b.nodes.filter((n) => n.kind === 'todo.task');
 const pomoState = (b: Board) => b.nodes.find((n) => n.kind === 'pomo')?.state as { status?: string; history?: unknown[] } | undefined;
 const habits = (b: Board) => ((b.nodes.find((n) => n.kind === 'habit' && n.isMother)?.state as { habits?: HabitLite[] } | undefined)?.habits ?? []);
@@ -80,6 +80,13 @@ const pomoStopped = (now: Board) => {
 };
 const habitAdded = (now: Board, start: Board) => habits(now).length > habits(start).length;
 const habitTicked = (now: Board, start: Board) => ticks(now) !== ticks(start);
+// Decision 39 — routines tour.
+const routineCount = (b: Board) => habits(b).filter((h) => h.kind === 'routine').length;
+const exceptionCount = (b: Board) => habits(b).reduce((n, h) => n + (h.exceptions?.length ?? 0), 0);
+const endedCount = (b: Board) => habits(b).filter((h) => h.kind === 'routine' && h.endsOn).length;
+const routineAdded = (now: Board, start: Board) => routineCount(now) > routineCount(start);
+const routineSkipped = (now: Board, start: Board) => exceptionCount(now) > exceptionCount(start);
+const routineEnded = (now: Board, start: Board) => endedCount(now) > endedCount(start);
 const taskDone = (now: Board, start: Board) => doneCount(now) > doneCount(start);
 const taskScheduled = (now: Board, start: Board) => scheduledCount(now) > scheduledCount(start);
 
@@ -196,7 +203,20 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-habit', target: HABIT, badge: 'HABITS', text: 'Habits are things you want to do **regularly** — reading, exercise, a weekly review.' },
       { target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'Click **add habit** at the bottom, type a habit and press **Enter**.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
       { target: `${HABIT} .habit-cell--today`, node: 'mother-habit', badge: 'TICK TODAY', text: "Did it today? Click **today's square**.", waitFor: { board: habitTicked }, hint: "Waiting for today's square…" },
-      { target: '[data-testid="habit-add-repeat"]', badge: 'OPTIONAL', text: '**Repeat** makes a habit a recurring event (say, gym Mon/Wed/Fri at 7:00) — it then shows on the **Calendar** and the **Clock**. **Right-click** a habit to rename, recolour or delete it.' },
+      { target: '[data-testid="habit-add-repeat"]', badge: 'OPTIONAL', text: '**Repeat** sets the days — **Any time**, or at a set time on the **Calendar** and the **Clock**. **Right-click** a habit to rename, recolour or delete it.' },
+    ],
+  },
+  {
+    id: 'routines',
+    title: 'Habits & Routines',
+    summary: 'Routines that just happen; habits with no set time',
+    steps: [
+      { node: 'mother-habit', target: HABIT, badge: 'TWO KINDS', text: 'Two kinds of repeating things: **habits** you tick, and **routines** that just happen — a class, a work shift, a weekly call. Routines are never ticked and never "missed".' },
+      { target: '[data-testid="habit-add-input"]', badge: 'ADD A ROUTINE', text: 'Type **Class**, click **Repeat**, choose **Routine**, pick its days and time, then press **Enter**.', waitFor: { board: routineAdded }, hint: 'Waiting for a new routine…' },
+      { node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'ON YOUR WEEK', text: 'Your routine is now a **band** on the Calendar every week; your plans sit on top. The **Routines** switch in the header hides them.' },
+      { node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'SKIP ONE', text: 'No class next time? **Click the band** and choose **Skip this one**. Only that day changes.', waitFor: { board: routineSkipped }, hint: 'Waiting for a skipped routine…' },
+      { target: '[data-testid="habit-add-repeat"]', badge: 'NO SET TIME', text: 'For a habit like **No sugar**, choose **Habit** and **Any time**: it is ticked in the grid and never sits at a made-up hour.' },
+      { node: 'mother-habit', target: HABIT, badge: 'END, DON’T DELETE', text: 'Semester over? **Right-click** the routine and **End routine** — its history stays, and **Restart** is in the node’s settings.', waitFor: { board: routineEnded }, hint: 'Waiting for an ended routine… (or Skip)' },
     ],
   },
   {
