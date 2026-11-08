@@ -129,6 +129,7 @@ import {
   habitMarkDone,
   habitRemove,
   habitArchive,
+  habitUnarchive,
   habitRename,
   habitSetColor,
   habitSetIcon,
@@ -417,6 +418,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.markDone':    return { state: habitMarkDone(s as never, args as never) };
         case 'habit.remove':      return { state: habitRemove(s as never, args as never) };
         case 'habit.archive':     return { state: habitArchive(s as never, args as never) };
+        case 'habit.unarchive':   return { state: habitUnarchive(s as never, args as never) };
         case 'habit.rename':      return { state: habitRename(s as never, args as never) };
         case 'habit.setColor':    return { state: habitSetColor(s as never, args as never) };
         case 'habit.setIcon':     return { state: habitSetIcon(s as never, args as never) };
@@ -1774,6 +1776,10 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, habitId ? { refId: habitId } : {});
     } else if (command === 'habit.add' && node.kind === 'habit') {
       emit('habit.created', `habit added on ${shortId(nodeId)}`);
+    } else if (command === 'habit.archive' && node.kind === 'habit') {
+      // An archived habit is not tracked: its lane goes too (as the CLI does).
+      const habitId = typeof args['id'] === 'string' ? args['id'] : '';
+      if (habitId) removeAllLanesForHabit(habitId);
     } else if (command === 'habit.remove' && node.kind === 'habit') {
       const habitId = typeof args['id'] === 'string' ? args['id'] : '';
       emit('habit.deleted', `habit ${habitId.slice(0, 8)} removed`, { severity: 'warn' });

@@ -17,6 +17,7 @@ import {
   habitSetIcon,
   habitSetNote,
   habitArchive,
+  habitUnarchive,
   habitSetSchedule,
   habitSetKind,
   routineSkip,
@@ -550,6 +551,25 @@ export async function cliArchive(
     message: `habit archived: "${resolved.habit.name}"${lanes ? ` (lane removed)` : ''}`,
     data: { id: resolved.habit.id },
   };
+}
+
+/** `krnl habit unarchive <id|name>`: bring an archived habit back, history kept. */
+export async function cliUnarchive(
+  ctx: HabitCtx,
+  ref: string | undefined,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit unarchive requires <id|name>' };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  if (!resolved.habit.archived) {
+    return { ok: true, message: `habit "${resolved.habit.name}" is not archived`, data: { id: resolved.habit.id } };
+  }
+  mother.state = habitUnarchive(mother.state, { id: resolved.habit.id });
+  writeBoard(ctx, board, mother);
+  return { ok: true, message: `habit restored: "${resolved.habit.name}"`, data: { id: resolved.habit.id } };
 }
 
 export async function cliShow(

@@ -23,6 +23,8 @@ interface Props {
   onSetIcon: (icon: string) => void;
   onSetNote: (note: string) => void;
   onDelete: () => void;
+  /** Hide it but keep its history; it comes back from the node's settings. */
+  onArchive?: () => void;
   onClose: () => void;
   // v2.2 — only the parent HabitNode passes this; the lane's own menu omits
   // it (the lane node itself can't pin another lane to its own habit).
@@ -45,6 +47,7 @@ export function HabitContextMenu({
   onSetIcon,
   onSetNote,
   onDelete,
+  onArchive,
   onClose,
   onPinAsLane,
   laneExists,
@@ -477,6 +480,15 @@ export function HabitContextMenu({
           borderTop: '1px solid var(--paper-2)',
         }}
       />
+      {onArchive && (
+        <MenuItem
+          label="Archive (keeps history)"
+          onClick={() => {
+            onArchive();
+            onClose();
+          }}
+        />
+      )}
       <MenuItem
         label="Delete"
         destructive

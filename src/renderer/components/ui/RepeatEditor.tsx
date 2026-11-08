@@ -4,6 +4,7 @@
 
 import type { HabitSchedule, IsoDow } from '../nodes/HabitNode/types';
 import { NumberStepper } from './NumberStepper';
+import { TimeField } from './TimeField';
 import { IconRepeat, IconClock, IconTimer, IconCalendarAll, IconBriefcase, IconDots } from './repeatIcons';
 
 export type RepeatKind = 'daily' | 'weekdays' | 'weekly';
@@ -90,14 +91,6 @@ export function RepeatEditor({ value, onChange, testIdPrefix = 'repeat' }: Props
     else set({ kind: 'weekly', days });
   };
 
-  const [hh, mm] = (() => {
-    const m = /^(\d{1,2}):(\d{1,2})$/.exec(value.timeOfDay);
-    return [m ? Number(m[1]) : 0, m ? Number(m[2]) : 0] as const;
-  })();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const setHH = (h: number) => set({ timeOfDay: `${pad(Math.max(0, Math.min(23, h)))}:${pad(mm)}` });
-  const setMM = (m: number) => set({ timeOfDay: `${pad(hh)}:${pad(Math.max(0, Math.min(59, m)))}` });
-
   const routine = value.itemKind === 'routine';
   const anyTime = isAnyTime(value);
   return (
@@ -177,11 +170,7 @@ export function RepeatEditor({ value, onChange, testIdPrefix = 'repeat' }: Props
       <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 18, alignItems: 'start' }}>
         <div style={col}>
           <span style={label}><IconClock />Time</span>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <NumberStepper value={hh} onChange={setHH} min={0} max={23} step={1} testId={`${testIdPrefix}-time-hh`} />
-            <span aria-hidden style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontWeight: 700 }}>:</span>
-            <NumberStepper value={mm} onChange={setMM} min={0} max={59} step={5} testId={`${testIdPrefix}-time-mm`} />
-          </div>
+          <TimeField value={value.timeOfDay} onChange={(t) => set({ timeOfDay: t })} testId={`${testIdPrefix}-time`} style={{ width: 104 }} />
         </div>
         <div style={col}>
           <span style={label}><IconTimer />Length</span>

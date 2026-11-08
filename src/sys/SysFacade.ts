@@ -752,6 +752,7 @@ export class SysFacade {
         case 'schedule':   return habit.cliSchedule(ctx, command.ref, command.scheduleKind, command.days, command.at, command.durationMin, command.invalidDays);
         case 'unschedule': return habit.cliUnschedule(ctx, command.ref);
         case 'archive':    return habit.cliArchive(ctx, command.ref);
+        case 'unarchive':  return habit.cliUnarchive(ctx, command.ref);
         case 'show':       return habit.cliShow(ctx, command.ref, command.json);
         case 'pin':        return habit.cliPin(ctx, command.ref);
         case 'unpin':      return habit.cliUnpin(ctx, command.ref);

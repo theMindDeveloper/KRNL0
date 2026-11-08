@@ -1243,14 +1243,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           type="button"
           className="nodrag cal-lineup"
           data-testid={`calendar-lineup-${g[0]!.task.id}`}
-          title={`Line them up: ${g.map((x) => x.task.text).join(', ')} — one after another`}
-          aria-label="Line them up"
+          title={`These overlap: ${g.map((x) => x.task.text).join(', ')}. Click to put them one after another, from the earliest (never before now).`}
+          aria-label="Fix overlap: put them one after another"
           draggable={false}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); lineUpClash(); }}
           style={{ position: 'absolute', top, right: 3, height: TAB, zIndex: 5 }}
         >
-          <CalIcon name="stairs" />{roomy && 'Line up'}
+          <CalIcon name="stairs" />{roomy && 'Fix overlap'}
         </button>,
       );
     }

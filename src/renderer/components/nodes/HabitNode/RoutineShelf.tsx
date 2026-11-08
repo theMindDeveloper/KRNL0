@@ -96,8 +96,9 @@ export function RoutineShelf({ routines, today, onMenu }: Props) {
             onKeyDown={(e) => { if (e.key === 'Enter') onMenu(e as unknown as React.MouseEvent, h.id); }}
             style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28, cursor: 'pointer', borderRadius: 5 }}
           >
-            <span style={{ color: `var(--${h.color})`, display: 'inline-flex', width: 16, justifyContent: 'center', flexShrink: 0 }}>
-              <HabitIcon icon={h.icon} size={14} />
+            <span style={{ color: `var(--${h.color})`, display: 'inline-flex', width: 16, justifyContent: 'center', flexShrink: 0, fontSize: 9 }}>
+              {/* No icon picked yet: a dot in its colour, so the row never starts with a gap. */}
+              <HabitIcon icon={h.icon} size={14} fallback="●" />
             </span>
             <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600, color: 'var(--ink)', width: 84, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.name}</span>
             <span aria-label={`on ${[...days].sort().map((d) => DAY_SHORT[d - 1]).join(', ')}`} style={{ display: 'inline-flex', gap: 3, flexShrink: 0 }}>

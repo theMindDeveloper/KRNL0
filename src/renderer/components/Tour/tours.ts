@@ -201,9 +201,9 @@ export const TOURS: readonly Tour[] = [
     summary: 'Add a habit, tick it off',
     steps: [
       { node: 'mother-habit', target: HABIT, badge: 'HABITS', text: 'Habits are things you want to do **regularly** — reading, exercise, a weekly review.' },
-      { target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'Click **add habit** at the bottom, type a habit and press **Enter**.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
+      { target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'Click **add a habit** at the bottom, type one and press **Enter**. It asks if you want to **tick it off** — say **Yes**, then how often.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
       { target: `${HABIT} .habit-cell--today`, node: 'mother-habit', badge: 'TICK TODAY', text: "Did it today? Click **today's square**.", waitFor: { board: habitTicked }, hint: "Waiting for today's square…" },
-      { target: '[data-testid="habit-add-repeat"]', badge: 'OPTIONAL', text: '**Repeat** sets the days — **Any time**, or at a set time on the **Calendar** and the **Clock**. **Right-click** a habit to rename, recolour or delete it.' },
+      { node: 'mother-habit', target: HABIT, badge: 'CHANGE IT LATER', text: '**Right-click** a habit to change its days or time (**Edit repeat…**), rename, recolour or archive it.' },
     ],
   },
   {
@@ -212,10 +212,10 @@ export const TOURS: readonly Tour[] = [
     summary: 'Routines that just happen; habits with no set time',
     steps: [
       { node: 'mother-habit', target: HABIT, badge: 'TWO KINDS', text: 'Two kinds of repeating things: **habits** you tick, and **routines** that just happen — a class, a work shift, a weekly call. Routines are never ticked and never "missed".' },
-      { target: '[data-testid="habit-add-input"]', badge: 'ADD A ROUTINE', text: 'Type **Class**, click **Repeat**, choose **Routine**, pick its days and time, then press **Enter**.', waitFor: { board: routineAdded }, hint: 'Waiting for a new routine…' },
+      { target: '[data-testid="habit-add-input"]', badge: 'ADD A ROUTINE', text: 'Type **Class** and press **Enter**. Asked if you want to tick it off, say **No, it just happens** — then pick its days, a time and how long.', waitFor: { board: routineAdded }, hint: 'Waiting for a new routine…' },
       { node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'ON YOUR WEEK', text: 'Your routine is now a **band** on the Calendar every week; your plans sit on top. The **Routines** switch in the header hides them.' },
       { node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'SKIP ONE', text: 'No class next time? **Click the band** and choose **Skip this one**. Only that day changes.', waitFor: { board: routineSkipped }, hint: 'Waiting for a skipped routine…' },
-      { target: '[data-testid="habit-add-repeat"]', badge: 'NO SET TIME', text: 'For a habit like **No sugar**, choose **Habit** and **Any time**: it is ticked in the grid and never sits at a made-up hour.' },
+      { node: 'mother-habit', target: '[data-testid="habit-add-input"]', badge: 'NO SET TIME', text: 'For a habit like **No sugar**, answer **Yes** (you tick it) and **Any time**: it is ticked in the grid and never sits at a made-up hour.' },
       { node: 'mother-habit', target: HABIT, badge: 'END, DON’T DELETE', text: 'Semester over? **Right-click** the routine and **End routine** — its history stays, and **Restart** is in the node’s settings.', waitFor: { board: routineEnded }, hint: 'Waiting for an ended routine… (or Skip)' },
     ],
   },

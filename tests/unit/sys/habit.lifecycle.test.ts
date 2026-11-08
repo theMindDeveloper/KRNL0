@@ -11,6 +11,7 @@ import {
   cliSchedule,
   cliUnschedule,
   cliArchive,
+  cliUnarchive,
   cliRemove,
   cliShow,
   type HabitCtx,
@@ -203,6 +204,17 @@ describe('habit archive', () => {
     const res = await cliArchive(ctx, habit.id);
     expect(res.ok).toBe(true);
     expect(getHabit().archived).toBe(true);
+  });
+
+  it('unarchive brings it back with its history (3.4: never lose years of ticks)', async () => {
+    const habit = getHabit();
+    const before = getHabit().log.length;
+    await cliArchive(ctx, habit.id);
+    const res = await cliUnarchive(ctx, habit.name);
+    expect(res.ok).toBe(true);
+    expect(getHabit().archived).toBe(false);
+    expect(getHabit().log.length).toBe(before);
+    expect((await cliUnarchive(ctx, habit.id)).message).toContain('not archived');
   });
 });
 

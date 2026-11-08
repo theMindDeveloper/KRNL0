@@ -134,6 +134,19 @@ export function habitArchive(
   };
 }
 
+/** Bring an archived habit or routine back, history and all. */
+export function habitUnarchive(
+  state: HabitState,
+  args: { id: string },
+): HabitState {
+  return {
+    ...state,
+    habits: state.habits.map((h) =>
+      h.id === args.id ? { ...h, archived: false } : h,
+    ),
+  };
+}
+
 export function habitRemove(
   state: HabitState,
   args: { id: string },
