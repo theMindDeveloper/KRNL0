@@ -1963,3 +1963,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/quickAdd.ts` (new: `parseQuickAdd`, `describeQuickAdd`), `TodoNode/index.tsx`, `store/scheduleActions.ts` (`scheduleTaskAt`), `Tour/tours.ts` (Todo tour step), `docs/research/new-user-review-2026-11-08.md`; test `quickAdd.test.ts` (new, 8).
 **Summary:** New-user review 2.5: a new user typed "Call mom tomorrow at 5pm" and got a task literally called that, with no time; the field's placeholder read "task → spawns a node…". The Todo add field now reads the day (today, tomorrow, mon..sun, next monday), the time (5pm, 17:00, at 9) and the length (30 min, 1h, 1h30) from the words and shows what Enter will do under the field ("Call mom → tomorrow 17:00", "(that time has passed today)" when it rolls over). Enter adds the plan with the parsed name, puts it on the Calendar when there is a time, or gives it a due day when there is only a day — and skips the "how long?" step when a length was said. Plain names are left alone ("Read chapter 3", "Buy 2 m cable"). Placeholder: "What do you want to get done? (e.g. Gym tomorrow 18:00 1h)". Checked in the preview on a fresh board (four plans typed; two landed on the Calendar, one got a due day); the Todo tour has a new step and was run.
+
+## [2026-11-08] — `krnl todo add` reads day, time and length too (experimental)
+
+**Type:** Feature (CLI)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `sys/commands/todo.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** Rule 8 (every feature has a `krnl` command): `krnl todo add "Dentist next monday 14:00 30 min"` now adds "Dentist" for 30 min and puts it on the Calendar (through the same path as `task schedule`); `krnl todo add "Pay rent friday"` gives it a due day. Plain names are unchanged.

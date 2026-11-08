@@ -1,6 +1,17 @@
 /** Quick add — plans typed the way people say them. */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { SysFacade } from '../../../src/sys/SysFacade';
+import { seedBoard } from '../../../src/main/persistence/board';
 import { parseQuickAdd, describeQuickAdd } from '../../../src/shared/quickAdd';
+
+vi.mock('electron', () => ({
+  app: { getName: vi.fn(() => 'krnl0-test'), getAppPath: vi.fn(() => tmpdir()), on: vi.fn() },
+  BrowserWindow: { getAllWindows: vi.fn(() => []) },
+  ipcMain: { handle: vi.fn(), on: vi.fn() },
+}));
 
 // Sunday 8 Nov 2026, 10:00.
 const NOW = new Date(2026, 10, 8, 10, 0);
@@ -39,5 +50,31 @@ describe('describeQuickAdd', () => {
     expect(describeQuickAdd(parseQuickAdd('Gym 18:00 1h', NOW), NOW)).toBe('today 18:00 · 1 h');
     expect(describeQuickAdd(parseQuickAdd('Pay rent friday', NOW), NOW)).toBe('due Fri 13 Nov');
     expect(describeQuickAdd(parseQuickAdd('Read chapter 3', NOW), NOW)).toBeNull();
+  });
+});
+
+describe('krnl todo add reads the words too', () => {
+  let dir = '';
+  let boardPath = '';
+  let f: SysFacade;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'krnl0-quick-'));
+    boardPath = join(dir, 'board.json');
+    writeFileSync(boardPath, JSON.stringify(seedBoard()), 'utf-8');
+    f = new SysFacade({ boardPath, hasOpenRenderer: () => false, onBoardChanged: () => {} });
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  const board = () => JSON.parse(readFileSync(boardPath, 'utf-8')) as { nodes: Array<{ id: string; kind: string; isMother?: boolean; state: Record<string, unknown> }> };
+
+  it('a day and a time land on the Calendar; a day alone is a due day', async () => {
+    const r = await f.run(['todo', 'add', 'Dentist next monday 14:00 30 min']);
+    expect(r.ok).toBe(true);
+    expect(r.message).toContain('on the Calendar');
+    const task = board().nodes.find((n) => n.kind === 'todo.task' && n.state['text'] === 'Dentist')!;
+    expect(String(task.state['scheduledFor'])).toMatch(/T14:00$/);
+    expect(task.state['plannedMin']).toBe(30);
+    await f.run(['todo', 'add', 'Pay rent friday']);
+    const items = board().nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<{ text: string; dueOn?: string }>;
+    expect(items.find((i) => i.text === 'Pay rent')?.dueOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

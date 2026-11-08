@@ -1,3 +1,5 @@
+import { parseQuickAdd } from '../../shared/quickAdd';
+import { taskSchedule } from './task';
 import { parseDue, dueLabel } from '../../shared/due';
 // sys todo CLI — real board.json operations for the sys CLI.
 // Operates on the first todo mother node in board.json.
@@ -60,21 +62,33 @@ export async function todoAdd(
 ): Promise<SysResult> {
   if (!text) return { ok: false, message: 'todo add requires a task description' };
   const board = loadBoard(ctx);
+  // Quick add, as in the app: "Gym tomorrow 18:00 1h" → name, day, time, length.
+  const q = parseQuickAdd(text);
 
   const pair = createTodoTaskPair(
     board,
-    { text, ...(tag !== undefined ? { tag } : {}) },
+    { text: q.text, ...(tag !== undefined ? { tag } : {}), ...(q.durationMin ? { plannedMin: q.durationMin } : {}) },
     { uuid: () => randomUUID(), now: () => new Date().toISOString() },
   );
   if (!pair) {
     return { ok: false, message: 'No todo mother node found in board.' };
   }
-
+  // A day without a time: a due day.
+  if (q.day && !q.time) {
+    const mother = board.nodes.find((n) => n.kind === 'todo' && n.isMother === true);
+    if (mother) mother.state = todoSetDue(mother.state as TodoState, { id: pair.todoItemId, dueOn: q.day });
+  }
   saveBoard(ctx, board);
+  // A day and a time: on the Calendar (same path as `task schedule`).
+  let when = '';
+  if (q.day && q.time) {
+    const r = await taskSchedule({ boardPath: ctx.boardPath }, pair.taskNodeId, `${q.day}T${q.time}`);
+    if (r.ok) when = ` · on the Calendar ${q.day} ${q.time}`;
+  } else if (q.day) when = ` · due ${q.day}`;
   return {
     ok: true,
-    message: `Added todo: "${text}"${tag ? ` [${tag}]` : ''} (task: ${pair.taskNodeId.slice(0, 13)}…)`,
-    data: { id: pair.todoItemId, todoItemId: pair.todoItemId, taskNodeId: pair.taskNodeId },
+    message: `Added todo: "${q.text}"${tag ? ` [${tag}]` : ''}${when}${q.durationMin ? ` · ${q.durationMin} min` : ''} (task: ${pair.taskNodeId.slice(0, 13)}…)`,
+    data: { id: pair.todoItemId, todoItemId: pair.todoItemId, taskNodeId: pair.taskNodeId, ...(q.day ? { day: q.day } : {}), ...(q.time ? { time: q.time } : {}), ...(q.durationMin ? { durationMin: q.durationMin } : {}) },
   };
 }
 
