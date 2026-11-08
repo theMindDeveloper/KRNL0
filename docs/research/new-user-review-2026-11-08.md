@@ -19,6 +19,7 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 | 1.8 | The Pomo before Start: the first of 25 minute bars lit and "MIN 1 / 25" | Reads as already running; a new user wonders if the timer started | **Fixed here** — before Start no bar is lit and it says "25 min session"; running and paused show the minute as before (Blocks, Vu and Outline faces) |
 | 1.9 | Analytics' toolbar is ten icons; the header said "· 3 SOURCES" | Nothing on screen named the page you were on | **Fixed here** — the header shows the open page ("Planned vs spent", "Habits"…); the source count moved to its tooltip |
 | 1.10 | Switching to **Free** fits all six windows side by side at ~34% | No text can be read; it looks like a strip of thumbnails | **Fixed here** — Free starts where reading starts: the first four windows from the left, at a readable size (~52%); FIT and the minimap show everything. The first fit of a fresh canvas never goes below 55% either |
+| 1.11 | The Pomo's two modes read **POMO / OBSERVE**, and its header **DEEP WORK · POMO.025** | "Observe" does not say "a stopwatch with no session length"; "POMO.025" is a code, not a word. The tooltips explain both | **Proposed** — rename for everyone (e.g. *Sessions / Free timer*) and drop the code from the header; a naming decision, so not changed here |
 | 1.7 | Top bar path `~/krnl0 / canvas / Main` and a green **live** dot | Developer breadcrumb; "live" means nothing to most people (marketing is for everyone) | **Fixed here** — the badge now says **saved** ("Your board saves itself as you go — there is nothing to save by hand"), which is true and what a new user wants to know; the path keeps its look and gains a tooltip (it already hides below 1380 px) |
 
 ## 2. Adding things — does the app do what was asked?
@@ -78,4 +79,5 @@ Preview: `?fixture=fresh` opens the board a new user gets.
 ## Proposed order for what is left
 
 1. Pick between this branch's draft D (built) and E for `feat/routines`.
+2. Name the Pomo's modes for everyone (1.11).
 
