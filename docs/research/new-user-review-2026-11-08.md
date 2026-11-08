@@ -60,13 +60,15 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 
 ## Changed on this branch
 
-- `ui/LayoutModeToggle.tsx` — Station / **Free**.
-- `AnalyticsNode/index.tsx` — the streak chip hides at 0.
-- `TodoNode/index.tsx` — the empty list says what to do.
-- `HabitNode/HabitAddAsk.tsx`, `ui/RepeatEditor.tsx`, `sys/commands/habit.ts` — no repeat that runs past midnight (refused with the reason, not drawn cut short).
-- `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx` — a name already in the node is said.
-- `shared/reminders.ts`, `HabitNode/types.ts` (`remindMin`), `HabitNode/commands.ts` (`habitSetRemind`), `HabitNode/index.tsx`, `sys/commands/habit.ts` (`routine remind`) — routine reminders.
-- `dev/previewBridge.ts` — `?fixture=fresh`, the board a new user opens (for render checks of first-run states).
+First screen: Station / **Free** layout toggle · no "streak 0d" · an empty Todo says what to do · the Calendar opens on the day, not the night · "Planned vs worked" says when it is empty · the Pomo says "25 min session" before Start · the top bar says **saved** · the narrow Calendar says "Nov 2" · Analytics names the open page · plain words ("window", "canvas card") instead of "mother", "node", "lane".
+
+Adding and planning: **quick add** ("Gym tomorrow 18:00 1h" → on the Calendar; "Pay rent friday" → due; "at 3" is 3 pm), also in `krnl todo add` · a second "Gym" is said · **a day, no time**: the Calendar's DAY line (draft D on due days) · **repeating plans** (Repeat…, the next one appears when you tick one off) · **due** in the Clock and in Welcome back.
+
+Habits and routines: **amounts** ("8 glasses a day") · **night shifts** (a routine past midnight draws its rest on the next day; a timed habit past midnight is refused with the reason) · routine **reminders** · Edit repeat… says why Save is off.
+
+Tours: Staying on track (weekly targets, amounts, rest days, due dates, repeats, reminders, drop) and the Todo tour's quick-add step — both run end to end in the preview. Keyboard: the new pickers take focus.
+
+Preview: `?fixture=fresh` opens the board a new user gets.
 
 ## Proposed order for what is left
 
