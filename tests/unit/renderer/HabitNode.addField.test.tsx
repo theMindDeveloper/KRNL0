@@ -85,6 +85,18 @@ describe('a name already in the node', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByTestId('habit-ask-dup')).toBeTruthy();
   });
+  it('an archived one is offered back, with its history', () => {
+    const onCommand = vi.fn();
+    const archived = { ...node, state: { habits: [{ id: 'g', name: 'Gym', createdAt: '2026-11-01T08:00:00.000Z', log: ['2026-11-01'], archived: true, color: 'acid' }] } } as unknown as typeof node;
+    render(<HabitNode node={archived} selected={false} onCommand={onCommand} onSelect={() => undefined} />);
+    const input = screen.getByPlaceholderText('add a habit or routine') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'gym ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByTestId('habit-ask-archived').textContent).toContain('Gym is in your archive');
+    fireEvent.click(screen.getByTestId('habit-ask-restore'));
+    expect(onCommand).toHaveBeenCalledWith('habit.unarchive', { id: 'g' });
+    expect(screen.queryByTestId('habit-ask-yes')).toBeNull();
+  });
 });
 
 describe('askMissing / askToAnswer', () => {

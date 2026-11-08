@@ -107,9 +107,12 @@ interface Props {
   onCancel: () => void;
   /** Names already in the node (lower-case): a second "Gym" is allowed, but said. */
   taken?: ReadonlySet<string>;
+  /** An archived habit with this name: restoring it keeps its history. */
+  archivedMatch?: { id: string; name: string } | null;
+  onRestore?: (id: string) => void;
 }
 
-export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken }: Props) {
+export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatch, onRestore }: Props) {
   const dup = taken?.has(name.trim().toLowerCase()) ?? false;
   const [d, setD] = useState<AskDraft>(EMPTY_ASK);
   const set = (patch: Partial<AskDraft>) => setD((cur) => ({ ...cur, ...patch }));
@@ -171,6 +174,15 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken }: Props) {
           <div style={q}>Do you want to tick off <b style={{ color: 'var(--ink)' }}>{name}</b> when you do it?</div>
           <Answer testId="habit-ask-yes" icon={<IconCheck />} title="Yes, keep track" sub="a habit · tick it, keep a streak" k="Y" onClick={() => setD({ ...EMPTY_ASK, kind: 'habit' })} />
           <Answer testId="habit-ask-no" icon={<IconClock />} title="No, it just happens" sub="a routine · on your Calendar, never ticked" k="N" onClick={() => setD({ ...EMPTY_ASK, kind: 'routine' })} />
+          {!dup && archivedMatch && onRestore && (
+            <div data-testid="habit-ask-archived" style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span><b style={{ color: 'var(--ink-2)' }}>{archivedMatch.name}</b> is in your archive, with its history.</span>
+              <button type="button" data-testid="habit-ask-restore" onClick={() => onRestore(archivedMatch.id)}
+                style={{ height: 26, padding: '0 10px', borderRadius: 7, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', cursor: 'pointer', fontSize: 12 }}>
+                Restore it instead
+              </button>
+            </div>
+          )}
           {dup && (
             <div data-testid="habit-ask-dup" style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.4 }}>
               You already have one called <b style={{ color: 'var(--ink-2)' }}>{name}</b>. This adds a second; a different name keeps them apart.

@@ -2254,3 +2254,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `TodoNode/index.tsx`, `src/sys/commands/todo.ts`; test `repeatTask.test.ts` (+1).
 **Summary:** Repeat… on a plan with no due day and no Calendar time made a plan that repeated on no day: nothing showed on the Calendar's DAY line or in the Clock, and the series only moved if it was ticked. It now gets its first matching day as a due day (on a Sunday, "every weekday" is due Monday). `todo repeat` does the same and says "first due …".
+
+## [2026-11-08] — Adding a habit you archived offers it back (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`; test `HabitNode.addField.test.tsx` (+1).
+**Summary:** Typing the name of an archived habit made a fresh one with no history, and said nothing. The add card now says "Gym is in your archive, with its history" with "Restore it instead", which brings the old habit back and closes the card. A new one can still be made with Yes/No.

@@ -463,7 +463,9 @@ export function HabitNode({
             </span>
             </div>
             {ask && newName.trim() && (
-              <HabitAddAsk name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => setAsk(null)} taken={takenNames} />
+              <HabitAddAsk name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => setAsk(null)} taken={takenNames}
+                archivedMatch={(() => { const h = state.habits.find((x) => x.archived && x.name.trim().toLowerCase() === newName.trim().toLowerCase()); return h ? { id: h.id, name: h.name } : null; })()}
+                onRestore={(id) => { onCommand('habit.unarchive', { id }); setNewName(''); setAsk(null); }} />
             )}
           </div>
 
