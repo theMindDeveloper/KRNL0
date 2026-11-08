@@ -38,6 +38,8 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element');
 
 function render(el: HTMLElement): void {
+  // UI rule guard: warns in the console when a control's text wraps or spills.
+  if (import.meta.env.DEV) void import('./dev/overflowGuard').then((m) => m.startOverflowGuard());
   createRoot(el).render(
     <StrictMode>
       <App />

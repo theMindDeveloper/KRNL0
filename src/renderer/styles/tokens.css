@@ -940,3 +940,14 @@ select option { background: var(--paper); color: var(--ink); }
 [data-testid="topbar"] :is(button, a, input, select, textarea, [role="button"], [role="menu"], [role="menuitem"], [role="radiogroup"], [role="tablist"], [role="dialog"], [data-no-drag]) {
   -webkit-app-region: no-drag;
 }
+
+/* ── UI rule: a control's words stay inside it ────────────────────────────
+   Buttons, tabs, menu items, options and chips keep their label on one line,
+   so a crowded row can't squeeze one narrower than its words ("New chat"
+   wrapping out of its pill). Controls that hold a title plus a description
+   (a div, a p, a hint/desc part) wrap as before; data-wrap opts out.
+   Zero specificity: any explicit white-space still wins. Guarded in dev by
+   src/renderer/dev/overflowGuard.ts. docs/04-visual-system/design-tokens.md. */
+:where(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], .task-tag):where(:not(:has(div, p, [class*="hint"], [class*="desc"])):not([data-wrap])) {
+  white-space: nowrap;
+}

@@ -714,7 +714,7 @@ export function Orb() {
               color: '#8a8270',
             }}
           >
-            <span data-testid="orb-chat-title">
+            <span data-testid="orb-chat-title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--accent-on-dark)' }}>
                 ◆
               </span>
@@ -722,13 +722,13 @@ export function Orb() {
             </span>
             {history.length > 0 && (
               <button type="button" data-testid="orb-chat-menu" onClick={() => setShowMenu((v) => !v)} aria-pressed={showMenu} title="Tours and quick actions"
-                style={{ marginLeft: 'auto', marginRight: 6, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: showMenu ? 'rgba(201,241,88,0.12)' : 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                style={{ flexShrink: 0, whiteSpace: 'nowrap', marginLeft: 'auto', marginRight: 6, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: showMenu ? 'rgba(201,241,88,0.12)' : 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
                 Tours
               </button>
             )}
             {history.length > 0 && (
               <button type="button" data-testid="orb-chat-new" onClick={newChat} title="Start a new conversation"
-                style={{ marginRight: 8, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                style={{ flexShrink: 0, whiteSpace: 'nowrap', marginRight: 8, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
                 New chat
               </button>
             )}
