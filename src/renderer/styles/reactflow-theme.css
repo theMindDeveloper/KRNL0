@@ -337,6 +337,8 @@
 .cal-subhead { container-type: inline-size; }
 @container (max-width: 600px) { .cal-weekof { display: none; } }
 @container (max-width: 470px) { .cal-layer-label { display: none; } }
+.cal-wl-short { display: none; }
+@container (max-width: 470px) { .cal-wl-long { display: none; } .cal-wl-short { display: inline; } }
 @container (max-width: 400px) { .cal-zoom { display: none; } }
 
 /* Todo rows in a narrow window: the title keeps its room; PLAN becomes its

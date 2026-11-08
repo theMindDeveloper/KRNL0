@@ -8,7 +8,7 @@
 
 | # | Requirement |
 |---|---|
-| F1 | The topbar (height 44 px) renders via `<Panel position="top-center">`: brand-mark `■`, wordmark `KRNL0`, breadcrumb `∷ ~/krnl0 / boards / deep-work`, and a `◆ live` badge on the left side |
+| F1 | The topbar (height 44 px) renders via `<Panel position="top-center">`: brand-mark `■`, wordmark `KRNL0`, breadcrumb `∷ ~/krnl0 / boards / deep-work`, and a `● saved` badge on the left side (tooltip: the board saves itself; was a static "live", new-user review 1.7) |
 | F2 | The topbar right side renders: FIT button (calls RF `fitView()`), theme toggle button (label `☾ DARK` / `☀ LIGHT` per active theme), TWEAKS button, and SHARE button |
 | F3 | The left dock renders via `<Panel position="top-left">` at `left: 14px; top: 60px` inside a glassmorphic container (`backdrop-filter: blur`, `border`, `border-radius: 8px`) with 4 icon buttons: select tool, text node, image node, and connect tool |
 | F4 | The text node and image node buttons dispatch `board.addNode` with kind `text`/`image` at canvas center; the select and connect buttons change the active tool mode only (no node creation) |
@@ -71,7 +71,7 @@ Feature: App chrome panels
     Then the topbar contains the brand-mark "■"
     And the topbar contains the wordmark "KRNL0"
     And the topbar contains breadcrumb text "∷ ~/krnl0 / boards / deep-work"
-    And the topbar contains badge text "◆ live"
+    And the topbar contains badge text "saved"
 
   Scenario: F2 — Topbar right buttons present
     When the app renders

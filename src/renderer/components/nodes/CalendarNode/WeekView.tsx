@@ -2224,7 +2224,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               minWidth: 0,
             }}
           >
-            {singleDay ? weekLabel : <><span className="cal-weekof">Week of </span>{weekLabel}</>}
+            {/* Narrow: "Nov 2", never a cut "Nove…" (new-user review 1.6). */}
+            {singleDay ? weekLabel : <><span className="cal-weekof">Week of </span><span className="cal-wl-long">{weekLabel}</span><span className="cal-wl-short">{parseYMD(baseYMD).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span></>}
           </span>
 
           {/* Layers — what the rail and the pills mean, and a switch for each. */}

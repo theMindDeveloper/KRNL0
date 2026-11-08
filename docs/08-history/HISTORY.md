@@ -1977,3 +1977,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `PomoNode/variants/Blocks.tsx`, `Readout.tsx`, `Vu.tsx`, `Outline.tsx`, `docs/research/new-user-review-2026-11-08.md`; test `pomo.idleFace.test.tsx` (new).
 **Summary:** New-user review 1.8: on a fresh board the Pomo showed its first minute bar lit (blinking) and "MIN 1 / 25" before anything ran. Before Start no bar is "now" and the label reads "25 MIN SESSION"; running and paused keep the minute read-out.
+
+## [2026-11-08] — Top bar says "saved"; the narrow Calendar says "Nov 2" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TopBar/index.tsx`, `CalendarNode/WeekView.tsx`, `styles/reactflow-theme.css`, `docs/06-requirements/app-chrome.md` (F1 + scenario), `docs/research/new-user-review-2026-11-08.md`; test `AppChrome.scenarios.test.ts`.
+**Summary:** New-user review 1.6 / 1.7. The top bar's green badge always read "live" and meant nothing; it now reads **saved** with the tooltip "Your board saves itself as you go — there is nothing to save by hand" (true: every change is written at once), and the path has a tooltip about the canvas switcher. In the Station slot the Calendar's week label was cut to "Nove…"; below 470 px it reads "Nov 2". The app-chrome requirement and its scenario were updated to match.

@@ -101,9 +101,10 @@ describe('F1 — Topbar left content', () => {
     );
   });
 
-  it('renders badge text "live" with a dot (no glyph)', () => {
+  it('renders badge text "saved" with a dot (no glyph) and says the board saves itself', () => {
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-live-badge').textContent).toBe('live');
+    expect(screen.getByTestId('topbar-live-badge').textContent).toBe('saved');
+    expect(screen.getByTestId('topbar-live-badge').getAttribute('title')).toContain('saves itself');
   });
 });
 

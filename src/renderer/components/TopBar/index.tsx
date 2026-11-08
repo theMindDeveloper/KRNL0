@@ -188,6 +188,7 @@ export function TopBar() {
         <span
           data-testid="topbar-breadcrumb"
           className="krnl-breadcrumb"
+          title="Your canvases — switch or add one with the menu next to it"
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 11,
@@ -203,9 +204,12 @@ export function TopBar() {
         <CanvasSwitcher />
 
         {/* Live badge */}
+        {/* New-user review 1.7: a static "live" said nothing; this says what a
+            new user wants to know — nothing to save by hand. */}
         <span
           data-testid="topbar-live-badge"
           className="krnl-live-badge"
+          title="Your board saves itself as you go — there is nothing to save by hand."
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 11,
@@ -220,7 +224,7 @@ export function TopBar() {
           }}
         >
           <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor' }} />
-          live
+          saved
         </span>
       </div>
 
