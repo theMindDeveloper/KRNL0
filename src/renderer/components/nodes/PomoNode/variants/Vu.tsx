@@ -12,7 +12,7 @@ const SEGMENTS = 'repeating-linear-gradient(0deg, #000 0 5px, transparent 5px 7p
 const LIT =
   'linear-gradient(0deg, var(--k-vu-low, #9be34a) 0 55%, var(--k-vu-mid, #ffd54a) 55% 80%, var(--k-vu-high, #ff6a3d) 80%)';
 
-export function Vu({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
+export function Vu({ m, s, elapsedPct, total = 25, running }: TimerFaceProps) {
   const TOTAL = barsFor(total);
   const minsElapsed = Math.floor((elapsedPct / 100) * TOTAL);
 
@@ -57,7 +57,7 @@ export function Vu({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
           );
         })}
       </div>
-      <Readout m={m} s={s} minute={minsElapsed + 1} total={TOTAL} />
+      <Readout m={m} s={s} minute={minsElapsed + 1} total={TOTAL} idle={!running && elapsedPct <= 0} />
     </div>
   );
 }

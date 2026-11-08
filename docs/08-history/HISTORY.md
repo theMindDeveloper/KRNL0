@@ -1970,3 +1970,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `sys/commands/todo.ts`; test `quickAdd.test.ts` (+1).
 **Summary:** Rule 8 (every feature has a `krnl` command): `krnl todo add "Dentist next monday 14:00 30 min"` now adds "Dentist" for 30 min and puts it on the Calendar (through the same path as `task schedule`); `krnl todo add "Pay rent friday"` gives it a due day. Plain names are unchanged.
+
+## [2026-11-08] — The Pomo no longer looks started before Start (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `PomoNode/variants/Blocks.tsx`, `Readout.tsx`, `Vu.tsx`, `Outline.tsx`, `docs/research/new-user-review-2026-11-08.md`; test `pomo.idleFace.test.tsx` (new).
+**Summary:** New-user review 1.8: on a fresh board the Pomo showed its first minute bar lit (blinking) and "MIN 1 / 25" before anything ran. Before Start no bar is "now" and the label reads "25 MIN SESSION"; running and paused keep the minute read-out.

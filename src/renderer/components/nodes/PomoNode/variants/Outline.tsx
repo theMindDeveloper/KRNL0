@@ -8,7 +8,7 @@ import { Readout } from './Readout';
 /** One bar per minute of the scale, kept between 5 and 60. */
 const barsFor = (total: number) => Math.max(5, Math.min(60, Math.round(total)));
 
-export function Outline({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
+export function Outline({ m, s, elapsedPct, total = 25, running }: TimerFaceProps) {
   const TOTAL = barsFor(total);
   const minsElapsed = Math.floor((elapsedPct / 100) * TOTAL);
 
@@ -48,7 +48,7 @@ export function Outline({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
         <span style={{ position: 'absolute', left: 0, bottom: -4, fontFamily: 'var(--font-mono)', fontSize: 'var(--face-label, 11px)', color: 'var(--ink-3)' }}>0</span>
         <span style={{ position: 'absolute', right: 0, bottom: -4, fontFamily: 'var(--font-mono)', fontSize: 'var(--face-label, 11px)', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{TOTAL} MIN</span>
       </div>
-      <Readout m={m} s={s} minute={minsElapsed + 1} total={TOTAL} />
+      <Readout m={m} s={s} minute={minsElapsed + 1} total={TOTAL} idle={!running && elapsedPct <= 0} />
     </div>
   );
 }

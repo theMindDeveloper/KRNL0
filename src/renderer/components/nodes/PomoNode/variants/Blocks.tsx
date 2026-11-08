@@ -14,9 +14,12 @@ import type { TimerFaceProps } from './types';
 /** Bars per scale: one per minute, kept between 5 and 60. */
 const barsFor = (total: number) => Math.max(5, Math.min(60, Math.round(total)));
 
-export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
+export function Blocks({ m, s, elapsedPct, total = 25, running }: TimerFaceProps) {
   const TOTAL_BARS = barsFor(total);
   const minsElapsed = Math.floor((elapsedPct / 100) * TOTAL_BARS);
+  // Not started yet: no minute is "now" (a lit first bar and "min 1 / 25"
+  // read as already running to a new user). Paused keeps its progress.
+  const idle = !running && elapsedPct <= 0;
 
   return (
     <div
@@ -52,7 +55,7 @@ export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
       >
         {Array.from({ length: TOTAL_BARS }, (_, i) => {
           const isPast = i < minsElapsed;
-          const isNow = i === minsElapsed;
+          const isNow = !idle && i === minsElapsed;
 
           let barStyle: React.CSSProperties;
           if (isPast) {
@@ -135,7 +138,7 @@ export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
             letterSpacing: '0.1em',
           }}
         >
-          min {minsElapsed + 1} / {TOTAL_BARS}
+          {idle ? `${TOTAL_BARS} min session` : `min ${minsElapsed + 1} / ${TOTAL_BARS}`}
         </span>
       </div>
     </div>
