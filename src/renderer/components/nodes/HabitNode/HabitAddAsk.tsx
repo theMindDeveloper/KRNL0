@@ -214,6 +214,15 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
       )}
     </div>
   );
+  // The number is the day's goal, not the size of one tick: said once, always
+  // on one line (the card keeps its height).
+  const goalHelp = (
+    <span data-testid="habit-ask-goal-help" style={{ fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      {d.amount
+        ? `Each click adds 1${amountUnit ? ` ${amountUnit.replace(/s$/, '')}` : ''} · done at ${d.amount.target || '?'}`
+        : 'One click a day marks it done'}
+    </span>
+  );
   const units = (
     <div style={{ display: 'flex', gap: 5 }}>
       {UNITS.map((u) => (
@@ -231,7 +240,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
     <div data-testid="habit-ask-editor" style={{ borderRadius: 10, background: 'var(--paper-2)', border: '1px solid var(--paper-3)', padding: 10, height: 128, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 8 }}>
       {open === 'days' && <>{modeSeg(true)}{daysBlock}</>}
       {open === 'time' && <><span style={edHead}>Time</span>{timeCtl}<span style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.45 }}>Any time: it shows all day. A time puts it on the Clock and the Calendar.</span></>}
-      {open === 'goal' && <><span style={edHead}>Goal</span>{goalCtl}{units}</>}
+      {open === 'goal' && <><span style={edHead}>Goal</span>{goalCtl}{units}{goalHelp}</>}
     </div>
   );
 
@@ -262,6 +271,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
       {daysBlock}
       <div style={rowGrid}><span style={rowLabel}>Time</span>{timeCtl}</div>
       <div style={rowGrid}><span style={rowLabel}>Goal</span>{goalCtl}</div>
+      <div style={{ ...rowGrid, minHeight: 0, marginTop: -6 }}><span />{goalHelp}</div>
     </>
   ) : variant === 'B' ? (
     <>

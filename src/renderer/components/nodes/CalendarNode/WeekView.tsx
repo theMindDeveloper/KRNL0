@@ -1000,12 +1000,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         }, 80);
         return;
       }
-      if (!det?.taskId || !el) return;
-      const start = det.startISO ? new Date(det.startISO) : null;
+      if (!el) return;
+      const start = det?.startISO ? new Date(det.startISO) : null;
       if (start && !Number.isNaN(start.getTime())) {
         el.scrollTop = Math.max(0, (start.getHours() - 1) * rowHeight);
         setGridTop(el.scrollTop);
       }
+      // No task: just bring that hour into view (the tour opens today at now).
+      if (!det?.taskId) return;
       window.setTimeout(() => {
         const block = el.querySelector<HTMLElement>(`[data-testid="task-block-${CSS.escape(det.taskId!)}"]`);
         if (!block) return;

@@ -14,7 +14,8 @@ import type { Board } from '../../../shared/types';
 import type { MotherNodeConfig } from '../../../shared/types/board';
 import { useBoardStore } from '../../store/boardStore';
 import { saveBoard } from '../../store/eventLog';
-import { focusNode } from '../../store/scheduleActions';
+import { CALENDAR_REVEAL_EVENT, focusNode } from '../../store/scheduleActions';
+import { beginPractice, keepPractice, practiceActive, practiceSummary, removePractice, type PracticeSummary } from '../../store/tourPractice';
 import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { stepsFor, tourById, type Tour } from './tours';
@@ -186,7 +187,9 @@ export function findTarget(selector: string, scope: Element | null, text?: strin
  * a big window), the spot on screen that covers the least of it wins.
  */
 export function placeCard(r: Rect, w: number, h: number, vw = window.innerWidth, vh = window.innerHeight): { left: number; top: number } {
-  const gap = 18;
+  // 36: the guide orb rides the card's top-left corner (half of it, 32 px,
+  // sticks out), so a smaller gap would put the orb on what the step shows.
+  const gap = 36;
   const m = 12;
   const clampX = (x: number) => Math.max(m, Math.min(x, vw - w - m));
   const clampY = (y: number) => Math.max(m, Math.min(y, vh - h - m));
@@ -212,10 +215,56 @@ export function placeCard(r: Rect, w: number, h: number, vw = window.innerWidth,
   return candidates.reduce((best, c) => (overlap(c) < overlap(best) ? c : best));
 }
 
+const todayYMD = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+/** `{today}` in a selector is today's date (`week-col-{today}`). */
+const sel = (s: string | undefined): string | undefined => s?.split('{today}').join(todayYMD());
+
+/**
+ * Open the Calendar on today alone (its Day view, so today is wide and never
+ * cut off at the edge) and scroll its hours to now. Returns a function that
+ * puts the user's own view back.
+ */
+function calendarToToday(): () => void {
+  const board = useBoardStore.getState().board;
+  const cal = board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return () => {};
+  const own = (cal.config as { view?: string }).view;
+  const sendTo = (view: string): void => {
+    void import('../Canvas/commandDispatch').then(({ makeCommandHandler }) => makeCommandHandler(cal.id)('calendar.setView', { view }));
+  };
+  void import('../Canvas/commandDispatch').then(({ makeCommandHandler }) => {
+    const send = makeCommandHandler(cal.id);
+    if (own !== 'day') send('calendar.setView', { view: 'day' });
+    send('calendar.setAnchor', { date: todayYMD() });
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(CALENDAR_REVEAL_EVENT, { detail: { startISO: new Date().toISOString() } }));
+    }, 150);
+  });
+  return () => { if (own && own !== 'day') sendTo(own); };
+}
+
+/** Does the tour ask the user to make or change things (practice)? */
+const practises = (t: Tour): boolean => t.steps.some((st) => !!st.waitFor && 'board' in st.waitFor);
+
+const overlapArea = (p: { left: number; top: number }, w: number, h: number, r: Rect): number => {
+  const x = Math.max(0, Math.min(p.left + w, r.left + r.width) - Math.max(p.left, r.left));
+  const y = Math.max(0, Math.min(p.top + h, r.top + r.height) - Math.max(p.top, r.top));
+  return x * y;
+};
+
 export function TourHost(): JSX.Element | null {
   const [tour, setTour] = useState<Tour | null>(null);
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  // The second ring (where to drag FROM).
+  const [rect2, setRect2] = useState<Rect | null>(null);
+  // What the user did that isn't what the step needs (dropped on another day).
+  const [nudge, setNudge] = useState<string | null>(null);
+  // The tour ended with practice items left: ask to remove or keep them.
+  const [practiceEnd, setPracticeEnd] = useState<PracticeSummary | null>(null);
   // The words show once the card has arrived at THIS step's target (or
   // straight away when the step points at nothing). Tracked per step, so the
   // next step's words never flash at the old spot.
@@ -249,7 +298,13 @@ export function TourHost(): JSX.Element | null {
     modeChosen.current = false;
     cardPos.current = null;
     rectRef.current = null;
-    setTour(null); setI(0); setRect(null); setReadyKey('');
+    setTour(null); setI(0); setRect(null); setRect2(null); setNudge(null); setReadyKey('');
+    // Practice left behind? Ask (nothing made: just stop pausing the log).
+    if (practiceActive()) {
+      const sum = practiceSummary();
+      if (sum.lines.length > 0) setPracticeEnd(sum);
+      else keepPractice();
+    }
   };
   const choose = (mode: 'easy' | 'advanced'): void => {
     modeChosen.current = true;
@@ -275,6 +330,9 @@ export function TourHost(): JSX.Element | null {
       const mode = useBoardStore.getState().board?.uiMode === 'easy' ? 'easy' : 'advanced';
       setTour({ ...t, steps: stepsFor(t, mode) });
       setI(0);
+      setPracticeEnd(null);
+      // A tour where the user makes things: what they make is practice.
+      if (practises(t) && !practiceActive()) beginPractice();
     };
     window.addEventListener(TOUR_EVENT, on);
     return () => window.removeEventListener(TOUR_EVENT, on);
@@ -307,11 +365,13 @@ export function TourHost(): JSX.Element | null {
     if (step.event) window.dispatchEvent(new CustomEvent(step.event));
     startBoard.current = useBoardStore.getState().board;
     if (step.node) bringIntoView(step.node);
+    const putViewBack = step.today ? calendarToToday() : null;
+    setNudge(null);
     for (const extra of step.also ?? []) bringIntoView(extra, false);
     // Never leave the words hidden: show them anyway if the target is slow.
     const key = `${tour?.id}:${i}`;
     const t = setTimeout(() => setReadyKey(key), 500);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); putViewBack?.(); };
   }, [tour, i]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // follow the target (it moves with the camera / layout)
@@ -327,7 +387,13 @@ export function TourHost(): JSX.Element | null {
       // The target, or (when it isn't on screen, e.g. no tasks to show a tag
       // on) the window the step is about.
       const scope = step.node ? document.querySelector(`[data-tour="${step.node}"]`) : null;
-      const found = step.target ? findTarget(step.target, scope, step.targetText) : null;
+      // A step about nothing in particular while a dialog is open (the day
+      // recap) is about that dialog: the card goes beside it, never on it.
+      const target = sel(step.target) ?? (!step.node ? '[role="dialog"][aria-modal="true"]:not([data-testid="tour-card"])' : undefined);
+      const found = target ? findTarget(target, scope, step.targetText) : null;
+      const from = step.from ? findTarget(step.from, null) : null;
+      const fromBox = from?.box ?? null;
+      setRect2((cur) => (fromBox ? (same(cur, fromBox) ? cur : fromBox) : null));
       if (found && !found.box && !scrolled) {
         // Present but scrolled out of sight inside its window (a Calendar
         // block below the fold): bring it into view once.
@@ -380,7 +446,11 @@ export function TourHost(): JSX.Element | null {
       document.addEventListener('click', on, true);
       return () => document.removeEventListener('click', on, true);
     }
-    const check = (b: Board | null): void => { if (b && startBoard.current && w.board(b, startBoard.current)) advance(); };
+    const check = (b: Board | null): void => {
+      if (!b || !startBoard.current) return;
+      if (w.board(b, startBoard.current)) { setNudge(null); advance(); return; }
+      if (step.nudge) setNudge(step.nudge(b, startBoard.current));
+    };
     check(useBoardStore.getState().board);
     return useBoardStore.subscribe((s) => check(s.board));
   }, [step, revisit]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -412,7 +482,39 @@ export function TourHost(): JSX.Element | null {
   });
   useEffect(() => () => setTourAnchor(null), []);
 
-  if (!tour || !step) return null;
+  if (!tour || !step) {
+    if (!practiceEnd) return null;
+    const W0 = Math.min(420, window.innerWidth - 24);
+    const done = (keep: boolean): void => { if (keep) keepPractice(); else removePractice(); setPracticeEnd(null); };
+    return createPortal(
+      <div data-testid="tour-practice" role="dialog" aria-label="Practice from the tour"
+        style={{
+          position: 'fixed', left: window.innerWidth / 2 - W0 / 2, top: Math.max(24, window.innerHeight / 2 - 160), width: W0, boxSizing: 'border-box', zIndex: Z.tour,
+          background: 'var(--paper)', border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', borderRadius: 14,
+          padding: '20px 22px 18px', display: 'flex', flexDirection: 'column', gap: 12, color: 'var(--ink)', boxShadow: '0 18px 50px rgba(0,0,0,0.45)',
+        }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-2)', fontWeight: 700 }}>Practice from the tour</span>
+        <div style={{ fontSize: 15, lineHeight: 1.55, fontFamily: 'var(--font-sans)' }}>
+          The tour made these to show you around. They are <b>not counted</b> anywhere yet — not in Analytics, not in your history.
+        </div>
+        <ul data-testid="tour-practice-list" style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
+          {practiceEnd.lines.map((l) => <li key={l}>{l}</li>)}
+        </ul>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>Remove them to keep your board as it was. Keep them if they were real.</div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button type="button" data-testid="tour-practice-keep" onClick={() => done(true)}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)' }}>
+            Keep them
+          </button>
+          <button type="button" data-testid="tour-practice-remove" autoFocus onClick={() => done(false)}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--acid)', background: 'var(--acid)', color: 'var(--paper)', fontWeight: 700 }}>
+            Remove them
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
 
   const W = Math.min(420, window.innerWidth - 24);
   const H = cardRef.current?.offsetHeight ?? 240;
@@ -421,7 +523,15 @@ export function TourHost(): JSX.Element | null {
   const ready = !pointsAt || readyKey === `${tour.id}:${i}`;
   let pos = { left: window.innerWidth / 2 - W / 2, top: window.innerHeight / 2 - H / 2 };
   if (rect) {
-    pos = placeCard({ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }, W, H);
+    // With a second ring, the card stays clear of both.
+    const u = rect2 ? {
+      left: Math.min(rect.left, rect2.left), top: Math.min(rect.top, rect2.top),
+      width: Math.max(rect.left + rect.width, rect2.left + rect2.width) - Math.min(rect.left, rect2.left),
+      height: Math.max(rect.top + rect.height, rect2.top + rect2.height) - Math.min(rect.top, rect2.top),
+    } : rect;
+    const placed = placeCard({ left: u.left - pad, top: u.top - pad, width: u.width + pad * 2, height: u.height + pad * 2 }, W, H);
+    // The union may leave no side free: then keep clear of the drop target at least.
+    pos = rect2 && overlapArea(placed, W, H, rect) > 0 ? placeCard({ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }, W, H) : placed;
     cardPos.current = pos;
   } else if (pointsAt && cardPos.current) {
     pos = cardPos.current;
@@ -470,6 +580,21 @@ export function TourHost(): JSX.Element | null {
       ) : (
         <div aria-hidden style={{ position: 'fixed', inset: 0, background: step.waitFor ? 'transparent' : 'rgba(0,0,0,0.35)', pointerEvents: 'none', zIndex: Z.tourBackdrop }} />
       )}
+      {rect2 && rect && (
+        <div data-testid="tour-spotlight-from" aria-hidden style={{
+          position: 'fixed', left: rect2.left - pad, top: rect2.top - pad, width: rect2.width + pad * 2, height: rect2.height + pad * 2,
+          borderRadius: 10, border: '2px dashed var(--acid)', pointerEvents: 'none', zIndex: Z.tourBackdrop,
+          boxShadow: '0 0 0 4px color-mix(in srgb, var(--acid) 14%, transparent)', animation: 'krnl-tour-in 200ms ease-out',
+        }}>
+          {step.fromBadge && (
+            <span style={{
+              position: 'absolute', left: -2, top: -26, padding: '3px 9px', borderRadius: 5,
+              background: 'var(--paper)', color: 'var(--acid-ink, var(--acid))', border: '1px solid var(--acid)', fontFamily: 'var(--font-mono)', fontSize: 11,
+              fontWeight: 700, letterSpacing: '0.08em', whiteSpace: 'nowrap',
+            }}>{step.fromBadge}</span>
+          )}
+        </div>
+      )}
       <div
         ref={cardRef}
         data-testid="tour-card"
@@ -506,6 +631,16 @@ export function TourHost(): JSX.Element | null {
         >
           {renderTourText(text)}
         </div>
+        {nudge && !revisit && (
+          <div data-testid="tour-nudge" style={{ fontSize: 13, lineHeight: 1.5, fontFamily: 'var(--font-sans)', color: 'var(--ink)', padding: '8px 10px', borderRadius: 8, background: 'color-mix(in srgb, var(--rust) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--rust) 40%, transparent)' }}>
+            {nudge}
+          </div>
+        )}
+        {i === 0 && practises(tour) && (
+          <div data-testid="tour-practice-note" style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
+            What you make in this tour is practice: it is not counted, and at the end you choose to remove it or keep it.
+          </div>
+        )}
         {step.waitFor && !revisit && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontFamily: 'var(--font-mono)', color: 'var(--acid-ink, var(--acid))', opacity: ready ? 1 : 0, transition: 'opacity 200ms ease 200ms' }}>
             <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--acid)', animation: 'krnl-tour-orb 1.6s ease-in-out infinite' }} />

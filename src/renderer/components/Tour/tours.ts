@@ -47,6 +47,15 @@ export interface TourStep {
   event?: string;
   /** Buttons that end the tour by choosing a mode (replace Next). */
   choices?: ReadonlyArray<{ label: string; mode: 'easy' | 'advanced' }>;
+  /** A second ring, e.g. where to drag FROM when `target` is where to drop. */
+  from?: string;
+  /** The second ring's tag ("FROM HERE"). */
+  fromBadge?: string;
+  /** Open the Calendar on today and scroll it to now (a drag step that must land today). */
+  today?: boolean;
+  /** Said under the text when the user did it, but not the way the step needs
+   *  (dropped on another day). Null = nothing to say. */
+  nudge?: (now: Board, atStart: Board) => string | null;
 }
 
 export interface Tour {
@@ -108,6 +117,29 @@ const newestScheduled = (now: Board) => {
   return !!newest && !!(newest.state as { scheduledFor?: string }).scheduledFor;
 };
 const planned = (now: Board, start: Board) => taskScheduled(now, start) || newestScheduled(now);
+// The first-day plan must land TODAY, so the Clock (today only) shows it next.
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const sched = (n: { state: unknown }) => String((n.state as { scheduledFor?: string }).scheduledFor ?? '');
+/** Tasks planned (or moved) since the step began. */
+const replanned = (now: Board, start: Board) => {
+  const was = new Map(tasks(start).map((n) => [n.id, sched(n)]));
+  return tasks(now).filter((n) => sched(n) && was.get(n.id) !== sched(n));
+};
+const plannedToday = (now: Board, start: Board) => {
+  const today = ymd(new Date());
+  if (replanned(now, start).some((n) => sched(n).startsWith(today))) return true;
+  // Quick add ("Essay 16:00") already put the newest one on today.
+  const newest = [...tasks(now)].sort((a, b) => String((b.state as { createdAt?: string }).createdAt ?? '').localeCompare(String((a.state as { createdAt?: string }).createdAt ?? '')))[0];
+  return !!newest && sched(newest).startsWith(today) && tasks(start).some((n) => n.id === newest.id);
+};
+const notToday = (now: Board, start: Board): string | null => {
+  const today = ymd(new Date());
+  const off = replanned(now, start).find((n) => !sched(n).startsWith(today));
+  if (!off) return null;
+  const d = new Date(sched(off));
+  const day = Number.isNaN(d.getTime()) ? 'another day' : d.toLocaleDateString('en-GB', { weekday: 'long' });
+  return `That landed on ${day}. The Clock only shows today, so drag it onto today (the highlighted column), later than now.`;
+};
 
 const POMO = '[data-tour="mother-pomo"]';
 const TODO = '[data-tour="mother-todo"]';
@@ -132,7 +164,7 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-todo', target: '.todo-add', badge: 'TYPE', text: "Add something you'll do today: click **add a plan** and type it. A card shows its **day, time and length** — pick any, or just press **Enter**.", waitFor: { board: newTask }, hint: 'Waiting for a new task…' },
       { target: '[data-testid^="todo-plan-"]', node: 'mother-todo', badge: 'ITS CARD', text: 'The **calendar icon** on a row opens its **plan card**: a day (or any time), a time, how long, a deadline — and Focus, Done, Delete. Right-click → **When…** opens it too.' },
       { target: '[data-testid="task-node-root"]', badge: 'SAME TASK', text: 'That card on the board is **the same task**. Tick it here or in the list — both stay in step.' },
-      { node: 'mother-calendar', also: ['mother-todo'], target: '[data-testid="calendar-grid-body"]', badge: 'PLAN IT', text: 'Now **plan it**: drag the task from the Todo onto a time today — now is fine. Or open its card and pick a time.', waitFor: { board: planned }, hint: 'Waiting for the task to land on the Calendar…' },
+      { node: 'mother-calendar', also: ['mother-todo'], today: true, target: '[data-testid="week-col-{today}"]', badge: 'TO TODAY', from: TODO, fromBadge: 'FROM HERE', text: 'Now **plan it**: drag the task from the **Todo** onto **today** in the Calendar, at a time later than now. Or open its card and pick a time today.', waitFor: { board: plannedToday }, nudge: notToday, hint: 'Waiting for the task to land on today…' },
       { node: 'mother-clock', target: CLOCK, badge: 'CLOCK', text: 'Your plan is on the **Clock** too, around the edge. Every window shows the same day.' },
       { node: 'mother-pomo', target: '[data-testid="pomo-primary"]', badge: 'PRESS', text: 'When you start working, press **START**. The {pomo} timer records what you really do.', waitFor: { board: (now) => pomoRunning(now) }, hint: 'Waiting for START…' },
       { target: '[data-testid="pomo-break"]', badge: 'PRESS', text: 'Need a pause? **BREAK**. Your work so far is saved, and the break is timed on its own.', waitFor: { board: (now) => pomoOnBreak(now) }, hint: 'Waiting for BREAK…' },
@@ -142,7 +174,7 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-todo', target: `${TODO} .todo-check`, badge: 'TICK', text: 'Done with it? **Tick it.**', waitFor: { board: taskDone }, hint: 'Waiting for a tick…' },
       { node: 'mother-habit', target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'One last thing: add a **habit** you want to keep (reading, a walk…). A card opens with **every day, any time** — press **Enter**.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
       { target: `${HABIT} .habit-cell--today`, node: 'mother-habit', badge: 'TICK TODAY', text: "Did it today? Click **today's square**.", waitFor: { board: habitTicked }, hint: "Waiting for today's square…" },
-      { event: 'krnl:recap-show', text: "Every evening ends like this: **what you did today**, in one card. Close it when you're ready." },
+      { event: 'krnl:recap-show', target: '[data-testid="day-recap"]', badge: 'YOUR DAY', text: "Every evening ends like this: **what you did today**, in one card. Close it when you're ready." },
       { target: ORB, badge: 'MORE', text: "That's the whole loop. Each window has a **short tour** in my menu." },
     ],
   },
@@ -198,7 +230,7 @@ export const TOURS: readonly Tour[] = [
     summary: 'Drag or click to plan, any time, plan vs reality',
     steps: [
       { node: 'mother-calendar', target: CAL, badge: 'CALENDAR', text: 'The Calendar holds your **plan** (blocks) and **what really happened** (the thin track at the left of each day).' },
-      { target: '[data-testid="calendar-grid-body"]', badge: 'DROP HERE', text: '**Drag a plan** from the Todo onto a time here to plan it.', waitFor: { board: taskScheduled }, hint: 'Waiting for you to drop a task on the grid…' },
+      { target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', also: ['mother-todo'], from: TODO, fromBadge: 'FROM HERE', badge: 'DROP HERE', text: '**Drag a plan** from the **Todo** onto a time here to plan it.', waitFor: { board: taskScheduled }, hint: 'Waiting for you to drop a task on the grid…' },
       { target: '[data-testid="calendar-day-only-row"]', node: 'mother-calendar', badge: 'ANY TIME', text: 'On a day but **no set time**? Drop it in the **ANY TIME** strip under the day names. Drag it into the hours later to give it a time. A dashed **flag** there is a deadline.' },
       { target: '[data-testid="calendar-new"]', node: 'mother-calendar', badge: 'ADD HERE', text: '**Click empty hours** — or this **+** — to add something right on the Calendar: **Once** is a plan, **Repeats** is a class or a shift.' },
       { target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', badge: 'ITS CARD', text: '**Click a plan** to open its card: move it to another day or **any time**, change how long, set a deadline or a reminder, Focus, Done, Delete.' },

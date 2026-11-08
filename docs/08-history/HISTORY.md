@@ -2385,3 +2385,16 @@ Follow-up: the Add button now has one fixed size (184 px) and the footer never w
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/HabitAddAsk.tsx`.
 **Summary:** The habit card is rebuilt in the three directions from the canvas ("Adding a habit · three drafts"), with an **A · B · C** switch in its header so they can be tried on real habits: **A** labelled rows (days, then Time and Goal), **B** a sentence whose words open one editor box, **C** three tiles (Days · Time · Goal) with the editor below. All three keep one fixed height, the goal is one control ("− 8 + glasses", unit typed or picked), and Add is a full-width button. The choice is remembered on the computer; the switch goes once one is picked. Habit tests green.
+
+## [2026-11-08] — Tours: practice is not counted, drag steps ring both ends and land today, the card stays off the target (experimental)
+
+**Type:** UX + Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/tourPractice.ts` (new), `store/timeLogPause.ts`, `components/Tour/TourHost.tsx`, `components/Tour/tours.ts`, `CalendarNode/WeekView.tsx`, `HabitNode/HabitAddAsk.tsx`, `tests/unit/renderer/tourPlaceCard.test.ts`.
+**Summary:**
+- **Practice from a tour.** A tour that asks you to do things (add a plan, record time, tick a habit) now says on its first step that what you make is practice. While it runs, nothing is written to the time log. At the end a card lists what it made ("1 plan: \"Essay\"", "12 min of recorded time", "1 habit tick") with **Remove them** (the Todo, Habits, timer and done ledger go back to how they were before the tour; undo is cleared so it can't come back) or **Keep them** (they stay and are logged then, as one change). Nothing practised reaches Analytics unless kept.
+- **Drag steps ring both ends.** "Plan it" rings the **Todo** ("FROM HERE", dashed) and the Calendar ("TO TODAY"); the card stays clear of both.
+- **The first-day plan lands today.** The Calendar opens on today's Day view at now for that step (your own view comes back after it). Dropped on another day, the step says so ("That landed on Monday. The Clock only shows today…") and waits; on today it moves on to the Clock.
+- **The card never sits on what it shows.** The day-recap step points at the recap card, so the guide goes beside it; and the card keeps 36 px from its target so the guide orb on its corner no longer covers it.
+- **Habit card:** one line under the goal says what the number means ("Each click adds 1 glass · done at 8" / "One click a day marks it done").
+Checked by walking the first-day tour in the preview (rings, wrong-day nudge, today drop, recap placement, Remove). Tests: 2,453 green; one time-log test timed out in the full run and passes on its own.

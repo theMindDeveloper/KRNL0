@@ -8,7 +8,7 @@ const overlaps = (p: { left: number; top: number }, w: number, h: number, r: { l
 describe('placeCard', () => {
   it('goes below a small target when there is room', () => {
     const r = { left: 100, top: 100, width: 200, height: 40 };
-    expect(placeCard(r, 420, 240, 1280, 800)).toEqual({ left: 100, top: 158 });
+    expect(placeCard(r, 420, 240, 1280, 800)).toEqual({ left: 100, top: 176 });
   });
   it('with no room on any side, it picks a spot clear of a tall target (Settings › Sounds)', () => {
     const r = { left: 460, top: 140, width: 520, height: 600 };
