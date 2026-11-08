@@ -1991,3 +1991,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `AnalyticsNode/index.tsx`, `docs/research/new-user-review-2026-11-08.md`.
 **Summary:** New-user review 1.9: the Analytics toolbar is ten icon buttons and the header read "· 3 SOURCES", so nothing on screen said which page was open. The header now names it ("PLANNED VS SPENT", "HABITS"…) and follows the toolbar; the source count is in its tooltip. Checked in the preview.
+
+## [2026-11-08] — Repeating plans: tick one off, the next appears (review 5.3, experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/repeatTask.ts` (new: `nextRepeatDay`, `parseRepeat`, `describeTaskRepeat`), `ui/TaskRepeatPicker.tsx` (new), `TodoNode/types.ts` (`repeat`), `TodoNode/commands.ts` (`todoSetRepeat`), `TodoNode/index.tsx`, `Canvas/commandDispatch.ts` (todo.toggle / task.toggle bring the next one), `store/scheduleActions.ts` (`spawnNextRepeat`), `Tour/tours.ts` (+ repeat step), `sys/commands/todo.ts` (`todo repeat`; `todo check` brings the next one), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `docs/research/new-user-review-2026-11-08.md`; tests `repeatTask.test.ts` (new, 6), `tours.test.tsx`.
+**Summary:** A weekly review or "water the plants" had to be re-typed every time (routines cover things that just happen, not plans with their own notes and time). A Todo row can now repeat (**Repeat…**: every day, weekdays, every <its weekday>; a repeat icon on the row). Ticking it off — from the row, the task card, the Calendar or `krnl todo check` — adds the next one with the same name, length and tag: at the same time on its next day when it was on the Calendar, otherwise due that day. Days already past are skipped (a late tick lands on today or the next matching day, never a backlog), and the repeat moves to the new one so unticking the old one never doubles it. Checked in the preview ("Water plants 19:00", every day → ticked → "Tomorrow 19:00"); the Staying on track tour gained a step and ran 8/8.

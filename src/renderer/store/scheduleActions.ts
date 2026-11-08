@@ -13,6 +13,7 @@
 
 import { useBoardStore, pushHistory } from './boardStore';
 import { unscheduleOne } from './chainSchedule';
+import { nextRepeatDay, parseRepeat } from '../../shared/repeatTask';
 import type { Board } from '../../shared/types';
 import { saveBoard } from './eventLog';
 import { pomoDeleteSegment, pomoRetagSegment, pomoStopAt } from '../components/nodes/PomoNode/commands';
@@ -94,6 +95,41 @@ async function dispatchToTask(taskId: string, command: string, args: Record<stri
 
 export function toggleTaskDone(taskId: string): Promise<void> {
   return dispatchToTask(taskId, 'task.toggle');
+}
+
+/**
+ * Review 5.3 — a repeating plan was ticked off: add the next one (same name,
+ * length and tag), at the same time on its next day when it was on the
+ * Calendar, else due that day. The repeat moves to the new one, so unticking
+ * and re-ticking the old one never makes a second copy.
+ */
+export async function spawnNextRepeat(itemId: string): Promise<void> {
+  const board = useBoardStore.getState().board;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  if (!board || !todo) return;
+  const items = (todo.state as { items: Array<{ id: string; text: string; done: boolean; createdAt: string; taskNodeId: string | null; dueOn?: string; tag?: string; repeat?: unknown }> }).items;
+  const item = items.find((i) => i.id === itemId);
+  const repeat = parseRepeat(item?.repeat);
+  if (!item || !repeat) return;
+  const place = item.taskNodeId ? placementOf(item.taskNodeId) : null;
+  const task = item.taskNodeId ? board.nodes.find((n) => n.id === item.taskNodeId) : undefined;
+  const ts = task?.state as { plannedMin?: number; timeOpen?: boolean } | undefined;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const d = new Date();
+  const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const base = place ? place.startISO.slice(0, 10) : item.dueOn ?? today;
+  const next = nextRepeatDay(repeat, base, today);
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  const run = makeCommandHandler(todo.id);
+  run('todo.add', { text: item.text, ...(ts?.plannedMin && !ts.timeOpen ? { durationMin: ts.plannedMin } : {}) });
+  const fresh = (useBoardStore.getState().board?.nodes.find((n) => n.id === todo.id)?.state as typeof todo.state & { items: typeof items }).items;
+  const added = [...fresh].filter((i) => i.text === item.text && !i.done && i.id !== item.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (!added) return;
+  run('todo.setRepeat', { id: added.id, repeat });
+  run('todo.setRepeat', { id: item.id, repeat: null });
+  if (item.tag) run('todo.setItemTag', { id: added.id, tag: item.tag });
+  if (place && added.taskNodeId) await scheduleTaskAt(added.taskNodeId, `${next}T${place.startISO.slice(11, 16)}`);
+  else run('todo.setDue', { id: added.id, dueOn: next });
 }
 
 /** Put a task on the Calendar at a local "YYYY-MM-DDTHH:MM" (quick add). */

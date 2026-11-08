@@ -107,6 +107,7 @@ import {
   todoSetDue,
   todoDrop,
   todoUndrop,
+  todoSetRepeat,
 } from '../nodes/TodoNode/commands';
 import type { TodoState } from '../nodes/TodoNode/types';
 
@@ -391,6 +392,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'todo.clearDone':      return { state: todoClearDone(s as never) };
         case 'todo.setDue':         return { state: todoSetDue(s as never, args as never) };
         case 'todo.drop':           return { state: todoDrop(s as never, args as never) };
+        case 'todo.setRepeat':      return { state: todoSetRepeat(s as never, args as never) };
         case 'todo.undrop':         return { state: todoUndrop(s as never, args as never) };
         // ADR 0016 — tags + Done/Archive lifecycle.
         case 'todo.setItemTag':     return { state: todoSetItemTag(s as never, args as never) };
@@ -1595,6 +1597,10 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
             }
           }
         }
+        // Review 5.3 — a repeating plan ticked off brings the next one.
+        if (prevItem && nextItem && !prevItem.done && nextItem.done && nextItem.repeat) {
+          window.setTimeout(() => { void import('../../store/scheduleActions').then((m) => m.spawnNextRepeat(itemId)); }, 0);
+        }
       }
 
       const updated = useBoardStore.getState().board;
@@ -1714,6 +1720,11 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           if (item && item.done !== nextTask.done) {
             const newTodoState = todoToggle(todoState, { id: prevTask.todoItemId });
             updateNode(todoNode.id, { state: newTodoState });
+            // Review 5.3 — a repeating plan ticked off (card, Calendar, Clock) brings the next one.
+            if (nextTask.done && item.repeat) {
+              const itemId = item.id;
+              window.setTimeout(() => { void import('../../store/scheduleActions').then((m) => m.spawnNextRepeat(itemId)); }, 0);
+            }
           }
         }
       }

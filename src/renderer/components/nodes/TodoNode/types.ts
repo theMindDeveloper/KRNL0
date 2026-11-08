@@ -1,3 +1,4 @@
+import type { TaskRepeat } from '../../../../shared/repeatTask';
 // Decision #10 — TodoNode state contract.
 // Persistence rule: store items in insertion order; sort a copy at render time.
 
@@ -30,6 +31,9 @@ export interface TodoItem {
   // is neither done nor deleted; it sits in the Archive marked "dropped" and
   // can be brought back. Analytics never counts it as done.
   droppedAt?: string;
+  // Review 5.3 — a repeating plan: ticking it off brings the next one (the
+  // repeat moves to it). Absent = a one-off.
+  repeat?: TaskRepeat;
 }
 
 export interface TodoState {

@@ -51,7 +51,7 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 
 - **5.1** Weekly-target habits show their week count only in the Week view; Month / Year still show a day badge. *Low* — use the week streak there too.
 - **5.2** Habit amounts ("8 glasses") — **built here**: Amount a day…, each click adds one, the day counts once reached.
-- **5.3** Repeating *tasks* (a weekly review with notes) — routines now cover "it happens at a time"; a repeating task with notes per time is still missing. *Medium*.
+- **5.3** Repeating *plans* — **built here**: row menu **Repeat…** (every day, weekdays, every <its weekday>); ticking one off brings the next (same name, length, tag; same time on its next day, or due that day; never a backlog of past days); `krnl todo repeat`, and `todo check` does the same.
 - **5.4** Naming tracked time freely ("Gaming") already works: the span picker's **+ Add category** makes a custom category in one step, and `krnl pomo retag <seg> --text "…"` names one span. Kept as is; the user wanted to discuss it.
 
 ---
@@ -69,4 +69,4 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 ## Proposed order for what is left
 
 1. Date-only plans + an "Anytime" row (2.4) — pick a design first.
-3. Repeating tasks with notes per time (5.3).
+

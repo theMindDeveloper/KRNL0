@@ -25,6 +25,8 @@ import { toneVarForTask } from '../../../utils/taskColor';
 import { undoable } from '../../../store/undoNotice';
 import { DuePicker } from '../../ui/DuePicker';
 import { RemindPicker } from '../../ui/RemindPicker';
+import { TaskRepeatPicker } from '../../ui/TaskRepeatPicker';
+import { describeTaskRepeat, isoDowOfYMD, parseRepeat } from '../../../../shared/repeatTask';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { scheduleTaskAt, setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
@@ -64,6 +66,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const [tagPicker, setTagPicker] = useState<{ x: number; y: number; itemId: string } | null>(null);
   // Review 2.1 — the due-day picker (row menu → "Due date…", or click the chip).
   const [duePick, setDuePick] = useState<{ x: number; y: number; itemId: string } | null>(null);
+  // Review 5.3 — repeat a plan (row menu → "Repeat…").
+  const [repeatPick, setRepeatPick] = useState<{ x: number; y: number; itemId: string; weekday: number } | null>(null);
   // Review 4.1 — reminder lead time per plan (row menu → "Remind me…").
   const [remindPick, setRemindPick] = useState<{ x: number; y: number; taskId: string; value: number | null } | null>(null);
   const remindByTask = useBoardStore(useShallow((s) => {
@@ -446,6 +450,15 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         },
       }] : []),
       ...(item && !item.done && item.droppedAt === undefined ? [{
+        label: item.repeat ? `Repeats ${describeTaskRepeat(item.repeat)}…` : 'Repeat…',
+        onSelect: () => {
+          // "Every <weekday>" offers the plan's own day: its Calendar day, its due day, or today.
+          const sched = item.taskNodeId ? taskScheduledInfo.get(item.taskNodeId)?.scheduledFor : item.scheduledFor;
+          const day = sched?.slice(0, 10) ?? item.dueOn ?? todayYMD;
+          if (ctxMenu) setRepeatPick({ x: ctxMenu.x, y: ctxMenu.y, itemId, weekday: isoDowOfYMD(day) });
+        },
+      }] : []),
+      ...(item && !item.done && item.droppedAt === undefined ? [{
         label: 'Drop (not doing it)',
         onSelect: () => {
           // Off the Calendar too: a dropped plan is not "missed".
@@ -617,6 +630,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         </span>
       )}
 
+      {/* Review 5.3 — a repeating plan. */}
+      {item.repeat && !item.done && (
+        <span data-testid={`todo-repeat-${item.id}`} title={`Repeats ${describeTaskRepeat(item.repeat)} — tick it off and the next one appears`} style={{ display: 'inline-flex', color: 'var(--ink-3)', flexShrink: 0 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" /></svg>
+        </span>
+      )}
       {/* Review 4.1 — a reminder is set (it fires while the plan is on the Calendar). */}
       {item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined && !item.done && (
         <span data-testid={`todo-remind-${item.id}`} title={`Reminder ${remindByTask[item.taskNodeId] === 0 ? 'at the start' : `${remindByTask[item.taskNodeId]} min before`}`} style={{ display: 'inline-flex', color: 'var(--ink-3)', flexShrink: 0 }}>
@@ -1063,6 +1082,16 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       )}
 
       {/* ADR 0016 — tag picker (portal, like the context menu). */}
+      {repeatPick !== null && (
+        <TaskRepeatPicker
+          x={repeatPick.x}
+          y={repeatPick.y}
+          weekday={repeatPick.weekday}
+          value={parseRepeat(state.items.find((i) => i.id === repeatPick.itemId)?.repeat)}
+          onPick={(r) => { onCommand('todo.setRepeat', { id: repeatPick.itemId, repeat: r }); setRepeatPick(null); }}
+          onClose={() => setRepeatPick(null)}
+        />
+      )}
       {remindPick !== null && (
         <RemindPicker
           x={remindPick.x}

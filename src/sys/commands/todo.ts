@@ -1,4 +1,5 @@
 import { parseQuickAdd } from '../../shared/quickAdd';
+import { describeTaskRepeat, isoDowOfYMD, nextRepeatDay, parseRepeat } from '../../shared/repeatTask';
 import { taskSchedule } from './task';
 import { parseDue, dueLabel } from '../../shared/due';
 // sys todo CLI — real board.json operations for the sys CLI.
@@ -7,7 +8,7 @@ import { parseDue, dueLabel } from '../../shared/due';
 import { randomUUID } from 'crypto';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
-import { todoDrop, todoUndrop, todoSetDue,
+import { todoSetRepeat, todoDrop, todoUndrop, todoSetDue,
   todoToggle as fsmTodoToggle,
   visibleItems,
   todoBuckets,
@@ -122,9 +123,11 @@ export async function todoCheck(ctx: TodoCtx, id?: string): Promise<SysResult> {
     }
   }
   saveBoard(ctx, board);
+  // Review 5.3 — a repeating plan ticked off brings the next one (as in the app).
+  const next = updated?.done && !item.done && item.repeat ? await nextRepeatFromCli(ctx, r.id.itemId) : '';
   return {
     ok: true,
-    message: `Todo "${item.text}" marked ${updated?.done ? 'done' : 'undone'}.`,
+    message: `Todo "${item.text}" marked ${updated?.done ? 'done' : 'undone'}.${next}`,
     data: { id: r.id.itemId, done: updated?.done },
   };
 }
@@ -264,6 +267,55 @@ export async function todoDropCmd(ctx: TodoCtx, ref: string | undefined, undo: b
   saveBoard(ctx, m.board);
   if (m.after === m.before) return { ok: true, message: `Todo "${item?.text ?? ref}" was ${undo ? 'not dropped' : 'already dropped or done'}.`, data: { id: r.id.itemId } };
   return { ok: true, message: undo ? `Todo "${item?.text}" is back on the list.` : `Todo "${item?.text}" dropped (in the Archive; todo undrop brings it back).`, data: { id: r.id.itemId, dropped: !undo } };
+}
+
+/** `krnl todo repeat <ref> <daily|weekdays|weekly|off>` (review 5.3). Weekly = the plan's own weekday. */
+export async function todoRepeat(ctx: TodoCtx, ref?: string, how?: string): Promise<SysResult> {
+  if (!ref || !how) return { ok: false, message: 'todo repeat requires <ref> <daily|weekdays|weekly|off>' };
+  const board = loadBoard(ctx);
+  const r = resolveTodoItemRef(board, ref);
+  if (!r.ok) return { ok: false, message: resolutionError('todo item', ref, r) };
+  const mother = board.nodes.find((n) => n.id === r.id.todoNodeId);
+  const item = (mother?.state as TodoState | undefined)?.items.find((i) => i.id === r.id.itemId);
+  const task = item?.taskNodeId ? board.nodes.find((n) => n.id === item.taskNodeId) : undefined;
+  const day = (task?.state as { scheduledFor?: string } | undefined)?.scheduledFor?.slice(0, 10) ?? item?.dueOn ?? localToday();
+  const repeat = how === 'off' ? null : how === 'daily' ? { kind: 'daily' as const } : how === 'weekdays' ? { kind: 'weekdays' as const } : how === 'weekly' ? { kind: 'weekly' as const, day: isoDowOfYMD(day) } : undefined;
+  if (repeat === undefined) return { ok: false, message: `todo repeat: "${how}" is not daily, weekdays, weekly or off` };
+  const m = mutateTodo(ctx, (st) => todoSetRepeat(st, { id: r.id.itemId, repeat }));
+  if (!m.ok) return m;
+  saveBoard(ctx, m.board);
+  return { ok: true, message: repeat ? `Todo "${item?.text ?? ref}" repeats ${describeTaskRepeat(repeat)}: tick it off and the next one appears.` : `Todo "${item?.text ?? ref}" no longer repeats.`, data: { id: r.id.itemId, repeat } };
+}
+
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** After `todo check` ticks a repeating item: add the next one (as the app does). */
+async function nextRepeatFromCli(ctx: TodoCtx, itemId: string): Promise<string> {
+  const board = loadBoard(ctx);
+  const mother = board.nodes.find((n) => n.kind === 'todo' && n.isMother === true);
+  const item = (mother?.state as TodoState | undefined)?.items.find((i) => i.id === itemId);
+  const repeat = parseRepeat(item?.repeat);
+  if (!mother || !item || !repeat) return '';
+  const task = item.taskNodeId ? board.nodes.find((n) => n.id === item.taskNodeId) : undefined;
+  const ts = task?.state as { scheduledFor?: string; plannedMin?: number; timeOpen?: boolean } | undefined;
+  const base = ts?.scheduledFor?.slice(0, 10) ?? item.dueOn ?? localToday();
+  const next = nextRepeatDay(repeat, base, localToday());
+  const pair = createTodoTaskPair(board, { text: item.text, ...(item.tag ? { tag: item.tag } : {}), ...(ts?.plannedMin && !ts.timeOpen ? { plannedMin: ts.plannedMin } : {}) }, { uuid: () => randomUUID(), now: () => new Date().toISOString() });
+  if (!pair) return '';
+  // The pair replaced the Todo node in the board: edit the one there now.
+  const now = board.nodes.find((n) => n.kind === 'todo' && n.isMother === true);
+  if (!now) return '';
+  let st = now.state as TodoState;
+  st = todoSetRepeat(st, { id: pair.todoItemId, repeat });
+  st = todoSetRepeat(st, { id: item.id, repeat: null });
+  if (!ts?.scheduledFor) st = todoSetDue(st, { id: pair.todoItemId, dueOn: next });
+  now.state = st;
+  saveBoard(ctx, board);
+  if (ts?.scheduledFor) await taskSchedule({ boardPath: ctx.boardPath }, pair.taskNodeId, `${next}T${ts.scheduledFor.slice(11, 16)}`);
+  return ` Next one: ${next}${ts?.scheduledFor ? ` ${ts.scheduledFor.slice(11, 16)}` : ''}.`;
 }
 
 export async function todoTags(

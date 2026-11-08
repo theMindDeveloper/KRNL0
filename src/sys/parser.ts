@@ -18,6 +18,7 @@ export type SysCommand =
   | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
   | { kind: 'todo'; sub: 'due'; ref: string | undefined; when: string | undefined }
   | { kind: 'todo'; sub: 'drop' | 'undrop'; ref: string | undefined }
+  | { kind: 'todo'; sub: 'repeat'; ref: string | undefined; how: string | undefined }
   | { kind: 'todo'; sub: 'tags'; action: string | undefined; label: string | undefined; keywords: string | undefined; color: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'archive' | 'clear-archive' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
@@ -465,6 +466,7 @@ export class SysParser {
       if (sub === 'tag') return { kind: 'todo', sub: 'tag', ref: rest[0], tag: rest[1] };
       if (sub === 'due') return { kind: 'todo', sub: 'due', ref: rest[0], when: rest[1] };
       if (sub === 'drop' || sub === 'undrop') return { kind: 'todo', sub, ref: rest[0] };
+      if (sub === 'repeat') return { kind: 'todo', sub: 'repeat', ref: rest[0], how: rest[1] };
       if (sub === 'tags') {
         return {
           kind: 'todo', sub: 'tags',
