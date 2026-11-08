@@ -2261,3 +2261,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`; test `HabitNode.addField.test.tsx` (+1).
 **Summary:** Typing the name of an archived habit made a fresh one with no history, and said nothing. The add card now says "Gym is in your archive, with its history" with "Restore it instead", which brings the old habit back and closes the card. A new one can still be made with Yes/No.
+
+## [2026-11-08] — A weekly target lets any day be ticked (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx` (`tickableOn`); test `HabitNode.addField.test.tsx` (+1).
+**Summary:** "Times a week…" says any days count, but on a habit that also had fixed days (say Mondays) the other days stayed "not scheduled" and could not be ticked, so 3 times a week could never be reached. With a weekly target every day can now be ticked, in the week row, the month view and by clicking the row; without one, fixed days still apply.

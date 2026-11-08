@@ -2,7 +2,7 @@
 /** The habit add field asks first: Enter never adds with settings you did not choose. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { HabitNode } from '../../../src/renderer/components/nodes/HabitNode';
+import { HabitNode, tickableOn } from '../../../src/renderer/components/nodes/HabitNode';
 import { defaultHabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
 import { askMissing, askToAnswer, summary, EMPTY_ASK } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
 import { endsPastMidnight, isRepeatValid } from '../../../src/renderer/components/ui/RepeatEditor';
@@ -132,5 +132,14 @@ describe('askMissing / askToAnswer', () => {
   it('a routine on all five weekdays is saved as weekdays', () => {
     const d = { ...EMPTY_ASK, kind: 'routine' as const, days: [1, 2, 3, 4, 5] as const, timeOfDay: '09:00', durationMin: 480 };
     expect(askToAnswer({ ...d, days: [...d.days] })?.schedule).toEqual({ kind: 'weekdays', timeOfDay: '09:00', durationMin: 480 });
+  });
+});
+
+describe('tickableOn', () => {
+  const mondays = { kind: 'weekly', days: [1] } as never;
+  it('fixed days only, unless the habit has a weekly target (any days count)', () => {
+    expect(tickableOn({ schedule: mondays }, '2026-11-04')).toBe(false); // a Wednesday
+    expect(tickableOn({ schedule: mondays }, '2026-11-02')).toBe(true);  // a Monday
+    expect(tickableOn({ schedule: mondays, perWeek: 3 }, '2026-11-04')).toBe(true);
   });
 });

@@ -96,6 +96,12 @@ interface MenuState {
   anchor: { x: number; y: number };
 }
 
+/** A day can be ticked when it is scheduled, or on any day once the habit
+ *  has a weekly target ("3× a week: any days count"). */
+export function tickableOn(h: Pick<Habit, 'schedule' | 'perWeek' | 'kind'>, day: string): boolean {
+  return weeklyTarget(h) !== null || isDayScheduled(h.schedule, day);
+}
+
 export function HabitNode({
   node,
   onCommand,
@@ -751,7 +757,7 @@ const WeekRow = memo(function WeekRow({
           {weekDays.map((dayStr) => {
             const done = logSet.has(dayStr);
             const isFuture = dayStr > today;
-            const scheduled = isDayScheduled(habit.schedule, dayStr);
+            const scheduled = tickableOn(habit, dayStr);
             const resting = !done && restSet.has(dayStr);
             const cls = cellClass(dayStr, today, done, 'week', scheduled) + (resting ? ' habit-cell--rest' : '');
             const size = { width: WEEK_CELL_SIZE, height: WEEK_CELL_SIZE };
@@ -1009,7 +1015,7 @@ const MonthRow = memo(function MonthRow({
       const date = t.getAttribute('data-date');
       if (!date) return;
       if (date > today) return;
-      if (!isDayScheduled(habit.schedule, date)) return;
+      if (!tickableOn(habit, date)) return;
       onToggle(habit.id, date);
     },
     [habit.id, today, onToggle, habit.schedule],
@@ -1073,7 +1079,7 @@ const MonthRow = memo(function MonthRow({
       >
         {monthDays.map((dayStr) => {
           const done = logSet.has(dayStr);
-          const scheduled = isDayScheduled(habit.schedule, dayStr);
+          const scheduled = tickableOn(habit, dayStr);
           const resting = !done && (habit.rest ?? []).includes(dayStr);
           const cls = cellClass(dayStr, today, done, 'month', scheduled) + (resting ? ' habit-cell--rest' : '');
           // Amounts and rest days read the same as in the week view.
