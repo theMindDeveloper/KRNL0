@@ -409,7 +409,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       data-card-tone={cardTone}
       className={isActive ? 'active' : undefined}
       onContextMenu={handleContextMenu}
-      style={{ ...cardFrameStyle(cardTone), opacity: 1, cursor: 'pointer', overflow: 'visible' }}
+      // The card moves: grab everywhere on it; its buttons show the pointer (#226).
+      style={{ ...cardFrameStyle(cardTone), opacity: 1, cursor: 'grab', overflow: 'visible' }}
       onDoubleClick={handleBodyDoubleClick}
     >
       {/* Row 1: check · title · the one action (drag onto the Calendar) */}
@@ -576,7 +577,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               className="task-eta"
               title="Your estimate — double-click to change"
               onDoubleClick={(e) => { e.stopPropagation(); startEtaEdit(); }}
-              style={{ cursor: 'text', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              // Part of the card: grab like the rest of it (#226).
+              style={{ cursor: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
               <span style={{ display: 'inline-flex', color: state.timeOpen ? 'var(--ink-4)' : 'var(--planned)' }}><CardIcon name="clock" size={11} /></span>
               {state.timeOpen ? 'no set time' : trackedMin >= 1 ? `of ${fmtDur(plannedMin)}` : fmtDur(plannedMin)}

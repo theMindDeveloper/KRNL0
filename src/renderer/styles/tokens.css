@@ -653,8 +653,8 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   border-color: transparent;
   display: grid;
   place-items: center;
+  /* Not clickable, and says so: the plain arrow (not the row's grab) (#226). */
   cursor: default;
-  pointer-events: none;
 }
 .habit-cell--unscheduled::before {
   content: '×';
@@ -925,4 +925,11 @@ select option { background: var(--paper); color: var(--ink); }
 /* Text buttons in a row (Tue 16:00 · by Fri · tag): taller, barely wider. */
 :is([data-testid^="todo-when-"], [data-testid^="todo-due-"], [data-testid^="todo-tag-"])::after { content: ''; position: absolute; inset: -6px -2px; }
 /* The windows' drag grip and the cards' connection dots. */
-.station-drag-handle::after, .react-flow__handle::after { content: ''; position: absolute; inset: -6px -8px; }
+.station-drag-handle::after { content: ''; position: absolute; inset: -6px -8px; }
+/* A connection dot's extra margin points away from its card, so the card's
+   own edge keeps the grab cursor (#226). */
+.react-flow__handle::after { content: ''; position: absolute; inset: -6px; }
+.react-flow__handle-left::after { right: 50%; }
+.react-flow__handle-right::after { left: 50%; }
+.react-flow__handle-top::after { bottom: 50%; }
+.react-flow__handle-bottom::after { top: 50%; }

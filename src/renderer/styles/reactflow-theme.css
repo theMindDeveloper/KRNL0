@@ -3,6 +3,10 @@
    Keeps RF chrome consistent with the cyber design system.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* The empty canvas shows the plain arrow (React Flow's selection mode used the
+   pointing finger, so leaving a card flipped grab to finger) (#226). */
+.react-flow .react-flow__pane.selection { cursor: default; }
+
 /* ── Handles ─────────────────────────────────────────────────────────────── */
 /* easy-mode D24 — Easy has no wires: no connection dots to drag from. */
 [data-ui-mode="easy"] .react-flow__handle { display: none !important; }

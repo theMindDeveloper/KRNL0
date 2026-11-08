@@ -481,7 +481,6 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const updateNode = useBoardStore((s) => s.updateNode);
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
-  const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
   const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport, setCenter } = useReactFlow();
 
   // Dock-frame variant (classic | synthesizer | telemetry | phosphor).
@@ -1564,44 +1563,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   //   others (pomo, terminal, calendar, clock) → empty (no child nodes with edges)
   // When hovering a non-mother: set = {hoveredNodeId} (direct source match).
   // When nothing hovered: empty set (frozen, stable reference).
-  const boldSet = useMemo<ReadonlySet<string>>(() => {
-    if (!hoveredNodeId || !board) return EMPTY_BOLD_SET;
-    const hoveredNode = board.nodes.find((n: KrnlNode) => n.id === hoveredNodeId);
-    if (!hoveredNode) return EMPTY_BOLD_SET;
-
-    if (hoveredNode.kind === 'todo' && hoveredNode.isMother) {
-      // All task nodes belonging to this todo mother.
-      const ids = new Set<string>();
-      for (const n of board.nodes) {
-        if (n.kind === 'todo.task') {
-          const ts = n.state as TaskState;
-          if (ts.parentTodoId === hoveredNodeId) ids.add(n.id);
-        }
-      }
-      return ids;
-    }
-
-    if (hoveredNode.kind === 'habit' && hoveredNode.isMother) {
-      // All habit.lane nodes whose habitId is one of this mother's habits.
-      const motherHabitIds = new Set<string>(
-        ((hoveredNode.state as { habits?: Array<{ id: string }> }).habits ?? []).map(
-          (h) => h.id
-        )
-      );
-      const ids = new Set<string>();
-      for (const n of board.nodes) {
-        if (n.kind === 'habit.lane') {
-          const ls = n.state as HabitLaneState;
-          if (motherHabitIds.has(ls.habitId)) ids.add(n.id);
-        }
-      }
-      return ids;
-    }
-
-    // Non-mother or other mother kinds (pomo, terminal, calendar, clock):
-    // bold edges whose source is the hovered node itself.
-    return new Set<string>([hoveredNodeId]);
-  }, [board, hoveredNodeId]);
+  // (The bold set lives in BoldSetProvider: hovering a window re-renders only the wires.)
 
   // ── onNodesChange — apply every change locally; commit only on drag end ──
   // Local-first: applyNodeChanges absorbs position/dimensions/select changes
@@ -1851,7 +1813,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   return (
     <div ref={canvasContainerRef} style={{ width: '100%', height: '100%' }}>
-    <BoldSetContext.Provider value={boldSet}>
+    <BoldSetProvider>
     <ReactFlow
       nodes={nodes}
       edges={rfEdges}
@@ -2096,7 +2058,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         />
       )}
     </ReactFlow>
-    </BoldSetContext.Provider>
+    </BoldSetProvider>
     </div>
   );
 }
@@ -2109,6 +2071,56 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 // NOTE: ReactFlowProvider is no longer here — it lives in App.tsx so that
 // TopBar (useReactFlow for fitView) and StatusBar (useReactFlow for zoom) share
 // the same RF instance context as CanvasFlowInner.
+
+/**
+ * Which source nodes bold their outgoing wires while a window is hovered.
+ * Its own component (#226): hovering a window used to re-render the whole
+ * canvas on every enter/leave; now only the wires that read this re-render
+ * (the canvas passed as children keeps its element identity).
+ */
+function BoldSetProvider({ children }: { children: React.ReactNode }) {
+  const board = useBoardStore((s) => s.board);
+  const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
+  const boldSet = useMemo<ReadonlySet<string>>(() => {
+    if (!hoveredNodeId || !board) return EMPTY_BOLD_SET;
+    const hoveredNode = board.nodes.find((n: KrnlNode) => n.id === hoveredNodeId);
+    if (!hoveredNode) return EMPTY_BOLD_SET;
+
+    if (hoveredNode.kind === 'todo' && hoveredNode.isMother) {
+      // All task nodes belonging to this todo mother.
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'todo.task') {
+          const ts = n.state as TaskState;
+          if (ts.parentTodoId === hoveredNodeId) ids.add(n.id);
+        }
+      }
+      return ids;
+    }
+
+    if (hoveredNode.kind === 'habit' && hoveredNode.isMother) {
+      // All habit.lane nodes whose habitId is one of this mother's habits.
+      const motherHabitIds = new Set<string>(
+        ((hoveredNode.state as { habits?: Array<{ id: string }> }).habits ?? []).map(
+          (h) => h.id
+        )
+      );
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'habit.lane') {
+          const ls = n.state as HabitLaneState;
+          if (motherHabitIds.has(ls.habitId)) ids.add(n.id);
+        }
+      }
+      return ids;
+    }
+
+    // Non-mother or other mother kinds (pomo, terminal, calendar, clock):
+    // bold edges whose source is the hovered node itself.
+    return new Set<string>([hoveredNodeId]);
+  }, [board, hoveredNodeId]);
+  return <BoldSetContext.Provider value={boldSet}>{children}</BoldSetContext.Provider>;
+}
 
 export function CanvasFlow() {
   const viewport = useBoardStore((s) => s.viewport);

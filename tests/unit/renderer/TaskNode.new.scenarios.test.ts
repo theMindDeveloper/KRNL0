@@ -96,10 +96,10 @@ describe('F8 — a done task shows the done card (engagement.md F2)', () => {
     expect(screen.getByRole('button', { name: 'Mark undone' })).toBeTruthy();
   });
 
-  it('cursor is "pointer" when not done', () => {
+  it('cursor is "grab" when not done: the card moves (#226)', () => {
     renderTaskNode(makeTaskState({ done: false }));
     const root = screen.getByTestId('task-node-root') as HTMLElement;
-    expect(root.style.cursor).toBe('pointer');
+    expect(root.style.cursor).toBe('grab');
   });
 });
 

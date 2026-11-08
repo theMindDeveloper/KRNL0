@@ -675,10 +675,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             textDecorationLine: item.done ? 'line-through' : 'none',
             textDecorationColor: 'var(--ink-4)',
             overflowWrap: 'anywhere',
-            // Text cursor: double-click edits. A single click does nothing (it
-            // would fire on every double-click); "Start pomo" is in the row menu.
-            cursor: item.done ? 'default' : 'text',
+            // The row moves, so the name shows grab like the rest of it (a text
+            // cursor here made the cursor flip as you slid across the row, #226).
+            // Double-click renames; the tooltip says so.
+            cursor: 'inherit',
           }}
+          title={item.done ? undefined : 'Double-click to rename'}
         >
           {item.text}
           {item.droppedAt !== undefined && (

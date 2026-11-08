@@ -805,7 +805,9 @@ const WeekRow = memo(function WeekRow({
           {habit.name}
         </div>
 
-        <div style={{ display: 'flex', gap: WEEK_CELL_GAP, flexShrink: 0 }}>
+        {/* The gaps between squares show the pointer too, so sliding along the
+            squares doesn't flip pointer/grab at every gap (#226). */}
+        <div style={{ display: 'flex', gap: WEEK_CELL_GAP, flexShrink: 0, cursor: 'pointer' }}>
           {weekDays.map((dayStr) => {
             const done = logSet.has(dayStr);
             const isFuture = dayStr > today;
@@ -1186,7 +1188,7 @@ const MonthRow = memo(function MonthRow({
         onClick={onRowClick}
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
-        style={{ display: 'flex', gap: MONTH_CELL_GAP, flexWrap: 'nowrap' }}
+        style={{ display: 'flex', gap: MONTH_CELL_GAP, flexWrap: 'nowrap', cursor: 'pointer' }}
       >
         {monthDays.map((dayStr) => {
           const done = logSet.has(dayStr);
