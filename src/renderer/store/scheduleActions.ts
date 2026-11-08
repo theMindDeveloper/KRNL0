@@ -108,6 +108,14 @@ export async function toggleHabitToday(habitId: string): Promise<void> {
   makeCommandHandler(habitNode.id)('habit.toggleDay', { id: habitId });
 }
 
+/** Decision 39 — a command on the habit mother (routines: skip / move / end …). */
+export async function habitMotherCommand(command: string, args: Record<string, unknown>): Promise<void> {
+  const habitNode = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'habit' && n.isMother);
+  if (!habitNode) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  makeCommandHandler(habitNode.id)(command, args);
+}
+
 /** Window event the canvas listens for to centre a node (works from any surface). */
 export const FOCUS_NODE_EVENT = 'krnl:focus-node';
 /** Window event the canvas listens for to fit several nodes on screen (`detail.nodeIds`). */

@@ -155,6 +155,12 @@ export type SysCommand =
   | { kind: 'habit'; sub: 'show'; ref: string | undefined; json: boolean }
   | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'kind'; ref: string | undefined; habitKind: string | undefined }
+  | { kind: 'routine'; sub: 'add'; name: string | undefined; days: string | undefined; at: string | undefined; forMin: number | undefined }
+  | { kind: 'routine'; sub: 'list'; json: boolean }
+  | { kind: 'routine'; sub: 'skip' | 'unskip' | 'end'; ref: string | undefined; on: string | undefined }
+  | { kind: 'routine'; sub: 'move'; ref: string | undefined; on: string | undefined; at: string | undefined }
+  | { kind: 'routine'; sub: 'restart'; ref: string | undefined }
   | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined; mode?: string | undefined }
   | {
       kind: 'frame';
@@ -677,6 +683,22 @@ export class SysParser {
       if (sub === 'unpin') {
         return { kind: 'habit', sub: 'unpin', ref: rest[0] };
       }
+      // Decision 39 — habit kind <ref> routine|habit
+      if (sub === 'kind') {
+        return { kind: 'habit', sub: 'kind', ref: rest[0], habitKind: rest[1] };
+      }
+    }
+
+    // Decision 39 — routines: repeat at a time, never ticked.
+    if (cmd === 'routine') {
+      if (sub === 'add') {
+        const forRaw = flag(rest, 'for');
+        return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: flag(rest, 'at'), forMin: forRaw !== undefined && /^\d+$/.test(forRaw) ? Number(forRaw) : undefined };
+      }
+      if (sub === 'list' || sub === undefined) return { kind: 'routine', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'skip' || sub === 'unskip' || sub === 'end') return { kind: 'routine', sub, ref: rest[0], on: flag(rest, 'on') };
+      if (sub === 'move') return { kind: 'routine', sub: 'move', ref: rest[0], on: flag(rest, 'on'), at: flag(rest, 'at') };
+      if (sub === 'restart') return { kind: 'routine', sub: 'restart', ref: rest[0] };
     }
 
     if (cmd === 'edge') {

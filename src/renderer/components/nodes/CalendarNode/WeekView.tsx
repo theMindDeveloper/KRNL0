@@ -33,7 +33,7 @@ import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarLayers, CalendarState } from './types';
 import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularityFor } from './types';
-import { getMondayOf, toYMD } from '../HabitNode/types';
+import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence } from '../HabitNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
 import { HabitSwapModal } from '../../ui/HabitSwapModal';
@@ -185,7 +185,8 @@ interface ScheduledHabit {
   name: string;
   color: string;        // CSS color token name (e.g. 'acid', 'cyan')
   icon: string | undefined;
-  schedule: HabitSchedule;
+  /** Timed habits only — untimed ("Any time") habits and routines are not pills (Decision 39). */
+  schedule: HabitSchedule & { timeOfDay: string };
   /** Days done ("YYYY-MM-DD") — the pill shows done / not done. */
   log: readonly string[];
   /** The habit mother, to tick the habit from the calendar. */
@@ -736,7 +737,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         const habitState = n.state as { habits?: Habit[] } | null;
         if (!habitState?.habits) continue;
         for (const h of habitState.habits) {
-          if (h.archived || !h.schedule) continue;
+          // Pills are for timed habits; routines are bands (routinesForCal),
+          // untimed habits live in the Habit grid (Decision 39).
+          if (h.archived || isRoutine(h) || !hasTimeOfDay(h)) continue;
           result.push({
             id: h.id,
             name: h.name,

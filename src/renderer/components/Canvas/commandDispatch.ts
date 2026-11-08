@@ -135,6 +135,12 @@ import {
   habitSetNote,
   habitSetView,
   habitSetSchedule,
+  habitSetKind,
+  routineSkip,
+  routineUnskip,
+  routineMove,
+  routineEnd,
+  routineRestart,
 } from '../nodes/HabitNode/commands';
 import type { HabitState } from '../nodes/HabitNode/types';
 import type { HabitSchedule } from '../nodes/HabitNode/types';
@@ -418,6 +424,13 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.setView':     return { config: habitSetView(c as never, args as never) };
         // ADR 0002 §5 — set/clear schedule on a habit.
         case 'habit.setSchedule': return { state: habitSetSchedule(s as never, args as never) };
+        // Decision 39 — routines.
+        case 'habit.setKind':     return { state: habitSetKind(s as never, args as never) };
+        case 'routine.skip':      return { state: routineSkip(s as never, args as never) };
+        case 'routine.unskip':    return { state: routineUnskip(s as never, args as never) };
+        case 'routine.move':      return { state: routineMove(s as never, args as never) };
+        case 'routine.end':       return { state: routineEnd(s as never, args as never) };
+        case 'routine.restart':   return { state: routineRestart(s as never, args as never) };
       }
       break;
     }

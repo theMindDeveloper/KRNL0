@@ -78,7 +78,8 @@ export function habitStreaks(nodes: readonly NodeLike[], today: string): HabitSt
   const out: HabitStreak[] = [];
   for (const raw of list) {
     const h = rec(raw);
-    if (h['archived'] === true || typeof h['id'] !== 'string') continue;
+    // Routines have no streak, so no milestone (Decision 39).
+    if (h['archived'] === true || h['kind'] === 'routine' || typeof h['id'] !== 'string') continue;
     const log = Array.isArray(h['log']) ? h['log'].filter((d): d is string => typeof d === 'string') : [];
     const schedule = h['schedule'] as HabitSchedule | undefined;
     out.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current: calcStreak(log, today, schedule), best: bestStreak(log, schedule), log });

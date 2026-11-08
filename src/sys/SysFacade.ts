@@ -755,6 +755,25 @@ export class SysFacade {
         case 'show':       return habit.cliShow(ctx, command.ref, command.json);
         case 'pin':        return habit.cliPin(ctx, command.ref);
         case 'unpin':      return habit.cliUnpin(ctx, command.ref);
+        case 'kind':       return habit.cliKind(ctx, command.ref, command.habitKind);
+      }
+    }
+
+    // Decision 39 — routines live on the habit mother.
+    if (command.kind === 'routine') {
+      const ctx: habit.HabitCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+        ...(this.deps.cliDispatch ? { cliDispatch: this.deps.cliDispatch } : {}),
+      };
+      switch (command.sub) {
+        case 'add':     return habit.cliRoutineAdd(ctx, command.name, command.days, command.at, command.forMin);
+        case 'list':    return habit.cliRoutineList(ctx, command.json);
+        case 'skip':    return habit.cliRoutineSkip(ctx, command.ref, command.on);
+        case 'unskip':  return habit.cliRoutineUnskip(ctx, command.ref, command.on);
+        case 'end':     return habit.cliRoutineEnd(ctx, command.ref, command.on);
+        case 'move':    return habit.cliRoutineMove(ctx, command.ref, command.on, command.at);
+        case 'restart': return habit.cliRoutineRestart(ctx, command.ref);
       }
     }
 

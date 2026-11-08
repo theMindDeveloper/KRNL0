@@ -125,7 +125,8 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
   if (Array.isArray(list)) {
     for (const raw of list) {
       const h = rec(raw);
-      if (h['archived'] === true || typeof h['id'] !== 'string') continue;
+      // Routines are never ticked, so never "broken" (Decision 39).
+      if (h['archived'] === true || h['kind'] === 'routine' || typeof h['id'] !== 'string') continue;
       const log = Array.isArray(h['log']) ? h['log'].filter((d): d is string => typeof d === 'string') : [];
       const schedule = h['schedule'] as HabitSchedule | undefined;
       const current = calcStreak(log, today, schedule);

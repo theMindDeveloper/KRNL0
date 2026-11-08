@@ -24,12 +24,14 @@ function sortedLog(log: string[]): string[] {
 
 export function habitAdd(
   state: HabitState,
-  args: { name: string; color?: HabitColor; schedule?: unknown },
+  args: { name: string; color?: HabitColor; schedule?: unknown; kind?: unknown },
   env: HabitEnv = defaultEnv,
 ): HabitState {
   const trimmed = args.name.trim();
   const schedule = parseAddSchedule(args.schedule);
   if (!trimmed) return state;
+  // Decision 39 — a routine needs days and a time; without them it is a habit.
+  const routine = args.kind === 'routine' && schedule !== undefined && schedule.timeOfDay !== undefined;
   const color: HabitColor = args.color && isHabitColor(args.color) ? args.color : 'acid';
   const habit: Habit = {
     id: env.uuid(),
@@ -39,6 +41,7 @@ export function habitAdd(
     archived: false,
     color,
     ...(schedule ? { schedule } : {}),
+    ...(routine ? { kind: 'routine' as const } : {}),
   };
   return { ...state, habits: [...state.habits, habit] };
 }
@@ -48,13 +51,15 @@ export function habitAdd(
 function parseAddSchedule(raw: unknown): HabitSchedule | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as { kind?: unknown; timeOfDay?: unknown; days?: unknown; durationMin?: unknown };
-  if (typeof r.timeOfDay !== 'string' || !isValidTimeOfDay(r.timeOfDay)) return undefined;
-  const dur = typeof r.durationMin === 'number' && r.durationMin >= 5 && r.durationMin <= 480 ? { durationMin: r.durationMin } : {};
-  if (r.kind === 'daily') return { kind: 'daily', timeOfDay: r.timeOfDay, ...dur };
-  if (r.kind === 'weekdays') return { kind: 'weekdays', timeOfDay: r.timeOfDay, ...dur };
+  // No time = "Any time" (Decision 39); a time, when given, must be HH:MM.
+  if (r.timeOfDay !== undefined && r.timeOfDay !== null && (typeof r.timeOfDay !== 'string' || !isValidTimeOfDay(r.timeOfDay))) return undefined;
+  const tod = typeof r.timeOfDay === 'string' ? { timeOfDay: r.timeOfDay } : {};
+  const dur = tod.timeOfDay && typeof r.durationMin === 'number' && r.durationMin >= 5 && r.durationMin <= 480 ? { durationMin: r.durationMin } : {};
+  if (r.kind === 'daily') return { kind: 'daily', ...tod, ...dur };
+  if (r.kind === 'weekdays') return { kind: 'weekdays', ...tod, ...dur };
   if (r.kind === 'weekly' && Array.isArray(r.days)) {
     const days = [...new Set(r.days.filter((d): d is IsoDow => Number.isInteger(d) && d >= 1 && d <= 7))].sort((a, b) => a - b);
-    if (days.length) return { kind: 'weekly', timeOfDay: r.timeOfDay, days, ...dur };
+    if (days.length) return { kind: 'weekly', ...tod, days, ...dur };
   }
   return undefined;
 }
@@ -76,7 +81,7 @@ export function habitToggleDay(
   return {
     ...state,
     habits: state.habits.map((h) => {
-      if (h.id !== args.id) return h;
+      if (h.id !== args.id || h.kind === 'routine') return h; // Decision 39: never ticked
       const has = h.log.includes(dateStr);
       const newLog = has
         ? h.log.filter((d) => d !== dateStr)
@@ -96,7 +101,7 @@ export function habitMarkDone(
   return {
     ...state,
     habits: state.habits.map((h) => {
-      if (h.id !== args.id) return h;
+      if (h.id !== args.id || h.kind === 'routine') return h; // Decision 39: never ticked
       if (h.log.includes(dateStr)) return h; // idempotent
       return { ...h, log: sortedLog([...h.log, dateStr]) };
     }),
@@ -220,8 +225,10 @@ export function habitSetSchedule(
     return { ...state, habits };
   }
 
-  // Validate timeOfDay.
-  if (!isValidTimeOfDay(schedule.timeOfDay)) return state;
+  // Validate timeOfDay: optional for a habit ("Any time", Decision 39),
+  // required for a routine; when given it must be HH:MM.
+  if (schedule.timeOfDay !== undefined && !isValidTimeOfDay(schedule.timeOfDay)) return state;
+  if (habit.kind === 'routine' && schedule.timeOfDay === undefined) return state;
 
   let normalised: HabitSchedule;
   if (schedule.kind === 'weekly') {
@@ -237,7 +244,7 @@ export function habitSetSchedule(
     }
     normalised = {
       kind: 'weekly',
-      timeOfDay: schedule.timeOfDay,
+      ...(schedule.timeOfDay !== undefined ? { timeOfDay: schedule.timeOfDay } : {}),
       days: deduped,
       ...(schedule.durationMin !== undefined ? { durationMin: schedule.durationMin } : {}),
     };
@@ -364,4 +371,76 @@ function nextDayStr(dateStr: string): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+// ── Decision 39 — routines ───────────────────────────────────────────────────
+
+function mapHabit(state: HabitState, id: string, fn: (h: Habit) => Habit): HabitState {
+  let changed = false;
+  const habits = state.habits.map((h) => {
+    if (h.id !== id) return h;
+    const n = fn(h);
+    if (n !== h) changed = true;
+    return n;
+  });
+  return changed ? { ...state, habits } : state;
+}
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Turn a habit into a routine or back. A routine needs a time: refused without one. Log kept. */
+export function habitSetKind(state: HabitState, args: { id: string; kind: 'routine' | 'habit' }): HabitState {
+  return mapHabit(state, args.id, (h) => {
+    if (args.kind === 'routine') {
+      if (h.kind === 'routine' || !h.schedule || h.schedule.timeOfDay === undefined) return h;
+      return { ...h, kind: 'routine' };
+    }
+    if (h.kind !== 'routine') return h;
+    const { kind: _k, endsOn: _e, exceptions: _x, ...rest } = h;
+    void _k; void _e; void _x;
+    return rest as Habit;
+  });
+}
+
+/** Skip (or move) one occurrence of a routine; `at` moves, `skip` skips. */
+function setException(h: Habit, date: string, ex: { skip?: true; at?: string } | null): Habit {
+  const rest = (h.exceptions ?? []).filter((e) => e.date !== date);
+  const next = ex ? [...rest, { date, ...ex }].sort((a, b) => a.date.localeCompare(b.date)) : rest;
+  const { exceptions: _x, ...base } = h;
+  void _x;
+  return next.length ? { ...base, exceptions: next } : (base as Habit);
+}
+
+export function routineSkip(state: HabitState, args: { id: string; date: string }): HabitState {
+  if (!YMD_RE.test(args.date)) return state;
+  return mapHabit(state, args.id, (h) => (h.kind === 'routine' ? setException(h, args.date, { skip: true }) : h));
+}
+
+export function routineUnskip(state: HabitState, args: { id: string; date: string }): HabitState {
+  if (!YMD_RE.test(args.date)) return state;
+  return mapHabit(state, args.id, (h) => (h.kind === 'routine' && h.exceptions?.some((e) => e.date === args.date) ? setException(h, args.date, null) : h));
+}
+
+export function routineMove(state: HabitState, args: { id: string; date: string; at: string }): HabitState {
+  if (!YMD_RE.test(args.date) || !isValidTimeOfDay(args.at)) return state;
+  return mapHabit(state, args.id, (h) => {
+    if (h.kind !== 'routine') return h;
+    // Moving back to its usual time just clears the exception.
+    return args.at === h.schedule?.timeOfDay ? setException(h, args.date, null) : setException(h, args.date, { at: args.at });
+  });
+}
+
+/** End a routine after `date` (inclusive last day). Nothing is deleted. */
+export function routineEnd(state: HabitState, args: { id: string; date: string }): HabitState {
+  if (!YMD_RE.test(args.date)) return state;
+  return mapHabit(state, args.id, (h) => (h.kind === 'routine' ? { ...h, endsOn: args.date } : h));
+}
+
+export function routineRestart(state: HabitState, args: { id: string }): HabitState {
+  return mapHabit(state, args.id, (h) => {
+    if (h.kind !== 'routine' || h.endsOn === undefined) return h;
+    const { endsOn: _e, ...rest } = h;
+    void _e;
+    return rest as Habit;
+  });
 }

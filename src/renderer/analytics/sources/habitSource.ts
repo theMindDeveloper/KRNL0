@@ -14,6 +14,7 @@ interface HabitLike {
   log?: string[];
   archived?: boolean;
   schedule?: HabitSchedule;
+  kind?: string;
 }
 
 interface HabitStateLike {
@@ -30,6 +31,7 @@ export const habitSource: AnalyticsDataSource = {
       const s = n.state as HabitStateLike;
       const habits = s.habits ?? [];
       for (const h of habits) {
+        if (h.kind === 'routine') continue; // never ticked (Decision 39)
         const log = h.log ?? [];
         for (const ymd of log) {
           out.push({
@@ -90,7 +92,7 @@ export function listHabits(board: BoardLike): HabitLike[] {
   for (const n of board.nodes) {
     if (n.kind !== 'habit') continue;
     const s = n.state as HabitStateLike;
-    return (s.habits ?? []).filter((h) => !h.archived);
+    return (s.habits ?? []).filter((h) => !h.archived && h.kind !== 'routine');
   }
   return [];
 }
