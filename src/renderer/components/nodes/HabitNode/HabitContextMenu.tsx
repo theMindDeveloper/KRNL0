@@ -31,6 +31,8 @@ interface Props {
   laneExists?: boolean;
   // Only a lane's own menu passes this: remove the lane, keep the habit.
   onUnpinLane?: () => void;
+  /** Decision 39 — routine / habit actions (Edit repeat, Skip next, End, Turn into …). */
+  extraItems?: ReadonlyArray<{ label: string; onClick: () => void; testId?: string }>;
 }
 
 const MENU_WIDTH = 232;
@@ -47,6 +49,7 @@ export function HabitContextMenu({
   onPinAsLane,
   laneExists,
   onUnpinLane,
+  extraItems,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -418,6 +421,15 @@ export function HabitContextMenu({
             </button>
           </div>
         </div>
+      )}
+
+      {extraItems && extraItems.length > 0 && (
+        <>
+          <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
+          {extraItems.map((it) => (
+            <MenuItem key={it.label} label={it.label} onClick={() => { it.onClick(); onClose(); }} />
+          ))}
+        </>
       )}
 
       {onUnpinLane && (

@@ -33,7 +33,9 @@ import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarLayers, CalendarState } from './types';
 import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularityFor } from './types';
-import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence } from '../HabitNode/types';
+import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, type RoutineOccurrence } from '../HabitNode/types';
+import { TimeField } from '../../ui/TimeField';
+import { habitMotherCommand } from '../../../store/scheduleActions';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
 import { HabitSwapModal } from '../../ui/HabitSwapModal';
@@ -224,6 +226,7 @@ const CAL_ICONS = {
   replan: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
   chevUp: 'M6 15l6-6 6 6',
   chevDown: 'M6 9l6 6 6-6',
+  repeat: 'M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4',
   prev: 'M15 5l-7 7 7 7',
   next: 'M9 5l7 7-7 7',
   grid: 'M4 4h16v16H4zM4 9.5h16M4 15h16M9.5 4v16',
@@ -754,6 +757,37 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       return result;
   }, [boardForCal]);
 
+  // Decision 39 — routines: bands behind the plans (F6), never ticked.
+  const routinesForCal = useMemo((): Habit[] => {
+    const out: Habit[] = [];
+    for (const n of boardForCal?.nodes ?? []) {
+      if (n.kind !== 'habit') continue;
+      for (const h of ((n.state as { habits?: Habit[] } | null)?.habits ?? [])) if (isRoutine(h) && !h.archived) out.push(h);
+    }
+    return out;
+  }, [boardForCal]);
+  const routineAt = (dayYMD: string, minute: number): { h: Habit; occ: RoutineOccurrence } | null => {
+    if (!layers.routines) return null;
+    for (const h of routinesForCal) {
+      const occ = routineOccurrence(h, dayYMD);
+      if (occ && minute >= occ.startMin && minute < occ.endMin) return { h, occ };
+    }
+    return null;
+  };
+  const [routineMove, setRoutineMove] = useState<{ id: string; name: string; date: string; value: string; x: number; y: number } | null>(null);
+  const routineMenuItems = (h: Habit, occ: RoutineOccurrence, x: number, y: number): ContextMenuItem[] => {
+    const hmOf = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    return [
+      { header: true, label: `${h.name} · ${hmOf(occ.startMin)}–${hmOf(occ.endMin)} · routine`, onSelect: () => {} },
+      occ.skipped
+        ? { label: 'Undo skip', onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }
+        : { label: 'Skip this one', onSelect: () => { void habitMotherCommand('routine.skip', { id: h.id, date: occ.date }); } },
+      ...(occ.skipped ? [] : [{ label: 'Move this one…', onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(occ.startMin), x, y }) }]),
+      ...(occ.moved ? [{ label: 'Back to its usual time', onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }] : []),
+      { label: 'End routine after this day', onSelect: () => { void habitMotherCommand('routine.end', { id: h.id, date: occ.date }); } },
+    ];
+  };
+
   // Build a map from YYYY-MM-DD → TaskSlice[], splitting any task whose
   // duration crosses midnight into one slice per affected day.
   const slicesByDay = useMemo(() => {
@@ -1056,13 +1090,17 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const x = e.clientX;
       const y = e.clientY;
       const future = clickMs > Date.now();
+      const r = routineAt(dayYMD, minute);
       setCtxMenu({
         x, y,
-        items: [{
-          label: future ? 'Log time here… (only past time)' : 'Log time here…',
-          disabled: future,
-          onSelect: () => openLogTime({ ...logTimeDefaults(clickMs), x, y }),
-        }],
+        items: [
+          ...(r ? routineMenuItems(r.h, r.occ, x, y) : []),
+          {
+            label: future ? 'Log time here… (only past time)' : 'Log time here…',
+            disabled: future,
+            onSelect: () => openLogTime({ ...logTimeDefaults(clickMs), x, y }),
+          },
+        ],
       });
       return;
     }
@@ -1081,7 +1119,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // overlapping spans open the picker, which then opens the details.
   function handleColumnClick(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
     const items = layersAt(dayYMD, e).filter((it) => it.kind === 'reality');
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      // Decision 39 — a click on a routine band: skip, move or end it.
+      const rect = e.currentTarget.getBoundingClientRect();
+      const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
+      const r = routineAt(dayYMD, minute);
+      if (r) setCtxMenu({ x: e.clientX, y: e.clientY, items: routineMenuItems(r.h, r.occ, e.clientX, e.clientY) });
+      return;
+    }
     if (items.length === 1) {
       openItemDetails(items[0]!, e.clientX, e.clientY);
       return;
@@ -1218,6 +1263,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const trackedMin = (trackedByTask.get(task.id) ?? 0) / 60;
       // A done task shows its time neutrally ("took X"), never as an overrun (C11).
       const overrunMin = task.done ? 0 : Math.round(trackedMin - task.plannedMin);
+      // Decision 39 — a plan on top of a routine says so (F6).
+      const overlapRoutines = layers.routines
+        ? routinesForCal.filter((r) => {
+            const o = routineOccurrence(r, dayYMD);
+            return o && !o.skipped && o.startMin < slice.sliceEndMin && slice.sliceStartMin < o.endMin;
+          }).map((r) => r.name)
+        : [];
       // Labels show the task's real start/end, not this day's slice edges
       // (a 22:30–01:00 block must not read "22:30–00:00").
       const taskStartDate = new Date(task.startISO);
@@ -1381,6 +1433,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             `${task.text} · ${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)} · plan ${fmtDur(task.plannedMin)}` +
             (trackedMin > 0 ? ` · tracked ${fmtDur(trackedMin)}` : '') +
             (overrunMin > 0 ? ` (${fmtDur(overrunMin)} over plan)` : '') +
+            (overlapRoutines.length ? ` · overlaps ${overlapRoutines.join(', ')}` : '') +
             (isMissed ? ' · missed' : '') +
             (isContinuation ? ' (continued from previous day)' : '')
           }
@@ -1821,6 +1874,55 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     });
   }
 
+  // Decision 39 / routines.md F6 — a routine is a soft band across its day,
+  // behind the plans, every week; a skipped one is a dashed outline. No
+  // pointer events (drops reach the hour cells); the column hit-tests clicks.
+  function renderRoutineBands(dayYMD: string) {
+    if (!layers.routines) return null;
+    const out: ReactNode[] = [];
+    const colPxB = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
+    for (const h of routinesForCal) {
+      const occ = routineOccurrence(h, dayYMD);
+      if (!occ) continue;
+      const top = (occ.startMin / 60) * rowHeight;
+      const height = Math.max(6, ((occ.endMin - occ.startMin) / 60) * rowHeight);
+      const col = `var(--${h.color})`;
+      const narrow = colPxB < 96;
+      const label = occ.skipped ? (narrow ? 'Skip' : `${h.name} · skipped`) : narrow ? clashLabels([h.name])[0] : h.name;
+      out.push(
+        <div
+          key={`routine-${h.id}`}
+          data-testid={`calendar-routine-${h.id}`}
+          data-skipped={occ.skipped ? 'true' : undefined}
+          aria-label={`${h.name}, routine${occ.skipped ? ', skipped this time' : ''}`}
+          title={`${h.name} · routine${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
+          style={{
+            position: 'absolute', left: 0, right: 0, top, height, zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box',
+            ...(occ.skipped
+              ? { border: `1px dashed color-mix(in srgb, ${col} 55%, transparent)`, borderRadius: 4, background: 'transparent' }
+              : {
+                  background: `color-mix(in srgb, ${col} 12%, transparent)`,
+                  borderTop: `1px solid color-mix(in srgb, ${col} 45%, transparent)`,
+                  borderBottom: `1px solid color-mix(in srgb, ${col} 45%, transparent)`,
+                }),
+          }}
+        >
+          {height >= 16 && (
+            <span style={{
+              position: 'absolute', top: 2, left: railPxFor(dayYMD) + 2, right: 4, display: 'flex', alignItems: 'center', gap: 4,
+              fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, lineHeight: '14px', whiteSpace: 'nowrap', overflow: 'hidden',
+              color: `color-mix(in srgb, ${col} 70%, var(--ink))`, opacity: occ.skipped ? 0.8 : 1,
+            }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+              {!narrow && <span style={{ marginLeft: 'auto', display: 'inline-flex', flexShrink: 0 }}><CalIcon name="repeat" size={11} /></span>}
+            </span>
+          )}
+        </div>,
+      );
+    }
+    return out;
+  }
+
   // What really happened (F16, F29): the Clock rail (see RAIL_STYLE). A
   // break is a gap in the fill; a running span has moving stripes and grows
   // to the knob. The rail sits beside the plans, never under them.
@@ -2092,7 +2194,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           <div data-testid="week-legend" role="group" aria-label="Calendar layers" style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
             {([
               ['recorded', 'Recorded', 'What you really did: the rail at the left of each day. Breaks are gaps.'],
-              ['habits', 'Habits', 'Habits and routines at their time. Click one to tick it.'],
+              ['habits', 'Habits', 'Habits at their time. Click one to tick it.'],
+              ['routines', 'Routines', 'Routines (a class, a shift) as bands behind your plans. Click one to skip, move or end it.'],
             ] as const).map(([k, label, tip]) => (
               <button
                 key={k}
@@ -2111,7 +2214,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               >
                 {k === 'recorded'
                   ? <span aria-hidden style={{ width: 4, height: 12, borderRadius: 999, background: layers[k] ? 'var(--acid)' : 'var(--paper-3)' }} />
-                  : <span aria-hidden style={{ width: 12, height: 8, borderRadius: 999, border: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}` }} />}
+                  : k === 'routines'
+                    ? <span aria-hidden style={{ width: 12, height: 8, borderTop: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}`, borderBottom: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}`, background: layers[k] ? 'color-mix(in srgb, var(--ink-2) 18%, transparent)' : 'transparent' }} />
+                    : <span aria-hidden style={{ width: 12, height: 8, borderRadius: 999, border: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}` }} />}
                 <span className="cal-layer-label">{label}</span>
               </button>
             ))}
@@ -2444,6 +2549,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
                 {/* Issue #166 — tracked reality as background highlights
                     (zIndex 0, no pointer events — behind habits and tasks) */}
+                {renderRoutineBands(dayYMD)}
                 {renderRealityBlocks(dayYMD)}
 
                 {/* App open / close markers (thin dashed lines). */}
@@ -2585,6 +2691,32 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         />
       )}
 
+      {routineMove && createPortal(
+        <div
+          data-testid="routine-move"
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed', left: Math.min(routineMove.x, window.innerWidth - 240), top: Math.min(routineMove.y, window.innerHeight - 140),
+            width: 220, zIndex: Z.popover, padding: 12, borderRadius: 10, background: 'var(--node-bg)', border: '1px solid var(--paper-3)',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 10, fontFamily: 'var(--font-sans)',
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--ink)' }}>Move “{routineMove.name}” this time</span>
+          <TimeField
+            value={routineMove.value}
+            onChange={(v) => setRoutineMove((m) => (m ? { ...m, value: v } : m))}
+            testId="routine-move-time"
+            onEnter={(v) => { void habitMotherCommand('routine.move', { id: routineMove.id, date: routineMove.date, at: v }); setRoutineMove(null); }}
+            onEscape={() => setRoutineMove(null)}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+            <button type="button" onClick={() => setRoutineMove(null)} style={{ height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12 }}>Cancel</button>
+            <button type="button" data-testid="routine-move-save" onClick={() => { void habitMotherCommand('routine.move', { id: routineMove.id, date: routineMove.date, at: routineMove.value }); setRoutineMove(null); }}
+              style={{ height: 28, padding: '0 12px', borderRadius: 7, border: 'none', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12, fontWeight: 650 }}>Move</button>
+          </div>
+        </div>,
+        document.body,
+      )}
       {ctxMenu && (
         <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onDismiss={() => setCtxMenu(null)} />
       )}
@@ -2800,7 +2932,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             isoDow={swapModal.isoDow}
             defaultTimeOfDay={defaultTimeOfDay}
             defaultDurationMin={25}
-            onConfirm={(schedule) => {
+            initialKind={habitRecord && isRoutine(habitRecord) ? 'routine' : 'habit'}
+            onConfirm={(schedule, kind) => {
               const snap = swapModal;
               setSwapModal(null);
               onCommand('calendar.scheduleHabit', {
@@ -2808,6 +2941,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 habitMotherId: snap.habit.habitMotherId,
                 schedule,
               });
+              // Decision 39 — the switch decides habit or routine (schedule first: a routine needs its time).
+              if ((kind === 'routine') !== (!!habitRecord && isRoutine(habitRecord))) {
+                void habitMotherCommand('habit.setKind', { id: snap.habit.habitId, kind });
+              }
             }}
             onCancel={() => setSwapModal(null)}
           />

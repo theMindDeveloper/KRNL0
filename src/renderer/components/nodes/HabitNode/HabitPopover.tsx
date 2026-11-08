@@ -11,6 +11,9 @@ interface Props {
   view: HabitView;
   onSetView: (view: HabitView) => void;
   onClose: () => void;
+  /** Decision 39 — routines that have ended (history kept), each with Restart. */
+  ended?: ReadonlyArray<{ id: string; name: string; endsOn: string }>;
+  onRestart?: (id: string) => void;
 }
 
 const VIEW_LABELS: Record<HabitView, string> = {
@@ -19,7 +22,7 @@ const VIEW_LABELS: Record<HabitView, string> = {
   year: 'Year',
 };
 
-export function HabitPopover({ view, onSetView, onClose }: Props) {
+export function HabitPopover({ view, onSetView, onClose, ended = [], onRestart }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,7 +46,7 @@ export function HabitPopover({ view, onSetView, onClose }: Props) {
         position: 'absolute',
         top: 36,
         right: 8,
-        width: 180,
+        width: 220,
         background: 'var(--node-bg)',
         border: '1px solid var(--paper-3)',
         borderRadius: 6,
@@ -117,8 +120,24 @@ export function HabitPopover({ view, onSetView, onClose }: Props) {
           lineHeight: 1.5,
         }}
       >
-        Right-click a habit to rename, change color, change icon, or delete.
+        Right-click a habit or routine to rename, change color, change icon, or delete.
       </div>
+      {ended.length > 0 && (
+        <div data-testid="habit-ended" style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--paper-2)' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-4)', marginBottom: 6 }}>Ended routines</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 132, overflowY: 'auto' }}>
+            {ended.map((r) => (
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${r.name} · ended ${r.endsOn}`}>{r.name}</span>
+                <button type="button" data-testid={`habit-restart-${r.id}`} onClick={() => onRestart?.(r.id)}
+                  style={{ height: 24, padding: '0 8px', borderRadius: 6, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', fontSize: 11, cursor: 'pointer' }}>
+                  Restart
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

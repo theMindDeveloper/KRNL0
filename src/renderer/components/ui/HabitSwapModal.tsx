@@ -23,19 +23,22 @@ export interface HabitSwapModalProps {
   isoDow: IsoDow;                  // ISO dow of dropDayYMD
   defaultTimeOfDay: string;        // "HH:MM" — derived from the drop hour
   defaultDurationMin: number;
-  onConfirm: (schedule: HabitSchedule) => void;
+  /** Decision 39 — the kind chosen with the editor's switch. */
+  onConfirm: (schedule: HabitSchedule, kind: 'habit' | 'routine') => void;
+  /** The item's current kind (the switch starts there). */
+  initialKind?: 'habit' | 'routine';
   onCancel: () => void;
 }
 
 export function HabitSwapModal(props: HabitSwapModalProps): JSX.Element | null {
-  const { habitName, habitIcon, streakDays, dropDayYMD, isoDow, defaultTimeOfDay, defaultDurationMin, onConfirm, onCancel } = props;
+  const { habitName, habitIcon, streakDays, dropDayYMD, isoDow, defaultTimeOfDay, defaultDurationMin, onConfirm, onCancel, initialKind = 'habit' } = props;
   const wday = DOW_FULL[isoDow - 1] ?? '';
 
   const [value, setValue] = useState<RepeatValue>({
-    kind: 'weekly', days: [isoDow], timeOfDay: defaultTimeOfDay, durationMin: defaultDurationMin,
+    kind: 'weekly', days: [isoDow], timeOfDay: defaultTimeOfDay, durationMin: defaultDurationMin, itemKind: initialKind, anyTime: false,
   });
   const valid = isRepeatValid(value);
-  const confirm = () => { if (valid) onConfirm(toSchedule(value)); };
+  const confirm = () => { if (valid) onConfirm(toSchedule(value), value.itemKind === 'routine' ? 'routine' : 'habit'); };
 
   const isThisDay = value.kind === 'weekly' && value.days.length === 1 && value.days[0] === isoDow;
   const isDaily = value.kind === 'daily';

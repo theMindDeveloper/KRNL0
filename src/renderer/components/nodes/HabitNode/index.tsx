@@ -18,7 +18,9 @@ import { SettingsIcon } from '../../ui/SettingsIcons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { RepeatEditor, describeRepeat, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
+import { RepeatEditor, describeRepeat, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
+import { RoutineShelf, routineStatus } from './RoutineShelf';
+import { isRoutine } from './types';
 import { IconRepeat } from '../../ui/repeatIcons';
 import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
 import { useBoardStore } from '../../../store/boardStore';
@@ -122,6 +124,15 @@ export function HabitNode({
     () => state.habits.filter((h) => !h.archived),
     [state.habits],
   );
+  // Decision 39 — two shelves: habits (ticked) above routines (just happen).
+  const habitsOnly = useMemo(() => visibleHabits.filter((h) => !isRoutine(h)), [visibleHabits]);
+  const routines = useMemo(() => visibleHabits.filter((h) => isRoutine(h) && !(h.endsOn && h.endsOn < today)), [visibleHabits, today]);
+  const endedRoutines = useMemo(
+    () => visibleHabits.filter((h) => isRoutine(h) && h.endsOn && h.endsOn < today).map((h) => ({ id: h.id, name: h.name, endsOn: h.endsOn! })),
+    [visibleHabits, today],
+  );
+  // Edit how an existing habit / routine repeats (menu → "Edit repeat…").
+  const [editRepeat, setEditRepeat] = useState<{ habitId: string; value: RepeatValue; x: number; y: number } | null>(null);
 
   // Which habits already have a pinned lane? Used to disable the menu item.
   // Return a sorted array via useShallow so identity is stable when contents
@@ -162,6 +173,7 @@ export function HabitNode({
       onCommand('habit.add', {
         name: trimmed,
         ...(newRepeat ? { schedule: toSchedule(newRepeat) } : {}),
+        ...(newRepeat?.itemKind === 'routine' ? { kind: 'routine' } : {}),
       });
       setNewName('');
       setNewRepeat(null);
@@ -193,6 +205,37 @@ export function HabitNode({
   };
 
   const menuHabit = menu ? visibleHabits.find((h) => h.id === menu.habitId) ?? null : null;
+
+  // Decision 39 — what the menu offers besides rename / colour / icon / note.
+  const menuItemsFor = (h: (typeof visibleHabits)[number], at: { x: number; y: number }) => {
+    const edit = (kind: 'habit' | 'routine') => setEditRepeat({ habitId: h.id, value: fromSchedule(h.schedule, kind), x: at.x, y: at.y });
+    if (isRoutine(h)) {
+      const d = new Date();
+      const st = routineStatus(h, today, d.getHours() * 60 + d.getMinutes());
+      const nextDate = st.kind === 'now' || st.kind === 'today' ? today : st.kind === 'next' ? st.date : null;
+      return [
+        { label: 'Edit repeat…', onClick: () => edit('routine') },
+        ...(nextDate ? [{ label: `Skip next (${nextDate === today ? 'today' : new Date(`${nextDate}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })})`, onClick: () => onCommand('routine.skip', { id: h.id, date: nextDate }) }] : []),
+        ...(st.kind === 'skipped' ? [{ label: 'Undo skip', onClick: () => onCommand('routine.unskip', { id: h.id, date: st.date }) }] : []),
+        { label: 'End routine (after today)', onClick: () => onCommand('routine.end', { id: h.id, date: today }) },
+        { label: 'Turn into habit', onClick: () => onCommand('habit.setKind', { id: h.id, kind: 'habit' }) },
+      ];
+    }
+    return [
+      { label: h.schedule ? 'Edit repeat…' : 'Repeat…', onClick: () => edit('habit') },
+      // A routine needs a time: with one it switches at once, without one the editor asks.
+      { label: 'Turn into routine', onClick: () => (h.schedule?.timeOfDay ? onCommand('habit.setKind', { id: h.id, kind: 'routine' }) : edit('routine')) },
+    ];
+  };
+  const saveEditRepeat = () => {
+    if (!editRepeat || !isRepeatValid(editRepeat.value)) return;
+    const h = visibleHabits.find((x) => x.id === editRepeat.habitId);
+    const wantRoutine = editRepeat.value.itemKind === 'routine';
+    // Schedule first (a routine needs its time before the switch).
+    onCommand('habit.setSchedule', { habitId: editRepeat.habitId, schedule: toSchedule(editRepeat.value) });
+    if (h && wantRoutine !== isRoutine(h)) onCommand('habit.setKind', { id: editRepeat.habitId, kind: wantRoutine ? 'routine' : 'habit' });
+    setEditRepeat(null);
+  };
 
   return (
     <MotherFrame
@@ -248,9 +291,10 @@ export function HabitNode({
         {/* nowheel: the wheel scrolls a long habit list instead of zooming the
             canvas — without it the habits below the fold were out of reach. */}
         <div ref={bodyRef} className="nowheel" style={{ padding: '14px 16px', position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+          {routines.length > 0 && habitsOnly.length > 0 && <ShelfLabel text="Habits" />}
           {view === 'week' && (
             <WeekView
-              habits={visibleHabits}
+              habits={habitsOnly}
               today={today}
               weekDays={weekDays}
               habitMotherId={node.id}
@@ -260,7 +304,7 @@ export function HabitNode({
           )}
           {view === 'month' && (
             <MonthView
-              habits={visibleHabits}
+              habits={habitsOnly}
               today={today}
               monthDays={monthDays}
               habitMotherId={node.id}
@@ -270,7 +314,7 @@ export function HabitNode({
           )}
           {view === 'year' && (
             <YearView
-              habits={visibleHabits}
+              habits={habitsOnly}
               today={today}
               yearGrid={yearGrid}
               habitMotherId={node.id}
@@ -279,16 +323,24 @@ export function HabitNode({
             />
           )}
 
-          {visibleHabits.length === 0 && (
+          {routines.length > 0 && (
+            <>
+              <ShelfLabel text="Routines" />
+              <RoutineShelf routines={routines} today={today} onMenu={(e, id) => onContextMenu(e, id)} />
+            </>
+          )}
+
+          {habitsOnly.length === 0 && routines.length === 0 && (
             <div
               style={{
                 color: 'var(--ink-3)',
                 fontSize: 12,
                 fontFamily: 'var(--font-sans)',
                 padding: '4px 0',
+                lineHeight: 1.5,
               }}
             >
-              No habits yet.
+              No habits or routines yet. A habit is something you tick; a routine just happens, like a class.
             </div>
           )}
 
@@ -304,8 +356,9 @@ export function HabitNode({
                 const name = state.habits.find((h) => h.id === menu.habitId)?.name ?? 'habit';
                 undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id: menu.habitId }));
               }}
-              onPinAsLane={() => onCommand('habit.spawnLane', { habitId: menu.habitId })}
+              {...(isRoutine(menuHabit) ? {} : { onPinAsLane: () => onCommand('habit.spawnLane', { habitId: menu.habitId }) })}
               laneExists={pinnedHabitIds.has(menu.habitId)}
+              extraItems={menuItemsFor(menuHabit, menu.anchor)}
               onClose={() => setMenu(null)}
             />
           )}
@@ -328,7 +381,7 @@ export function HabitNode({
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <input
               type="text"
-              placeholder="add habit"
+              placeholder="add habit or routine"
               aria-label="Add a habit or recurring event"
               data-habit-add
               data-testid="habit-add-input"
@@ -365,7 +418,7 @@ export function HabitNode({
                 e.stopPropagation();
                 const r = e.currentTarget.getBoundingClientRect();
                 setRepeatAt({ x: r.right, y: r.bottom });
-                setNewRepeat((v) => v ?? { kind: 'daily', days: [], timeOfDay: '07:00', durationMin: 25 });
+                setNewRepeat((v) => v ?? { kind: 'daily', days: [], timeOfDay: '09:00', durationMin: 60, itemKind: 'habit', anyTime: true });
               }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
@@ -378,7 +431,7 @@ export function HabitNode({
                 color: newRepeat ? 'var(--ink)' : 'var(--ink-3)',
               }}
             >
-              <IconRepeat />{newRepeat ? 'Repeats' : 'Repeat'}
+              <IconRepeat />{newRepeat?.itemKind === 'routine' ? 'Routine' : newRepeat ? 'Repeats' : 'Repeat'}
             </button>
             <span
               aria-hidden
@@ -440,10 +493,42 @@ export function HabitNode({
             view={view}
             onSetView={(v) => onCommand('habit.setView', { view: v })}
             onClose={() => setSettingsOpen(false)}
+            ended={endedRoutines}
+            onRestart={(id) => onCommand('routine.restart', { id })}
           />
         )}
       </div>
+      {editRepeat && createPortal(
+        <div
+          data-testid="habit-edit-repeat"
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed', left: Math.min(editRepeat.x, window.innerWidth - 340), top: Math.min(editRepeat.y, window.innerHeight - 460),
+            width: 320, zIndex: Z.popover, padding: 14, borderRadius: 12, background: 'var(--node-bg)',
+            border: '1px solid var(--paper-3)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 12,
+          }}
+        >
+          <RepeatEditor value={editRepeat.value} onChange={(v) => setEditRepeat((cur) => (cur ? { ...cur, value: v } : cur))} testIdPrefix="habit-edit" />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+            <button type="button" onClick={() => setEditRepeat(null)}
+              style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12.5 }}>Cancel</button>
+            <button type="button" data-testid="habit-edit-save" disabled={!isRepeatValid(editRepeat.value)} onClick={saveEditRepeat}
+              style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12.5, fontWeight: 650, opacity: isRepeatValid(editRepeat.value) ? 1 : 0.4 }}>Save</button>
+          </div>
+        </div>,
+        document.body,
+      )}
     </MotherFrame>
+  );
+}
+
+/** Decision 39 — a quiet label above a shelf (only when both shelves show). */
+function ShelfLabel({ text }: { text: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0 8px', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>
+      <span>{text}</span>
+      <span aria-hidden style={{ flex: 1, height: 1, background: 'var(--paper-3)' }} />
+    </div>
   );
 }
 

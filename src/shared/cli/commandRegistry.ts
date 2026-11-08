@@ -237,7 +237,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'view', usage: 'cal view <day|week|month|year> [--date YYYY-MM-DD]', summary: 'Switch the Calendar view (year = 12 mini-months with focus heat)' },
       { name: 'zoom', usage: 'cal zoom <1-6>', summary: 'Week / day view hour height (1 = hourly grid … 6 = 5-minute grid), as the zoom buttons'},
-      { name: 'layers', usage: 'cal layers [recorded|habits on|off] [--json]', summary: 'Show or hide the recorded rail and the habit pills over the plan, as the header switches' },
+      { name: 'layers', usage: 'cal layers [recorded|habits|routines on|off] [--json]', summary: 'Show or hide the recorded rail, the habit pills and the routine bands, as the header switches' },
       { name: 'lineup', usage: 'cal lineup <task> <task> [...] [--json]', summary: 'Put plans that clash one after another, in start order, from the first (never in the past), as the Line up button on a calendar shelf' },
       { name: 'show', usage: 'cal show [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--json]', summary: 'List all scheduled task placements, sorted by time' },
     ],
