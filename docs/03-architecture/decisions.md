@@ -2564,3 +2564,24 @@ Only habits repeat, and a habit is always tickable and (ADR 0002) always timed. 
 ### Consequences
 - Turning a habit into a routine (or back) is one switch and keeps its log.
 - Ships in a minor release with its tour (AGENTS.md "Design and tutorial gates") and designed release notes.
+
+---
+
+## Decision 40 — Plans have one When and an optional Deadline; routines become repeating events on the Calendar (2026-11-08)
+
+**Status:** Accepted (maintainer, 2026-11-08, after using the branch: "imagine yourself as someone using the app for the first time"). End design: canvas "KRNL0 launch designs", row "End design" (End-Plans, End-Calendar, End-Habits). Requirements: docs/06-requirements/plans-when-deadline.md. Issues: #219–#221. Supersedes the user-facing parts of Decision 39.
+
+### Context
+"Due" meant two things (a deadline from the row menu, and "on this day, no time" from quick add), so a plan could be "scheduled Sun 16:05, due Sat 21" with nothing saying which is which. There was no way to put a plan on a day with no time by hand, deadlines and plans looked the same on the Calendar, and routines (repeating events that are never ticked) lived in the Habits window next to things you tick, under a name that in English means a habit.
+
+### Decision
+- **A plan has one When**: a day + time (`task.scheduledFor`, a block in the hours) or a day at **any time** (`TodoItem.onDay`, the ANY TIME strip under the day names). Giving it a time clears `onDay`; moving a block into the strip unschedules it and sets `onDay`.
+- **Deadline** is `TodoItem.dueOn` and means only that. Optional, drawn as a dashed flag mark on its day.
+- **Migration** (on load, idempotent): an item with `dueOn` and no Calendar time had it as its day → `onDay = dueOn`, `dueOn` removed. An item with both keeps `dueOn` as its deadline.
+- **Quick add**: a day alone ("fri", "15.11") → When, any time; "by / due / before / deadline <day>" → Deadline; "every …" → a hint, nothing read.
+- **Habits window holds only habits** (things you tick). **Repeating events** (stored as before: `Habit` with `kind: 'routine'`) are created on the Calendar (drag on empty hours → Once / Repeats), managed from their band and the Calendar's Events list. The word "routine" leaves the UI; `krnl routine` stays and `krnl event` is added.
+- Calendar shapes: timed plan = filled block; any-time plan = solid chip; deadline = dashed flag; timed habit = stadium with a ring; repeating event = hatched band.
+
+### Consequences
+- One editor (the When popover) replaces Edit time, Due date… and Reminder…; the Todo add flow has one step.
+- Board data is additive (`onDay`) plus one load-time migration; schemaVersion unchanged.

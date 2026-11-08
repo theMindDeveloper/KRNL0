@@ -131,6 +131,7 @@ krnl habit view week|month|year                        # change the displayed gr
 
 A **habit** is ticked; a **routine** (a class, a work shift, a weekly call) just happens at its time, sits on the Calendar every week and is **never ticked, counted or "missed"**. Ask the user which one they mean if it is not obvious: *"Do you want to tick it off?"* — yes = habit, no = routine. Something you do at a set time and tick (Gym at 18:00 every day) is a **habit with a time** (`habit schedule … --at 18:00`). Todo plans happen once; nothing in the Todo repeats.
 ```
+# The app calls these **repeating events** (made on the Calendar, never ticked); `krnl event …` = `krnl routine …`.
 krnl routine add "Class" --days mon,wed --at 10:00 --for 120     # may run past midnight (a night shift)
 krnl routine list
 krnl routine skip|unskip|end "Class" [--on YYYY-MM-DD]            # one week / its end; history kept
@@ -234,7 +235,8 @@ krnl task chain <ref1> <ref2> [...]    # wire task.next → task.activate betwee
 krnl todo add "<text>" [--tag <label>]   # untagged adds are auto-tagged
                                            # reads day/time/length from the words:
                                            #   "Gym tomorrow 18:00 1h" -> on the Calendar; "Pay rent friday" -> due that day
-krnl todo due <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>   # deadline, apart from when it is planned
+krnl todo when <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off> [HH:MM]   # its When: a day + time (Calendar) or a day at any time (ANY TIME strip)
+krnl todo deadline <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>      # its Deadline, apart from its When (todo due = same)
 krnl todo drop <ref> / todo undrop <ref>   # "not doing it": to the Archive, not done, off the Calendar
 krnl todo check <ref>                      # done -> "Done" today, "Archive" from tomorrow
 krnl todo list [--done|--archived|--all] [--json]   # default: open + done today
@@ -249,7 +251,7 @@ krnl analytics show --view tags [--range N] [--json]   # time by tag
 ```
 krnl habit add|done|streak|color|rename|icon|note|view|remove|archive|unarchive|show
 krnl habit target|amount|count|rest|kind
-krnl routine add|list|skip|unskip|move|end|restart|remind
+krnl event add|list|skip|unskip|move|end|restart|remind|delete   # repeating events (a class, a shift); `routine` = same
 krnl habit schedule|unschedule
 krnl habit pin|unpin                   # renderer-only
 krnl habit list [--json]
