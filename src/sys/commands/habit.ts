@@ -20,6 +20,7 @@ import {
   habitUnarchive,
   habitSetTarget,
   habitSetRest,
+  habitStreak,
   habitSetSchedule,
   habitSetKind,
   routineSkip,
@@ -246,7 +247,7 @@ export async function cliStreak(
   if (!mother) return notFound();
   const resolved = resolveHabit(mother.state, idOrName);
   if ('error' in resolved) return { ok: false, message: resolved.error };
-  const n = calcStreak(resolved.habit.log, todayLocal(), resolved.habit.schedule ?? undefined, resolved.habit.rest);
+  const n = habitStreak(resolved.habit, todayLocal()).current;
   return {
     ok: true,
     message: `streak for "${resolved.habit.name}": ${n} day${n === 1 ? '' : 's'}`,
@@ -348,7 +349,7 @@ export async function cliList(ctx: HabitCtx, json = false): Promise<SysResult> {
     name: h.name,
     color: h.color,
     archived: h.archived,
-    streak: calcStreak(h.log, today, h.schedule ?? undefined, h.rest),
+    streak: habitStreak(h, today).current,
     logCount: h.log.length,
   }));
   if (json) {
@@ -644,7 +645,7 @@ export async function cliShow(
   if ('error' in resolved) return { ok: false, message: resolved.error };
   const h = resolved.habit;
   const today = todayLocal();
-  const streak = calcStreak(h.log, today, h.schedule ?? undefined, h.rest);
+  const streak = habitStreak(h, today).current;
 
   const data: {
     id: string;

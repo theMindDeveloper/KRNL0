@@ -41,7 +41,7 @@ import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
 import { HabitSwapModal } from '../../ui/HabitSwapModal';
 import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
-import { calcStreak } from '../HabitNode/commands';
+import { habitStreak } from '../HabitNode/commands';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { boardTagLibrary, spanTone } from '../../../store/spanTags';
 import { useEasyMode } from '../../../store/uiMode';
@@ -2962,7 +2962,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             habitName={habitRecord?.name ?? swapModal.habit.name}
             habitIcon={habitRecord?.icon}
             habitNumber={habitIndex + 1}
-            streakDays={habitRecord ? calcStreak(habitRecord.log, todayStr, habitRecord.schedule ?? undefined) : 0}
+            streakDays={habitRecord && habitStreak(habitRecord, todayStr).unit === 'day' ? habitStreak(habitRecord, todayStr).current : 0}
             dropDayYMD={swapModal.dayYMD}
             isoDow={swapModal.isoDow}
             defaultTimeOfDay={defaultTimeOfDay}

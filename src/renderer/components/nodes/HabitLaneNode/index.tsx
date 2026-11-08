@@ -11,7 +11,7 @@ import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
 import type { Habit, HabitColor, HabitSchedule, IsoDow } from '../HabitNode/types';
-import { calcStreak } from '../HabitNode/commands';
+import { habitStreak } from '../HabitNode/commands';
 import { HABIT_COLORS, isDayScheduled, toYMD } from '../HabitNode/types';
 import { useBoardStore } from '../../../store/boardStore';
 import { useLocalDay } from '../../../hooks/useLocalDay';
@@ -146,7 +146,8 @@ export function HabitLaneNode({
   const scheduledToday = isDayScheduled((habit as { schedule?: HabitSchedule }).schedule, today);
   const cadence = (habit as { schedule?: HabitSchedule | null }).schedule ?? null;
   // Pass the schedule like HabitNode does, or a weekdays habit reads 0 on weekends.
-  const streak = calcStreak(habit.log, today, cadence ?? undefined);
+  // The same streak as the Habit node (a weekly target counts weeks; rest days never break it).
+  const { current: streak, unit: streakUnit } = habitStreak(habit as Parameters<typeof habitStreak>[0], today);
   const cadHeader = cadenceTag(cadence);
   const cadFoot = cadenceFootText(cadence);
 
@@ -317,7 +318,7 @@ export function HabitLaneNode({
         }}
       >
         <span style={{ color: streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', fontWeight: streak > 0 ? 600 : 400 }}>
-          {streak > 0 ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>{streak}d streak</> : 'no streak'}
+          {streak > 0 ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>{streak}{streakUnit === 'week' ? 'w' : 'd'} streak</> : 'no streak'}
         </span>
         <span style={{ color: 'var(--ink-3)' }}>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>

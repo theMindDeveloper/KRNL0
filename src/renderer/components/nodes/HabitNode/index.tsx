@@ -41,7 +41,7 @@ import {
   getYearGridCells,
   isDayScheduled,
 } from './types';
-import { bestStreak, bestWeekStreak, calcStreak, calcWeekStreak, milestoneReached, nextMilestone, repairableDay, ticksThisWeek } from './commands';
+import { habitStreak, milestoneReached, nextMilestone, repairableDay, ticksThisWeek } from './commands';
 
 /** YYYY-MM-DD plus `n` days (local). */
 function addDaysLocal(ymd: string, n: number): string {
@@ -630,11 +630,8 @@ const WeekRow = memo(function WeekRow({
   const color = habitColor(habit.color);
   // "3 times a week": the streak counts weeks that reached the target.
   const target = weeklyTarget(habit);
-  const streak = useMemo(
-    () => (target ? calcWeekStreak(habit.log, today, target, habit.rest) : calcStreak(habit.log, today, habit.schedule, habit.rest)),
-    [habit.log, today, habit.schedule, target, habit.rest],
-  );
-  const best = useMemo(() => (target ? bestWeekStreak(habit.log, target) : bestStreak(habit.log, habit.schedule, habit.rest)), [habit.log, habit.schedule, target, habit.rest]);
+  // One streak for every screen (habitStreak): weeks for a target, rest days stepped over.
+  const { current: streak, best } = useMemo(() => habitStreak(habit, today), [habit, today]);
   const restSet = useMemo(() => new Set(habit.rest ?? []), [habit.rest]);
   const weekTicks = target ? ticksThisWeek(habit.log, today) : 0;
   const unit = target ? 'week' : 'day';
@@ -932,10 +929,7 @@ const MonthRow = memo(function MonthRow({
   onContextMenu,
 }: MonthRowProps) {
   const color = habitColor(habit.color);
-  const streak = useMemo(
-    () => calcStreak(habit.log, today, habit.schedule),
-    [habit.log, today, habit.schedule],
-  );
+  const { current: streak, unit: streakUnit } = useMemo(() => habitStreak(habit, today), [habit, today]);
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const monthRowRef = useRef<HTMLDivElement>(null);
@@ -1023,7 +1017,7 @@ const MonthRow = memo(function MonthRow({
         >
           {habit.name}
         </div>
-        <StreakBadge streak={streak} />
+        <StreakBadge streak={streak} unit={streakUnit} />
       </div>
 
       <div
@@ -1108,10 +1102,7 @@ const YearRow = memo(function YearRow({
   onContextMenu,
 }: YearRowProps) {
   const color = habitColor(habit.color);
-  const streak = useMemo(
-    () => calcStreak(habit.log, today, habit.schedule),
-    [habit.log, today, habit.schedule],
-  );
+  const { current: streak, unit: streakUnit } = useMemo(() => habitStreak(habit, today), [habit, today]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const schedule = habit.schedule;
@@ -1223,7 +1214,7 @@ const YearRow = memo(function YearRow({
         >
           {habit.name}
         </div>
-        <StreakBadge streak={streak} />
+        <StreakBadge streak={streak} unit={streakUnit} />
       </div>
 
       {/* Canvas-based year grid — replaces 371 cell divs with one canvas.
@@ -1248,10 +1239,10 @@ const YearRow = memo(function YearRow({
 
 
 /** The streak in Month and Year views: the week view's flame and count. */
-function StreakBadge({ streak }: { streak: number }) {
+function StreakBadge({ streak, unit = 'day' }: { streak: number; unit?: 'day' | 'week' }) {
   return (
     <div
-      title={streak > 0 ? `${streak} day${streak === 1 ? '' : 's'} in a row` : 'No streak yet'}
+      title={streak > 0 ? `${streak} ${unit}${streak === 1 ? '' : 's'} in a row` : 'No streak yet'}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
         fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
@@ -1259,7 +1250,7 @@ function StreakBadge({ streak }: { streak: number }) {
       }}
     >
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>
-      {streak}
+      {streak}{unit === 'week' ? 'w' : ''}
     </div>
   );
 }
