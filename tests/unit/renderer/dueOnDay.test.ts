@@ -38,3 +38,21 @@ describe('Welcome back lists what is due', () => {
     expect(isEmptyCatchup(today)).toBe(true);
   });
 });
+
+describe('Welcome back and repeating plans', () => {
+  const task = (id: string, text: string, at: string) => ({ id, kind: 'todo.task', state: { text, done: false, scheduledFor: at } });
+  it('a missed copy of a repeating plan is not a loose end (its series brings the next one)', () => {
+    // Before the next copy is made: the missed one still carries the repeat.
+    const before = computeCatchup({ nodes: [...todo([{ id: 'i1', text: 'Water plants', done: false, taskNodeId: 't1', repeat: { kind: 'daily' } }]), task('t1', 'Water plants', '2026-11-07T08:00')], edges: [] } as never, TODAY);
+    expect(before.tasks.map((t) => t.text)).toEqual([]);
+    // After: the missed one has no repeat, the next one today has it.
+    const after = computeCatchup({ nodes: [
+      ...todo([{ id: 'i1', text: 'Water plants', done: false, taskNodeId: 't1' }, { id: 'i2', text: 'Water plants', done: false, taskNodeId: 't2', repeat: { kind: 'daily' } }]),
+      task('t1', 'Water plants', '2026-11-07T08:00'), task('t2', 'Water plants', '2026-11-08T08:00'),
+    ], edges: [] } as never, TODAY);
+    expect(after.tasks.map((t) => t.text)).toEqual([]);
+    // A plain missed plan still is.
+    const plain = computeCatchup({ nodes: [...todo([{ id: 'i3', text: 'Call bank', done: false, taskNodeId: 't3' }]), task('t3', 'Call bank', '2026-11-07T10:00')], edges: [] } as never, TODAY);
+    expect(plain.tasks.map((t) => t.text)).toEqual(['Call bank']);
+  });
+});

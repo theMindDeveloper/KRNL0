@@ -96,6 +96,24 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
     return false;
   };
 
+  // Repeating plans (still carrying their repeat, before the next copy is
+  // made) and the names of plans already on the Calendar from today on.
+  const todoMother = board.nodes.find((n) => n.kind === 'todo' && n.isMother === true);
+  const todoItems = rec(todoMother?.state)['items'];
+  const repeatingTasks = new Set<string>();
+  if (Array.isArray(todoItems)) {
+    for (const raw of todoItems) {
+      const it = rec(raw);
+      if (it['repeat'] && typeof it['taskNodeId'] === 'string') repeatingTasks.add(it['taskNodeId']);
+    }
+  }
+  const seriesAhead = new Set<string>();
+  for (const n of tasks.values()) {
+    const s = rec(n.state);
+    const at = typeof s['scheduledFor'] === 'string' ? s['scheduledFor'].slice(0, 10) : '';
+    if (s['done'] !== true && at >= today && repeatingTasks.has(n.id)) seriesAhead.add(String(s['text'] ?? ''));
+  }
+
   const slipped: SlippedTask[] = [];
   for (const n of tasks.values()) {
     const s = rec(n.state);
@@ -103,6 +121,9 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
     const day = at.slice(0, 10);
     if (!isSlipped(n.id)) continue;
     if (hasSlippedAncestor(n.id)) continue; // it moves with that head
+    // A missed copy of a repeating plan: its series brings the next one by
+    // itself, so "Today" here would make a second copy.
+    if (repeatingTasks.has(n.id) || seriesAhead.has(String(s['text'] ?? ''))) continue;
     const followers: Array<{ id: string; text: string; time?: string }> = [];
     const seen = new Set<string>([n.id]);
     let frontier = nexts.get(n.id) ?? [];

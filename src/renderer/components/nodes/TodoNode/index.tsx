@@ -988,7 +988,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           if (q?.hint) {
             return (
               <div data-testid="todo-quick-preview" style={{ padding: '6px 14px 0', borderTop: '1px dashed var(--paper-3)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                Added as typed: {q.hint}
+                Will be added as typed: {q.hint}
               </div>
             );
           }

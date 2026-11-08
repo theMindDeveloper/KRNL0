@@ -2240,3 +2240,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/index.tsx`.
 **Summary:** A habit already ticked today still offered "Rest today", which changed nothing on screen (the tick wins) and left a stray rest day in the data. The menu now offers it only on a day not yet done; "Undo rest today" stays when a rest day is set.
+
+## [2026-11-08] — Welcome back leaves out missed copies of repeating plans (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `launch/catchup.ts`, `TodoNode/index.tsx` (hint wording), `Tour/tours.ts` (Rest step); test `dueOnDay.test.ts` (+1).
+**Summary:** Since a missed repeating plan now brings its next copy by itself, Welcome back listing the missed one with a "Today" button would have put a second copy on today. Missed copies whose series is still repeating (before or after the next copy is made) are no longer loose ends; plain missed plans still are. Also: the multi-day quick-add hint says "Will be added as typed", and the tour's Rest step asks for a habit not done today (a done day has no "Rest today").
