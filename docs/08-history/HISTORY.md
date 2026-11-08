@@ -2378,3 +2378,10 @@ Checked in the preview as a user (plain Enter, card day/length/deadline, words f
 **Branch:** `experiment/new-user-review`
 **Summary:** Picking six days made the Add button read every day and grow, resizing the whole habit card. Six days now read "all but Tue", and a long button label is cut instead of growing the card. (`HabitNode/HabitAddAsk.tsx`)
 Follow-up: the Add button now has one fixed size (184 px) and the footer never wraps, so the button no longer drops to its own line when the label gets longer; "Not ticked? Calendar →" sits on two lines beside it.
+
+## [2026-11-08] — Habit card: three designs to try in the app (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitAddAsk.tsx`.
+**Summary:** The habit card is rebuilt in the three directions from the canvas ("Adding a habit · three drafts"), with an **A · B · C** switch in its header so they can be tried on real habits: **A** labelled rows (days, then Time and Goal), **B** a sentence whose words open one editor box, **C** three tiles (Days · Time · Goal) with the editor below. All three keep one fixed height, the goal is one control ("− 8 + glasses", unit typed or picked), and Add is a full-width button. The choice is remembered on the computer; the switch goes once one is picked. Habit tests green.
