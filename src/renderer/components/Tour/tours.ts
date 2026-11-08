@@ -63,7 +63,7 @@ export function stepsFor(tour: Tour, mode: 'easy' | 'advanced'): TourStep[] {
 
 // ── board predicates ───────────────────────────────────────────────────────
 type Item = { done?: boolean };
-type HabitLite = { log?: string[]; kind?: string; exceptions?: unknown[]; endsOn?: string };
+type HabitLite = { log?: string[]; kind?: string; exceptions?: unknown[]; endsOn?: string; perWeek?: number; rest?: string[] };
 const tasks = (b: Board) => b.nodes.filter((n) => n.kind === 'todo.task');
 const pomoState = (b: Board) => b.nodes.find((n) => n.kind === 'pomo')?.state as { status?: string; history?: unknown[] } | undefined;
 const habits = (b: Board) => ((b.nodes.find((n) => n.kind === 'habit' && n.isMother)?.state as { habits?: HabitLite[] } | undefined)?.habits ?? []);
@@ -88,6 +88,16 @@ const routineAdded = (now: Board, start: Board) => routineCount(now) > routineCo
 const routineSkipped = (now: Board, start: Board) => exceptionCount(now) > exceptionCount(start);
 const routineEnded = (now: Board, start: Board) => endedCount(now) > endedCount(start);
 const taskDone = (now: Board, start: Board) => doneCount(now) > doneCount(start);
+// "Staying on track" tour: weekly targets, rest days, due dates, reminders.
+const targetsKey = (b: Board) => habits(b).map((h) => h.perWeek ?? 0).join(',');
+const restCount = (b: Board) => habits(b).reduce((n, h) => n + (h.rest?.length ?? 0), 0);
+const todoItems = (b: Board) => ((b.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as { items?: Array<{ dueOn?: string }> } | undefined)?.items ?? []);
+const dueKey = (b: Board) => todoItems(b).map((i) => i.dueOn ?? '').join(',');
+const remindCount = (b: Board) => tasks(b).filter((n) => typeof (n.state as { remindMin?: unknown }).remindMin === 'number').length;
+const targetSet = (now: Board, start: Board) => targetsKey(now) !== targetsKey(start) && habits(now).some((h) => !!h.perWeek);
+const restAdded = (now: Board, start: Board) => restCount(now) > restCount(start);
+const dueSet = (now: Board, start: Board) => dueKey(now) !== dueKey(start) && todoItems(now).some((i) => !!i.dueOn);
+const remindSet = (now: Board, start: Board) => remindCount(now) > remindCount(start);
 const taskScheduled = (now: Board, start: Board) => scheduledCount(now) > scheduledCount(start);
 
 const POMO = '[data-tour="mother-pomo"]';
@@ -217,6 +227,19 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'SKIP ONE', text: 'No class next time? **Click the band** and choose **Skip this one**. Only that day changes.', waitFor: { board: routineSkipped }, hint: 'Waiting for a skipped routine…' },
       { node: 'mother-habit', target: '[data-testid="habit-add-input"]', badge: 'NO SET TIME', text: 'For a habit like **No sugar**, answer **Yes** (you tick it) and **Any time**: it is ticked in the grid and never sits at a made-up hour.' },
       { node: 'mother-habit', target: HABIT, badge: 'END, DON’T DELETE', text: 'Semester over? **Right-click** the routine and **End routine** — its history stays, and **Restart** is in the node’s settings.', waitFor: { board: routineEnded }, hint: 'Waiting for an ended routine… (or Skip)' },
+    ],
+  },
+  {
+    id: 'on-track',
+    title: 'Staying on track',
+    summary: 'Weekly targets, rest days, due dates, reminders',
+    steps: [
+      { node: 'mother-habit', target: HABIT, badge: 'REAL LIFE', text: 'Not every week goes to plan. Four things keep you on track without lying to the app: **weekly targets**, **rest days**, **due dates** and **reminders**.' },
+      { node: 'mother-habit', target: HABIT, badge: 'TIMES A WEEK', text: '**Right-click** a habit and choose **Times a week…** — say **3×**. Any days count, and the streak counts weeks that reach it.', waitFor: { board: targetSet }, hint: 'Waiting for a weekly target… (or Skip)' },
+      { node: 'mother-habit', target: HABIT, badge: 'REST DAY', text: 'Sick or away? **Right-click** a habit and choose **Rest today**. A rest day never breaks a streak — it shows as a quiet hatch.', waitFor: { board: restAdded }, hint: 'Waiting for a rest day… (or Skip)' },
+      { node: 'mother-todo', target: TODO, badge: 'DUE BY', text: 'A plan can have a deadline apart from its time. **Right-click** a Todo row and choose **Due date…** — the row shows *due Fri*, and the Clock lists what is due.', waitFor: { board: dueSet }, hint: 'Waiting for a due date… (or Skip)' },
+      { node: 'mother-todo', target: TODO, badge: 'REMIND ME', text: 'Want a nudge? **Right-click** a planned row and choose **Remind me…**. A notification comes before it starts, even with the window closed.', waitFor: { board: remindSet }, hint: 'Waiting for a reminder… (or Skip)' },
+      { node: 'mother-todo', target: TODO, badge: 'DROP IT', text: 'Not doing something any more? **Drop (not doing it)** moves it to the **Archive** — not done, not deleted, and its checkbox there brings it back.' },
     ],
   },
   {

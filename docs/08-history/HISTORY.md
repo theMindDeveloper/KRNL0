@@ -1902,3 +1902,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/routines`
 **Files changed:** `HabitNode/commands.ts` (`habitStreak`), `HabitNode/index.tsx` (Week, Month and Year rows), `HabitLaneNode/index.tsx`, `ui/TaskInfoPopup.tsx`, `CalendarNode/WeekView.tsx` (drop dialog), `sys/commands/habit.ts`; test `habit.restDays.test.ts` (+1).
 **Summary:** Found in review: weekly targets and rest days reached only the Week view's row and the CLI. The Month and Year rows, the habit lane, the plan popup and the Calendar's drop dialog still counted plain day streaks — mark a rest day, switch the node to Month, and the streak dropped back; a 3×-a-week habit showed a day streak on its lane. Every screen now asks one helper, `habitStreak(habit, today)` → current, best and unit (weeks for a target, rest days stepped over); the lane reads "3w streak", the popup "streak 3 weeks", the Month/Year badge "3w".
+
+## [2026-11-08] — "Staying on track" tour; a tour no longer hides the menu its step asks for
+
+**Type:** Feature (tutorial) + Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `Tour/tours.ts` (`on-track` tour + predicates), `Tour/TourHost.tsx` (`coveringPanel`), `tests/unit/renderer/tours.test.tsx`.
+**Summary:** The workflow rule says a feature is done only once its tour exists and has run. New tour **Staying on track** (Help → Tutorials, `krnl tour start on-track`): weekly targets (Times a week… → 3×), rest days (Rest today), due dates (Due date…), reminders (Remind me…) and dropping a plan — each step waits for the real action. Running it in the app found a bug: the tour fades out any fixed panel covering the window it points at, and that included the right-click menu the step had just asked for, so "right-click a habit and choose Times a week…" could not be done. Menus and popovers (layered at popover level or above) are now never tucked. Run once in the preview, all six steps with real clicks.
