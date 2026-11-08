@@ -250,6 +250,18 @@ export function focusNode(nodeId: string): void {
   window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { nodeId } }));
 }
 
+/** "Show on canvas": centre the plan's card on the canvas and make it blink. */
+export function showTaskOnCanvas(taskId: string): void {
+  focusNode(taskId);
+  window.setTimeout(() => {
+    const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(taskId)}"]`);
+    el?.animate(
+      [{ boxShadow: '0 0 0 0 var(--acid)' }, { boxShadow: '0 0 0 5px var(--acid)' }, { boxShadow: '0 0 0 0 var(--acid)' }],
+      { duration: 700, iterations: 3, easing: 'ease-in-out' },
+    );
+  }, 450);
+}
+
 /** Window event the Calendar listens for to bring a task block into view and pulse it. */
 export const CALENDAR_REVEAL_EVENT = 'krnl:calendar-reveal';
 
@@ -262,7 +274,11 @@ export async function showTaskOnCalendar(taskId: string): Promise<void> {
   const board = useBoardStore.getState().board;
   // The block's real start: a chain successor has no scheduledFor, and a
   // pushed anchor (Decision 30) can land on a later day than it stores.
-  const when = placementOf(taskId)?.startISO;
+  const placed = placementOf(taskId)?.startISO;
+  // Decision 40 — a plan on a day at any time sits in the ANY TIME strip.
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const item = (todo?.state as { items?: Array<{ id: string; taskNodeId: string | null; onDay?: string }> } | undefined)?.items?.find((i) => i.taskNodeId === taskId);
+  const when = placed ?? (item?.onDay ? `${item.onDay}T00:00` : undefined);
   const cal = board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
   if (!when || !cal) return;
   const d = new Date(when);
@@ -277,7 +293,7 @@ export async function showTaskOnCalendar(taskId: string): Promise<void> {
   if (board?.layoutMode !== 'station') focusNode(cal.id);
   // After the calendar re-renders on the new week.
   window.setTimeout(() => {
-    window.dispatchEvent(new CustomEvent(CALENDAR_REVEAL_EVENT, { detail: { taskId, startISO: when } }));
+    window.dispatchEvent(new CustomEvent(CALENDAR_REVEAL_EVENT, { detail: placed ? { taskId, startISO: when } : { taskId, itemId: item?.id } }));
   }, 120);
 }
 

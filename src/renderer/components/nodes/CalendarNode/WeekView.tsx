@@ -4,7 +4,7 @@
 // rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
 // HabitSwapModal. NowLine is rendered as an overlay.
 
-import { CALENDAR_REVEAL_EVENT, unscheduleTask } from '../../../store/scheduleActions';
+import { CALENDAR_REVEAL_EVENT, showTaskOnCanvas, unscheduleTask } from '../../../store/scheduleActions';
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -989,8 +989,18 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   // task and pulse its block.
   useEffect(() => {
     const onReveal = (e: Event) => {
-      const det = (e as CustomEvent<{ taskId?: string; startISO?: string }>).detail;
+      const det = (e as CustomEvent<{ taskId?: string; startISO?: string; itemId?: string }>).detail;
       const el = gridBodyRef.current;
+      if (det?.itemId) {
+        // An any-time plan: blink its chip in the ANY TIME strip.
+        window.setTimeout(() => {
+          document.querySelector<HTMLElement>(`[data-testid="calendar-day-only-${CSS.escape(det.itemId!)}"]`)?.animate(
+            [{ boxShadow: '0 0 0 0 var(--acid)' }, { boxShadow: '0 0 0 3px var(--acid)' }, { boxShadow: '0 0 0 0 var(--acid)' }],
+            { duration: 700, iterations: 3, easing: 'ease-in-out' },
+          );
+        }, 80);
+        return;
+      }
       if (!det?.taskId || !el) return;
       const start = det.startISO ? new Date(det.startISO) : null;
       if (start && !Number.isNaN(start.getTime())) {
@@ -2773,7 +2783,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 {renderRealityBlocks(dayYMD)}
 
                 {/* App open / close markers (thin dashed lines). */}
-                {renderAppMarkers(dayYMD)}
+                {/* App open / close times are still recorded (time log), but no longer drawn: the user found the lines noisy. */}
 
                 {/* Habit blocks (zIndex: 1 — behind tasks) */}
                 {renderHabitBlocks(dayYMD)}
@@ -2886,7 +2896,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             actions={[
               { key: 'timer', label: observe ? 'Track it now' : 'Focus on it', icon: observe ? 'observe' : 'play', onClick: () => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); close(); } },
               { key: 'done', label: taskPopup.task.done ? 'Not done yet' : 'Mark done', icon: taskPopup.task.done ? 'undo' : 'check', onClick: () => { void toggleTaskDone(taskPopup.task.id); close(); } },
-              { key: 'find', label: 'Show its card', icon: 'find', onClick: () => { jumpToTaskNode(taskPopup.task.id); close(); } },
+              { key: 'find', label: 'Show on canvas', icon: 'show', onClick: () => { const t = taskPopup.task.id; close(); showTaskOnCanvas(t); } },
               { key: 'delete', label: 'Delete', icon: 'delete', danger: true, onClick: () => { void deletePlanOfTask(taskPopup.task.id); close(); } },
             ]}
             onApply={(next) => { void applyPlanWhen(plan, next); close(); }}

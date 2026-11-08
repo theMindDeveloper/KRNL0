@@ -5,6 +5,7 @@ import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
+import { MenuIcon } from '../../ui/menuIcons';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import { useShallow } from 'zustand/react/shallow';
@@ -344,7 +345,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     },
     // Only for tasks that are on the calendar (anchors and chain successors).
     ...(onCalendar
-      ? [{ label: 'Show on calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTaskOnCalendar(taskId)); } }]
+      ? [{ label: 'Show on Calendar', icon: <MenuIcon name="show" />, onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTaskOnCalendar(taskId)); } }]
       : []),
     {
       label: 'Delete',

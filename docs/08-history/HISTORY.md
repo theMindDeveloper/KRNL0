@@ -2352,3 +2352,10 @@ Checked in the preview as a user (plain Enter, card day/length/deadline, words f
 **Branch:** `experiment/new-user-review`
 **Files changed:** `ui/WhenPopover.tsx` (controlled mode, `anchorAbove`, `primaryLabel`), `TodoNode/index.tsx`, `TodoNode/PlanAddCard.tsx` (helpers only now).
 **Summary:** Adding a plan had its own card (a week of day circles with no dates) while a row's When… and a Calendar block showed the month calendar card — two looks for one thing, and the add card could not say which Tuesday. Typing a plan now opens the same plan card: its name, When / Deadline tabs, the month calendar, Any time or a time, length, reminder, and an **Add** button. It follows the words as you type ("Essay tue 16:00 1h" selects Tue 10, 16:00, 1h), anything picked on the card wins, the text field keeps the focus, Enter adds, Esc cancels. A plain name and Enter still adds a plain plan.
+
+## [2026-11-08] — Show on canvas / Show on Calendar, no open-close lines (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/scheduleActions.ts` (`showTaskOnCanvas`, any-time plans in `showTaskOnCalendar`), `TodoNode/index.tsx`, `TaskNode/index.tsx`, `CalendarNode/WeekView.tsx`, `ui/menuIcons.tsx`.
+**Summary:** A plan's right-click menu has two eye items: **Show on canvas** centres its card and makes it blink; **Show on Calendar** opens the Calendar on its day and blinks the block (or its chip in the ANY TIME strip). Show on Calendar is greyed out with "no day yet" when the plan has no day. The plan card has the same two actions, and on the Calendar "Show its card" became "Show on canvas". The Calendar no longer draws the dashed lines for when KRNL0 was first opened and last closed each day; the times are still recorded. 2,447 tests and typecheck green.
