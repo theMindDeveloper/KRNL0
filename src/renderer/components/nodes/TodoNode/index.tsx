@@ -630,16 +630,19 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         </span>
       )}
 
-      {/* Review 5.3 — a repeating plan. */}
-      {item.repeat && !item.done && (
-        <span data-testid={`todo-repeat-${item.id}`} title={`Repeats ${describeTaskRepeat(item.repeat)} — tick it off and the next one appears`} style={{ display: 'inline-flex', color: 'var(--ink-3)', flexShrink: 0 }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" /></svg>
-        </span>
-      )}
-      {/* Review 4.1 — a reminder is set (it fires while the plan is on the Calendar). */}
-      {item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined && !item.done && (
-        <span data-testid={`todo-remind-${item.id}`} title={`Reminder ${remindByTask[item.taskNodeId] === 0 ? 'at the start' : `${remindByTask[item.taskNodeId]} min before`}`} style={{ display: 'inline-flex', color: 'var(--ink-3)', flexShrink: 0 }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" /></svg>
+      {/* Review 5.3 / 4.1 — repeats and a reminder: one tight group of small marks. */}
+      {!item.done && (item.repeat || (item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined)) && (
+        <span style={{ display: 'inline-flex', gap: 2, color: 'var(--ink-3)', flexShrink: 0 }}>
+          {item.repeat && (
+            <span data-testid={`todo-repeat-${item.id}`} title={`Repeats ${describeTaskRepeat(item.repeat)} — tick it off and the next one appears`} style={{ display: 'inline-flex' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" /></svg>
+            </span>
+          )}
+          {item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined && (
+            <span data-testid={`todo-remind-${item.id}`} title={`Reminder ${remindByTask[item.taskNodeId] === 0 ? 'at the start' : `${remindByTask[item.taskNodeId]} min before`}`} style={{ display: 'inline-flex' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" /></svg>
+            </span>
+          )}
         </span>
       )}
       {/* Review 2.1 — the deadline, apart from when it is planned. */}
@@ -659,7 +662,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               border: `1px solid color-mix(in srgb, ${col} 55%, transparent)`, background: 'transparent', color: col,
             }}
           >
-            {d.text}
+            {d.text.startsWith('due ') ? <><span className="todo-due-word">due </span>{d.text.slice(4)}</> : d.text}
           </button>
         );
       })()}

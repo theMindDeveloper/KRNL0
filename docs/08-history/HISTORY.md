@@ -2039,3 +2039,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `ChassisLayer/TelemetryChrome.tsx`, `Dock/index.tsx`, `MotherFrame/index.tsx`, `TopBar/PocketSection.tsx`.
 **Summary:** A sweep of visible labels and screen-reader names for internal words: "Jump to the habit window", "Add an image (I)", "Pick the window frame style", "Drag to swap with another window", and the floating timer's Box look is "The Pomo window itself".
+
+## [2026-11-08] — A busy Todo row still fits (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/index.tsx`, `styles/reactflow-theme.css`.
+**Summary:** A row with a due day, a repeat and a reminder pushed its PLAN button off the edge at Station width (351 px). The repeat and reminder marks now sit together in one tight group, and in a narrow row the due chip drops its "due " word ("tomorrow", "Fri" — the chip reads as a date). Nothing is hidden; PLAN fits again.

@@ -347,6 +347,8 @@
 @container (max-width: 420px) {
   .todo-plan__label { display: none; }
   .todo-tag { max-width: 72px !important; }
+  /* The due chip reads as a date on its own ("tomorrow", "Fri"). */
+  .todo-due-word { display: none; }
 }
 /* Narrower still: the tag is its colour dot alone (its name is in the tooltip
    and the picker) so the task name is not cut to a few letters. */
