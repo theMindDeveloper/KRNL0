@@ -48,6 +48,12 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('Standup every weekday 9:30', NOW)).toMatchObject({ text: 'Standup', repeat: { kind: 'weekdays' }, day: '2026-11-09', time: '09:30' });
     expect(describeQuickAdd(parseQuickAdd('Weekly review every sunday 18:00', NOW), NOW)).toBe('today 18:00 · repeats every Sunday');
   });
+  it('a range gives the start and the length', () => {
+    expect(parseQuickAdd('Meeting 14:00-15:30', NOW)).toEqual({ text: 'Meeting', day: '2026-11-08', time: '14:00', durationMin: 90 });
+    expect(parseQuickAdd('Gym 6pm-7pm tomorrow', NOW)).toEqual({ text: 'Gym', day: '2026-11-09', time: '18:00', durationMin: 60 });
+    expect(parseQuickAdd('Class 9-11am monday', NOW)).toEqual({ text: 'Class', day: '2026-11-09', time: '09:00', durationMin: 120 });
+    expect(parseQuickAdd('Pages 10-20', NOW)).toEqual({ text: 'Pages 10-20' }); // no clock words: not a time
+  });
   it('plain names are left alone', () => {
     expect(parseQuickAdd('Read chapter 3', NOW)).toEqual({ text: 'Read chapter 3' });
     expect(parseQuickAdd('Buy 2 m cable', NOW)).toEqual({ text: 'Buy 2 m cable' });

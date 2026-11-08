@@ -2163,3 +2163,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `tests/unit/main/board.newFields.roundtrip.test.ts` (new).
 **Summary:** Release rule: an update must open every older board and never drop data. Today's fields are all optional (no migration needed); node state is `z.unknown()` and the two load-time patches spread every field. The new test writes a board with every new field — due day, repeat, dropped, reminder, event kind, weekly target, amount and counts, rest days, a night-shift routine with a reminder and a skip — and loads it through the real loader: all kept.
+
+## [2026-11-08] — Quick add reads ranges: "Meeting 14:00-15:30" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Meeting 14:00-15:30" left "-15:30" in the name. A range now gives the start and the length: "14:00-15:30" (90 min), "6pm-7pm", "9-10am" (the am/pm of the end applies to the start). Numbers without clock words stay in the name ("Pages 10-20").

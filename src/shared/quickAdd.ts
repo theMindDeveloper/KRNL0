@@ -30,13 +30,29 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   const out: QuickAdd = { text: raw.trim() };
   const cut = (m: RegExpExecArray) => { s = s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length); };
 
-  // Time first ("5pm" must not be read as 5 minutes).
-  let m = /\b(?:at\s+)?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)\b/i.exec(s);
+  // A range first: "14:00-15:30", "6pm-7pm", "9-10am" — the start and the length.
+  let m: RegExpExecArray | null = /\b(?:from\s+)?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?\s?(?:-|–|to)\s?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?\b/i.exec(s);
+  if (m && (m[2] || m[5] || m[3] || m[6])) {
+    const endAp = m[6] ?? m[3];
+    const to24 = (h: number, ap?: string) => (ap ? (h % 12) + (ap.toLowerCase() === 'pm' ? 12 : 0) : h);
+    const h1 = to24(Number(m[1]), m[3] ?? endAp);
+    const h2 = to24(Number(m[4]), endAp);
+    const a1 = h1 * 60 + Number(m[2] ?? 0);
+    const a2 = h2 * 60 + Number(m[5] ?? 0);
+    if (h1 <= 23 && h2 <= 23 && a2 > a1) {
+      out.time = `${pad(h1)}:${pad(Number(m[2] ?? 0))}`;
+      out.durationMin = a2 - a1;
+      cut(m);
+    }
+  }
+
+  // Time ("5pm" must not be read as 5 minutes).
+  m = out.time ? null : /\b(?:at\s+)?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)\b/i.exec(s);
   if (m) {
     let h = Number(m[1]) % 12;
     if (m[3]!.toLowerCase() === 'pm') h += 12;
     if (Number(m[1]) <= 12) { out.time = `${pad(h)}:${m[2] ?? '00'}`; cut(m); }
-  } else {
+  } else if (!out.time) {
     m = /\b(?:at\s+)?([01]?\d|2[0-3]):([0-5]\d)\b/i.exec(s);
     if (m) { out.time = `${pad(Number(m[1]))}:${m[2]}`; cut(m); }
     else {
@@ -46,10 +62,10 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
     }
   }
 
-  // Length: "1h30", "1.5h", "2 hours", "45m", "45 min".
-  m = /\b(\d{1,2})h([0-5]\d)\b/i.exec(s);
+  // Length: "1h30", "1.5h", "2 hours", "45m", "45 min" (a range already gave one).
+  m = out.durationMin !== undefined ? null : /\b(\d{1,2})h([0-5]\d)\b/i.exec(s);
   if (m) { out.durationMin = Number(m[1]) * 60 + Number(m[2]); cut(m); }
-  else {
+  else if (out.durationMin === undefined) {
     m = /\b(?:for\s+)?(\d{1,2}(?:\.\d)?)\s?(?:h|hr|hrs|hour|hours)\b/i.exec(s);
     if (m) { out.durationMin = Math.round(Number(m[1]) * 60); cut(m); }
     else {
