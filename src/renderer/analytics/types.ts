@@ -73,7 +73,7 @@ export interface Totals {
 
 export interface StreakResult {
   longestHabitStreak: number;
-  perHabit: Array<{ habitId: string; label: string; streak: number }>;
+  perHabit: Array<{ habitId: string; label: string; streak: number; unit?: 'day' | 'week' }>;
 }
 
 export interface OpenCounters {
