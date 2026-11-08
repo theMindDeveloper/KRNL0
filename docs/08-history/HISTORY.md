@@ -2233,3 +2233,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/quickAdd.ts`, `TodoNode/index.tsx`, `src/sys/commands/todo.ts`; test `quickAdd.test.ts` (+1).
 **Summary:** "Gym every monday and thursday" took "every monday" as the repeat and "thursday" as the first day, so the plan started on a Thursday that did not match its own repeat. A plan repeats on one weekday, so on several days quick add now reads none of it and says why under the field: "Added as typed: a plan repeats on one weekday; for several days, add a routine in Habits". `todo add` says the same.
+
+## [2026-11-08] — "Rest today" is not offered on a day already done (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`.
+**Summary:** A habit already ticked today still offered "Rest today", which changed nothing on screen (the tick wins) and left a stray rest day in the data. The menu now offers it only on a day not yet done; "Undo rest today" stays when a rest day is set.

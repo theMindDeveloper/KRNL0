@@ -252,9 +252,11 @@ export function HabitNode({
     const tgt = weeklyTarget(h);
     return [
       { label: h.schedule ? 'Edit repeat…' : 'Repeat…', onClick: () => edit('habit') },
-      (h.rest ?? []).includes(today)
-        ? { label: 'Undo rest today', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: false }) }
-        : { label: 'Rest today (keeps the streak)', testId: 'habit-menu-rest', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: true }) },
+      // A day already done needs no rest (the tick wins on screen anyway).
+      ...((h.rest ?? []).includes(today)
+        ? [{ label: 'Undo rest today', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: false }) }]
+        : h.log.includes(today) ? []
+        : [{ label: 'Rest today (keeps the streak)', testId: 'habit-menu-rest', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: true }) }]),
       { label: h.amount ? `Amount a day: ${h.amount.target}${h.amount.unit ? ` ${h.amount.unit}` : ''}…` : 'Amount a day…', testId: 'habit-menu-amount', onClick: () => setAmountEdit({ habitId: h.id, target: h.amount?.target ?? null, unit: h.amount?.unit ?? '', x: at.x, y: at.y }) },
       { label: tgt ? `Times a week: ${tgt}…` : 'Times a week…', testId: 'habit-menu-target', onClick: () => setTargetEdit({ habitId: h.id, value: tgt, x: at.x, y: at.y }) },
       // A routine needs a time: with one it switches at once, without one the editor asks.
