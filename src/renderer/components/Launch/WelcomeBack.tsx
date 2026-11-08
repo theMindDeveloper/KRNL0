@@ -227,8 +227,8 @@ export function WelcomeBack() {
                       </div>
                       <div className="wb-habit__say">
                         {h.broken
-                          ? <>Start again today <span>· best {h.best}</span></>
-                          : <span className="wb-going"><Icon name="flame" size={12} />{h.current} {h.current === 1 ? 'day' : 'days'}, still going</span>}
+                          ? <>Start again {h.unit === 'week' ? 'this week' : 'today'} <span>· best {h.best}{h.unit === 'week' ? 'w' : ''}</span></>
+                          : <span className="wb-going"><Icon name="flame" size={12} />{h.current} {h.unit === 'week' ? (h.current === 1 ? 'week' : 'weeks') : h.current === 1 ? 'day' : 'days'}, still going</span>}
                       </div>
                     </div>
                   );

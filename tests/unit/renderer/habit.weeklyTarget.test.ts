@@ -59,6 +59,14 @@ describe('model', () => {
     expect(on.habits[0]!.perWeek).toBe(4);
     expect('perWeek' in habitSetTarget(on, { id: 'h1', perWeek: null }).habits[0]!).toBe(false);
   });
+  it('Welcome back counts a weekly-target habit in weeks', () => {
+    const log = ['2026-10-19', '2026-10-21', '2026-10-23', '2026-10-26', '2026-10-28', '2026-10-30'];
+    const board = { nodes: [{ id: 'h', kind: 'habit', isMother: true, state: { habits: [{ id: 'g', name: 'Gym', log, archived: false, perWeek: 3 }] } }], edges: [] };
+    const hs = computeCatchup(board as never, '2026-11-04').habits;
+    expect(hs).toHaveLength(1);
+    expect(hs[0]).toMatchObject({ current: 2, unit: 'week', broken: false });
+  });
+
   it('Welcome back never lists a weekly-target habit as a broken day streak', () => {
     const board = { nodes: [{ id: 'h', kind: 'habit', isMother: true, state: { habits: [{ id: 'g', name: 'Gym', log: ['2026-10-20', '2026-10-21'], archived: false, perWeek: 3 }] } }], edges: [] };
     expect(computeCatchup(board as never, '2026-11-04').habits).toEqual([]);

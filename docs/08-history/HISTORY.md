@@ -2177,3 +2177,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
 **Summary:** "Call back in 2 hours" took "2 hours" as the length. "in N min / N hours" is now a start time from now, rounded up to the next 5 minutes (crossing midnight moves it to tomorrow); a length can still follow ("Stretch in 15 min for 10 min").
+
+## [2026-11-08] — Welcome back counts weekly-target habits in weeks (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `launch/catchup.ts`, `Launch/WelcomeBack.tsx`; test `habit.weeklyTarget.test.ts` (+1).
+**Summary:** Welcome back left weekly-target habits out entirely ("Gym 3× a week" never showed, even after a missed week). It now asks the same `habitStreak` as every other screen: "2 weeks, still going" or "Start again this week · best 4w".

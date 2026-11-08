@@ -6,7 +6,7 @@
 // or is still going. Shared by the dialog and `krnl catchup`. Nothing here
 // changes the board: every fix is a button the user presses.
 
-import { calcStreak } from '../components/nodes/HabitNode/commands';
+import { calcStreak, habitStreak } from '../components/nodes/HabitNode/commands';
 import { dueOnDay, type DueItem } from '../../shared/dueOn';
 import { isDayScheduled } from '../components/nodes/HabitNode/types';
 import type { HabitSchedule } from '../components/nodes/HabitNode/types';
@@ -40,6 +40,8 @@ export interface HabitCatchup {
   log: string[];
   /** Colour token name (acid, cyan, …). */
   color: string;
+  /** A weekly target ("3 a week") counts weeks. Absent = days. */
+  unit?: 'week';
 }
 
 export interface Catchup {
@@ -130,15 +132,13 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
       const h = rec(raw);
       // Routines are never ticked, so never "broken" (Decision 39).
       if (h['archived'] === true || h['kind'] === 'routine' || typeof h['id'] !== 'string') continue;
-      // A weekly target ("3 a week") has no missed days to catch up on.
-      if (typeof h['perWeek'] === 'number') continue;
       const log = Array.isArray(h['log']) ? h['log'].filter((d): d is string => typeof d === 'string') : [];
       const schedule = h['schedule'] as HabitSchedule | undefined;
       const rest = Array.isArray(h['rest']) ? h['rest'].filter((d): d is string => typeof d === 'string') : [];
-      const current = calcStreak(log, today, schedule, rest);
-      const best = bestStreak(log, schedule, rest);
-      if (current === 0 && best < 2) continue;
-      habits.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current, best, broken: current === 0, log, color: typeof h['color'] === 'string' ? h['color'] : 'acid' });
+      // The same streak as the Habit node: a weekly target ("3 a week") counts weeks.
+      const s = habitStreak({ log, ...(schedule ? { schedule } : {}), rest, ...(typeof h['perWeek'] === 'number' ? { perWeek: h['perWeek'] } : {}) }, today);
+      if (s.current === 0 && s.best < 2) continue;
+      habits.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current: s.current, best: s.best, broken: s.current === 0, log, color: typeof h['color'] === 'string' ? h['color'] : 'acid', ...(s.unit === 'week' ? { unit: 'week' as const } : {}) });
     }
   }
   habits.sort((a, b) => Number(b.broken) - Number(a.broken) || b.best - a.best);
