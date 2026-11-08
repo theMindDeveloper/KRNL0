@@ -13,11 +13,13 @@ interface Props {
   value: string | null;
   onPick: (dueOn: string | null) => void;
   onClose: () => void;
+  /** False for a repeating plan with no Calendar time: it needs a day. */
+  canClear?: boolean;
 }
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-export function DuePicker({ x, y, today, value, onPick, onClose }: Props) {
+export function DuePicker({ x, y, today, value, onPick, onClose, canClear = true }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -82,7 +84,7 @@ export function DuePicker({ x, y, today, value, onPick, onClose }: Props) {
             );
           })}
         </div>
-        {value !== null && (
+        {value !== null && canClear && (
           <button type="button" data-testid="due-clear" onClick={() => onPick(null)}
             style={{ alignSelf: 'flex-start', height: 26, padding: '0 10px', borderRadius: 7, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12 }}>
             No due date

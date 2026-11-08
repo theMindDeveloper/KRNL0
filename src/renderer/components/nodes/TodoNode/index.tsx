@@ -1162,6 +1162,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           value={state.items.find((i) => i.id === duePick.itemId)?.dueOn ?? null}
           onPick={(dueOn) => { onCommand('todo.setDue', { id: duePick.itemId, dueOn }); setDuePick(null); }}
           onClose={() => setDuePick(null)}
+          canClear={(() => {
+            // A repeating plan with no Calendar time needs its day (Repeat… → Off ends it instead).
+            const it = state.items.find((i) => i.id === duePick.itemId);
+            return !(it?.repeat && !(it.taskNodeId && taskScheduledInfo.has(it.taskNodeId)));
+          })()}
         />
       )}
       {tagPicker !== null && (() => {

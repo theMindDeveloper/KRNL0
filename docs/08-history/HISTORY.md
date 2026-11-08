@@ -2275,3 +2275,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
 **Summary:** "Lunch with Sam at noon friday" kept "at noon" in the name. "noon" and "midday" now read as 12:00.
+
+## [2026-11-08] — A repeating plan keeps its day (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/DuePicker.tsx` (`canClear`), `TodoNode/index.tsx`.
+**Summary:** "No due date" on a repeating plan with no Calendar time made it repeat on no day again. The due picker no longer offers it there; the plan can move to another day, and Repeat… → Off ends the series.
