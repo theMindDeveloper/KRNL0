@@ -1942,3 +1942,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `launch/catchup.ts` (`due`, `isEmptyCatchup`), `Launch/WelcomeBack.tsx`, `docs/research/new-user-review-2026-11-08.md`; tests `dueOnDay.test.ts` (+1), `habit.weeklyTarget.test.ts` (passed a timestamp where a day was meant).
 **Summary:** New-user review 4.3, second half: Welcome back has a **Due** section — open Todo items due today or overdue, overdue first ("overdue · was due Fri 6" in rust). A missed deadline is reason enough to open Welcome back; something merely due today is shown when it opens anyway. Checked in the preview.
+
+## [2026-11-08] — Habit amounts: "8 glasses a day" (review 3.2, experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/types.ts` (`amount`, `counts`, `countOn`), `HabitNode/commands.ts` (`habitSetAmount`, `habitSetCount`; `habitToggleDay` / `habitMarkDone` count on amount habits), `HabitNode/index.tsx`, `Canvas/commandDispatch.ts`, `Tour/tours.ts` (+ amount step), `sys/commands/habit.ts` (`habit amount`, `habit count`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; tests `habit.amount.test.ts` (new, 5), `tours.test.tsx`.
+**Summary:** "8 glasses of water", "20 pages" were a yes/no tick. A habit can now have an amount a day (right-click → **Amount a day…**: 2–20 chips and a unit, or **Plain tick**). Each click on a day adds one — the cell fills from the bottom — and the day is done (in the log, so streaks, rest days and weekly targets work unchanged) once the amount is reached; one more click starts the day again from 0. The row reads "2 of 8 glasses today". A day ticked before the amount was set counts as full; a Pomo edge fills the day. `krnl habit amount <ref> <n|off> [unit]`, `krnl habit count <ref> <n> [--on]`. The Staying on track tour gained an amount step; run end to end in the preview (7/7).

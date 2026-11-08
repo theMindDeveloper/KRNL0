@@ -21,7 +21,7 @@ import { createPortal } from 'react-dom';
 import { RepeatEditor, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
 import { HabitAddAsk, type AddAnswer } from './HabitAddAsk';
 import { RemindPicker } from '../../ui/RemindPicker';
-import { weeklyTarget } from './types';
+import { countOn, weeklyTarget } from './types';
 import { RoutineShelf, routineStatus } from './RoutineShelf';
 import { isRoutine } from './types';
 import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
@@ -140,6 +140,8 @@ export function HabitNode({
   );
   // A routine's reminder (menu → "Remind me…").
   const [routineRemind, setRoutineRemind] = useState<{ habitId: string; value: number | null; x: number; y: number } | null>(null);
+  // A habit's daily amount (menu → "Amount a day…"): "8 glasses".
+  const [amountEdit, setAmountEdit] = useState<{ habitId: string; target: number | null; unit: string; x: number; y: number } | null>(null);
   // A habit's weekly target (menu → "Times a week…"): 1–6, or none.
   const [targetEdit, setTargetEdit] = useState<{ habitId: string; value: number | null; x: number; y: number } | null>(null);
   // Edit how an existing habit / routine repeats (menu → "Edit repeat…").
@@ -241,6 +243,7 @@ export function HabitNode({
       (h.rest ?? []).includes(today)
         ? { label: 'Undo rest today', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: false }) }
         : { label: 'Rest today (keeps the streak)', testId: 'habit-menu-rest', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: true }) },
+      { label: h.amount ? `Amount a day: ${h.amount.target}${h.amount.unit ? ` ${h.amount.unit}` : ''}…` : 'Amount a day…', testId: 'habit-menu-amount', onClick: () => setAmountEdit({ habitId: h.id, target: h.amount?.target ?? null, unit: h.amount?.unit ?? '', x: at.x, y: at.y }) },
       { label: tgt ? `Times a week: ${tgt}…` : 'Times a week…', testId: 'habit-menu-target', onClick: () => setTargetEdit({ habitId: h.id, value: tgt, x: at.x, y: at.y }) },
       // A routine needs a time: with one it switches at once, without one the editor asks.
       { label: 'Turn into routine', onClick: () => (h.schedule?.timeOfDay ? onCommand('habit.setKind', { id: h.id, kind: 'routine' }) : edit('routine')) },
@@ -470,6 +473,53 @@ export function HabitNode({
           onPick={(min) => { onCommand('habit.setRemind', { id: routineRemind.habitId, min }); setRoutineRemind(null); }}
           onClose={() => setRoutineRemind(null)}
         />
+      )}
+      {amountEdit && createPortal(
+        <>
+          <div onMouseDown={(e) => { e.stopPropagation(); setAmountEdit(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+          <div
+            data-testid="habit-amount-pop"
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed', left: Math.min(amountEdit.x, window.innerWidth - 300), top: Math.min(amountEdit.y, window.innerHeight - 200),
+              width: 284, zIndex: Z.popover, padding: 14, borderRadius: 12, background: 'var(--paper)', boxSizing: 'border-box',
+              border: '1px solid var(--paper-3)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 10, fontFamily: 'var(--font-sans)',
+            }}
+          >
+            <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.4 }}>How much a day? Each click on the day adds one; the day counts once it is reached.</div>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {[2, 3, 4, 5, 6, 8, 10, 20].map((n) => (
+                <button key={n} type="button" data-testid={`habit-amount-${n}`}
+                  onClick={() => setAmountEdit((cur) => (cur ? { ...cur, target: n } : cur))}
+                  style={{ minWidth: 34, height: 30, borderRadius: 999, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 650,
+                    border: `1px solid ${amountEdit.target === n ? 'var(--acid)' : 'var(--paper-3)'}`, background: amountEdit.target === n ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent', color: 'var(--ink)' }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <input
+              data-testid="habit-amount-unit"
+              value={amountEdit.unit}
+              placeholder="unit, e.g. glasses, pages, km"
+              maxLength={24}
+              onChange={(e) => setAmountEdit((cur) => (cur ? { ...cur, unit: e.target.value } : cur))}
+              style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)', fontFamily: 'var(--font-sans)', fontSize: 12.5, outline: 'none' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <button type="button" data-testid="habit-amount-off" onClick={() => { onCommand('habit.setAmount', { id: amountEdit.habitId, target: null }); setAmountEdit(null); }}
+                style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12 }}>
+                Plain tick
+              </button>
+              <button type="button" data-testid="habit-amount-save" disabled={amountEdit.target === null}
+                onClick={() => { if (amountEdit.target !== null) onCommand('habit.setAmount', { id: amountEdit.habitId, target: amountEdit.target, unit: amountEdit.unit }); setAmountEdit(null); }}
+                style={{ height: 30, padding: '0 14px', borderRadius: 8, border: 'none', background: amountEdit.target === null ? 'var(--paper-3)' : 'var(--btn-primary-bg)', color: amountEdit.target === null ? 'var(--ink-4)' : 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12.5, fontWeight: 650 }}>
+                {amountEdit.target === null ? 'Pick an amount' : `Save · ${amountEdit.target}${amountEdit.unit.trim() ? ` ${amountEdit.unit.trim()}` : ''} a day`}
+              </button>
+            </div>
+          </div>
+        </>,
+        document.body,
       )}
       {targetEdit && createPortal(
         <>
@@ -741,9 +791,17 @@ const WeekRow = memo(function WeekRow({
             const resting = !done && restSet.has(dayStr);
             const cls = cellClass(dayStr, today, done, 'week', scheduled) + (resting ? ' habit-cell--rest' : '');
             const size = { width: WEEK_CELL_SIZE, height: WEEK_CELL_SIZE };
+            // An amount ("8 glasses"): the cell fills from the bottom as the day's count grows.
+            const cnt = habit.amount ? countOn(habit, dayStr) : 0;
+            const partial = habit.amount && !done && cnt > 0 ? Math.min(1, cnt / habit.amount.target) : 0;
             const tip = !scheduled
               ? `${habit.name} ${dayStr} — not scheduled`
-              : resting ? `${habit.name} ${dayStr} — rest day (the streak carries on)` : `${habit.name} ${dayStr}`;
+              : resting ? `${habit.name} ${dayStr} — rest day (the streak carries on)`
+              : habit.amount ? `${habit.name} ${dayStr} — ${cnt} of ${habit.amount.target}${habit.amount.unit ? ` ${habit.amount.unit}` : ''}`
+              : `${habit.name} ${dayStr}`;
+            const cellStyle = partial > 0
+              ? { ...size, background: `linear-gradient(to top, color-mix(in srgb, var(--habit-color, var(--acid)) 75%, transparent) ${Math.round(partial * 100)}%, transparent ${Math.round(partial * 100)}%)` }
+              : size;
             return isFuture || !scheduled ? (
               <div key={dayStr} className={cls} style={size} title={tip} />
             ) : (
@@ -751,8 +809,8 @@ const WeekRow = memo(function WeekRow({
                 key={dayStr}
                 type="button"
                 className={cls}
-                style={size}
-                title={`${tip} — click to toggle`}
+                style={cellStyle}
+                title={`${tip} — click to ${habit.amount ? 'add one' : 'toggle'}`}
                 onClick={(e) => { e.stopPropagation(); onToggle(habit.id, dayStr); }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -808,6 +866,15 @@ const WeekRow = memo(function WeekRow({
             </span>
           )
           : target ? null : <span>{best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
+        {habit.amount && (() => {
+          const c = countOn(habit, today);
+          const t = habit.amount.target;
+          return (
+            <span data-testid={`habit-amount-${habit.id}`} style={{ color: c >= t ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>
+              {'· '}{Math.min(c, t)} of {t}{habit.amount.unit ? ` ${habit.amount.unit}` : ''} today{c >= t ? ' ✓' : ''}
+            </span>
+          );
+        })()}
         {target !== null && (
           <span data-testid={`habit-week-${habit.id}`} style={{ color: weekTicks >= target ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>
             {streak > 0 ? '· ' : ''}{Math.min(weekTicks, target)} of {target} this week{weekTicks >= target ? ' ✓' : ''}

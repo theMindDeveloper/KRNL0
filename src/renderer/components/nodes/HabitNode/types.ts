@@ -101,6 +101,19 @@ export interface Habit {
   /** Routine only: remind this many minutes before each time it happens
    *  (0 = at the start). Absent = no reminder. */
   remindMin?: number;
+  /** Habit only (review 3.2): "8 glasses a day". A day is done (in `log`)
+   *  once its count reaches the target. Absent = a plain yes/no tick. */
+  amount?: { target: number; unit: string };
+  /** Per-day counts toward `amount` (YYYY-MM-DD → count). */
+  counts?: Record<string, number>;
+}
+
+/** Today's count toward the amount (a ticked day without a count counts as full). */
+export function countOn(h: Pick<Habit, 'amount' | 'counts' | 'log'>, date: string): number {
+  if (!h.amount) return h.log.includes(date) ? 1 : 0;
+  const c = h.counts?.[date];
+  if (typeof c === 'number') return c;
+  return h.log.includes(date) ? h.amount.target : 0;
 }
 
 /** The habit's weekly target, or null (routines never have one). */

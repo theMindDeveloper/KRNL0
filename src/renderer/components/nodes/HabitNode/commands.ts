@@ -3,7 +3,7 @@
 // Time and id sources are injected so tests can pin them.
 
 import type { Habit, HabitColor, HabitConfig, HabitSchedule, HabitState, HabitView, IsoDow } from './types';
-import { isHabitColor, isHabitView, isValidTimeOfDay, isDayScheduled, todayLocal } from './types';
+import { countOn, isHabitColor, isHabitView, isValidTimeOfDay, isDayScheduled, todayLocal } from './types';
 
 export interface HabitEnv {
   uuid: () => string;
@@ -92,6 +92,43 @@ export function habitSetTarget(state: HabitState, args: { id: string; perWeek: n
   };
 }
 
+// ── Amounts ("8 glasses a day", review 3.2) ───────────────────────────────────
+
+/** Set a day's count; the day is in the log exactly when the count reaches the target. */
+function withCount(h: Habit, date: string, count: number): Habit {
+  if (!h.amount) return h;
+  const n = Math.max(0, Math.min(999, Math.round(count)));
+  const counts = { ...(h.counts ?? {}) };
+  if (n === 0) delete counts[date]; else counts[date] = n;
+  const done = n >= h.amount.target;
+  const log = done ? (h.log.includes(date) ? h.log : sortedLog([...h.log, date])) : h.log.filter((d) => d !== date);
+  const { counts: _old, ...rest } = h;
+  return Object.keys(counts).length ? { ...rest, log, counts } : { ...rest, log };
+}
+
+/** `habit.setCount` — a day's count toward the amount (future days refused). */
+export function habitSetCount(state: HabitState, args: { id: string; date?: string; count: number }, env: HabitEnv = defaultEnv): HabitState {
+  const date = args.date ?? env.today();
+  if (date > env.today() || !Number.isFinite(args.count)) return state;
+  return { ...state, habits: state.habits.map((h) => (h.id === args.id && h.amount && h.kind !== 'routine' ? withCount(h, date, args.count) : h)) };
+}
+
+/** `habit.setAmount` — "8 glasses a day" (target 2–999, a short unit), or null for a plain tick. */
+export function habitSetAmount(state: HabitState, args: { id: string; target: number | null; unit?: string }): HabitState {
+  return {
+    ...state,
+    habits: state.habits.map((h) => {
+      if (h.id !== args.id || h.kind === 'routine') return h;
+      if (args.target === null) { const { amount: _a, counts: _c, ...rest } = h; return rest; }
+      const target = Math.round(args.target);
+      if (!(target >= 2 && target <= 999)) return h;
+      const unit = (args.unit ?? h.amount?.unit ?? '').trim().slice(0, 24);
+      // Days already ticked stay done (they count as full).
+      return { ...h, amount: { target, unit } };
+    }),
+  };
+}
+
 // Optional repeat set while adding (Habit window's repeat picker). Anything
 // malformed is dropped: the habit is still added, just unscheduled.
 function parseAddSchedule(raw: unknown): HabitSchedule | undefined {
@@ -128,6 +165,12 @@ export function habitToggleDay(
     ...state,
     habits: state.habits.map((h) => {
       if (h.id !== args.id || h.kind === 'routine') return h; // Decision 39: never ticked
+      // An amount ("8 glasses"): each click adds one; past the target it
+      // starts again from 0. The day is done once the target is reached.
+      if (h.amount) {
+        const now = countOn(h, dateStr);
+        return withCount(h, dateStr, now >= h.amount.target ? 0 : now + 1);
+      }
       const has = h.log.includes(dateStr);
       const newLog = has
         ? h.log.filter((d) => d !== dateStr)
@@ -149,6 +192,7 @@ export function habitMarkDone(
     habits: state.habits.map((h) => {
       if (h.id !== args.id || h.kind === 'routine') return h; // Decision 39: never ticked
       if (h.log.includes(dateStr)) return h; // idempotent
+      if (h.amount) return withCount(h, dateStr, h.amount.target);
       return { ...h, log: sortedLog([...h.log, dateStr]) };
     }),
   };

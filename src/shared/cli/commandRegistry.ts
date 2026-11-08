@@ -74,6 +74,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'unschedule', usage: 'habit unschedule <id|name>', summary: 'Clear habit schedule' },
       { name: 'archive', usage: 'habit archive <id|name>', summary: 'Archive a habit (hidden from grid, history kept)' },
       { name: 'unarchive', usage: 'habit unarchive <id|name>', summary: 'Bring an archived habit back, history and all' },
+      { name: 'amount', usage: 'habit amount <id|name> <2-999|off> [unit]', summary: 'An amount a day, e.g. 8 glasses: each tick adds one; the day counts once reached' },
+      { name: 'count', usage: 'habit count <id|name> <n> [--on YYYY-MM-DD]', summary: "Set a day's count toward its amount" },
       { name: 'target', usage: 'habit target <id|name> <1-6|off>', summary: 'Aim for N times a week, any days (the streak counts weeks)' },
       { name: 'rest', usage: 'habit rest <id|name> [--on YYYY-MM-DD] [--to YYYY-MM-DD] [--off]', summary: 'Rest days (sick, away, a break): they never break the streak. Default today' },
       { name: 'show', usage: 'habit show <id|name> [--json]', summary: 'Show full habit detail including schedule and log count' },

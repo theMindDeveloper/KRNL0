@@ -754,6 +754,8 @@ export class SysFacade {
         case 'archive':    return habit.cliArchive(ctx, command.ref);
         case 'unarchive':  return habit.cliUnarchive(ctx, command.ref);
         case 'target':     return habit.cliTarget(ctx, command.ref, command.value);
+        case 'amount':     return habit.cliAmount(ctx, command.ref, command.value, command.unit);
+        case 'count':      return habit.cliCount(ctx, command.ref, command.value, command.on);
         case 'rest':       return habit.cliRest(ctx, command.ref, command.on, command.to, command.off);
         case 'show':       return habit.cliShow(ctx, command.ref, command.json);
         case 'pin':        return habit.cliPin(ctx, command.ref);

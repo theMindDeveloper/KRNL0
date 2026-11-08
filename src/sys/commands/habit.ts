@@ -21,6 +21,8 @@ import {
   habitSetTarget,
   habitSetRest,
   habitSetRemind,
+  habitSetAmount,
+  habitSetCount,
   habitStreak,
   habitSetSchedule,
   habitSetKind,
@@ -629,6 +631,44 @@ export async function cliRoutineRemind(ctx: HabitCtx, ref: string | undefined, v
   mother.state = habitSetRemind(mother.state, { id: resolved.habit.id, min: off ? null : n });
   writeBoard(ctx, board, mother);
   return { ok: true, message: off ? `routine "${resolved.habit.name}": no reminder` : `routine "${resolved.habit.name}": reminder ${n === 0 ? 'at the start' : `${n} min before`} each time`, data: { id: resolved.habit.id, remindMin: off ? null : n } };
+}
+
+/** `krnl habit amount <id|name> <n> [unit…]` / `habit amount <id|name> off` — "8 glasses a day" (review 3.2). */
+export async function cliAmount(ctx: HabitCtx, ref: string | undefined, value: string | undefined, unit: string | undefined): Promise<SysResult> {
+  if (!ref || !value) return { ok: false, message: 'habit amount requires <id|name> <2-999|off> [unit]' };
+  const off = value === 'off' || value === 'none';
+  const n = Number(value);
+  if (!off && !(Number.isInteger(n) && n >= 2 && n <= 999)) return { ok: false, message: `habit amount: "${value}" is not 2-999 or off` };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  if (resolved.habit.kind === 'routine') return { ok: false, message: `"${resolved.habit.name}" is a routine: routines are never counted` };
+  mother.state = habitSetAmount(mother.state, { id: resolved.habit.id, target: off ? null : n, ...(unit ? { unit } : {}) });
+  writeBoard(ctx, board, mother);
+  const h = mother.state.habits.find((x) => x.id === resolved.habit.id);
+  return { ok: true, message: off ? `habit "${resolved.habit.name}": a plain tick again` : `habit "${resolved.habit.name}": ${n}${h?.amount?.unit ? ` ${h.amount.unit}` : ''} a day`, data: { id: resolved.habit.id, amount: h?.amount ?? null } };
+}
+
+/** `krnl habit count <id|name> <n> [--on YYYY-MM-DD]` — that day's count toward its amount. */
+export async function cliCount(ctx: HabitCtx, ref: string | undefined, value: string | undefined, on: string | undefined): Promise<SysResult> {
+  if (!ref || value === undefined) return { ok: false, message: 'habit count requires <id|name> <n> [--on YYYY-MM-DD]' };
+  const n = Number(value);
+  if (!(Number.isInteger(n) && n >= 0 && n <= 999)) return { ok: false, message: `habit count: "${value}" is not 0-999` };
+  const date = on ?? todayLocal();
+  if (!isValidYMD(date)) return { ok: false, message: `habit count: bad --on "${date}"` };
+  if (date > todayLocal()) return { ok: false, message: 'habit count: not a day in the future' };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  if (!resolved.habit.amount) return { ok: false, message: `"${resolved.habit.name}" has no amount — set one: habit amount "${resolved.habit.name}" 8 glasses` };
+  mother.state = habitSetCount(mother.state, { id: resolved.habit.id, date, count: n });
+  writeBoard(ctx, board, mother);
+  const t = resolved.habit.amount.target;
+  return { ok: true, message: `habit "${resolved.habit.name}": ${n} of ${t}${resolved.habit.amount.unit ? ` ${resolved.habit.amount.unit}` : ''} on ${date}${n >= t ? ' — done' : ''}`, data: { id: resolved.habit.id, date, count: n, done: n >= t } };
 }
 
 /** `krnl habit unarchive <id|name>`: bring an archived habit back, history kept. */
