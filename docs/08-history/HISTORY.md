@@ -1923,3 +1923,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/routines` (and `experiment/new-user-review`)
 **Files changed:** `analytics/engine.ts`, `analytics/sources/habitSource.ts`, `analytics/types.ts`, `AnalyticsNode/index.tsx`; test `analytics/__tests__/streaks.sameEverywhere.test.ts` (new).
 **Summary:** Found in the new-user review: Analytics kept its own copy of the streak (`calcHabitStreak`), which knew nothing of rest days or weekly targets — a habit with a rest day read 2 days in Analytics and 4 in the Habit node. Analytics now asks `habitStreak` like every other screen; a weekly-target habit's streak is in weeks ("2w" in the per-habit list) and stays out of the "longest streak" figure, which is in days (as milestones do).
+
+## [2026-11-08] — Every tutorial is in Help
+
+**Type:** UX (tutorials)
+**Branch:** `feat/routines` (and `experiment/new-user-review`)
+**Files changed:** `Launch/HelpMenu.tsx`.
+**Summary:** Help offered only "Take the tour"; the other tutorials (Habits & Routines, Staying on track, Calendar, …) could be started only from the Orb, yet the 0.11 notes say "Help › Staying on track". Help now has **Tutorials** (N more), which opens the full list in place; each starts its tour, with its summary as the tooltip. Checked in the preview.
