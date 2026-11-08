@@ -27,7 +27,8 @@ import { DuePicker } from '../../ui/DuePicker';
 import { RemindPicker } from '../../ui/RemindPicker';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
-import { setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
+import { scheduleTaskAt, setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
+import { describeQuickAdd, parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -264,10 +265,27 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     setInputFocused(true);
   };
 
+  // Quick add: "Call mom tomorrow at 5pm" → the day, time and length are read
+  // from the words, shown under the field, and applied on Enter.
+  const quickSubmit = (q: QuickAdd) => {
+    onCommand('todo.add', q.durationMin ? { text: q.text, durationMin: q.durationMin } : { text: q.text });
+    const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
+    const item = [...(st?.items ?? [])].filter((i) => i.text === q.text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (item) {
+      if (q.time && q.day && item.taskNodeId) void scheduleTaskAt(item.taskNodeId, `${q.day}T${q.time}`);
+      else if (q.day && !q.time) onCommand('todo.setDue', { id: item.id, dueOn: q.day });
+    }
+    setPendingName('');
+    setInputPhase('name');
+    setInputFocused(true);
+  };
+
   const handleAddKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (inputPhase === 'name') {
       if (e.key === 'Enter') {
         const name = pendingName.trim();
+        const q = name ? parseQuickAdd(name) : null;
+        if (q && (q.time || q.day || q.durationMin)) { quickSubmit(q); return; }
         if (name) {
           setInputPhase('duration');
           setDurationValue('');
@@ -879,7 +897,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             >
               {doneItems.length > 0 || buckets.archived.length > 0 ? 'All clear' : (
                 <span data-testid="todo-empty-hint" style={{ lineHeight: 1.5 }}>
-                  Nothing planned yet. Type something you want to get done below and press Enter, then drag it onto the Calendar to give it a time.
+                  Nothing planned yet. Type something you want to get done below and press Enter. Say when as you type ("Gym tomorrow 18:00 1h") and it goes straight onto the Calendar; or drag it there later.
                 </span>
               )}
             </div>
@@ -905,6 +923,20 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               earlier days stay in the data (Analytics, \`todo list --archived\`). */}
           </div>
         </PagedView>
+
+        {/* Quick add: what Enter will do with the words typed so far. */}
+        {inputFocused && inputPhase === 'name' && (() => {
+          const q = pendingName.trim() ? parseQuickAdd(pendingName.trim()) : null;
+          const said = q ? describeQuickAdd(q) : null;
+          if (!q || !said) return null;
+          return (
+            <div data-testid="todo-quick-preview" style={{ padding: '6px 14px 0', borderTop: '1px dashed var(--paper-3)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+              <span style={{ color: 'var(--ink)' }}>{q.text}</span> → <span style={{ color: 'var(--acid-ink, var(--acid))' }}>{said}</span>
+              {q.rolledToTomorrow ? <span> (that time has passed today)</span> : null}
+              {q.day && !q.time ? <span> · no time yet: drag it onto the Calendar for one</span> : null}
+            </div>
+          );
+        })()}
 
         {/* engagement.md F13 — one-tap guesses while asking "how long?".
             mousedown keeps the input focused (its blur would cancel the add). */}
@@ -979,7 +1011,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 }
               }}
               autoFocus
-              placeholder={inputPhase === 'name' ? 'task → spawns a node…' : 'or type minutes — Enter to skip'}
+              placeholder={inputPhase === 'name' ? 'What do you want to get done? (e.g. Gym tomorrow 18:00 1h)' : 'or type minutes — Enter to skip'}
               style={{
                 flex: 1,
                 background: 'transparent',

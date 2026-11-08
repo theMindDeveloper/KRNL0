@@ -178,6 +178,7 @@ export const TOURS: readonly Tour[] = [
     steps: [
       { node: 'mother-todo', target: TODO, badge: 'TODO', text: "This is your list. Let's **add a task**." },
       { target: '[data-testid="add-task-placeholder"]', badge: 'CLICK', text: 'Click **add task** at the bottom, type a name, press **Enter** — then type minutes, or just Enter again.', waitFor: { board: newTask }, hint: 'Waiting for a new task…' },
+      { target: '[data-testid="add-task-placeholder"]', badge: 'SAY WHEN', text: 'Faster: say when as you type — **Gym tomorrow 18:00 1h** goes straight onto the Calendar, **Pay rent friday** gets a due day. The line under the field shows what Enter will do.' },
       { target: '[data-testid="todo-item-breakdown"]', badge: 'ESTIMATE', text: 'This is **how long you think it takes**. Click it to change it — **0** means "no set time". Once you record time it reads **⏱ worked / planned**.' },
       { onlyIn: 'advanced', target: '[data-testid^="todo-tag-"]', badge: 'TAG', text: 'The **tag** (Code, Study…) groups time in Analytics. Click it to change it.' },
       { target: `${TODO} .todo-check`, badge: 'TICK', text: 'Done? **Tick the box.**', waitFor: { board: taskDone }, hint: 'Waiting for a tick…' },

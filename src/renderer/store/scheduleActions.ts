@@ -96,6 +96,14 @@ export function toggleTaskDone(taskId: string): Promise<void> {
   return dispatchToTask(taskId, 'task.toggle');
 }
 
+/** Put a task on the Calendar at a local "YYYY-MM-DDTHH:MM" (quick add). */
+export async function scheduleTaskAt(taskId: string, scheduledFor: string): Promise<void> {
+  const cal = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  makeCommandHandler(cal.id)('calendar.schedule', { taskId, scheduledFor });
+}
+
 /** Review 4.1 — remind N minutes before a plan starts (null = no reminder). */
 export function setTaskReminder(taskId: string, min: number | null): Promise<void> {
   return dispatchToTask(taskId, 'task.setRemind', { min });
