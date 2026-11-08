@@ -72,6 +72,10 @@ Tours: Staying on track (weekly targets, amounts, rest days, due dates, repeats,
 
 Second pass: **Free** opens on the first four windows at a readable size · a busy Todo row still fits · the Month view and Calendar pills show amounts and rest days · "Did it yesterday? Yes" fills an amount habit's day · an optional amount while adding a habit · quick add reads "every day / weekday / sunday" · **Analytics streaks agree with the Habit node** (its own copy ignored rest days and targets — fixed on `feat/routines` too) · `krnl todo list` / `habit list` show what the rows show · the in-app assistant's instructions know every new command.
 
+Third pass: quick add reads **time ranges** ("14:00-15:30"), **"in 2 hours"** as a start time and **dates** ("15.11", "Nov 20th", "the 15th") · the Month view shows the DAY chips too · Help lists every **tutorial** · the first-day tour waits for the right things · Welcome back counts **weekly-target habits in weeks** · a routine running past midnight says "now" on the night shift · the next copy of a repeating plan keeps its reminder and kind.
+
+Logic fixes: **Drop offers UNDO** (and puts the Calendar time back) · Habit **Archive offers UNDO** · **dropping a repeating plan skips it** ("Skip this time") instead of silently ending the series, in the app and in `todo drop` · **a missed day no longer ends a repeating plan**: the next copy is made on open and at midnight, the missed one stays · the Staying-on-track tour no longer points at an Archive the Todo never shows · a board round-trip test proves every new field survives a load.
+
 Structure: one home for local-date helpers (`shared/ymd.ts`) · the habit target / amount popovers in their own file.
 
 Preview: `?fixture=fresh` opens the board a new user gets.
