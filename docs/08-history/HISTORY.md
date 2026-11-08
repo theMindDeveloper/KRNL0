@@ -2156,3 +2156,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `CalendarNode/MonthView.tsx`.
 **Summary:** The Week view's DAY line listed plans due a day with no time yet; the Month view did not, so "Pay rent friday" was invisible there. Month cells now list them after the timed plans, dashed (rust when overdue), draggable like the others, from the same `dayOnlyPlans`. In the short Station slot a cell shows only the chip's edge, like timed chips there; the name is in the tooltip.
+
+## [2026-11-08] — Proof that the new fields survive a load (experimental)
+
+**Type:** Test
+**Branch:** `experiment/new-user-review`
+**Files changed:** `tests/unit/main/board.newFields.roundtrip.test.ts` (new).
+**Summary:** Release rule: an update must open every older board and never drop data. Today's fields are all optional (no migration needed); node state is `z.unknown()` and the two load-time patches spread every field. The new test writes a board with every new field — due day, repeat, dropped, reminder, event kind, weekly target, amount and counts, rest days, a night-shift routine with a reminder and a skip — and loads it through the real loader: all kept.
