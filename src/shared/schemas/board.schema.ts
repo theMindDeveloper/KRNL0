@@ -42,6 +42,8 @@ export const BoardSchema = z.object({
   activeCanvasId: z.string().optional(),
   // Easy / Advanced UI mode; absent = advanced
   uiMode: z.enum(['easy', 'advanced']).optional(),
+  // Align to grid (invisible snap grid): cards only, or everything; absent = off
+  alignGrid: z.enum(['cards', 'all']).optional(),
   // ADR 0008 § 4.1: station geometry optional (persisted only after user resizes)
   layoutGeometry: z
     .object({

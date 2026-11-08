@@ -285,6 +285,12 @@ export class SysFacade {
         ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
       }, command.mode);
     }
+    if (command.kind === 'settings' && command.sub === 'grid') {
+      return infoCmd.settingsGrid({
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      }, command.value);
+    }
     if (command.kind === 'settings' && command.sub === 'layout') {
       return infoCmd.settingsLayout({
         boardPath: this.deps.boardPath,

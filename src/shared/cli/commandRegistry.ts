@@ -287,6 +287,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'show', usage: 'settings show [--json]', summary: 'theme + viewport + boardPath + version' },
       { name: 'mode', usage: 'settings mode [easy|advanced]', summary: 'Show or set the UI mode (Easy hides links between features; data is the same)' },
+      { name: 'grid', usage: 'settings grid [off|cards|all]', summary: 'Show or set Align to grid: cards only, or everything (things you move settle on an invisible grid, never on top of each other)' },
       { name: 'layout', usage: 'settings layout [station|canvas]', summary: 'Show or set the layout (Station docks windows beside the terminal; same as the top-bar pill / Ctrl+Shift+L)' },
     ],
   },

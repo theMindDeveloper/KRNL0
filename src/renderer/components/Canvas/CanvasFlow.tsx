@@ -87,6 +87,19 @@ const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
 import { FIT_NODES_EVENT, FOCUS_NODE_EVENT } from '../../store/scheduleActions';
 import { activeCanvasOf, edgesOnCanvas, isOnCanvas, isSharedNode, isStrokeOnCanvas, visibleNodeIds } from '../../../shared/canvas';
+import { alignAll, landing, onGrid, snap as snapGrid, type Box } from './alignGrid';
+
+/** Align to grid: let moved nodes glide the last few pixels instead of jumping. */
+function settleNodes(ids: readonly string[]): void {
+  requestAnimationFrame(() => {
+    for (const id of ids) {
+      const el = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+      if (!el) continue;
+      el.setAttribute('data-settling', '1');
+      window.setTimeout(() => el.removeAttribute('data-settling'), 320);
+    }
+  });
+}
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
 // Hex literals used instead of CSS var() to skip variable resolution per rect.
@@ -1723,22 +1736,48 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     if (!dragged) return;
     const draggedKind = dragged.data?.node?.kind;
 
-    updateNode(draggedId, { position: dragged.position });
+    // Align to grid: the drop settles on the nearest free grid spot (a frame
+    // only snaps; its children move with it). Others moving in the same
+    // gesture don't count as in the way.
+    const alignOn = onGrid(useBoardStore.getState().board?.alignGrid, draggedKind, dragged.data?.node?.isMother === true);
+    const pos = { ...dragged.position };
+    if (alignOn) {
+      const boxOf = (n: KrnlRFNode): Box => ({ x: n.position.x, y: n.position.y, w: (n.measured?.width ?? n.width ?? 0) as number, h: (n.measured?.height ?? n.height ?? 0) as number });
+      if (draggedKind === 'frame') {
+        pos.x = snapGrid(pos.x); pos.y = snapGrid(pos.y);
+      } else {
+        const obstacles = all
+          .filter((n) => n.id !== draggedId && !n.selected && !n.dragging && n.data?.node?.kind !== 'frame' && !isStrokeId(n.id) && !n.hidden)
+          .map(boxOf);
+        Object.assign(pos, landing(boxOf(dragged), obstacles));
+      }
+      if (pos.x !== dragged.position.x || pos.y !== dragged.position.y) settleNodes([draggedId]);
+    }
+    const shift = { dx: pos.x - dragged.position.x, dy: pos.y - dragged.position.y };
+    updateNode(draggedId, { position: pos });
+    // The canvas keeps its own copy while dragging; move it there too (the
+    // store may not change at all when the free spot is where it started).
+    if (shift.dx || shift.dy) {
+      const kids = new Set(draggedKind === 'frame' ? ((dragged.data.node.state as FrameState).childIds ?? []) : []);
+      setNodes((nds) => nds.map((n) => (n.id === draggedId ? { ...n, position: pos }
+        : kids.has(n.id) ? { ...n, position: { x: n.position.x + shift.dx, y: n.position.y + shift.dy } } : n)));
+    }
 
     if (draggedKind === 'frame') {
       const fs = dragged.data.node.state as FrameState;
       for (const cid of fs.childIds ?? []) {
         const child = all.find((n) => n.id === cid);
-        if (child) updateNode(cid, { position: child.position });
+        if (child) updateNode(cid, { position: { x: child.position.x + shift.dx, y: child.position.y + shift.dy } });
       }
+      if (shift.dx || shift.dy) settleNodes(fs.childIds ?? []);
     } else if (draggedKind && draggedKind !== 'frame') {
       // Skip mothers — they are not eligible to be soft-grouped.
       const isMother = dragged.data?.node?.isMother === true;
       if (!isMother) {
         const w = (dragged.measured?.width ?? dragged.width ?? 0) as number;
         const h = (dragged.measured?.height ?? dragged.height ?? 0) as number;
-        const cx = dragged.position.x + w / 2;
-        const cy = dragged.position.y + h / 2;
+        const cx = pos.x + w / 2;
+        const cy = pos.y + h / 2;
         let newParent: string | null = null;
         for (const n of all) {
           if (n.data?.node?.kind !== 'frame') continue;
@@ -1777,7 +1816,32 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
-  }, [getNodes, updateNode]);
+  }, [getNodes, updateNode, setNodes]);
+
+  // ── Align to grid: turning it on tidies the canvas once ──────────────────
+  // Fixed things (windows, frames and what is in them) stay; every other card,
+  // note and image settles on its nearest free grid spot, in reading order.
+  // One undo step. Runs on the switch going on (Settings or `krnl settings
+  // grid on`), not on every load.
+  const gridScope = useBoardStore((s) => s.board?.alignGrid ?? null);
+  const gridWas = useRef<'cards' | 'all' | null | undefined>(undefined);
+  useEffect(() => {
+    const was = gridWas.current;
+    gridWas.current = gridScope;
+    // Only when it is switched on, or widened from cards to everything.
+    if (was === undefined || !gridScope || was === gridScope || was === 'all') return;
+    const all = getNodes() as KrnlRFNode[];
+    const inFrame = new Set(all.flatMap((n) => (n.data?.node?.kind === 'frame' ? ((n.data.node.state as FrameState).childIds ?? []) : [])));
+    const items = all.filter((n) => !isStrokeId(n.id) && !n.hidden).map((n) => ({
+      id: n.id,
+      box: { x: n.position.x, y: n.position.y, w: (n.measured?.width ?? n.width ?? 0) as number, h: (n.measured?.height ?? n.height ?? 0) as number },
+      movable: onGrid(gridScope, n.data?.node?.kind, n.data?.node?.isMother === true) && n.data?.node?.kind !== 'frame' && !inFrame.has(n.id) && n.draggable !== false,
+    }));
+    const moves = alignAll(items);
+    if (moves.size === 0) return;
+    useBoardStore.getState().moveNodes([...moves].map(([id, p]) => ({ id, ...p })));
+    settleNodes([...moves.keys()]);
+  }, [gridScope, getNodes]);
 
   // ── onEdgesChange — ignored for v1 (no edge create/delete UX) ────────────
   const onEdgesChange = useCallback((_changes: EdgeChange[]) => {

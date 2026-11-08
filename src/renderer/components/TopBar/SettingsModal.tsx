@@ -14,6 +14,7 @@ import { PocketSection } from './PocketSection';
 import { BackupsSection, CelebrationsSection } from './LaunchSettings';
 import { SoundSection } from './SoundSection';
 import { FinishedSection } from './FinishedSection';
+import { Switch } from '../ui/Switch';
 import { SettingsIcon, type SettingsIconName } from '../ui/SettingsIcons';
 
 export type Theme = 'light' | 'dark';
@@ -132,6 +133,8 @@ function Card({ title, icon, children }: { title?: string; icon?: SettingsIconNa
 
 function General({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
   const setUiMode = useBoardStore((s) => s.setUiMode);
+  const alignGrid = useBoardStore((s) => s.board?.alignGrid ?? null);
+  const setAlignGrid = useBoardStore((s) => s.setAlignGrid);
   const easy = useEasyMode();
   return (
     <>
@@ -163,6 +166,30 @@ function General({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void
             );
           })}
         </div>
+      </Card>
+      <Card title="Canvas" icon="box">
+        <div className="st-row">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="st-row__title">Align to grid</div>
+            <div className="st-row__hint">
+              What you move settles into neat positions, never on top of each other. Turning it on tidies the canvas once.
+            </div>
+          </div>
+          <Switch checked={alignGrid !== null} onChange={(on) => setAlignGrid(on ? 'cards' : null)} testId="settings-align-grid" title="Align to grid" />
+        </div>
+        {alignGrid !== null && (
+          <div role="radiogroup" aria-label="What aligns to the grid" className="st-choices" style={{ marginTop: 12 }}>
+            {([
+              ['cards', 'Cards only', 'Plan, habit and event cards'],
+              ['all', 'Everything', 'Also notes, shapes, images and frames'],
+            ] as const).map(([v, label, hint]) => (
+              <button key={v} type="button" role="radio" aria-checked={alignGrid === v} data-testid={`settings-align-grid-${v}`} onClick={() => setAlignGrid(v)} className="st-choice st-choice--text">
+                <span className="st-choice__label">{label}</span>
+                <span className="st-choice__hint">{hint}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </Card>
     </>
   );

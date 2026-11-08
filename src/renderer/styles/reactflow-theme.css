@@ -344,3 +344,12 @@
    of hiding parts of it; nothing here shrinks or hides. */
 
 
+
+/* Align to grid: a moved node glides onto its grid spot (CanvasFlow settleNodes). */
+.react-flow__node[data-settling] {
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node[data-settling] { transition: none; }
+}
+[data-motion="reduced"] .react-flow__node[data-settling] { transition: none; }
