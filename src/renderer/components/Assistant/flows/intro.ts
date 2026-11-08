@@ -77,7 +77,7 @@ export const introFlow: Flow = {
       {
         kind: 'speak',
         clip: 'intro_06',
-        text: 'Down here in the corner — that\'s me. Click me anytime, or hold Space to talk.',
+        text: 'Down here in the corner — that\'s me. Click me anytime.',
       },
       { kind: 'wait', ms: 300 },
 

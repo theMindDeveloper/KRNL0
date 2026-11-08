@@ -2490,3 +2490,10 @@ Checked in the preview (auto start, the Advanced step, hand-over, once only). 2,
 - **Tours:** the orb no longer jumps onto the tour card's corner at 60 % size; it keeps its place and size, stays above the dimming, and shows its speaking rings while the guide's voice plays.
 - **Moving the window:** every group in the top bar was "no drag", so only small gaps moved the window. Now the whole bar drags and only its controls (buttons, links, fields, menus) don't.
 Checked in the preview with a stand-in bridge (status line, Sign in, menu hide/show, answer and its krnl line, orb place and size during a tour). 2,484 tests and typecheck green.
+
+## [2026-11-08] — Hold Space to talk removed; Easy hides the tag on task cards (#228) (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Orb/index.tsx`, `Assistant/flows/intro.ts`, `TaskNode/index.tsx`, `TaskNode/DoneCard.tsx`, `tests/unit/renderer/TaskNode.new.scenarios.test.ts`, `docs/releases/pre-release-todo.md`.
+**Summary:** The user chose text-only for the orb (no Whisper): holding Space showed a "listening" animation that heard nothing, so push-to-talk is gone (Escape still closes the chat; the orb's label and the intro line no longer mention Space). In Easy, tags were hidden in the Todo list but still showed on the board's task cards — open and done cards now hide them too (test added). Also filed #229: board cards for habits and repeating events in the new task-card style (asked earlier, missed in the to-do list). 2,485 tests and typecheck green.

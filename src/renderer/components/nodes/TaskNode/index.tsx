@@ -484,7 +484,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
 
       {/* Row 2: tag · when */}
       <CardMetaRow
-        tag={tag}
+        // Easy hides tags (easy-mode D8) — on the card too, like the Todo list (#228).
+        tag={easy ? '' : tag}
         tone={tagTone}
         icon={isActiveRunning ? 'clock' : 'calendar'}
         when={isActiveRunning ? 'Focusing now' : isActivePaused ? 'Paused' : when ? (isPastScheduled ? `Was ${when}` : when) : 'Not on the calendar'}

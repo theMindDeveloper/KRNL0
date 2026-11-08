@@ -343,3 +343,23 @@ describe('F13 — Delete via context menu fires task.delete', () => {
     expect(onCommand).toHaveBeenCalledWith('task.delete');
   });
 });
+
+// ── easy-mode D8 / #228 — no tag on the card in Easy ─────────────────────────
+
+describe('#228 — Easy hides the tag on task cards', () => {
+  it('Advanced shows the tag; Easy does not (open and done cards)', async () => {
+    const { useBoardStore } = await import('../../../src/renderer/store/boardStore');
+    const setMode = (uiMode: 'easy' | 'advanced') => useBoardStore.setState({ board: { version: 1, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 }, layoutMode: 'station', uiMode } as never });
+    setMode('advanced');
+    renderTaskNode(makeTaskState({ tag: 'dev' }));
+    expect(document.querySelector('.task-tag')).not.toBeNull();
+    cleanup();
+    setMode('easy');
+    renderTaskNode(makeTaskState({ tag: 'dev' }));
+    expect(document.querySelector('.task-tag')).toBeNull();
+    cleanup();
+    renderTaskNode(makeTaskState({ tag: 'dev', done: true }));
+    expect(document.querySelector('.task-tag')).toBeNull();
+    setMode('advanced');
+  });
+});

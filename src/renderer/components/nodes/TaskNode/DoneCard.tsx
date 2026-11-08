@@ -5,6 +5,7 @@
 // Clock). Ticking plays a one-shot reward: the check pops, eight small dots
 // burst from it, the border glows once. Then it rests.
 
+import { useEasyMode } from '../../../store/uiMode';
 import { LineGlyph } from '../../ui/LineGlyph';
 import type { MouseEvent, ReactNode } from 'react';
 import { CARD_H, CardIcon, CardMetaRow, CardMeter, cardFrameStyle } from './CardParts';
@@ -58,6 +59,7 @@ interface Props {
 }
 
 export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onContextMenu, children }: Props) {
+  const easy = useEasyMode();
   const plannedMin = state.plannedMin ?? state.durationMin ?? 0;
   const tookMin = trackedSec / 60;
   const at = state.completedAt ? new Date(state.completedAt) : null;
@@ -117,7 +119,8 @@ export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onCon
       </div>
 
       {/* Row 2: tag · when it was finished */}
-      <CardMetaRow tag={state.tag ?? ''} tone={tone} icon="check" when={atLabel ? `Done ${atLabel}` : 'Done'} whenColor="var(--acid-ink, var(--acid))" />
+      {/* Easy hides tags (D8, #228). */}
+      <CardMetaRow tag={easy ? '' : state.tag ?? ''} tone={tone} icon="check" when={atLabel ? `Done ${atLabel}` : 'Done'} whenColor="var(--acid-ink, var(--acid))" />
 
       {/* Meter: full — how long it took, against the plan */}
       <CardMeter

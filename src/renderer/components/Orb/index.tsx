@@ -9,8 +9,7 @@
  * glow toward purple.
  *
  * Behaviour:
- * - Space (push-to-talk) preserves the previous FSM (idle -> listening on
- *   keydown; listening -> thinking on keyup).
+ * - No push-to-talk: questions are typed (they go to Claude Code, Decision 41).
  * - Click toggles a chat panel anchored above the orb.
  * - Orb is draggable. Position is persisted to localStorage.
  * - Quick-action buttons trigger pre-recorded voice flows with live camera
@@ -75,7 +74,6 @@ import { askClaude, claudeStatus, type ClaudeStatus } from '../../store/askClaud
 import { launchDialogOpen } from '../../launch/launchStore';
 import { emit } from '../../store/eventLog';
 import { Z } from '../ui/layers';
-import { isTypingTarget, isControlTarget, isModalOpen } from '../../utils/keyboardTargets';
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'running';
 /** An answer may carry the krnl commands Claude ran (tools) and be an error. */
@@ -471,35 +469,14 @@ export function Orb() {
     runnerRef.current.run(flow);
   }, []);
 
-  // ── Space push-to-talk ────────────────────────────────────────────────────
+  // Escape closes the chat. (Hold Space to talk was removed: there is no
+  // speech-to-text, and a "listening" animation that hears nothing misleads.)
   useEffect(() => {
-    // Space belongs to whatever has focus: a field, the terminal, or a
-    // button / radio / switch it activates. Push-to-talk only takes a Space
-    // nothing else would use, and never behind a modal.
-    const spaceTaken = (t: EventTarget | null): boolean => isTypingTarget(t) || isControlTarget(t) || isModalOpen();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Escape' && open) { setOpen(false); return; }
-      if (spaceTaken(e.target)) return;
-      if (e.code === 'Space' && orbState === 'idle') {
-        e.preventDefault();
-        setOrbState('listening');
-      }
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return;
-      if (e.code === 'Space' && orbState === 'listening') {
-        e.preventDefault();
-        setOrbState('thinking');
-        window.setTimeout(() => setOrbState('idle'), 600);
-      }
-    };
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => { if (e.code === 'Escape') setOpen(false); };
     window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-    };
-  }, [orbState, open]);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -981,7 +958,7 @@ export function Orb() {
       <button
         type="button"
         data-testid="orb-button"
-        aria-label={`AI assistant — ${orbState}. Click to ${open ? 'close' : 'open'} chat, hold Space to talk.`}
+        aria-label={`AI assistant — ${orbState}. Click to ${open ? 'close' : 'open'} chat.`}
         aria-live="polite"
         onMouseDown={onMouseDown}
         onClick={onOrbClick}
