@@ -1162,7 +1162,6 @@ const YearRow = memo(function YearRow({
   const { current: streak, unit: streakUnit } = useMemo(() => habitStreak(habit, today), [habit, today]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const schedule = habit.schedule;
 
   // Canvas redraw — 371 cells in one DOM node instead of 371 divs. Re-runs
   // only when log / color / today / yearGrid changes. Resolves CSS-var colors
@@ -1203,7 +1202,7 @@ const YearRow = memo(function YearRow({
         const x = c * step;
         const y = r * step;
         const done = logSet.has(day);
-        const scheduled = isDayScheduled(schedule, day);
+        const scheduled = tickableOn(habit, day);
         if (done) {
           ctx.fillStyle = doneColor;
           if (!scheduled) ctx.globalAlpha = 0.35;
@@ -1224,7 +1223,7 @@ const YearRow = memo(function YearRow({
         }
       }
     }
-  }, [habit.log, color, today, yearGrid, schedule]);
+  }, [habit, color, today, yearGrid]);
 
   // Year view is intentionally read-only (2026-05-15 product call). No
   // click/toggle from year view — feels noisy at 5 px cells; use the week or

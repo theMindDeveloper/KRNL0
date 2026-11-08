@@ -2267,7 +2267,7 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Type:** Bug Fix (logic)
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/index.tsx` (`tickableOn`); test `HabitNode.addField.test.tsx` (+1).
-**Summary:** "Times a week…" says any days count, but on a habit that also had fixed days (say Mondays) the other days stayed "not scheduled" and could not be ticked, so 3 times a week could never be reached. With a weekly target every day can now be ticked, in the week row, the month view and by clicking the row; without one, fixed days still apply.
+**Summary:** "Times a week…" says any days count, but on a habit that also had fixed days (say Mondays) the other days stayed "not scheduled" and could not be ticked, so 3 times a week could never be reached. With a weekly target every day can now be ticked, in the week row, the month view and by clicking the row, and the year view no longer dims those days (it also redraws when the target changes); without one, fixed days still apply.
 
 ## [2026-11-08] — Quick add reads "noon" (experimental)
 
