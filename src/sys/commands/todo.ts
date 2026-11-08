@@ -1,6 +1,6 @@
 import { todayYMD } from '../../shared/ymd';
 import { parseQuickAdd } from '../../shared/quickAdd';
-import { taskSchedule } from './task';
+import { taskSchedule, taskUnschedule } from './task';
 import { parseDue, dueLabel } from '../../shared/due';
 // sys todo CLI — real board.json operations for the sys CLI.
 // Operates on the first todo mother node in board.json.
@@ -8,7 +8,7 @@ import { parseDue, dueLabel } from '../../shared/due';
 import { randomUUID } from 'crypto';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
-import { todoDrop, todoUndrop, todoSetDue,
+import { todoDrop, todoUndrop, todoSetDue, todoSetOnDay,
   todoToggle as fsmTodoToggle,
   visibleItems,
   todoBuckets,
@@ -74,10 +74,15 @@ export async function todoAdd(
   if (!pair) {
     return { ok: false, message: 'No todo mother node found in board.' };
   }
-  // A day without a time: a due day.
-  if (q.day && !q.time) {
+  // Decision 40 — a day without a time is its When (any time); "by fri" its Deadline.
+  if ((q.day && !q.time) || q.deadline) {
     const mother = board.nodes.find((n) => n.kind === 'todo' && n.isMother === true);
-    if (mother) mother.state = todoSetDue(mother.state as TodoState, { id: pair.todoItemId, dueOn: q.day });
+    if (mother) {
+      let st = mother.state as TodoState;
+      if (q.day && !q.time) st = todoSetOnDay(st, { id: pair.todoItemId, onDay: q.day });
+      if (q.deadline) st = todoSetDue(st, { id: pair.todoItemId, dueOn: q.deadline });
+      mother.state = st;
+    }
   }
   saveBoard(ctx, board);
   // A day and a time: on the Calendar (same path as `task schedule`).
@@ -85,7 +90,8 @@ export async function todoAdd(
   if (q.day && q.time) {
     const r = await taskSchedule({ boardPath: ctx.boardPath }, pair.taskNodeId, `${q.day}T${q.time}`);
     if (r.ok) when = ` · on the Calendar ${q.day} ${q.time}`;
-  } else if (q.day) when = ` · due ${q.day}`;
+  } else if (q.day) when = ` · ${q.day}, any time`;
+  if (q.deadline) when += ` · deadline ${q.deadline}`;
   return {
     ok: true,
     message: `Added todo: "${q.text}"${tag ? ` [${tag}]` : ''}${when}${q.durationMin ? ` · ${q.durationMin} min` : ''}${q.hint ? ` · added as typed: ${q.hint}` : ''} (task: ${pair.taskNodeId.slice(0, 13)}…)`,
@@ -178,7 +184,8 @@ export async function todoList(
     const tag = label ? ` [${label}${i.tagSource === 'auto' ? '?' : ''}]` : '';
     const facts: string[] = [];
     if (i.droppedAt) facts.push('dropped');
-    if (i.dueOn && !i.done) facts.push(`due ${i.dueOn}`);
+    if (i.onDay && !i.done) facts.push(`${i.onDay}, any time`);
+    if (i.dueOn && !i.done) facts.push(`deadline ${i.dueOn}`);
     const rem = remindOf(i.taskNodeId);
     if (rem !== null && !i.done) facts.push(`reminder ${rem === 0 ? 'at start' : `${rem} min before`}`);
     return `${status} ${i.id.slice(0, 8)}  ${i.text}${tag}${facts.length ? `  · ${facts.join(' · ')}` : ''}`;
@@ -251,9 +258,43 @@ export async function todoDue(ctx: TodoCtx, ref?: string, when?: string): Promis
   const item = m.after.items.find((i) => i.id === r.id.itemId);
   return {
     ok: true,
-    message: dueOn === null ? `Todo "${item?.text ?? ref}": no due date.` : `Todo "${item?.text ?? ref}" due ${dueOn} (${dueLabel(dueOn, today).text}).`,
+    message: dueOn === null ? `Todo "${item?.text ?? ref}": no deadline.` : `Todo "${item?.text ?? ref}" deadline ${dueOn} (${dueLabel(dueOn, today).text}).`,
     data: { id: r.id.itemId, dueOn },
   };
+}
+
+/**
+ * `krnl todo when <ref> <day|off> [HH:MM]` (Decision 40): the plan's When.
+ * A day + time puts it on the Calendar; a day alone is that day at any time
+ * (the ANY TIME strip); off takes its day away.
+ */
+export async function todoWhen(ctx: TodoCtx, ref?: string, day?: string, time?: string): Promise<SysResult> {
+  if (!ref || !day) return { ok: false, message: 'todo when requires <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off> [HH:MM]' };
+  const today = todayYMD();
+  const onDay = parseDue(day, today);
+  if (onDay === undefined) return { ok: false, message: `todo when: "${day}" is not a day (YYYY-MM-DD, today, tomorrow, mon..sun, off)` };
+  if (time !== undefined && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) return { ok: false, message: `todo when: "${time}" is not a time (HH:MM)` };
+  const board = loadBoard(ctx);
+  const r = resolveTodoItemRef(board, ref);
+  if (!r.ok) return { ok: false, message: resolutionError('todo item', ref, r) };
+  const mother = board.nodes.find((n) => n.id === r.id.todoNodeId);
+  const item = (mother?.state as TodoState | undefined)?.items.find((i) => i.id === r.id.itemId);
+  if (!item) return { ok: false, message: `todo when: no item ${ref}` };
+  if (onDay && time && item.taskNodeId) {
+    const hh = time.length === 4 ? `0${time}` : time;
+    const res = await taskSchedule({ boardPath: ctx.boardPath }, item.taskNodeId, `${onDay}T${hh}`);
+    if (!res.ok) return res;
+    return { ok: true, message: `Todo "${item.text}" on the Calendar ${onDay} ${hh}.`, data: { id: r.id.itemId, day: onDay, time: hh } };
+  }
+  // Any time that day (or no day): off the grid first when it had a time.
+  if (item.taskNodeId) {
+    const t = board.nodes.find((n) => n.id === item.taskNodeId);
+    if ((t?.state as { scheduledFor?: string } | undefined)?.scheduledFor) await taskUnschedule({ boardPath: ctx.boardPath }, item.taskNodeId);
+  }
+  const m = mutateTodo(ctx, (st) => todoSetOnDay(st, { id: r.id.itemId, onDay }));
+  if (!m.ok) return m;
+  saveBoard(ctx, m.board);
+  return { ok: true, message: onDay === null ? `Todo "${item.text}": no day.` : `Todo "${item.text}" on ${onDay}, any time.`, data: { id: r.id.itemId, day: onDay } };
 }
 
 /** `krnl todo drop <ref>` / `todo undrop <ref>` — not doing it any more (review 6.1). */

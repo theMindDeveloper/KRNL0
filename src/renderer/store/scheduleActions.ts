@@ -144,6 +144,42 @@ export async function deletePlanOfTask(taskId: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Decision 40 — put a plan on a day at any time (the Calendar's ANY TIME
+ * strip): off the grid if it had a time, then `onDay`. UNDO puts it back.
+ * `ref` is what a drag carries: the task id, or a Todo item id.
+ */
+export async function putPlanOnDay(ref: { taskId?: string; itemId?: string }, day: string): Promise<void> {
+  const board = useBoardStore.getState().board;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const items = (todo?.state as { items?: Array<{ id: string; text: string; taskNodeId: string | null; onDay?: string }> } | undefined)?.items ?? [];
+  const item = ref.itemId ? items.find((i) => i.id === ref.itemId) : items.find((i) => i.taskNodeId === ref.taskId);
+  if (!todo || !item) return;
+  const taskId = item.taskNodeId;
+  const wasAt = taskId ? placementOf(taskId)?.startISO ?? null : null;
+  const wasDay = item.onDay ?? null;
+  if (!wasAt && wasDay === day) return;
+  const [{ makeCommandHandler }, { revertible }] = await Promise.all([import('../components/Canvas/commandDispatch'), import('./undoNotice')]);
+  if (taskId && wasAt) await unscheduleTask(taskId);
+  makeCommandHandler(todo.id)('todo.setOnDay', { id: item.id, onDay: day });
+  const label = new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  revertible(`"${item.text}" → ${label}, any time`, () => {
+    makeCommandHandler(todo.id)('todo.setOnDay', { id: item.id, onDay: wasDay });
+    if (taskId && wasAt) void scheduleTaskAt(taskId, wasAt.slice(0, 16));
+  });
+}
+
+/** Decision 40 — "New here… · Once": a plan at that day and time, with a length. */
+export async function addPlanAt(text: string, day: string, time: string, lengthMin: number): Promise<void> {
+  const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  if (!todo) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  makeCommandHandler(todo.id)('todo.add', { text, durationMin: lengthMin });
+  const items = (useBoardStore.getState().board?.nodes.find((n) => n.id === todo.id)?.state as { items?: Array<{ id: string; text: string; done: boolean; createdAt: string; taskNodeId: string | null }> } | undefined)?.items ?? [];
+  const added = [...items].filter((i) => i.text === text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (added?.taskNodeId) await scheduleTaskAt(added.taskNodeId, `${day}T${time}`);
+}
+
 /** A routine deleted from its Calendar band: gone from every day and from Habits & Routines, with UNDO. */
 export async function deleteRoutine(habitId: string): Promise<void> {
   const habitNode = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'habit' && n.isMother);

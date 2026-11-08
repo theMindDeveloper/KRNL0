@@ -794,6 +794,7 @@ export class SysFacade {
         case 'list':  return todo.todoList(ctx, command.json, command.scope);
         case 'tag':   return todo.todoTag(ctx, command.ref, command.tag);
         case 'due':   return todo.todoDue(ctx, command.ref, command.when);
+        case 'when':  return todo.todoWhen(ctx, command.ref, command.day, command.time);
         case 'drop':   return todo.todoDropCmd(ctx, command.ref, false);
         case 'undrop': return todo.todoDropCmd(ctx, command.ref, true);
         case 'tags': {

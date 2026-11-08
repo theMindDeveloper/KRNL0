@@ -22,8 +22,11 @@ describe('new optional fields survive a load', () => {
     todo.state['items'] = [{
       id: 'i1', text: 'Weekly review', done: false, createdAt: '2026-11-01T08:00:00.000Z', completedAt: null, taskNodeId: 't1',
       dueOn: '2026-11-15', repeat: { kind: 'weekly', day: 7 }, droppedAt: '2026-11-08T09:00:00.000Z',
+    }, {
+      id: 'i2', text: 'Essay', done: false, createdAt: '2026-11-01T08:00:00.000Z', completedAt: null, taskNodeId: 't2', dueOn: '2026-11-21',
     }];
     board.nodes.push({ id: 't1', kind: 'todo.task', state: { text: 'Weekly review', done: false, kind: 'event', remindMin: 10 } } as never);
+    board.nodes.push({ id: 't2', kind: 'todo.task', state: { text: 'Essay', done: false, scheduledFor: '2026-11-17T16:00' } } as never);
     const habit = board.nodes.find((n) => n.kind === 'habit' && n.isMother)!;
     habit.state['habits'] = [
       { id: 'h1', name: 'Water', createdAt: '2026-11-01T08:00:00.000Z', log: [], archived: false, color: 'cyan', perWeek: 3, amount: { target: 8, unit: 'glasses' }, counts: { '2026-11-08': 3 }, rest: ['2026-11-06'] },
@@ -34,8 +37,18 @@ describe('new optional fields survive a load', () => {
       const p = join(dir, 'board.json');
       writeFileSync(p, JSON.stringify(board), 'utf-8');
       const loaded = loadBoardFrom(p) as typeof board;
-      const item = (loaded.nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<Record<string, unknown>>)[0]!;
-      expect(item).toMatchObject({ dueOn: '2026-11-15', repeat: { kind: 'weekly', day: 7 }, droppedAt: '2026-11-08T09:00:00.000Z' });
+      const todoState = loaded.nodes.find((n) => n.kind === 'todo' && n.isMother)!.state;
+      const [item, essay] = todoState['items'] as Array<Record<string, unknown>>;
+      // Decision 40 migration: an old "due" with no Calendar time was its day (any time);
+      // one on a plan with a time stays its deadline.
+      expect(item).toMatchObject({ onDay: '2026-11-15', repeat: { kind: 'weekly', day: 7 }, droppedAt: '2026-11-08T09:00:00.000Z' });
+      expect(item!['dueOn']).toBeUndefined();
+      expect(essay).toMatchObject({ dueOn: '2026-11-21' });
+      expect(todoState['whenModel']).toBe(1);
+      // Once migrated, a deadline on a plan with no time stays a deadline on the next load.
+      writeFileSync(p, JSON.stringify({ ...loaded, nodes: loaded.nodes.map((n) => (n.kind === 'todo' && n.isMother ? { ...n, state: { ...n.state, items: [{ ...(n.state['items'] as unknown[])[0] as object, dueOn: '2026-11-30' }] } } : n)) }), 'utf-8');
+      const again = loadBoardFrom(p) as typeof board;
+      expect(((again.nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<Record<string, unknown>>)[0])).toMatchObject({ dueOn: '2026-11-30', onDay: '2026-11-15' });
       expect(loaded.nodes.find((n) => n.id === 't1')!.state).toMatchObject({ remindMin: 10, kind: 'event' });
       const habits = loaded.nodes.find((n) => n.kind === 'habit' && n.isMother)!.state['habits'] as Array<Record<string, unknown>>;
       expect(habits[0]).toMatchObject({ perWeek: 3, amount: { target: 8, unit: 'glasses' }, counts: { '2026-11-08': 3 }, rest: ['2026-11-06'] });

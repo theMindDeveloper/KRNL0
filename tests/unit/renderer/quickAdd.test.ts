@@ -42,10 +42,10 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('Standup at 9 tomorrow', NOW).time).toBe('09:00');
     expect(parseQuickAdd('Flight at 3am tomorrow', NOW).time).toBe('03:00');
   });
-  it('"every …" is not a plan: reads none of it and points to Habits & Routines', () => {
+  it('"every …" is not a plan: reads none of it and points to habits and repeating events', () => {
     for (const t of ['Water plants every day', 'Weekly review every sunday 18:00', 'Standup every weekday 9:30', 'Gym every monday and thursday 18:00']) {
       const q = parseQuickAdd(t, NOW);
-      expect(q).toEqual({ text: t, hint: expect.stringContaining('Habits & Routines') });
+      expect(q).toEqual({ text: t, hint: expect.stringContaining('repeating event') });
       expect(describeQuickAdd(q, NOW)).toBeNull();
     }
     expect(parseQuickAdd('Read everything tomorrow', NOW).hint).toBeUndefined();
@@ -65,6 +65,15 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('Read chapter 3', NOW)).toEqual({ text: 'Read chapter 3' });
     expect(parseQuickAdd('Buy 2 m cable', NOW)).toEqual({ text: 'Buy 2 m cable' });
     expect(parseQuickAdd('Call 5 friends', NOW)).toEqual({ text: 'Call 5 friends' });
+  });
+});
+
+describe('quick add reads deadlines (Decision 40)', () => {
+  it('"by / due / before / deadline <day>" is the Deadline; the rest is the When', () => {
+    expect(parseQuickAdd('Essay tue 16:00 by sat', NOW)).toEqual({ text: 'Essay', deadline: '2026-11-14', time: '16:00', day: '2026-11-10' });
+    expect(parseQuickAdd('Tax due 21.11', NOW)).toEqual({ text: 'Tax', deadline: '2026-11-21' });
+    expect(parseQuickAdd('Report before Nov 20th 2h', NOW)).toEqual({ text: 'Report', deadline: '2026-11-20', durationMin: 120 });
+    expect(parseQuickAdd('Stand by me', NOW)).toEqual({ text: 'Stand by me' });
   });
 });
 
@@ -92,7 +101,8 @@ describe('describeQuickAdd', () => {
   it('says what Enter will do', () => {
     expect(describeQuickAdd(parseQuickAdd('Call mom tomorrow at 5pm', NOW), NOW)).toBe('tomorrow 17:00');
     expect(describeQuickAdd(parseQuickAdd('Gym 18:00 1h', NOW), NOW)).toBe('today 18:00 · 1 h');
-    expect(describeQuickAdd(parseQuickAdd('Pay rent friday', NOW), NOW)).toBe('due Fri 13 Nov');
+    expect(describeQuickAdd(parseQuickAdd('Pay rent friday', NOW), NOW)).toBe('Fri 13 Nov, any time');
+    expect(describeQuickAdd(parseQuickAdd('Essay tue 16:00 by sat', NOW), NOW)).toBe('Tue 10 Nov 16:00 · deadline Sat 14 Nov');
     expect(describeQuickAdd(parseQuickAdd('Read chapter 3', NOW), NOW)).toBeNull();
   });
 });
@@ -110,7 +120,7 @@ describe('krnl todo add reads the words too', () => {
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
   const board = () => JSON.parse(readFileSync(boardPath, 'utf-8')) as { nodes: Array<{ id: string; kind: string; isMother?: boolean; state: Record<string, unknown> }> };
 
-  it('a day and a time land on the Calendar; a day alone is a due day', async () => {
+  it('a day and a time land on the Calendar; a day alone is that day at any time; "by" is a deadline (Decision 40)', async () => {
     const r = await f.run(['todo', 'add', 'Dentist next monday 14:00 30 min']);
     expect(r.ok).toBe(true);
     expect(r.message).toContain('on the Calendar');
@@ -118,8 +128,13 @@ describe('krnl todo add reads the words too', () => {
     expect(String(task.state['scheduledFor'])).toMatch(/T14:00$/);
     expect(task.state['plannedMin']).toBe(30);
     await f.run(['todo', 'add', 'Pay rent friday']);
-    const items = board().nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<{ text: string; dueOn?: string }>;
-    expect(items.find((i) => i.text === 'Pay rent')?.dueOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const items = board().nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<{ text: string; dueOn?: string; onDay?: string }>;
+    expect(items.find((i) => i.text === 'Pay rent')?.onDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(items.find((i) => i.text === 'Pay rent')?.dueOn).toBeUndefined();
+    await f.run(['todo', 'add', 'Tax form by friday']);
+    const withDl = board().nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<{ text: string; dueOn?: string; onDay?: string }>;
+    expect(withDl.find((i) => i.text === 'Tax form')?.dueOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(withDl.find((i) => i.text === 'Tax form')?.onDay).toBeUndefined();
     const r2 = await f.run(['todo', 'add', 'Water plants every day']);
     expect(r2.message).toContain('added as typed');
     const again = board().nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<{ text: string; repeat?: unknown; dueOn?: string }>;

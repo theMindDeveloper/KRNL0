@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
 import { dayOnlyPlans } from './dayOnly';
 import { DueFlag } from './DueFlag';
+import { putPlanOnDay } from '../../../store/scheduleActions';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
@@ -276,8 +277,13 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
     const board = useBoardStore.getState().board;
     const task = payload.taskId ? board?.nodes.find((n) => n.id === payload.taskId) : undefined;
     const current = (task?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor;
-    const time = typeof current === 'string' && /T\d{2}:\d{2}/.test(current) ? current.slice(11, 16) : '09:00';
-    const scheduledFor = `${ymd}T${time}`;
+    // Decision 40 — a plan with a time keeps it on the new day; one without
+    // goes on that day at any time (it is not given a made-up 09:00).
+    if (!(typeof current === 'string' && /T\d{2}:\d{2}/.test(current))) {
+      void putPlanOnDay(payload, ymd);
+      return;
+    }
+    const scheduledFor = `${ymd}T${current.slice(11, 16)}`;
     if (payload.taskId) onCommand('calendar.schedule', { taskId: payload.taskId, scheduledFor });
     else if (payload.itemId) {
       onCommand('calendar.schedule', {
@@ -650,23 +656,27 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                   {(dayOnly.get(ymd) ?? []).map((d) => (
                     <div
                       key={`day-${d.id}`}
-                      data-testid="month-day-only-chip"
-                      title={d.plannedOn ? `${d.text} — due this day (planned on another day)` : `${d.text} — due this day, no time yet. Drag it into a day of the week view to give it a time.`}
-                      draggable={!d.plannedOn}
+                      data-testid={d.kind === 'deadline' ? 'month-deadline-chip' : 'month-day-only-chip'}
+                      title={d.kind === 'deadline' ? `Deadline: ${d.text}` : `${d.text} — this day, any time. Drag it to another day, or into the hours of the week view.`}
+                      draggable={d.kind === 'plan'}
                       onDragStart={(e) => {
                         e.stopPropagation();
-                        if (d.plannedOn) { e.preventDefault(); return; }
+                        if (d.kind === 'deadline') { e.preventDefault(); return; }
                         e.dataTransfer.setData('application/krnl-task', JSON.stringify(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin }));
                         e.dataTransfer.effectAllowed = 'move';
                       }}
                       style={{
                         fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0, borderRadius: 2, padding: '0 3px', lineHeight: '1.3',
-                        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'grab',
-                        border: `1px dashed ${d.overdue ? 'color-mix(in srgb, var(--rust) 70%, transparent)' : 'var(--ink-4)'}`,
-                        color: d.overdue ? 'var(--rust)' : 'var(--ink-2)', background: 'transparent',
+                        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: d.kind === 'plan' ? 'grab' : 'default',
+                        // Decision 40 — a plan any time that day is a solid chip; a deadline a dashed flag.
+                        border: d.kind === 'deadline'
+                          ? `1px dashed ${d.overdue ? 'color-mix(in srgb, var(--rust) 70%, transparent)' : 'var(--ink-4)'}`
+                          : `1px solid ${d.overdue ? 'color-mix(in srgb, var(--rust) 60%, transparent)' : 'var(--paper-3)'}`,
+                        color: d.overdue ? 'var(--rust)' : d.kind === 'deadline' ? 'var(--ink-2)' : 'var(--ink)',
+                        background: d.kind === 'deadline' ? 'transparent' : 'var(--paper-2)',
                       }}
                     >
-                      {d.plannedOn && <DueFlag />}{truncateLabel(d.text)}
+                      {d.kind === 'deadline' && <DueFlag />}{truncateLabel(d.text)}
                     </div>
                   ))}
                 </div>

@@ -19,7 +19,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { RepeatEditor, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
-import { HabitAddAsk, type AddAnswer } from './HabitAddAsk';
+import { HabitAddAsk, type AddAnswer, type CardDraft } from './HabitAddAsk';
+import { MenuIcon } from '../../ui/menuIcons';
+import { FOCUS_NODE_EVENT } from '../../../store/scheduleActions';
 import { RemindPicker } from '../../ui/RemindPicker';
 import { AmountPopover, TargetPopover } from './HabitPopovers';
 import { countOn, weeklyTarget } from './types';
@@ -234,48 +236,42 @@ export function HabitNode({
   );
 
   const titleByView: Record<HabitView, string> = {
-    week: `HABITS & ROUTINES — WEEK ${weekNum} · HBT.WEEK`,
-    month: `HABITS & ROUTINES — ${MONTH_LABELS[now.getMonth()]} · HBT.MONTH`,
-    year: `HABITS & ROUTINES — ${now.getFullYear()} · HBT.YEAR`,
+    week: `HABITS — WEEK ${weekNum} · HBT.WEEK`,
+    month: `HABITS — ${MONTH_LABELS[now.getMonth()]} · HBT.MONTH`,
+    year: `HABITS — ${now.getFullYear()} · HBT.YEAR`,
   };
 
   const menuHabit = menu ? visibleHabits.find((h) => h.id === menu.habitId) ?? null : null;
 
-  // Decision 39 — what the menu offers besides rename / colour / icon / note.
-  const menuItemsFor = (h: (typeof visibleHabits)[number], at: { x: number; y: number }) => {
-    const edit = (kind: 'habit' | 'routine') => setEditRepeat({ habitId: h.id, value: fromSchedule(h.schedule, kind), x: at.x, y: at.y });
-    if (isRoutine(h) && h.endsOn && h.endsOn < today) {
-      return [
-        { label: 'Restart routine', onClick: () => onCommand('routine.restart', { id: h.id }) },
-        { label: 'Edit repeat…', onClick: () => edit('routine') },
-      ];
-    }
-    if (isRoutine(h)) {
-      const d = new Date();
-      const st = routineStatus(h, today, d.getHours() * 60 + d.getMinutes());
-      const nextDate = st.kind === 'now' || st.kind === 'today' ? today : st.kind === 'next' ? st.date : null;
-      return [
-        { label: 'Edit repeat…', onClick: () => edit('routine') },
-        ...(nextDate ? [{ label: `Skip next (${nextDate === today ? 'today' : new Date(`${nextDate}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })})`, onClick: () => onCommand('routine.skip', { id: h.id, date: nextDate }) }] : []),
-        ...(st.kind === 'skipped' ? [{ label: 'Undo skip', onClick: () => onCommand('routine.unskip', { id: h.id, date: st.date }) }] : []),
-        { label: h.remindMin !== undefined ? `Reminder: ${h.remindMin === 0 ? 'at the start' : `${h.remindMin} min before`}…` : 'Remind me…', testId: 'routine-menu-remind', onClick: () => setRoutineRemind({ habitId: h.id, value: h.remindMin ?? null, x: at.x, y: at.y }) },
-        { label: 'End routine (after today)', onClick: () => onCommand('routine.end', { id: h.id, date: today }) },
-        { label: 'Turn into habit', onClick: () => onCommand('habit.setKind', { id: h.id, kind: 'habit' }) },
-      ];
-    }
+  // Decision 40 — the habit menu: Days & time… (the add card, one editor for
+  // days, time, times a week and amount) and Rest today, above rename /
+  // colour / icon / note, the canvas card, Archive and Delete.
+  const draftOf = (h: (typeof visibleHabits)[number]): CardDraft => {
+    const sch = h.schedule;
+    const days = !sch || sch.kind === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : sch.kind === 'weekdays' ? [1, 2, 3, 4, 5] : [...sch.days];
     const tgt = weeklyTarget(h);
+    return { mode: tgt ? 'week' : 'days', days: days as CardDraft['days'], perWeek: tgt ?? 3, time: sch?.timeOfDay ?? '', amount: h.amount ? { target: h.amount.target, unit: h.amount.unit ?? '' } : null };
+  };
+  const menuItemsFor = (h: (typeof visibleHabits)[number], at: { x: number; y: number }) => {
+    if (isRoutine(h)) return [];
+    const d = draftOf(h);
+    const daysHint = d.mode === 'week' ? `${d.perWeek}× a week` : d.days.length === 7 ? 'every day' : d.days.map((x) => 'MTWTFSS'[x - 1]).join(' ');
     return [
-      { label: h.schedule ? 'Edit repeat…' : 'Repeat…', onClick: () => edit('habit') },
+      { label: 'Days & time…', icon: 'repeat' as const, hint: `${daysHint}${d.time ? ` ${d.time}` : ''}`, testId: 'habit-menu-days', onClick: () => setEditCard({ habitId: h.id, name: h.name, draft: d, anchor: { left: at.x, right: at.x + 330, top: at.y + 300 } }) },
       // A day already done needs no rest (the tick wins on screen anyway).
       ...((h.rest ?? []).includes(today)
-        ? [{ label: 'Undo rest today', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: false }) }]
+        ? [{ label: 'Undo rest today', icon: 'undo' as const, onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: false }) }]
         : h.log.includes(today) ? []
-        : [{ label: 'Rest today (keeps the streak)', testId: 'habit-menu-rest', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: true }) }]),
-      { label: h.amount ? `Amount a day: ${h.amount.target}${h.amount.unit ? ` ${h.amount.unit}` : ''}…` : 'Amount a day…', testId: 'habit-menu-amount', onClick: () => setAmountEdit({ habitId: h.id, target: h.amount?.target ?? null, unit: h.amount?.unit ?? '', x: at.x, y: at.y }) },
-      { label: tgt ? `Times a week: ${tgt}…` : 'Times a week…', testId: 'habit-menu-target', onClick: () => setTargetEdit({ habitId: h.id, value: tgt, x: at.x, y: at.y }) },
-      // A routine needs a time: with one it switches at once, without one the editor asks.
-      { label: 'Turn into routine', onClick: () => (h.schedule?.timeOfDay ? onCommand('habit.setKind', { id: h.id, kind: 'routine' }) : edit('routine')) },
+        : [{ label: 'Rest today', icon: 'rest' as const, hint: 'keeps streak', testId: 'habit-menu-rest', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: true }) }]),
     ];
+  };
+  const [editCard, setEditCard] = useState<{ habitId: string; name: string; draft: CardDraft; anchor: { left: number; right: number; top: number } } | null>(null);
+  const saveEditCard = (a: AddAnswer) => {
+    if (!editCard) return;
+    onCommand('habit.setSchedule', { habitId: editCard.habitId, schedule: a.schedule });
+    onCommand('habit.setTarget', { id: editCard.habitId, perWeek: a.perWeek ?? null });
+    onCommand('habit.setAmount', a.amount ? { id: editCard.habitId, target: a.amount.target, unit: a.amount.unit } : { id: editCard.habitId, target: null });
+    setEditCard(null);
   };
   const saveEditRepeat = () => {
     if (!editRepeat || !isRepeatValid(editRepeat.value)) return;
@@ -341,7 +337,6 @@ export function HabitNode({
         {/* nowheel: the wheel scrolls a long habit list instead of zooming the
             canvas — without it the habits below the fold were out of reach. */}
         <div ref={bodyRef} className="nowheel" style={{ padding: '14px 16px', position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
-          {routines.length > 0 && habitsOnly.length > 0 && <ShelfLabel text="Habits" />}
           {view === 'week' && (
             <WeekView
               habits={habitsOnly}
@@ -375,14 +370,8 @@ export function HabitNode({
             />
           )}
 
-          {routines.length > 0 && (
-            <>
-              <ShelfLabel text="Routines" />
-              <RoutineShelf routines={routines} today={today} onMenu={(e, id) => onContextMenu(e, id)} />
-            </>
-          )}
-
-          {habitsOnly.length === 0 && routines.length === 0 && (
+          {/* Decision 40 — repeating events live on the Calendar (its Events list). */}
+          {habitsOnly.length === 0 && (
             <div
               style={{
                 color: 'var(--ink-3)',
@@ -392,7 +381,7 @@ export function HabitNode({
                 lineHeight: 1.5,
               }}
             >
-              No habits or routines yet. A habit is something you tick; a routine just happens, like a class.
+              Something you do again and tick off: a run, 20 pages, 8 glasses.
             </div>
           )}
 
@@ -406,7 +395,7 @@ export function HabitNode({
               onSetNote={(note) => onCommand('habit.setNote', { id: menu.habitId, note })}
               onDelete={() => {
                 const h = state.habits.find((x) => x.id === menu.habitId);
-                undoable(`Deleted ${h?.kind === 'routine' ? 'routine' : 'habit'} "${h?.name ?? ''}"`, () => onCommand('habit.remove', { id: menu.habitId }));
+                undoable(`Deleted habit "${h?.name ?? ''}"`, () => onCommand('habit.remove', { id: menu.habitId }));
               }}
               onArchive={() => {
                 // Archived rows leave the list (Restore is in the habit menu's Archived list).
@@ -438,12 +427,20 @@ export function HabitNode({
             <div ref={addRowRef} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <input
               type="text"
-              placeholder="add a habit or routine"
-              aria-label="Add a habit or recurring event"
+              placeholder="add a habit"
+              aria-label="Add a habit"
               data-habit-add
               data-testid="habit-add-input"
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              onChange={(e) => {
+                setNewName(e.target.value);
+                // Decision 40 — the card opens as you type, with its defaults: Enter adds.
+                if (!e.target.value.trim()) { setAsk(null); return; }
+                if (!ask) {
+                  const r = addRowRef.current?.getBoundingClientRect();
+                  setAsk(r ? { left: r.left, right: r.right, top: r.top } : { left: 8, right: 360, top: window.innerHeight - 60 });
+                }
+              }}
               onKeyDown={handleKeyDown}
               // Stop click/pointer events at the input so they don't bubble
               // to RF's onNodeClick → selecting the habit mother → acid
@@ -477,9 +474,18 @@ export function HabitNode({
             </span>
             </div>
             {ask && newName.trim() && (
-              <HabitAddAsk name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => setAsk(null)} taken={takenNames}
+              <HabitAddAsk name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => { setAsk(null); setNewName(''); }} taken={takenNames}
                 archivedMatch={(() => { const h = state.habits.find((x) => x.archived && x.name.trim().toLowerCase() === newName.trim().toLowerCase()); return h ? { id: h.id, name: h.name } : null; })()}
-                onRestore={(id) => { onCommand('habit.unarchive', { id }); setNewName(''); setAsk(null); }} />
+                onRestore={(id) => { onCommand('habit.unarchive', { id }); setNewName(''); setAsk(null); }}
+                onCalendar={() => {
+                  setAsk(null);
+                  const cal = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+                  if (cal) window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { nodeId: cal.id } }));
+                }} />
+            )}
+            {editCard && (
+              <HabitAddAsk name={editCard.name} anchor={editCard.anchor} initial={editCard.draft} saveLabel="Save"
+                onAdd={saveEditCard} onCancel={() => setEditCard(null)} />
             )}
           </div>
 

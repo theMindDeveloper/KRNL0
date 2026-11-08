@@ -9,6 +9,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { MenuIcon, type MenuIconName } from '../../ui/menuIcons';
 import type { Habit, HabitColor } from './types';
 import { HABIT_COLORS } from './types';
 import { HabitIcon, HABIT_ICON_IDS, habitIconId } from './HabitIcon';
@@ -34,7 +35,7 @@ interface Props {
   // Only a lane's own menu passes this: remove the lane, keep the habit.
   onUnpinLane?: () => void;
   /** Decision 39 — routine / habit actions (Edit repeat, Skip next, End, Turn into …). */
-  extraItems?: ReadonlyArray<{ label: string; onClick: () => void; testId?: string }>;
+  extraItems?: ReadonlyArray<{ label: string; onClick: () => void; testId?: string; icon?: MenuIconName; hint?: string }>;
 }
 
 const MENU_WIDTH = 232;
@@ -199,8 +200,18 @@ export function HabitContextMenu({
         )}
       </div>
 
+      {/* Decision 40 — what you change most often first: days & time, rest today. */}
+      {extraItems && extraItems.length > 0 && (
+        <>
+          {extraItems.map((it) => (
+            <MenuItem key={it.label} label={it.label} {...(it.icon ? { icon: it.icon } : {})} {...(it.hint ? { trailing: <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{it.hint}</span> } : {})} {...(it.testId ? { testId: it.testId } : {})} onClick={() => { it.onClick(); onClose(); }} />
+          ))}
+          <div style={{ margin: '4px -8px 4px', borderTop: '1px solid var(--paper-2)' }} />
+        </>
+      )}
       <MenuItem
         label="Rename"
+        icon="rename"
         onClick={() => {
           setDraft(habit.name);
           cancelledRef.current = false;
@@ -210,6 +221,7 @@ export function HabitContextMenu({
       />
       <MenuItem
         label="Color"
+        icon="color"
         trailing={
           <span
             aria-hidden
@@ -264,6 +276,7 @@ export function HabitContextMenu({
 
       <MenuItem
         label="Icon"
+        icon="icon"
         trailing={
           <span
             aria-hidden
@@ -349,6 +362,7 @@ export function HabitContextMenu({
 
       <MenuItem
         label={habit.note && habit.note.length > 0 ? 'Edit note' : 'Add note'}
+        icon="note"
         onClick={() => {
           if (pickerOpen === 'note') {
             setPickerOpen(null);
@@ -435,20 +449,13 @@ export function HabitContextMenu({
         </div>
       )}
 
-      {extraItems && extraItems.length > 0 && (
-        <>
-          <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
-          {extraItems.map((it) => (
-            <MenuItem key={it.label} label={it.label} {...(it.testId ? { testId: it.testId } : {})} onClick={() => { it.onClick(); onClose(); }} />
-          ))}
-        </>
-      )}
 
       {onUnpinLane && (
         <>
           <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
           <MenuItem
-            label="Remove its canvas card (keep the habit)"
+            label="Remove canvas card"
+            icon="canvas"
             onClick={() => { onUnpinLane(); onClose(); }}
           />
         </>
@@ -463,7 +470,8 @@ export function HabitContextMenu({
             }}
           />
           <MenuItem
-            label={laneExists ? 'Already on the canvas' : 'Put a card on the canvas'}
+            label={laneExists ? 'Card is on the canvas' : 'Card on canvas'}
+            icon="canvas"
             disabled={laneExists === true}
             onClick={() => {
               if (laneExists) return;
@@ -482,7 +490,9 @@ export function HabitContextMenu({
       />
       {onArchive && (
         <MenuItem
-          label="Archive (keeps history)"
+          label="Archive"
+          icon="archive"
+          trailing={<span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>keeps history</span>}
           onClick={() => {
             onArchive();
             onClose();
@@ -491,6 +501,7 @@ export function HabitContextMenu({
       )}
       <MenuItem
         label="Delete"
+        icon="delete"
         destructive
         onClick={() => {
           onDelete();
@@ -508,6 +519,7 @@ export function HabitContextMenu({
 
 function MenuItem({
   label,
+  icon,
   trailing,
   destructive,
   disabled,
@@ -515,6 +527,7 @@ function MenuItem({
   testId,
 }: {
   label: string;
+  icon?: MenuIconName;
   trailing?: React.ReactNode;
   destructive?: boolean;
   disabled?: boolean;
@@ -555,6 +568,7 @@ function MenuItem({
         (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
       }}
     >
+      <span aria-hidden style={{ width: 14, display: 'inline-flex', flexShrink: 0, color: destructive ? 'var(--rust)' : 'var(--ink-3)' }}>{icon && <MenuIcon name={icon} />}</span>
       <span style={{ flex: 1 }}>{label}</span>
       {trailing}
     </button>

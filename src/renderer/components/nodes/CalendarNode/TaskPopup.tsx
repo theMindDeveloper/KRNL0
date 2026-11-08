@@ -34,6 +34,8 @@ interface Props {
   onActivate: () => void;
   onJump: () => void;
   onUnschedule: () => void;
+  /** The timer item's words: "Focus on it" (Pomo) or "Track it now" (Observe). */
+  timerLabel?: string;
   /** Delete the plan everywhere (Todo, Calendar, canvas), with UNDO. */
   onDelete?: () => void;
   onClose: () => void;
@@ -166,15 +168,15 @@ export function TaskPopup(p: Props) {
         <div style={{ display: 'grid', gridTemplateColumns: p.onDelete ? '1fr 1fr' : '1fr 1fr 1fr', gap: 6, padding: '10px 12px', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
           <button type="button" data-testid="calendar-task-activate" onClick={p.onActivate} style={actionBtn}>
             <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5v9l7.5-4.5z" /></svg>
-            Activate
+            {p.timerLabel ?? 'Focus on it'}
           </button>
           <button type="button" data-testid="calendar-task-jump" onClick={p.onJump} style={actionBtn}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4"><circle cx="6" cy="6" r="4" /><circle cx="6" cy="6" r="1.2" fill="currentColor" /></svg>
-            Find
+            Show in Todo
           </button>
-          <button type="button" data-testid="calendar-task-unschedule" onClick={p.onUnschedule} title="Take it off the calendar — the task stays in your Todo" style={actionBtn}>
+          <button type="button" data-testid="calendar-task-unschedule" onClick={p.onUnschedule} title="Take it out of the hours: it stays on this day, at any time" style={actionBtn}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="1.5" y="2.5" width="9" height="8" rx="1.5" /><path d="M1.5 5h9M4.5 7l3 2M7.5 7l-3 2" /></svg>
-            Unschedule
+            Any time that day
           </button>
           {p.onDelete && (
             <button type="button" data-testid="calendar-task-delete" onClick={p.onDelete} title="Delete the plan from the Todo and the Calendar (UNDO in the notice)" style={{ ...actionBtn, color: 'var(--rust)' }}>

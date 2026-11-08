@@ -17,6 +17,7 @@ export type SysCommand =
   | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
   | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
   | { kind: 'todo'; sub: 'due'; ref: string | undefined; when: string | undefined }
+  | { kind: 'todo'; sub: 'when'; ref: string | undefined; day: string | undefined; time: string | undefined }
   | { kind: 'todo'; sub: 'drop' | 'undrop'; ref: string | undefined }
   | { kind: 'todo'; sub: 'tags'; action: string | undefined; label: string | undefined; keywords: string | undefined; color: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'archive' | 'clear-archive' }
@@ -463,7 +464,8 @@ export class SysParser {
       }
       // ADR 0016 — tags + archive.
       if (sub === 'tag') return { kind: 'todo', sub: 'tag', ref: rest[0], tag: rest[1] };
-      if (sub === 'due') return { kind: 'todo', sub: 'due', ref: rest[0], when: rest[1] };
+      if (sub === 'due' || sub === 'deadline') return { kind: 'todo', sub: 'due', ref: rest[0], when: rest[1] };
+      if (sub === 'when') return { kind: 'todo', sub: 'when', ref: rest[0], day: rest[1], time: rest[2] };
       if (sub === 'drop' || sub === 'undrop') return { kind: 'todo', sub, ref: rest[0] };
       if (sub === 'tags') {
         return {
@@ -719,8 +721,10 @@ export class SysParser {
       }
     }
 
-    // Decision 39 — routines: repeat at a time, never ticked.
-    if (cmd === 'routine') {
+    // Decision 39 / 40 — repeating events (stored as routines): never ticked.
+    // `event` is the name people see; `routine` keeps working.
+    if (cmd === 'routine' || cmd === 'event') {
+      if (sub === 'delete') return { kind: 'habit', sub: 'remove', name: rest[0] };
       if (sub === 'add') {
         const forRaw = flag(rest, 'for');
         return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: flag(rest, 'at'), forMin: forRaw !== undefined && /^\d+$/.test(forRaw) ? Number(forRaw) : undefined };

@@ -5,7 +5,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { calcWeekStreak, bestWeekStreak, ticksThisWeek, habitSetTarget, habitAdd } from '../../../src/renderer/components/nodes/HabitNode/commands';
 import { weeklyTarget, type Habit, type HabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
-import { askMissing, askToAnswer, summary, EMPTY_ASK } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
+import { cardToAnswer, cardSummary, DEFAULT_CARD } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
 import { computeCatchup } from '../../../src/renderer/launch/catchup';
 import { SysFacade } from '../../../src/sys/SysFacade';
 import { seedBoard } from '../../../src/main/persistence/board';
@@ -73,14 +73,11 @@ describe('model', () => {
   });
 });
 
-describe('add card: "A few a week"', () => {
-  it('asks how many, never a time; adds an any-time daily habit with the target', () => {
-    const d = { ...EMPTY_ASK, kind: 'habit' as const, often: 'perWeek' as const };
-    expect(askMissing(d)).toBe('Pick how many times');
-    const done = { ...d, perWeek: 3 };
-    expect(askMissing(done)).toBeNull();
-    expect(summary(done)).toBe('3× a week, any days');
-    expect(askToAnswer(done)).toEqual({ kind: 'habit', schedule: { kind: 'daily' }, perWeek: 3 });
+describe('add card: times a week', () => {
+  it('any days, the target; adds an any-time daily habit with it', () => {
+    const d = { ...DEFAULT_CARD, mode: 'week' as const, perWeek: 3 };
+    expect(cardSummary(d)).toBe('3× a week');
+    expect(cardToAnswer(d)).toEqual({ kind: 'habit', schedule: { kind: 'daily' }, perWeek: 3 });
   });
 });
 

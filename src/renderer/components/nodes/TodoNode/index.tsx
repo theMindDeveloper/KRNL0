@@ -23,12 +23,12 @@ import { breakdownPomoTime } from '../../../store/pomoSchedule';
 import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { revertible, undoable } from '../../../store/undoNotice';
-import { DuePicker } from '../../ui/DuePicker';
-import { RemindPicker } from '../../ui/RemindPicker';
+import { WhenPopover, dayWord, fmtLength, type WhenValue } from '../../ui/WhenPopover';
+import { MenuIcon } from '../../ui/menuIcons';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { scheduleTaskAt, setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
-import { describeQuickAdd, parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
+import { parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
 
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
@@ -63,10 +63,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   // ADR 0016 — Done / Archive dropdowns (collapsed by default) + tag picker.
   const [doneOpen, setDoneOpen] = useState(false);
   const [tagPicker, setTagPicker] = useState<{ x: number; y: number; itemId: string } | null>(null);
-  // Review 2.1 — the due-day picker (row menu → "Due date…", or click the chip).
-  const [duePick, setDuePick] = useState<{ x: number; y: number; itemId: string } | null>(null);
-  // Review 4.1 — reminder lead time per plan (row menu → "Remind me…").
-  const [remindPick, setRemindPick] = useState<{ x: number; y: number; taskId: string; value: number | null } | null>(null);
+  // Decision 40 — the When popover (When tab or Deadline tab), from the row,
+  // its menu or its When / Deadline text.
+  const [whenPick, setWhenPick] = useState<{ x: number; y: number; itemId: string; tab: 'when' | 'deadline' } | null>(null);
   const remindByTask = useBoardStore(useShallow((s) => {
     const out: Record<string, number> = {};
     for (const n of s.board?.nodes ?? []) {
@@ -154,6 +153,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       return (pomo?.config as PomoConfig | null) ?? defaultPomoConfig();
     }),
   );
+
+  // The timer item in the row menu follows the timer: mode, and what it runs on.
+  const pomoRun = useBoardStore(useShallow((s) => {
+    const st = s.board?.nodes.find((n) => n.kind === 'pomo')?.state as { status?: string; activeTaskId?: string | null } | undefined;
+    return { running: !!st && st.status !== 'idle' && st.status !== 'done', taskId: st?.activeTaskId ?? null };
+  }));
 
   // Map taskNodeId → { scheduledFor, scheduledDurationMin } for past-graying.
   const taskScheduledInfo = useBoardStore(
@@ -274,7 +279,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     const item = [...(st?.items ?? [])].filter((i) => i.text === q.text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     if (item) {
       if (q.time && q.day && item.taskNodeId) void scheduleTaskAt(item.taskNodeId, `${q.day}T${q.time}`);
-      else if (q.day && !q.time) onCommand('todo.setDue', { id: item.id, dueOn: q.day });
+      else if (q.day && !q.time) onCommand('todo.setOnDay', { id: item.id, onDay: q.day });
+      if (q.deadline) onCommand('todo.setDue', { id: item.id, dueOn: q.deadline });
     }
     setPendingName('');
     setInputPhase('name');
@@ -284,16 +290,13 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const handleAddKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (inputPhase === 'name') {
       if (e.key === 'Enter') {
+        // Decision 40 — one step: Enter always adds; what the words said is
+        // shown as chips above the field first.
         const name = pendingName.trim();
-        const q = name ? parseQuickAdd(name) : null;
-        if (q && (q.time || q.day || q.durationMin)) { quickSubmit(q); return; }
-        if (name) {
-          setInputPhase('duration');
-          setDurationValue('');
-          setDurationInvalid(false);
-          // focus is preserved on the same element since type changes
-          setTimeout(() => inputRef.current?.focus(), 0);
-        }
+        if (!name) return;
+        const q = parseQuickAdd(name);
+        if (!q.hint && (q.time || q.day || q.durationMin || q.deadline)) { quickSubmit(q); return; }
+        submitTask(name, null);
       } else if (e.key === 'Escape') {
         setPendingName('');
         setInputFocused(false);
@@ -408,46 +411,76 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     setCtxMenu({ x: e.clientX, y: e.clientY, itemId, hasTaskNode });
   };
 
+  // Decision 40 — a plan's When and Deadline, read from the board.
+  const whenOf = (item: TodoItem): WhenValue => {
+    const at = item.taskNodeId ? taskScheduledInfo.get(item.taskNodeId)?.scheduledFor : undefined;
+    const open = item.taskNodeId ? taskOpenKeys.includes(item.taskNodeId) : true;
+    const planned = item.taskNodeId ? taskPlannedMin.get(item.taskNodeId) : undefined;
+    return {
+      day: at ? at.slice(0, 10) : item.onDay ?? null,
+      time: at ? at.slice(11, 16) : null,
+      lengthMin: open || !planned ? null : planned,
+      remindMin: item.taskNodeId ? remindByTask[item.taskNodeId] ?? null : null,
+      deadline: item.dueOn ?? null,
+    };
+  };
+  /** "16:05" today, "Tue 16:00", "Fri" (any time), or null. */
+  const whenText = (w: WhenValue): string | null => {
+    if (!w.day) return null;
+    if (w.time) return w.day === todayYMD ? w.time : `${dayWord(w.day, todayYMD)} ${w.time}`;
+    return dayWord(w.day, todayYMD);
+  };
+  const applyWhen = (item: TodoItem, prev: WhenValue, next: WhenValue) => {
+    if (next.deadline !== prev.deadline) onCommand('todo.setDue', { id: item.id, dueOn: next.deadline });
+    if (next.lengthMin !== prev.lengthMin && item.taskNodeId) onCommand('todo.setItemPlannedMin', { itemId: item.id, minutes: next.lengthMin ?? 0 });
+    if (next.day !== prev.day || next.time !== prev.time) {
+      if (next.day && next.time && item.taskNodeId) void scheduleTaskAt(item.taskNodeId, `${next.day}T${next.time}`);
+      else {
+        if (prev.time && item.taskNodeId) void unscheduleTask(item.taskNodeId);
+        onCommand('todo.setOnDay', { id: item.id, onDay: next.day });
+      }
+    }
+    if (item.taskNodeId && next.remindMin !== prev.remindMin) void setTaskReminder(item.taskNodeId, next.time ? next.remindMin : null);
+  };
+  const openWhen = (e: { clientX: number; clientY: number }, itemId: string, tab: 'when' | 'deadline' = 'when') =>
+    setWhenPick({ x: e.clientX, y: e.clientY, itemId, tab });
+
   const buildRowMenuItems = (itemId: string, hasTaskNode: boolean): ContextMenuItem[] => {
     const item = state.items.find((i) => i.id === itemId);
+    if (!item) return [];
+    const at = ctxMenu ?? { x: 0, y: 0 };
+    const rename: ContextMenuItem = { label: 'Rename', icon: <MenuIcon name="rename" />, onSelect: () => startEdit(itemId, item.text) };
+    const del: ContextMenuItem = { label: 'Delete', icon: <MenuIcon name="delete" />, danger: true, onSelect: () => removeItem(itemId) };
+    if (item.droppedAt !== undefined) {
+      return [{ label: 'Bring back', icon: <MenuIcon name="undo" />, onSelect: () => onCommand('todo.undrop', { id: itemId }) }, { ...del, divider: true }];
+    }
+    if (item.done) {
+      return [{ label: 'Not done yet', icon: <MenuIcon name="undo" />, onSelect: () => onCommand('todo.toggle', { id: itemId }) }, rename, { ...del, divider: true }];
+    }
+    const w = whenOf(item);
+    // The timer item follows the timer (Pomo or Observe) and what it runs on.
+    const observe = pomoConfig.mode === 'observe';
+    const onThis = pomoRun.running && item.taskNodeId !== null && pomoRun.taskId === item.taskNodeId;
+    const timer: ContextMenuItem = onThis
+      ? { label: 'On the timer now', icon: <MenuIcon name={observe ? 'observe' : 'play'} />, disabled: true, onSelect: () => {} }
+      : pomoRun.running
+        ? { label: 'Switch timer to it', icon: <MenuIcon name="convert" />, onSelect: () => onCommand('todo.startPomoForItem', { itemId }) }
+        : observe
+          ? { label: 'Track it now', icon: <MenuIcon name="observe" />, onSelect: () => onCommand('todo.startPomoForItem', { itemId }) }
+          : { label: 'Focus on it', icon: <MenuIcon name="play" />, hint: `${pomoConfig.sessionMin} min`, onSelect: () => onCommand('todo.startPomoForItem', { itemId }) };
+    const tagLabel = item.tag !== undefined ? tagDisplay(tagLibrary, item.tag).label : undefined;
     return [
-      {
-        label: 'Edit text',
-        onSelect: () => {
-          if (item) startEdit(itemId, item.text);
-        },
-      },
-      {
-        label: 'Edit time',
-        // Time lives on the linked task node — no task node, nothing to edit.
-        disabled: !hasTaskNode || (item?.done ?? false),
-        onSelect: () => {
-          if (item?.taskNodeId) startTimeEdit(itemId, item.taskNodeId);
-        },
-      },
+      { label: 'When…', icon: <MenuIcon name="when" />, ...(whenText(w) ? { hint: whenText(w)! } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId) },
+      { label: 'Deadline…', icon: <MenuIcon name="deadline" />, ...(w.deadline ? { hint: dayWord(w.deadline, todayYMD) } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId, 'deadline') },
       ...(easy ? [] : [
-        {
-          label: 'Set tag…',
-          onSelect: () => {
-            if (ctxMenu) setTagPicker({ x: ctxMenu.x, y: ctxMenu.y, itemId });
-          },
-        },
-        {
-          label: 'Start pomo',
-          disabled: !hasTaskNode,
-          onSelect: () => {
-            onCommand('todo.startPomoForItem', { itemId });
-          },
-        },
+        ...(hasTaskNode ? [{ ...timer, divider: true }] : []),
+        { label: 'Tag…', icon: <MenuIcon name="tag" />, ...(tagLabel ? { hint: tagLabel } : {}), ...(hasTaskNode ? {} : { divider: true }), onSelect: () => setTagPicker({ x: at.x, y: at.y, itemId }) },
       ]),
-      ...(item?.taskNodeId && !item.done ? [{
-        label: remindByTask[item.taskNodeId] !== undefined ? 'Reminder…' : 'Remind me…',
-        onSelect: () => {
-          if (ctxMenu && item.taskNodeId) setRemindPick({ x: ctxMenu.x, y: ctxMenu.y, taskId: item.taskNodeId, value: remindByTask[item.taskNodeId] ?? null });
-        },
-      }] : []),
-      ...(item && !item.done && item.droppedAt === undefined ? [{
-        label: 'Drop (not doing it)',
+      { ...rename, ...(easy ? { divider: true } : {}) },
+      {
+        label: "Won't do",
+        icon: <MenuIcon name="drop" />,
+        divider: true,
         onSelect: () => {
           // Off the Calendar too: a dropped plan is not "missed". Dropped
           // plans leave the list, so the notice offers UNDO (time put back).
@@ -455,24 +488,13 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           const was = taskId ? taskScheduledInfo.get(taskId)?.scheduledFor ?? null : null;
           if (taskId) void unscheduleTask(taskId);
           onCommand('todo.drop', { id: itemId });
-          revertible(`Dropped "${item.text}"`, () => {
+          revertible(`Won't do "${item.text}"`, () => {
             onCommand('todo.undrop', { id: itemId });
             if (taskId && was) void scheduleTaskAt(taskId, was);
           });
         },
-      }] : []),
-      {
-        label: item?.dueOn ? 'Change due date…' : 'Due date…',
-        disabled: item?.done ?? false,
-        onSelect: () => {
-          if (ctxMenu) setDuePick({ x: ctxMenu.x, y: ctxMenu.y, itemId });
-        },
       },
-      {
-        label: 'Delete',
-        danger: true,
-        onSelect: () => removeItem(itemId),
-      },
+      del,
     ];
   };
 
@@ -511,8 +533,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       }
       style={{
         display: 'flex',
+        flexWrap: 'wrap',
         alignItems: 'center',
-        gap: 8,
+        gap: '2px 8px',
         padding: '4px 14px',
         opacity: isGrayed ? 0.5 : 1,
         cursor: 'grab',
@@ -601,18 +624,16 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           onDoubleClick={() => !item.done && startEdit(item.id, item.text)}
           onClick={(e) => e.stopPropagation()}
           style={{
-            flex: 1,
-            // A long title shrinks (ellipsis) so the buttons after it stay in
-            // the window — but never below a readable start (see todo-item CSS).
-            minWidth: 72,
+            // Decision 40 — a long name wraps at word breaks; the meta moves
+            // under it as one group. Nothing is cut off.
+            flex: '1 1 120px',
+            minWidth: 0,
             fontFamily: 'var(--font-sans)',
             fontSize: 12.5,
             color: item.done ? 'var(--ink-4)' : 'var(--ink)',
             textDecorationLine: item.done ? 'line-through' : 'none',
             textDecorationColor: 'var(--ink-4)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            overflowWrap: 'anywhere',
             // Text cursor: double-click edits. A single click does nothing (it
             // would fire on every double-click); "Start pomo" is in the row menu.
             cursor: item.done ? 'default' : 'text',
@@ -620,126 +641,82 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         >
           {item.text}
           {item.droppedAt !== undefined && (
-            <span data-testid={`todo-dropped-${item.id}`} style={{ marginLeft: 6, fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-4)', textDecoration: 'none', display: 'inline-block' }}>dropped</span>
+            <span data-testid={`todo-dropped-${item.id}`} style={{ marginLeft: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', textDecoration: 'none', display: 'inline-block' }}>won't do</span>
           )}
         </span>
       )}
 
-      {/* Review 4.1 — a reminder: a small mark. */}
-      {!item.done && item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined && (
-        <span style={{ display: 'inline-flex', gap: 2, color: 'var(--ink-3)', flexShrink: 0 }}>
-          {item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined && (
-            <span data-testid={`todo-remind-${item.id}`} title={`Reminder ${remindByTask[item.taskNodeId] === 0 ? 'at the start' : `${remindByTask[item.taskNodeId]} min before`}`} style={{ display: 'inline-flex' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" /></svg>
-            </span>
-          )}
-        </span>
-      )}
-      {/* Review 2.1 — the deadline, apart from when it is planned. */}
-      {item.dueOn && !item.done && (() => {
-        const d = dueLabel(item.dueOn, todayYMD);
-        const col = d.tone === 'over' ? 'var(--rust)' : d.tone === 'today' ? 'var(--acid-ink, var(--acid))' : d.tone === 'soon' ? 'var(--ink-2)' : 'var(--ink-3)';
-        return (
-          <button
-            type="button"
-            data-testid={`todo-due-${item.id}`}
-            title={`Due ${new Date(`${item.dueOn}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · click to change`}
-            onClick={(e) => { e.stopPropagation(); setDuePick({ x: e.clientX, y: e.clientY, itemId: item.id }); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              flexShrink: 0, height: 18, padding: '0 6px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap',
-              fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: d.tone === 'over' || d.tone === 'today' ? 650 : 500,
-              border: `1px solid color-mix(in srgb, ${col} 55%, transparent)`, background: 'transparent', color: col,
-            }}
-          >
-            {d.text.startsWith('due ') ? <><span className="todo-due-word">due </span>{d.text.slice(4)}</> : d.text}
+      {/* The meta and the tag travel together: one group that moves under the name when narrow. */}
+      <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0, maxWidth: '100%' }}>
+      {/* Decision 40 — one meta group: When · Deadline · length · reminder.
+          It wraps under the name as a whole when the row is narrow; nothing is cut. */}
+      {!item.done && (() => {
+        const w = whenOf(item);
+        const wt = whenText(w);
+        const overdue = (isPast && !!w.time) || (!w.time && !!w.day && w.day < todayYMD);
+        const dl = w.deadline ? dueLabel(w.deadline, todayYMD) : null;
+        const lateForDeadline = !!(w.deadline && w.day && w.day > w.deadline);
+        const dlCol = !dl ? '' : dl.tone === 'over' || lateForDeadline ? 'var(--rust)' : dl.tone === 'today' ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)';
+        const planned = item.taskNodeId !== null ? taskPlannedMin.get(item.taskNodeId) ?? 25 : 25;
+        const trackedMin = item.taskNodeId !== null ? Math.round((trackedSecByTask.get(item.taskNodeId) ?? 0) / 60) : 0;
+        const openTime = item.taskNodeId === null || taskOpenKeys.includes(item.taskNodeId);
+        const kind = item.taskNodeId !== null ? taskKindMap.get(item.taskNodeId) ?? 'focus' : 'focus';
+        const bd = kind === 'event' ? { workMin: planned, breakMin: 0, effectiveMin: planned } : breakdownPomoTime(planned, 0, pomoConfig);
+        const parts: Array<{ key: string; el: JSX.Element }> = [];
+        if (wt) parts.push({ key: 'when', el: (
+          <button type="button" data-testid={`todo-when-${item.id}`} title={w.time ? 'When · click to change' : 'Any time that day · click to change'}
+            onClick={(e) => { e.stopPropagation(); openWhen(e, item.id); }} onMouseDown={(e) => e.stopPropagation()}
+            style={{ ...metaBtn, color: overdue ? 'var(--rust)' : w.time && w.day === todayYMD ? 'var(--ink)' : 'var(--ink-2)', fontWeight: overdue ? 650 : 500 }}>{wt}</button>
+        ) });
+        if (dl && w.deadline) parts.push({ key: 'dl', el: (
+          <button type="button" data-testid={`todo-due-${item.id}`}
+            title={`Deadline ${new Date(`${w.deadline}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}${lateForDeadline ? ' · planned after its deadline' : ''} · click to change`}
+            onClick={(e) => { e.stopPropagation(); openWhen(e, item.id, 'deadline'); }} onMouseDown={(e) => e.stopPropagation()}
+            style={{ ...metaBtn, color: dlCol, fontWeight: dl.tone === 'over' || dl.tone === 'today' ? 650 : 500, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <MenuIcon name="deadline" size={10} />{dayWord(w.deadline, todayYMD)}
           </button>
+        ) });
+        if (trackedMin > 0 || !openTime) parts.push({ key: 'len', el: (
+          <span data-testid="todo-item-breakdown"
+            title={`${trackedMin > 0 ? `tracked ${fmtTodoMin(trackedMin)} · ` : ''}${openTime ? 'no length set' : `planned: work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m`}`}
+            onClick={(e) => { e.stopPropagation(); openWhen(e, item.id); }} onMouseDown={(e) => e.stopPropagation()}
+            style={{ ...metaBtn, color: 'var(--ink-3)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            {trackedMin > 0 && (
+              <span data-testid="todo-item-tracked" style={{ color: !openTime && trackedMin > bd.effectiveMin ? 'color-mix(in srgb, var(--rust) 72%, var(--ink))' : 'var(--ink-2)' }}>
+                <SettingsIcon name="clock" size={11} /> {fmtTodoMin(trackedMin)}{!openTime && <span style={{ color: 'var(--ink-3)' }}> / </span>}
+              </span>
+            )}
+            {!openTime && <span>{fmtTodoMin(bd.effectiveMin)}</span>}
+          </span>
+        ) });
+        if (item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined) parts.push({ key: 'rem', el: (
+          <span data-testid={`todo-remind-${item.id}`} title={`Reminder ${remindByTask[item.taskNodeId] === 0 ? 'at the start' : `${remindByTask[item.taskNodeId]} min before`}`} style={{ display: 'inline-flex', color: 'var(--ink-3)' }}>
+            <MenuIcon name="reminder" size={11} />
+          </span>
+        ) });
+        return (
+          <span data-testid={`todo-meta-${item.id}`} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0 }}>
+            {parts.map((p, i) => (
+              <span key={p.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                {i > 0 && <span aria-hidden style={{ color: 'var(--ink-4)' }}>·</span>}
+                {p.el}
+              </span>
+            ))}
+            {!wt && !archived && (
+              <button type="button" className="todo-when-add" data-testid={`todo-plan-${item.id}`} title="When… (or drag it onto the Calendar)" aria-label={`When: ${item.text}`}
+                onClick={(e) => { e.stopPropagation(); openWhen(e, item.id); }} onMouseDown={(e) => e.stopPropagation()}
+                style={{ ...metaBtn, color: 'var(--ink-4)', display: 'inline-flex', alignItems: 'center' }}>
+                <MenuIcon name="when" size={13} />
+              </button>
+            )}
+          </span>
         );
       })()}
-
-      {/* Three-numbers display: work / break / total (mono, right-aligned).
-          Only shown when item is wired to a task node (has taskNodeId).
-          Replaced by a numeric input when this row's time is being edited. */}
-      {item.taskNodeId !== null && (
-        editingTimeId === item.id ? (
-          <input
-            type="number"
-            min={0}
-            max={480}
-            title={timeInvalid ? 'Whole minutes from 0 to 480 (0 = no set time)' : 'Minutes (0 = no set time)'}
-            aria-invalid={timeInvalid}
-            value={timeValue}
-            autoFocus
-            onFocus={(e) => e.currentTarget.select()}
-            onChange={(e) => {
-              setTimeValue(e.target.value);
-              setTimeInvalid(false);
-            }}
-            onKeyDown={handleTimeKeyDown}
-            // Leaving an invalid value abandons the edit instead of leaving a
-            // red field open with nothing focused.
-            onBlur={() => { if (!commitTimeEdit()) cancelTimeEdit(); }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              flexShrink: 0,
-              width: 56,
-              background: 'var(--paper-2)',
-              border: `1px solid ${timeInvalid ? 'var(--rust)' : 'var(--ink-3)'}`,
-              borderRadius: 3,
-              outline: 'none',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              color: 'var(--ink-3)',
-              textAlign: 'right',
-              padding: '1px 4px',
-            }}
-          />
-        ) : (() => {
-          const planned = taskPlannedMin.get(item.taskNodeId) ?? 25;
-          const trackedMin = Math.round((trackedSecByTask.get(item.taskNodeId) ?? 0) / 60);
-          const openTime = taskOpenKeys.includes(item.taskNodeId);
-          const kind = taskKindMap.get(item.taskNodeId) ?? 'focus';
-          const bd = kind === 'event'
-            ? { workMin: planned, breakMin: 0, effectiveMin: planned }
-            : breakdownPomoTime(planned, 0, pomoConfig);
-          return (
-            <span
-              data-testid="todo-item-breakdown"
-              title={`${trackedMin > 0 ? `tracked ${fmtTodoMin(trackedMin)} · ` : ''}planned: work ${bd.workMin}m · break ${bd.breakMin}m · total ${bd.effectiveMin}m${item.done ? '' : ' · click to change the estimate'}`}
-              onClick={item.done || item.taskNodeId === null ? undefined : (e) => { e.stopPropagation(); startTimeEdit(item.id, item.taskNodeId as string); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                cursor: item.done ? 'default' : 'pointer',
-                flexShrink: 0,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                color: 'var(--ink-3)',
-                letterSpacing: '0.02em',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-            >
-              {/* #207 — one readable figure: tracked / planned once anything is tracked. */}
-              {trackedMin > 0 && (
-                <span data-testid="todo-item-tracked" style={{ color: !openTime && trackedMin > bd.effectiveMin ? 'color-mix(in srgb, var(--rust) 72%, var(--ink))' : 'var(--ink-2)' }}>
-                  <SettingsIcon name="clock" size={11} /> {fmtTodoMin(trackedMin)}{!openTime && <span style={{ color: 'var(--ink-3)' }}> / </span>}
-                </span>
-              )}
-              {openTime
-                ? (trackedMin > 0 ? null : <span style={{ color: 'var(--ink-3)' }}>open</span>)
-                : <span style={{ color: 'var(--ink-3)' }}>{fmtTodoMin(bd.effectiveMin)}</span>}
-            </span>
-          );
-        })()
-      )}
 
       {/* F2 / ADR 0016: tag pill — click to re-tag. A dashed border marks
           a tag the classifier guessed; solid means the user chose it.
           Untagged rows get a faint "+" so there's always a way in. */}
-      {!easy && (() => {
+      {!easy && !item.done && (() => {
         const disp = item.tag !== undefined ? tagDisplay(tagLibrary, item.tag) : null;
         const isAuto = item.tagSource === 'auto';
         return (
@@ -760,15 +737,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               gap: 4,
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
-              // Same chip as the task card: the tag's colour, tinted; text mixed toward ink.
               color: disp ? `color-mix(in srgb, ${disp.color} 45%, var(--ink))` : 'var(--ink-3)',
               background: disp ? `color-mix(in srgb, ${disp.color} 16%, transparent)` : 'transparent',
               border: `1px ${isAuto ? 'dashed' : 'solid'} ${disp ? (isAuto ? `color-mix(in srgb, ${disp.color} 55%, transparent)` : 'transparent') : 'transparent'}`,
               padding: '1px 8px',
               borderRadius: 999,
               letterSpacing: '0.01em',
-              maxWidth: 96,
-              overflow: 'hidden',
               whiteSpace: 'nowrap',
               cursor: 'pointer',
               lineHeight: '15px',
@@ -777,35 +751,17 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             {disp ? (
               <>
                 <span aria-hidden style={{ width: 5, height: 5, borderRadius: '50%', background: disp.color, flexShrink: 0 }} />
-                <span className="todo-tag__label" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{disp.label}</span>
+                <span className="todo-tag__label">{disp.label}</span>
               </>
             ) : '+'}
           </button>
         );
       })()}
-
-      {/* engagement.md F14 — PLAN shows how to drag the row onto the Calendar. */}
-      {!item.done && !archived && !sched && (
-        <button
-          type="button"
-          className="todo-plan"
-          data-testid={`todo-plan-${item.id}`}
-          title="Plan it: drag it onto the Calendar"
-          aria-label={`Plan: ${item.text}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            showPlanGuide({ mode: 'plan', itemId: item.id, taskId: item.taskNodeId, text: item.text });
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-            flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, height: 19, padding: '0 7px',
-            borderRadius: 999, border: '1px solid var(--paper-3)', background: 'transparent', cursor: 'pointer',
-            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--ink-3)',
-          }}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
-          <span className="todo-plan__label">PLAN</span>
-        </button>
+      </span>
+      {item.done && (
+        <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>
+          {item.completedAt ? `done ${new Date(item.completedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'done'}
+        </span>
       )}
 
       {/* Delete — hover-revealed */}
@@ -909,7 +865,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             >
               {doneItems.length > 0 || buckets.archived.length > 0 ? 'All clear' : (
                 <span data-testid="todo-empty-hint" style={{ lineHeight: 1.5 }}>
-                  Nothing planned yet. Type something you want to get done below and press Enter. Say when as you type ("Gym tomorrow 18:00 1h") and it goes straight onto the Calendar; or drag it there later.
+                  Nothing planned. Type a plan below; add a day or a time as you type.
                 </span>
               )}
             </div>
@@ -936,55 +892,35 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           </div>
         </PagedView>
 
-        {/* Quick add: what Enter will do with the words typed so far. */}
-        {inputFocused && inputPhase === 'name' && (() => {
-          const q = pendingName.trim() ? parseQuickAdd(pendingName.trim()) : null;
-          const said = q ? describeQuickAdd(q) : null;
-          if (q?.hint) {
+        {/* Decision 40 — what the words said, as chips above the field, before Enter. */}
+        {inputFocused && pendingName.trim() !== '' && (() => {
+          const q = parseQuickAdd(pendingName.trim());
+          if (q.hint) {
             return (
-              <div data-testid="todo-quick-preview" style={{ padding: '6px 14px 0', borderTop: '1px dashed var(--paper-3)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                Will be added as typed: {q.hint}
+              <div data-testid="todo-quick-preview" style={previewLine}>
+                <span style={{ color: 'var(--ink-3)' }}>Repeats? Add it in Habits, or draw it on the Calendar.</span>
               </div>
             );
           }
-          if (!q || !said) return null;
+          const chips: Array<{ key: string; icon: 'when' | 'day' | 'deadline' | 'length'; text: string }> = [];
+          if (q.day) {
+            const passed = q.rolledToTomorrow ? ', tomorrow' : '';
+            chips.push({ key: 'when', icon: q.time ? 'when' : 'day', text: q.time ? `${q.day === todayYMD ? 'Today' : dayWord(q.day, todayYMD)} ${q.time}${passed}` : `${dayWord(q.day, todayYMD)}, any time` });
+          }
+          if (q.deadline) chips.push({ key: 'dl', icon: 'deadline', text: `by ${dayWord(q.deadline, todayYMD)}` });
+          if (q.durationMin) chips.push({ key: 'len', icon: 'length', text: fmtLength(q.durationMin) });
+          if (chips.length === 0) return null;
           return (
-            <div data-testid="todo-quick-preview" style={{ padding: '6px 14px 0', borderTop: '1px dashed var(--paper-3)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-              <span style={{ color: 'var(--ink)' }}>{q.text}</span> → <span style={{ color: 'var(--acid-ink, var(--acid))' }}>{said}</span>
-              {q.rolledToTomorrow ? <span> (that time has passed today)</span> : null}
-              {q.day && !q.time ? <span> · shows on that day in the Calendar; drag it into the hours for a time</span> : null}
+            <div data-testid="todo-quick-preview" style={previewLine}>
+              <span style={{ color: 'var(--ink)' }}>{q.text}</span>
+              {chips.map((c) => (
+                <span key={c.key} data-testid={`todo-quick-chip-${c.key}`} style={previewChip}>
+                  <span style={{ color: 'var(--ink-3)', display: 'inline-flex' }}><MenuIcon name={c.icon} size={11} /></span>{c.text}
+                </span>
+              ))}
             </div>
           );
         })()}
-
-        {/* engagement.md F13 — one-tap guesses while asking "how long?".
-            mousedown keeps the input focused (its blur would cancel the add). */}
-        {inputFocused && inputPhase === 'duration' && (
-          <div
-            data-testid="todo-estimate-chips"
-            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: '8px 14px 0', borderTop: '1px dashed var(--paper-3)' }}
-          >
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)', marginRight: 2 }}>
-              how long? (your guess)
-            </span>
-            {([15, 30, 60, 120] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                data-testid={`todo-estimate-${m}`}
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                onClick={(e) => { e.stopPropagation(); submitTask(pendingName.trim(), m); }}
-                style={{
-                  height: 24, padding: '0 10px', borderRadius: 999, cursor: 'pointer',
-                  border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)',
-                  fontFamily: 'var(--font-mono)', fontSize: 11,
-                }}
-              >
-                {m < 60 ? `${m}m` : `${m / 60}h`}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* F4: add-task row — "add task" placeholder swaps to input on click, ↵ always visible */}
         <div
@@ -1003,10 +939,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           {inputFocused ? (
             <input
               ref={inputRef}
-              type={inputPhase === 'duration' ? 'number' : 'text'}
-              min={inputPhase === 'duration' ? 1 : undefined}
-              max={inputPhase === 'duration' ? 480 : undefined}
-              value={inputPhase === 'name' ? pendingName : durationValue}
+              type="text"
+              value={pendingName}
               onChange={(e) => {
                 if (inputPhase === 'name') {
                   setPendingName(e.target.value);
@@ -1030,7 +964,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 }
               }}
               autoFocus
-              placeholder={inputPhase === 'name' ? 'What do you want to get done? (e.g. Gym tomorrow 18:00 1h)' : 'or type minutes — Enter to skip'}
+              placeholder="Add a plan — try: Gym fri 18:00 1h"
               style={{
                 flex: 1,
                 background: 'transparent',
@@ -1049,7 +983,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               onClick={() => setInputFocused(true)}
               style={{ flex: 1, cursor: 'text' }}
             >
-              add task
+              add a plan
             </span>
           )}
           {/* F4b: ↵ hint always visible */}
@@ -1082,25 +1016,22 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       )}
 
       {/* ADR 0016 — tag picker (portal, like the context menu). */}
-      {remindPick !== null && (
-        <RemindPicker
-          x={remindPick.x}
-          y={remindPick.y}
-          value={remindPick.value}
-          onPick={(min) => { void setTaskReminder(remindPick.taskId, min); setRemindPick(null); }}
-          onClose={() => setRemindPick(null)}
-        />
-      )}
-      {duePick !== null && (
-        <DuePicker
-          x={duePick.x}
-          y={duePick.y}
-          today={todayYMD}
-          value={state.items.find((i) => i.id === duePick.itemId)?.dueOn ?? null}
-          onPick={(dueOn) => { onCommand('todo.setDue', { id: duePick.itemId, dueOn }); setDuePick(null); }}
-          onClose={() => setDuePick(null)}
-        />
-      )}
+      {whenPick !== null && (() => {
+        const it = state.items.find((i) => i.id === whenPick.itemId);
+        if (!it) return null;
+        const prev = whenOf(it);
+        return (
+          <WhenPopover
+            x={whenPick.x}
+            y={whenPick.y}
+            today={todayYMD}
+            value={prev}
+            tab={whenPick.tab}
+            onApply={(next) => { applyWhen(it, prev, next); setWhenPick(null); }}
+            onClose={() => setWhenPick(null)}
+          />
+        );
+      })()}
       {tagPicker !== null && (() => {
         const item = state.items.find((i) => i.id === tagPicker.itemId);
         if (!item) return null;
@@ -1204,3 +1135,15 @@ function fmtTodoMin(min: number): string {
   const r = m % 60;
   return r ? `${h}h${String(r).padStart(2, '0')}` : `${h}h`;
 }
+
+const metaBtn: React.CSSProperties = {
+  padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: '16px', whiteSpace: 'nowrap',
+};
+const previewLine: React.CSSProperties = {
+  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: '6px 14px 0', borderTop: '1px dashed var(--paper-3)',
+  fontFamily: 'var(--font-mono)', fontSize: 11,
+};
+const previewChip: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 20, padding: '0 7px', borderRadius: 10, whiteSpace: 'nowrap',
+  background: 'var(--paper-2)', border: '1px solid var(--paper-3)', color: 'var(--ink)', fontSize: 11,
+};

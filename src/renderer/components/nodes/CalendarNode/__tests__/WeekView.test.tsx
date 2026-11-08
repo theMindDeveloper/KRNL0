@@ -370,7 +370,7 @@ describe('WeekView — drop to schedule', () => {
 });
 
 describe('WeekView — empty state hint', () => {
-  it('shows empty-state hint when no tasks are scheduled this week', () => {
+  it('an empty week shows no overlay, and the ANY TIME strip is always there (Decision 40)', () => {
     setEmptyBoard();
     render(
       <WeekView
@@ -379,7 +379,8 @@ describe('WeekView — empty state hint', () => {
         onCommand={noop}
       />,
     );
-    expect(screen.getByTestId('week-empty-hint')).toBeTruthy();
+    expect(screen.queryByTestId('week-empty-hint')).toBeNull();
+    expect(screen.getByTestId('calendar-day-only-row')).toBeTruthy();
   });
 
   it('hides empty-state hint when at least one task is scheduled in the week', () => {

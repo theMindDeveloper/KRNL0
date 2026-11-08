@@ -47,7 +47,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'list', usage: 'todo list [--done|--archived|--all] [--json]', summary: 'List TodoItems — default: open + done today; --done today only, --archived past days, --all everything. [Tag?] = auto tag' },
       { name: 'drop', usage: 'todo drop <ref>', summary: 'Not doing it any more: to the Archive as "dropped" (not done), off the Calendar.' },
       { name: 'undrop', usage: 'todo undrop <ref>', summary: 'Bring a dropped item back to the list' },
-      { name: 'due', usage: 'todo due <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>', summary: 'The day it must be done by (apart from when it is planned)' },
+      { name: 'when', usage: 'todo when <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off> [HH:MM]', summary: 'When it happens: a day and a time (on the Calendar) or a day at any time (the ANY TIME strip); off = no day' },
+      { name: 'deadline', usage: 'todo deadline <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>', summary: 'The day it must be done by, apart from when it happens (todo due is the same)' },
       { name: 'tag', usage: 'todo tag <ref> <tag|auto>', summary: 'Hand-tag a TodoItem (id or label; unknown labels create a custom tag). "auto" hands it back to the classifier' },
       { name: 'tags', usage: 'todo tags [list|add "<label>" [--keywords a,b] [--color c]|remove <id>] [--json]', summary: 'List, create or remove tags. Built-ins: code, study, writing, reading, meetings, admin, planning, health, chores, social, creative' },
       { name: 'archive', usage: 'todo archive', summary: 'Move every done item to the archive now (otherwise they move when the day ends)' },
@@ -85,7 +86,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
   },
   {
     group: 'routine',
-    summary: 'Routines: repeat on set days at a set time and just happen (a class, a shift) — never ticked',
+    summary: 'Repeating events (a class, a shift): set days, a set time, never ticked. `krnl event …` is the same command',
     subcommands: [
       { name: 'add', usage: 'routine add "<name>" --days mon,wed --at HH:MM --for <minutes>', summary: 'Add a routine (days: mon..sun, 1..7, daily, weekdays)' },
       { name: 'list', usage: 'routine list [--json]', summary: 'List routines with their next date' },
@@ -95,6 +96,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'end', usage: 'routine end <id|name> [--on YYYY-MM-DD]', summary: 'End it after a date (default today); nothing is deleted' },
       { name: 'restart', usage: 'routine restart <id|name>', summary: 'Bring an ended routine back' },
       { name: 'remind', usage: 'routine remind <id|name> <minutes-before|off>', summary: 'A notification before each time it happens (0 = at the start)' },
+      { name: 'delete', usage: 'routine delete <id|name>', summary: 'Delete the event from every day (event delete is the same)' },
     ],
   },
   {

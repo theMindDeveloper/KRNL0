@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-/** The habit add field asks first: Enter never adds with settings you did not choose. */
+/** Decision 40 — the habit add card: habits only, sensible defaults, Enter adds; the button says what. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { HabitNode, tickableOn } from '../../../src/renderer/components/nodes/HabitNode';
 import { defaultHabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
-import { askMissing, askToAnswer, summary, EMPTY_ASK } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
-import { endsPastMidnight, isRepeatValid } from '../../../src/renderer/components/ui/RepeatEditor';
+import { cardToAnswer, cardSummary, DEFAULT_CARD } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
 import type { Node } from '../../../src/shared/types/node';
 import type { HabitState, HabitConfig } from '../../../src/renderer/components/nodes/HabitNode/types';
 
@@ -13,125 +12,92 @@ afterEach(cleanup);
 
 const node = { id: 'mother-habit', kind: 'habit', isMother: true, position: { x: 0, y: 0 }, state: defaultHabitState(), config: {} } as unknown as Node<HabitState, HabitConfig>;
 
-function setup() {
+function setup(n = node) {
   const onCommand = vi.fn();
-  render(<HabitNode node={node} selected={false} onCommand={onCommand} onSelect={() => undefined} />);
-  const input = screen.getByPlaceholderText('add a habit or routine') as HTMLInputElement;
+  render(<HabitNode node={n} selected={false} onCommand={onCommand} onSelect={() => undefined} />);
+  const input = screen.getByPlaceholderText('add a habit') as HTMLInputElement;
   return { onCommand, input };
 }
 
 describe('habit add field', () => {
-  it('Escape clears what was typed', () => {
-    const { input } = setup();
-    fireEvent.change(input, { target: { value: 'gym' } });
-    fireEvent.keyDown(input, { key: 'Escape' });
-    expect(input.value).toBe('');
-  });
-
-  it('Enter asks "do you want to tick it off?" and adds nothing yet; Esc cancels', () => {
+  it('the card opens as you type; Escape closes it and clears what was typed', () => {
     const { input, onCommand } = setup();
-    fireEvent.change(input, { target: { value: 'Gym' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.change(input, { target: { value: 'gym' } });
     expect(screen.getByTestId('habit-ask')).toBeTruthy();
-    expect(onCommand).not.toHaveBeenCalledWith('habit.add', expect.anything());
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByTestId('habit-ask')).toBeNull();
+    expect(input.value).toBe('');
     expect(onCommand).not.toHaveBeenCalled();
   });
 
-  it('yes → a habit: Add stays off until how often and when are answered', () => {
+  it('Enter adds with the defaults: every day, any time, a plain tick', () => {
     const { input, onCommand } = setup();
-    fireEvent.change(input, { target: { value: 'Gym' } });
+    fireEvent.change(input, { target: { value: 'Read 20 pages' } });
+    expect(screen.getByTestId('habit-ask-add').textContent).toContain('every day');
     fireEvent.keyDown(input, { key: 'Enter' });
-    fireEvent.click(screen.getByTestId('habit-ask-yes'));
-    const add = screen.getByTestId('habit-ask-add') as HTMLButtonElement;
-    expect(add.disabled).toBe(true);
-    expect(screen.getByTestId('habit-ask-missing').textContent).toBe('Pick how often');
-    fireEvent.click(screen.getByTestId('habit-ask-often-weekdays'));
-    expect(screen.getByTestId('habit-ask-missing').textContent).toBe('Pick any time or a set time');
-    fireEvent.click(screen.getByTestId('habit-ask-when-any'));
-    expect(add.disabled).toBe(false);
-    expect(add.textContent).toBe('Add · weekdays, any time');
-    fireEvent.click(add);
-    expect(onCommand).toHaveBeenCalledWith('habit.add', { name: 'Gym', schedule: { kind: 'weekdays' } });
-    expect(input.value).toBe('');
+    expect(onCommand).toHaveBeenCalledWith('habit.add', { name: 'Read 20 pages', schedule: { kind: 'daily' } });
   });
 
-  it('no → a routine: needs days, a start time and a length', () => {
+  it('days and a time: the button says them; no day picked turns it off', () => {
     const { input, onCommand } = setup();
+    fireEvent.change(input, { target: { value: 'Gym' } });
+    for (const d of [2, 4, 6, 7]) fireEvent.click(screen.getByTestId(`habit-ask-day-${d}`));
+    fireEvent.change(screen.getByTestId('habit-ask-time'), { target: { value: '18:00' } });
+    expect(screen.getByTestId('habit-ask-add').textContent).toContain('M W F · 18:00');
+    fireEvent.click(screen.getByTestId('habit-ask-add'));
+    expect(onCommand).toHaveBeenCalledWith('habit.add', { name: 'Gym', schedule: { kind: 'weekly', days: [1, 3, 5], timeOfDay: '18:00' } });
+  });
+
+  it('never asks "habit or routine": the card has no such question', () => {
+    const { input } = setup();
     fireEvent.change(input, { target: { value: 'Class' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    fireEvent.keyDown(window, { key: 'n' });
-    expect(screen.getByTestId('habit-ask-missing').textContent).toBe('Pick its days');
-    fireEvent.click(screen.getByTestId('habit-ask-day-1'));
-    fireEvent.click(screen.getByTestId('habit-ask-day-3'));
-    fireEvent.change(screen.getByTestId('habit-ask-time'), { target: { value: '10:00' } });
-    fireEvent.click(screen.getByTestId('habit-ask-len-120'));
-    const add = screen.getByTestId('habit-ask-add');
-    expect(add.textContent).toBe('Add · Mon Wed 10:00–12:00');
-    fireEvent.click(add);
-    expect(onCommand).toHaveBeenCalledWith('habit.add', {
-      name: 'Class', kind: 'routine', schedule: { kind: 'weekly', days: [1, 3], timeOfDay: '10:00', durationMin: 120 },
-    });
+    expect(screen.queryByTestId('habit-ask-yes')).toBeNull();
+    expect(screen.queryByTestId('habit-ask-no')).toBeNull();
+    expect(screen.getByTestId('habit-ask-calendar').textContent).toContain('Calendar');
   });
 });
 
 describe('a name already in the node', () => {
   it('is said in the card (a second "Gym" makes every krnl habit command ambiguous)', () => {
     const withGym = { ...node, state: { habits: [{ id: 'g', name: 'Gym', createdAt: '2026-11-01T08:00:00.000Z', log: [], archived: false, color: 'acid' }] } } as unknown as typeof node;
-    render(<HabitNode node={withGym} selected={false} onCommand={vi.fn()} onSelect={() => undefined} />);
-    const input = screen.getByPlaceholderText('add a habit or routine') as HTMLInputElement;
+    const { input } = setup(withGym);
     fireEvent.change(input, { target: { value: 'gym' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByTestId('habit-ask-dup')).toBeTruthy();
   });
   it('an archived one is offered back, with its history', () => {
-    const onCommand = vi.fn();
     const archived = { ...node, state: { habits: [{ id: 'g', name: 'Gym', createdAt: '2026-11-01T08:00:00.000Z', log: ['2026-11-01'], archived: true, color: 'acid' }] } } as unknown as typeof node;
-    render(<HabitNode node={archived} selected={false} onCommand={onCommand} onSelect={() => undefined} />);
-    const input = screen.getByPlaceholderText('add a habit or routine') as HTMLInputElement;
+    const { input, onCommand } = setup(archived);
     fireEvent.change(input, { target: { value: 'gym ' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByTestId('habit-ask-archived').textContent).toContain('Gym is in your archive');
     fireEvent.click(screen.getByTestId('habit-ask-restore'));
     expect(onCommand).toHaveBeenCalledWith('habit.unarchive', { id: 'g' });
-    expect(screen.queryByTestId('habit-ask-yes')).toBeNull();
   });
 });
 
-describe('askMissing / askToAnswer', () => {
-  it('nothing is answered by default', () => {
-    expect(askMissing(EMPTY_ASK)).toBe('Answer yes or no');
-    expect(askToAnswer(EMPTY_ASK)).toBeNull();
+describe('cardToAnswer / cardSummary', () => {
+  it('the defaults are every day, any time', () => {
+    expect(cardToAnswer(DEFAULT_CARD)).toEqual({ kind: 'habit', schedule: { kind: 'daily' } });
+    expect(cardSummary(DEFAULT_CARD)).toBe('every day');
   });
-  it('a habit at a set time needs the time and the length', () => {
-    const d = { ...EMPTY_ASK, kind: 'habit' as const, often: 'daily' as const, when: 'at' as const };
-    expect(askMissing(d)).toBe('Pick a time');
-    expect(askMissing({ ...d, timeOfDay: '07:00' })).toBe('Pick how long');
-    expect(askToAnswer({ ...d, timeOfDay: '07:00', durationMin: 30 })).toEqual({ kind: 'habit', schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 30 } });
+  it('weekdays and weekends read as words; no day is not addable', () => {
+    expect(cardToAnswer({ ...DEFAULT_CARD, days: [1, 2, 3, 4, 5] })?.schedule).toEqual({ kind: 'weekdays' });
+    expect(cardSummary({ ...DEFAULT_CARD, days: [6, 7] })).toBe('weekends');
+    expect(cardToAnswer({ ...DEFAULT_CARD, days: [] })).toBeNull();
   });
-  it('a timed habit past midnight is refused; a routine may run past it (a night shift)', () => {
-    const habitNight = { ...EMPTY_ASK, kind: 'habit' as const, often: 'daily' as const, when: 'at' as const, timeOfDay: '23:00', durationMin: 120 };
-    expect(askMissing(habitNight)).toBe('Ends after midnight: start earlier or make it shorter');
-    const shift = { ...EMPTY_ASK, kind: 'routine' as const, days: [5] as never, timeOfDay: '22:00', durationMin: 480 };
-    expect(askMissing(shift)).toBeNull();
-    expect(summary(shift)).toBe('Fri 22:00–06:00 next day');
-    expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '23:00', durationMin: 120, itemKind: 'habit' })).toBe(false);
-    expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '22:00', durationMin: 480, itemKind: 'routine' })).toBe(true);
-    expect(endsPastMidnight({ kind: 'daily', days: [], timeOfDay: '23:30', durationMin: 60 })).toBe(true);
+  it('times a week: any days, the target, an optional time', () => {
+    const d = { ...DEFAULT_CARD, mode: 'week' as const, perWeek: 3 };
+    expect(cardToAnswer(d)).toEqual({ kind: 'habit', schedule: { kind: 'daily' }, perWeek: 3 });
+    expect(cardSummary(d)).toBe('3× a week');
   });
-  it('an amount is optional; once opened it needs a number (or none)', () => {
-    const base = { ...EMPTY_ASK, kind: 'habit' as const, often: 'daily' as const, when: 'any' as const };
-    expect(askMissing(base)).toBeNull();
-    expect(askMissing({ ...base, amount: { target: 0, unit: '' } })).toBe('Pick how much, or none');
-    const eight = { ...base, amount: { target: 8, unit: 'glasses' } };
-    expect(askToAnswer(eight)).toEqual({ kind: 'habit', schedule: { kind: 'daily' }, amount: { target: 8, unit: 'glasses' } });
-    expect(summary(eight)).toBe('every day, any time, 8 glasses');
-    expect(askToAnswer({ ...base, amount: null })).toEqual({ kind: 'habit', schedule: { kind: 'daily' } });
+  it('an amount is optional; once chosen it needs 2 or more', () => {
+    expect(cardToAnswer({ ...DEFAULT_CARD, amount: { target: 1, unit: '' } })).toBeNull();
+    const eight = { ...DEFAULT_CARD, amount: { target: 8, unit: 'glasses' } };
+    expect(cardToAnswer(eight)).toEqual({ kind: 'habit', schedule: { kind: 'daily' }, amount: { target: 8, unit: 'glasses' } });
+    expect(cardSummary(eight)).toBe('every day · 8 glasses');
   });
-  it('a routine on all five weekdays is saved as weekdays', () => {
-    const d = { ...EMPTY_ASK, kind: 'routine' as const, days: [1, 2, 3, 4, 5] as const, timeOfDay: '09:00', durationMin: 480 };
-    expect(askToAnswer({ ...d, days: [...d.days] })?.schedule).toEqual({ kind: 'weekdays', timeOfDay: '09:00', durationMin: 480 });
+  it('a half-typed time is not added', () => {
+    expect(cardToAnswer({ ...DEFAULT_CARD, time: '25:9' })).toBeNull();
+    expect(cardToAnswer({ ...DEFAULT_CARD, time: '07:30' })?.schedule).toEqual({ kind: 'daily', timeOfDay: '07:30' });
   });
 });
 

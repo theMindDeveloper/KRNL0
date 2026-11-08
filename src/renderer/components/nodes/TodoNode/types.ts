@@ -30,6 +30,10 @@ export interface TodoItem {
   // is neither done nor deleted; it sits in the Archive marked "dropped" and
   // can be brought back. Analytics never counts it as done.
   droppedAt?: string;
+  // Decision 40 — its When as a day with no time (the Calendar's ANY TIME
+  // strip). Set only while the plan has no Calendar time; `dueOn` is its
+  // Deadline and nothing else.
+  onDay?: string;
 }
 
 export interface TodoState {

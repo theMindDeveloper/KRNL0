@@ -160,9 +160,27 @@ export const todoSetItemSchedule = (
       void _sf;
       return rest;
     }
-    return { ...item, scheduledFor: args.scheduledFor };
+    // Decision 40 — a time on the Calendar is its When: no any-time day too.
+    const { onDay: _od, ...timed } = item;
+    void _od;
+    return { ...timed, scheduledFor: args.scheduledFor };
   }),
 });
+
+// todo.setOnDay — Decision 40: the plan's When as a day with no time (the
+// Calendar's ANY TIME strip), or null for no day. The caller takes it off the
+// grid first when it had a time.
+export const todoSetOnDay = (state: TodoState, args: { id: string; onDay: string | null }): TodoState => {
+  if (args.onDay !== null && !/^\d{4}-\d{2}-\d{2}$/.test(args.onDay)) return state;
+  return {
+    ...state,
+    items: state.items.map((item) => {
+      if (item.id !== args.id) return item;
+      if (args.onDay === null) { const { onDay: _o, ...rest } = item; void _o; return rest; }
+      return { ...item, onDay: args.onDay };
+    }),
+  };
+};
 
 // ── ADR 0016 — tags ─────────────────────────────────────────────────────────
 

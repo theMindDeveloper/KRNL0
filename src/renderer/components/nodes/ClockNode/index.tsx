@@ -16,6 +16,7 @@ import { dayProgress, progressRatio, weekProgress } from '../../../store/dayProg
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { dueOnDay } from '../../../../shared/dueOn';
+import { MenuIcon } from '../../ui/menuIcons';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import { selectPomoReality, pomoIsLive, type RealitySegment } from '../../../store/pomoReality';
 import type { TaskState } from '../TaskNode/types';
@@ -1321,12 +1322,13 @@ export function ClockNode({
         {!dialOnly && dueItems.length > 0 && (
           <div
             data-testid="clock-due"
-            title="Due on this day (from the Todo list). Right-click a Todo row to change it."
+            title="This day with no time: plans for any time, and deadlines (flag). From the Todo list."
             style={{ width: '100%', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '2px 8px', padding: '6px 0 2px', borderTop: '1px solid var(--paper-2)', fontSize: 11.5, fontFamily: 'var(--font-sans)', color: 'var(--ink-2)' }}
           >
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.08em', color: 'var(--ink-4)' }}>DUE</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', color: 'var(--ink-4)' }}>ANY TIME</span>
             {dueItems.map((d) => (
-              <span key={d.id} data-testid="clock-due-item" style={{ color: d.overdue ? 'var(--rust)' : 'var(--ink-2)', whiteSpace: 'nowrap' }}>
+              <span key={`${d.kind}-${d.id}`} data-testid="clock-due-item" style={{ color: d.overdue ? 'var(--rust)' : 'var(--ink-2)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                {d.kind === 'deadline' && <MenuIcon name="deadline" size={10} />}
                 {d.text}{d.overdue ? ` · was ${new Date(`${d.dueOn}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })}` : ''}
               </span>
             ))}

@@ -578,9 +578,37 @@ function migrateTodoItemFields(board: Record<string, unknown>): Record<string, u
       if ('taskNodeId' in it) return it;
       return { ...it, taskNodeId: null };
     });
-    return { ...node, state: { ...(node.state ?? {}), items: patched } };
+    return { ...node, state: { ...(node.state ?? {}), items: migrateWhenModel(patched, nodes, node.state as Record<string, unknown> | undefined) } };
+  });
+  // The todo mother's marker is set inside the state spread below.
+  board['nodes'] = (board['nodes'] as unknown[]).map((n: unknown) => {
+    const node = n as { kind?: string; state?: Record<string, unknown> };
+    if (node?.kind !== 'todo' || !node.state || node.state['whenModel'] === 1) return n;
+    return { ...node, state: { ...node.state, whenModel: 1 } };
   });
   return board;
+}
+
+/**
+ * Decision 40 — one When, an optional Deadline. Before it, `dueOn` also meant
+ * "on this day, no time" (quick add "Pay rent fri"). Once per board (the todo
+ * state's `whenModel` marker): an item with `dueOn` and no Calendar time gets
+ * it as its any-time day (`onDay`); one with a time keeps it as its deadline.
+ */
+export function migrateWhenModel(items: unknown[], nodes: unknown[], state: Record<string, unknown> | undefined): unknown[] {
+  if (state?.['whenModel'] === 1) return items;
+  const timed = new Set<string>();
+  for (const n of nodes) {
+    const t = n as { id?: unknown; kind?: string; state?: { scheduledFor?: unknown } };
+    if (t?.kind === 'todo.task' && typeof t.id === 'string' && typeof t.state?.scheduledFor === 'string' && t.state.scheduledFor) timed.add(t.id);
+  }
+  return items.map((item) => {
+    const it = item as { dueOn?: unknown; onDay?: unknown; taskNodeId?: unknown };
+    if (typeof it !== 'object' || it === null || typeof it.dueOn !== 'string' || it.onDay !== undefined) return item;
+    if (typeof it.taskNodeId === 'string' && timed.has(it.taskNodeId)) return item;
+    const { dueOn, ...rest } = it as Record<string, unknown> & { dueOn: string };
+    return { ...rest, onDay: dueOn };
+  });
 }
 
 

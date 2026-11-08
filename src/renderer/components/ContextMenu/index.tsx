@@ -5,7 +5,7 @@
  * overflow:hidden ancestor. Dismisses on click-outside (capture phase) or ESC.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Z } from '../ui/layers';
 
@@ -16,6 +16,12 @@ export interface ContextMenuItem {
   disabled?: boolean;
   /** Non-interactive caption row (e.g. "Focus · 09:10–09:35 · 25m"). */
   header?: boolean;
+  /** A 14 px line icon before the label (MenuIcon). */
+  icon?: ReactNode;
+  /** A thin rule above this item: starts a new group. */
+  divider?: boolean;
+  /** Quiet text at the right: the current value ("Sun 16:05") or a key. */
+  hint?: string;
 }
 
 export interface ContextMenuProps {
@@ -59,6 +65,7 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
     };
   }, [onDismiss]);
 
+  const hasIcons = items.some((it) => !!it.icon);
   const menu = (
     <div
       ref={menuRef}
@@ -98,44 +105,55 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
           {item.label}
         </div>
       ) : (
-        <button
-          key={i}
-          type="button"
-          disabled={item.disabled}
-          onClick={() => {
-            if (!item.disabled) {
-              item.onSelect();
-              onDismiss();
-            }
-          }}
-          style={{
-            display: 'block',
-            width: '100%',
-            textAlign: 'left',
-            background: 'transparent',
-            border: 'none',
-            padding: '6px 14px',
-            cursor: item.disabled ? 'default' : 'pointer',
-            color: item.disabled
-              ? 'var(--ink-4)'
-              : item.danger
-                ? 'var(--rust)'
-                : 'var(--ink)',
-            fontFamily: 'inherit',
-            fontSize: 'inherit',
-            opacity: item.disabled ? 0.5 : 1,
-          }}
-          onMouseEnter={(e) => {
-            if (!item.disabled) {
-              (e.currentTarget as HTMLButtonElement).style.background = 'var(--paper-2)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-          }}
-        >
-          {item.label}
-        </button>
+        <Fragment key={i}>
+          {item.divider && i > 0 && <div role="separator" style={{ height: 1, background: 'var(--paper-3)', margin: '4px 0' }} />}
+          <button
+            type="button"
+            disabled={item.disabled}
+            onClick={() => {
+              if (!item.disabled) {
+                item.onSelect();
+                onDismiss();
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              width: '100%',
+              textAlign: 'left',
+              background: 'transparent',
+              border: 'none',
+              padding: hasIcons ? '6px 14px 6px 10px' : '6px 14px',
+              cursor: item.disabled ? 'default' : 'pointer',
+              color: item.disabled
+                ? 'var(--ink-4)'
+                : item.danger
+                  ? 'var(--rust)'
+                  : 'var(--ink)',
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+              whiteSpace: 'nowrap',
+              opacity: item.disabled ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!item.disabled) {
+                (e.currentTarget as HTMLButtonElement).style.background = 'var(--paper-2)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+            }}
+          >
+            {hasIcons && (
+              <span aria-hidden style={{ width: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: item.danger ? 'var(--rust)' : 'var(--ink-3)' }}>
+                {item.icon}
+              </span>
+            )}
+            <span style={{ flex: 1 }}>{item.label}</span>
+            {item.hint && <span style={{ marginLeft: 16, fontSize: 11, color: 'var(--ink-3)' }}>{item.hint}</span>}
+          </button>
+        </Fragment>
       ))}
     </div>
   );

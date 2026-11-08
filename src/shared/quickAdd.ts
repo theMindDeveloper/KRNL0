@@ -15,11 +15,14 @@ export interface QuickAdd {
   rolledToTomorrow?: boolean;
   /** Something typed that quick add can't do, said in words (nothing else is read then). */
   hint?: string;
+  /** Decision 40 — "by fri", "due 21.11": the plan's Deadline (YYYY-MM-DD). `day` is its When. */
+  deadline?: string;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const DEADLINE_RE = /\b(?:by|due|before|deadline)\s+((?:on\s+)?(?:next\s+)?(?:today|tonight|tomorrow|tmrw|tmr|(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d{1,2}[./]\d{1,2}\.?|the\s+\d{1,2}(?:st|nd|rd|th)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*))\b/i;
 const DAY_RE = /\b(?:on\s+)?(next\s+)?(mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/i;
 
 export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
@@ -29,9 +32,17 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   // is a habit with a time (ticked) or a routine (just happens), so read none
   // of it rather than make a one-off plan that looks like a series.
   if (/\bevery\s+(?:day|morning|evening|night|week|weekday|weekend|mon|tue|wed|thu|fri|sat|sun)/i.test(s)) {
-    return { text: raw.trim(), hint: 'a plan happens once. For something that repeats, add a habit with a time or a routine in Habits & Routines' };
+    return { text: raw.trim(), hint: 'a plan happens once. Something that repeats is a habit (in Habits) or a repeating event (on the Calendar)' };
   }
   const cut = (m: RegExpExecArray) => { s = s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length); };
+
+  // A deadline first ("by fri", "due 21.11", "before Nov 20th"), so its day
+  // is not read as the plan's When.
+  const dl = DEADLINE_RE.exec(s);
+  if (dl) {
+    const day = parseQuickAdd(dl[1]!, now).day;
+    if (day) { out.deadline = day; cut(dl); }
+  }
 
   // "in 2 hours", "in 30 min": a start time from now (rounded up to 5 min).
   const rel = /\bin\s+(\d{1,3})\s?(min|mins|minutes|m|h|hr|hrs|hour|hours)\b/i.exec(s);
@@ -185,8 +196,9 @@ export function describeQuickAdd(q: QuickAdd, now: Date = new Date()): string | 
     const today = ymd(now);
     const t = new Date(now); t.setDate(t.getDate() + 1);
     const word = q.day === today ? 'today' : q.day === ymd(t) ? 'tomorrow' : new Date(`${q.day}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-    parts.push(q.time ? `${word} ${q.time}` : `due ${word}`);
+    parts.push(q.time ? `${word} ${q.time}` : `${word}, any time`);
   }
   if (q.durationMin) parts.push(q.durationMin % 60 === 0 && q.durationMin >= 60 ? `${q.durationMin / 60} h` : `${q.durationMin} min`);
+  if (q.deadline) parts.push(`deadline ${new Date(`${q.deadline}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`);
   return parts.length ? parts.join(' · ') : null;
 }
