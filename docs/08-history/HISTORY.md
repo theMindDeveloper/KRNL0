@@ -1902,3 +1902,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `docs/research/new-user-review-2026-11-08.md` (new), `ui/LayoutModeToggle.tsx`, `AnalyticsNode/index.tsx`, `TodoNode/index.tsx`, `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`, `ui/RepeatEditor.tsx`, `sys/commands/habit.ts`, `dev/previewBridge.ts` (`?fixture=fresh`); test `HabitNode.addField.test.tsx`.
 **Summary:** Opened KRNL0 on a brand-new board and walked everyday use cases as a first-time user. Fixed: two top-bar buttons both said "CANVAS" (the layout toggle now reads Station / **Free**); Analytics greeted every new user with "streak 0d" (hidden until there is a streak); the empty Todo now says what to do; a routine or timed habit that would run past midnight was cut at 24:00 on the Calendar while the card promised "→ 01:00" (now refused with the reason in the add card, Edit repeat… and `krnl routine add`); adding a second "Gym" is now said in the card (it made every `krnl habit … Gym` ambiguous). Everything else is written up with a proposed order in the review doc (date-only plans, the empty Analytics wall, the Calendar's first view at 2 am, due-today in the Clock and Welcome back, routine reminders).
+
+## [2026-11-08] — Routine reminders (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/reminders.ts`, `HabitNode/types.ts` (`remindMin`), `HabitNode/commands.ts` (`habitSetRemind`), `HabitNode/index.tsx`, `Canvas/commandDispatch.ts` (`habit.setRemind`), `sys/commands/habit.ts` (`routine remind`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `reminders.test.ts` (+2).
+**Summary:** From the new-user review (4.2): "remind me before class". A routine's right-click menu has **Remind me…** (the same picker as plans); the main-process reminder loop now also shows a notification before each time a routine happens — never on a skipped day — and `krnl routine remind <id|name> <minutes|off>` sets it from the terminal. Full suite: 2,389 passing, typecheck 0.

@@ -92,6 +92,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'move', usage: 'routine move <id|name> --on YYYY-MM-DD --at HH:MM', summary: 'Move one occurrence to another time that day' },
       { name: 'end', usage: 'routine end <id|name> [--on YYYY-MM-DD]', summary: 'End it after a date (default today); nothing is deleted' },
       { name: 'restart', usage: 'routine restart <id|name>', summary: 'Bring an ended routine back' },
+      { name: 'remind', usage: 'routine remind <id|name> <minutes-before|off>', summary: 'A notification before each time it happens (0 = at the start)' },
     ],
   },
   {

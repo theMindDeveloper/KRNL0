@@ -5,6 +5,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { dueReminders, leadWords } from '../../../src/shared/reminders';
 import { taskSetRemind } from '../../../src/renderer/components/nodes/TaskNode/commands';
+import { habitSetRemind } from '../../../src/renderer/components/nodes/HabitNode/commands';
+import type { HabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
 import type { Board } from '../../../src/shared/types';
 import { SysFacade } from '../../../src/sys/SysFacade';
@@ -55,6 +57,30 @@ describe('dueReminders', () => {
     expect(leadWords(0)).toBe('now');
     expect(leadWords(90)).toBe('in 1 h 30 min');
     expect(leadWords(60)).toBe('in 1 h');
+  });
+});
+
+describe('routine reminders', () => {
+  // Class Mon & Wed 10:00 for 2 h, remind 10 min before; Wed 11 Nov skipped.
+  const klass = {
+    id: 'r-class', name: 'Class', createdAt: '2026-11-01T08:00:00.000Z', log: [], archived: false, color: 'amber', kind: 'routine',
+    schedule: { kind: 'weekly', days: [1, 3], timeOfDay: '10:00', durationMin: 120 }, remindMin: 10, exceptions: [{ date: '2026-11-11', skip: true }],
+  };
+  const board = { nodes: [{ id: 'mother-habit', kind: 'habit', isMother: true, state: { habits: [klass] } }], edges: [] } as unknown as Board;
+  const t = (d: string, hhmm: string) => new Date(`${d}T${hhmm}:00`).getTime();
+
+  it('fires 10 min before each class, never on a skipped day or a day without class', () => {
+    const r = dueReminders(board, t('2026-11-09', '09:49'), t('2026-11-09', '09:50'));
+    expect(r.map((x) => [x.title, x.body])).toEqual([['Class', 'Starts in 10 min · 10:00']]);
+    expect(dueReminders(board, t('2026-11-11', '09:49'), t('2026-11-11', '09:50'))).toEqual([]);
+    expect(dueReminders(board, t('2026-11-10', '09:49'), t('2026-11-10', '09:50'))).toEqual([]);
+  });
+
+  it('habitSetRemind sets and clears on routines only', () => {
+    const s = { habits: [klass, { ...klass, id: 'h', kind: undefined }] } as unknown as HabitState;
+    const off = habitSetRemind(s, { id: 'r-class', min: null }).habits[0]!;
+    expect('remindMin' in off).toBe(false);
+    expect(habitSetRemind(s, { id: 'h', min: 5 }).habits[1]!.remindMin).toBe(10);
   });
 });
 

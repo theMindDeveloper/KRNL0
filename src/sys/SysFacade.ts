@@ -777,6 +777,7 @@ export class SysFacade {
         case 'end':     return habit.cliRoutineEnd(ctx, command.ref, command.on);
         case 'move':    return habit.cliRoutineMove(ctx, command.ref, command.on, command.at);
         case 'restart': return habit.cliRoutineRestart(ctx, command.ref);
+        case 'remind':  return habit.cliRoutineRemind(ctx, command.ref, command.value);
       }
     }
 

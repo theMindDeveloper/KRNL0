@@ -68,6 +68,19 @@ export function habitSetRest(state: HabitState, args: { id: string; date: string
   };
 }
 
+/** Routine only: minutes before each occurrence (0–240), or null for none. */
+export function habitSetRemind(state: HabitState, args: { id: string; min: number | null }): HabitState {
+  return {
+    ...state,
+    habits: state.habits.map((h) => {
+      if (h.id !== args.id || h.kind !== 'routine') return h;
+      if (args.min === null) { const { remindMin: _r, ...rest } = h; return rest; }
+      if (!Number.isFinite(args.min)) return h;
+      return { ...h, remindMin: Math.max(0, Math.min(240, Math.round(args.min))) };
+    }),
+  };
+}
+
 export function habitSetTarget(state: HabitState, args: { id: string; perWeek: number | null }): HabitState {
   return {
     ...state,

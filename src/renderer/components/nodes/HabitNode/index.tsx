@@ -20,6 +20,7 @@ import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { RepeatEditor, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
 import { HabitAddAsk, type AddAnswer } from './HabitAddAsk';
+import { RemindPicker } from '../../ui/RemindPicker';
 import { weeklyTarget } from './types';
 import { RoutineShelf, routineStatus } from './RoutineShelf';
 import { isRoutine } from './types';
@@ -137,6 +138,8 @@ export function HabitNode({
     () => state.habits.filter((h) => h.archived).map((h) => ({ id: h.id, name: h.name, days: h.log.length })),
     [state.habits],
   );
+  // A routine's reminder (menu → "Remind me…").
+  const [routineRemind, setRoutineRemind] = useState<{ habitId: string; value: number | null; x: number; y: number } | null>(null);
   // A habit's weekly target (menu → "Times a week…"): 1–6, or none.
   const [targetEdit, setTargetEdit] = useState<{ habitId: string; value: number | null; x: number; y: number } | null>(null);
   // Edit how an existing habit / routine repeats (menu → "Edit repeat…").
@@ -227,6 +230,7 @@ export function HabitNode({
         { label: 'Edit repeat…', onClick: () => edit('routine') },
         ...(nextDate ? [{ label: `Skip next (${nextDate === today ? 'today' : new Date(`${nextDate}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })})`, onClick: () => onCommand('routine.skip', { id: h.id, date: nextDate }) }] : []),
         ...(st.kind === 'skipped' ? [{ label: 'Undo skip', onClick: () => onCommand('routine.unskip', { id: h.id, date: st.date }) }] : []),
+        { label: h.remindMin !== undefined ? `Reminder: ${h.remindMin === 0 ? 'at the start' : `${h.remindMin} min before`}…` : 'Remind me…', testId: 'routine-menu-remind', onClick: () => setRoutineRemind({ habitId: h.id, value: h.remindMin ?? null, x: at.x, y: at.y }) },
         { label: 'End routine (after today)', onClick: () => onCommand('routine.end', { id: h.id, date: today }) },
         { label: 'Turn into habit', onClick: () => onCommand('habit.setKind', { id: h.id, kind: 'habit' }) },
       ];
@@ -458,6 +462,15 @@ export function HabitNode({
           />
         )}
       </div>
+      {routineRemind && (
+        <RemindPicker
+          x={routineRemind.x}
+          y={routineRemind.y}
+          value={routineRemind.value}
+          onPick={(min) => { onCommand('habit.setRemind', { id: routineRemind.habitId, min }); setRoutineRemind(null); }}
+          onClose={() => setRoutineRemind(null)}
+        />
+      )}
       {targetEdit && createPortal(
         <>
           <div onMouseDown={(e) => { e.stopPropagation(); setTargetEdit(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />

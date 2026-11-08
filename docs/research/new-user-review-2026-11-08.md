@@ -41,7 +41,7 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 | # | Use case | What happened | Status |
 |---|---|---|---|
 | 4.1 | "Remind me before the dentist call" | No reminders at all | **Fixed on `feat/routines`** — Remind me… (at start … 1 h before), system notification from the main process |
-| 4.2 | "Remind me before class" (a routine) | Routines cannot remind | **Proposed** — the same lead-time picker on a routine; `dueReminders` already has the shape for it |
+| 4.2 | "Remind me before class" (a routine) | Routines could not remind | **Fixed here** — routine menu **Remind me…** (same picker), a notification before each time it happens, never on a skipped day; `krnl routine remind <id|name> <minutes|off>` |
 | 4.3 | "Something is due today" | The due chip shows only in the Todo row; the Today schedule and Welcome back don't mention it | **Proposed** — list due-today items under the Clock's Today list and in Welcome back |
 
 ## 5. Smaller logic notes
@@ -60,11 +60,12 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 - `TodoNode/index.tsx` — the empty list says what to do.
 - `HabitNode/HabitAddAsk.tsx`, `ui/RepeatEditor.tsx`, `sys/commands/habit.ts` — no repeat that runs past midnight (refused with the reason, not drawn cut short).
 - `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx` — a name already in the node is said.
+- `shared/reminders.ts`, `HabitNode/types.ts` (`remindMin`), `HabitNode/commands.ts` (`habitSetRemind`), `HabitNode/index.tsx`, `sys/commands/habit.ts` (`routine remind`) — routine reminders.
 - `dev/previewBridge.ts` — `?fixture=fresh`, the board a new user opens (for render checks of first-run states).
 
 ## Proposed order for what is left
 
 1. Date-only plans + an "Anytime" row (2.4) — pick a design first.
 2. Analytics empty state (1.4) and the Calendar's first view (1.5) — both are what every new user sees first.
-3. Due-today in the Clock list and Welcome back (4.3); routine reminders (4.2).
+3. Due-today in the Clock list and Welcome back (4.3).
 4. Overnight routines (2.3), habit amounts (5.2), repeating tasks (5.3).

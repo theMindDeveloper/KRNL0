@@ -4,6 +4,10 @@
 
 import type { Board } from './types';
 import { selectSchedule } from '../renderer/store/scheduleSelector';
+import { routineOccurrence, type Habit } from '../renderer/components/nodes/HabitNode/types';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const ymdOf = (ms: number) => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 
 export interface Reminder {
   /** Stable per plan + start + lead, so one reminder never shows twice. */
@@ -44,6 +48,32 @@ export function dueReminders(board: Board | null, fromMs: number, toMs: number):
       body: `Starts ${leadWords(lead)} · ${p.startISO.slice(11, 16)}`,
       atMs,
     });
+  }
+  // Routines ("remind me before class"): each occurrence that is not skipped.
+  for (const node of board.nodes) {
+    if (node.kind !== 'habit') continue;
+    const habits = ((node.state as { habits?: unknown } | null)?.habits ?? []) as Habit[];
+    if (!Array.isArray(habits)) continue;
+    for (const h of habits) {
+      const lead = h.remindMin;
+      if (h.kind !== 'routine' || typeof lead !== 'number' || lead < 0) continue;
+      // The occurrence can be today or tomorrow (a 23:55 check, 10 min before 00:05).
+      const days = new Set([ymdOf(fromMs), ymdOf(toMs), ymdOf(toMs + lead * 60_000)]);
+      for (const ymd of days) {
+        const occ = routineOccurrence(h, ymd);
+        if (!occ || occ.skipped) continue;
+        const startMs = new Date(`${ymd}T${pad(Math.floor(occ.startMin / 60))}:${pad(occ.startMin % 60)}:00`).getTime();
+        const atMs = startMs - lead * 60_000;
+        if (!(atMs > fromMs && atMs <= toMs)) continue;
+        out.push({
+          key: `${h.id}@${ymd}T${occ.startMin}-${lead}`,
+          taskId: h.id,
+          title: h.name,
+          body: `Starts ${leadWords(lead)} · ${pad(Math.floor(occ.startMin / 60))}:${pad(occ.startMin % 60)}`,
+          atMs,
+        });
+      }
+    }
   }
   return out.sort((a, b) => a.atMs - b.atMs);
 }

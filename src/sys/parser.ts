@@ -167,6 +167,7 @@ export type SysCommand =
   | { kind: 'routine'; sub: 'skip' | 'unskip' | 'end'; ref: string | undefined; on: string | undefined }
   | { kind: 'routine'; sub: 'move'; ref: string | undefined; on: string | undefined; at: string | undefined }
   | { kind: 'routine'; sub: 'restart'; ref: string | undefined }
+  | { kind: 'routine'; sub: 'remind'; ref: string | undefined; value: string | undefined }
   | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined; mode?: string | undefined }
   | {
       kind: 'frame';
@@ -719,6 +720,7 @@ export class SysParser {
       if (sub === 'skip' || sub === 'unskip' || sub === 'end') return { kind: 'routine', sub, ref: rest[0], on: flag(rest, 'on') };
       if (sub === 'move') return { kind: 'routine', sub: 'move', ref: rest[0], on: flag(rest, 'on'), at: flag(rest, 'at') };
       if (sub === 'restart') return { kind: 'routine', sub: 'restart', ref: rest[0] };
+      if (sub === 'remind') return { kind: 'routine', sub: 'remind', ref: rest[0], value: rest[1] };
     }
 
     if (cmd === 'edge') {

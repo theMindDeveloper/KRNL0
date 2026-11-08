@@ -98,6 +98,9 @@ export interface Habit {
   /** Rest days (YYYY-MM-DD): sick, travelling, a planned break. A rest day
    *  never breaks a streak and never asks "did it yesterday?". */
   rest?: string[];
+  /** Routine only: remind this many minutes before each time it happens
+   *  (0 = at the start). Absent = no reminder. */
+  remindMin?: number;
 }
 
 /** The habit's weekly target, or null (routines never have one). */

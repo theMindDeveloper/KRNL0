@@ -20,6 +20,7 @@ import {
   habitUnarchive,
   habitSetTarget,
   habitSetRest,
+  habitSetRemind,
   habitSetSchedule,
   habitSetKind,
   routineSkip,
@@ -610,6 +611,23 @@ export async function cliRest(
   writeBoard(ctx, board, mother);
   const span = days.length === 1 ? days[0] : `${days[0]} to ${days[days.length - 1]}`;
   return { ok: true, message: off ? `habit "${resolved.habit.name}": ${span} is no longer a rest day` : `habit "${resolved.habit.name}": rest ${span} — the streak carries on`, data: { id: resolved.habit.id, days, rest: !off } };
+}
+
+/** `krnl routine remind <id|name> <minutes-before|off>` — a notification before each time it happens. */
+export async function cliRoutineRemind(ctx: HabitCtx, ref: string | undefined, value: string | undefined): Promise<SysResult> {
+  if (!ref || value === undefined) return { ok: false, message: 'routine remind requires <id|name> <minutes-before|off>' };
+  const off = value === 'off' || value === 'none';
+  const n = Number(value);
+  if (!off && !(Number.isInteger(n) && n >= 0 && n <= 240)) return { ok: false, message: `routine remind: "${value}" is not 0-240 minutes or off` };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  if (resolved.habit.kind !== 'routine') return { ok: false, message: `"${resolved.habit.name}" is a habit, not a routine` };
+  mother.state = habitSetRemind(mother.state, { id: resolved.habit.id, min: off ? null : n });
+  writeBoard(ctx, board, mother);
+  return { ok: true, message: off ? `routine "${resolved.habit.name}": no reminder` : `routine "${resolved.habit.name}": reminder ${n === 0 ? 'at the start' : `${n} min before`} each time`, data: { id: resolved.habit.id, remindMin: off ? null : n } };
 }
 
 /** `krnl habit unarchive <id|name>`: bring an archived habit back, history kept. */
