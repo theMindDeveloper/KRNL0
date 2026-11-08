@@ -117,6 +117,14 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
     const d = new Date(now); d.setDate(d.getDate() + add); out.day = ymd(d); cut(m);
   }
 
+  // A date: "15.11", "15/11", "Nov 20", "20 November", "the 15th" (day
+  // before month, as written in Germany). A date already past this year is
+  // next year's; "the 15th" alone is this month's, or next month's if past.
+  if (!out.day) {
+    const dm = parseDate(s, now);
+    if (dm) { out.day = dm.day; s = s.slice(0, dm.index) + ' ' + s.slice(dm.index + dm.length); }
+  }
+
   // A repeat with no day: its first matching day from today (today counts
   // unless its time has passed).
   if (out.repeat && !out.day) {
@@ -135,6 +143,52 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   const text = s.replace(/\s+/g, ' ').replace(/\s+(?:at|on|for|by)\s*$/i, '').trim();
   out.text = text || raw.trim();
   return out;
+}
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const MON = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+const ORD = '(\\d{1,2})(?:st|nd|rd|th)?';
+
+/** A real calendar day (no 31.02), as YYYY-MM-DD, or null. */
+function realDay(y: number, m: number, d: number): string | null {
+  const t = new Date(y, m - 1, d);
+  return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d ? `${y}-${pad(m)}-${pad(d)}` : null;
+}
+
+function parseDate(s: string, now: Date): { day: string; index: number; length: number } | null {
+  const today = ymd(now);
+  const y = now.getFullYear();
+  const pick = (m: number, d: number) => {
+    const here = realDay(y, m, d);
+    if (here && here >= today) return here;
+    return realDay(y + 1, m, d);
+  };
+  let m: RegExpExecArray | null;
+  // 15.11 / 15.11. / 15/11 (not "1.5h", not a version like 2.5.1)
+  if ((m = /(?<![\d./])\b(?:on\s+)?(\d{1,2})[./](\d{1,2})\.?(?![\d./]|\s?(?:h|hr|hrs|hour|hours|min|m)\b)/i.exec(s))) {
+    const day = pick(Number(m[2]), Number(m[1]));
+    if (day) return { day, index: m.index, length: m[0].length };
+  }
+  // Nov 20 / November 20th
+  if ((m = new RegExp(`\\b(?:on\\s+)?${MON}\\s+${ORD}\\b`, 'i').exec(s))) {
+    const day = pick(MONTHS.indexOf(m[1]!.slice(0, 3).toLowerCase()) + 1, Number(m[2]));
+    if (day) return { day, index: m.index, length: m[0].length };
+  }
+  // 20 Nov / 20th of November
+  if ((m = new RegExp(`\\b(?:on\\s+)?(?:the\\s+)?${ORD}(?:\\s+of)?\\s+${MON}\\b`, 'i').exec(s))) {
+    const day = pick(MONTHS.indexOf(m[2]!.slice(0, 3).toLowerCase()) + 1, Number(m[1]));
+    if (day) return { day, index: m.index, length: m[0].length };
+  }
+  // the 15th / on the 3rd: this month, or next month once it has passed
+  if ((m = /\b(?:on\s+)?the\s+(\d{1,2})(?:st|nd|rd|th)\b/i.exec(s))) {
+    const d = Number(m[1]);
+    for (let k = 0; k < 3; k++) {
+      const t = new Date(y, now.getMonth() + k, 1);
+      const day = realDay(t.getFullYear(), t.getMonth() + 1, d);
+      if (day && day >= today) return { day, index: m.index, length: m[0].length };
+    }
+  }
+  return null;
 }
 
 /** "tomorrow 17:00 · 30 min", "due Fri", "45 min" — what Enter will do, in words. */

@@ -66,6 +66,23 @@ describe('parseQuickAdd', () => {
   });
 });
 
+describe('quick add reads dates', () => {
+  it('day before month, month names and ordinals; past dates move forward', () => {
+    expect(parseQuickAdd('Dentist 15.11', NOW)).toEqual({ text: 'Dentist', day: '2026-11-15' });
+    expect(parseQuickAdd('Dentist 15.11. at 9:30', NOW)).toEqual({ text: 'Dentist', day: '2026-11-15', time: '09:30' });
+    expect(parseQuickAdd('Tax return 31/1', NOW).day).toBe('2027-01-31');
+    expect(parseQuickAdd('Party Nov 20th 7pm', NOW)).toEqual({ text: 'Party', day: '2026-11-20', time: '19:00' });
+    expect(parseQuickAdd('Trip on 3 March', NOW)).toEqual({ text: 'Trip', day: '2027-03-03' });
+    expect(parseQuickAdd('Pay bills on the 15th', NOW)).toEqual({ text: 'Pay bills', day: '2026-11-15' });
+    expect(parseQuickAdd('Pay bills on the 2nd', NOW).day).toBe('2026-12-02');
+  });
+  it('leaves lengths, versions and impossible dates alone', () => {
+    expect(parseQuickAdd('Read 1.5h', NOW)).toEqual({ text: 'Read', durationMin: 90 });
+    expect(parseQuickAdd('Ship 2.5.1', NOW)).toEqual({ text: 'Ship 2.5.1' });
+    expect(parseQuickAdd('Odd 31.02', NOW).day).toBeUndefined();
+  });
+});
+
 describe('describeQuickAdd', () => {
   it('says what Enter will do', () => {
     expect(describeQuickAdd(parseQuickAdd('Call mom tomorrow at 5pm', NOW), NOW)).toBe('tomorrow 17:00');

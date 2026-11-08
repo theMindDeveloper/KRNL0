@@ -2191,3 +2191,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `store/undoNotice.ts` (`revertible`), `ui/UndoNoticeBar.tsx`, `TodoNode/index.tsx`; test `undoNotice.test.ts` (+1).
 **Summary:** A dropped plan leaves the list (dropped plans live in the hidden archive), so a mis-click on "Drop (not doing it)" had no way back except `todo undrop` in the terminal. Drop now shows "Dropped "…" · UNDO"; UNDO brings the plan back and puts its Calendar time back. The notice runs its own reverse step because Drop also unschedules the plan a moment later, which the history-based undo could not cover.
+
+## [2026-11-08] — Quick add reads dates (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+2).
+**Summary:** Quick add knew "tomorrow" and weekdays but not a date, so "Dentist 15.11" kept "15.11" in the name. It now reads "15.11", "15/11", "Nov 20th", "3 March" and "the 15th" (day before month, as written in Germany). A date already past this year is next year's, and "the 2nd" means next month's once this month's has passed. Lengths ("1.5h"), version numbers ("2.5.1") and impossible dates ("31.02") are left alone. `todo add` in the terminal gets the same.
