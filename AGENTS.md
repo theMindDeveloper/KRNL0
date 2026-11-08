@@ -92,6 +92,11 @@ If a requirement isn't written down yet, the **architect** writes it (or the use
 
 Nothing merges until **all four** have signed off (architect → backend-dev → tester → pm-docs). PM is the last gate; merge cannot happen without their requirement-checklist pass.
 
+#### Design and tutorial gates (every big change)
+
+- **Design drafts first.** New UI is drafted on the Claude Design canvas (several directions, checked at full size before showing) and the user picks one before any code is written.
+- **Every big feature ends with a tutorial.** A guided tour in `src/renderer/components/Tour/` (see [docs/06-requirements/guided-tours.md](docs/06-requirements/guided-tours.md)) that walks through the new feature with real actions, reachable from Help. The feature is not Done until its tour exists and has been run once in the app. Small fixes need none.
+
 #### 4. Scrum cadence
 
 Treat each requirements doc as a sprint backlog. Each `F#` / `UC-K#` / `Scenario` is a kanban card. Move cards Backlog → In Progress → Review → Done as you go — use TodoWrite to track this in-session. Don't open the next card until the current one is in Done.
@@ -127,6 +132,7 @@ KRNL0 ships updates through **GitHub Releases** (free, public repo). Windows ins
 2. `git checkout main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z`.
 3. CI checks the tag equals `package.json`, builds, and creates a **draft** release with the installers **and `latest.yml`**.
 4. Check the draft (assets include `latest.yml`), then **Publish**. That click is what ships the update to every install.
+5. **Designed release notes, every release.** Each release's "What's new" (`src/shared/whatsnew.ts` slides + the in-app dialog, and `docs/releases/vX.Y.Z.md`) is designed on the Claude Design canvas like any UI — one slide per headline feature with its art, plus the "more" list — and the user approves it before the release PR merges. Every feature that goes into a release must appear in its notes.
 
 Never: reuse a version number, move a tag after publishing, hand-upload an `.exe` without its `latest.yml` + `.blockmap`, or merge a board-schema change without a migration (an update must open every older `board.json`).
 
