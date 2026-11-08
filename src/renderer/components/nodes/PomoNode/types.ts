@@ -64,7 +64,7 @@ export interface PomoState {
 }
 
 /** Every Timer face. 'vu' and 'outline' added with the theme engine (ADR 0009). */
-export const TIMER_FACES = ['ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline', 'mac'] as const;
+export const TIMER_FACES = ['minimal', 'ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline', 'mac'] as const;
 export type TimerFace = (typeof TIMER_FACES)[number];
 
 /** 'observe' drops the pomodoro rhythm: no threshold, breaks, pause or pips —

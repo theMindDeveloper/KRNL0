@@ -38,7 +38,8 @@ import { routineLanes } from './routineLanes';
 import { dayOnlyPlans } from './dayOnly';
 import { DueFlag } from './DueFlag';
 import { TimeField } from '../../ui/TimeField';
-import { addPlanAt, deletePlanOfTask, deleteRoutine, habitMotherCommand, putPlanOnDay } from '../../../store/scheduleActions';
+import { addPlanAt, applyPlanWhen, deletePlanOfTask, deleteRoutine, habitMotherCommand, planWhenOf, putPlanOnDay, toggleTaskDone } from '../../../store/scheduleActions';
+import { WhenPopover } from '../../ui/WhenPopover';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
 import { HabitSwapModal } from '../../ui/HabitSwapModal';
@@ -811,6 +812,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
   const [eventRemind, setEventRemind] = useState<{ id: string; x: number; y: number; value: number | null } | null>(null);
   const DAY_LETTER = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const daysOf = (h: Habit): number[] => !h.schedule || h.schedule.kind === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : h.schedule.kind === 'weekdays' ? [1, 2, 3, 4, 5] : [...h.schedule.days];
+  const openNewAt = (dayYMD: string, minute: number, x: number, y: number) => {
+    const snapMin = Math.max(0, Math.min(1425, Math.floor(minute / 15) * 15));
+    const at = `${String(Math.floor(snapMin / 60)).padStart(2, '0')}:${String(snapMin % 60).padStart(2, '0')}`;
+    const isoDow = ((new Date(`${dayYMD}T00:00:00`).getDay() + 6) % 7) + 1;
+    setEventCard({ x, y, day: dayYMD, allowOnce: true, initial: { name: '', mode: 'once', days: [isoDow], time: at, lengthMin: 60 } });
+  };
   const submitEvent = (card: NonNullable<typeof eventCard>, d: EventDraft) => {
     setEventCard(null);
     if (d.mode === 'once') { void addPlanAt(d.name, card.day, d.time, d.lengthMin); return; }
@@ -1218,7 +1225,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const rect = e.currentTarget.getBoundingClientRect();
       const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
       const r = routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width));
-      if (r) setCtxMenu({ x: e.clientX, y: e.clientY, items: routineMenuItems(r.h, r.occ, e.clientX, e.clientY) });
+      if (r) { setCtxMenu({ x: e.clientX, y: e.clientY, items: routineMenuItems(r.h, r.occ, e.clientX, e.clientY) }); return; }
+      // Decision 40 — a click on empty hours adds something there (like any
+      // calendar): a plan at that time, or a repeating event.
+      openNewAt(dayYMD, minute, e.clientX, e.clientY);
       return;
     }
     if (items.length === 1) {
@@ -2327,6 +2337,22 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             ))}
           </div>
 
+          {/* Decision 40 — add something without knowing the right-click: a plan or a repeating event. */}
+          <button
+            type="button"
+            data-testid="calendar-new"
+            title="Add a plan or a repeating event (or click empty hours)"
+            aria-label="Add to the Calendar"
+            onClick={(e) => {
+              const now = new Date();
+              const day = weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!;
+              openNewAt(day, Math.min(23 * 60, (now.getHours() + 1) * 60), e.clientX - 120, e.clientY + 14);
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 20, borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', background: 'color-mix(in srgb, var(--acid) 12%, transparent)', color: 'var(--ink)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
+          >
+            <MenuIcon name="plus" size={12} />
+          </button>
+
           {/* Decision 40 — every repeating event, ended ones too: their home now
               that the Habits window lists only habits. */}
           <button
@@ -2842,8 +2868,33 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         </div>
       )}
 
-      {/* Task info popup — shown on left-click of a task block */}
-      {taskPopup && (
+      {/* Decision 40 — a left-click on a plan opens the same plan card as its
+          Todo row (When, Deadline, length, reminder, and what to do with it).
+          A canvas-only task (no Todo row) keeps the small time popup. */}
+      {taskPopup && (() => {
+        const plan = planWhenOf({ taskId: taskPopup.task.id });
+        if (!plan) return null;
+        const observe = (useBoardStore.getState().board?.nodes.find((n) => n.kind === 'pomo')?.config as { mode?: string } | undefined)?.mode === 'observe';
+        const close = () => setTaskPopup(null);
+        return (
+          <WhenPopover
+            x={taskPopup.x}
+            y={taskPopup.y}
+            today={todayYMD()}
+            value={plan.value}
+            title={{ text: plan.text, tone: toneVarForTask(taskPopup.task.id) }}
+            actions={[
+              { key: 'timer', label: observe ? 'Track it now' : 'Focus on it', icon: observe ? 'observe' : 'play', onClick: () => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); close(); } },
+              { key: 'done', label: taskPopup.task.done ? 'Not done yet' : 'Mark done', icon: taskPopup.task.done ? 'undo' : 'check', onClick: () => { void toggleTaskDone(taskPopup.task.id); close(); } },
+              { key: 'find', label: 'Show its card', icon: 'find', onClick: () => { jumpToTaskNode(taskPopup.task.id); close(); } },
+              { key: 'delete', label: 'Delete', icon: 'delete', danger: true, onClick: () => { void deletePlanOfTask(taskPopup.task.id); close(); } },
+            ]}
+            onApply={(next) => { void applyPlanWhen(plan, next); close(); }}
+            onClose={close}
+          />
+        );
+      })()}
+      {taskPopup && !planWhenOf({ taskId: taskPopup.task.id }) && (
         <TaskPopup
           task={taskPopup.task}
           x={taskPopup.x}

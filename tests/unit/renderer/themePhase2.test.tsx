@@ -99,8 +99,8 @@ describe('F6 — Clock features are identical in every frame style', () => {
 });
 
 describe('F7 — new Pomo faces', () => {
-  it('TIMER_FACES lists the new faces next to the original four', () => {
-    expect(TIMER_FACES).toEqual(['ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline', 'mac']);
+  it('TIMER_FACES lists the new faces next to the original four, Minimal first', () => {
+    expect(TIMER_FACES).toEqual(['minimal', 'ascii', 'lcd', 'blocks', 'vapor', 'vu', 'outline', 'mac']);
   });
 
   it.each([['vu', Vu], ['outline', Outline]] as const)('%s renders 25 minute bars and the readout', (name, Face) => {

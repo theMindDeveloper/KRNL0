@@ -17,6 +17,7 @@ import { Vapor } from './variants/Vapor';
 import { Vu } from './variants/Vu';
 import { Outline } from './variants/Outline';
 import { Mac } from './variants/Mac';
+import { Minimal } from './variants/Minimal';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { AppSelect } from '../../ui/AppSelect';
 import { boardTagLibrary, spanTagFor } from '../../../store/spanTags';
@@ -568,7 +569,7 @@ export function PomoNode({
           </div>
           <div
             data-testid="pomo-face-picker"
-            style={{ display: 'flex', gap: 4, marginBottom: 4 }}
+            style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -587,8 +588,8 @@ export function PomoNode({
                   }}
                   onMouseDown={(e) => e.stopPropagation()}
                   style={{
-                    flex: 1,
-                    padding: '5px 2px',
+                    flex: '1 0 auto',
+                    padding: '5px 6px',
                     background: isActive ? 'var(--rust-deep, var(--rust))' : 'transparent',
                     color: isActive ? 'var(--paper)' : 'var(--ink-3)',
                     border: `1px solid ${isActive ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
@@ -712,6 +713,9 @@ export function PomoNode({
           )}
           {activeFace === 'mac' && (
             <Mac m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
+          )}
+          {activeFace === 'minimal' && (
+            <Minimal m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
           )}
           </>)}
           </FaceWrap>

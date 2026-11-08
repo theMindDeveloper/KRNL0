@@ -8,7 +8,7 @@ import { Z } from './layers';
 import { addDays } from '../../../shared/due';
 import { TimeField, parseTime } from './TimeField';
 import { AppSelect } from './AppSelect';
-import { MenuIcon } from './menuIcons';
+import { MenuIcon, type MenuIconName } from './menuIcons';
 
 export interface WhenValue {
   /** YYYY-MM-DD, or null for no day. */
@@ -31,6 +31,11 @@ interface Props {
   tab?: 'when' | 'deadline';
   onApply: (next: WhenValue) => void;
   onClose: () => void;
+  /** The plan card (Decision 40): the plan's name at the top… */
+  title?: { text: string; tone?: string };
+  /** …and what you can do with it (the timer, show it, delete it), the same
+   *  from the Todo row and from its block on the Calendar. */
+  actions?: ReadonlyArray<{ key: string; label: string; icon: MenuIconName; onClick: () => void; danger?: boolean }>;
 }
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -63,7 +68,7 @@ export function dayWord(day: string, today: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, onClose }: Props) {
+export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, onClose, title, actions }: Props) {
   const [tab, setTab] = useState<'when' | 'deadline'>(tab0);
   const [v, setV] = useState<WhenValue>(value);
   const [timeText, setTimeText] = useState(value.time ?? '');
@@ -90,7 +95,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   const friday = addDays(today, (4 - dow + 7) % 7 || 7);
   const nextMon = addDays(today, 7 - dow);
   const quick: Array<[string, string]> = tab === 'when'
-    ? [['Today', today], ['Tmrw', addDays(today, 1)], ['Fri', friday], ['Next Mon', nextMon]]
+    ? [['Today', today], ['Tmrw', addDays(today, 1)], ...(friday !== addDays(today, 1) ? [['Fri', friday] as [string, string]] : []), ...(nextMon !== addDays(today, 1) ? [['Next Mon', nextMon] as [string, string]] : [['In a week', addDays(today, 7)] as [string, string]])]
     : [['Today', today], ['Tmrw', addDays(today, 1)], ['Fri', friday], ['In a week', addDays(today, 7)]];
   const selected = tab === 'when' ? v.day : v.deadline;
   const pick = (d: string) => setV((p) => (tab === 'when' ? { ...p, day: d } : { ...p, deadline: d }));
@@ -116,6 +121,15 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
           display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)',
         }}
       >
+        {title && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            {title.tone && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: title.tone, flexShrink: 0, marginTop: 5 }} />}
+            <span data-testid="plan-card-title" style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 650, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{title.text}</span>
+            <button type="button" aria-label="Close" onClick={onClose} style={{ border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', padding: 2, display: 'inline-flex', flexShrink: 0 }}>
+              <MenuIcon name="drop" size={12} />
+            </button>
+          </div>
+        )}
         <div role="tablist" style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: 'var(--paper-2)', border: '1px solid var(--paper-3)' }}>
           {(['when', 'deadline'] as const).map((t) => (
             <button key={t} type="button" role="tab" aria-selected={tab === t} data-testid={`when-tab-${t}`} onClick={() => setTab(t)}
@@ -174,7 +188,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
             <div style={rowStyle}>
               <span style={iconCol}><MenuIcon name="when" /></span>
               <button type="button" data-testid="when-any-time" onClick={() => setTimeText('')} style={chip(!timeText.trim())}>Any time</button>
-              <TimeField value={timeText} onChange={setTimeText} testId="when-time" placeholder="--:--" onEnter={() => apply()} onEscape={onClose} style={{ width: 82 }} />
+              <TimeField value={timeText} onChange={setTimeText} testId="when-time" placeholder="--:--" onEnter={() => apply()} onEscape={onClose} style={{ width: 96 }} />
             </div>
             <div style={rowStyle}>
               <span style={iconCol}><MenuIcon name="length" /></span>
@@ -200,11 +214,24 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
 
         {late && <div data-testid="when-late" style={{ color: 'var(--rust)', fontSize: 11 }}>After its deadline</div>}
 
+        {actions && actions.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, borderTop: '1px solid var(--paper-3)', paddingTop: 8 }}>
+            {actions.map((a) => (
+              <button key={a.key} type="button" data-testid={`plan-card-${a.key}`} onClick={a.onClick}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 28, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                  border: '1px solid var(--paper-3)', background: 'transparent', color: a.danger ? 'var(--rust)' : 'var(--ink)', fontFamily: 'inherit', fontSize: 11.5 }}>
+                <span style={{ display: 'inline-flex', color: a.danger ? 'var(--rust)' : 'var(--ink-3)' }}><MenuIcon name={a.icon} size={13} /></span>
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--paper-3)', paddingTop: 8 }}>
           {tab === 'when'
             ? <button type="button" data-testid="when-clear" onClick={() => { setV((p) => ({ ...p, day: null })); setTimeText(''); }} style={ghost}>No day</button>
             : <button type="button" data-testid="when-no-deadline" onClick={() => setV((p) => ({ ...p, deadline: null }))} style={ghost}>No deadline</button>}
-          <button type="button" data-testid="when-done" onClick={apply}
+          <button type="button" data-testid="when-done" onClick={apply} title="Save the day, time and deadline"
             style={{ height: 28, padding: '0 12px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--btn-primary-bg, var(--acid))', color: 'var(--btn-primary-fg, #111)', fontFamily: 'inherit', fontSize: 12, fontWeight: 650 }}>
             Done ↵
           </button>

@@ -45,7 +45,9 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
   const time = parseTime(timeText);
   const endMin = time ? Number(time.slice(0, 2)) * 60 + Number(time.slice(3)) + d.lengthMin : 0;
   const end = `${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
-  const dayLetters = [...d.days].sort().map((n) => LETTERS[n - 1]).join(' ');
+  const sorted = [...d.days].sort().join();
+  // Short words where they exist, so the button always fits the card.
+  const dayLetters = sorted === '1,2,3,4,5,6,7' ? 'every day' : sorted === '1,2,3,4,5' ? 'weekdays' : sorted === '6,7' ? 'weekends' : [...d.days].sort().map((n) => LETTERS[n - 1]).join('');
   const valid = d.name.trim() !== '' && !!time && (d.mode === 'once' || d.days.length > 0);
   const label = submitLabel ?? (d.mode === 'once' ? `Add plan · ${dayLabel} ${time ?? ''}` : d.days.length ? `Add event · ${dayLetters} ${time ?? ''}` : 'Pick a day');
   const submit = () => { if (valid && time) onSubmit({ ...d, name: d.name.trim(), time }); };
@@ -121,8 +123,8 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
           <button type="button" aria-label="Longer" onClick={() => setD((p) => ({ ...p, lengthMin: Math.min(16 * 60, p.lengthMin + 15) }))} style={stepBtn}>+</button>
         </div>
         <button type="button" data-testid="event-submit" disabled={!valid} onClick={submit}
-          style={{ alignSelf: 'flex-end', height: 30, padding: '0 12px', borderRadius: 6, border: 'none', cursor: valid ? 'pointer' : 'default', opacity: valid ? 1 : 0.5,
-            background: 'var(--btn-primary-bg, var(--acid))', color: 'var(--btn-primary-fg, #111)', fontFamily: 'inherit', fontSize: 12, fontWeight: 650, whiteSpace: 'nowrap' }}>
+          style={{ alignSelf: 'stretch', minHeight: 30, padding: '5px 12px', borderRadius: 6, border: 'none', cursor: valid ? 'pointer' : 'default', opacity: valid ? 1 : 0.5,
+            background: 'var(--btn-primary-bg, var(--acid))', color: 'var(--btn-primary-fg, #111)', fontFamily: 'inherit', fontSize: 12, fontWeight: 650, whiteSpace: 'normal', textAlign: 'center' }}>
           {label} ↵
         </button>
       </div>

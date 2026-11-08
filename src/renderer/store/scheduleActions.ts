@@ -169,6 +169,58 @@ export async function putPlanOnDay(ref: { taskId?: string; itemId?: string }, da
   });
 }
 
+/**
+ * Decision 40 — one plan card everywhere (Todo row and Calendar block): what a
+ * plan's When and Deadline are now, read from the board. Null when the task
+ * has no Todo item (a canvas-only task).
+ */
+export interface PlanWhen {
+  itemId: string;
+  taskId: string | null;
+  text: string;
+  value: { day: string | null; time: string | null; lengthMin: number | null; remindMin: number | null; deadline: string | null };
+}
+export function planWhenOf(ref: { taskId?: string; itemId?: string }): PlanWhen | null {
+  const board = useBoardStore.getState().board;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const items = (todo?.state as { items?: Array<{ id: string; text: string; taskNodeId: string | null; onDay?: string; dueOn?: string }> } | undefined)?.items ?? [];
+  const it = ref.itemId ? items.find((i) => i.id === ref.itemId) : items.find((i) => i.taskNodeId === ref.taskId);
+  if (!board || !it) return null;
+  const task = it.taskNodeId ? board.nodes.find((n) => n.id === it.taskNodeId) : undefined;
+  const ts = task?.state as { plannedMin?: number; timeOpen?: boolean; remindMin?: number } | undefined;
+  const at = it.taskNodeId ? placementOf(it.taskNodeId)?.startISO ?? null : null;
+  return {
+    itemId: it.id,
+    taskId: it.taskNodeId,
+    text: it.text,
+    value: {
+      day: at ? at.slice(0, 10) : it.onDay ?? null,
+      time: at ? at.slice(11, 16) : null,
+      lengthMin: ts?.timeOpen || !ts?.plannedMin ? null : ts.plannedMin,
+      remindMin: typeof ts?.remindMin === 'number' ? ts.remindMin : null,
+      deadline: it.dueOn ?? null,
+    },
+  };
+}
+/** Apply what the plan card changed (only what changed). */
+export async function applyPlanWhen(p: PlanWhen, next: PlanWhen['value']): Promise<void> {
+  const prev = p.value;
+  const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  if (!todo) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  const run = makeCommandHandler(todo.id);
+  if (next.deadline !== prev.deadline) run('todo.setDue', { id: p.itemId, dueOn: next.deadline });
+  if (next.lengthMin !== prev.lengthMin && p.taskId) run('todo.setItemPlannedMin', { itemId: p.itemId, minutes: next.lengthMin ?? 0 });
+  if (next.day !== prev.day || next.time !== prev.time) {
+    if (next.day && next.time && p.taskId) await scheduleTaskAt(p.taskId, `${next.day}T${next.time}`);
+    else {
+      if (prev.time && p.taskId) await unscheduleTask(p.taskId);
+      run('todo.setOnDay', { id: p.itemId, onDay: next.day });
+    }
+  }
+  if (p.taskId && next.remindMin !== prev.remindMin) await setTaskReminder(p.taskId, next.time ? next.remindMin : null);
+}
+
 /** Decision 40 — "New here… · Once": a plan at that day and time, with a length. */
 export async function addPlanAt(text: string, day: string, time: string, lengthMin: number): Promise<void> {
   const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);

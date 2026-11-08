@@ -29,6 +29,7 @@ import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { scheduleTaskAt, setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
 import { parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
+import { PlanAddCard, effectiveDraft, type PlanDraft, type PlanOverrides } from './PlanAddCard';
 
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
@@ -273,6 +274,33 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   // Quick add: "Call mom tomorrow at 5pm" → the day, time and length are read
   // from the words, shown under the field, and applied on Enter.
+  // Decision 40 — the add card: what the card set wins over the words.
+  const [planOv, setPlanOv] = useState<PlanOverrides>({});
+  const addRowRef = useRef<HTMLDivElement>(null);
+  const fromWords = (q: QuickAdd): PlanDraft => ({ day: q.day ?? null, time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: q.deadline ?? null });
+  const addPlan = (text: string, d: PlanDraft) => {
+    onCommand('todo.add', d.lengthMin ? { text, durationMin: d.lengthMin } : { text });
+    const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
+    const item = [...(st?.items ?? [])].filter((i) => i.text === text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (item) {
+      if (d.day && d.time && item.taskNodeId) void scheduleTaskAt(item.taskNodeId, `${d.day}T${d.time}`);
+      else if (d.day) onCommand('todo.setOnDay', { id: item.id, onDay: d.day });
+      if (d.deadline) onCommand('todo.setDue', { id: item.id, dueOn: d.deadline });
+    }
+    setPendingName('');
+    setPlanOv({});
+    setInputPhase('name');
+    setInputFocused(true);
+  };
+  const addTyped = () => {
+    const name = pendingName.trim();
+    if (!name) return;
+    const q = parseQuickAdd(name);
+    const d = effectiveDraft(q.hint ? { day: null, time: null, lengthMin: null, deadline: null } : fromWords(q), planOv);
+    if (!d.day && !d.lengthMin && !d.deadline) { submitTask(q.hint ? name : q.text, null); setPlanOv({}); return; }
+    addPlan(q.hint ? name : q.text, d);
+  };
+
   const quickSubmit = (q: QuickAdd) => {
     onCommand('todo.add', q.durationMin ? { text: q.text, durationMin: q.durationMin } : { text: q.text });
     const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
@@ -292,13 +320,10 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       if (e.key === 'Enter') {
         // Decision 40 — one step: Enter always adds; what the words said is
         // shown as chips above the field first.
-        const name = pendingName.trim();
-        if (!name) return;
-        const q = parseQuickAdd(name);
-        if (!q.hint && (q.time || q.day || q.durationMin || q.deadline)) { quickSubmit(q); return; }
-        submitTask(name, null);
+        addTyped();
       } else if (e.key === 'Escape') {
         setPendingName('');
+        setPlanOv({});
         setInputFocused(false);
         setInputPhase('name');
       }
@@ -892,39 +917,34 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           </div>
         </PagedView>
 
-        {/* Decision 40 — what the words said, as chips above the field, before Enter. */}
+        {/* Decision 40 — the add card: while typing, the plan's day, time, length and
+            deadline, filled from the words; change any of them, or just press Enter. */}
         {inputFocused && pendingName.trim() !== '' && (() => {
           const q = parseQuickAdd(pendingName.trim());
           if (q.hint) {
             return (
               <div data-testid="todo-quick-preview" style={previewLine}>
-                <span style={{ color: 'var(--ink-3)' }}>Repeats? Add it in Habits, or draw it on the Calendar.</span>
+                <span style={{ color: 'var(--ink-3)' }}>Repeats? Add it in Habits, or on the Calendar (+).</span>
               </div>
             );
           }
-          const chips: Array<{ key: string; icon: 'when' | 'day' | 'deadline' | 'length'; text: string }> = [];
-          if (q.day) {
-            const passed = q.rolledToTomorrow ? ', tomorrow' : '';
-            chips.push({ key: 'when', icon: q.time ? 'when' : 'day', text: q.time ? `${q.day === todayYMD ? 'Today' : dayWord(q.day, todayYMD)} ${q.time}${passed}` : `${dayWord(q.day, todayYMD)}, any time` });
-          }
-          if (q.deadline) chips.push({ key: 'dl', icon: 'deadline', text: `by ${dayWord(q.deadline, todayYMD)}` });
-          if (q.durationMin) chips.push({ key: 'len', icon: 'length', text: fmtLength(q.durationMin) });
-          if (chips.length === 0) return null;
+          const r = addRowRef.current?.getBoundingClientRect();
           return (
-            <div data-testid="todo-quick-preview" style={previewLine}>
-              <span style={{ color: 'var(--ink)' }}>{q.text}</span>
-              {chips.map((c) => (
-                <span key={c.key} data-testid={`todo-quick-chip-${c.key}`} style={previewChip}>
-                  <span style={{ color: 'var(--ink-3)', display: 'inline-flex' }}><MenuIcon name={c.icon} size={11} /></span>{c.text}
-                </span>
-              ))}
-            </div>
+            <PlanAddCard
+              name={q.text}
+              today={todayYMD}
+              draft={effectiveDraft(fromWords(q), planOv)}
+              onSet={(patch) => setPlanOv((cur) => ({ ...cur, ...patch }))}
+              onAdd={addTyped}
+              anchor={r ? { left: r.left, right: r.right, top: r.top } : { left: 8, right: 360, top: window.innerHeight - 60 }}
+            />
           );
         })()}
 
         {/* F4: add-task row — "add task" placeholder swaps to input on click, ↵ always visible */}
         <div
           className="todo-add"
+          ref={addRowRef}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1027,6 +1047,13 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             today={todayYMD}
             value={prev}
             tab={whenPick.tab}
+            // Decision 40 — the same plan card as a block on the Calendar.
+            title={{ text: it.text, ...(it.taskNodeId ? { tone: toneVarForTask(it.taskNodeId) } : {}) }}
+            actions={[
+              ...(!easy && it.taskNodeId ? [{ key: 'timer', label: pomoConfig.mode === 'observe' ? 'Track it now' : 'Focus on it', icon: (pomoConfig.mode === 'observe' ? 'observe' : 'play') as 'observe' | 'play', onClick: () => { onCommand('todo.startPomoForItem', { itemId: it.id }); setWhenPick(null); } }] : []),
+              { key: 'done', label: it.done ? 'Not done yet' : 'Mark done', icon: (it.done ? 'undo' : 'check') as 'undo' | 'check', onClick: () => { onCommand('todo.toggle', { id: it.id }); setWhenPick(null); } },
+              { key: 'delete', label: 'Delete', icon: 'delete' as const, danger: true, onClick: () => { removeItem(it.id); setWhenPick(null); } },
+            ]}
             onApply={(next) => { applyWhen(it, prev, next); setWhenPick(null); }}
             onClose={() => setWhenPick(null)}
           />

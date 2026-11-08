@@ -2324,3 +2324,17 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 - Tours rewritten for the new words and places (Habits, Repeating events, Staying on track, Todo "SAY WHEN").
 Checked by walking it in the preview as a user (add, tick, drag to the strip, block to the strip, UNDO, New here… Once and Repeats, events list, habit card and Days & time…); 2,441 tests and typecheck green.
 **Not done:** the 0.11 release notes (`shared/whatsnew.ts`) still say "Habits & Routines" — they need the designed, approved notes pass; the habit "Edit…" panel that would fold rename/colour/icon/note into one item was left as separate items.
+
+## [2026-11-08] — One plan card everywhere; an add card while typing; adding on the Calendar is findable; Pomo keeps its face; a Minimal face (experimental)
+
+**Type:** UX (Decision 40, follow-up)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/WhenPopover.tsx` (title + actions: the plan card), `TodoNode/PlanAddCard.tsx` (new), `TodoNode/index.tsx`, `CalendarNode/WeekView.tsx`, `CalendarNode/EventCard.tsx`, `store/scheduleActions.ts` (`planWhenOf`, `applyPlanWhen`), `PomoNode/FaceFit.tsx`, `PomoNode/variants/{Minimal,Outline}.tsx`, `PomoNode/{index,types}.ts`, `pocket/PocketApp.tsx`, `Tour/tours.ts`; tests `planAddCard.test.tsx` (new), `themePhase2.test.tsx`.
+**Summary:** From the user's next round:
+- **One plan card.** Clicking a plan's block on the Calendar opened a different popup than the Todo row's When…. Both now open the same card: the plan's name, When / Deadline, day or any time, time, length, reminder, and its actions (Focus on it / Track it now, Mark done, Show its card, Delete).
+- **Add card while typing a plan.** A small card above the field shows the day (or no day), any time or a time, a length and a deadline, filled from the words; set any of them before adding, or just press Enter. The field keeps the focus.
+- **Adding on the Calendar without knowing the right-click.** A click on empty hours opens the add card (Once = a plan, Repeats = an event), and a **+** sits in the Calendar header. The event card's button now fits ("every day", "weekdays" instead of seven letters).
+- **Pomo keeps the face you picked.** In a short window the face used to swap to a different look; now it scales down and only leaves out its small labels when there's no room. The Outline face's "0 … 25 MIN" labels were positioned over the read-out and overlapped "25:00" when scaled; they're in the flow now.
+- **Minimal Pomo face**: just the time, a thin progress line while it runs, and one word (Ready / Focus / Paused). In the face picker, the pocket timer and `krnl pomo config --face minimal`.
+- **Tours** updated for the new ways: first day (add card, its card, PLAN gone), welcome (plans, click to add, events), Todo (the add card, its card), Calendar (ANY TIME strip, click/+ to add, a plan's card), repeating events (click empty hours), modes ("Focus on it").
+Checked in the preview as a user (plain Enter, card day/length/deadline, words filling the card, click and + on the Calendar, block and row opening the same card; faces at five window sizes). 2,447 tests and typecheck green.

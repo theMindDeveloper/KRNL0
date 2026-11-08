@@ -25,6 +25,7 @@ import { Vapor } from '../components/nodes/PomoNode/variants/Vapor';
 import { Vu } from '../components/nodes/PomoNode/variants/Vu';
 import { Outline } from '../components/nodes/PomoNode/variants/Outline';
 import { Mac } from '../components/nodes/PomoNode/variants/Mac';
+import { Minimal } from '../components/nodes/PomoNode/variants/Minimal';
 import type { TimerFaceProps } from '../components/nodes/PomoNode/variants/types';
 import type { TimerFace } from '../components/nodes/PomoNode/types';
 import { POCKET_SHADOW, buildModel } from './model';
@@ -34,7 +35,7 @@ import { AskWhat } from './parts';
 import { POCKET_LABEL_COMMAND, isObserve as isObserveMode, spanToName } from '../components/nodes/PomoNode/derive';
 
 const FACES: Record<TimerFace, ComponentType<TimerFaceProps>> = {
-  ascii: Ascii, lcd: Lcd, blocks: Blocks, vapor: Vapor, vu: Vu, outline: Outline, mac: Mac,
+  minimal: Minimal, ascii: Ascii, lcd: Lcd, blocks: Blocks, vapor: Vapor, vu: Vu, outline: Outline, mac: Mac,
 };
 
 // Electron's window drag region; buttons opt out so they stay clickable.

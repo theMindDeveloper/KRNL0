@@ -24,51 +24,59 @@ export function compactLevelFor(h: number): 0 | 1 | 2 | 3 {
   return h >= 330 ? 0 : h >= 295 ? 1 : h >= 262 ? 2 : 3;
 }
 
-export function FaceFit({ children, compact }: { children: ReactNode; compact?: ReactNode }) {
+export function FaceFit({ children }: { children: ReactNode; compact?: ReactNode }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [useCompact, setUseCompact] = useState(false);
-  /** The full face's natural height, kept while the compact face is shown. */
-  const naturalRef = useRef(0);
+  // The face you picked always stays: a short window scales it down, and when
+  // its small labels would fall under the 11 px floor they are left out
+  // (never drawn over the digits). No switch to another look on resize.
+  const [labelsOff, setLabelsOff] = useState(false);
+  const labelsOffRef = useRef(false);
+  /** The face's natural height with its labels (kept while they are off). */
+  const withLabelsRef = useRef(0);
 
   useLayoutEffect(() => {
     const o = outer.current;
     const i = inner.current;
-    if (!o || typeof ResizeObserver === 'undefined') return;
+    if (!o || !i || typeof ResizeObserver === 'undefined') return;
     const fit = (): void => {
       const room = o.clientHeight;
-      const shownFace = !!inner.current && inner.current.dataset['face'] === 'full';
-      if (shownFace) naturalRef.current = inner.current!.offsetHeight;
-      const natural = naturalRef.current;
-      if (natural <= 0 || room <= 0) return;
+      const cur = i.offsetHeight;
+      if (!labelsOffRef.current) withLabelsRef.current = cur;
+      const withLabels = withLabelsRef.current;
+      if (withLabels <= 0 || room <= 0 || cur <= 0) return;
       // 4 px spare: big digits' line boxes run a little past their container.
+      const wantFull = withLabels <= room ? 1 : (room - 4) / withLabels;
+      const off = wantFull < COMPACT_BELOW;
+      if (off !== labelsOffRef.current) {
+        labelsOffRef.current = off;
+        setLabelsOff(off);
+        // Measure again once the face has re-laid out (its height may not change,
+        // so the observer alone would not call back).
+        requestAnimationFrame(fit);
+      }
+      const natural = off ? cur : withLabels;
       const want = natural <= room ? 1 : Math.floor(((room - 4) / natural) * 100) / 100;
-      setUseCompact(compactAvailable.current && want < COMPACT_BELOW);
       const next = Math.max(MIN_SCALE, want);
-      setScale((cur) => (Math.abs(cur - next) < 0.01 ? cur : next));
+      setScale((c) => (Math.abs(c - next) < 0.01 ? c : next));
     };
     const ro = new ResizeObserver(fit);
     ro.observe(o);
-    if (i) ro.observe(i);
+    ro.observe(i);
     fit();
     return () => ro.disconnect();
   }, []);
-
-  const compactAvailable = useRef(compact !== undefined);
-  compactAvailable.current = compact !== undefined;
-  const showCompact = useCompact && compact !== undefined;
 
   return (
     <div
       ref={outer}
       data-testid="pomo-face-fit"
       data-scale={scale}
-      data-compact={showCompact ? 'true' : undefined}
+      data-labels={labelsOff ? 'off' : undefined}
       // Takes what's left after the controls; never forces the window taller.
       style={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}
     >
-      {showCompact ? <div style={{ alignSelf: 'center', width: '100%' }}>{compact}</div> : (
       <div
         ref={inner}
         data-face="full"
@@ -81,13 +89,13 @@ export function FaceFit({ children, compact }: { children: ReactNode; compact?: 
           transform: scale < 1 ? `scale(${scale})` : undefined,
           transformOrigin: 'top center',
           // Labels inside the face are drawn at 11 px / scale, so after the
-          // scale they still read at the 11 px floor (the big digits scale).
-          ['--face-label' as string]: `${(11 / scale).toFixed(2)}px`,
+          // scale they still read at the 11 px floor (the big digits scale);
+          // with no room for them they are left out.
+          ['--face-label' as string]: labelsOff ? '0px' : `${(11 / scale).toFixed(2)}px`,
         }}
       >
         {children}
       </div>
-      )}
     </div>
   );
 }

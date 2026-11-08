@@ -14,7 +14,7 @@ export function Outline({ m, s, elapsedPct, total = 25, running }: TimerFaceProp
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div data-testid="pomo-face-outline" style={{ position: 'relative', paddingBottom: 18 }}>
+      <div data-testid="pomo-face-outline" style={{ position: 'relative' }}>
         <div
           style={{
             display: 'grid',
@@ -43,10 +43,13 @@ export function Outline({ m, s, elapsedPct, total = 25, running }: TimerFaceProp
             );
           })}
         </div>
-        {/* Dimension line: 0 ----- 25 MIN */}
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 8, height: 1, background: 'var(--ink-3)' }} />
-        <span style={{ position: 'absolute', left: 0, bottom: -4, fontFamily: 'var(--font-mono)', fontSize: 'var(--face-label, 11px)', color: 'var(--ink-3)' }}>0</span>
-        <span style={{ position: 'absolute', right: 0, bottom: -4, fontFamily: 'var(--font-mono)', fontSize: 'var(--face-label, 11px)', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{TOTAL} MIN</span>
+        {/* Dimension line: 0 ----- 25 MIN — in the flow, so a bigger label
+            pushes the read-out down instead of drawing over it. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 'var(--face-label, 11px)', lineHeight: 1.2, color: 'var(--ink-3)' }}>
+          <span>0</span>
+          <span aria-hidden style={{ flex: 1, height: 1, background: 'var(--ink-3)' }} />
+          <span style={{ whiteSpace: 'nowrap' }}>{TOTAL} MIN</span>
+        </div>
       </div>
       <Readout m={m} s={s} minute={minsElapsed + 1} total={TOTAL} idle={!running && elapsedPct <= 0} />
     </div>
