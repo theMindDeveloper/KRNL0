@@ -191,6 +191,11 @@ export function HabitNode({
     [onCommand],
   );
 
+  const onRestDay = useCallback(
+    (habitId: string, date: string) => onCommand('habit.setRest', { id: habitId, date, rest: true }),
+    [onCommand],
+  );
+
   const onContextMenu = useCallback(
     (e: React.MouseEvent, habitId: string) => {
       e.preventDefault();
@@ -228,6 +233,9 @@ export function HabitNode({
     const tgt = weeklyTarget(h);
     return [
       { label: h.schedule ? 'Edit repeat…' : 'Repeat…', onClick: () => edit('habit') },
+      (h.rest ?? []).includes(today)
+        ? { label: 'Undo rest today', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: false }) }
+        : { label: 'Rest today (keeps the streak)', testId: 'habit-menu-rest', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: true }) },
       { label: tgt ? `Times a week: ${tgt}…` : 'Times a week…', testId: 'habit-menu-target', onClick: () => setTargetEdit({ habitId: h.id, value: tgt, x: at.x, y: at.y }) },
       // A routine needs a time: with one it switches at once, without one the editor asks.
       { label: 'Turn into routine', onClick: () => (h.schedule?.timeOfDay ? onCommand('habit.setKind', { id: h.id, kind: 'routine' }) : edit('routine')) },
@@ -305,6 +313,7 @@ export function HabitNode({
               weekDays={weekDays}
               habitMotherId={node.id}
               onToggle={onToggleCell}
+              onRest={onRestDay}
               onContextMenu={onContextMenu}
             />
           )}
@@ -556,10 +565,11 @@ interface WeekViewProps {
   weekDays: string[];
   habitMotherId: string;
   onToggle: (id: string, date: string) => void;
+  onRest?: (id: string, date: string) => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
 }
 
-function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextMenu }: WeekViewProps) {
+function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onRest, onContextMenu }: WeekViewProps) {
   const gridWidth = WEEK_CELL_SIZE * 7 + WEEK_CELL_GAP * 6;
   return (
     <div data-view-week>
@@ -593,6 +603,7 @@ function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextM
           weekDays={weekDays}
           habitMotherId={habitMotherId}
           onToggle={onToggle}
+          {...(onRest ? { onRest } : {})}
           onContextMenu={onContextMenu}
         />
       ))}
@@ -602,6 +613,7 @@ function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextM
 
 interface WeekRowProps extends RowCommonProps {
   weekDays: string[];
+  onRest?: (id: string, date: string) => void;
 }
 
 const WeekRow = memo(function WeekRow({
@@ -612,16 +624,18 @@ const WeekRow = memo(function WeekRow({
   weekDays,
   habitMotherId,
   onToggle,
+  onRest = () => undefined,
   onContextMenu,
 }: WeekRowProps) {
   const color = habitColor(habit.color);
   // "3 times a week": the streak counts weeks that reached the target.
   const target = weeklyTarget(habit);
   const streak = useMemo(
-    () => (target ? calcWeekStreak(habit.log, today, target) : calcStreak(habit.log, today, habit.schedule)),
-    [habit.log, today, habit.schedule, target],
+    () => (target ? calcWeekStreak(habit.log, today, target, habit.rest) : calcStreak(habit.log, today, habit.schedule, habit.rest)),
+    [habit.log, today, habit.schedule, target, habit.rest],
   );
-  const best = useMemo(() => (target ? bestWeekStreak(habit.log, target) : bestStreak(habit.log, habit.schedule)), [habit.log, habit.schedule, target]);
+  const best = useMemo(() => (target ? bestWeekStreak(habit.log, target) : bestStreak(habit.log, habit.schedule, habit.rest)), [habit.log, habit.schedule, target, habit.rest]);
+  const restSet = useMemo(() => new Set(habit.rest ?? []), [habit.rest]);
   const weekTicks = target ? ticksThisWeek(habit.log, today) : 0;
   const unit = target ? 'week' : 'day';
   const milestone = target ? null : milestoneReached(streak);
@@ -631,7 +645,7 @@ const WeekRow = memo(function WeekRow({
   // next morning — app left open overnight — asks again.
   const [repairHiddenDay, setRepairHiddenDay] = useState<string | null>(null);
   // A weekly target has no missed days: nothing to repair.
-  const repairCandidate = useMemo(() => (target ? null : repairableDay(habit.log, today, habit.schedule)), [habit.log, today, habit.schedule, target]);
+  const repairCandidate = useMemo(() => (target ? null : repairableDay(habit.log, today, habit.schedule, habit.rest)), [habit.log, today, habit.schedule, target, habit.rest]);
   const repairDay = repairCandidate !== null && repairCandidate !== repairHiddenDay && !repairDismissed(habit.id, repairCandidate) ? repairCandidate : null;
   const repairLabel = repairDay === null ? '' : repairDay === addDaysLocal(today, -1) ? 'yesterday' : new Date(`${repairDay}T00:00:00`).toLocaleDateString('en', { weekday: 'long' });
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
@@ -713,11 +727,12 @@ const WeekRow = memo(function WeekRow({
             const done = logSet.has(dayStr);
             const isFuture = dayStr > today;
             const scheduled = isDayScheduled(habit.schedule, dayStr);
-            const cls = cellClass(dayStr, today, done, 'week', scheduled);
+            const resting = !done && restSet.has(dayStr);
+            const cls = cellClass(dayStr, today, done, 'week', scheduled) + (resting ? ' habit-cell--rest' : '');
             const size = { width: WEEK_CELL_SIZE, height: WEEK_CELL_SIZE };
-            const tip = scheduled
-              ? `${habit.name} ${dayStr}`
-              : `${habit.name} ${dayStr} — not scheduled`;
+            const tip = !scheduled
+              ? `${habit.name} ${dayStr} — not scheduled`
+              : resting ? `${habit.name} ${dayStr} — rest day (the streak carries on)` : `${habit.name} ${dayStr}`;
             return isFuture || !scheduled ? (
               <div key={dayStr} className={cls} style={size} title={tip} />
             ) : (
@@ -832,6 +847,16 @@ const WeekRow = memo(function WeekRow({
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
             Yes
+          </button>
+          <button
+            type="button"
+            data-testid={`habit-repair-rest-${habit.id}`}
+            onClick={(e) => { e.stopPropagation(); onRest(habit.id, repairDay); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            title={`Sick, away or a planned break: mark ${repairLabel} as a rest day and keep the streak`}
+            style={{ height: 22, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0 }}
+          >
+            Rest day
           </button>
           <button
             type="button"

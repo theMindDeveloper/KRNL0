@@ -95,6 +95,9 @@ export interface Habit {
    *  any day; its streak counts weeks that reach the target, so a rest day
    *  never breaks it. Absent = every scheduled day counts. */
   perWeek?: number;
+  /** Rest days (YYYY-MM-DD): sick, travelling, a planned break. A rest day
+   *  never breaks a streak and never asks "did it yesterday?". */
+  rest?: string[];
 }
 
 /** The habit's weekly target, or null (routines never have one). */

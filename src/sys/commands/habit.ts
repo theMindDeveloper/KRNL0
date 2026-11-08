@@ -19,6 +19,7 @@ import {
   habitArchive,
   habitUnarchive,
   habitSetTarget,
+  habitSetRest,
   habitSetSchedule,
   habitSetKind,
   routineSkip,
@@ -245,7 +246,7 @@ export async function cliStreak(
   if (!mother) return notFound();
   const resolved = resolveHabit(mother.state, idOrName);
   if ('error' in resolved) return { ok: false, message: resolved.error };
-  const n = calcStreak(resolved.habit.log, todayLocal(), resolved.habit.schedule ?? undefined);
+  const n = calcStreak(resolved.habit.log, todayLocal(), resolved.habit.schedule ?? undefined, resolved.habit.rest);
   return {
     ok: true,
     message: `streak for "${resolved.habit.name}": ${n} day${n === 1 ? '' : 's'}`,
@@ -347,7 +348,7 @@ export async function cliList(ctx: HabitCtx, json = false): Promise<SysResult> {
     name: h.name,
     color: h.color,
     archived: h.archived,
-    streak: calcStreak(h.log, today, h.schedule ?? undefined),
+    streak: calcStreak(h.log, today, h.schedule ?? undefined, h.rest),
     logCount: h.log.length,
   }));
   if (json) {
@@ -575,6 +576,42 @@ export async function cliTarget(
   return { ok: true, message: off ? `habit "${resolved.habit.name}": no weekly target` : `habit "${resolved.habit.name}": ${n}× a week, any days`, data: { id: resolved.habit.id, perWeek: off ? null : n } };
 }
 
+/**
+ * `krnl habit rest <id|name> [--on YYYY-MM-DD] [--to YYYY-MM-DD] [--off]` (review 3.3)
+ * Sick, away, a planned break: rest days never break the streak. Default: today.
+ */
+export async function cliRest(
+  ctx: HabitCtx,
+  ref: string | undefined,
+  on: string | undefined,
+  to: string | undefined,
+  off: boolean,
+): Promise<SysResult> {
+  if (!ref) return { ok: false, message: 'habit rest requires <id|name> [--on YYYY-MM-DD] [--to YYYY-MM-DD] [--off]' };
+  const from = on ?? todayLocal();
+  const until = to ?? from;
+  for (const [flag, v] of [['--on', from], ['--to', until]] as const) {
+    if (!isValidYMD(v)) return { ok: false, message: `habit rest: bad ${flag} "${v}" (want YYYY-MM-DD)` };
+  }
+  if (until < from) return { ok: false, message: 'habit rest: --to is before --on' };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  if (resolved.habit.kind === 'routine') return { ok: false, message: `"${resolved.habit.name}" is a routine: skip it instead (routine skip)` };
+  const days: string[] = [];
+  for (let d = new Date(`${from}T00:00:00`); ; d.setDate(d.getDate() + 1)) {
+    const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (ymd > until || days.length > 366) break;
+    days.push(ymd);
+  }
+  for (const date of days) mother.state = habitSetRest(mother.state, { id: resolved.habit.id, date, rest: !off });
+  writeBoard(ctx, board, mother);
+  const span = days.length === 1 ? days[0] : `${days[0]} to ${days[days.length - 1]}`;
+  return { ok: true, message: off ? `habit "${resolved.habit.name}": ${span} is no longer a rest day` : `habit "${resolved.habit.name}": rest ${span} — the streak carries on`, data: { id: resolved.habit.id, days, rest: !off } };
+}
+
 /** `krnl habit unarchive <id|name>`: bring an archived habit back, history kept. */
 export async function cliUnarchive(
   ctx: HabitCtx,
@@ -607,7 +644,7 @@ export async function cliShow(
   if ('error' in resolved) return { ok: false, message: resolved.error };
   const h = resolved.habit;
   const today = todayLocal();
-  const streak = calcStreak(h.log, today, h.schedule ?? undefined);
+  const streak = calcStreak(h.log, today, h.schedule ?? undefined, h.rest);
 
   const data: {
     id: string;

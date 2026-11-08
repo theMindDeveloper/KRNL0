@@ -131,8 +131,9 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
       if (typeof h['perWeek'] === 'number') continue;
       const log = Array.isArray(h['log']) ? h['log'].filter((d): d is string => typeof d === 'string') : [];
       const schedule = h['schedule'] as HabitSchedule | undefined;
-      const current = calcStreak(log, today, schedule);
-      const best = bestStreak(log, schedule);
+      const rest = Array.isArray(h['rest']) ? h['rest'].filter((d): d is string => typeof d === 'string') : [];
+      const current = calcStreak(log, today, schedule, rest);
+      const best = bestStreak(log, schedule, rest);
       if (current === 0 && best < 2) continue;
       habits.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current, best, broken: current === 0, log, color: typeof h['color'] === 'string' ? h['color'] : 'acid' });
     }

@@ -71,6 +71,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'archive', usage: 'habit archive <id|name>', summary: 'Archive a habit (hidden from grid, history kept)' },
       { name: 'unarchive', usage: 'habit unarchive <id|name>', summary: 'Bring an archived habit back, history and all' },
       { name: 'target', usage: 'habit target <id|name> <1-6|off>', summary: 'Aim for N times a week, any days (the streak counts weeks)' },
+      { name: 'rest', usage: 'habit rest <id|name> [--on YYYY-MM-DD] [--to YYYY-MM-DD] [--off]', summary: 'Rest days (sick, away, a break): they never break the streak. Default today' },
       { name: 'show', usage: 'habit show <id|name> [--json]', summary: 'Show full habit detail including schedule and log count' },
       { name: 'pin', usage: 'habit pin <id|name>', summary: 'Spawn a habit.lane card on the canvas (requires open renderer, exit 2 if detached)' },
       { name: 'unpin', usage: 'habit unpin <id|name>', summary: 'Remove the habit.lane card (requires open renderer, exit 2 if detached)' },

@@ -131,6 +131,7 @@ import {
   habitArchive,
   habitUnarchive,
   habitSetTarget,
+  habitSetRest,
   habitRename,
   habitSetColor,
   habitSetIcon,
@@ -421,6 +422,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.archive':     return { state: habitArchive(s as never, args as never) };
         case 'habit.unarchive':   return { state: habitUnarchive(s as never, args as never) };
         case 'habit.setTarget':   return { state: habitSetTarget(s as never, args as never) };
+        case 'habit.setRest':     return { state: habitSetRest(s as never, args as never) };
         case 'habit.rename':      return { state: habitRename(s as never, args as never) };
         case 'habit.setColor':    return { state: habitSetColor(s as never, args as never) };
         case 'habit.setIcon':     return { state: habitSetIcon(s as never, args as never) };

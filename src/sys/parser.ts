@@ -154,6 +154,7 @@ export type SysCommand =
   | { kind: 'habit'; sub: 'archive'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unarchive'; ref: string | undefined }
   | { kind: 'habit'; sub: 'target'; ref: string | undefined; value: string | undefined }
+  | { kind: 'habit'; sub: 'rest'; ref: string | undefined; on: string | undefined; to: string | undefined; off: boolean }
   | { kind: 'habit'; sub: 'show'; ref: string | undefined; json: boolean }
   | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
@@ -681,6 +682,9 @@ export class SysParser {
       }
       if (sub === 'target') {
         return { kind: 'habit', sub: 'target', ref: rest[0], value: rest[1] };
+      }
+      if (sub === 'rest') {
+        return { kind: 'habit', sub: 'rest', ref: rest[0], on: flag(rest, 'on'), to: flag(rest, 'to'), off: hasFlag(rest, 'off') };
       }
       if (sub === 'show') {
         return { kind: 'habit', sub: 'show', ref: rest[0], json: hasFlag(rest, 'json') };

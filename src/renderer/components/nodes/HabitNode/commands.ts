@@ -52,6 +52,22 @@ function validPerWeek(n: unknown): n is number {
 }
 
 /** Set or clear a habit's weekly target (1–6 times a week; null clears). Routines: no-op. */
+/** Mark or clear a rest day (sick, away, a planned break): it never breaks the streak. Routines: no-op. */
+export function habitSetRest(state: HabitState, args: { id: string; date: string; rest: boolean }): HabitState {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) return state;
+  return {
+    ...state,
+    habits: state.habits.map((h) => {
+      if (h.id !== args.id || h.kind === 'routine') return h;
+      const set = new Set(h.rest ?? []);
+      if (args.rest) set.add(args.date); else set.delete(args.date);
+      const rest = [...set].sort();
+      if (rest.length === 0) { const { rest: _drop, ...without } = h; return without; }
+      return { ...h, rest };
+    }),
+  };
+}
+
 export function habitSetTarget(state: HabitState, args: { id: string; perWeek: number | null }): HabitState {
   return {
     ...state,
@@ -299,19 +315,22 @@ export function calcStreak(
   log: string[],
   today: string,
   schedule?: HabitSchedule,
+  rest: readonly string[] = [],
 ): number {
   const logSet = new Set(log);
+  const restSet = new Set(rest);
+  const on = (d: string) => isDayScheduled(schedule, d) && !restSet.has(d);
 
   let cursor = today;
   let safety = 366;
-  while (!isDayScheduled(schedule, cursor) && safety-- > 0) {
+  while (!on(cursor) && safety-- > 0) {
     cursor = prevDayStr(cursor);
   }
 
   if (cursor === today && !logSet.has(cursor)) {
     cursor = prevDayStr(cursor);
     safety = 366;
-    while (!isDayScheduled(schedule, cursor) && safety-- > 0) {
+    while (!on(cursor) && safety-- > 0) {
       cursor = prevDayStr(cursor);
     }
   }
@@ -321,7 +340,7 @@ export function calcStreak(
     count++;
     cursor = prevDayStr(cursor);
     safety = 366;
-    while (!isDayScheduled(schedule, cursor) && safety-- > 0) {
+    while (!on(cursor) && safety-- > 0) {
       cursor = prevDayStr(cursor);
     }
   }
@@ -360,12 +379,18 @@ export function ticksThisWeek(log: string[], today: string): number {
 
 /** Weeks in a row that reached the target. This week counts once reached;
  *  until then it is still open and does not break the run. */
-export function calcWeekStreak(log: string[], today: string, perWeek: number): number {
+export function calcWeekStreak(log: string[], today: string, perWeek: number, rest: readonly string[] = []): number {
   const counts = weekCounts(log);
+  const rested = weekCounts([...rest]);
   let week = mondayOf(today);
   if ((counts.get(week) ?? 0) < perWeek) week = shiftWeek(week, -1);
   let n = 0;
-  while ((counts.get(week) ?? 0) >= perWeek && n < 1000) { n++; week = shiftWeek(week, -1); }
+  for (let guard = 0; guard < 1000; guard++) {
+    if ((counts.get(week) ?? 0) >= perWeek) n++;
+    else if (!rested.has(week)) break; // a short week with rest days is skipped, not broken
+    week = shiftWeek(week, -1);
+    if (week < '2000-01-01') break;
+  }
   return n;
 }
 
@@ -407,8 +432,10 @@ export function milestoneReached(streak: number): number | null {
 }
 
 /** Longest run of consecutive scheduled days ever logged. Kept forever: it only grows. */
-export function bestStreak(log: string[], schedule?: HabitSchedule): number {
+export function bestStreak(log: string[], schedule?: HabitSchedule, rest: readonly string[] = []): number {
   if (log.length === 0) return 0;
+  const restSet = new Set(rest);
+  const on = (d: string) => isDayScheduled(schedule, d) && !restSet.has(d);
   const sorted = [...new Set(log)].sort();
   const logSet = new Set(sorted);
   let best = 0;
@@ -416,7 +443,7 @@ export function bestStreak(log: string[], schedule?: HabitSchedule): number {
     // Only start counting at the first day of a run.
     let prev = prevDayStr(day);
     let safety = 366;
-    while (!isDayScheduled(schedule, prev) && safety-- > 0) prev = prevDayStr(prev);
+    while (!on(prev) && safety-- > 0) prev = prevDayStr(prev);
     if (logSet.has(prev)) continue;
     let run = 0;
     let cursor = day;
@@ -424,7 +451,7 @@ export function bestStreak(log: string[], schedule?: HabitSchedule): number {
       run++;
       let next = nextDayStr(cursor);
       safety = 366;
-      while (!isDayScheduled(schedule, next) && safety-- > 0) next = nextDayStr(next);
+      while (!on(next) && safety-- > 0) next = nextDayStr(next);
       cursor = next;
     }
     best = Math.max(best, run);
@@ -437,15 +464,17 @@ export function bestStreak(log: string[], schedule?: HabitSchedule): number {
  * ("Missed yesterday? Tick it if you did it"): the last scheduled day before
  * today is not logged, but the scheduled day before that is. Null otherwise.
  */
-export function repairableDay(log: string[], today: string, schedule?: HabitSchedule): string | null {
+export function repairableDay(log: string[], today: string, schedule?: HabitSchedule, rest: readonly string[] = []): string | null {
   const logSet = new Set(log);
+  const restSet = new Set(rest);
+  const on = (d: string) => isDayScheduled(schedule, d) && !restSet.has(d);
   let missed = prevDayStr(today);
   let safety = 366;
-  while (!isDayScheduled(schedule, missed) && safety-- > 0) missed = prevDayStr(missed);
+  while (!on(missed) && safety-- > 0) missed = prevDayStr(missed);
   if (logSet.has(missed)) return null;
   let before = prevDayStr(missed);
   safety = 366;
-  while (!isDayScheduled(schedule, before) && safety-- > 0) before = prevDayStr(before);
+  while (!on(before) && safety-- > 0) before = prevDayStr(before);
   return logSet.has(before) ? missed : null;
 }
 
