@@ -76,6 +76,9 @@ describe('quick add reads dates', () => {
     expect(parseQuickAdd('Pay bills on the 15th', NOW)).toEqual({ text: 'Pay bills', day: '2026-11-15' });
     expect(parseQuickAdd('Pay bills on the 2nd', NOW).day).toBe('2026-12-02');
   });
+  it('noon is 12:00', () => {
+    expect(parseQuickAdd('Lunch with Sam at noon friday', NOW)).toEqual({ text: 'Lunch with Sam', time: '12:00', day: '2026-11-13' });
+  });
   it('several repeat days: reads none of it and says why', () => {
     const q = parseQuickAdd('Gym every monday and thursday 18:00', NOW);
     expect(q.text).toBe('Gym every monday and thursday 18:00');

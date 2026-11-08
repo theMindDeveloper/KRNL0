@@ -85,6 +85,9 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
     }
   }
 
+  // "noon" / "midday": 12:00.
+  if (!out.time && (m = /\b(?:at\s+)?(?:noon|midday)\b/i.exec(s))) { out.time = '12:00'; cut(m); }
+
   // Length: "1h30", "1.5h", "2 hours", "45m", "45 min" (a range already gave one).
   m = out.durationMin !== undefined ? null : /\b(\d{1,2})h([0-5]\d)\b/i.exec(s);
   if (m) { out.durationMin = Number(m[1]) * 60 + Number(m[2]); cut(m); }
