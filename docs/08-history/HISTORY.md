@@ -2198,3 +2198,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+2).
 **Summary:** Quick add knew "tomorrow" and weekdays but not a date, so "Dentist 15.11" kept "15.11" in the name. It now reads "15.11", "15/11", "Nov 20th", "3 March" and "the 15th" (day before month, as written in Germany). A date already past this year is next year's, and "the 2nd" means next month's once this month's has passed. Lengths ("1.5h"), version numbers ("2.5.1") and impossible dates ("31.02") are left alone. `todo add` in the terminal gets the same.
+
+## [2026-11-08] — Habit Archive offers UNDO; routine deletes say "routine" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`.
+**Summary:** Archiving a habit made the row vanish with no word about where it went. It now shows "Archived "…" · UNDO" like a delete. Deleting a routine said "Deleted habit"; it now says "Deleted routine".

@@ -389,10 +389,14 @@ export function HabitNode({
               onSetIcon={(icon) => onCommand('habit.setIcon', { id: menu.habitId, icon })}
               onSetNote={(note) => onCommand('habit.setNote', { id: menu.habitId, note })}
               onDelete={() => {
-                const name = state.habits.find((h) => h.id === menu.habitId)?.name ?? 'habit';
-                undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id: menu.habitId }));
+                const h = state.habits.find((x) => x.id === menu.habitId);
+                undoable(`Deleted ${h?.kind === 'routine' ? 'routine' : 'habit'} "${h?.name ?? ''}"`, () => onCommand('habit.remove', { id: menu.habitId }));
               }}
-              onArchive={() => onCommand('habit.archive', { id: menu.habitId })}
+              onArchive={() => {
+                // Archived rows leave the list (Restore is in the habit menu's Archived list).
+                const h = state.habits.find((x) => x.id === menu.habitId);
+                undoable(`Archived "${h?.name ?? ''}"`, () => onCommand('habit.archive', { id: menu.habitId }));
+              }}
               {...(isRoutine(menuHabit) ? {} : { onPinAsLane: () => onCommand('habit.spawnLane', { habitId: menu.habitId }) })}
               laneExists={pinnedHabitIds.has(menu.habitId)}
               extraItems={menuItemsFor(menuHabit, menu.anchor)}
@@ -472,8 +476,8 @@ export function HabitNode({
             archived={archivedList}
             onUnarchive={(id) => onCommand('habit.unarchive', { id })}
             onDeleteForever={(id) => {
-              const name = state.habits.find((h) => h.id === id)?.name ?? 'habit';
-              undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id }));
+              const h = state.habits.find((x) => x.id === id);
+              undoable(`Deleted ${h?.kind === 'routine' ? 'routine' : 'habit'} "${h?.name ?? ''}"`, () => onCommand('habit.remove', { id }));
             }}
           />
         )}
