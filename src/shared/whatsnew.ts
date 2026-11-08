@@ -82,6 +82,11 @@ export const RELEASES: readonly WhatsNewRelease[] = [
       'A task card keeps the same shape when you tick it, so nothing moves under your click.',
       'The floating timer comes in three looks (Dial, Capsule, Box) and asks what an Observe span was.',
       'Easier to read: larger labels, stronger contrast in light and dark, and line icons throughout.',
+      'Habits & Routines: a routine (a class, a work shift) sits on your Calendar every week and is never ticked; skip one week, move one, or end it. Habits can be "any time".',
+      'Adding asks first: type a name, press Enter, and say whether you tick it off (a habit) or it just happens (a routine). Nothing is added with settings you did not choose.',
+      'Habits: aim for 3 times a week on any days, mark a rest day when you are sick or away, and archive a habit to keep its history.',
+      'Plans: a due date apart from the time, a reminder before it starts (even with the window closed), and Drop for things you are not doing any more.',
+      'New tour: Help › Staying on track.',
     ],
   },
   {
