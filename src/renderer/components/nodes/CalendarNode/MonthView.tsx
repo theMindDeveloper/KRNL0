@@ -11,7 +11,7 @@ import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
 import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
-import { getMonthDays, getMondayOf, toYMD } from '../HabitNode/types';
+import { getMonthDays, getMondayOf, toYMD, isRoutine } from '../HabitNode/types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { selectPomoReality } from '../../../store/pomoReality';
 import { fmtMinutes } from '../ClockNode/dayModel';
@@ -218,7 +218,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
         const habitState = n.state as { habits?: Habit[] } | null;
         if (!habitState?.habits) continue;
         for (const h of habitState.habits) {
-          if (h.archived || !h.schedule) continue;
+          if (h.archived || !h.schedule || isRoutine(h)) continue; // routines are never ticked (Decision 39)
           const created = h.createdAt ? new Date(h.createdAt) : null;
           const createdYMD = created && !Number.isNaN(created.getTime()) ? toYMD(created) : '';
           result.push({ id: h.id, color: h.color, schedule: h.schedule, createdYMD });

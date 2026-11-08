@@ -16,6 +16,8 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
   | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
+  | { kind: 'todo'; sub: 'due'; ref: string | undefined; when: string | undefined }
+  | { kind: 'todo'; sub: 'drop' | 'undrop'; ref: string | undefined }
   | { kind: 'todo'; sub: 'tags'; action: string | undefined; label: string | undefined; keywords: string | undefined; color: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'archive' | 'clear-archive' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
@@ -34,6 +36,7 @@ export type SysCommand =
   | { kind: 'task'; sub: 'chain'; refs: string[] }
   | { kind: 'task'; sub: 'schedule'; id: string | undefined; at: string | undefined; durationMin: number | undefined }
   | { kind: 'task'; sub: 'unschedule'; id: string | undefined }
+  | { kind: 'task'; sub: 'remind'; ref: string | undefined; value: string | undefined }
   | { kind: 'task'; sub: 'addNext'; sourceRef: string | undefined; text: string | undefined; durationMin: number | undefined }
   | { kind: 'cal'; sub: 'show'; from: string | undefined; to: string | undefined; json: boolean }
   | { kind: 'cal'; sub: 'view'; view: string | undefined; date: string | undefined }
@@ -152,9 +155,18 @@ export type SysCommand =
     }
   | { kind: 'habit'; sub: 'unschedule'; ref: string | undefined }
   | { kind: 'habit'; sub: 'archive'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'unarchive'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'target'; ref: string | undefined; value: string | undefined }
+  | { kind: 'habit'; sub: 'rest'; ref: string | undefined; on: string | undefined; to: string | undefined; off: boolean }
   | { kind: 'habit'; sub: 'show'; ref: string | undefined; json: boolean }
   | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'kind'; ref: string | undefined; habitKind: string | undefined }
+  | { kind: 'routine'; sub: 'add'; name: string | undefined; days: string | undefined; at: string | undefined; forMin: number | undefined }
+  | { kind: 'routine'; sub: 'list'; json: boolean }
+  | { kind: 'routine'; sub: 'skip' | 'unskip' | 'end'; ref: string | undefined; on: string | undefined }
+  | { kind: 'routine'; sub: 'move'; ref: string | undefined; on: string | undefined; at: string | undefined }
+  | { kind: 'routine'; sub: 'restart'; ref: string | undefined }
   | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined; mode?: string | undefined }
   | {
       kind: 'frame';
@@ -448,6 +460,8 @@ export class SysParser {
       }
       // ADR 0016 — tags + archive.
       if (sub === 'tag') return { kind: 'todo', sub: 'tag', ref: rest[0], tag: rest[1] };
+      if (sub === 'due') return { kind: 'todo', sub: 'due', ref: rest[0], when: rest[1] };
+      if (sub === 'drop' || sub === 'undrop') return { kind: 'todo', sub, ref: rest[0] };
       if (sub === 'tags') {
         return {
           kind: 'todo', sub: 'tags',
@@ -537,6 +551,9 @@ export class SysParser {
       }
       if (sub === 'unschedule') {
         return { kind: 'task', sub: 'unschedule', id: rest[0] };
+      }
+      if (sub === 'remind') {
+        return { kind: 'task', sub: 'remind', ref: rest[0], value: rest[1] };
       }
       if (sub === 'addNext') {
         const durRaw = flag(rest, 'duration');
@@ -668,6 +685,15 @@ export class SysParser {
       if (sub === 'archive') {
         return { kind: 'habit', sub: 'archive', ref: rest[0] };
       }
+      if (sub === 'unarchive') {
+        return { kind: 'habit', sub: 'unarchive', ref: rest[0] };
+      }
+      if (sub === 'target') {
+        return { kind: 'habit', sub: 'target', ref: rest[0], value: rest[1] };
+      }
+      if (sub === 'rest') {
+        return { kind: 'habit', sub: 'rest', ref: rest[0], on: flag(rest, 'on'), to: flag(rest, 'to'), off: hasFlag(rest, 'off') };
+      }
       if (sub === 'show') {
         return { kind: 'habit', sub: 'show', ref: rest[0], json: hasFlag(rest, 'json') };
       }
@@ -677,6 +703,22 @@ export class SysParser {
       if (sub === 'unpin') {
         return { kind: 'habit', sub: 'unpin', ref: rest[0] };
       }
+      // Decision 39 — habit kind <ref> routine|habit
+      if (sub === 'kind') {
+        return { kind: 'habit', sub: 'kind', ref: rest[0], habitKind: rest[1] };
+      }
+    }
+
+    // Decision 39 — routines: repeat at a time, never ticked.
+    if (cmd === 'routine') {
+      if (sub === 'add') {
+        const forRaw = flag(rest, 'for');
+        return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: flag(rest, 'at'), forMin: forRaw !== undefined && /^\d+$/.test(forRaw) ? Number(forRaw) : undefined };
+      }
+      if (sub === 'list' || sub === undefined) return { kind: 'routine', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'skip' || sub === 'unskip' || sub === 'end') return { kind: 'routine', sub, ref: rest[0], on: flag(rest, 'on') };
+      if (sub === 'move') return { kind: 'routine', sub: 'move', ref: rest[0], on: flag(rest, 'on'), at: flag(rest, 'at') };
+      if (sub === 'restart') return { kind: 'routine', sub: 'restart', ref: rest[0] };
     }
 
     if (cmd === 'edge') {

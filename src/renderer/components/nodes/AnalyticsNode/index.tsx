@@ -1526,7 +1526,7 @@ function ViewBody(props: ViewBodyProps) {
                     <tr key={h.habitId} style={{ borderTop: '1px solid var(--k-an-line, #23262a)' }}>
                       <td style={{ padding: '4px 6px' }}>{h.label}</td>
                       <td style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--acid, #c9f158)' }}>
-                        {h.streak}d
+                        {h.streak}{h.unit === 'week' ? 'w' : 'd'}
                       </td>
                     </tr>
                   ))}

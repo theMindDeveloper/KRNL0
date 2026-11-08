@@ -104,6 +104,9 @@ import {
   todoClearArchived,
   todoReclassify,
   todoBuckets,
+  todoSetDue,
+  todoDrop,
+  todoUndrop,
 } from '../nodes/TodoNode/commands';
 import type { TodoState } from '../nodes/TodoNode/types';
 
@@ -119,6 +122,7 @@ import {
   taskClearCurrentSessionElapsedSec,
   taskSetDuration,
   taskSetSchedule,
+  taskSetRemind,
 } from '../nodes/TaskNode/commands';
 import type { TaskState } from '../nodes/TaskNode/types';
 
@@ -129,12 +133,21 @@ import {
   habitMarkDone,
   habitRemove,
   habitArchive,
+  habitUnarchive,
+  habitSetTarget,
+  habitSetRest,
   habitRename,
   habitSetColor,
   habitSetIcon,
   habitSetNote,
   habitSetView,
   habitSetSchedule,
+  habitSetKind,
+  routineSkip,
+  routineUnskip,
+  routineMove,
+  routineEnd,
+  routineRestart,
 } from '../nodes/HabitNode/commands';
 import type { HabitState } from '../nodes/HabitNode/types';
 import type { HabitSchedule } from '../nodes/HabitNode/types';
@@ -373,6 +386,9 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'todo.edit':           return { state: todoEdit(s as never, args as never) };
         case 'todo.remove':         return { state: todoRemove(s as never, args as never) };
         case 'todo.clearDone':      return { state: todoClearDone(s as never) };
+        case 'todo.setDue':         return { state: todoSetDue(s as never, args as never) };
+        case 'todo.drop':           return { state: todoDrop(s as never, args as never) };
+        case 'todo.undrop':         return { state: todoUndrop(s as never, args as never) };
         // ADR 0016 — tags + Done/Archive lifecycle.
         case 'todo.setItemTag':     return { state: todoSetItemTag(s as never, args as never) };
         case 'todo.addTag':         return { state: todoAddTag(s as never, args as never) };
@@ -401,6 +417,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'task.setDuration':       return { state: taskSetDuration(s as never, args as never) };
         // ADR 0001 — calendar integration: set/clear schedule on a task.
         case 'task.setSchedule':       return { state: taskSetSchedule(s as never, args as never) };
+        case 'task.setRemind':         return { state: taskSetRemind(s as never, args as never) };
       }
       break;
     }
@@ -411,6 +428,9 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.markDone':    return { state: habitMarkDone(s as never, args as never) };
         case 'habit.remove':      return { state: habitRemove(s as never, args as never) };
         case 'habit.archive':     return { state: habitArchive(s as never, args as never) };
+        case 'habit.unarchive':   return { state: habitUnarchive(s as never, args as never) };
+        case 'habit.setTarget':   return { state: habitSetTarget(s as never, args as never) };
+        case 'habit.setRest':     return { state: habitSetRest(s as never, args as never) };
         case 'habit.rename':      return { state: habitRename(s as never, args as never) };
         case 'habit.setColor':    return { state: habitSetColor(s as never, args as never) };
         case 'habit.setIcon':     return { state: habitSetIcon(s as never, args as never) };
@@ -418,6 +438,13 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.setView':     return { config: habitSetView(c as never, args as never) };
         // ADR 0002 §5 — set/clear schedule on a habit.
         case 'habit.setSchedule': return { state: habitSetSchedule(s as never, args as never) };
+        // Decision 39 — routines.
+        case 'habit.setKind':     return { state: habitSetKind(s as never, args as never) };
+        case 'routine.skip':      return { state: routineSkip(s as never, args as never) };
+        case 'routine.unskip':    return { state: routineUnskip(s as never, args as never) };
+        case 'routine.move':      return { state: routineMove(s as never, args as never) };
+        case 'routine.end':       return { state: routineEnd(s as never, args as never) };
+        case 'routine.restart':   return { state: routineRestart(s as never, args as never) };
       }
       break;
     }
@@ -1761,6 +1788,10 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, habitId ? { refId: habitId } : {});
     } else if (command === 'habit.add' && node.kind === 'habit') {
       emit('habit.created', `habit added on ${shortId(nodeId)}`);
+    } else if (command === 'habit.archive' && node.kind === 'habit') {
+      // An archived habit is not tracked: its lane goes too (as the CLI does).
+      const habitId = typeof args['id'] === 'string' ? args['id'] : '';
+      if (habitId) removeAllLanesForHabit(habitId);
     } else if (command === 'habit.remove' && node.kind === 'habit') {
       const habitId = typeof args['id'] === 'string' ? args['id'] : '';
       emit('habit.deleted', `habit ${habitId.slice(0, 8)} removed`, { severity: 'warn' });

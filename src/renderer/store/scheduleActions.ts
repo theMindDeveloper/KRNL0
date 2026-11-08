@@ -96,6 +96,11 @@ export function toggleTaskDone(taskId: string): Promise<void> {
   return dispatchToTask(taskId, 'task.toggle');
 }
 
+/** Review 4.1 — remind N minutes before a plan starts (null = no reminder). */
+export function setTaskReminder(taskId: string, min: number | null): Promise<void> {
+  return dispatchToTask(taskId, 'task.setRemind', { min });
+}
+
 export function startFocusOnTask(taskId: string): Promise<void> {
   return dispatchToTask(taskId, 'task.startPomo');
 }
@@ -106,6 +111,14 @@ export async function toggleHabitToday(habitId: string): Promise<void> {
   if (!habitNode) return;
   const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
   makeCommandHandler(habitNode.id)('habit.toggleDay', { id: habitId });
+}
+
+/** Decision 39 — a command on the habit mother (routines: skip / move / end …). */
+export async function habitMotherCommand(command: string, args: Record<string, unknown>): Promise<void> {
+  const habitNode = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'habit' && n.isMother);
+  if (!habitNode) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  makeCommandHandler(habitNode.id)(command, args);
 }
 
 /** Window event the canvas listens for to centre a node (works from any surface). */

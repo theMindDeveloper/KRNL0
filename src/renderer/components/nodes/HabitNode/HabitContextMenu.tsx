@@ -7,7 +7,7 @@
 // viewport (client) coords. Position is rounded → crisp text, no blur on
 // nested sub-pickers (color/icon grid).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Habit, HabitColor } from './types';
 import { HABIT_COLORS } from './types';
@@ -23,6 +23,8 @@ interface Props {
   onSetIcon: (icon: string) => void;
   onSetNote: (note: string) => void;
   onDelete: () => void;
+  /** Hide it but keep its history; it comes back from the node's settings. */
+  onArchive?: () => void;
   onClose: () => void;
   // v2.2 — only the parent HabitNode passes this; the lane's own menu omits
   // it (the lane node itself can't pin another lane to its own habit).
@@ -31,6 +33,8 @@ interface Props {
   laneExists?: boolean;
   // Only a lane's own menu passes this: remove the lane, keep the habit.
   onUnpinLane?: () => void;
+  /** Decision 39 — routine / habit actions (Edit repeat, Skip next, End, Turn into …). */
+  extraItems?: ReadonlyArray<{ label: string; onClick: () => void; testId?: string }>;
 }
 
 const MENU_WIDTH = 232;
@@ -43,10 +47,12 @@ export function HabitContextMenu({
   onSetIcon,
   onSetNote,
   onDelete,
+  onArchive,
   onClose,
   onPinAsLane,
   laneExists,
   onUnpinLane,
+  extraItems,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,7 +99,15 @@ export function HabitContextMenu({
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const clampedX = Math.round(Math.min(Math.max(0, anchor.x), Math.max(0, vw - MENU_WIDTH)));
-  const clampedY = Math.round(Math.min(Math.max(0, anchor.y), Math.max(0, vh - estHeight)));
+  // The real height once drawn (routine items and pickers make it taller than
+  // any fixed guess): a menu opened low on the screen moves up to fit.
+  const [measured, setMeasured] = useState(0);
+  useLayoutEffect(() => {
+    const h = ref.current?.offsetHeight ?? 0;
+    if (h && Math.abs(h - measured) > 1) setMeasured(h);
+  });
+  const height = Math.min(Math.max(estHeight, measured), vh - 16);
+  const clampedY = Math.round(Math.min(Math.max(8, anchor.y), Math.max(8, vh - height - 8)));
 
   const commitRename = () => {
     if (cancelledRef.current) return;
@@ -113,6 +127,9 @@ export function HabitContextMenu({
         left: clampedX,
         top: clampedY,
         width: MENU_WIDTH,
+        maxHeight: vh - 16,
+        overflowY: 'auto',
+        boxSizing: 'border-box',
         // Same shell as the shared ContextMenu.
         background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
@@ -121,8 +138,6 @@ export function HabitContextMenu({
         padding: 8,
         zIndex: Z.contextMenu,
         fontFamily: 'var(--font-sans)',
-        maxHeight: `calc(100vh - ${clampedY + 16}px)`,
-        overflowY: 'auto',
       }}
     >
       {/* Header: icon + name (or rename input) */}
@@ -420,6 +435,15 @@ export function HabitContextMenu({
         </div>
       )}
 
+      {extraItems && extraItems.length > 0 && (
+        <>
+          <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
+          {extraItems.map((it) => (
+            <MenuItem key={it.label} label={it.label} {...(it.testId ? { testId: it.testId } : {})} onClick={() => { it.onClick(); onClose(); }} />
+          ))}
+        </>
+      )}
+
       {onUnpinLane && (
         <>
           <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
@@ -456,6 +480,15 @@ export function HabitContextMenu({
           borderTop: '1px solid var(--paper-2)',
         }}
       />
+      {onArchive && (
+        <MenuItem
+          label="Archive (keeps history)"
+          onClick={() => {
+            onArchive();
+            onClose();
+          }}
+        />
+      )}
       <MenuItem
         label="Delete"
         destructive
@@ -479,16 +512,19 @@ function MenuItem({
   destructive,
   disabled,
   onClick,
+  testId,
 }: {
   label: string;
   trailing?: React.ReactNode;
   destructive?: boolean;
   disabled?: boolean;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
+      data-testid={testId}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       style={{

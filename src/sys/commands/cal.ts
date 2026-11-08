@@ -132,7 +132,7 @@ export function calZoom(ctx: CalCtx & { onBoardChanged?: () => void }, zoom: num
 
 /**
  * krnl cal layers                     → show both layers' state
- * krnl cal layers recorded|habits on|off
+ * krnl cal layers recorded|habits|routines on|off
  * The recorded rail and the habit pills over the plan (calendar F-layers).
  */
 export function calLayers(
@@ -146,9 +146,9 @@ export function calLayers(
   const cal = board.nodes.find((n) => n.kind === 'calendar' && n.isMother);
   if (!cal) return { ok: false, message: 'No calendar on the board' };
   const cur = calendarLayersOf(cal.state as CalendarState);
-  const show = (l: typeof cur): string => `recorded ${l.recorded ? 'on' : 'off'} · habits ${l.habits ? 'on' : 'off'}`;
+  const show = (l: typeof cur): string => `recorded ${l.recorded ? 'on' : 'off'} · habits ${l.habits ? 'on' : 'off'} · routines ${l.routines ? 'on' : 'off'}`;
   if (layer === undefined) return { ok: true, message: json ? JSON.stringify(cur) : show(cur), data: cur };
-  if (layer !== 'recorded' && layer !== 'habits') return { ok: false, message: 'cal layers <recorded|habits> <on|off>' };
+  if (layer !== 'recorded' && layer !== 'habits' && layer !== 'routines') return { ok: false, message: 'cal layers <recorded|habits|routines> <on|off>' };
   if (on !== 'on' && on !== 'off') return { ok: false, message: `cal layers ${layer} needs on or off` };
   cal.state = calendarSetLayers(cal.state as CalendarState, { [layer]: on === 'on' });
   saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });

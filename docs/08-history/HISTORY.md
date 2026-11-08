@@ -1839,3 +1839,94 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/pocket-pomo`
 **Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.dayTotal.test.tsx` (new)
 **Summary:** Found on the user's board: Monday read "3h48" in the week header and "3h 18m" in the month cell. A session over midnight is split into one piece per day, but each piece keeps the whole session's start and end; the week header summed those, so the session counted in full on both days. It now sums each day's own piece (as the month view does). Test fails on the old code ("2h" instead of "1h").
+
+## [2026-11-08] — Routines and any-time habits (Decision 39, #217)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/types.ts` (`kind`, `endsOn`, `exceptions`, optional `timeOfDay`, `isRoutine`, `routineOccurrence`), `HabitNode/commands.ts` (routine skip/unskip/move/end/restart, `habitSetKind`; ticks are no-ops on routines), `HabitNode/RoutineShelf.tsx` (new), `HabitNode/index.tsx`, `HabitContextMenu.tsx`, `HabitPopover.tsx`, `ui/RepeatEditor.tsx`, `ui/HabitSwapModal.tsx`, `ui/TaskInfoPopup.tsx`, `CalendarNode/WeekView.tsx` (+ types/commands), `MonthView.tsx`, `ClockNode/dayModel.ts` + `index.tsx`, `launch/catchup.ts`, `launch/milestones.ts`, `analytics/sources/habitSource.ts`, `Canvas/commandDispatch.ts`, `store/scheduleActions.ts`, `Tour/tours.ts`, `sys/commands/habit.ts`, `sys/commands/cal.ts`, `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; docs: Decision 39, `docs/06-requirements/routines.md`; tests: `tests/unit/sys/routines.test.ts` (new), tours, layers, add field.
+**Summary:** A class every Monday modelled as a habit got a tick, a streak and "missed"; "No sugar" had to pretend to happen at an hour. Now one record and one editor: the Repeat editor's switch *Routine · it just happens / Habit · I tick it*. Routines always have days, a time and a length; they are never ticked, counted or flagged (streaks, repair, Welcome back, milestones, habit analytics, lanes all skip them — one guard, `isRoutine`). Habits may be **Any time**: ticked in the grid, not on the Calendar or the Clock dial. Node design "B · Two shelves" (picked on the design canvas): HABITS grid above a ROUTINES timetable (name, day letters, now / today / next / skipped). Calendar: a soft band behind plans every week, dashed when skipped; click it to skip, move this one, or end the routine; a **Routines** layer switch; plans overlapping a routine say so in their tooltip. Clock: routines as outlined arcs; their popup offers Skip this one, never a tick. End keeps history; ended routines are listed in the node's settings with Restart. CLI: `routine add|list|skip|unskip|move|end|restart`, `habit kind`, `habit schedule` without `--at`, `cal layers routines on|off`. Tutorial: "Habits & Routines" tour (6 steps, waits on adding, skipping and ending a routine), run in the app — which found and fixed the Repeat popover sitting under the tour card. Existing boards load unchanged (all new fields optional).
+
+## [2026-11-08] — Routine menu and Repeat popup stay inside the window
+
+**Type:** Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `src/renderer/components/nodes/HabitNode/HabitContextMenu.tsx`, `src/renderer/components/nodes/HabitNode/index.tsx`
+**Summary:** Found while capturing the routines walkthrough. Right-clicking a routine low in the node opened its menu off the bottom of the window (only Rename, Color, Icon and Add note showed; Edit repeat, Skip next, End routine and Turn into habit were cut off), and the Repeat popup for a routine (with its time and length rows) was cut off the same way. Both placed themselves from a fixed height guess; both now measure their real height once drawn, move up to fit, and scroll if the window is shorter than they are. Checked in the preview at 640 and 720 px tall.
+
+## [2026-11-08] — Overlapping routines sit side by side; a routine shows across the week it was added
+
+**Type:** Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/routineLanes.ts` (new), `CalendarNode/WeekView.tsx`, `HabitNode/types.ts` (`routineOccurrence`), tests `CalendarNode/__tests__/routineLanes.test.ts` (new), `tests/unit/sys/routines.test.ts`
+**Summary:** User report: two routines at 11:00 drew their bands and names on top of each other ("fgreg" over "hhrthtr6"). Overlapping routines on a day now get a lane each, side by side with a hairline between, and a click picks the routine in the lane clicked. In narrow lanes the name stays (with an ellipsis) down to 44 px; only the repeat icon goes. Also: a routine was hidden on days before the one it was added — a weekday routine added on a Sunday showed nothing that week. It now shows from the Monday of the week it was added. Checked in the preview at Station width.
+
+## [2026-11-08] — Adding asks first; archive and restore habits; clearer calendar words
+
+**Type:** Feature + Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/HabitAddAsk.tsx` (new), `HabitNode/index.tsx`, `HabitNode/HabitContextMenu.tsx`, `HabitNode/HabitPopover.tsx`, `HabitNode/RoutineShelf.tsx`, `HabitNode/commands.ts` (`habitUnarchive`), `Canvas/commandDispatch.ts`, `ui/RepeatEditor.tsx`, `ui/TimeField.tsx` (placeholder), `CalendarNode/WeekView.tsx`, `Tour/tours.ts`, `sys/commands/habit.ts` (`habit unarchive`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `docs/06-requirements/habit-node.md` (F7); tests `HabitNode.addField.test.tsx` (rewritten), `habit.lifecycle.test.ts`.
+**Summary:** User report: typing a name and pressing Enter added a habit with settings never chosen, and the Repeat button was the only way to say what it was. Design "B · Ask in your words" (design canvas, three drafts): the Repeat button is gone; Enter opens a card that asks "Do you want to tick off *Gym* when you do it?" — **Yes, keep track** (a habit) or **No, it just happens** (a routine), keys Y / N — then only that kind's questions (habit: how often, any time or a set time; routine: which days, start time, length). Nothing is pre-chosen; the button stays off and says what is missing ("Pick how often") until every answer is in, then says what will be added ("Add · Mon Wed 10:00–12:00"). Esc cancels and adds nothing. Both tours updated. Review item 3.4: a habit can be **archived** from its right-click menu (history kept, lane removed); archived ones are listed in the node's settings with **Restore** and a delete-for-good button (undoable); `krnl habit unarchive <id|name>` is new (an archived habit could never come back before). Also: the Calendar's "Line up" tab now reads **Fix overlap** and its tooltip names the plans and what a click does (the user asked what "Line up" meant); the Repeat editor's time is one time field ("09:00") instead of two number boxes ("9 : 0"); a routine with no icon shows a colour dot instead of a gap; `habit-node.md` F7 rewritten for habit lanes.
+
+## [2026-11-08] — Weekly targets: "3 times a week, any days" (review 3.1)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/types.ts` (`perWeek`, `weeklyTarget`), `HabitNode/commands.ts` (`calcWeekStreak`, `bestWeekStreak`, `ticksThisWeek`, `habitSetTarget`; `habitAdd` takes `perWeek`), `HabitNode/index.tsx`, `HabitNode/HabitAddAsk.tsx`, `HabitNode/HabitContextMenu.tsx` (test ids), `Canvas/commandDispatch.ts` (`habit.setTarget`), `launch/catchup.ts`, `launch/milestones.ts`, `sys/commands/habit.ts` (`habit target`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `tests/unit/renderer/habit.weeklyTarget.test.ts` (new, 8).
+**Summary:** "Gym 3× a week, any days" could not be said: fixing days broke the streak on a good week. A habit can now have a weekly target (1–6). It is ticked any day; its row reads "2 weeks · 1 of 3 this week" (✓ once reached); the streak counts weeks that reached the target, and this week stays open until it ends, so a rest day never breaks it. No "did it yesterday?" repair and no day milestones for it, and Welcome back never lists it as a broken day streak. Set it while adding (How often? → **Per week** → 1×–6×), from the right-click menu (**Times a week…**), or `krnl habit target <id|name> <1-6|off>`. Old boards load unchanged (optional field).
+
+## [2026-11-08] — Rest days: sick, away or a planned break never break a streak (review 3.3)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/types.ts` (`rest`), `HabitNode/commands.ts` (`habitSetRest`; `calcStreak`, `bestStreak`, `repairableDay`, `calcWeekStreak` take rest days), `HabitNode/index.tsx`, `styles/tokens.css` (`.habit-cell--rest`), `Canvas/commandDispatch.ts` (`habit.setRest`), `launch/catchup.ts`, `launch/milestones.ts`, `sys/commands/habit.ts` (`habit rest`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `tests/unit/renderer/habit.restDays.test.ts` (new, 6).
+**Summary:** One sick day reset a streak to zero, and the only choice was "did it yesterday?" — yes (a lie) or no (start over). A habit can now have rest days. The "Did it yesterday?" card has a third answer, **Rest day**; the right-click menu has **Rest today (keeps the streak)** / **Undo rest today**; `krnl habit rest <id|name> [--on] [--to] [--off]` marks a range (a trip next week). A rest day is stepped over by the streak (it neither counts nor breaks), never asks to be repaired, and shows as a quiet hatch in the grid (still clickable if you did it after all). For a weekly target, a week that falls short but has rest days is skipped, not broken. Welcome back and milestones use the same rule. Checked in the preview: "Read 20 pages" went from "Start again today" to "11 days" after marking yesterday a rest day.
+
+## [2026-11-08] — Due dates and dropped plans (review 2.1, 6.1)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `src/shared/due.ts` (new: `parseDue`, `dueLabel`), `ui/DuePicker.tsx` (new), `TodoNode/types.ts` (`dueOn`, `droppedAt`), `TodoNode/commands.ts` (`todoSetDue`, `todoDrop`, `todoUndrop`; buckets), `TodoNode/index.tsx`, `Canvas/commandDispatch.ts`, `sys/commands/todo.ts` (`todo due`, `todo drop`, `todo undrop`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; tests `todo.dueDate.test.ts`, `todo.drop.test.ts` (new).
+**Summary:** Two gaps from the use-case review. **Due dates:** "tax form due Friday" had to live in the title. A Todo item can now have a due day, apart from when it is planned: row menu **Due date…** opens an app-styled picker (Today, Tomorrow, Friday, In a week, and the next five weeks); the row shows a chip — *overdue · Fri 6* (rust), *due today* (acid), *due tomorrow*, *due Fri*, *due 20 Nov* — that opens the picker again. `krnl todo due <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>`. **Dropped:** "not doing this any more" either lied (done) or vanished (delete). Row menu **Drop (not doing it)** moves it to the Archive marked *dropped* — not done, no completion, never in analytics — and takes it off the Calendar; its checkbox in the Archive brings it back. `krnl todo drop|undrop <ref>`. Full suite: 2,380 passing.
+
+## [2026-11-08] — Reminders before a plan starts (review 4.1)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `src/shared/reminders.ts` (new: `dueReminders`, `leadWords`), `src/main/reminders.ts` (new), `src/main/index.ts`, `TaskNode/types.ts` (`remindMin`), `TaskNode/commands.ts` (`taskSetRemind`), `Canvas/commandDispatch.ts` (`task.setRemind`), `store/scheduleActions.ts` (`setTaskReminder`), `ui/RemindPicker.tsx` (new), `TodoNode/index.tsx`, `sys/commands/task.ts` (`task remind`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `tests/unit/renderer/reminders.test.ts` (new, 5).
+**Summary:** Plans passed silently — the review's biggest missing loop for a day planner. A plan can now remind you: Todo row menu **Remind me…** (at the start, 5, 10, 15, 30 min or 1 h before; a small bell marks the row), or `krnl task remind <ref> <minutes|off>`. The main process checks every 30 s and shows a system notification ("Call the dentist — Starts in 10 min · 14:00"; click opens KRNL0), so it works with the window closed to the tray. Start times come from the same schedule as the Calendar (chained plans included); done plans and plans not on the Calendar never remind; each reminder shows once and opening the app never replays old ones. Not yet checked with a real Windows notification on screen — needs a run of the app.
+
+## [2026-11-08] — One streak on every screen (weekly targets and rest days everywhere)
+
+**Type:** Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/commands.ts` (`habitStreak`), `HabitNode/index.tsx` (Week, Month and Year rows), `HabitLaneNode/index.tsx`, `ui/TaskInfoPopup.tsx`, `CalendarNode/WeekView.tsx` (drop dialog), `sys/commands/habit.ts`; test `habit.restDays.test.ts` (+1).
+**Summary:** Found in review: weekly targets and rest days reached only the Week view's row and the CLI. The Month and Year rows, the habit lane, the plan popup and the Calendar's drop dialog still counted plain day streaks — mark a rest day, switch the node to Month, and the streak dropped back; a 3×-a-week habit showed a day streak on its lane. Every screen now asks one helper, `habitStreak(habit, today)` → current, best and unit (weeks for a target, rest days stepped over); the lane reads "3w streak", the popup "streak 3 weeks", the Month/Year badge "3w".
+
+## [2026-11-08] — "Staying on track" tour; a tour no longer hides the menu its step asks for
+
+**Type:** Feature (tutorial) + Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `Tour/tours.ts` (`on-track` tour + predicates), `Tour/TourHost.tsx` (`coveringPanel`), `tests/unit/renderer/tours.test.tsx`.
+**Summary:** The workflow rule says a feature is done only once its tour exists and has run. New tour **Staying on track** (Help → Tutorials, `krnl tour start on-track`): weekly targets (Times a week… → 3×), rest days (Rest today), due dates (Due date…), reminders (Remind me…) and dropping a plan — each step waits for the real action. Running it in the app found a bug: the tour fades out any fixed panel covering the window it points at, and that included the right-click menu the step had just asked for, so "right-click a habit and choose Times a week…" could not be done. Menus and popovers (layered at popover level or above) are now never tucked. Run once in the preview, all six steps with real clicks.
+
+## [2026-11-08] — 0.11 notes list the routines work
+
+**Type:** Docs (release notes)
+**Branch:** `feat/routines`
+**Files changed:** `src/shared/whatsnew.ts`.
+**Summary:** Workflow rule: every feature in a release appears in its notes. The 0.11 "more" list now names Habits & Routines, the ask-first add flow, weekly targets / rest days / archive, due dates / reminders / Drop, and the Staying on track tour. The designed headline slides for these still need drafts on the design canvas and the user's approval before the release PR.
+
+## [2026-11-08] — Analytics shows the same habit streak as the Habit node
+
+**Type:** Bug Fix
+**Branch:** `feat/routines` (and `experiment/new-user-review`)
+**Files changed:** `analytics/engine.ts`, `analytics/sources/habitSource.ts`, `analytics/types.ts`, `AnalyticsNode/index.tsx`; test `analytics/__tests__/streaks.sameEverywhere.test.ts` (new).
+**Summary:** Found in the new-user review: Analytics kept its own copy of the streak (`calcHabitStreak`), which knew nothing of rest days or weekly targets — a habit with a rest day read 2 days in Analytics and 4 in the Habit node. Analytics now asks `habitStreak` like every other screen; a weekly-target habit's streak is in weeks ("2w" in the per-habit list) and stays out of the "longest streak" figure, which is in days (as milestones do).
+
+## [2026-11-08] — Every tutorial is in Help
+
+**Type:** UX (tutorials)
+**Branch:** `feat/routines` (and `experiment/new-user-review`)
+**Files changed:** `Launch/HelpMenu.tsx`.
+**Summary:** Help offered only "Take the tour"; the other tutorials (Habits & Routines, Staying on track, Calendar, …) could be started only from the Orb, yet the 0.11 notes say "Help › Staying on track". Help now has **Tutorials** (N more), which opens the full list in place; each starts its tour, with its summary as the tooltip. Checked in the preview.

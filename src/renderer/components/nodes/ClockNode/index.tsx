@@ -804,6 +804,15 @@ export function ClockNode({
                     />,
                   ];
                 }
+                // Decision 39 — a routine: an outline in its colour (no fill,
+                // never ticked); the hit area still gives hover and details.
+                if (t.routine) {
+                  return [
+                    <g key={`${t.id}-routine-hit`} opacity={0}>{baseArc(t.id, t.start, t.end, 'round')}</g>,
+                    <path key={`${t.id}-routine-o`} data-testid="clock-routine-arc" d={arcPath(t.start, t.end, r)} fill="none" stroke={t.colorVar} strokeWidth={sw} strokeLinecap="round" opacity={hovered ? 1 : 0.85} pointerEvents="none" />,
+                    <path key={`${t.id}-routine-i`} d={arcPath(t.start, t.end, r)} fill="none" stroke="var(--k-clock-face, var(--node-bg))" strokeWidth={Math.max(1, sw - 3)} strokeLinecap="round" pointerEvents="none" />,
+                  ];
+                }
                 if (breakdown === null || breakdown.segments.length <= 1) {
                   return [baseArc(t.id, t.start, t.end, 'round')];
                 }

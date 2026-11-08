@@ -22,13 +22,15 @@ export interface CalendarState {
 export interface CalendarLayers {
   recorded: boolean;
   habits: boolean;
+  /** Decision 39 — routine bands behind the plans. */
+  routines: boolean;
 }
 
-export const DEFAULT_CAL_LAYERS: CalendarLayers = { recorded: true, habits: true };
+export const DEFAULT_CAL_LAYERS: CalendarLayers = { recorded: true, habits: true, routines: true };
 
 export function calendarLayersOf(state: { layers?: Partial<CalendarLayers> | undefined } | null | undefined): CalendarLayers {
   const l = state?.layers;
-  return { recorded: l?.recorded !== false, habits: l?.habits !== false };
+  return { recorded: l?.recorded !== false, habits: l?.habits !== false, routines: l?.routines !== false };
 }
 
 export const CAL_ZOOM_MIN = 1;

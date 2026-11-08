@@ -752,9 +752,31 @@ export class SysFacade {
         case 'schedule':   return habit.cliSchedule(ctx, command.ref, command.scheduleKind, command.days, command.at, command.durationMin, command.invalidDays);
         case 'unschedule': return habit.cliUnschedule(ctx, command.ref);
         case 'archive':    return habit.cliArchive(ctx, command.ref);
+        case 'unarchive':  return habit.cliUnarchive(ctx, command.ref);
+        case 'target':     return habit.cliTarget(ctx, command.ref, command.value);
+        case 'rest':       return habit.cliRest(ctx, command.ref, command.on, command.to, command.off);
         case 'show':       return habit.cliShow(ctx, command.ref, command.json);
         case 'pin':        return habit.cliPin(ctx, command.ref);
         case 'unpin':      return habit.cliUnpin(ctx, command.ref);
+        case 'kind':       return habit.cliKind(ctx, command.ref, command.habitKind);
+      }
+    }
+
+    // Decision 39 — routines live on the habit mother.
+    if (command.kind === 'routine') {
+      const ctx: habit.HabitCtx = {
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+        ...(this.deps.cliDispatch ? { cliDispatch: this.deps.cliDispatch } : {}),
+      };
+      switch (command.sub) {
+        case 'add':     return habit.cliRoutineAdd(ctx, command.name, command.days, command.at, command.forMin);
+        case 'list':    return habit.cliRoutineList(ctx, command.json);
+        case 'skip':    return habit.cliRoutineSkip(ctx, command.ref, command.on);
+        case 'unskip':  return habit.cliRoutineUnskip(ctx, command.ref, command.on);
+        case 'end':     return habit.cliRoutineEnd(ctx, command.ref, command.on);
+        case 'move':    return habit.cliRoutineMove(ctx, command.ref, command.on, command.at);
+        case 'restart': return habit.cliRoutineRestart(ctx, command.ref);
       }
     }
 
@@ -768,6 +790,9 @@ export class SysFacade {
         case 'check': return todo.todoCheck(ctx, command.id);
         case 'list':  return todo.todoList(ctx, command.json, command.scope);
         case 'tag':   return todo.todoTag(ctx, command.ref, command.tag);
+        case 'due':   return todo.todoDue(ctx, command.ref, command.when);
+        case 'drop':   return todo.todoDropCmd(ctx, command.ref, false);
+        case 'undrop': return todo.todoDropCmd(ctx, command.ref, true);
         case 'tags': {
           const opts: Parameters<typeof todo.todoTags>[1] = { json: command.json };
           if (command.action !== undefined) opts.action = command.action;
@@ -803,6 +828,7 @@ export class SysFacade {
         case 'chain':      return task.taskChain(ctx, command.refs);
         case 'schedule':   return task.taskSchedule(ctx, command.id, command.at, command.durationMin);
         case 'unschedule': return task.taskUnschedule(ctx, command.id);
+        case 'remind':     return task.taskRemind(ctx, command.ref, command.value);
         case 'addNext':    return task.taskAddNext(ctx, command.sourceRef, command.text, command.durationMin);
         // Decision 29 — kind + note
         case 'kind': return task.taskKind(ctx, command.ref, command.taskKind);

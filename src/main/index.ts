@@ -16,6 +16,7 @@ import type { RpcServer } from './rpc/server';
 import { initUpdater } from './updater';
 import { getMainWindow, revealMainWindow, setMainWindow } from './mainWindow';
 import { attachMainWindow, initPocket, registerPocketSettings, setPocketPort } from './pocket';
+import { startReminders } from './reminders';
 
 // Force canonical display name. package.json's `name` stays lowercase per
 // npm convention; this is what shows in the taskbar, window title, About
@@ -332,6 +333,8 @@ app.whenReady().then(async () => {
   });
   setPocketPort(pocketPort);
   registerPocketSettings(pocketPort);
+  // Review 4.1 — plan reminders, window open or closed to the tray.
+  startReminders();
 
   createWindow();
 

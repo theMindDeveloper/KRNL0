@@ -5,6 +5,7 @@
 import { useRef, useState } from 'react';
 import { Popover } from '../ui/Popover';
 import { startTour } from '../Tour/TourHost';
+import { TOURS } from '../Tour/tours';
 import { openFeedback, openShare, openWelcomeBack, openWhatsNew, todayYMD, useLaunchStore } from '../../launch/launchStore';
 import { allShareCards } from '../../launch/milestones';
 import { useBoardStore } from '../../store/boardStore';
@@ -18,6 +19,7 @@ const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0
 export function HelpMenu() {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [toursOpen, setToursOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const version = useLaunchStore((s) => s.info?.version) ?? APP_VERSION;
   const notes = latestNotes();
@@ -58,6 +60,15 @@ export function HelpMenu() {
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { startTour('first-day'); })}>
             <span>Take the tour</span><span />
           </button>
+          {/* Every tutorial, not just the first one (they were only in the Orb). */}
+          <button type="button" role="menuitem" className="ln-menu__item" aria-expanded={toursOpen} data-testid="help-tutorials" onClick={() => setToursOpen((o) => !o)}>
+            <span>Tutorials</span><span>{toursOpen ? 'hide' : `${TOURS.length - 1} more`}</span>
+          </button>
+          {toursOpen && TOURS.filter((t) => t.id !== 'first-day').map((t) => (
+            <button key={t.id} type="button" role="menuitem" className="ln-menu__item" data-testid={`help-tour-${t.id}`} title={t.summary} onClick={run(() => { startTour(t.id); })} style={{ paddingLeft: 22 }}>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{t.title}</span><span />
+            </button>
+          ))}
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { openWelcomeBack(true, null); })} data-testid="help-catchup">
             <span>Catch up</span><span>what slipped</span>
           </button>

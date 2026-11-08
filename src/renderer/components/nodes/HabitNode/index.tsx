@@ -18,8 +18,11 @@ import { SettingsIcon } from '../../ui/SettingsIcons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { RepeatEditor, describeRepeat, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
-import { IconRepeat } from '../../ui/repeatIcons';
+import { RepeatEditor, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
+import { HabitAddAsk, type AddAnswer } from './HabitAddAsk';
+import { weeklyTarget } from './types';
+import { RoutineShelf, routineStatus } from './RoutineShelf';
+import { isRoutine } from './types';
 import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -38,7 +41,7 @@ import {
   getYearGridCells,
   isDayScheduled,
 } from './types';
-import { bestStreak, calcStreak, milestoneReached, nextMilestone, repairableDay } from './commands';
+import { habitStreak, milestoneReached, nextMilestone, repairableDay, ticksThisWeek } from './commands';
 
 /** YYYY-MM-DD plus `n` days (local). */
 function addDaysLocal(ymd: string, n: number): string {
@@ -99,9 +102,10 @@ export function HabitNode({
 }: NodeProps<HabitState, HabitConfig>) {
   const { state, config } = node;
   const [newName, setNewName] = useState('');
-  // Optional repeat for the habit being added (null = no schedule).
-  const [newRepeat, setNewRepeat] = useState<RepeatValue | null>(null);
-  const [repeatAt, setRepeatAt] = useState<{ x: number; y: number } | null>(null);
+  // Enter asks first (HabitAddAsk): habit or routine, then when. Nothing is
+  // added with settings the user did not choose. null = the card is closed.
+  const [ask, setAsk] = useState<{ left: number; right: number; top: number } | null>(null);
+  const addRowRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -122,6 +126,21 @@ export function HabitNode({
     () => state.habits.filter((h) => !h.archived),
     [state.habits],
   );
+  // Decision 39 — two shelves: habits (ticked) above routines (just happen).
+  const habitsOnly = useMemo(() => visibleHabits.filter((h) => !isRoutine(h)), [visibleHabits]);
+  const routines = useMemo(() => visibleHabits.filter((h) => isRoutine(h) && !(h.endsOn && h.endsOn < today)), [visibleHabits, today]);
+  const endedRoutines = useMemo(
+    () => visibleHabits.filter((h) => isRoutine(h) && h.endsOn && h.endsOn < today).map((h) => ({ id: h.id, name: h.name, endsOn: h.endsOn! })),
+    [visibleHabits, today],
+  );
+  const archivedList = useMemo(
+    () => state.habits.filter((h) => h.archived).map((h) => ({ id: h.id, name: h.name, days: h.log.length })),
+    [state.habits],
+  );
+  // A habit's weekly target (menu → "Times a week…"): 1–6, or none.
+  const [targetEdit, setTargetEdit] = useState<{ habitId: string; value: number | null; x: number; y: number } | null>(null);
+  // Edit how an existing habit / routine repeats (menu → "Edit repeat…").
+  const [editRepeat, setEditRepeat] = useState<{ habitId: string; value: RepeatValue; x: number; y: number } | null>(null);
 
   // Which habits already have a pinned lane? Used to disable the menu item.
   // Return a sorted array via useShallow so identity is stable when contents
@@ -147,31 +166,33 @@ export function HabitNode({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (ask) return; // the question card has the keys
     if (e.key === 'Escape') {
       // Same as the Todo add field: Escape abandons what was typed.
       setNewName('');
-      setNewRepeat(null);
       return;
     }
     if (e.key === 'Enter') {
-      const trimmed = newName.trim();
-      if (!trimmed) return;
-      // A half-set repeat (weekly, no days) is never dropped silently: the
-      // hint below says what is missing and Enter waits for it.
-      if (newRepeat && !isRepeatValid(newRepeat)) return;
-      onCommand('habit.add', {
-        name: trimmed,
-        ...(newRepeat ? { schedule: toSchedule(newRepeat) } : {}),
-      });
-      setNewName('');
-      setNewRepeat(null);
+      if (!newName.trim()) return;
+      const r = addRowRef.current?.getBoundingClientRect();
+      setAsk(r ? { left: r.left, right: r.right, top: r.top } : { left: 8, right: 360, top: window.innerHeight - 60 });
     }
+  };
+  const addAnswered = (a: AddAnswer) => {
+    onCommand('habit.add', { name: newName.trim(), schedule: a.schedule, ...(a.kind === 'routine' ? { kind: 'routine' } : {}), ...(a.perWeek ? { perWeek: a.perWeek } : {}) });
+    setNewName('');
+    setAsk(null);
   };
 
   const onToggleCell = useCallback(
     (habitId: string, date: string) => {
       onCommand('habit.toggleDay', { id: habitId, date });
     },
+    [onCommand],
+  );
+
+  const onRestDay = useCallback(
+    (habitId: string, date: string) => onCommand('habit.setRest', { id: habitId, date, rest: true }),
     [onCommand],
   );
 
@@ -193,6 +214,42 @@ export function HabitNode({
   };
 
   const menuHabit = menu ? visibleHabits.find((h) => h.id === menu.habitId) ?? null : null;
+
+  // Decision 39 — what the menu offers besides rename / colour / icon / note.
+  const menuItemsFor = (h: (typeof visibleHabits)[number], at: { x: number; y: number }) => {
+    const edit = (kind: 'habit' | 'routine') => setEditRepeat({ habitId: h.id, value: fromSchedule(h.schedule, kind), x: at.x, y: at.y });
+    if (isRoutine(h)) {
+      const d = new Date();
+      const st = routineStatus(h, today, d.getHours() * 60 + d.getMinutes());
+      const nextDate = st.kind === 'now' || st.kind === 'today' ? today : st.kind === 'next' ? st.date : null;
+      return [
+        { label: 'Edit repeat…', onClick: () => edit('routine') },
+        ...(nextDate ? [{ label: `Skip next (${nextDate === today ? 'today' : new Date(`${nextDate}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })})`, onClick: () => onCommand('routine.skip', { id: h.id, date: nextDate }) }] : []),
+        ...(st.kind === 'skipped' ? [{ label: 'Undo skip', onClick: () => onCommand('routine.unskip', { id: h.id, date: st.date }) }] : []),
+        { label: 'End routine (after today)', onClick: () => onCommand('routine.end', { id: h.id, date: today }) },
+        { label: 'Turn into habit', onClick: () => onCommand('habit.setKind', { id: h.id, kind: 'habit' }) },
+      ];
+    }
+    const tgt = weeklyTarget(h);
+    return [
+      { label: h.schedule ? 'Edit repeat…' : 'Repeat…', onClick: () => edit('habit') },
+      (h.rest ?? []).includes(today)
+        ? { label: 'Undo rest today', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: false }) }
+        : { label: 'Rest today (keeps the streak)', testId: 'habit-menu-rest', onClick: () => onCommand('habit.setRest', { id: h.id, date: today, rest: true }) },
+      { label: tgt ? `Times a week: ${tgt}…` : 'Times a week…', testId: 'habit-menu-target', onClick: () => setTargetEdit({ habitId: h.id, value: tgt, x: at.x, y: at.y }) },
+      // A routine needs a time: with one it switches at once, without one the editor asks.
+      { label: 'Turn into routine', onClick: () => (h.schedule?.timeOfDay ? onCommand('habit.setKind', { id: h.id, kind: 'routine' }) : edit('routine')) },
+    ];
+  };
+  const saveEditRepeat = () => {
+    if (!editRepeat || !isRepeatValid(editRepeat.value)) return;
+    const h = visibleHabits.find((x) => x.id === editRepeat.habitId);
+    const wantRoutine = editRepeat.value.itemKind === 'routine';
+    // Schedule first (a routine needs its time before the switch).
+    onCommand('habit.setSchedule', { habitId: editRepeat.habitId, schedule: toSchedule(editRepeat.value) });
+    if (h && wantRoutine !== isRoutine(h)) onCommand('habit.setKind', { id: editRepeat.habitId, kind: wantRoutine ? 'routine' : 'habit' });
+    setEditRepeat(null);
+  };
 
   return (
     <MotherFrame
@@ -248,19 +305,21 @@ export function HabitNode({
         {/* nowheel: the wheel scrolls a long habit list instead of zooming the
             canvas — without it the habits below the fold were out of reach. */}
         <div ref={bodyRef} className="nowheel" style={{ padding: '14px 16px', position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+          {routines.length > 0 && habitsOnly.length > 0 && <ShelfLabel text="Habits" />}
           {view === 'week' && (
             <WeekView
-              habits={visibleHabits}
+              habits={habitsOnly}
               today={today}
               weekDays={weekDays}
               habitMotherId={node.id}
               onToggle={onToggleCell}
+              onRest={onRestDay}
               onContextMenu={onContextMenu}
             />
           )}
           {view === 'month' && (
             <MonthView
-              habits={visibleHabits}
+              habits={habitsOnly}
               today={today}
               monthDays={monthDays}
               habitMotherId={node.id}
@@ -270,7 +329,7 @@ export function HabitNode({
           )}
           {view === 'year' && (
             <YearView
-              habits={visibleHabits}
+              habits={habitsOnly}
               today={today}
               yearGrid={yearGrid}
               habitMotherId={node.id}
@@ -279,16 +338,24 @@ export function HabitNode({
             />
           )}
 
-          {visibleHabits.length === 0 && (
+          {routines.length > 0 && (
+            <>
+              <ShelfLabel text="Routines" />
+              <RoutineShelf routines={routines} today={today} onMenu={(e, id) => onContextMenu(e, id)} />
+            </>
+          )}
+
+          {habitsOnly.length === 0 && routines.length === 0 && (
             <div
               style={{
                 color: 'var(--ink-3)',
                 fontSize: 12,
                 fontFamily: 'var(--font-sans)',
                 padding: '4px 0',
+                lineHeight: 1.5,
               }}
             >
-              No habits yet.
+              No habits or routines yet. A habit is something you tick; a routine just happens, like a class.
             </div>
           )}
 
@@ -304,8 +371,10 @@ export function HabitNode({
                 const name = state.habits.find((h) => h.id === menu.habitId)?.name ?? 'habit';
                 undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id: menu.habitId }));
               }}
-              onPinAsLane={() => onCommand('habit.spawnLane', { habitId: menu.habitId })}
+              onArchive={() => onCommand('habit.archive', { id: menu.habitId })}
+              {...(isRoutine(menuHabit) ? {} : { onPinAsLane: () => onCommand('habit.spawnLane', { habitId: menu.habitId }) })}
               laneExists={pinnedHabitIds.has(menu.habitId)}
+              extraItems={menuItemsFor(menuHabit, menu.anchor)}
               onClose={() => setMenu(null)}
             />
           )}
@@ -325,10 +394,10 @@ export function HabitNode({
             color: 'var(--ink-4)',
           }}
         >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <div ref={addRowRef} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <input
               type="text"
-              placeholder="add habit"
+              placeholder="add a habit or routine"
               aria-label="Add a habit or recurring event"
               data-habit-add
               data-testid="habit-add-input"
@@ -356,30 +425,6 @@ export function HabitNode({
                 minWidth: 0,
               }}
             />
-            <button
-              type="button"
-              data-testid="habit-add-repeat"
-              title={newRepeat ? describeRepeat(newRepeat) : 'Repeat: make it a recurring event on the calendar (optional)'}
-              aria-pressed={!!newRepeat}
-              onClick={(e) => {
-                e.stopPropagation();
-                const r = e.currentTarget.getBoundingClientRect();
-                setRepeatAt({ x: r.right, y: r.bottom });
-                setNewRepeat((v) => v ?? { kind: 'daily', days: [], timeOfDay: '07:00', durationMin: 25 });
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
-                height: 24, padding: '0 8px', borderRadius: 7, cursor: 'pointer',
-                fontFamily: 'var(--font-sans)', fontSize: 11,
-                border: `1px solid ${newRepeat ? 'var(--acid)' : 'var(--paper-3)'}`,
-                background: newRepeat ? 'color-mix(in srgb, var(--acid) 14%, transparent)' : 'transparent',
-                color: newRepeat ? 'var(--ink)' : 'var(--ink-3)',
-              }}
-            >
-              <IconRepeat />{newRepeat ? 'Repeats' : 'Repeat'}
-            </button>
             <span
               aria-hidden
               style={{
@@ -390,47 +435,8 @@ export function HabitNode({
               ↵
             </span>
             </div>
-            {newRepeat && !repeatAt && (
-              isRepeatValid(newRepeat) ? (
-                <div style={{ marginTop: 5, fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
-                  {describeRepeat(newRepeat)} · press Enter to add
-                </div>
-              ) : (
-                <div data-testid="habit-add-repeat-invalid" style={{ marginTop: 5, fontSize: 11, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
-                  Repeat isn't finished (days, time or minutes) — open it to fix, or Esc to clear
-                </div>
-              )
-            )}
-            {repeatAt && newRepeat && createPortal(
-              <>
-                <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
-                <div
-                  data-testid="habit-add-repeat-pop"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    position: 'fixed', zIndex: Z.popup, width: 380, boxSizing: 'border-box',
-                    left: Math.max(8, Math.min(repeatAt.x - 380, window.innerWidth - 388)),
-                    top: Math.max(8, Math.min(repeatAt.y + 6, window.innerHeight - 330)),
-                    padding: 16, borderRadius: 14, background: 'var(--paper)', color: 'var(--ink)',
-                    border: '1px solid var(--paper-3)', boxShadow: '0 24px 60px rgba(0,0,0,0.5)', fontFamily: 'var(--font-sans)',
-                  }}
-                >
-                  <RepeatEditor value={newRepeat} onChange={setNewRepeat} testIdPrefix="habit-add" />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-                    <button type="button" onClick={() => { setNewRepeat(null); setRepeatAt(null); }}
-                      style={{ height: 32, padding: '0 12px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 12.5 }}>
-                      No repeat
-                    </button>
-                    <button type="button" disabled={!isRepeatValid(newRepeat)} onClick={() => setRepeatAt(null)}
-                      style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12.5, fontWeight: 650, opacity: isRepeatValid(newRepeat) ? 1 : 0.4 }}>
-                      Done
-                    </button>
-                  </div>
-                </div>
-              </>,
-              document.body,
+            {ask && newName.trim() && (
+              <HabitAddAsk name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => setAsk(null)} />
             )}
           </div>
 
@@ -440,10 +446,81 @@ export function HabitNode({
             view={view}
             onSetView={(v) => onCommand('habit.setView', { view: v })}
             onClose={() => setSettingsOpen(false)}
+            ended={endedRoutines}
+            onRestart={(id) => onCommand('routine.restart', { id })}
+            archived={archivedList}
+            onUnarchive={(id) => onCommand('habit.unarchive', { id })}
+            onDeleteForever={(id) => {
+              const name = state.habits.find((h) => h.id === id)?.name ?? 'habit';
+              undoable(`Deleted habit "${name}"`, () => onCommand('habit.remove', { id }));
+            }}
           />
         )}
       </div>
+      {targetEdit && createPortal(
+        <>
+          <div onMouseDown={(e) => { e.stopPropagation(); setTargetEdit(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+          <div
+            data-testid="habit-target-pop"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed', left: Math.min(targetEdit.x, window.innerWidth - 300), top: Math.min(targetEdit.y, window.innerHeight - 150),
+              width: 284, zIndex: Z.popover, padding: 14, borderRadius: 12, background: 'var(--paper)', boxSizing: 'border-box',
+              border: '1px solid var(--paper-3)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 10, fontFamily: 'var(--font-sans)',
+            }}
+          >
+            <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.4 }}>How many times a week? Any days count, and a rest day never breaks the streak.</div>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <button key={n} type="button" data-testid={`habit-target-${n}`}
+                  onClick={() => { onCommand('habit.setTarget', { id: targetEdit.habitId, perWeek: n }); setTargetEdit(null); }}
+                  style={{ minWidth: 34, height: 30, borderRadius: 999, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 650,
+                    border: `1px solid ${targetEdit.value === n ? 'var(--acid)' : 'var(--paper-3)'}`, background: targetEdit.value === n ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent', color: 'var(--ink)' }}>
+                  {n}×
+                </button>
+              ))}
+            </div>
+            {targetEdit.value !== null && (
+              <button type="button" data-testid="habit-target-off" onClick={() => { onCommand('habit.setTarget', { id: targetEdit.habitId, perWeek: null }); setTargetEdit(null); }}
+                style={{ alignSelf: 'flex-start', height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12 }}>
+                No target (every day it repeats)
+              </button>
+            )}
+          </div>
+        </>,
+        document.body,
+      )}
+      {editRepeat && createPortal(
+        <div
+          data-testid="habit-edit-repeat"
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed', left: Math.min(editRepeat.x, window.innerWidth - 340), top: Math.min(editRepeat.y, window.innerHeight - 460),
+            width: 320, zIndex: Z.popover, padding: 14, borderRadius: 12, background: 'var(--node-bg)',
+            border: '1px solid var(--paper-3)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 12,
+          }}
+        >
+          <RepeatEditor value={editRepeat.value} onChange={(v) => setEditRepeat((cur) => (cur ? { ...cur, value: v } : cur))} testIdPrefix="habit-edit" />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+            <button type="button" onClick={() => setEditRepeat(null)}
+              style={{ height: 32, padding: '0 12px', borderRadius: 8, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12.5 }}>Cancel</button>
+            <button type="button" data-testid="habit-edit-save" disabled={!isRepeatValid(editRepeat.value)} onClick={saveEditRepeat}
+              style={{ height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12.5, fontWeight: 650, opacity: isRepeatValid(editRepeat.value) ? 1 : 0.4 }}>Save</button>
+          </div>
+        </div>,
+        document.body,
+      )}
     </MotherFrame>
+  );
+}
+
+/** Decision 39 — a quiet label above a shelf (only when both shelves show). */
+function ShelfLabel({ text }: { text: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0 8px', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>
+      <span>{text}</span>
+      <span aria-hidden style={{ flex: 1, height: 1, background: 'var(--paper-3)' }} />
+    </div>
   );
 }
 
@@ -488,10 +565,11 @@ interface WeekViewProps {
   weekDays: string[];
   habitMotherId: string;
   onToggle: (id: string, date: string) => void;
+  onRest?: (id: string, date: string) => void;
   onContextMenu: (e: React.MouseEvent, id: string) => void;
 }
 
-function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextMenu }: WeekViewProps) {
+function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onRest, onContextMenu }: WeekViewProps) {
   const gridWidth = WEEK_CELL_SIZE * 7 + WEEK_CELL_GAP * 6;
   return (
     <div data-view-week>
@@ -525,6 +603,7 @@ function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextM
           weekDays={weekDays}
           habitMotherId={habitMotherId}
           onToggle={onToggle}
+          {...(onRest ? { onRest } : {})}
           onContextMenu={onContextMenu}
         />
       ))}
@@ -534,6 +613,7 @@ function WeekView({ habits, today, weekDays, habitMotherId, onToggle, onContextM
 
 interface WeekRowProps extends RowCommonProps {
   weekDays: string[];
+  onRest?: (id: string, date: string) => void;
 }
 
 const WeekRow = memo(function WeekRow({
@@ -544,21 +624,25 @@ const WeekRow = memo(function WeekRow({
   weekDays,
   habitMotherId,
   onToggle,
+  onRest = () => undefined,
   onContextMenu,
 }: WeekRowProps) {
   const color = habitColor(habit.color);
-  const streak = useMemo(
-    () => calcStreak(habit.log, today, habit.schedule),
-    [habit.log, today, habit.schedule],
-  );
-  const best = useMemo(() => bestStreak(habit.log, habit.schedule), [habit.log, habit.schedule]);
-  const milestone = milestoneReached(streak);
-  const nextMs = nextMilestone(streak);
+  // "3 times a week": the streak counts weeks that reached the target.
+  const target = weeklyTarget(habit);
+  // One streak for every screen (habitStreak): weeks for a target, rest days stepped over.
+  const { current: streak, best } = useMemo(() => habitStreak(habit, today), [habit, today]);
+  const restSet = useMemo(() => new Set(habit.rest ?? []), [habit.rest]);
+  const weekTicks = target ? ticksThisWeek(habit.log, today) : 0;
+  const unit = target ? 'week' : 'day';
+  const milestone = target ? null : milestoneReached(streak);
+  const nextMs = target ? null : nextMilestone(streak);
   const toNext = nextMs !== null ? nextMs - streak : null;
   // The day the user said "no" to (not a plain flag): a new missed day the
   // next morning — app left open overnight — asks again.
   const [repairHiddenDay, setRepairHiddenDay] = useState<string | null>(null);
-  const repairCandidate = useMemo(() => repairableDay(habit.log, today, habit.schedule), [habit.log, today, habit.schedule]);
+  // A weekly target has no missed days: nothing to repair.
+  const repairCandidate = useMemo(() => (target ? null : repairableDay(habit.log, today, habit.schedule, habit.rest)), [habit.log, today, habit.schedule, target, habit.rest]);
   const repairDay = repairCandidate !== null && repairCandidate !== repairHiddenDay && !repairDismissed(habit.id, repairCandidate) ? repairCandidate : null;
   const repairLabel = repairDay === null ? '' : repairDay === addDaysLocal(today, -1) ? 'yesterday' : new Date(`${repairDay}T00:00:00`).toLocaleDateString('en', { weekday: 'long' });
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
@@ -640,11 +724,12 @@ const WeekRow = memo(function WeekRow({
             const done = logSet.has(dayStr);
             const isFuture = dayStr > today;
             const scheduled = isDayScheduled(habit.schedule, dayStr);
-            const cls = cellClass(dayStr, today, done, 'week', scheduled);
+            const resting = !done && restSet.has(dayStr);
+            const cls = cellClass(dayStr, today, done, 'week', scheduled) + (resting ? ' habit-cell--rest' : '');
             const size = { width: WEEK_CELL_SIZE, height: WEEK_CELL_SIZE };
-            const tip = scheduled
-              ? `${habit.name} ${dayStr}`
-              : `${habit.name} ${dayStr} — not scheduled`;
+            const tip = !scheduled
+              ? `${habit.name} ${dayStr} — not scheduled`
+              : resting ? `${habit.name} ${dayStr} — rest day (the streak carries on)` : `${habit.name} ${dayStr}`;
             return isFuture || !scheduled ? (
               <div key={dayStr} className={cls} style={size} title={tip} />
             ) : (
@@ -705,10 +790,15 @@ const WeekRow = memo(function WeekRow({
           ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--acid-ink, var(--acid))', fontWeight: 600 }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>
-              {`${streak} day${streak === 1 ? '' : 's'}`}
+              {`${streak} ${unit}${streak === 1 ? '' : 's'}`}
             </span>
           )
-          : <span>{best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
+          : target ? null : <span>{best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
+        {target !== null && (
+          <span data-testid={`habit-week-${habit.id}`} style={{ color: weekTicks >= target ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>
+            {streak > 0 ? '· ' : ''}{Math.min(weekTicks, target)} of {target} this week{weekTicks >= target ? ' ✓' : ''}
+          </span>
+        )}
         {milestone !== null && (
           <button
             type="button"
@@ -754,6 +844,16 @@ const WeekRow = memo(function WeekRow({
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
             Yes
+          </button>
+          <button
+            type="button"
+            data-testid={`habit-repair-rest-${habit.id}`}
+            onClick={(e) => { e.stopPropagation(); onRest(habit.id, repairDay); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            title={`Sick, away or a planned break: mark ${repairLabel} as a rest day and keep the streak`}
+            style={{ height: 22, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0 }}
+          >
+            Rest day
           </button>
           <button
             type="button"
@@ -829,10 +929,7 @@ const MonthRow = memo(function MonthRow({
   onContextMenu,
 }: MonthRowProps) {
   const color = habitColor(habit.color);
-  const streak = useMemo(
-    () => calcStreak(habit.log, today, habit.schedule),
-    [habit.log, today, habit.schedule],
-  );
+  const { current: streak, unit: streakUnit } = useMemo(() => habitStreak(habit, today), [habit, today]);
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const monthRowRef = useRef<HTMLDivElement>(null);
@@ -920,7 +1017,7 @@ const MonthRow = memo(function MonthRow({
         >
           {habit.name}
         </div>
-        <StreakBadge streak={streak} />
+        <StreakBadge streak={streak} unit={streakUnit} />
       </div>
 
       <div
@@ -1005,10 +1102,7 @@ const YearRow = memo(function YearRow({
   onContextMenu,
 }: YearRowProps) {
   const color = habitColor(habit.color);
-  const streak = useMemo(
-    () => calcStreak(habit.log, today, habit.schedule),
-    [habit.log, today, habit.schedule],
-  );
+  const { current: streak, unit: streakUnit } = useMemo(() => habitStreak(habit, today), [habit, today]);
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const schedule = habit.schedule;
@@ -1120,7 +1214,7 @@ const YearRow = memo(function YearRow({
         >
           {habit.name}
         </div>
-        <StreakBadge streak={streak} />
+        <StreakBadge streak={streak} unit={streakUnit} />
       </div>
 
       {/* Canvas-based year grid — replaces 371 cell divs with one canvas.
@@ -1145,10 +1239,10 @@ const YearRow = memo(function YearRow({
 
 
 /** The streak in Month and Year views: the week view's flame and count. */
-function StreakBadge({ streak }: { streak: number }) {
+function StreakBadge({ streak, unit = 'day' }: { streak: number; unit?: 'day' | 'week' }) {
   return (
     <div
-      title={streak > 0 ? `${streak} day${streak === 1 ? '' : 's'} in a row` : 'No streak yet'}
+      title={streak > 0 ? `${streak} ${unit}${streak === 1 ? '' : 's'} in a row` : 'No streak yet'}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
         fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
@@ -1156,7 +1250,7 @@ function StreakBadge({ streak }: { streak: number }) {
       }}
     >
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>
-      {streak}
+      {streak}{unit === 'week' ? 'w' : ''}
     </div>
   );
 }

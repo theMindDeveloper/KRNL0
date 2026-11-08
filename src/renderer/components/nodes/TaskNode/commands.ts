@@ -112,6 +112,16 @@ export const taskSetDuration = (
   return taskSetPlannedMin({ ...state, durationMin: min, eta: `~${min} min` }, { minutes: min });
 };
 
+// task.setRemind — review 4.1: minutes before the start (0–240), or null for none.
+export const taskSetRemind = (
+  state: TaskState,
+  args: { min: number | null },
+): TaskState => {
+  if (args.min === null) { const { remindMin: _r, ...rest } = state; void _r; return rest; }
+  if (!Number.isFinite(args.min)) return state;
+  return { ...state, remindMin: Math.max(0, Math.min(240, Math.round(args.min))) };
+};
+
 // task.setSchedule — ADR 0001: set or clear the scheduled datetime for a task.
 // Passing scheduledFor: null clears the schedule. Optional scheduledDurationMin
 // overrides the calendar block height; absence leaves the field unchanged.

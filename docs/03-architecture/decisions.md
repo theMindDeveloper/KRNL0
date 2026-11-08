@@ -2541,3 +2541,26 @@ The splash, What's new, the patch notice, Welcome back and milestone cards all n
 - An update can always be rolled back by hand from `backups/`.
 - Deleting `app-state.json` is harmless: the next launch treats the board as updated (one extra backup) and may show What's new again.
 - Welcome back measures "away" from the last time the window was used, so a crash or a sleeping laptop with KRNL0 open still counts the days correctly from the last focus.
+
+---
+
+## Decision 39 — Routines: a repeating item you don't tick; habits may have no time (2026-11-08)
+
+**Status:** Accepted (maintainer, 2026-11-08; node design "B · Two shelves" picked on the design canvas). Requirements: docs/06-requirements/routines.md. Issue: #217.
+
+### Context
+Only habits repeat, and a habit is always tickable and (ADR 0002) always timed. A class every Monday modelled as a habit gets a tick circle, a streak and reads "missed"; a habit like "No sugar" must invent an hour. People ask two questions of anything that repeats — *do I tick it?* and *is it at a time?* — and the model welded both answers together.
+
+### Decision
+- **One record, one editor.** A routine is a `Habit` with `kind: 'routine'` (absent = a habit). The Repeat editor's first control is the switch *Routine · it just happens / Habit · I tick it*. No new node, add row or object type; Todo stays one-off tasks.
+- **Routines** always have days, a time and a length. They are never ticked, never "missed", never in streaks, repair prompts, Welcome back, milestones or habit analytics. Optional `endsOn` (YYYY-MM-DD, last day shown) ends one without deleting it; `exceptions: { date, skip?: true, at?: 'HH:MM' }[]` skips or moves one occurrence.
+- **Habits** may repeat with no time: `schedule.timeOfDay` becomes optional for habits ("Any time"). An untimed habit is not drawn on the Calendar or the Clock dial; it is ticked in the Habit grid (and listed with today's items on the Clock).
+- **Node:** two shelves — HABITS (the week grid, unchanged) above ROUTINES (one line each: icon, name, day letters, next/now/skipped or time range).
+- **Calendar:** a routine is a soft band behind plans in its slot, every week, with its name and a repeat icon; a skipped occurrence is a dashed outline; a **Routines** layer switch sits beside Recorded and Habits. **Clock:** an outlined arc, no tick.
+- **One guard:** `isRoutine(h)` (HabitNode/types.ts) — every consumer of habits that ticks, counts or flags checks it.
+- **Data:** all new fields are optional and additive; board `schemaVersion` stays 2 (node state is not schema-validated field by field). Old boards load unchanged: every existing entry is a habit.
+- **CLI** (rule 8): `krnl routine add|list|skip|move|end|restart`, `krnl habit kind <ref> routine|habit`, `krnl habit add` / `habit schedule` without `--at` = any time.
+
+### Consequences
+- Turning a habit into a routine (or back) is one switch and keeps its log.
+- Ships in a minor release with its tour (AGENTS.md "Design and tutorial gates") and designed release notes.

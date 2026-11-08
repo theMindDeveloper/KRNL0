@@ -738,6 +738,22 @@ export async function taskSchedule(
  * Clears scheduledFor from a TaskNode (removes the field entirely, matching
  * the FSM behaviour) and mirrors the clear to the linked TodoItem.
  */
+/** `krnl task remind <ref> <minutes-before|off>` (review 4.1). 0 = at the start. */
+export async function taskRemind(ctx: TaskCtx, ref: string | undefined, value: string | undefined): Promise<SysResult> {
+  if (!ref || value === undefined) return { ok: false, message: 'task remind requires <ref> <minutes-before|off>' };
+  const off = value === 'off' || value === 'none';
+  const n = Number(value);
+  if (!off && !(Number.isInteger(n) && n >= 0 && n <= 240)) return { ok: false, message: `task remind: "${value}" is not 0-240 minutes or off` };
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, ref);
+  if (!taskNode) return { ok: false, message: noTaskMessage(ref) };
+  const st = taskNode.state as Record<string, unknown>;
+  if (off) delete st['remindMin']; else st['remindMin'] = n;
+  saveBoard(ctx, board);
+  const text = typeof st['text'] === 'string' ? st['text'] : ref;
+  return { ok: true, message: off ? `"${text}": no reminder` : `"${text}": reminder ${n === 0 ? 'at the start' : `${n} min before`} (while it is on the Calendar)`, data: { id: taskNode.id, remindMin: off ? null : n } };
+}
+
 export async function taskUnschedule(
   ctx: TaskCtx,
   taskId: string | undefined,

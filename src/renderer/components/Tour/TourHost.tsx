@@ -133,7 +133,13 @@ export function coveringPanel(el: Element, box: Rect): HTMLElement | null {
     if (!hit || el.contains(hit) || hit.contains(el) || hit.closest('[data-testid="tour-card"]')) continue;
     for (let p: HTMLElement | null = hit as HTMLElement; p && p !== document.body; p = p.parentElement) {
       if (p.contains(el)) break;
-      if (getComputedStyle(p).position === 'fixed') return p;
+      const cs = getComputedStyle(p);
+      if (cs.position !== 'fixed') continue;
+      // A menu or popover the user just opened (a step says "right-click …
+      // and choose …") is the step itself, never in the way: leave it alone.
+      const z = Number(cs.zIndex);
+      if (Number.isFinite(z) && z >= Z.popover) break;
+      return p;
     }
   }
   return null;
