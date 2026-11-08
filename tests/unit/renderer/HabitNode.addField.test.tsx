@@ -5,6 +5,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { HabitNode } from '../../../src/renderer/components/nodes/HabitNode';
 import { defaultHabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
 import { askMissing, askToAnswer, EMPTY_ASK } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
+import { isRepeatValid } from '../../../src/renderer/components/ui/RepeatEditor';
 import type { Node } from '../../../src/shared/types/node';
 import type { HabitState, HabitConfig } from '../../../src/renderer/components/nodes/HabitNode/types';
 
@@ -75,6 +76,17 @@ describe('habit add field', () => {
   });
 });
 
+describe('a name already in the node', () => {
+  it('is said in the card (a second "Gym" makes every krnl habit command ambiguous)', () => {
+    const withGym = { ...node, state: { habits: [{ id: 'g', name: 'Gym', createdAt: '2026-11-01T08:00:00.000Z', log: [], archived: false, color: 'acid' }] } } as unknown as typeof node;
+    render(<HabitNode node={withGym} selected={false} onCommand={vi.fn()} onSelect={() => undefined} />);
+    const input = screen.getByPlaceholderText('add a habit or routine') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'gym' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByTestId('habit-ask-dup')).toBeTruthy();
+  });
+});
+
 describe('askMissing / askToAnswer', () => {
   it('nothing is answered by default', () => {
     expect(askMissing(EMPTY_ASK)).toBe('Answer yes or no');
@@ -85,6 +97,13 @@ describe('askMissing / askToAnswer', () => {
     expect(askMissing(d)).toBe('Pick a time');
     expect(askMissing({ ...d, timeOfDay: '07:00' })).toBe('Pick how long');
     expect(askToAnswer({ ...d, timeOfDay: '07:00', durationMin: 30 })).toEqual({ kind: 'habit', schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 30 } });
+  });
+  it('a repeat that would run past midnight is refused, not cut short on the Calendar', () => {
+    const night = { ...EMPTY_ASK, kind: 'routine' as const, days: [5] as never, timeOfDay: '23:00', durationMin: 120 };
+    expect(askMissing(night)).toBe('Ends after midnight: start earlier or make it shorter');
+    expect(askMissing({ ...night, durationMin: 60 })).toBeNull();
+    expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '23:00', durationMin: 120, itemKind: 'routine' })).toBe(false);
+    expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '23:00', durationMin: 60, itemKind: 'routine' })).toBe(true);
   });
   it('a routine on all five weekdays is saved as weekdays', () => {
     const d = { ...EMPTY_ASK, kind: 'routine' as const, days: [1, 2, 3, 4, 5] as const, timeOfDay: '09:00', durationMin: 480 };

@@ -44,7 +44,7 @@ export function LayoutModeToggle() {
   return (
     <div
       data-testid="layout-mode-toggle"
-      title="Toggle Station / Canvas mode (⌘⇧L)"
+      title="Station: windows in fixed places · Free: put anything anywhere (⌘⇧L)"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -61,7 +61,7 @@ export function LayoutModeToggle() {
         onClick={() => { if (!isStation) setLayoutMode('station'); }}
       />
       <PillSegment
-        label="◰ CANVAS"
+        label="◰ FREE"
         active={!isStation}
         testId="layout-toggle-canvas"
         onClick={() => { if (isStation) setLayoutMode('canvas'); }}

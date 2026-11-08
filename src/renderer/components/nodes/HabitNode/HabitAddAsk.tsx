@@ -33,6 +33,12 @@ export const EMPTY_ASK: AskDraft = { kind: null, often: null, perWeek: null, day
 
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
+/** The Calendar draws a repeat inside one day; one that runs past 24:00 would be cut. */
+function pastMidnight(t: string, len: number): boolean {
+  const [h, m] = t.split(':').map(Number) as [number, number];
+  return h * 60 + m + len > 24 * 60;
+}
+
 /** What is still missing, in words, or null when it can be added. */
 export function askMissing(d: AskDraft): string | null {
   if (!d.kind) return 'Answer yes or no';
@@ -43,11 +49,13 @@ export function askMissing(d: AskDraft): string | null {
     if (!d.when) return 'Pick any time or a set time';
     if (d.when === 'at' && !TIME_RE.test(d.timeOfDay)) return 'Pick a time';
     if (d.when === 'at' && !d.durationMin) return 'Pick how long';
+    if (d.when === 'at' && d.durationMin && pastMidnight(d.timeOfDay, d.durationMin)) return 'Ends after midnight: start earlier or make it shorter';
     return null;
   }
   if (d.days.length === 0) return 'Pick its days';
   if (!TIME_RE.test(d.timeOfDay)) return 'Pick a start time';
   if (!d.durationMin) return 'Pick how long';
+  if (pastMidnight(d.timeOfDay, d.durationMin)) return 'Ends after midnight: start earlier or make it shorter';
   return null;
 }
 
@@ -90,9 +98,12 @@ interface Props {
   anchor: { left: number; right: number; top: number };
   onAdd: (a: AddAnswer) => void;
   onCancel: () => void;
+  /** Names already in the node (lower-case): a second "Gym" is allowed, but said. */
+  taken?: ReadonlySet<string>;
 }
 
-export function HabitAddAsk({ name, anchor, onAdd, onCancel }: Props) {
+export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken }: Props) {
+  const dup = taken?.has(name.trim().toLowerCase()) ?? false;
   const [d, setD] = useState<AskDraft>(EMPTY_ASK);
   const set = (patch: Partial<AskDraft>) => setD((cur) => ({ ...cur, ...patch }));
   const missing = askMissing(d);
@@ -153,6 +164,11 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel }: Props) {
           <div style={q}>Do you want to tick off <b style={{ color: 'var(--ink)' }}>{name}</b> when you do it?</div>
           <Answer testId="habit-ask-yes" icon={<IconCheck />} title="Yes, keep track" sub="a habit · tick it, keep a streak" k="Y" onClick={() => setD({ ...EMPTY_ASK, kind: 'habit' })} />
           <Answer testId="habit-ask-no" icon={<IconClock />} title="No, it just happens" sub="a routine · on your Calendar, never ticked" k="N" onClick={() => setD({ ...EMPTY_ASK, kind: 'routine' })} />
+          {dup && (
+            <div data-testid="habit-ask-dup" style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.4 }}>
+              You already have one called <b style={{ color: 'var(--ink-2)' }}>{name}</b>. This adds a second; a different name keeps them apart.
+            </div>
+          )}
           <div style={foot}>Like a run (yes) or a class (no)<span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Kbd>Esc</Kbd>cancel</span></div>
         </>
       ) : (

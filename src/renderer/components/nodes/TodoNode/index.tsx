@@ -877,7 +877,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 fontFamily: 'var(--font-sans)',
               }}
             >
-              {doneItems.length > 0 || buckets.archived.length > 0 ? 'All clear' : 'No todos yet'}
+              {doneItems.length > 0 || buckets.archived.length > 0 ? 'All clear' : (
+                <span data-testid="todo-empty-hint" style={{ lineHeight: 1.5 }}>
+                  Nothing planned yet. Type something you want to get done below and press Enter, then drag it onto the Calendar to give it a time.
+                </span>
+              )}
             </div>
           ) : (
             items.map((item) => renderRow(item))

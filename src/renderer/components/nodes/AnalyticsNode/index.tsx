@@ -597,10 +597,12 @@ export function AnalyticsNode({
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>focus </span>
           <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin}m</span>
         </span>
-        <span className="an-chip an-chip--streak" style={summaryChipStyle}>
-          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>streak </span>
-          <span style={{ color: 'var(--acid-ink, var(--acid, #c9f158))', fontWeight: 600 }}>{streaks.longestHabitStreak}d</span>
-        </span>
+        {streaks.longestHabitStreak > 0 && (
+          <span className="an-chip an-chip--streak" style={summaryChipStyle} title="Longest habit streak in this range">
+            <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>streak </span>
+            <span style={{ color: 'var(--acid-ink, var(--acid, #c9f158))', fontWeight: 600 }}>{streaks.longestHabitStreak}d</span>
+          </span>
+        )}
         <button
           type="button"
           data-testid="analytics-gear"

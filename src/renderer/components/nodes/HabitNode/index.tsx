@@ -178,6 +178,7 @@ export function HabitNode({
       setAsk(r ? { left: r.left, right: r.right, top: r.top } : { left: 8, right: 360, top: window.innerHeight - 60 });
     }
   };
+  const takenNames = useMemo(() => new Set(state.habits.filter((h) => !h.archived).map((h) => h.name.trim().toLowerCase())), [state.habits]);
   const addAnswered = (a: AddAnswer) => {
     onCommand('habit.add', { name: newName.trim(), schedule: a.schedule, ...(a.kind === 'routine' ? { kind: 'routine' } : {}), ...(a.perWeek ? { perWeek: a.perWeek } : {}) });
     setNewName('');
@@ -436,7 +437,7 @@ export function HabitNode({
             </span>
             </div>
             {ask && newName.trim() && (
-              <HabitAddAsk name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => setAsk(null)} />
+              <HabitAddAsk name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => setAsk(null)} taken={takenNames} />
             )}
           </div>
 

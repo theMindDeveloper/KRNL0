@@ -36,8 +36,11 @@ const ROUTINE_LEN = [30, 60, 90, 120, 180, 240];
 export function isRepeatValid(v: RepeatValue): boolean {
   const daysOk = v.kind !== 'weekly' || v.days.length > 0;
   if (isAnyTime(v)) return daysOk;
-  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(v.timeOfDay)
-    && Number.isFinite(v.durationMin) && v.durationMin >= 5 && v.durationMin <= 720
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(v.timeOfDay)) return false;
+  const [h, m] = v.timeOfDay.split(':').map(Number) as [number, number];
+  return Number.isFinite(v.durationMin) && v.durationMin >= 5 && v.durationMin <= 720
+    // Drawn inside one day: a repeat that runs past midnight would be cut.
+    && h * 60 + m + v.durationMin <= 24 * 60
     && daysOk;
 }
 

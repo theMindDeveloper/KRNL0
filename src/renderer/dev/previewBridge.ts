@@ -218,7 +218,22 @@ function richBoard(): Json {
   return b;
 }
 
-const FIXTURES: Record<string, () => Json> = { stress: stressBoard, rich: richBoard };
+/** `?fixture=fresh` — what a brand-new user opens: the mother nodes, nothing in them. */
+function freshBoard(): Json {
+  seq = 0;
+  const nodes = mothers();
+  nodes.push({
+    id: 'mother-analytics', kind: 'analytics', position: { x: 1960, y: 0 }, isMother: true,
+    state: { view: 'estimates', rangeDays: 7, metric: 'taskCount', width: 540, height: 540, hiddenCards: [], pinnedCards: [], settingsOpen: false },
+    config: { stationSlot: 'bottom-right-pre' },
+  });
+  return {
+    version: 1, schemaVersion: 2, savedAt: new Date().toISOString(),
+    viewport: { x: 0, y: 220, zoom: 1 }, layoutMode: 'station', nodes, edges: [], completions: [],
+  };
+}
+
+const FIXTURES: Record<string, () => Json> = { stress: stressBoard, rich: richBoard, fresh: freshBoard };
 
 export function installPreviewBridge(): void {
   const name = new URLSearchParams(location.search).get('fixture') ?? 'stress';

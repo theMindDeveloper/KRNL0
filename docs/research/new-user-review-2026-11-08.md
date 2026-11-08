@@ -1,0 +1,70 @@
+# New-user review — what someone meets on day one, and where the app's logic lets them down
+
+**Date:** 2026-11-08 · **Branch:** `experiment/new-user-review` (from `feat/routines`) · **Method:** opened the app on a brand-new board (the new `?fixture=fresh` preview: mother nodes only, nothing in them) at 1440 × 900, read every node as someone who has never seen KRNL0, then walked the everyday use cases (add a plan, give it a time, repeat things, miss a day, stop doing something, get reminded) through the model and the `krnl` CLI. Each finding says what the person sees or tries, what happens, and why it matters. **Fixed here** = changed on this branch; **Proposed** = needs a design pick or a contract change first.
+
+Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11-07.md) — most of that list is now built on `feat/routines` (weekly targets, rest days, archive/restore, due dates, dropped, reminders).
+
+---
+
+## 1. First screen (fresh board)
+
+| # | What a new user sees | Why it hurts | Status |
+|---|---|---|---|
+| 1.1 | Two buttons say **CANVAS** side by side in the top bar: one shows/hides the canvas panel, the other switches the whole layout | Same word, two meanings, one click apart; the layout one looks like a duplicate | **Fixed here** — the layout toggle now reads **Station / Free**, tooltip "Station: windows in fixed places · Free: put anything anywhere" |
+| 1.2 | Analytics greets with **streak 0d** | A zero streak on day one reads as failure before anything happened | **Fixed here** — the chip appears once there is a streak |
+| 1.3 | Todo says only *No todos yet* (Habits already explains itself) | Nothing says what to type, or that a plan gets its time by dragging it onto the Calendar | **Fixed here** — "Nothing planned yet. Type something you want to get done below and press Enter, then drag it onto the Calendar to give it a time." |
+| 1.4 | Analytics on an empty board is a wall of ~15 empty charts with axes ("30m / 15m", "1") | Empty axes look like broken charts; the one useful line ("Finish a task, run a pomo or check off a habit and this fills in") is lost among them | **Proposed** — on a range with no data at all, show only the summary card and one example card; the rest appear as data arrives |
+| 1.5 | The Calendar in its Station slot opens at zoom 2.0 on the hours around *now* — at 4 am that is 02:00–03:30, an empty night | A new user sees an empty strip, not a week | **Proposed** — a first-time Calendar starts at 1.0 and scrolls to 08:00 when the day has nothing yet |
+| 1.6 | Recorded / Habits / Routines layer chips are icon-only circles in a narrow slot | Three unlabeled toggles; their meaning is in tooltips only | **Proposed** — label them when the Calendar is wide enough, and mention them in the Calendar tour |
+| 1.7 | Top bar path `~/krnl0 / canvas / Main` and a green **live** dot | Developer breadcrumb; "live" means nothing to most people (marketing is for everyone) | **Proposed** — show the canvas name only; explain "live" in a tooltip or drop it |
+
+## 2. Adding things — does the app do what was asked?
+
+| # | Use case | What happened | Status |
+|---|---|---|---|
+| 2.1 | Type a habit, press Enter | It was added with settings nobody chose; the Repeat button was the only way to say what it was | **Fixed on `feat/routines`** — Enter asks "Do you want to tick it off?" (habit / routine), then only that kind's questions |
+| 2.2 | Add "Gym" when "Gym" already exists | Silently a second Gym; every `krnl habit … Gym` is then ambiguous | **Fixed here** — the card says "You already have one called Gym. This adds a second; a different name keeps them apart." |
+| 2.3 | A night shift: routine 23:00 for 2 h | The card said "→ 01:00" but the Calendar cut it at 24:00 (`routineOccurrence` clamps to the day) — what you see is not what you asked | **Fixed here (guard)** — the add card, Edit repeat… and `krnl routine add` refuse it with "Ends after midnight: start earlier or make it shorter". **Proposed:** real overnight routines (draw the part after midnight on the next day) |
+| 2.4 | "Pay rent on Sunday" — a day, no time | Still impossible: a plan needs a clock time (review 1.2) | **Proposed** — the largest open item; needs a decision (date-only `scheduledFor`) and an "Anytime" row design. Draft D on the design canvas was not picked |
+
+## 3. Keeping going — streaks, misses, stopping
+
+| # | Use case | What happened | Status |
+|---|---|---|---|
+| 3.1 | Sick for two days | The streak reset; "did it yesterday?" offered only yes (a lie) or no | **Fixed on `feat/routines`** — **Rest day** answer, menu item and `habit rest` |
+| 3.2 | "Gym 3× a week, any days" | Not expressible; fixed days broke the streak on a good week | **Fixed on `feat/routines`** — weekly targets, streak in weeks |
+| 3.3 | Stop a habit, keep its history | Only hard delete in the UI; archived habits could never come back | **Fixed on `feat/routines`** — Archive (keeps history), Restore, `habit unarchive` |
+| 3.4 | "Not doing this any more" (a plan) | Either done (a lie in analytics) or deleted | **Fixed on `feat/routines`** — Drop (to the Archive as *dropped*, off the Calendar) |
+
+## 4. Being reminded
+
+| # | Use case | What happened | Status |
+|---|---|---|---|
+| 4.1 | "Remind me before the dentist call" | No reminders at all | **Fixed on `feat/routines`** — Remind me… (at start … 1 h before), system notification from the main process |
+| 4.2 | "Remind me before class" (a routine) | Routines cannot remind | **Proposed** — the same lead-time picker on a routine; `dueReminders` already has the shape for it |
+| 4.3 | "Something is due today" | The due chip shows only in the Todo row; the Today schedule and Welcome back don't mention it | **Proposed** — list due-today items under the Clock's Today list and in Welcome back |
+
+## 5. Smaller logic notes
+
+- **5.1** Weekly-target habits show their week count only in the Week view; Month / Year still show a day badge. *Low* — use the week streak there too.
+- **5.2** Habit amounts ("8 glasses") are still a yes/no tick (review 3.2). *Medium* — needs a model change (`log` with counts).
+- **5.3** Repeating *tasks* (a weekly review with notes) — routines now cover "it happens at a time"; a repeating task with notes per time is still missing. *Medium*.
+- **5.4** Naming tracked time freely ("Gaming") already works: the span picker's **+ Add category** makes a custom category in one step, and `krnl pomo retag <seg> --text "…"` names one span. Kept as is; the user wanted to discuss it.
+
+---
+
+## Changed on this branch
+
+- `ui/LayoutModeToggle.tsx` — Station / **Free**.
+- `AnalyticsNode/index.tsx` — the streak chip hides at 0.
+- `TodoNode/index.tsx` — the empty list says what to do.
+- `HabitNode/HabitAddAsk.tsx`, `ui/RepeatEditor.tsx`, `sys/commands/habit.ts` — no repeat that runs past midnight (refused with the reason, not drawn cut short).
+- `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx` — a name already in the node is said.
+- `dev/previewBridge.ts` — `?fixture=fresh`, the board a new user opens (for render checks of first-run states).
+
+## Proposed order for what is left
+
+1. Date-only plans + an "Anytime" row (2.4) — pick a design first.
+2. Analytics empty state (1.4) and the Calendar's first view (1.5) — both are what every new user sees first.
+3. Due-today in the Clock list and Welcome back (4.3); routine reminders (4.2).
+4. Overnight routines (2.3), habit amounts (5.2), repeating tasks (5.3).

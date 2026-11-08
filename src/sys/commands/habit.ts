@@ -847,6 +847,8 @@ export async function cliRoutineAdd(
   if (!at || !isValidTimeOfDay(at)) return { ok: false, message: `routine add: needs --at HH:MM (24-hour)` };
   const len = forMin ?? 60;
   if (!(len >= 5 && len <= 720)) return { ok: false, message: 'routine add: --for must be 5–720 minutes' };
+  { const [h, m] = at.split(':').map(Number) as [number, number];
+    if (h * 60 + m + len > 24 * 60) return { ok: false, message: 'routine add: it would end after midnight (the Calendar draws a routine inside one day) — start earlier or make it shorter' }; }
   const board = loadBoard(ctx);
   const mother = findMother(board);
   if (!mother) return notFound();
