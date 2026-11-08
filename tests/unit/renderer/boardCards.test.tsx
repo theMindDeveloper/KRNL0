@@ -50,8 +50,10 @@ describe('the card (F1–F3)', () => {
     draw('e1');
     expect(screen.getByTestId('habit-lane-root').getAttribute('data-card')).toBe('event');
     expect(screen.queryByTestId('habit-card-tick')).toBeNull();
-    expect(screen.getByText(/Mon Wed · 10:00/)).toBeTruthy();
-    expect(screen.getByTestId('habit-card-left').textContent).toBe('Today 10:00');
+    expect(screen.getByText('Mon Wed')).toBeTruthy();
+    // Its own shape: a time tile like its Calendar block (start and length).
+    expect(screen.getByTestId('event-card-time').textContent).toBe('10:002 h');
+    expect(screen.getByTestId('habit-card-left').textContent).toBe('Today');
   });
 });
 

@@ -2516,3 +2516,10 @@ Checked in the preview with a stand-in bridge (status line, Sign in, menu hide/s
 - **The event card was busy:** no hatch over the whole card; its days are quiet solid bars (stripes on every day read as a barcode); row 2 shows the start only ("every day · 23:00") so it isn't cut off.
 - **Same motion as other cards:** habit cards no longer tilt, turn rust and show a "drop on a calendar day" hint while dragged, and selected they get the task cards' cyan ring.
 2,490 tests and typecheck green; checked in the preview.
+
+## [2026-11-08] — Board cards: task, habit and event look different at a glance (experimental)
+
+**Type:** Enhancement
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx`, `tests/unit/renderer/boardCards.test.tsx`, `docs/06-requirements/board-cards.md`.
+**Summary:** The user found the three cards too alike. Same size, rows and ports still, but each kind now has its own shape: a **task** stays plain with a square box; a **habit** is tinted in its own colour, its tick (or counter) is round, and a stack of two sheets behind the card says "it repeats every day"; a **repeating event** has no box but a time tile on its left — repeat mark, start time large, length ("17:30 · 1.5 h") — like its block on the Calendar, so row 2 shows only its days and the bottom only the day ("Tomorrow · in 18 h"). Checked in the preview with all four next to each other.
