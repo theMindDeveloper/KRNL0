@@ -2504,3 +2504,15 @@ Checked in the preview with a stand-in bridge (status line, Sign in, menu hide/s
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitLaneNode/index.tsx` (rewritten), `Canvas/commandDispatch.ts` (`spawnHabitCard`, card on `habit.add`), `Canvas/CanvasFlow.tsx`, `Tour/tours.ts`, `docs/03-architecture/decisions.md` (Decision 42), `docs/06-requirements/board-cards.md` (new), `tests/unit/renderer/boardCards.test.tsx` (new), `docs/releases/pre-release-todo.md`.
 **Summary:** Draft A ("Same card") from the canvas. The board card of a habit (`habit.lane`) is redrawn in the task card's frame (CardParts: 220 × 120, same rows and ports): **habit** — tick box (an amount: a count box that adds one), "habit · every day / M W F · 07:30", the week as seven bars (today ringed), "5 days in a row · today open/done today", an amount fills a meter "3 of 8 glasses today". The same node draws a **repeating event** card when it points at an event: never ticked — a repeat mark and the Calendar's hatch, "event · Mon Wed · 10:00–12:00", its days in the week, "Today 10:00 · in 2 h" / "Wed 10:00 · in 3 days"; while it happens, the running border and "Until 12:00 · 40 min left". **Cards appear on their own** when a habit or an event is added (Habits window, Calendar, board `+ Habit` — which now places that card where you clicked instead of adding a second); deleting or archiving removes it, as before; `krnl habit pin|unpin` still add and remove by hand. Tour steps in Habits and Repeating events. No new node kind, no migration. Checked in the preview (three cards next to a task card, ticking and counting from the card). 2,490 tests and typecheck green.
+
+## [2026-11-08] — Board cards: fixes after the user's first look (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx`, `Canvas/rfAdapters.tsx`, `styles/reactflow-theme.css`, `tests/unit/renderer/boardCards.test.tsx`.
+**Summary:**
+- **The second dot:** the card's box was still the old lane's 280 × 170 while the card is 220 × 120, so its right-hand dot floated 60 px past the card (onto the next one). The box is the task card's size now; the dots sit on the card's sides.
+- **A day the habit isn't on** ("drink milk", Mondays, on a Sunday) no longer says "0 of 2 today · click to add one" next to a box you can't use: it says "Next: tomorrow · 2 a day" (a plain habit: "next: Mon"), the box dims.
+- **The event card was busy:** no hatch over the whole card; its days are quiet solid bars (stripes on every day read as a barcode); row 2 shows the start only ("every day · 23:00") so it isn't cut off.
+- **Same motion as other cards:** habit cards no longer tilt, turn rust and show a "drop on a calendar day" hint while dragged, and selected they get the task cards' cyan ring.
+2,490 tests and typecheck green; checked in the preview.

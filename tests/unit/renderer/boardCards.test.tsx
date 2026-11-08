@@ -50,7 +50,7 @@ describe('the card (F1–F3)', () => {
     draw('e1');
     expect(screen.getByTestId('habit-lane-root').getAttribute('data-card')).toBe('event');
     expect(screen.queryByTestId('habit-card-tick')).toBeNull();
-    expect(screen.getByText(/Mon Wed · 10:00–12:00/)).toBeTruthy();
+    expect(screen.getByText(/Mon Wed · 10:00/)).toBeTruthy();
     expect(screen.getByTestId('habit-card-left').textContent).toBe('Today 10:00');
   });
 });

@@ -56,7 +56,7 @@ const INITIAL_DIMS_BY_KIND: Record<string, { width: number; height: number }> = 
   'terminal':    { width: 540, height: 540 },
   'calendar':    { width: 540, height: 540 },
   'clock':       { width: 540, height: 540 },
-  'habit.lane':  { width: 280, height: 170 },
+  'habit.lane':  { width: 220, height: 120 }, // Decision 42: the task card's size (CardParts)
   'text':        { width: 260, height: 120 },
   'image':       { width: 240, height: 180 },
   'frame':       { width: 360, height: 240 },

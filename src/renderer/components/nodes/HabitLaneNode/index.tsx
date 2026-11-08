@@ -12,8 +12,8 @@
 //   5 days in a row            today open    Today 10:00                in 2 h
 //
 // A habit is ticked (the box; an amount counts up and fills a meter). An
-// event is never ticked: a repeat mark, the Calendar's hatch, and when it is
-// next — while it happens, how much is left.
+// event is never ticked: a repeat mark and when it is next — while it
+// happens, how much is left.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
@@ -28,7 +28,6 @@ import { useLocalDay } from '../../../hooks/useLocalDay';
 import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
-import { LineGlyph } from '../../ui/LineGlyph';
 import { MenuIcon } from '../../ui/menuIcons';
 import { CardMetaRow, CardMeter, cardFrameStyle, type CardTone } from '../TaskNode/CardParts';
 
@@ -64,10 +63,9 @@ function daysWords(h: Habit): string {
 function timeWords(h: Habit, event: boolean): string {
   const t = (h.schedule as HabitSchedule | undefined)?.timeOfDay;
   if (!t) return 'any time';
-  if (!event) return t;
-  const [hh, mm] = t.split(':').map(Number) as [number, number];
-  const len = (h.schedule as HabitSchedule | undefined)?.durationMin ?? 60;
-  return `${t}–${hm(hh * 60 + mm + len)}`;
+  // The start only: "every day · 17:00" fits; the end shows while it happens.
+  void event;
+  return t;
 }
 
 function dayName(ymd: string, today: string): string {
@@ -75,6 +73,16 @@ function dayName(ymd: string, today: string): string {
   const t = new Date(`${today}T00:00:00`); t.setDate(t.getDate() + 1);
   if (toYMD(t) === ymd) return 'Tomorrow';
   return new Date(`${ymd}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' });
+}
+
+/** The next day the habit is on, after today ("Mon", "tomorrow"). */
+function nextHabitDay(h: Habit, today: string): string | null {
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(`${today}T00:00:00`); d.setDate(d.getDate() + i);
+    const ymd = toYMD(d);
+    if (isDayScheduled(h.schedule, ymd)) return i === 1 ? 'tomorrow' : d.toLocaleDateString('en-GB', { weekday: 'short' });
+  }
+  return null;
 }
 
 function inWords(min: number): string {
@@ -157,8 +165,9 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
           <span key={ymd} title={ymd}
             style={{
               flex: 1, height: 8, borderRadius: 2,
+              // An event's days are quiet solid bars (stripes on every day read as a barcode).
               background: event
-                ? (on ? 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink-3) 70%, transparent) 0 2px, transparent 2px 4px)' : 'transparent')
+                ? (on ? 'color-mix(in srgb, var(--ink-3) 45%, transparent)' : 'transparent')
                 : on ? color : off ? 'transparent' : 'var(--paper-3)',
               boxShadow: isToday ? '0 0 0 1px var(--acid)' : off || (event && !on) ? 'inset 0 0 0 1px var(--paper-3)' : 'none',
               opacity: ymd > today && !event ? 0.55 : 1,
@@ -193,11 +202,16 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
       const right = status.kind === 'today' ? inWords(occStart - nowMin) : status.kind === 'next' ? inWords(days * 24 * 60 + occStart - nowMin) : '';
       bottom = <div style={{ marginTop: 'auto' }}>{weekBars}{labels(left, right, 'var(--ink)')}</div>;
     }
+  } else if (amount && !canTick) {
+    // Not one of its days: say when it is next, not "0 of 2 today · click to add one".
+    const next = nextHabitDay(habit, today);
+    bottom = <CardMeter ratio={0} color={color} left={next ? `Next: ${next}` : 'Not today'} right={`${amount.target}${amount.unit ? ` ${amount.unit}` : ''} a day`} />;
   } else if (amount) {
     bottom = <CardMeter ratio={count / Math.max(1, amount.target)} color={color} left={`${Math.min(count, amount.target)} of ${amount.target}${amount.unit ? ` ${amount.unit}` : ''} today`} right={count >= amount.target ? 'done' : 'click to add one'} />;
   } else {
     const left = streak > 0 ? `${streak} ${unit}${streak === 1 ? '' : 's'} in a row` : 'No streak yet';
-    const right = doneToday ? 'done today' : scheduledToday || weeklyTarget(habit) ? 'today open' : 'not today';
+    const next = nextHabitDay(habit, today);
+    const right = doneToday ? 'done today' : scheduledToday || weeklyTarget(habit) ? 'today open' : next ? `next: ${next}` : 'not today';
     bottom = <div style={{ marginTop: 'auto' }}>{weekBars}{labels(left, right, streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)')}</div>;
   }
 
@@ -208,8 +222,6 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
       onContextMenu={openMenu}
       style={{ ...cardFrameStyle(tone), cursor: 'grab', overflow: 'visible', ['--habit-color' as string]: color } as React.CSSProperties}
     >
-      {/* An event wears the Calendar's hatch: it happens, it isn't ticked. */}
-      {event && <span aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none', background: 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink-3) 7%, transparent) 0 6px, transparent 6px 12px)' }} />}
 
       {/* Row 1: box (habit) or repeat mark (event) · name · its menu */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
@@ -224,7 +236,7 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
             onMouseDown={(e) => e.stopPropagation()}
             aria-label={`${habit.name}: add one (${count} of ${amount.target} today)`}
             title={canTick ? 'Add one' : 'Not a day for this habit'}
-            style={{ minWidth: 15, height: 15, padding: '0 3px', borderRadius: 4, boxSizing: 'border-box', flexShrink: 0, cursor: canTick ? 'pointer' : 'default', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, lineHeight: 1,
+            style={{ minWidth: 15, height: 15, padding: '0 3px', borderRadius: 4, boxSizing: 'border-box', flexShrink: 0, cursor: canTick ? 'pointer' : 'default', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, lineHeight: 1, opacity: canTick ? 1 : 0.4,
               border: `1.5px solid ${count >= amount.target ? color : 'var(--ink-4)'}`, background: count >= amount.target ? color : 'transparent', color: count >= amount.target ? 'var(--ink-on-bright, #111)' : 'var(--ink-2)' }}>
             {count}
           </button>
@@ -257,11 +269,6 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
 
       {bottom}
 
-      {/* Drop hint while dragged (reactflow-theme.css). */}
-      <div aria-hidden className="habit-lane-drophint"
-        style={{ position: 'absolute', left: 0, right: 0, bottom: -22, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--acid-ink, var(--acid))', opacity: 0, transition: 'opacity 0.15s ease', pointerEvents: 'none' }}>
-        <LineGlyph name="arrowDownRight" size={11} /> drop on a calendar day
-      </div>
 
       {menuOpen && (
         <HabitContextMenu
