@@ -985,6 +985,13 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         {inputFocused && inputPhase === 'name' && (() => {
           const q = pendingName.trim() ? parseQuickAdd(pendingName.trim()) : null;
           const said = q ? describeQuickAdd(q) : null;
+          if (q?.hint) {
+            return (
+              <div data-testid="todo-quick-preview" style={{ padding: '6px 14px 0', borderTop: '1px dashed var(--paper-3)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+                Added as typed: {q.hint}
+              </div>
+            );
+          }
           if (!q || !said) return null;
           return (
             <div data-testid="todo-quick-preview" style={{ padding: '6px 14px 0', borderTop: '1px dashed var(--paper-3)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>

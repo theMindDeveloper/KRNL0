@@ -94,7 +94,7 @@ export async function todoAdd(
   } else if (q.day) when = ` · due ${q.day}`;
   return {
     ok: true,
-    message: `Added todo: "${q.text}"${tag ? ` [${tag}]` : ''}${when}${q.durationMin ? ` · ${q.durationMin} min` : ''}${q.repeat ? ` · repeats ${describeTaskRepeat(q.repeat)}` : ''} (task: ${pair.taskNodeId.slice(0, 13)}…)`,
+    message: `Added todo: "${q.text}"${tag ? ` [${tag}]` : ''}${when}${q.durationMin ? ` · ${q.durationMin} min` : ''}${q.repeat ? ` · repeats ${describeTaskRepeat(q.repeat)}` : ''}${q.hint ? ` · added as typed: ${q.hint}` : ''} (task: ${pair.taskNodeId.slice(0, 13)}…)`,
     data: { id: pair.todoItemId, todoItemId: pair.todoItemId, taskNodeId: pair.taskNodeId, ...(q.day ? { day: q.day } : {}), ...(q.time ? { time: q.time } : {}), ...(q.durationMin ? { durationMin: q.durationMin } : {}) },
   };
 }

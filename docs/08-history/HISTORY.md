@@ -2226,3 +2226,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/sys/commands/todo.ts`, `shared/cli/commandRegistry.ts`, `claude/CLAUDE.md`; test `repeatTask.test.ts` (+1).
 **Summary:** Same fix as the app, from the terminal: `todo drop` on a repeating plan makes its next one first (same time, same repeat), then drops this one: "Skipped "Gym" this time. Next one: … 18:00." The help and the in-app assistant's notes say so.
+
+## [2026-11-08] — Quick add won't half-read "every monday and thursday" (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`, `TodoNode/index.tsx`, `src/sys/commands/todo.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Gym every monday and thursday" took "every monday" as the repeat and "thursday" as the first day, so the plan started on a Thursday that did not match its own repeat. A plan repeats on one weekday, so on several days quick add now reads none of it and says why under the field: "Added as typed: a plan repeats on one weekday; for several days, add a routine in Habits". `todo add` says the same.

@@ -18,6 +18,8 @@ export interface QuickAdd {
   rolledToTomorrow?: boolean;
   /** "every day" / "every weekday" / "every sunday": a repeating plan. */
   repeat?: TaskRepeat;
+  /** Something typed that quick add can't do, said in words (nothing else is read then). */
+  hint?: string;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -28,6 +30,11 @@ const DAY_RE = /\b(?:on\s+)?(next\s+)?(mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?
 export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   let s = ` ${raw} `;
   const out: QuickAdd = { text: raw.trim() };
+  // "every monday and thursday": a plan repeats on one weekday. Reading half
+  // of it would start the plan on the wrong day, so read none of it.
+  if (/\bevery\s+(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*(?:\s*(?:,|and|&|\+|or)\s*(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*)+/i.test(s)) {
+    return { text: raw.trim(), hint: 'a plan repeats on one weekday; for several days, add a routine in Habits' };
+  }
   const cut = (m: RegExpExecArray) => { s = s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length); };
 
   // "in 2 hours", "in 30 min": a start time from now (rounded up to 5 min).

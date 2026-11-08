@@ -76,6 +76,15 @@ describe('quick add reads dates', () => {
     expect(parseQuickAdd('Pay bills on the 15th', NOW)).toEqual({ text: 'Pay bills', day: '2026-11-15' });
     expect(parseQuickAdd('Pay bills on the 2nd', NOW).day).toBe('2026-12-02');
   });
+  it('several repeat days: reads none of it and says why', () => {
+    const q = parseQuickAdd('Gym every monday and thursday 18:00', NOW);
+    expect(q.text).toBe('Gym every monday and thursday 18:00');
+    expect(q.repeat).toBeUndefined();
+    expect(q.day).toBeUndefined();
+    expect(q.hint).toContain('routine');
+    expect(parseQuickAdd('Gym every mon, thu', NOW).hint).toBeDefined();
+    expect(parseQuickAdd('Gym every monday 18:00', NOW).hint).toBeUndefined();
+  });
   it('leaves lengths, versions and impossible dates alone', () => {
     expect(parseQuickAdd('Read 1.5h', NOW)).toEqual({ text: 'Read', durationMin: 90 });
     expect(parseQuickAdd('Ship 2.5.1', NOW)).toEqual({ text: 'Ship 2.5.1' });
