@@ -18,6 +18,7 @@ import {
   habitSetNote,
   habitArchive,
   habitUnarchive,
+  habitSetTarget,
   habitSetSchedule,
   habitSetKind,
   routineSkip,
@@ -551,6 +552,27 @@ export async function cliArchive(
     message: `habit archived: "${resolved.habit.name}"${lanes ? ` (lane removed)` : ''}`,
     data: { id: resolved.habit.id },
   };
+}
+
+/** `krnl habit target <id|name> <1-6|off>`: "3 times a week, any days" (review 3.1). */
+export async function cliTarget(
+  ctx: HabitCtx,
+  ref: string | undefined,
+  value: string | undefined,
+): Promise<SysResult> {
+  if (!ref || !value) return { ok: false, message: 'habit target requires <id|name> <1-6|off>' };
+  const off = value === 'off' || value === 'none';
+  const n = Number(value);
+  if (!off && !(Number.isInteger(n) && n >= 1 && n <= 6)) return { ok: false, message: `habit target: "${value}" is not 1-6 or off` };
+  const board = loadBoard(ctx);
+  const mother = findMother(board);
+  if (!mother) return notFound();
+  const resolved = resolveHabit(mother.state, ref);
+  if ('error' in resolved) return { ok: false, message: resolved.error };
+  if (resolved.habit.kind === 'routine') return { ok: false, message: `"${resolved.habit.name}" is a routine: routines are never ticked, so they have no target` };
+  mother.state = habitSetTarget(mother.state, { id: resolved.habit.id, perWeek: off ? null : n });
+  writeBoard(ctx, board, mother);
+  return { ok: true, message: off ? `habit "${resolved.habit.name}": no weekly target` : `habit "${resolved.habit.name}": ${n}× a week, any days`, data: { id: resolved.habit.id, perWeek: off ? null : n } };
 }
 
 /** `krnl habit unarchive <id|name>`: bring an archived habit back, history kept. */

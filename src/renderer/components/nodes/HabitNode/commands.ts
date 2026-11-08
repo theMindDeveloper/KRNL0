@@ -24,7 +24,7 @@ function sortedLog(log: string[]): string[] {
 
 export function habitAdd(
   state: HabitState,
-  args: { name: string; color?: HabitColor; schedule?: unknown; kind?: unknown },
+  args: { name: string; color?: HabitColor; schedule?: unknown; kind?: unknown; perWeek?: unknown },
   env: HabitEnv = defaultEnv,
 ): HabitState {
   const trimmed = args.name.trim();
@@ -42,8 +42,25 @@ export function habitAdd(
     color,
     ...(schedule ? { schedule } : {}),
     ...(routine ? { kind: 'routine' as const } : {}),
+    ...(!routine && validPerWeek(args.perWeek) ? { perWeek: args.perWeek } : {}),
   };
   return { ...state, habits: [...state.habits, habit] };
+}
+
+function validPerWeek(n: unknown): n is number {
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 6;
+}
+
+/** Set or clear a habit's weekly target (1–6 times a week; null clears). Routines: no-op. */
+export function habitSetTarget(state: HabitState, args: { id: string; perWeek: number | null }): HabitState {
+  return {
+    ...state,
+    habits: state.habits.map((h) => {
+      if (h.id !== args.id || h.kind === 'routine') return h;
+      if (args.perWeek === null) { const { perWeek: _drop, ...rest } = h; return rest; }
+      return validPerWeek(args.perWeek) ? { ...h, perWeek: args.perWeek } : h;
+    }),
+  };
 }
 
 // Optional repeat set while adding (Habit window's repeat picker). Anything
@@ -309,6 +326,61 @@ export function calcStreak(
     }
   }
   return count;
+}
+
+// ── Weekly targets ("3 times a week") ─────────────────────────────────────────
+// A week is Monday–Sunday. A week counts when it has at least `perWeek` ticks.
+
+function mondayOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = d.getDay();
+  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function weekCounts(log: string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const day of new Set(log)) {
+    const m = mondayOf(day);
+    out.set(m, (out.get(m) ?? 0) + 1);
+  }
+  return out;
+}
+
+function shiftWeek(monday: string, weeks: number): string {
+  const d = new Date(monday + 'T00:00:00');
+  d.setDate(d.getDate() + weeks * 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Ticks in the week that holds `today`. */
+export function ticksThisWeek(log: string[], today: string): number {
+  return weekCounts(log).get(mondayOf(today)) ?? 0;
+}
+
+/** Weeks in a row that reached the target. This week counts once reached;
+ *  until then it is still open and does not break the run. */
+export function calcWeekStreak(log: string[], today: string, perWeek: number): number {
+  const counts = weekCounts(log);
+  let week = mondayOf(today);
+  if ((counts.get(week) ?? 0) < perWeek) week = shiftWeek(week, -1);
+  let n = 0;
+  while ((counts.get(week) ?? 0) >= perWeek && n < 1000) { n++; week = shiftWeek(week, -1); }
+  return n;
+}
+
+/** Longest run of weeks that reached the target. */
+export function bestWeekStreak(log: string[], perWeek: number): number {
+  const met = [...weekCounts(log).entries()].filter(([, c]) => c >= perWeek).map(([w]) => w).sort();
+  let best = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const w of met) {
+    run = prev !== null && shiftWeek(prev, 1) === w ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = w;
+  }
+  return best;
 }
 
 function prevDayStr(dateStr: string): string {

@@ -80,6 +80,8 @@ export function habitStreaks(nodes: readonly NodeLike[], today: string): HabitSt
     const h = rec(raw);
     // Routines have no streak, so no milestone (Decision 39).
     if (h['archived'] === true || h['kind'] === 'routine' || typeof h['id'] !== 'string') continue;
+    // Day milestones (7, 30, 100) mean nothing for "3 a week": its streak is in weeks.
+    if (typeof h['perWeek'] === 'number') continue;
     const log = Array.isArray(h['log']) ? h['log'].filter((d): d is string => typeof d === 'string') : [];
     const schedule = h['schedule'] as HabitSchedule | undefined;
     out.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current: calcStreak(log, today, schedule), best: bestStreak(log, schedule), log });

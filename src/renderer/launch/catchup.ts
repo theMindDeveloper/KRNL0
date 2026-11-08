@@ -127,6 +127,8 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
       const h = rec(raw);
       // Routines are never ticked, so never "broken" (Decision 39).
       if (h['archived'] === true || h['kind'] === 'routine' || typeof h['id'] !== 'string') continue;
+      // A weekly target ("3 a week") has no missed days to catch up on.
+      if (typeof h['perWeek'] === 'number') continue;
       const log = Array.isArray(h['log']) ? h['log'].filter((d): d is string => typeof d === 'string') : [];
       const schedule = h['schedule'] as HabitSchedule | undefined;
       const current = calcStreak(log, today, schedule);

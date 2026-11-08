@@ -439,7 +439,7 @@ export function HabitContextMenu({
         <>
           <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
           {extraItems.map((it) => (
-            <MenuItem key={it.label} label={it.label} onClick={() => { it.onClick(); onClose(); }} />
+            <MenuItem key={it.label} label={it.label} {...(it.testId ? { testId: it.testId } : {})} onClick={() => { it.onClick(); onClose(); }} />
           ))}
         </>
       )}
@@ -512,16 +512,19 @@ function MenuItem({
   destructive,
   disabled,
   onClick,
+  testId,
 }: {
   label: string;
   trailing?: React.ReactNode;
   destructive?: boolean;
   disabled?: boolean;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
+      data-testid={testId}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       style={{

@@ -91,6 +91,17 @@ export interface Habit {
   endsOn?: string;
   /** Routine only: one occurrence skipped or moved to another time. */
   exceptions?: RoutineException[];
+  /** Habit only: a weekly target ("3 times a week, any days"), 1–6. Ticked
+   *  any day; its streak counts weeks that reach the target, so a rest day
+   *  never breaks it. Absent = every scheduled day counts. */
+  perWeek?: number;
+}
+
+/** The habit's weekly target, or null (routines never have one). */
+export function weeklyTarget(h: Pick<Habit, 'perWeek' | 'kind'>): number | null {
+  if (h.kind === 'routine') return null;
+  const n = h.perWeek;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 6 ? n : null;
 }
 
 export interface RoutineException {

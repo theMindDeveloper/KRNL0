@@ -20,6 +20,7 @@ import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { RepeatEditor, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
 import { HabitAddAsk, type AddAnswer } from './HabitAddAsk';
+import { weeklyTarget } from './types';
 import { RoutineShelf, routineStatus } from './RoutineShelf';
 import { isRoutine } from './types';
 import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
@@ -40,7 +41,7 @@ import {
   getYearGridCells,
   isDayScheduled,
 } from './types';
-import { bestStreak, calcStreak, milestoneReached, nextMilestone, repairableDay } from './commands';
+import { bestStreak, bestWeekStreak, calcStreak, calcWeekStreak, milestoneReached, nextMilestone, repairableDay, ticksThisWeek } from './commands';
 
 /** YYYY-MM-DD plus `n` days (local). */
 function addDaysLocal(ymd: string, n: number): string {
@@ -136,6 +137,8 @@ export function HabitNode({
     () => state.habits.filter((h) => h.archived).map((h) => ({ id: h.id, name: h.name, days: h.log.length })),
     [state.habits],
   );
+  // A habit's weekly target (menu → "Times a week…"): 1–6, or none.
+  const [targetEdit, setTargetEdit] = useState<{ habitId: string; value: number | null; x: number; y: number } | null>(null);
   // Edit how an existing habit / routine repeats (menu → "Edit repeat…").
   const [editRepeat, setEditRepeat] = useState<{ habitId: string; value: RepeatValue; x: number; y: number } | null>(null);
 
@@ -176,7 +179,7 @@ export function HabitNode({
     }
   };
   const addAnswered = (a: AddAnswer) => {
-    onCommand('habit.add', { name: newName.trim(), schedule: a.schedule, ...(a.kind === 'routine' ? { kind: 'routine' } : {}) });
+    onCommand('habit.add', { name: newName.trim(), schedule: a.schedule, ...(a.kind === 'routine' ? { kind: 'routine' } : {}), ...(a.perWeek ? { perWeek: a.perWeek } : {}) });
     setNewName('');
     setAsk(null);
   };
@@ -222,8 +225,10 @@ export function HabitNode({
         { label: 'Turn into habit', onClick: () => onCommand('habit.setKind', { id: h.id, kind: 'habit' }) },
       ];
     }
+    const tgt = weeklyTarget(h);
     return [
       { label: h.schedule ? 'Edit repeat…' : 'Repeat…', onClick: () => edit('habit') },
+      { label: tgt ? `Times a week: ${tgt}…` : 'Times a week…', testId: 'habit-menu-target', onClick: () => setTargetEdit({ habitId: h.id, value: tgt, x: at.x, y: at.y }) },
       // A routine needs a time: with one it switches at once, without one the editor asks.
       { label: 'Turn into routine', onClick: () => (h.schedule?.timeOfDay ? onCommand('habit.setKind', { id: h.id, kind: 'routine' }) : edit('routine')) },
     ];
@@ -443,6 +448,39 @@ export function HabitNode({
           />
         )}
       </div>
+      {targetEdit && createPortal(
+        <>
+          <div onMouseDown={(e) => { e.stopPropagation(); setTargetEdit(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+          <div
+            data-testid="habit-target-pop"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed', left: Math.min(targetEdit.x, window.innerWidth - 300), top: Math.min(targetEdit.y, window.innerHeight - 150),
+              width: 284, zIndex: Z.popover, padding: 14, borderRadius: 12, background: 'var(--paper)', boxSizing: 'border-box',
+              border: '1px solid var(--paper-3)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 10, fontFamily: 'var(--font-sans)',
+            }}
+          >
+            <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.4 }}>How many times a week? Any days count, and a rest day never breaks the streak.</div>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <button key={n} type="button" data-testid={`habit-target-${n}`}
+                  onClick={() => { onCommand('habit.setTarget', { id: targetEdit.habitId, perWeek: n }); setTargetEdit(null); }}
+                  style={{ minWidth: 34, height: 30, borderRadius: 999, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 650,
+                    border: `1px solid ${targetEdit.value === n ? 'var(--acid)' : 'var(--paper-3)'}`, background: targetEdit.value === n ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent', color: 'var(--ink)' }}>
+                  {n}×
+                </button>
+              ))}
+            </div>
+            {targetEdit.value !== null && (
+              <button type="button" data-testid="habit-target-off" onClick={() => { onCommand('habit.setTarget', { id: targetEdit.habitId, perWeek: null }); setTargetEdit(null); }}
+                style={{ alignSelf: 'flex-start', height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12 }}>
+                No target (every day it repeats)
+              </button>
+            )}
+          </div>
+        </>,
+        document.body,
+      )}
       {editRepeat && createPortal(
         <div
           data-testid="habit-edit-repeat"
@@ -577,18 +615,23 @@ const WeekRow = memo(function WeekRow({
   onContextMenu,
 }: WeekRowProps) {
   const color = habitColor(habit.color);
+  // "3 times a week": the streak counts weeks that reached the target.
+  const target = weeklyTarget(habit);
   const streak = useMemo(
-    () => calcStreak(habit.log, today, habit.schedule),
-    [habit.log, today, habit.schedule],
+    () => (target ? calcWeekStreak(habit.log, today, target) : calcStreak(habit.log, today, habit.schedule)),
+    [habit.log, today, habit.schedule, target],
   );
-  const best = useMemo(() => bestStreak(habit.log, habit.schedule), [habit.log, habit.schedule]);
-  const milestone = milestoneReached(streak);
-  const nextMs = nextMilestone(streak);
+  const best = useMemo(() => (target ? bestWeekStreak(habit.log, target) : bestStreak(habit.log, habit.schedule)), [habit.log, habit.schedule, target]);
+  const weekTicks = target ? ticksThisWeek(habit.log, today) : 0;
+  const unit = target ? 'week' : 'day';
+  const milestone = target ? null : milestoneReached(streak);
+  const nextMs = target ? null : nextMilestone(streak);
   const toNext = nextMs !== null ? nextMs - streak : null;
   // The day the user said "no" to (not a plain flag): a new missed day the
   // next morning — app left open overnight — asks again.
   const [repairHiddenDay, setRepairHiddenDay] = useState<string | null>(null);
-  const repairCandidate = useMemo(() => repairableDay(habit.log, today, habit.schedule), [habit.log, today, habit.schedule]);
+  // A weekly target has no missed days: nothing to repair.
+  const repairCandidate = useMemo(() => (target ? null : repairableDay(habit.log, today, habit.schedule)), [habit.log, today, habit.schedule, target]);
   const repairDay = repairCandidate !== null && repairCandidate !== repairHiddenDay && !repairDismissed(habit.id, repairCandidate) ? repairCandidate : null;
   const repairLabel = repairDay === null ? '' : repairDay === addDaysLocal(today, -1) ? 'yesterday' : new Date(`${repairDay}T00:00:00`).toLocaleDateString('en', { weekday: 'long' });
   const logSet = useMemo(() => new Set(habit.log), [habit.log]);
@@ -735,10 +778,15 @@ const WeekRow = memo(function WeekRow({
           ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--acid-ink, var(--acid))', fontWeight: 600 }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>
-              {`${streak} day${streak === 1 ? '' : 's'}`}
+              {`${streak} ${unit}${streak === 1 ? '' : 's'}`}
             </span>
           )
-          : <span>{best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
+          : target ? null : <span>{best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
+        {target !== null && (
+          <span data-testid={`habit-week-${habit.id}`} style={{ color: weekTicks >= target ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>
+            {streak > 0 ? '· ' : ''}{Math.min(weekTicks, target)} of {target} this week{weekTicks >= target ? ' ✓' : ''}
+          </span>
+        )}
         {milestone !== null && (
           <button
             type="button"

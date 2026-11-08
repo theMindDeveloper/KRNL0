@@ -14,19 +14,22 @@ import { IconCheck, IconClock } from '../../ui/repeatIcons';
 export interface AddAnswer {
   kind: 'habit' | 'routine';
   schedule: HabitSchedule;
+  /** Habit only: "3 times a week, any days". */
+  perWeek?: number;
 }
 
 /** The answers so far; null = not answered yet (nothing is pre-chosen). */
 export interface AskDraft {
   kind: 'habit' | 'routine' | null;
-  often: RepeatKind | null;
+  often: RepeatKind | 'perWeek' | null;
+  perWeek: number | null;
   days: IsoDow[];
   when: 'any' | 'at' | null;
   timeOfDay: string;
   durationMin: number | null;
 }
 
-export const EMPTY_ASK: AskDraft = { kind: null, often: null, days: [], when: null, timeOfDay: '', durationMin: null };
+export const EMPTY_ASK: AskDraft = { kind: null, often: null, perWeek: null, days: [], when: null, timeOfDay: '', durationMin: null };
 
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
@@ -35,6 +38,7 @@ export function askMissing(d: AskDraft): string | null {
   if (!d.kind) return 'Answer yes or no';
   if (d.kind === 'habit') {
     if (!d.often) return 'Pick how often';
+    if (d.often === 'perWeek') return d.perWeek ? null : 'Pick how many times';
     if (d.often === 'weekly' && d.days.length === 0) return 'Pick its days';
     if (!d.when) return 'Pick any time or a set time';
     if (d.when === 'at' && !TIME_RE.test(d.timeOfDay)) return 'Pick a time';
@@ -52,16 +56,17 @@ export function askToRepeat(d: AskDraft): RepeatValue {
   const days = [...d.days].sort((a, b) => a - b) as IsoDow[];
   const kind: RepeatKind = d.kind === 'routine'
     ? (days.length === 7 ? 'daily' : days.join() === '1,2,3,4,5' ? 'weekdays' : 'weekly')
-    : (d.often ?? 'daily');
+    : (d.often === 'perWeek' || !d.often ? 'daily' : d.often);
   return {
     kind, days, timeOfDay: d.timeOfDay || '09:00', durationMin: d.durationMin ?? 60,
-    itemKind: d.kind ?? 'habit', anyTime: d.kind === 'habit' && d.when === 'any',
+    itemKind: d.kind ?? 'habit', anyTime: d.kind === 'habit' && (d.when === 'any' || d.often === 'perWeek'),
   };
 }
 
 export function askToAnswer(d: AskDraft): AddAnswer | null {
   if (askMissing(d) || !d.kind) return null;
-  return { kind: d.kind, schedule: toSchedule(askToRepeat(d)) };
+  const perWeek = d.kind === 'habit' && d.often === 'perWeek' && d.perWeek ? { perWeek: d.perWeek } : {};
+  return { kind: d.kind, schedule: toSchedule(askToRepeat(d)), ...perWeek };
 }
 
 const DAYS: ReadonlyArray<{ dow: IsoDow; letter: string; name: string }> = [
@@ -160,15 +165,28 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel }: Props) {
           {d.kind === 'habit' ? (
             <>
               <div style={q}>How often?</div>
-              <Seg testId="habit-ask-often" value={d.often} onPick={(v) => set({ often: v as RepeatKind })}
-                options={[['daily', 'Every day'], ['weekdays', 'Weekdays'], ['weekly', 'Pick days']]} />
+              <Seg testId="habit-ask-often" value={d.often} onPick={(v) => set({ often: v as AskDraft['often'] })}
+                options={[['daily', 'Every day'], ['weekdays', 'Weekdays'], ['weekly', 'Pick days'], ['perWeek', 'Per week']]} />
               {d.often === 'weekly' && <DayRow lit={lit} onToggle={toggleDay} />}
-              <div style={q}>At a set time?</div>
-              <Seg testId="habit-ask-when" value={d.when} onPick={(v) => set({ when: v as 'any' | 'at' })}
-                options={[['any', 'Any time'], ['at', 'At a time']]} />
-              {d.when === 'at' && (
-                <TimeLen time={d.timeOfDay} len={d.durationMin} lens={HABIT_LEN}
-                  onTime={(t) => set({ timeOfDay: t })} onLen={(m) => set({ durationMin: m })} />
+              {d.often === 'perWeek' ? (
+                <>
+                  <div style={q}>How many times a week? <span style={{ color: 'var(--ink-4)' }}>Any days count.</span></div>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                      <button key={n} type="button" data-testid={`habit-ask-per-${n}`} onClick={() => set({ perWeek: n })} style={chip(d.perWeek === n)}>{n}×</button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={q}>At a set time?</div>
+                  <Seg testId="habit-ask-when" value={d.when} onPick={(v) => set({ when: v as 'any' | 'at' })}
+                    options={[['any', 'Any time'], ['at', 'At a time']]} />
+                  {d.when === 'at' && (
+                    <TimeLen time={d.timeOfDay} len={d.durationMin} lens={HABIT_LEN}
+                      onTime={(t) => set({ timeOfDay: t })} onLen={(m) => set({ durationMin: m })} />
+                  )}
+                </>
               )}
             </>
           ) : (
@@ -216,6 +234,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel }: Props) {
 
 /** "weekdays · any time", "Mon Wed · 10:00–12:00". */
 export function summary(d: AskDraft): string {
+  if (d.kind === 'habit' && d.often === 'perWeek' && d.perWeek) return `${d.perWeek}× a week, any days`;
   const v = askToRepeat(d);
   const days = v.kind === 'daily' ? 'every day' : v.kind === 'weekdays' ? 'weekdays'
     : v.days.map((x) => DAYS.find((y) => y.dow === x)?.name.slice(0, 3)).join(' ');
