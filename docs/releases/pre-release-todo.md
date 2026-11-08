@@ -6,7 +6,7 @@ What must be done before this branch ships. Each line is a GitHub issue; tick it
 
 - [ ] **Orb answers through Claude** — "Ask anything" and hold-Space-to-talk send the question to the Claude CLI and show the answer as text in the orb. ([#224](https://github.com/theMindDeveloper/KRNL0/issues/224))
 - [ ] **One voice** — re-record the orb's own lines ("hi", "I'm here", the welcome line) in the new ElevenLabs voice. ([#225](https://github.com/theMindDeveloper/KRNL0/issues/225))
-- [x] **Cursor stutter** — task cards and their edges flick between pointer, grab and default; each area gets one cursor. ([#226](https://github.com/theMindDeveloper/KRNL0/issues/226)) *Built 8 Nov; waiting for your check in the app.*
+- [x] **Cursor stutter** — task cards and their edges flick between pointer, grab and default; each area gets one cursor. ([#226](https://github.com/theMindDeveloper/KRNL0/issues/226)) *Done 8 Nov — checked by the user.*
 - [ ] **Voice the other tours** — after the first-day voice is approved. ([#227](https://github.com/theMindDeveloper/KRNL0/issues/227))
 
 ## Found while testing
