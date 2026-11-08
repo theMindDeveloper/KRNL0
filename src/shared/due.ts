@@ -1,20 +1,11 @@
 // Due dates (review 2.1): "tax form due Friday" — the day it must be done by,
 // separate from when you plan to work on it (scheduledFor).
 
-import { isValidYMD } from './ymd';
+import { addDaysYMD, daysBetweenYMD, isValidYMD } from './ymd';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const ymdOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
-export function addDays(ymd: string, n: number): string {
-  const d = new Date(`${ymd}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return ymdOf(d);
-}
-
-function daysBetween(a: string, b: string): number {
-  return Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86_400_000);
-}
+/** Kept for callers: same as `addDaysYMD`. */
+export const addDays = addDaysYMD;
+const daysBetween = daysBetweenYMD;
 
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 

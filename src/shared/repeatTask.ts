@@ -2,15 +2,15 @@
 // plants every day". A plan, not a habit — it has its own notes and time each
 // time. Ticking one off brings the next one; nothing piles up for days gone by.
 
+import { addDaysYMD, isoDowYMD } from './ymd';
+
 export type TaskRepeat =
   | { kind: 'daily' }
   | { kind: 'weekdays' }
   | { kind: 'weekly'; day: number }; // ISO 1 = Mon … 7 = Sun
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const ymdOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const isoDow = (ymd: string) => { const g = new Date(`${ymd}T00:00:00`).getDay(); return g === 0 ? 7 : g; };
-const plusDays = (ymd: string, n: number) => { const d = new Date(`${ymd}T00:00:00`); d.setDate(d.getDate() + n); return ymdOf(d); };
+const isoDow = isoDowYMD;
+const plusDays = addDaysYMD;
 
 function matches(r: TaskRepeat, ymd: string): boolean {
   const dow = isoDow(ymd);

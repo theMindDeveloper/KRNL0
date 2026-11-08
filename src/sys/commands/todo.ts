@@ -1,3 +1,4 @@
+import { todayYMD } from '../../shared/ymd';
 import { parseQuickAdd } from '../../shared/quickAdd';
 import { describeTaskRepeat, isoDowOfYMD, nextRepeatDay, parseRepeat } from '../../shared/repeatTask';
 import { taskSchedule } from './task';
@@ -243,7 +244,7 @@ export async function todoTag(ctx: TodoCtx, ref?: string, tag?: string): Promise
 /** `krnl todo due <ref> <YYYY-MM-DD|today|tomorrow|fri|off>` (review 2.1). */
 export async function todoDue(ctx: TodoCtx, ref?: string, when?: string): Promise<SysResult> {
   if (!ref || !when) return { ok: false, message: 'todo due requires <ref> and <YYYY-MM-DD|today|tomorrow|mon..sun|off>' };
-  const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  const today = todayYMD();
   const dueOn = parseDue(when, today);
   if (dueOn === undefined) return { ok: false, message: `todo due: "${when}" is not a day (YYYY-MM-DD, today, tomorrow, mon..sun, off)` };
   const board = loadBoard(ctx);
@@ -300,10 +301,7 @@ export async function todoRepeat(ctx: TodoCtx, ref?: string, how?: string): Prom
   return { ok: true, message: repeat ? `Todo "${item?.text ?? ref}" repeats ${describeTaskRepeat(repeat)}: tick it off and the next one appears.` : `Todo "${item?.text ?? ref}" no longer repeats.`, data: { id: r.id.itemId, repeat } };
 }
 
-function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+const localToday = (): string => todayYMD();
 
 /** After `todo check` ticks a repeating item: add the next one (as the app does). */
 async function nextRepeatFromCli(ctx: TodoCtx, itemId: string): Promise<string> {

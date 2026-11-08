@@ -2087,3 +2087,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`; test `HabitNode.addField.test.tsx` (+1).
 **Summary:** Amounts were only in the right-click menu. The add card's habit questions end with an optional "+ An amount a day (8 glasses, 20 pages…)": it opens chips (2–20), a unit field and "none"; nothing is set unless asked for, and the button says it ("Add · every day, any time, 8 glasses"). Checked in the preview: the new habit reads "0 of 8 glasses today".
+
+## [2026-11-08] — One home for local-date helpers (experimental)
+
+**Type:** Refactor
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/ymd.ts` (`todayYMD`, `addDaysYMD`, `isoDowYMD`, `daysBetweenYMD`), `src/shared/due.ts`, `src/shared/repeatTask.ts`, `src/sys/commands/todo.ts`; test `tests/unit/shared.ymd.test.ts` (new).
+**Summary:** Structure: today's new modules each carried their own copy of "pad / date to YYYY-MM-DD / add days / ISO weekday". They now share `shared/ymd.ts` (which already held `isValidYMD` and `localYMD`), with a test across month ends and a DST weekend. No behaviour change.
