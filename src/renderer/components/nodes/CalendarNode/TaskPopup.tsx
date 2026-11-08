@@ -34,6 +34,8 @@ interface Props {
   onActivate: () => void;
   onJump: () => void;
   onUnschedule: () => void;
+  /** Delete the plan everywhere (Todo, Calendar, canvas), with UNDO. */
+  onDelete?: () => void;
   onClose: () => void;
 }
 
@@ -161,7 +163,7 @@ export function TaskPopup(p: Props) {
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: '10px 12px', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: p.onDelete ? '1fr 1fr' : '1fr 1fr 1fr', gap: 6, padding: '10px 12px', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
           <button type="button" data-testid="calendar-task-activate" onClick={p.onActivate} style={actionBtn}>
             <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5v9l7.5-4.5z" /></svg>
             Activate
@@ -174,6 +176,12 @@ export function TaskPopup(p: Props) {
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="1.5" y="2.5" width="9" height="8" rx="1.5" /><path d="M1.5 5h9M4.5 7l3 2M7.5 7l-3 2" /></svg>
             Unschedule
           </button>
+          {p.onDelete && (
+            <button type="button" data-testid="calendar-task-delete" onClick={p.onDelete} title="Delete the plan from the Todo and the Calendar (UNDO in the notice)" style={{ ...actionBtn, color: 'var(--rust)' }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3.5h8M4.5 3.5V2.2h3v1.3M3.2 3.5l.5 6.3h4.6l.5-6.3" /></svg>
+              Delete
+            </button>
+          )}
         </div>
       </div>
     </>,

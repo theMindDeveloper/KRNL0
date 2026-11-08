@@ -136,7 +136,9 @@ export function HabitNode({
   );
   // Decision 39 — two shelves: habits (ticked) above routines (just happen).
   const habitsOnly = useMemo(() => visibleHabits.filter((h) => !isRoutine(h)), [visibleHabits]);
-  const routines = useMemo(() => visibleHabits.filter((h) => isRoutine(h) && !(h.endsOn && h.endsOn < today)), [visibleHabits, today]);
+  // Ended routines stay on the shelf, marked ended: the Calendar still shows
+  // the days they happened, so they must be findable here (and deletable).
+  const routines = useMemo(() => visibleHabits.filter((h) => isRoutine(h)), [visibleHabits]);
   const endedRoutines = useMemo(
     () => visibleHabits.filter((h) => isRoutine(h) && h.endsOn && h.endsOn < today).map((h) => ({ id: h.id, name: h.name, endsOn: h.endsOn! })),
     [visibleHabits, today],
@@ -242,6 +244,12 @@ export function HabitNode({
   // Decision 39 — what the menu offers besides rename / colour / icon / note.
   const menuItemsFor = (h: (typeof visibleHabits)[number], at: { x: number; y: number }) => {
     const edit = (kind: 'habit' | 'routine') => setEditRepeat({ habitId: h.id, value: fromSchedule(h.schedule, kind), x: at.x, y: at.y });
+    if (isRoutine(h) && h.endsOn && h.endsOn < today) {
+      return [
+        { label: 'Restart routine', onClick: () => onCommand('routine.restart', { id: h.id }) },
+        { label: 'Edit repeat…', onClick: () => edit('routine') },
+      ];
+    }
     if (isRoutine(h)) {
       const d = new Date();
       const st = routineStatus(h, today, d.getHours() * 60 + d.getMinutes());

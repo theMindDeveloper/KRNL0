@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
 import { dayOnlyPlans } from './dayOnly';
+import { DueFlag } from './DueFlag';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
@@ -235,7 +236,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
   // in their day like the Week view's DAY line, dashed.
   const boardNodes = useBoardStore((st) => st.board?.nodes);
   const dayOnly = useMemo(
-    () => dayOnlyPlans(boardNodes ?? [], cells, new Set(scheduledTasks.map((t) => t.id)), todayYMD),
+    () => dayOnlyPlans(boardNodes ?? [], cells, new Map(scheduledTasks.map((t) => [t.id, t.startISO.slice(0, 10)])), todayYMD),
     [boardNodes, cells, scheduledTasks, todayYMD],
   );
 
@@ -650,10 +651,11 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     <div
                       key={`day-${d.id}`}
                       data-testid="month-day-only-chip"
-                      title={`${d.text} — due this day, no time yet. Drag it into a day of the week view to give it a time.`}
-                      draggable
+                      title={d.plannedOn ? `${d.text} — due this day (planned on another day)` : `${d.text} — due this day, no time yet. Drag it into a day of the week view to give it a time.`}
+                      draggable={!d.plannedOn}
                       onDragStart={(e) => {
                         e.stopPropagation();
+                        if (d.plannedOn) { e.preventDefault(); return; }
                         e.dataTransfer.setData('application/krnl-task', JSON.stringify(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin }));
                         e.dataTransfer.effectAllowed = 'move';
                       }}
@@ -664,7 +666,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                         color: d.overdue ? 'var(--rust)' : 'var(--ink-2)', background: 'transparent',
                       }}
                     >
-                      {truncateLabel(d.text)}
+                      {d.plannedOn && <DueFlag />}{truncateLabel(d.text)}
                     </div>
                   ))}
                 </div>

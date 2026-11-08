@@ -24,6 +24,7 @@ export type RoutineStatus =
   | { kind: 'today'; at: number }
   | { kind: 'skipped'; date: string }
   | { kind: 'next'; date: string; at: number }
+  | { kind: 'ended'; date: string }
   | { kind: 'none' };
 
 /**
@@ -31,6 +32,7 @@ export type RoutineStatus =
  * occurrence skipped, or the next one. Pure — tested.
  */
 export function routineStatus(h: Habit, today: string, nowMin: number): RoutineStatus {
+  if (h.endsOn && h.endsOn < today) return { kind: 'ended', date: h.endsOn };
   // A night shift from yesterday still running after midnight is "now".
   const spill = routineSpansOn(h, today).find((sp) => sp.spill && !sp.skipped);
   if (spill && nowMin < spill.endMin) return { kind: 'now', until: spill.endMin };
@@ -53,6 +55,7 @@ function sortKey(s: RoutineStatus, today: string): string {
   if (s.kind === 'today') return `1${pad(s.at)}`;
   if (s.kind === 'next') return `2${s.date}${pad(s.at)}`;
   if (s.kind === 'skipped') return `3${s.date}`;
+  if (s.kind === 'ended') return `8${s.date}`;
   return `9${today}`;
 }
 
@@ -97,7 +100,7 @@ export function RoutineShelf({ routines, today, onMenu }: Props) {
             onClick={(e) => onMenu(e, h.id)}
             onContextMenu={(e) => onMenu(e, h.id)}
             onKeyDown={(e) => { if (e.key === 'Enter') onMenu(e as unknown as React.MouseEvent, h.id); }}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28, cursor: 'pointer', borderRadius: 5 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, height: 28, cursor: 'pointer', borderRadius: 5, opacity: s.kind === 'ended' ? 0.62 : 1 }}
           >
             <span style={{ color: `var(--${h.color})`, display: 'inline-flex', width: 16, justifyContent: 'center', flexShrink: 0, fontSize: 9 }}>
               {/* No icon picked yet: a dot in its colour, so the row never starts with a gap. */}
@@ -121,6 +124,7 @@ export function RoutineShelf({ routines, today, onMenu }: Props) {
               {s.kind === 'now' && <Chip tone="acid">now · until {hm(s.until)}</Chip>}
               {s.kind === 'today' && <Chip tone="acid">today {hm(s.at)}</Chip>}
               {s.kind === 'skipped' && <Chip tone="rust">skipped {DAY_SHORT[dowOf(s.date) - 1]}</Chip>}
+              {s.kind === 'ended' && <span data-testid={`routine-ended-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>ended {new Date(`${s.date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>}
               {s.kind === 'next' && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{DAY_SHORT[dowOf(s.date) - 1]} {hm(s.at)}</span>}
             </span>
           </div>

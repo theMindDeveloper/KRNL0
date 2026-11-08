@@ -129,6 +129,30 @@ export async function habitMotherCommand(command: string, args: Record<string, u
   makeCommandHandler(habitNode.id)(command, args);
 }
 
+/**
+ * Delete from the Calendar means gone everywhere: the plan leaves the Todo,
+ * the Calendar and the canvas (todo.remove cascades to its task), with UNDO.
+ * Returns false when the task has no Todo item to delete.
+ */
+export async function deletePlanOfTask(taskId: string): Promise<boolean> {
+  const board = useBoardStore.getState().board;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const item = (todo?.state as { items?: Array<{ id: string; text: string; taskNodeId: string | null }> } | undefined)?.items?.find((i) => i.taskNodeId === taskId);
+  if (!todo || !item) return false;
+  const [{ makeCommandHandler }, { undoable }] = await Promise.all([import('../components/Canvas/commandDispatch'), import('./undoNotice')]);
+  undoable(`Deleted "${item.text}"`, () => makeCommandHandler(todo.id)('todo.remove', { id: item.id }));
+  return true;
+}
+
+/** A routine deleted from its Calendar band: gone from every day and from Habits & Routines, with UNDO. */
+export async function deleteRoutine(habitId: string): Promise<void> {
+  const habitNode = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'habit' && n.isMother);
+  const h = (habitNode?.state as { habits?: Array<{ id: string; name: string }> } | undefined)?.habits?.find((x) => x.id === habitId);
+  if (!habitNode || !h) return;
+  const [{ makeCommandHandler }, { undoable }] = await Promise.all([import('../components/Canvas/commandDispatch'), import('./undoNotice')]);
+  undoable(`Deleted routine "${h.name}"`, () => makeCommandHandler(habitNode.id)('habit.remove', { id: habitId }));
+}
+
 /** Window event the canvas listens for to centre a node (works from any surface). */
 export const FOCUS_NODE_EVENT = 'krnl:focus-node';
 /** Window event the canvas listens for to fit several nodes on screen (`detail.nodeIds`). */

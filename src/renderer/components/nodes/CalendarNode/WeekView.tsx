@@ -36,8 +36,9 @@ import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularit
 import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, routineSpansOn, countOn, type RoutineOccurrence, type RoutineSpan } from '../HabitNode/types';
 import { routineLanes } from './routineLanes';
 import { dayOnlyPlans } from './dayOnly';
+import { DueFlag } from './DueFlag';
 import { TimeField } from '../../ui/TimeField';
-import { habitMotherCommand } from '../../../store/scheduleActions';
+import { deletePlanOfTask, deleteRoutine, habitMotherCommand } from '../../../store/scheduleActions';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
 import { HabitSwapModal } from '../../ui/HabitSwapModal';
@@ -765,11 +766,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       return result;
   }, [boardForCal]);
 
-  // Plans with a day but no time yet (draft D, "slim line"): a plan due a day
-  // that is not on the grid. Shown under the day names; drag one onto the
-  // grid to give it a time (it then leaves the line).
+  // The DAY line (draft D, "slim line"): a plan due a day with no time yet
+  // (drag it onto the grid to give it a time), and the deadline of a plan
+  // planned on another day (marked "due").
   const dueByDay = useMemo(
-    () => dayOnlyPlans(boardForCal?.nodes ?? [], weekDays, new Set(scheduledTasks.map((t) => t.id)), todayYMD()),
+    () => dayOnlyPlans(boardForCal?.nodes ?? [], weekDays, new Map(scheduledTasks.map((t) => [t.id, t.startISO.slice(0, 10)])), todayYMD()),
     [boardForCal, scheduledTasks, weekDays],
   );
 
@@ -810,7 +811,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         : { label: 'Skip this one', onSelect: () => { void habitMotherCommand('routine.skip', { id: h.id, date: occ.date }); } },
       ...(occ.skipped ? [] : [{ label: 'Move this one…', onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(s0), x, y }) }]),
       ...(occ.moved ? [{ label: 'Back to its usual time', onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }] : []),
-      { label: 'End routine after this day', onSelect: () => { void habitMotherCommand('routine.end', { id: h.id, date: occ.date }); } },
+      { label: 'End routine after this day (keeps the days before)', onSelect: () => { void habitMotherCommand('routine.end', { id: h.id, date: occ.date }); } },
+      { label: 'Delete routine', danger: true, onSelect: () => { void deleteRoutine(h.id); } },
     ];
   };
 
@@ -2420,7 +2422,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       {/* Draft D — plans with a day but no time yet, one slim line; only when the week has one. */}
       {dueByDay.size > 0 && (
         <div data-testid="calendar-day-only-row" style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid var(--paper-3)' }}>
-          <div title="A day, no time yet — drag one onto the grid to give it a time" style={{ width: GUTTER_WIDTH, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', color: 'var(--ink-4)' }}>DAY</div>
+          <div title="Due this day. No time yet: drag it onto the grid. Marked due: a plan's deadline (its time is on another day)" style={{ width: GUTTER_WIDTH, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', color: 'var(--ink-4)' }}>DAY</div>
           {weekDays.map((dayYMD) => (
             <div key={dayYMD} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 3px' }}>
               {(dueByDay.get(dayYMD) ?? []).map((d) => (
@@ -2428,19 +2430,24 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   key={d.id}
                   data-testid={`calendar-day-only-${d.id}`}
                   className="nodrag"
-                  draggable
-                  title={`${d.text} — due this day, no time yet. Drag it onto the grid to give it a time.`}
+                  draggable={!d.plannedOn}
+                  title={d.plannedOn
+                    ? `${d.text} — due this day; planned ${new Date(`${d.plannedOn}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`
+                    : `${d.text} — due this day, no time yet. Drag it onto the grid to give it a time.`}
                   onDragStart={(e) => {
+                    if (d.plannedOn) { e.preventDefault(); return; }
                     e.dataTransfer.setData('application/krnl-task', JSON.stringify(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin }));
                     e.dataTransfer.effectAllowed = 'move';
                   }}
                   style={{
-                    height: 18, lineHeight: '16px', padding: '0 6px', borderRadius: 5, boxSizing: 'border-box', cursor: 'grab',
-                    fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    border: `1px solid ${d.overdue ? 'color-mix(in srgb, var(--rust) 60%, transparent)' : 'var(--paper-3)'}`,
-                    background: 'var(--paper-2)', color: d.overdue ? 'var(--rust)' : 'var(--ink)',
+                    // Wraps instead of cutting: a narrow day still shows the whole name.
+                    minHeight: 18, lineHeight: '14px', padding: '1px 5px', borderRadius: 5, boxSizing: 'border-box', cursor: d.plannedOn ? 'default' : 'grab',
+                    fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, whiteSpace: 'normal', overflowWrap: 'anywhere',
+                    border: `1px ${d.plannedOn ? 'dashed' : 'solid'} ${d.overdue ? 'color-mix(in srgb, var(--rust) 60%, transparent)' : d.plannedOn ? 'var(--ink-4)' : 'var(--paper-3)'}`,
+                    background: d.plannedOn ? 'transparent' : 'var(--paper-2)', color: d.overdue ? 'var(--rust)' : d.plannedOn ? 'var(--ink-2)' : 'var(--ink)',
                   }}
                 >
+                  {d.plannedOn && <DueFlag />}
                   {d.text}
                 </div>
               ))}
@@ -2775,6 +2782,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           onActivate={() => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); setTaskPopup(null); }}
           onJump={() => { jumpToTaskNode(taskPopup.task.id); setTaskPopup(null); }}
           onUnschedule={() => { void unscheduleTask(taskPopup.task.id); setTaskPopup(null); }}
+          onDelete={() => { void deletePlanOfTask(taskPopup.task.id); setTaskPopup(null); }}
           onClose={() => setTaskPopup(null)}
         />
       )}

@@ -16,9 +16,13 @@ const nodes = [
 
 describe('dayOnlyPlans (a day, no time yet)', () => {
   it('open items due this week that are not on the grid', () => {
-    const m = dayOnlyPlans(nodes, WEEK, new Set(['t-b']), '2026-11-10');
+    const m = dayOnlyPlans(nodes, WEEK, new Map([['t-b', '2026-11-13']]), '2026-11-10');
     expect(m.get('2026-11-13')).toEqual([{ id: 'a', text: 'Pay rent', taskId: 't-a', plannedMin: 45, overdue: false }]);
     expect(m.get('2026-11-09')?.[0]?.overdue).toBe(true);
     expect([...m.keys()].sort()).toEqual(['2026-11-09', '2026-11-13']);
+  });
+  it('a plan with a time on another day shows its deadline, marked with that day', () => {
+    const m = dayOnlyPlans(nodes, WEEK, new Map([['t-b', '2026-11-10']]), '2026-11-10');
+    expect(m.get('2026-11-13')?.map((d) => [d.id, d.plannedOn])).toEqual([['a', undefined], ['b', '2026-11-10']]);
   });
 });
