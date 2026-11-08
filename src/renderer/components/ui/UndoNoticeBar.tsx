@@ -11,7 +11,8 @@ const SHOW_MS = 6000;
 export function UndoNoticeBar() {
   const notice = useUndoNotice((s) => s.notice);
   const board = useBoardStore((s) => s.board);
-  const stale = notice !== null && board !== notice.after;
+  // A revert notice runs its own reverse step, which is safe on any board.
+  const stale = notice !== null && !notice.revert && board !== notice.after;
 
   useEffect(() => {
     if (!notice) return;

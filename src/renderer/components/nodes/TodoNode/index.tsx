@@ -22,7 +22,7 @@ import { defaultPomoConfig } from '../PomoNode/types';
 import { breakdownPomoTime } from '../../../store/pomoSchedule';
 import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { toneVarForTask } from '../../../utils/taskColor';
-import { undoable } from '../../../store/undoNotice';
+import { revertible, undoable } from '../../../store/undoNotice';
 import { DuePicker } from '../../ui/DuePicker';
 import { RemindPicker } from '../../ui/RemindPicker';
 import { TaskRepeatPicker } from '../../ui/TaskRepeatPicker';
@@ -462,9 +462,16 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       ...(item && !item.done && item.droppedAt === undefined ? [{
         label: 'Drop (not doing it)',
         onSelect: () => {
-          // Off the Calendar too: a dropped plan is not "missed".
-          if (item.taskNodeId) void unscheduleTask(item.taskNodeId);
+          // Off the Calendar too: a dropped plan is not "missed". Dropped
+          // plans leave the list, so the notice offers UNDO (time put back).
+          const taskId = item.taskNodeId;
+          const was = taskId ? taskScheduledInfo.get(taskId)?.scheduledFor ?? null : null;
+          if (taskId) void unscheduleTask(taskId);
           onCommand('todo.drop', { id: itemId });
+          revertible(`Dropped "${item.text}"`, () => {
+            onCommand('todo.undrop', { id: itemId });
+            if (taskId && was) void scheduleTaskAt(taskId, was);
+          });
         },
       }] : []),
       {

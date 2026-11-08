@@ -2184,3 +2184,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `launch/catchup.ts`, `Launch/WelcomeBack.tsx`; test `habit.weeklyTarget.test.ts` (+1).
 **Summary:** Welcome back left weekly-target habits out entirely ("Gym 3× a week" never showed, even after a missed week). It now asks the same `habitStreak` as every other screen: "2 weeks, still going" or "Start again this week · best 4w".
+
+## [2026-11-08] — Drop offers UNDO (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/undoNotice.ts` (`revertible`), `ui/UndoNoticeBar.tsx`, `TodoNode/index.tsx`; test `undoNotice.test.ts` (+1).
+**Summary:** A dropped plan leaves the list (dropped plans live in the hidden archive), so a mis-click on "Drop (not doing it)" had no way back except `todo undrop` in the terminal. Drop now shows "Dropped "…" · UNDO"; UNDO brings the plan back and puts its Calendar time back. The notice runs its own reverse step because Drop also unschedules the plan a moment later, which the history-based undo could not cover.
