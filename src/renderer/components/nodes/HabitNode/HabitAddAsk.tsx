@@ -3,9 +3,8 @@
 // after the name adds it. Something you don't tick (a class) is a repeating
 // event, made on the Calendar.
 //
-// Three layouts are being tried (canvas "Adding a habit · three drafts"):
-// A labelled rows, B a sentence, C three tiles. Same controls, same data;
-// the A · B · C switch in the header picks one and remembers it.
+// Layout (canvas "Adding a habit", draft A): the days at the top, then one
+// labelled row each for Time and Goal. One fixed height, nothing jumps.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -63,6 +62,8 @@ export function cardSummary(d: CardDraft): string {
     : [...d.days].sort().join() === '1,2,3,4,5' ? 'weekdays'
     : [...d.days].sort().join() === '6,7' ? 'weekends'
     : d.days.length === 6 ? `all but ${SHORT[([1, 2, 3, 4, 5, 6, 7] as const).find((x) => !d.days.includes(x))! - 1]}`
+    // One or two days: their short names ("Mon", "Mon Thu"); more: letters.
+    : d.days.length <= 2 ? [...d.days].sort().map((x) => SHORT[x - 1]).join(' ')
     : [...d.days].sort().map((x) => LETTERS[x - 1]).join(' ');
   const amt = d.amount && d.amount.target >= 2 ? ` · ${d.amount.target}${d.amount.unit ? ` ${d.amount.unit}` : ''}` : '';
   return `${when}${t ? ` · ${t}` : ''}${amt}`;
@@ -127,14 +128,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
   const top = Math.max(8, Math.min(anchor.top - h - 8, vh - h - 8));
   const toggleDay = (dow: IsoDow) => set({ days: d.days.includes(dow) ? d.days.filter((x) => x !== dow) : [...d.days, dow] });
 
-  const [variant, setVariantState] = useState<CardVariant>(readVariant);
-  const setVariant = (v: CardVariant) => {
-    setVariantState(v);
-    try { localStorage.setItem(VARIANT_KEY, v); } catch { /* private window: just this time */ }
-  };
-  const [open, setOpen] = useState<Part>('days');
-
-  // ── the controls, shared by every layout ──────────────────────────────────
+  // ── the controls ─────────────────────────────────────────────────────────
   const modeSeg = (small: boolean) => (
     <div role="radiogroup" aria-label="On days or times a week" style={segWrap}>
       {([['days', 'On days'], ['week', 'Times a week']] as const).map(([m, label]) => (
@@ -158,17 +152,6 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
       })}
     </div>
   );
-  const sortedDays = [...d.days].sort().join();
-  const presets = (
-    <div style={segWrap}>
-      {([['Every day', ALL], ['Weekdays', [1, 2, 3, 4, 5]], ['Weekends', [6, 7]]] as const).map(([label, days]) => (
-        <button key={label} type="button" data-testid={`habit-ask-preset-${label.toLowerCase().replace(' ', '-')}`} onClick={() => set({ days: [...days] as IsoDow[] })}
-          style={segBtn(sortedDays === [...days].join(), true)}>
-          {label}
-        </button>
-      ))}
-    </div>
-  );
   const perWeek = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32 }}>
       <span style={stepper(true)}>
@@ -181,8 +164,8 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
   );
   // Days, or times a week: always the same height, so nothing below moves.
   const daysBlock = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: 62, justifyContent: d.mode === 'days' ? 'flex-start' : 'center' }}>
-      {d.mode === 'days' ? <>{dayDots}{presets}</> : perWeek}
+    <div style={{ height: 32 }}>
+      {d.mode === 'days' ? dayDots : perWeek}
     </div>
   );
   const timeCtl = (
@@ -223,49 +206,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
         : 'One click a day marks it done'}
     </span>
   );
-  const units = (
-    <div style={{ display: 'flex', gap: 5 }}>
-      {UNITS.map((u) => (
-        <button key={u} type="button" onClick={() => set({ amount: { target: d.amount && d.amount.target >= 2 ? d.amount.target : 8, unit: u } })}
-          style={{ ...pill(amountUnit === u && !!d.amount), height: 24, padding: '0 8px', fontSize: 11 }}>{u}</button>
-      ))}
-    </div>
-  );
-  const goalWords = d.amount ? `${d.amount.target || '?'} ${d.amount.unit || 'a day'}` : 'just a tick';
-  const daysWords = cardSummary({ ...d, time: '', amount: null });
-  const timeWords = (d.time.trim() ? parseTime(d.time) : null) ?? 'any time';
-
-  // B and C: one part at a time in a box that is always the same height.
-  const editor = (
-    <div data-testid="habit-ask-editor" style={{ borderRadius: 10, background: 'var(--paper-2)', border: '1px solid var(--paper-3)', padding: 10, height: 128, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {open === 'days' && <>{modeSeg(true)}{daysBlock}</>}
-      {open === 'time' && <><span style={edHead}>Time</span>{timeCtl}<span style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.45 }}>Any time: it shows all day. A time puts it on the Clock and the Calendar.</span></>}
-      {open === 'goal' && <><span style={edHead}>Goal</span>{goalCtl}{units}{goalHelp}</>}
-    </div>
-  );
-
-  const token = (part: Part, words: string) => (
-    <button type="button" data-testid={`habit-ask-word-${part}`} onClick={() => setOpen(part)} aria-pressed={open === part}
-      style={{ padding: '1px 3px', border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, whiteSpace: 'nowrap',
-        color: 'var(--acid-ink, var(--acid))',
-        background: open === part ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent',
-        boxShadow: open === part ? 'inset 0 0 0 1px color-mix(in srgb, var(--acid) 40%, transparent)' : 'inset 0 -1.5px 0 color-mix(in srgb, var(--acid) 55%, transparent)' }}>
-      {words}
-    </button>
-  );
-  const tile = (part: Part, label: string, icon: 'day' | 'when' | 'target', value: string) => (
-    <button type="button" data-testid={`habit-ask-tile-${part}`} onClick={() => setOpen(part)} aria-pressed={open === part}
-      style={{ minWidth: 0, borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', padding: '8px 9px', display: 'flex', flexDirection: 'column', gap: 4, border: 'none',
-        background: open === part ? 'color-mix(in srgb, var(--acid) 8%, var(--paper-2))' : 'var(--paper-2)',
-        boxShadow: open === part ? 'inset 0 0 0 1.5px var(--acid)' : 'inset 0 0 0 1px var(--paper-3)' }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: open === part ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>
-        <MenuIcon name={icon} size={11} />{label}
-      </span>
-      <span style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</span>
-    </button>
-  );
-
-  const body = variant === 'A' ? (
+  const body = (
     <>
       {modeSeg(false)}
       {daysBlock}
@@ -273,32 +214,13 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
       <div style={rowGrid}><span style={rowLabel}>Goal</span>{goalCtl}</div>
       <div style={{ ...rowGrid, minHeight: 0, marginTop: -6 }}><span />{goalHelp}</div>
     </>
-  ) : variant === 'B' ? (
-    <>
-      {/* Two lines always, so the card keeps one height as the words change. */}
-      <div data-testid="habit-ask-sentence" style={{ fontSize: 13.5, lineHeight: '27px', height: 54, overflow: 'hidden', color: 'var(--ink-2)' }}>
-        {token('days', daysWords)}, at {token('time', timeWords)}, {token('goal', goalWords)}.
-      </div>
-      {editor}
-    </>
-  ) : (
-    <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
-        {tile('days', 'Days', 'day', daysWords)}
-        {tile('time', 'Time', 'when', timeWords)}
-        {tile('goal', 'Goal', 'target', goalWords)}
-      </div>
-      {editor}
-    </>
   );
-
   const card = (
     <div
       ref={ref}
       role="dialog"
       aria-label={initial ? `Edit ${name}` : `Add ${name}`}
       data-testid="habit-ask"
-      data-variant={variant}
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -312,14 +234,6 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-        {/* Trying the three designs: pick one, it stays picked on this computer. */}
-        <span role="radiogroup" aria-label="Card design" title="Try the three card designs" style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 6, border: '1px dashed var(--paper-3)' }}>
-          {VARIANTS.map((v) => (
-            <button key={v} type="button" role="radio" aria-checked={variant === v} data-testid={`habit-ask-variant-${v}`} onClick={() => setVariant(v)}
-              style={{ width: 22, height: 20, borderRadius: 4, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, fontWeight: 700, padding: 0,
-                background: variant === v ? 'var(--acid)' : 'transparent', color: variant === v ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)' }}>{v}</button>
-          ))}
-        </span>
         <button type="button" aria-label="Cancel" onClick={onCancel} style={{ border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', padding: 2, display: 'inline-flex' }}><MenuIcon name="drop" size={12} /></button>
       </div>
 
@@ -355,9 +269,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
         >
           {!answer
             ? (d.mode === 'days' && d.days.length === 0 ? 'Pick a day' : 'Check the time or amount')
-            : variant === 'A'
-              ? <>{saveLabel ?? 'Add'} <span style={{ fontWeight: 500, opacity: 0.75 }}>{cardSummary(d)}</span> ↵</>
-              : `${saveLabel ?? 'Add'} habit ↵`}
+            : <>{saveLabel ?? 'Add'} <span style={{ fontWeight: 500, opacity: 0.75 }}>{cardSummary(d)}</span> ↵</>}
         </button>
         {!initial && onCalendar && (
           <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
@@ -379,18 +291,6 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
     document.body,
   );
 }
-
-type CardVariant = 'A' | 'B' | 'C';
-type Part = 'days' | 'time' | 'goal';
-const VARIANTS: readonly CardVariant[] = ['A', 'B', 'C'];
-const VARIANT_KEY = 'krnl:habit-card-variant';
-function readVariant(): CardVariant {
-  try {
-    const v = localStorage.getItem(VARIANT_KEY);
-    return v === 'B' || v === 'C' ? v : 'A';
-  } catch { return 'A'; }
-}
-const UNITS = ['glasses', 'pages', 'min', 'km', 'times'];
 
 const segWrap: React.CSSProperties = { display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'var(--paper-2)', border: '1px solid var(--paper-3)' };
 const segBtn = (on: boolean, small: boolean): React.CSSProperties => ({
@@ -415,4 +315,3 @@ const stepBtn: React.CSSProperties = {
 };
 const rowGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: '48px 1fr', alignItems: 'center', gap: 8, minHeight: 30 };
 const rowLabel: React.CSSProperties = { fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' };
-const edHead: React.CSSProperties = { fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' };

@@ -2404,3 +2404,14 @@ Checked by walking the first-day tour in the preview (rings, wrong-day nudge, to
 **Type:** Bug Fix
 **Branch:** `experiment/new-user-review`
 **Summary:** A habit with an amount ("Water, 8 glasses") at 1 of 8 drew a thin coloured line inside today's square that looked like a rendering glitch. The square now fills softly with the count and shows the number ("1"), so progress is readable. (`HabitNode/index.tsx`)
+
+## [2026-11-08] — Habit card settled on A; habit days read clearly (experimental)
+
+**Type:** UX + Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`, `styles/tokens.css`.
+**Summary:**
+- **Habit card:** the A · B · C switch is gone (it confused more than it helped); the card is draft A — days, then Time and Goal rows. The Every day / Weekdays / Weekends row is removed to keep it small: tap the days. One or two days read "Mon" / "Mon Thu" on the button.
+- **The green bar on top of a part-done square** was the progress fill repeating into the square's 1 px border; it is painted from the border box and never repeats now.
+- **Days a habit isn't on** show a quiet **×** and can't be clicked (they were near-invisible squares).
+- **On a day the habit isn't on,** the row says "Next: tomorrow · 2 glasses a day" instead of "Tick today to start · 0 of 2 today".

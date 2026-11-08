@@ -680,6 +680,15 @@ const WeekRow = memo(function WeekRow({
   const target = weeklyTarget(habit);
   // One streak for every screen (habitStreak): weeks for a target, rest days stepped over.
   const { current: streak, best } = useMemo(() => habitStreak(habit, today), [habit, today]);
+  // Today one of its days? If not, the next one ("Next: Mon").
+  const onToday = tickableOn(habit, today);
+  const nextDay = useMemo(() => {
+    for (let k = 1; k <= 7; k++) {
+      const d = addDaysLocal(today, k);
+      if (tickableOn(habit, d)) return k === 1 ? 'tomorrow' : new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' });
+    }
+    return 'later';
+  }, [habit, today]);
   const restSet = useMemo(() => new Set(habit.rest ?? []), [habit.rest]);
   const weekTicks = target ? ticksThisWeek(habit.log, today) : 0;
   const unit = target ? 'week' : 'day';
@@ -788,7 +797,10 @@ const WeekRow = memo(function WeekRow({
             const cellStyle = partial > 0
               ? {
                 ...size,
-                background: `linear-gradient(to top, color-mix(in srgb, var(--habit-color, var(--acid)) 38%, transparent) ${Math.max(18, Math.round(partial * 100))}%, transparent ${Math.max(18, Math.round(partial * 100))}%)`,
+                // Painted from the border box and never repeated: a repeating fill
+                // showed again as a thin bar along the top border.
+                backgroundImage: `linear-gradient(to top, color-mix(in srgb, var(--habit-color, var(--acid)) 38%, transparent) ${Math.max(18, Math.round(partial * 100))}%, transparent ${Math.max(18, Math.round(partial * 100))}%)`,
+                backgroundRepeat: 'no-repeat', backgroundOrigin: 'border-box',
                 display: 'grid', placeItems: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, lineHeight: 1, color: 'var(--ink)',
               }
               : size;
@@ -857,13 +869,16 @@ const WeekRow = memo(function WeekRow({
               {`${streak} ${unit}${streak === 1 ? '' : 's'}`}
             </span>
           )
-          : target ? null : <span>{best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
+          : target ? null : <span>{!onToday ? `Next: ${nextDay}` : best > 0 ? 'Start again today' : 'Tick today to start'}</span>}
         {habit.amount && (() => {
           const c = countOn(habit, today);
           const t = habit.amount.target;
+          const u = habit.amount.unit ? ` ${habit.amount.unit}` : '';
+          // Not a habit day today: say the goal, not "0 of 2 today".
+          if (!onToday) return <span data-testid={`habit-amount-${habit.id}`}>{'· '}{t}{u} a day</span>;
           return (
             <span data-testid={`habit-amount-${habit.id}`} style={{ color: c >= t ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>
-              {'· '}{Math.min(c, t)} of {t}{habit.amount.unit ? ` ${habit.amount.unit}` : ''} today{c >= t ? ' ✓' : ''}
+              {'· '}{Math.min(c, t)} of {t}{u} today{c >= t ? ' ✓' : ''}
             </span>
           );
         })()}
