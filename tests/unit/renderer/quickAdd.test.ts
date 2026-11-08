@@ -37,6 +37,11 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('Review next monday', NOW).day).toBe('2026-11-16');
     expect(parseQuickAdd('Review monday', NOW).day).toBe('2026-11-09');
   });
+  it('"at 3" is 3 pm; "at 9" is 9 am; 3am stays 3 am', () => {
+    expect(parseQuickAdd('Call Sam at 3', NOW).time).toBe('15:00');
+    expect(parseQuickAdd('Standup at 9 tomorrow', NOW).time).toBe('09:00');
+    expect(parseQuickAdd('Flight at 3am tomorrow', NOW).time).toBe('03:00');
+  });
   it('plain names are left alone', () => {
     expect(parseQuickAdd('Read chapter 3', NOW)).toEqual({ text: 'Read chapter 3' });
     expect(parseQuickAdd('Buy 2 m cable', NOW)).toEqual({ text: 'Buy 2 m cable' });

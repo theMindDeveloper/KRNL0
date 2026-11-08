@@ -2004,3 +2004,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/routines`
 **Files changed:** `src/shared/whatsnew.ts`.
 **Summary:** Workflow rule: every feature in a release appears in its notes. The 0.11 "more" list now names Habits & Routines, the ask-first add flow, weekly targets / rest days / archive, due dates / reminders / Drop, and the Staying on track tour. The designed headline slides for these still need drafts on the design canvas and the user's approval before the release PR.
+
+## [2026-11-08] — Quick add: "at 3" is 3 pm (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Call Sam at 3" was read as 03:00. A bare hour from 1 to 7 without am/pm now reads as afternoon (15:00); "at 9" stays 09:00, "3am" stays 03:00, and the line under the field still shows the result before Enter.

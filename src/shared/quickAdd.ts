@@ -36,7 +36,8 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
     if (m) { out.time = `${pad(Number(m[1]))}:${m[2]}`; cut(m); }
     else {
       m = /\bat\s+([01]?\d|2[0-3])\b(?!\s*(?:min|h\b|hr|hour))/i.exec(s);
-      if (m) { out.time = `${pad(Number(m[1]))}:00`; cut(m); }
+      // "at 3" means 3 pm to almost everyone; 1–7 without am/pm read as afternoon.
+      if (m) { const n = Number(m[1]); out.time = `${pad(n >= 1 && n <= 7 ? n + 12 : n)}:00`; cut(m); }
     }
   }
 
