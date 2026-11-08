@@ -2398,3 +2398,9 @@ Follow-up: the Add button now has one fixed size (184 px) and the footer never w
 - **The card never sits on what it shows.** The day-recap step points at the recap card, so the guide goes beside it; and the card keeps 36 px from its target so the guide orb on its corner no longer covers it.
 - **Habit card:** one line under the goal says what the number means ("Each click adds 1 glass · done at 8" / "One click a day marks it done").
 Checked by walking the first-day tour in the preview (rings, wrong-day nudge, today drop, recap placement, Remove). Tests: 2,453 green; one time-log test timed out in the full run and passes on its own.
+
+## [2026-11-08] — Habits window: an amount part-way through the day reads as progress (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Summary:** A habit with an amount ("Water, 8 glasses") at 1 of 8 drew a thin coloured line inside today's square that looked like a rendering glitch. The square now fills softly with the count and shows the number ("1"), so progress is readable. (`HabitNode/index.tsx`)

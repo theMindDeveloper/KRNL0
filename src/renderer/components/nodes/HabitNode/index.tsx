@@ -783,8 +783,14 @@ const WeekRow = memo(function WeekRow({
               : resting ? `${habit.name} ${dayStr} — rest day (the streak carries on)`
               : habit.amount ? `${habit.name} ${dayStr} — ${cnt} of ${habit.amount.target}${habit.amount.unit ? ` ${habit.amount.unit}` : ''}`
               : `${habit.name} ${dayStr}`;
+            // Part-way to the day's amount: a soft fill rising with the count and
+            // the count itself, so "1 of 8" reads as progress, not as a stray line.
             const cellStyle = partial > 0
-              ? { ...size, background: `linear-gradient(to top, color-mix(in srgb, var(--habit-color, var(--acid)) 75%, transparent) ${Math.round(partial * 100)}%, transparent ${Math.round(partial * 100)}%)` }
+              ? {
+                ...size,
+                background: `linear-gradient(to top, color-mix(in srgb, var(--habit-color, var(--acid)) 38%, transparent) ${Math.max(18, Math.round(partial * 100))}%, transparent ${Math.max(18, Math.round(partial * 100))}%)`,
+                display: 'grid', placeItems: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, lineHeight: 1, color: 'var(--ink)',
+              }
               : size;
             return isFuture || !scheduled ? (
               <div key={dayStr} className={cls} style={size} title={tip} />
@@ -799,7 +805,9 @@ const WeekRow = memo(function WeekRow({
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 aria-pressed={done}
-              />
+              >
+                {partial > 0 ? cnt : null}
+              </button>
             );
           })}
         </div>
