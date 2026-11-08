@@ -236,7 +236,7 @@ krnl todo add "<text>" [--tag <label>]   # untagged adds are auto-tagged
                                            #   "Gym tomorrow 18:00 1h" -> on the Calendar; "Pay rent friday" -> due that day
 krnl todo due <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>   # deadline, apart from when it is planned
 krnl todo repeat <ref> <daily|weekdays|weekly|off>    # ticking it off adds the next one
-krnl todo drop <ref> / todo undrop <ref>   # "not doing it": to the Archive, not done, off the Calendar
+krnl todo drop <ref> / todo undrop <ref>   # "not doing it": to the Archive, not done, off the Calendar; a repeating plan is skipped (next one stays)
 krnl todo check <ref>                      # done -> "Done" today, "Archive" from tomorrow
 krnl todo list [--done|--archived|--all] [--json]   # default: open + done today
 krnl todo tag <ref> <tag|auto>             # hand-tag (unknown label = new custom tag); auto = classifier

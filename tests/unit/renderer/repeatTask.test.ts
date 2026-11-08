@@ -77,6 +77,17 @@ describe('krnl todo repeat + check', () => {
     expect(list).toContain('repeats every day');
     expect(list).toMatch(/due \d{4}-\d{2}-\d{2}/);
   });
+  it('dropping a repeating plan skips it: the next one stays', async () => {
+    await f.run(['todo', 'add', 'Gym 18:00 every monday']);
+    const it0 = items().find((i) => i.text === 'Gym')!;
+    const r = await f.run(['todo', 'drop', it0.id]);
+    expect(r.message).toContain('Skipped "Gym" this time');
+    expect(r.message).toContain('18:00');
+    const all = items().filter((i) => i.text === 'Gym');
+    expect(all).toHaveLength(2);
+    expect(all.find((i) => i.id === it0.id)!.droppedAt).toBeDefined();
+    expect(all.find((i) => i.id !== it0.id)!.repeat).toEqual({ kind: 'weekly', day: 1 });
+  });
   it('the next one keeps the reminder and the kind (event)', async () => {
     await f.run(['todo', 'add', 'Team sync']);
     const it0 = items().find((i) => i.text === 'Team sync')!;

@@ -2219,3 +2219,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/repeatTask.ts` (`repeatsBehind`), `TodoNode/index.tsx`; test `repeatTask.test.ts` (+1).
 **Summary:** The next copy of a repeating plan was only made on tick, so "Water plants every day" stopped for good the first time a day passed unticked. On open and at midnight, every open repeating plan whose day has passed now makes its next copy from today (same time, same repeat). The old one stays where it was, as missed, so nothing is hidden. A guard keeps a double-run effect from making two copies (checked in the preview: one copy).
+
+## [2026-11-08] — `todo drop` skips a repeating plan too (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/sys/commands/todo.ts`, `shared/cli/commandRegistry.ts`, `claude/CLAUDE.md`; test `repeatTask.test.ts` (+1).
+**Summary:** Same fix as the app, from the terminal: `todo drop` on a repeating plan makes its next one first (same time, same repeat), then drops this one: "Skipped "Gym" this time. Next one: … 18:00." The help and the in-app assistant's notes say so.

@@ -46,7 +46,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'check', usage: 'todo check <ref>', summary: 'Toggle a TodoItem done/undone — <ref> accepts id-prefix or text match' },
       { name: 'list', usage: 'todo list [--done|--archived|--all] [--json]', summary: 'List TodoItems — default: open + done today; --done today only, --archived past days, --all everything. [Tag?] = auto tag' },
       { name: 'repeat', usage: 'todo repeat <ref> <daily|weekdays|weekly|off>', summary: 'Repeat a plan: tick it off and the next one appears (weekly = its own weekday)' },
-      { name: 'drop', usage: 'todo drop <ref>', summary: 'Not doing it any more: to the Archive as "dropped" (not done), off the Calendar' },
+      { name: 'drop', usage: 'todo drop <ref>', summary: 'Not doing it any more: to the Archive as "dropped" (not done), off the Calendar. A repeating plan is skipped: its next one stays' },
       { name: 'undrop', usage: 'todo undrop <ref>', summary: 'Bring a dropped item back to the list' },
       { name: 'due', usage: 'todo due <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>', summary: 'The day it must be done by (apart from when it is planned)' },
       { name: 'tag', usage: 'todo tag <ref> <tag|auto>', summary: 'Hand-tag a TodoItem (id or label; unknown labels create a custom tag). "auto" hands it back to the classifier' },

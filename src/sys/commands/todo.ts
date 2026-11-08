@@ -272,6 +272,10 @@ export async function todoDropCmd(ctx: TodoCtx, ref: string | undefined, undo: b
   const board = loadBoard(ctx);
   const r = resolveTodoItemRef(board, ref);
   if (!r.ok) return { ok: false, message: resolutionError('todo item', ref, r) };
+  // A repeating plan is skipped, not ended: its next one comes first (it
+  // reads this one's time before the drop takes it off the Calendar).
+  const was = (findTodoMother(board)?.state as TodoState | undefined)?.items.find((i) => i.id === r.id.itemId);
+  const skip = !undo && was && !was.done && was.droppedAt === undefined && parseRepeat(was.repeat) ? await nextRepeatFromCli(ctx, r.id.itemId) : '';
   const m = mutateTodo(ctx, (st) => (undo ? todoUndrop(st, { id: r.id.itemId }) : todoDrop(st, { id: r.id.itemId })));
   if (!m.ok) return m;
   const item = m.after.items.find((i) => i.id === r.id.itemId);
@@ -285,6 +289,7 @@ export async function todoDropCmd(ctx: TodoCtx, ref: string | undefined, undo: b
   }
   saveBoard(ctx, m.board);
   if (m.after === m.before) return { ok: true, message: `Todo "${item?.text ?? ref}" was ${undo ? 'not dropped' : 'already dropped or done'}.`, data: { id: r.id.itemId } };
+  if (skip) return { ok: true, message: `Skipped "${item?.text}" this time.${skip}`, data: { id: r.id.itemId, dropped: true, skipped: true } };
   return { ok: true, message: undo ? `Todo "${item?.text}" is back on the list.` : `Todo "${item?.text}" dropped (in the Archive; todo undrop brings it back).`, data: { id: r.id.itemId, dropped: !undo } };
 }
 
