@@ -24,9 +24,10 @@ import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../st
 import { toneVarForTask } from '../../../utils/taskColor';
 import { undoable } from '../../../store/undoNotice';
 import { DuePicker } from '../../ui/DuePicker';
+import { RemindPicker } from '../../ui/RemindPicker';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
-import { unscheduleTask } from '../../../store/scheduleActions';
+import { setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
   const { state, config: rawConfig } = node;
@@ -62,6 +63,16 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   const [tagPicker, setTagPicker] = useState<{ x: number; y: number; itemId: string } | null>(null);
   // Review 2.1 — the due-day picker (row menu → "Due date…", or click the chip).
   const [duePick, setDuePick] = useState<{ x: number; y: number; itemId: string } | null>(null);
+  // Review 4.1 — reminder lead time per plan (row menu → "Remind me…").
+  const [remindPick, setRemindPick] = useState<{ x: number; y: number; taskId: string; value: number | null } | null>(null);
+  const remindByTask = useBoardStore(useShallow((s) => {
+    const out: Record<string, number> = {};
+    for (const n of s.board?.nodes ?? []) {
+      const r = (n.state as { remindMin?: unknown } | null)?.remindMin;
+      if (n.kind === 'todo.task' && typeof r === 'number') out[n.id] = r;
+    }
+    return out;
+  }));
   const todayYMD = useLocalDay();
 
   // 60-second tick for past-item graying — also rolls yesterday's Done into
@@ -410,6 +421,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           },
         },
       ]),
+      ...(item?.taskNodeId && !item.done ? [{
+        label: remindByTask[item.taskNodeId] !== undefined ? 'Reminder…' : 'Remind me…',
+        onSelect: () => {
+          if (ctxMenu && item.taskNodeId) setRemindPick({ x: ctxMenu.x, y: ctxMenu.y, taskId: item.taskNodeId, value: remindByTask[item.taskNodeId] ?? null });
+        },
+      }] : []),
       ...(item && !item.done && item.droppedAt === undefined ? [{
         label: 'Drop (not doing it)',
         onSelect: () => {
@@ -582,6 +599,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         </span>
       )}
 
+      {/* Review 4.1 — a reminder is set (it fires while the plan is on the Calendar). */}
+      {item.taskNodeId !== null && remindByTask[item.taskNodeId] !== undefined && !item.done && (
+        <span data-testid={`todo-remind-${item.id}`} title={`Reminder ${remindByTask[item.taskNodeId] === 0 ? 'at the start' : `${remindByTask[item.taskNodeId]} min before`}`} style={{ display: 'inline-flex', color: 'var(--ink-3)', flexShrink: 0 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" /></svg>
+        </span>
+      )}
       {/* Review 2.1 — the deadline, apart from when it is planned. */}
       {item.dueOn && !item.done && (() => {
         const d = dueLabel(item.dueOn, todayYMD);
@@ -1004,6 +1027,15 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       )}
 
       {/* ADR 0016 — tag picker (portal, like the context menu). */}
+      {remindPick !== null && (
+        <RemindPicker
+          x={remindPick.x}
+          y={remindPick.y}
+          value={remindPick.value}
+          onPick={(min) => { void setTaskReminder(remindPick.taskId, min); setRemindPick(null); }}
+          onClose={() => setRemindPick(null)}
+        />
+      )}
       {duePick !== null && (
         <DuePicker
           x={duePick.x}

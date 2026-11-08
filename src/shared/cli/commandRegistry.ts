@@ -31,6 +31,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'chain', usage: 'task chain <ref1> <ref2> [<ref3>...]', summary: 'Wire task.next → task.activate between consecutive tasks' },
       { name: 'schedule', usage: 'task schedule <ref> --at <YYYY-MM-DDTHH:MM> [--duration <min>]', summary: 'Schedule a task at a wall-clock time (cascade anchor)' },
       { name: 'unschedule', usage: 'task unschedule <ref>', summary: 'Clear the scheduled time from a task' },
+      { name: 'remind', usage: 'task remind <ref> <minutes-before|off>', summary: 'A system notification before it starts (0 = at the start); works with the window closed' },
       { name: 'addNext', usage: 'task addNext <sourceRef> "<text>" [--duration <min>]', summary: 'Add a sequential successor task after source' },
       { name: 'list', usage: 'task list [<todoId>] [--json]', summary: 'List tasks, optionally filtered by TodoNode. IDs/refs accept ≥4-char prefix or unique text.' },
       { name: 'kind', usage: 'task kind <ref> <focus|event>', summary: 'Task kind (event only since #180 — focus is refused). Kept for script compatibility.' },

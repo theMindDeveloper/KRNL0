@@ -828,6 +828,7 @@ export class SysFacade {
         case 'chain':      return task.taskChain(ctx, command.refs);
         case 'schedule':   return task.taskSchedule(ctx, command.id, command.at, command.durationMin);
         case 'unschedule': return task.taskUnschedule(ctx, command.id);
+        case 'remind':     return task.taskRemind(ctx, command.ref, command.value);
         case 'addNext':    return task.taskAddNext(ctx, command.sourceRef, command.text, command.durationMin);
         // Decision 29 — kind + note
         case 'kind': return task.taskKind(ctx, command.ref, command.taskKind);

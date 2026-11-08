@@ -122,6 +122,7 @@ import {
   taskClearCurrentSessionElapsedSec,
   taskSetDuration,
   taskSetSchedule,
+  taskSetRemind,
 } from '../nodes/TaskNode/commands';
 import type { TaskState } from '../nodes/TaskNode/types';
 
@@ -416,6 +417,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'task.setDuration':       return { state: taskSetDuration(s as never, args as never) };
         // ADR 0001 — calendar integration: set/clear schedule on a task.
         case 'task.setSchedule':       return { state: taskSetSchedule(s as never, args as never) };
+        case 'task.setRemind':         return { state: taskSetRemind(s as never, args as never) };
       }
       break;
     }

@@ -36,6 +36,7 @@ export type SysCommand =
   | { kind: 'task'; sub: 'chain'; refs: string[] }
   | { kind: 'task'; sub: 'schedule'; id: string | undefined; at: string | undefined; durationMin: number | undefined }
   | { kind: 'task'; sub: 'unschedule'; id: string | undefined }
+  | { kind: 'task'; sub: 'remind'; ref: string | undefined; value: string | undefined }
   | { kind: 'task'; sub: 'addNext'; sourceRef: string | undefined; text: string | undefined; durationMin: number | undefined }
   | { kind: 'cal'; sub: 'show'; from: string | undefined; to: string | undefined; json: boolean }
   | { kind: 'cal'; sub: 'view'; view: string | undefined; date: string | undefined }
@@ -550,6 +551,9 @@ export class SysParser {
       }
       if (sub === 'unschedule') {
         return { kind: 'task', sub: 'unschedule', id: rest[0] };
+      }
+      if (sub === 'remind') {
+        return { kind: 'task', sub: 'remind', ref: rest[0], value: rest[1] };
       }
       if (sub === 'addNext') {
         const durRaw = flag(rest, 'duration');

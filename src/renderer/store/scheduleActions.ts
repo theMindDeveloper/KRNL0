@@ -96,6 +96,11 @@ export function toggleTaskDone(taskId: string): Promise<void> {
   return dispatchToTask(taskId, 'task.toggle');
 }
 
+/** Review 4.1 — remind N minutes before a plan starts (null = no reminder). */
+export function setTaskReminder(taskId: string, min: number | null): Promise<void> {
+  return dispatchToTask(taskId, 'task.setRemind', { min });
+}
+
 export function startFocusOnTask(taskId: string): Promise<void> {
   return dispatchToTask(taskId, 'task.startPomo');
 }
