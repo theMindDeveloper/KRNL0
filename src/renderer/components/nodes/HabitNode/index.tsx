@@ -186,6 +186,11 @@ export function HabitNode({
   const takenNames = useMemo(() => new Set(state.habits.filter((h) => !h.archived).map((h) => h.name.trim().toLowerCase())), [state.habits]);
   const addAnswered = (a: AddAnswer) => {
     onCommand('habit.add', { name: newName.trim(), schedule: a.schedule, ...(a.kind === 'routine' ? { kind: 'routine' } : {}), ...(a.perWeek ? { perWeek: a.perWeek } : {}) });
+    // An amount a day, when asked for (set right after the habit exists).
+    if (a.amount) {
+      const h = [...(useBoardStore.getState().board?.nodes.find((n) => n.id === node.id)?.state as HabitState | undefined)?.habits ?? []].reverse().find((x) => x.name === newName.trim());
+      if (h) onCommand('habit.setAmount', { id: h.id, target: a.amount.target, unit: a.amount.unit });
+    }
     setNewName('');
     setAsk(null);
   };

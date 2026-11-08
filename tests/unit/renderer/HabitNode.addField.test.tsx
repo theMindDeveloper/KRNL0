@@ -108,6 +108,15 @@ describe('askMissing / askToAnswer', () => {
     expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '22:00', durationMin: 480, itemKind: 'routine' })).toBe(true);
     expect(endsPastMidnight({ kind: 'daily', days: [], timeOfDay: '23:30', durationMin: 60 })).toBe(true);
   });
+  it('an amount is optional; once opened it needs a number (or none)', () => {
+    const base = { ...EMPTY_ASK, kind: 'habit' as const, often: 'daily' as const, when: 'any' as const };
+    expect(askMissing(base)).toBeNull();
+    expect(askMissing({ ...base, amount: { target: 0, unit: '' } })).toBe('Pick how much, or none');
+    const eight = { ...base, amount: { target: 8, unit: 'glasses' } };
+    expect(askToAnswer(eight)).toEqual({ kind: 'habit', schedule: { kind: 'daily' }, amount: { target: 8, unit: 'glasses' } });
+    expect(summary(eight)).toBe('every day, any time, 8 glasses');
+    expect(askToAnswer({ ...base, amount: null })).toEqual({ kind: 'habit', schedule: { kind: 'daily' } });
+  });
   it('a routine on all five weekdays is saved as weekdays', () => {
     const d = { ...EMPTY_ASK, kind: 'routine' as const, days: [1, 2, 3, 4, 5] as const, timeOfDay: '09:00', durationMin: 480 };
     expect(askToAnswer({ ...d, days: [...d.days] })?.schedule).toEqual({ kind: 'weekdays', timeOfDay: '09:00', durationMin: 480 });

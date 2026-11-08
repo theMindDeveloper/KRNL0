@@ -16,6 +16,8 @@ export interface AddAnswer {
   schedule: HabitSchedule;
   /** Habit only: "3 times a week, any days". */
   perWeek?: number;
+  /** Habit only: "8 glasses a day" (optional). */
+  amount?: { target: number; unit: string };
 }
 
 /** The answers so far; null = not answered yet (nothing is pre-chosen). */
@@ -27,6 +29,8 @@ export interface AskDraft {
   when: 'any' | 'at' | null;
   timeOfDay: string;
   durationMin: number | null;
+  /** Optional, habit only: "8 glasses a day". null = a plain tick. */
+  amount?: { target: number; unit: string } | null;
 }
 
 export const EMPTY_ASK: AskDraft = { kind: null, often: null, perWeek: null, days: [], when: null, timeOfDay: '', durationMin: null };
@@ -44,12 +48,13 @@ export function askMissing(d: AskDraft): string | null {
   if (!d.kind) return 'Answer yes or no';
   if (d.kind === 'habit') {
     if (!d.often) return 'Pick how often';
-    if (d.often === 'perWeek') return d.perWeek ? null : 'Pick how many times';
+    if (d.often === 'perWeek') return !d.perWeek ? 'Pick how many times' : d.amount && !(d.amount.target >= 2) ? 'Pick how much, or none' : null;
     if (d.often === 'weekly' && d.days.length === 0) return 'Pick its days';
     if (!d.when) return 'Pick any time or a set time';
     if (d.when === 'at' && !TIME_RE.test(d.timeOfDay)) return 'Pick a time';
     if (d.when === 'at' && !d.durationMin) return 'Pick how long';
     if (d.when === 'at' && d.durationMin && pastMidnight(d.timeOfDay, d.durationMin)) return 'Ends after midnight: start earlier or make it shorter';
+    if (d.amount && !(d.amount.target >= 2)) return 'Pick how much, or none';
     return null;
   }
   if (d.days.length === 0) return 'Pick its days';
@@ -73,7 +78,8 @@ export function askToRepeat(d: AskDraft): RepeatValue {
 export function askToAnswer(d: AskDraft): AddAnswer | null {
   if (askMissing(d) || !d.kind) return null;
   const perWeek = d.kind === 'habit' && d.often === 'perWeek' && d.perWeek ? { perWeek: d.perWeek } : {};
-  return { kind: d.kind, schedule: toSchedule(askToRepeat(d)), ...perWeek };
+  const amount = d.kind === 'habit' && d.amount ? { amount: d.amount } : {};
+  return { kind: d.kind, schedule: toSchedule(askToRepeat(d)), ...perWeek, ...amount };
 }
 
 const DAYS: ReadonlyArray<{ dow: IsoDow; letter: string; name: string }> = [
@@ -205,6 +211,27 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken }: Props) {
                   )}
                 </>
               )}
+              {/* Optional: an amount a day ("8 glasses"). Nothing is set unless asked for. */}
+              {d.amount === undefined || d.amount === null ? (
+                <button type="button" data-testid="habit-ask-amount-open" onClick={() => set({ amount: { target: 0, unit: '' } })}
+                  style={{ alignSelf: 'flex-start', padding: 0, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-sans)' }}>
+                  + An amount a day (8 glasses, 20 pages…)
+                </button>
+              ) : (
+                <>
+                  <div style={q}>How much a day? <span style={{ color: 'var(--ink-4)' }}>Each tick adds one.</span></div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {[2, 4, 6, 8, 10, 20].map((n) => (
+                      <button key={n} type="button" data-testid={`habit-ask-amount-${n}`} onClick={() => set({ amount: { target: n, unit: d.amount?.unit ?? '' } })} style={chip(d.amount?.target === n)}>{n}</button>
+                    ))}
+                    <input data-testid="habit-ask-amount-unit" value={d.amount.unit} maxLength={24} placeholder="glasses"
+                      onChange={(e) => set({ amount: { target: d.amount?.target ?? 0, unit: e.target.value } })}
+                      style={{ width: 90, height: 26, padding: '0 8px', borderRadius: 7, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)', fontSize: 12, outline: 'none' }} />
+                    <button type="button" data-testid="habit-ask-amount-off" onClick={() => set({ amount: null })} title="Just a tick"
+                      style={{ padding: 0, border: 'none', background: 'transparent', color: 'var(--ink-4)', cursor: 'pointer', fontSize: 12 }}>none</button>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <>
@@ -251,7 +278,12 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken }: Props) {
 
 /** "weekdays · any time", "Mon Wed · 10:00–12:00". */
 export function summary(d: AskDraft): string {
-  if (d.kind === 'habit' && d.often === 'perWeek' && d.perWeek) return `${d.perWeek}× a week, any days`;
+  const amt = d.kind === 'habit' && d.amount ? `, ${d.amount.target}${d.amount.unit ? ` ${d.amount.unit}` : ''}` : '';
+  if (d.kind === 'habit' && d.often === 'perWeek' && d.perWeek) return `${d.perWeek}× a week, any days${amt}`;
+  return summaryBase(d) + amt;
+}
+
+function summaryBase(d: AskDraft): string {
   const v = askToRepeat(d);
   const days = v.kind === 'daily' ? 'every day' : v.kind === 'weekdays' ? 'weekdays'
     : v.days.map((x) => DAYS.find((y) => y.dow === x)?.name.slice(0, 3)).join(' ');

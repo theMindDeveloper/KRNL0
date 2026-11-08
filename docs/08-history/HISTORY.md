@@ -2080,3 +2080,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `claude/CLAUDE.md`.
 **Summary:** The assistant's instructions predated routines and today's work, so it would reach for the old commands or say something cannot be done. It now has a "Routines and habits — two kinds" section (when to ask "do you want to tick it off?"), the routine commands, weekly targets / amounts / counts / rest days / archive–unarchive, quick add in `todo add`, `todo due|repeat|drop|undrop`, and `task remind`; "Pin as lane" reads "Put a card on the canvas".
+
+## [2026-11-08] — Say an amount while adding a habit (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`; test `HabitNode.addField.test.tsx` (+1).
+**Summary:** Amounts were only in the right-click menu. The add card's habit questions end with an optional "+ An amount a day (8 glasses, 20 pages…)": it opens chips (2–20), a unit field and "none"; nothing is set unless asked for, and the button says it ("Add · every day, any time, 8 glasses"). Checked in the preview: the new habit reads "0 of 8 glasses today".
