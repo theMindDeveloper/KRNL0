@@ -118,7 +118,18 @@ function AppInner() {
       try {
         // maxZoom: 1 keeps fitView from over-zooming when the visible set is
         // small (e.g. a single task node). Matches seedBoard's default zoom.
-        fitView({ padding: CANVAS_FIT_PADDING, duration: 400, maxZoom: 1 });
+        // In Free mode, start where reading starts: the first four windows
+        // from the left at a readable size (all six side by side fit at ~34%,
+        // where no text can be read — new-user review). FIT and the minimap
+        // still show everything.
+        const first = effectiveMode === 'canvas'
+          ? (useBoardStore.getState().board?.nodes ?? [])
+              .filter((n) => (n as { isMother?: boolean }).isMother === true)
+              .sort((x, y) => x.position.x - y.position.x)
+              .slice(0, 4)
+              .map((n) => ({ id: n.id }))
+          : [];
+        fitView({ padding: CANVAS_FIT_PADDING, duration: 400, maxZoom: 1, ...(first.length === 4 ? { nodes: first } : {}) });
       } catch {
         /* RF not ready yet — skipped */
       }

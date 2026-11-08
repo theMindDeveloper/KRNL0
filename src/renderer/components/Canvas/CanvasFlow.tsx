@@ -664,7 +664,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       .filter((n) => (n as { isMother?: boolean }).isMother === true)
       .map((n) => ({ id: (n as { id: string }).id }));
     if (motherIds.length === 0) return;
-    fitView({ padding: 0.15, includeHiddenNodes: false, nodes: motherIds, duration: 0 });
+    // Never below a readable size: six windows side by side fit at ~34%, where
+    // no text can be read (new-user review). FIT and the minimap show them all.
+    fitView({ padding: 0.15, includeHiddenNodes: false, nodes: motherIds, duration: 0, minZoom: 0.55 });
     didFitRef.current = true;
   }, [rfNodes.length, initialViewport, fitView]);
 

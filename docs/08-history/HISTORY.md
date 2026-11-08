@@ -2046,3 +2046,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `TodoNode/index.tsx`, `styles/reactflow-theme.css`.
 **Summary:** A row with a due day, a repeat and a reminder pushed its PLAN button off the edge at Station width (351 px). The repeat and reminder marks now sit together in one tight group, and in a narrow row the due chip drops its "due " word ("tomorrow", "Fri" — the chip reads as a date). Nothing is hidden; PLAN fits again.
+
+## [2026-11-08] — Free layout opens readable (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `App.tsx`, `Canvas/CanvasFlow.tsx`, `docs/research/new-user-review-2026-11-08.md`.
+**Summary:** New-user review 1.10: switching to Free fitted all six windows side by side at about 34%, where nothing can be read. Free now fits the first four windows from the left (Pomo, Todo, Habits, Calendar) at a readable size (52% at 1440 × 900); FIT and the minimap still show everything. The first fit of a fresh canvas also never goes below 55%. Checked in the preview.
