@@ -2115,3 +2115,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/quickAdd.ts`, `TodoNode/index.tsx`, `sys/commands/todo.ts`, `Tour/tours.ts`; test `quickAdd.test.ts` (+1, CLI +1).
 **Summary:** "Weekly review every sunday 18:00", "Water plants every day", "Standup every weekday 9:30" now add a repeating plan in one line: the repeat is read from the words, the first one lands on its first matching day (today counts unless its time has passed), and the line under the field says so ("today 18:00 · repeats every Sunday"). Same in `krnl todo add`. The Todo tour's quick-add step names it.
+
+## [2026-11-08] — Calendar habit pills show an amount's count (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/WeekView.tsx`.
+**Summary:** A timed habit with an amount ("Meditate · 8 a day") showed only done / not done on the Calendar while a click there added one. The pill now shows the day's count ("3/8") until it is done. Checked in the preview.

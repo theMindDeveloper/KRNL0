@@ -33,7 +33,7 @@ import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarLayers, CalendarState } from './types';
 import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularityFor } from './types';
-import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, routineSpansOn, type RoutineOccurrence, type RoutineSpan } from '../HabitNode/types';
+import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, routineSpansOn, countOn, type RoutineOccurrence, type RoutineSpan } from '../HabitNode/types';
 import { routineLanes } from './routineLanes';
 import { dayOnlyPlans } from './dayOnly';
 import { TimeField } from '../../ui/TimeField';
@@ -195,6 +195,9 @@ interface ScheduledHabit {
   log: readonly string[];
   /** The habit mother, to tick the habit from the calendar. */
   motherId: string;
+  /** "8 glasses a day": the pill shows the day's count (each click adds one). */
+  amount?: { target: number; unit: string };
+  counts?: Record<string, number>;
 }
 
 // ── Layers (calendar-visual-grammar) ─────────────────────────────────────────
@@ -755,6 +758,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             schedule: h.schedule,
             log: h.log,
             motherId: n.id,
+            ...(h.amount ? { amount: h.amount, ...(h.counts ? { counts: h.counts } : {}) } : {}),
           });
         }
       }
@@ -2164,6 +2168,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               : habit.icon ? <HabitIcon icon={habit.icon} size={10} /> : <span style={{ width: 7, height: 7, borderRadius: 999, background: colour, display: 'inline-block' }} />}
           </span>
           {!iconOnly && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{habit.name}</span>}
+          {habit.amount && !done && (
+            <span data-testid={`calendar-habit-count-${habit.id}`} style={{ flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>
+              {countOn({ amount: habit.amount, ...(habit.counts ? { counts: habit.counts } : {}), log: [...habit.log] }, dayYMD)}/{habit.amount.target}
+            </span>
+          )}
         </button>,
       );
     }
