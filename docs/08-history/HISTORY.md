@@ -2338,3 +2338,10 @@ Checked by walking it in the preview as a user (add, tick, drag to the strip, bl
 - **Minimal Pomo face**: just the time, a thin progress line while it runs, and one word (Ready / Focus / Paused). In the face picker, the pocket timer and `krnl pomo config --face minimal`.
 - **Tours** updated for the new ways: first day (add card, its card, PLAN gone), welcome (plans, click to add, events), Todo (the add card, its card), Calendar (ANY TIME strip, click/+ to add, a plan's card), repeating events (click empty hours), modes ("Focus on it").
 Checked in the preview as a user (plain Enter, card day/length/deadline, words filling the card, click and + on the Calendar, block and row opening the same card; faces at five window sizes). 2,447 tests and typecheck green.
+
+## [2026-11-08] — The add-plan card in the habit card's style (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/PlanAddCard.tsx`.
+**Summary:** The first add-plan card was a wall of identical chips (seven days, seven lengths, four deadlines, wrapping rows). The user asked for the habit card's style instead: the plan's name; a No day / On a day switch; this week as day circles (today ringed); a time row (Any time or a time); a length row (No length, − value +); a deadline row (No deadline / by …, with its own day circles); and one button that says what Enter adds ("Add · Tue 16:00 · 1h 30 · by Tue"). Still filled from the words, and Enter still adds a plain plan straight away. Three other directions are on the canvas ("Adding a plan · three drafts").
