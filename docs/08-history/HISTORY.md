@@ -2345,3 +2345,10 @@ Checked in the preview as a user (plain Enter, card day/length/deadline, words f
 **Branch:** `experiment/new-user-review`
 **Files changed:** `TodoNode/PlanAddCard.tsx`.
 **Summary:** The first add-plan card was a wall of identical chips (seven days, seven lengths, four deadlines, wrapping rows). The user asked for the habit card's style instead: the plan's name; a No day / On a day switch; this week as day circles (today ringed); a time row (Any time or a time); a length row (No length, − value +); a deadline row (No deadline / by …, with its own day circles); and one button that says what Enter adds ("Add · Tue 16:00 · 1h 30 · by Tue"). Still filled from the words, and Enter still adds a plain plan straight away. Three other directions are on the canvas ("Adding a plan · three drafts").
+
+## [2026-11-08] — One plan card for adding, editing and the Calendar (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/WhenPopover.tsx` (controlled mode, `anchorAbove`, `primaryLabel`), `TodoNode/index.tsx`, `TodoNode/PlanAddCard.tsx` (helpers only now).
+**Summary:** Adding a plan had its own card (a week of day circles with no dates) while a row's When… and a Calendar block showed the month calendar card — two looks for one thing, and the add card could not say which Tuesday. Typing a plan now opens the same plan card: its name, When / Deadline tabs, the month calendar, Any time or a time, length, reminder, and an **Add** button. It follows the words as you type ("Essay tue 16:00 1h" selects Tue 10, 16:00, 1h), anything picked on the card wins, the text field keeps the focus, Enter adds, Esc cancels. A plain name and Enter still adds a plain plan.

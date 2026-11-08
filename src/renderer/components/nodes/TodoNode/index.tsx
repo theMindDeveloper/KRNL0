@@ -29,7 +29,7 @@ import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { scheduleTaskAt, setTaskReminder, unscheduleTask } from '../../../store/scheduleActions';
 import { parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
-import { PlanAddCard, effectiveDraft, type PlanDraft, type PlanOverrides } from './PlanAddCard';
+import { effectiveDraft, type PlanDraft, type PlanOverrides } from './PlanAddCard';
 
 
 export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TOTAL }: NodeProps<TodoState, TodoConfig>) {
@@ -283,8 +283,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
     const item = [...(st?.items ?? [])].filter((i) => i.text === text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     if (item) {
-      if (d.day && d.time && item.taskNodeId) void scheduleTaskAt(item.taskNodeId, `${d.day}T${d.time}`);
-      else if (d.day) onCommand('todo.setOnDay', { id: item.id, onDay: d.day });
+      if (d.day && d.time && item.taskNodeId) {
+        const taskId = item.taskNodeId;
+        const remind = d.remindMin ?? null;
+        void scheduleTaskAt(taskId, `${d.day}T${d.time}`).then(() => { if (remind !== null) void setTaskReminder(taskId, remind); });
+      } else if (d.day) onCommand('todo.setOnDay', { id: item.id, onDay: d.day });
       if (d.deadline) onCommand('todo.setDue', { id: item.id, dueOn: d.deadline });
     }
     setPendingName('');
@@ -928,15 +931,28 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
               </div>
             );
           }
+          // Decision 40 — the same plan card as a row's When… and a Calendar
+          // block, following the words while you type; Add adds.
           const r = addRowRef.current?.getBoundingClientRect();
+          const d = effectiveDraft(fromWords(q), planOv);
+          const value = { day: d.day, time: d.time, lengthMin: d.lengthMin, deadline: d.deadline, remindMin: d.remindMin ?? null };
           return (
-            <PlanAddCard
-              name={q.text}
+            <WhenPopover
+              x={0}
+              y={0}
               today={todayYMD}
-              draft={effectiveDraft(fromWords(q), planOv)}
-              onSet={(patch) => setPlanOv((cur) => ({ ...cur, ...patch }))}
-              onAdd={addTyped}
-              anchor={r ? { left: r.left, right: r.right, top: r.top } : { left: 8, right: 360, top: window.innerHeight - 60 }}
+              value={value}
+              title={{ text: q.text }}
+              onChange={(next) => {
+                const patch: PlanOverrides = {};
+                (['day', 'time', 'lengthMin', 'deadline', 'remindMin'] as const).forEach((k) => { if (next[k] !== value[k]) (patch as Record<string, unknown>)[k] = next[k]; });
+                setPlanOv((cur) => ({ ...cur, ...patch }));
+              }}
+              onApply={(next) => addPlan(q.text, { day: next.day, time: next.time, lengthMin: next.lengthMin, deadline: next.deadline, remindMin: next.remindMin })}
+              onClose={() => { setPendingName(''); setPlanOv({}); setInputFocused(false); }}
+              anchorAbove={r ? { left: r.left + 8, top: r.top } : { left: 8, top: window.innerHeight - 60 }}
+              // The card shows the values; the button just says what it does.
+              primaryLabel="Add ↵"
             />
           );
         })()}

@@ -2,7 +2,7 @@
 // time; its length; a reminder) and, on its own tab, its Deadline. Replaces
 // "Edit time", "Due date…" and "Reminder…". App-styled: no native pickers.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Z } from './layers';
 import { addDays } from '../../../shared/due';
@@ -36,6 +36,14 @@ interface Props {
   /** …and what you can do with it (the timer, show it, delete it), the same
    *  from the Todo row and from its block on the Calendar. */
   actions?: ReadonlyArray<{ key: string; label: string; icon: MenuIconName; onClick: () => void; danger?: boolean }>;
+  /** Adding a plan: the card follows the typed words (controlled). Each
+   *  change on the card is reported; the parent keeps the value. */
+  onChange?: (next: WhenValue) => void;
+  /** Adding a plan: sits just above the add row, no backdrop, and the text
+   *  field keeps the focus (typing goes on while the card is open). */
+  anchorAbove?: { left: number; top: number };
+  /** The main button's words ("Done ↵" when editing, "Add · … ↵" when adding). */
+  primaryLabel?: string;
 }
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -68,14 +76,31 @@ export function dayWord(day: string, today: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, onClose, title, actions }: Props) {
+export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, onClose, title, actions, onChange, anchorAbove, primaryLabel }: Props) {
   const [tab, setTab] = useState<'when' | 'deadline'>(tab0);
-  const [v, setV] = useState<WhenValue>(value);
+  const [vLocal, setVLocal] = useState<WhenValue>(value);
+  // Controlled (adding a plan): the parent's value is the card's value.
+  const v = onChange ? value : vLocal;
+  const setV = (f: (p: WhenValue) => WhenValue) => { const next = f(v); if (onChange) onChange(next); else setVLocal(next); };
   const [timeText, setTimeText] = useState(value.time ?? '');
+  const [timeTouched, setTimeTouched] = useState(false);
+  // While adding, a time typed in the words shows here until the card's own field is used.
+  const shownTime = onChange && !timeTouched ? (value.time ?? '') : timeText;
+  const setTime = (t: string) => {
+    setTimeText(t);
+    setTimeTouched(true);
+    if (onChange) { const pt = t.trim() ? parseTime(t) : null; onChange({ ...v, day: v.day ?? (pt ? today : null), time: pt ?? null }); }
+  };
   const [weekOffset, setWeekOffset] = useState(0);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [cardH, setCardH] = useState(420);
+  useLayoutEffect(() => {
+    const m = cardRef.current?.offsetHeight ?? 0;
+    if (m && Math.abs(m - cardH) > 1) setCardH(m);
+  });
 
   const apply = () => {
-    const t = timeText.trim() ? parseTime(timeText) : null;
+    const t = shownTime.trim() ? parseTime(shownTime) : null;
     const time = v.day ? t : null;
     onApply({ ...v, time, remindMin: time ? v.remindMin : null });
   };
@@ -100,21 +125,24 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   const selected = tab === 'when' ? v.day : v.deadline;
   const pick = (d: string) => setV((p) => (tab === 'when' ? { ...p, day: d } : { ...p, deadline: d }));
   const late = !!(v.day && v.deadline && v.day > v.deadline);
-  const hasTime = !!(v.day && timeText.trim() && parseTime(timeText));
+  const hasTime = !!(v.day && shownTime.trim() && parseTime(shownTime));
 
   const W = 264;
-  const left = Math.max(8, Math.min(x, window.innerWidth - W - 8));
-  const top = Math.max(8, Math.min(y, window.innerHeight - 440));
+  const left = Math.max(8, Math.min(anchorAbove ? anchorAbove.left : x, window.innerWidth - W - 8));
+  const top = anchorAbove ? Math.max(8, anchorAbove.top - cardH - 8) : Math.max(8, Math.min(y, window.innerHeight - cardH - 8));
   const monthLabel = new Date(`${days[14]}T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
   return createPortal(
     <>
-      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+      {!anchorAbove && <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />}
       <div
+        ref={cardRef}
         data-testid="when-popover"
+        data-adding={anchorAbove ? 'true' : undefined}
         role="dialog"
         aria-label={tab === 'when' ? 'When' : 'Deadline'}
-        onMouseDown={(e) => e.stopPropagation()}
+        // Adding: clicks on the card never take the focus from the text field.
+        onMouseDown={(e) => { e.stopPropagation(); if (anchorAbove && !(e.target instanceof HTMLInputElement)) e.preventDefault(); }}
         style={{
           position: 'fixed', left, top, width: W, zIndex: Z.popover, boxSizing: 'border-box', padding: 10, borderRadius: 12,
           background: 'var(--paper)', border: '1px solid var(--paper-3)', boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
@@ -187,8 +215,8 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
           <>
             <div style={rowStyle}>
               <span style={iconCol}><MenuIcon name="when" /></span>
-              <button type="button" data-testid="when-any-time" onClick={() => setTimeText('')} style={chip(!timeText.trim())}>Any time</button>
-              <TimeField value={timeText} onChange={setTimeText} testId="when-time" placeholder="--:--" onEnter={() => apply()} onEscape={onClose} style={{ width: 96 }} />
+              <button type="button" data-testid="when-any-time" onClick={() => setTime('')} style={chip(!shownTime.trim())}>Any time</button>
+              <TimeField value={shownTime} onChange={setTime} testId="when-time" placeholder="--:--" onEnter={() => apply()} onEscape={onClose} style={{ width: 96 }} />
             </div>
             <div style={rowStyle}>
               <span style={iconCol}><MenuIcon name="length" /></span>
@@ -229,11 +257,11 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--paper-3)', paddingTop: 8 }}>
           {tab === 'when'
-            ? <button type="button" data-testid="when-clear" onClick={() => { setV((p) => ({ ...p, day: null })); setTimeText(''); }} style={ghost}>No day</button>
+            ? <button type="button" data-testid="when-clear" onClick={() => { setV((p) => ({ ...p, day: null, time: null })); setTimeText(''); setTimeTouched(true); }} style={ghost}>No day</button>
             : <button type="button" data-testid="when-no-deadline" onClick={() => setV((p) => ({ ...p, deadline: null }))} style={ghost}>No deadline</button>}
           <button type="button" data-testid="when-done" onClick={apply} title="Save the day, time and deadline"
             style={{ height: 28, padding: '0 12px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--btn-primary-bg, var(--acid))', color: 'var(--btn-primary-fg, #111)', fontFamily: 'inherit', fontSize: 12, fontWeight: 650 }}>
-            Done ↵
+            {primaryLabel ?? 'Done ↵'}
           </button>
         </div>
       </div>
