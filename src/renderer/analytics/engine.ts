@@ -17,7 +17,8 @@ import type {
   Totals,
 } from './types';
 import { collectAllEvents } from './registry';
-import { calcHabitStreak, listHabits } from './sources/habitSource';
+import { listHabits } from './sources/habitSource';
+import { habitStreak } from '../components/nodes/HabitNode/commands';
 import { isoToYMD, splitMinutesByLocalDay, todayLocal } from './dateRange';
 import {
   byDay,
@@ -111,12 +112,14 @@ export function buildAnalytics(board: BoardLike): AnalyticsResult {
       if (streaksCache) return streaksCache;
       const today = todayLocal();
       const habits = listHabits(board);
-      const perHabit = habits.map((h) => ({
-        habitId: h.id,
-        label: h.name,
-        streak: calcHabitStreak(h.log ?? [], today, h.schedule),
-      }));
-      const longestHabitStreak = perHabit.reduce((m, p) => Math.max(m, p.streak), 0);
+      // The same streak as the Habit node, lane and popup (habitStreak): rest
+      // days stepped over, a weekly target counted in weeks. "Longest streak"
+      // is in days, so a weekly-target habit stays out of it (like milestones).
+      const perHabit = habits.map((h) => {
+        const s = habitStreak({ log: h.log ?? [], ...(h.schedule ? { schedule: h.schedule } : {}), ...(typeof h.perWeek === 'number' ? { perWeek: h.perWeek } : {}), ...(h.rest ? { rest: h.rest } : {}) }, today);
+        return { habitId: h.id, label: h.name, streak: s.current, unit: s.unit };
+      });
+      const longestHabitStreak = perHabit.filter((p) => p.unit === 'day').reduce((m, p) => Math.max(m, p.streak), 0);
       streaksCache = { longestHabitStreak, perHabit };
       return streaksCache;
     },

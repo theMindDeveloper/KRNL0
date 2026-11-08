@@ -15,6 +15,9 @@ interface HabitLike {
   archived?: boolean;
   schedule?: HabitSchedule;
   kind?: string;
+  /** Weekly target and rest days: the streak every screen shows (habitStreak). */
+  perWeek?: number;
+  rest?: string[];
 }
 
 interface HabitStateLike {
