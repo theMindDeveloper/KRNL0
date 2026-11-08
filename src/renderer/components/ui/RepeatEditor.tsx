@@ -45,8 +45,9 @@ export function isRepeatValid(v: RepeatValue): boolean {
   if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(v.timeOfDay)) return false;
   const [h, m] = v.timeOfDay.split(':').map(Number) as [number, number];
   return Number.isFinite(v.durationMin) && v.durationMin >= 5 && v.durationMin <= 720
-    // Drawn inside one day: a repeat that runs past midnight would be cut.
-    && h * 60 + m + v.durationMin <= 24 * 60
+    // A timed habit is drawn inside one day; a routine may run past midnight
+    // (a night shift: the rest shows at the start of the next day).
+    && (v.itemKind === 'routine' || h * 60 + m + v.durationMin <= 24 * 60)
     && daysOk;
 }
 
@@ -175,7 +176,7 @@ export function RepeatEditor({ value, onChange, testIdPrefix = 'repeat' }: Props
       )}
 
       {/* Say why Save is off instead of a silent grey button. */}
-      {!anyTime && endsPastMidnight(value) && (
+      {!anyTime && value.itemKind !== 'routine' && endsPastMidnight(value) && (
         <div data-testid={`${testIdPrefix}-past-midnight`} style={{ fontSize: 12, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
           Ends after midnight: start earlier or make it shorter.
         </div>

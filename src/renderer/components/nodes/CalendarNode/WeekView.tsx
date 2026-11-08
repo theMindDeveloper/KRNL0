@@ -33,7 +33,7 @@ import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarLayers, CalendarState } from './types';
 import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularityFor } from './types';
-import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, type RoutineOccurrence } from '../HabitNode/types';
+import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, routineSpansOn, type RoutineOccurrence, type RoutineSpan } from '../HabitNode/types';
 import { routineLanes } from './routineLanes';
 import { TimeField } from '../../ui/TimeField';
 import { habitMotherCommand } from '../../../store/scheduleActions';
@@ -770,14 +770,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     return out;
   }, [boardForCal]);
   // A day's routines with their lanes: overlapping ones sit side by side.
-  const routinesOnDay = (dayYMD: string): Array<{ h: Habit; occ: RoutineOccurrence; lane: number; lanes: number }> => {
-    const hits: Array<{ h: Habit; occ: RoutineOccurrence }> = [];
-    for (const h of routinesForCal) {
-      const occ = routineOccurrence(h, dayYMD);
-      if (occ) hits.push({ h, occ });
-    }
-    const lanes = routineLanes(hits.map(({ h, occ }) => ({ id: h.id, startMin: occ.startMin, endMin: occ.endMin })));
-    return hits.map((r) => ({ ...r, ...(lanes.get(r.h.id) ?? { lane: 0, lanes: 1 }) }));
+  const routinesOnDay = (dayYMD: string): Array<{ h: Habit; occ: RoutineSpan; lane: number; lanes: number }> => {
+    const hits: Array<{ h: Habit; occ: RoutineSpan }> = [];
+    // Its own time that day, and the after-midnight part of last night's (a night shift).
+    for (const h of routinesForCal) for (const occ of routineSpansOn(h, dayYMD)) hits.push({ h, occ });
+    const keyOf = (r: { h: Habit; occ: RoutineSpan }) => `${r.h.id}${r.occ.spill ? ':spill' : ''}`;
+    const lanes = routineLanes(hits.map((r) => ({ id: keyOf(r), startMin: r.occ.startMin, endMin: r.occ.endMin })));
+    return hits.map((r) => ({ ...r, ...(lanes.get(keyOf(r)) ?? { lane: 0, lanes: 1 }) }));
   };
   /** The routine under a click: by time, then by lane (xFrac = 0..1 across the day). */
   const routineAt = (dayYMD: string, minute: number, xFrac = 0): { h: Habit; occ: RoutineOccurrence } | null => {
@@ -787,14 +786,16 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     return hit ? { h: hit.h, occ: hit.occ } : null;
   };
   const [routineMove, setRoutineMove] = useState<{ id: string; name: string; date: string; value: string; x: number; y: number } | null>(null);
-  const routineMenuItems = (h: Habit, occ: RoutineOccurrence, x: number, y: number): ContextMenuItem[] => {
-    const hmOf = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const routineMenuItems = (h: Habit, occ: RoutineOccurrence | RoutineSpan, x: number, y: number): ContextMenuItem[] => {
+    const hmOf = (m: number) => { const mm = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(mm / 60)).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}`; };
+    const s0 = 'fullStart' in occ ? occ.fullStart : occ.startMin;
+    const s1 = 'fullEnd' in occ ? occ.fullEnd : occ.endMin;
     return [
-      { header: true, label: `${h.name} · ${hmOf(occ.startMin)}–${hmOf(occ.endMin)} · routine`, onSelect: () => {} },
+      { header: true, label: `${h.name} · ${hmOf(s0)}–${hmOf(s1)}${s1 > 1440 ? ' (next day)' : ''} · routine`, onSelect: () => {} },
       occ.skipped
         ? { label: 'Undo skip', onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }
         : { label: 'Skip this one', onSelect: () => { void habitMotherCommand('routine.skip', { id: h.id, date: occ.date }); } },
-      ...(occ.skipped ? [] : [{ label: 'Move this one…', onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(occ.startMin), x, y }) }]),
+      ...(occ.skipped ? [] : [{ label: 'Move this one…', onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(s0), x, y }) }]),
       ...(occ.moved ? [{ label: 'Back to its usual time', onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }] : []),
       { label: 'End routine after this day', onSelect: () => { void habitMotherCommand('routine.end', { id: h.id, date: occ.date }); } },
     ];
@@ -1300,10 +1301,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const overrunMin = task.done ? 0 : Math.round(trackedMin - task.plannedMin);
       // Decision 39 — a plan on top of a routine says so (F6).
       const overlapRoutines = layers.routines
-        ? routinesForCal.filter((r) => {
-            const o = routineOccurrence(r, dayYMD);
-            return o && !o.skipped && o.startMin < slice.sliceEndMin && slice.sliceStartMin < o.endMin;
-          }).map((r) => r.name)
+        ? routinesForCal.filter((r) => routineSpansOn(r, dayYMD).some((o) => !o.skipped && o.startMin < slice.sliceEndMin && slice.sliceStartMin < o.endMin)).map((r) => r.name)
         : [];
       // Labels show the task's real start/end, not this day's slice edges
       // (a 22:30–01:00 block must not read "22:30–00:00").
@@ -1925,11 +1923,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       const laneW = colPxB / lanes;
       const narrow = laneW < 44;
       const showIcon = laneW >= 96;
-      const label = occ.skipped ? (narrow ? 'Skip' : `${h.name} · skipped`) : narrow ? clashLabels([h.name])[0] : h.name;
+      const label = occ.skipped ? (narrow ? 'Skip' : `${h.name} · skipped`) : narrow ? clashLabels([h.name])[0] : occ.spill ? `${h.name} · from last night` : h.name;
       out.push(
         <div
-          key={`routine-${h.id}`}
-          data-testid={`calendar-routine-${h.id}`}
+          key={`routine-${h.id}${occ.spill ? '-spill' : ''}`}
+          data-testid={`calendar-routine-${h.id}${occ.spill ? '-spill' : ''}`}
           data-skipped={occ.skipped ? 'true' : undefined}
           aria-label={`${h.name}, routine${occ.skipped ? ', skipped this time' : ''}`}
           title={`${h.name} · routine${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}

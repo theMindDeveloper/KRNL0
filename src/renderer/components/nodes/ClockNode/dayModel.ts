@@ -8,7 +8,7 @@ import type { RealitySegment } from '../../../store/pomoReality';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskState, TaskKind } from '../TaskNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
-import { hasTimeOfDay, isRoutine, routineOccurrence } from '../HabitNode/types';
+import { hasTimeOfDay, isRoutine, routineOccurrence, routineSpansOn } from '../HabitNode/types';
 import type { TagDef } from '../../../../shared/tags/classify';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { spanTone } from '../../../store/spanTags';
@@ -205,6 +205,7 @@ export function planForDay(
     let durMin: number;
     if (h.routine) {
       // A routine's own occurrence: its days, end, and a skip or move for this date.
+      // (The after-midnight part of last night's is added below.)
       const occ = routineOccurrence(h.routine, ymd);
       if (!occ || occ.skipped) continue;
       startH = occ.startMin / 60;
@@ -235,6 +236,32 @@ export function planForDay(
       source: 'habit',
       ...(h.routine ? { routine: true } : {}),
     });
+  }
+
+  // A routine that ran past midnight last night (a night shift): its rest, from 00:00.
+  for (const h of habits) {
+    if (!h.routine) continue;
+    for (const sp of routineSpansOn(h.routine, ymd)) {
+      if (!sp.spill || sp.skipped) continue;
+      const startH = 0;
+      const endH = sp.endMin / 60;
+      if (endH <= winLo || startH >= winHi) continue;
+      out.push({
+        id: `habit-${h.id}-spill`,
+        start: Math.max(startH, winLo),
+        end: Math.min(endH, winHi),
+        realStart: startH,
+        realEnd: endH,
+        name: h.name,
+        colorVar: `var(--${h.color})`,
+        plannedMin: sp.endMin,
+        breakdown: null,
+        parallelGroupId: null,
+        parallelBranchIndex: null,
+        source: 'habit',
+        routine: true,
+      });
+    }
   }
 
   out.sort((a, b) => a.start - b.start);

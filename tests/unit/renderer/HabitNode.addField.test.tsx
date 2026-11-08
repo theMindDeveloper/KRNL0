@@ -4,7 +4,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { HabitNode } from '../../../src/renderer/components/nodes/HabitNode';
 import { defaultHabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
-import { askMissing, askToAnswer, EMPTY_ASK } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
+import { askMissing, askToAnswer, summary, EMPTY_ASK } from '../../../src/renderer/components/nodes/HabitNode/HabitAddAsk';
 import { endsPastMidnight, isRepeatValid } from '../../../src/renderer/components/ui/RepeatEditor';
 import type { Node } from '../../../src/shared/types/node';
 import type { HabitState, HabitConfig } from '../../../src/renderer/components/nodes/HabitNode/types';
@@ -98,12 +98,14 @@ describe('askMissing / askToAnswer', () => {
     expect(askMissing({ ...d, timeOfDay: '07:00' })).toBe('Pick how long');
     expect(askToAnswer({ ...d, timeOfDay: '07:00', durationMin: 30 })).toEqual({ kind: 'habit', schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 30 } });
   });
-  it('a repeat that would run past midnight is refused, not cut short on the Calendar', () => {
-    const night = { ...EMPTY_ASK, kind: 'routine' as const, days: [5] as never, timeOfDay: '23:00', durationMin: 120 };
-    expect(askMissing(night)).toBe('Ends after midnight: start earlier or make it shorter');
-    expect(askMissing({ ...night, durationMin: 60 })).toBeNull();
-    expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '23:00', durationMin: 120, itemKind: 'routine' })).toBe(false);
-    expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '23:00', durationMin: 60, itemKind: 'routine' })).toBe(true);
+  it('a timed habit past midnight is refused; a routine may run past it (a night shift)', () => {
+    const habitNight = { ...EMPTY_ASK, kind: 'habit' as const, often: 'daily' as const, when: 'at' as const, timeOfDay: '23:00', durationMin: 120 };
+    expect(askMissing(habitNight)).toBe('Ends after midnight: start earlier or make it shorter');
+    const shift = { ...EMPTY_ASK, kind: 'routine' as const, days: [5] as never, timeOfDay: '22:00', durationMin: 480 };
+    expect(askMissing(shift)).toBeNull();
+    expect(summary(shift)).toBe('Fri 22:00–06:00 next day');
+    expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '23:00', durationMin: 120, itemKind: 'habit' })).toBe(false);
+    expect(isRepeatValid({ kind: 'daily', days: [], timeOfDay: '22:00', durationMin: 480, itemKind: 'routine' })).toBe(true);
     expect(endsPastMidnight({ kind: 'daily', days: [], timeOfDay: '23:30', durationMin: 60 })).toBe(true);
   });
   it('a routine on all five weekdays is saved as weekdays', () => {

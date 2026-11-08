@@ -55,7 +55,6 @@ export function askMissing(d: AskDraft): string | null {
   if (d.days.length === 0) return 'Pick its days';
   if (!TIME_RE.test(d.timeOfDay)) return 'Pick a start time';
   if (!d.durationMin) return 'Pick how long';
-  if (pastMidnight(d.timeOfDay, d.durationMin)) return 'Ends after midnight: start earlier or make it shorter';
   return null;
 }
 
@@ -86,10 +85,12 @@ const DAYS: ReadonlyArray<{ dow: IsoDow; letter: string; name: string }> = [
 const HABIT_LEN = [10, 15, 30, 60];
 const ROUTINE_LEN = [30, 60, 90, 120, 180, 240];
 const fmtLen = (m: number) => (m < 60 ? `${m}m` : m % 60 ? `${Math.floor(m / 60)}h${m % 60}` : `${m / 60}h`);
+/** "12:00", or "02:00 next day" for a routine past midnight (a night shift). */
 const endOf = (t: string, len: number) => {
   const [h, m] = t.split(':').map(Number) as [number, number];
-  const e = Math.min(24 * 60, h * 60 + m + len);
-  return `${String(Math.floor(e / 60) % 24).padStart(2, '0')}:${String(e % 60).padStart(2, '0')}`;
+  const e = h * 60 + m + len;
+  const w = e % (24 * 60);
+  return `${String(Math.floor(w / 60)).padStart(2, '0')}:${String(w % 60).padStart(2, '0')}${e > 24 * 60 ? ' next day' : ''}`;
 };
 
 interface Props {

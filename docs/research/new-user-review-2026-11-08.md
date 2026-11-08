@@ -24,7 +24,7 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 |---|---|---|---|
 | 2.1 | Type a habit, press Enter | It was added with settings nobody chose; the Repeat button was the only way to say what it was | **Fixed on `feat/routines`** — Enter asks "Do you want to tick it off?" (habit / routine), then only that kind's questions |
 | 2.2 | Add "Gym" when "Gym" already exists | Silently a second Gym; every `krnl habit … Gym` is then ambiguous | **Fixed here** — the card says "You already have one called Gym. This adds a second; a different name keeps them apart." |
-| 2.3 | A night shift: routine 23:00 for 2 h | The card said "→ 01:00" but the Calendar cut it at 24:00 (`routineOccurrence` clamps to the day) — what you see is not what you asked | **Fixed here (guard)** — the add card, Edit repeat… and `krnl routine add` refuse it with "Ends after midnight: start earlier or make it shorter". **Proposed:** real overnight routines (draw the part after midnight on the next day) |
+| 2.3 | A night shift: routine 23:00 for 2 h | The card said "→ 01:00" but the Calendar cut it at 24:00 (`routineOccurrence` clamps to the day) — what you see is not what you asked | **Fixed here** — routines now run past midnight for real: the Calendar draws the night's part on its day and the rest at the top of the next ("Night shift · from last night"), the Clock too; skip / move / end act on the night it started; the card says "Fri 22:00–06:00 next day". A *timed habit* past midnight is still refused with the reason (a habit is ticked on one day) |
 | 2.4 | "Pay rent on Sunday" — a day, no time | Still impossible: a plan needs a clock time (review 1.2) | **Proposed** — the largest open item; needs a decision (date-only `scheduledFor`) and an "Anytime" row design. Draft D on the design canvas was not picked |
 
 ## 3. Keeping going — streaks, misses, stopping
@@ -47,7 +47,7 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 ## 5. Smaller logic notes
 
 - **5.1** Weekly-target habits show their week count only in the Week view; Month / Year still show a day badge. *Low* — use the week streak there too.
-- **5.2** Habit amounts ("8 glasses") are still a yes/no tick (review 3.2). *Medium* — needs a model change (`log` with counts).
+- **5.2** Habit amounts ("8 glasses") — **built here**: Amount a day…, each click adds one, the day counts once reached.
 - **5.3** Repeating *tasks* (a weekly review with notes) — routines now cover "it happens at a time"; a repeating task with notes per time is still missing. *Medium*.
 - **5.4** Naming tracked time freely ("Gaming") already works: the span picker's **+ Add category** makes a custom category in one step, and `krnl pomo retag <seg> --text "…"` names one span. Kept as is; the user wanted to discuss it.
 
@@ -66,4 +66,4 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 ## Proposed order for what is left
 
 1. Date-only plans + an "Anytime" row (2.4) — pick a design first.
-4. Overnight routines (2.3), habit amounts (5.2), repeating tasks (5.3).
+3. Repeating tasks with notes per time (5.3).

@@ -147,6 +147,33 @@ export interface RoutineOccurrence {
   moved: boolean;
 }
 
+/** What a routine draws on one day: its own time, and the part of last
+ *  night's that runs past midnight (a 22:00–06:00 shift). `date` is always the
+ *  day the occurrence started, so skip / move / end act on the right one. */
+export interface RoutineSpan extends RoutineOccurrence {
+  /** True for the after-midnight part of the previous day's occurrence. */
+  spill: boolean;
+  /** The whole occurrence, in minutes from its own day's midnight (end may pass 1440). */
+  fullStart: number;
+  fullEnd: number;
+}
+
+export function routineSpansOn(h: Habit, date: string): RoutineSpan[] {
+  const out: RoutineSpan[] = [];
+  const len = (o: RoutineOccurrence) => Math.max(5, h.schedule?.durationMin ?? (o.endMin - o.startMin));
+  const own = routineOccurrence(h, date);
+  if (own) out.push({ ...own, spill: false, fullStart: own.startMin, fullEnd: own.startMin + len(own) });
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  const prev = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const p = routineOccurrence(h, prev);
+  if (p) {
+    const over = p.startMin + len(p) - 24 * 60;
+    if (over > 0) out.push({ ...p, startMin: 0, endMin: Math.min(24 * 60, over), spill: true, fullStart: p.startMin, fullEnd: p.startMin + len(p) });
+  }
+  return out;
+}
+
 /**
  * Where a routine happens on `date`, or null when it does not (not one of its
  * days, before it was created, after it ended, or it has no time).

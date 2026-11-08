@@ -9,7 +9,7 @@ import { tmpdir } from 'os';
 import { SysFacade } from '../../../src/sys/SysFacade';
 import { seedBoard } from '../../../src/main/persistence/board';
 import { habitToggleDay, habitMarkDone, habitSetKind, routineSkip, routineMove, routineEnd, routineRestart } from '../../../src/renderer/components/nodes/HabitNode/commands';
-import { routineOccurrence, isRoutine, type Habit, type HabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
+import { routineOccurrence, routineSpansOn, isRoutine, type Habit, type HabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
 import { computeCatchup } from '../../../src/renderer/launch/catchup';
 import { parseRoutineDays } from '../../../src/sys/commands/habit';
 
@@ -48,6 +48,16 @@ describe('model', () => {
     const ended = routineEnd(state(h), { id: 'r1', date: '2026-11-04' }).habits[0]!;
     expect(routineOccurrence(ended, '2026-11-09')).toBeNull();
     expect(routineOccurrence(routineRestart(state(ended), { id: 'r1' }).habits[0]!, '2026-11-09')).not.toBeNull();
+  });
+
+  it('a night shift (Fri 22:00 for 8 h) shows Friday 22:00–24:00 and Saturday 00:00–06:00; skipping Friday skips both', () => {
+    const shift = routine({ schedule: { kind: 'weekly', days: [5], timeOfDay: '22:00', durationMin: 480 } });
+    const fri = routineSpansOn(shift, '2026-11-06');
+    expect(fri.map((s) => [s.startMin, s.endMin, s.spill])).toEqual([[1320, 1440, false]]);
+    const sat = routineSpansOn(shift, '2026-11-07');
+    expect(sat.map((s) => [s.startMin, s.endMin, s.spill, s.date, s.fullStart, s.fullEnd])).toEqual([[0, 360, true, '2026-11-06', 1320, 1800]]);
+    const skipped = routineSkip(state(shift), { id: 'r1', date: '2026-11-06' }).habits[0]!;
+    expect(routineSpansOn(skipped, '2026-11-07')[0]!.skipped).toBe(true);
   });
 
   it('F10 — turning a habit into a routine needs a time; turning back keeps the log', () => {
