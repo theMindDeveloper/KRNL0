@@ -2025,3 +2025,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `CalendarNode/dayOnly.ts` (new, `dayOnlyPlans`), `CalendarNode/WeekView.tsx`, `TodoNode/index.tsx`, `docs/research/new-user-review-2026-11-08.md`; test `CalendarNode/__tests__/dayOnly.test.ts` (new).
 **Summary:** The oldest open item (review 1.2 / new-user 2.4): "Pay rent on Sunday" could not be planned without inventing a time. On this branch a plan with a day and no time is a plan due that day (quick add "Pay rent sunday", or Due date…), and the Calendar shows the week's ones in one slim **DAY** line under the day names (design draft D) — only when the week has one, never hidden behind "+N" (narrow columns cut the name; the tooltip has it), overdue in rust. Drag a chip into the hours to give it a time; it then leaves the line. Built on due days, so the scheduler and the board format are unchanged. Checked in the preview: "Call bank today" in this week's line, dragged onto the grid, line gone; next week shows "Groceries" (Mon) and "Pay rent" (Fri). Draft D had not been picked for `feat/routines`; the user gave this branch free rein.
+
+## [2026-11-08] — Habit menu: plain words for the canvas card (experimental)
+
+**Type:** Copy
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitContextMenu.tsx`, `docs/research/new-user-review-2026-11-08.md`.
+**Summary:** "Pin as lane" / "Lane already pinned" / "Unpin lane (keep the habit)" used an internal word. Now: "Put a card on the canvas" / "Already on the canvas" / "Remove its canvas card (keep the habit)".

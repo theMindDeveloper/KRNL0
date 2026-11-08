@@ -49,6 +49,8 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 
 ## 5. Smaller logic notes
 
+- **5.0** The habit menu said "Pin as lane" / "Unpin lane" — internal words. **Fixed here:** "Put a card on the canvas" / "Already on the canvas" / "Remove its canvas card (keep the habit)".
+
 - **5.1** Weekly-target habits show their week count only in the Week view; Month / Year still show a day badge. *Low* — use the week streak there too.
 - **5.2** Habit amounts ("8 glasses") — **built here**: Amount a day…, each click adds one, the day counts once reached.
 - **5.3** Repeating *plans* — **built here**: row menu **Repeat…** (every day, weekdays, every <its weekday>); ticking one off brings the next (same name, length, tag; same time on its next day, or due that day; never a backlog of past days); `krnl todo repeat`, and `todo check` does the same.

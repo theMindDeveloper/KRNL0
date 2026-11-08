@@ -448,7 +448,7 @@ export function HabitContextMenu({
         <>
           <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
           <MenuItem
-            label="Unpin lane (keep the habit)"
+            label="Remove its canvas card (keep the habit)"
             onClick={() => { onUnpinLane(); onClose(); }}
           />
         </>
@@ -463,7 +463,7 @@ export function HabitContextMenu({
             }}
           />
           <MenuItem
-            label={laneExists ? 'Lane already pinned' : 'Pin as lane'}
+            label={laneExists ? 'Already on the canvas' : 'Put a card on the canvas'}
             disabled={laneExists === true}
             onClick={() => {
               if (laneExists) return;
