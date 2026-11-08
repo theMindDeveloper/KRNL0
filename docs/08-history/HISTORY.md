@@ -2129,3 +2129,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `store/scheduleActions.ts`, `sys/commands/todo.ts`; test `repeatTask.test.ts` (+1).
 **Summary:** Found by crossing two new features: "Team sync, every Monday, remind me 10 min before" lost its reminder on the second week, and an event came back as a focus block. The next one now keeps the reminder and the kind (in the app and through `krnl todo check`).
+
+## [2026-11-08] — A night shift reads "now" after midnight (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/RoutineShelf.tsx` (`routineStatus`); test `routines.test.ts` (+1).
+**Summary:** Crossing night shifts with the Routines shelf: at 01:00 on Saturday, Friday's 22:00–06:00 shift was still on, but the shelf said "next Fri". It now reads "now" until the shift ends.

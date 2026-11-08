@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Habit, IsoDow } from './types';
-import { routineOccurrence } from './types';
+import { routineOccurrence, routineSpansOn } from './types';
 import { HabitIcon } from './HabitIcon';
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -31,6 +31,9 @@ export type RoutineStatus =
  * occurrence skipped, or the next one. Pure — tested.
  */
 export function routineStatus(h: Habit, today: string, nowMin: number): RoutineStatus {
+  // A night shift from yesterday still running after midnight is "now".
+  const spill = routineSpansOn(h, today).find((sp) => sp.spill && !sp.skipped);
+  if (spill && nowMin < spill.endMin) return { kind: 'now', until: spill.endMin };
   const t = routineOccurrence(h, today);
   if (t && !t.skipped && nowMin >= t.startMin && nowMin < t.endMin) return { kind: 'now', until: t.endMin };
   if (t && !t.skipped && nowMin < t.startMin) return { kind: 'today', at: t.startMin };

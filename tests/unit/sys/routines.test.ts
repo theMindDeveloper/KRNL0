@@ -10,6 +10,7 @@ import { SysFacade } from '../../../src/sys/SysFacade';
 import { seedBoard } from '../../../src/main/persistence/board';
 import { habitToggleDay, habitMarkDone, habitSetKind, routineSkip, routineMove, routineEnd, routineRestart } from '../../../src/renderer/components/nodes/HabitNode/commands';
 import { routineOccurrence, routineSpansOn, isRoutine, type Habit, type HabitState } from '../../../src/renderer/components/nodes/HabitNode/types';
+import { routineStatus } from '../../../src/renderer/components/nodes/HabitNode/RoutineShelf';
 import { computeCatchup } from '../../../src/renderer/launch/catchup';
 import { parseRoutineDays } from '../../../src/sys/commands/habit';
 
@@ -58,6 +59,12 @@ describe('model', () => {
     expect(sat.map((s) => [s.startMin, s.endMin, s.spill, s.date, s.fullStart, s.fullEnd])).toEqual([[0, 360, true, '2026-11-06', 1320, 1800]]);
     const skipped = routineSkip(state(shift), { id: 'r1', date: '2026-11-06' }).habits[0]!;
     expect(routineSpansOn(skipped, '2026-11-07')[0]!.skipped).toBe(true);
+  });
+
+  it('a night shift is "now" on the shelf after midnight, until it ends', () => {
+    const shift = routine({ schedule: { kind: 'weekly', days: [5], timeOfDay: '22:00', durationMin: 480 } });
+    expect(routineStatus(shift, '2026-11-07', 60)).toEqual({ kind: 'now', until: 360 }); // Sat 01:00
+    expect(routineStatus(shift, '2026-11-07', 400).kind).toBe('next'); // Sat 06:40: over
   });
 
   it('F10 — turning a habit into a routine needs a time; turning back keeps the log', () => {
