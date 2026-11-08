@@ -60,6 +60,7 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
   }, [onClose]);
 
   const meta = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]!;
+  const easyMode = useEasyMode();
 
   return createPortal(
     <div
@@ -74,7 +75,8 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
       <div className="ln-dialog st" onClick={(e) => e.stopPropagation()}>
         <nav className="st-nav" aria-label="Settings sections">
           <div className="st-nav__title"><SettingsIcon name="settings" />Settings</div>
-          {SECTIONS.map((s) => (
+          {/* easy-mode D25 — Finished cards (how done cards clear off the canvas) is Advanced. */}
+          {SECTIONS.filter((s) => !(easyMode && s.id === 'finished')).map((s) => (
             <button
               key={s.id}
               type="button"

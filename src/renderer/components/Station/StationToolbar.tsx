@@ -235,7 +235,7 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           panels
         </span>
       )}
-      {MOTHER_ORDER.map((m) => {
+      {MOTHER_ORDER.filter((m) => !(easy && m.kind === 'term')).map((m) => {
         const node = motherByKind.get(m.kind);
         const active = !!node && !isStationHidden(node);
         return (

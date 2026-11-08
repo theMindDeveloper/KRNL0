@@ -277,7 +277,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   // Decision 40 — the add card: what the card set wins over the words.
   const [planOv, setPlanOv] = useState<PlanOverrides>({});
   const addRowRef = useRef<HTMLDivElement>(null);
-  const fromWords = (q: QuickAdd): PlanDraft => ({ day: q.day ?? null, time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: q.deadline ?? null });
+  // Easy: "by fri" sets no deadline (easy-mode D19).
+  const fromWords = (q: QuickAdd): PlanDraft => ({ day: q.day ?? null, time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: easy ? null : q.deadline ?? null });
   const addPlan = (text: string, d: PlanDraft) => {
     onCommand('todo.add', d.lengthMin ? { text, durationMin: d.lengthMin } : { text });
     const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
@@ -504,7 +505,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     ] : [];
     return [
       { label: 'When…', icon: <MenuIcon name="when" />, ...(whenText(w) ? { hint: whenText(w)! } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId) },
-      { label: 'Deadline…', icon: <MenuIcon name="deadline" />, ...(w.deadline ? { hint: dayWord(w.deadline, todayYMD) } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId, 'deadline') },
+      // easy-mode D19 — Deadline is Advanced (one date per plan in Easy).
+      ...(easy ? [] : [{ label: 'Deadline…', icon: <MenuIcon name="deadline" />, ...(w.deadline ? { hint: dayWord(w.deadline, todayYMD) } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId, 'deadline') }]),
       ...show,
       ...(easy ? [] : [
         ...(hasTaskNode ? [{ ...timer, divider: true }] : []),

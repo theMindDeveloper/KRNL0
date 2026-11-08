@@ -6,6 +6,7 @@
  * Theme toggle writes data-theme on <html> and persists to localStorage.
  */
 
+import { useEasyMode } from '../../store/uiMode';
 import { CANVAS_FIT_PADDING } from '../Canvas/fitPadding';
 import { SettingsIcon } from '../ui/SettingsIcons';
 import { useState, useEffect, useLayoutEffect } from 'react';
@@ -71,6 +72,7 @@ function writeFrameBeforeLight(style: DockStyle | null): void {
 }
 
 export function TopBar() {
+  const easyMode = useEasyMode();
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
   const [dockStyle, setDockStyle] = useDockStyle();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -200,8 +202,9 @@ export function TopBar() {
         >
           ~/krnl0 / canvas /
         </span>
-        {/* Decision 33 — canvas switcher (the breadcrumb's last segment). */}
-        <CanvasSwitcher />
+        {/* Decision 33 — canvas switcher (the breadcrumb's last segment).
+            easy-mode D24: one canvas in Easy. */}
+        {!easyMode && <CanvasSwitcher />}
 
         {/* Live badge */}
         {/* New-user review 1.7: a static "live" said nothing; this says what a

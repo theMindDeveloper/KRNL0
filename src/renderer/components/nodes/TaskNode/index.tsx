@@ -6,6 +6,7 @@ import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
 import { MenuIcon } from '../../ui/menuIcons';
+import { useEasyMode } from '../../../store/uiMode';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import { useShallow } from 'zustand/react/shallow';
@@ -49,6 +50,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   );
 
   const isActive = pomoRuntime?.activeTaskId === taskId;
+  const easy = useEasyMode();
   const isActiveRunning = isActive && pomoRuntime?.status === 'running' && pomoRuntime?.startedAt !== null;
   const isActivePaused = isActive && pomoRuntime?.status === 'paused';
 
@@ -320,7 +322,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       onSelect: startEtaEdit,
       disabled: state.done,
     },
-    {
+    // easy-mode D21 — making chains is Advanced; existing chains keep working.
+    ...(easy ? [] : [{
       // ADR 0004 §2 — sequential successor: same chain level as source,
       // single task.next edge.
       label: 'Add next task',
@@ -344,7 +347,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         setInlineDurationInvalid(false);
       },
       disabled: state.done,
-    },
+    }]),
     {
       label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
       onSelect: startNoteEdit,

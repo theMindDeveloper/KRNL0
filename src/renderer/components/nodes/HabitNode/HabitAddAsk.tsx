@@ -85,9 +85,12 @@ interface Props {
   /** Editing an existing habit ("Days & time…"): its values, and the button says Save. */
   initial?: CardDraft;
   saveLabel?: string;
+  /** easy-mode D20 — Easy: name, days and a time. Times a week and the goal
+   *  are Advanced; a habit that already has them keeps them (shown, kept on Save). */
+  simple?: boolean;
 }
 
-export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatch, onRestore, onCalendar, initial, saveLabel }: Props) {
+export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatch, onRestore, onCalendar, initial, saveLabel, simple = false }: Props) {
   const dup = !initial && (taken?.has(name.trim().toLowerCase()) ?? false);
   const [d, setD] = useState<CardDraft>(initial ?? DEFAULT_CARD);
   const set = (patch: Partial<CardDraft>) => setD((cur) => ({ ...cur, ...patch }));
@@ -206,13 +209,15 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
         : 'One click a day marks it done'}
     </span>
   );
+  const showWeekMode = !simple || d.mode === 'week';
+  const showGoal = !simple || !!d.amount;
   const body = (
     <>
-      {modeSeg(false)}
+      {showWeekMode && modeSeg(false)}
       {daysBlock}
       <div style={rowGrid}><span style={rowLabel}>Time</span>{timeCtl}</div>
-      <div style={rowGrid}><span style={rowLabel}>Goal</span>{goalCtl}</div>
-      <div style={{ ...rowGrid, minHeight: 0, marginTop: -6 }}><span />{goalHelp}</div>
+      {showGoal && <div style={rowGrid}><span style={rowLabel}>Goal</span>{goalCtl}</div>}
+      {showGoal && <div style={{ ...rowGrid, minHeight: 0, marginTop: -6 }}><span />{goalHelp}</div>}
     </>
   );
   const card = (

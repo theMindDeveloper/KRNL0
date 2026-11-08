@@ -2314,7 +2314,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           </span>
 
           {/* Layers — what the rail and the pills mean, and a switch for each. */}
-          <div data-testid="week-legend" role="group" aria-label="Calendar layers" style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
+          {/* easy-mode D22 — the layer switches and zoom are Advanced. */}
+          {!easy && <div data-testid="week-legend" role="group" aria-label="Calendar layers" style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
             {([
               ['recorded', 'Recorded', 'What you really did: the rail at the left of each day. Breaks are gaps.'],
               ['habits', 'Habits', 'Habits at their time. Click one to tick it.'],
@@ -2343,7 +2344,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                 <span className="cal-layer-label">{label}</span>
               </button>
             ))}
-          </div>
+          </div>}
 
           {/* Decision 40 — add something without knowing the right-click: a plan or a repeating event. */}
           <button
@@ -2398,7 +2399,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
           {/* #5 — ruler zoom controls. Stretch the grid to read pomo/task
               section boundaries; the gutter gains :30/:15 sub-marks as you go. */}
-          <div
+          {!easy && <div
             data-testid="week-zoom"
             className="cal-zoom"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
@@ -2436,7 +2437,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             >
               +
             </button>
-          </div>
+          </div>}
         </div>
         <button
           type="button"

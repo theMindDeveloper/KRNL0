@@ -21,6 +21,7 @@ import { createPortal } from 'react-dom';
 import { RepeatEditor, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
 import { HabitAddAsk, type AddAnswer, type CardDraft } from './HabitAddAsk';
 import { MenuIcon } from '../../ui/menuIcons';
+import { useEasyMode } from '../../../store/uiMode';
 import { FOCUS_NODE_EVENT } from '../../../store/scheduleActions';
 import { RemindPicker } from '../../ui/RemindPicker';
 import { AmountPopover, TargetPopover } from './HabitPopovers';
@@ -123,6 +124,7 @@ export function HabitNode({
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const view: HabitView = config.view ?? 'week';
+  const easy = useEasyMode();
   // useLocalDay re-renders at midnight so `today` and the grids roll over.
   const today = useLocalDay();
   // Re-derive the grid anchor when the local day changes. Memoizing on [] froze
@@ -490,7 +492,7 @@ export function HabitNode({
             </span>
             </div>
             {ask && newName.trim() && (
-              <HabitAddAsk name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => { setAsk(null); setNewName(''); }} taken={takenNames}
+              <HabitAddAsk simple={easy} name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => { setAsk(null); setNewName(''); }} taken={takenNames}
                 archivedMatch={(() => { const h = state.habits.find((x) => x.archived && x.name.trim().toLowerCase() === newName.trim().toLowerCase()); return h ? { id: h.id, name: h.name } : null; })()}
                 onRestore={(id) => { onCommand('habit.unarchive', { id }); setNewName(''); setAsk(null); }}
                 onCalendar={() => {
@@ -500,7 +502,7 @@ export function HabitNode({
                 }} />
             )}
             {editCard && (
-              <HabitAddAsk name={editCard.name} anchor={editCard.anchor} initial={editCard.draft} saveLabel="Save"
+              <HabitAddAsk simple={easy} name={editCard.name} anchor={editCard.anchor} initial={editCard.draft} saveLabel="Save"
                 onAdd={saveEditCard} onCancel={() => setEditCard(null)} />
             )}
           </div>

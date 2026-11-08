@@ -2,6 +2,7 @@
 // time; its length; a reminder) and, on its own tab, its Deadline. Replaces
 // "Edit time", "Due date…" and "Reminder…". App-styled: no native pickers.
 
+import { useEasyMode } from '../../store/uiMode';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Z } from './layers';
@@ -77,6 +78,7 @@ export function dayWord(day: string, today: string): string {
 }
 
 export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, onClose, title, actions, onChange, anchorAbove, primaryLabel }: Props) {
+  const easy = useEasyMode();
   const [tab, setTab] = useState<'when' | 'deadline'>(tab0);
   const [vLocal, setVLocal] = useState<WhenValue>(value);
   // Controlled (adding a plan): the parent's value is the card's value.
@@ -158,7 +160,9 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
             </button>
           </div>
         )}
-        <div role="tablist" style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: 'var(--paper-2)', border: '1px solid var(--paper-3)' }}>
+        {/* easy-mode D19 — Easy plans have one date, their When (a deadline set
+            earlier still shows here, so it can be seen and cleared). */}
+        {(!easy || !!value.deadline) && <div role="tablist" style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: 'var(--paper-2)', border: '1px solid var(--paper-3)' }}>
           {(['when', 'deadline'] as const).map((t) => (
             <button key={t} type="button" role="tab" aria-selected={tab === t} data-testid={`when-tab-${t}`} onClick={() => setTab(t)}
               style={{ flex: 1, height: 24, borderRadius: 5, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
@@ -168,7 +172,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
               {t === 'deadline' && <MenuIcon name="deadline" size={11} />}{t === 'when' ? 'When' : 'Deadline'}
             </button>
           ))}
-        </div>
+        </div>}
 
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {quick.map(([label, ymd]) => (

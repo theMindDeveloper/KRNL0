@@ -65,6 +65,13 @@ export interface Tour {
   title: string;
   summary: string;
   steps: TourStep[];
+  /** A tour about something only one mode has (the Terminal: Advanced). */
+  onlyIn?: 'easy' | 'advanced';
+}
+
+/** The tours listed in a mode (menus); `krnl tour start` can still run any. */
+export function toursIn(mode: 'easy' | 'advanced'): Tour[] {
+  return TOURS.filter((t) => !t.onlyIn || t.onlyIn === mode);
 }
 
 /** The steps a user in `mode` sees (drops steps for the other mode). */
@@ -164,7 +171,7 @@ export const TOURS: readonly Tour[] = [
     steps: [
       { text: "Let's plan **one real thing** and do it together. It takes about 4 minutes. **Next** (or Enter) goes on, **Esc** stops." },
       { node: 'mother-todo', target: '.todo-add', badge: 'TYPE', text: "Add something you'll do today: click **add a plan** and type it. A card shows its **day, time and length** — pick any, or just press **Enter**.", waitFor: { board: newTask }, hint: 'Waiting for a new task…' },
-      { target: '[data-testid^="todo-plan-"]', node: 'mother-todo', badge: 'ITS CARD', text: 'The **calendar icon** on a row opens its **plan card**: a day (or any time), a time, how long, a deadline — and Focus, Done, Delete. Right-click → **When…** opens it too.' },
+      { target: '[data-testid^="todo-plan-"]', node: 'mother-todo', badge: 'ITS CARD', text: 'The **calendar icon** on a row opens its **plan card**: a day (or any time), a time, how long and a reminder — and Done or Delete. Right-click → **When…** opens it too.' },
       { target: '[data-testid="task-node-root"]', badge: 'SAME TASK', text: 'That card on the board is **the same task**. Tick it here or in the list — both stay in step.' },
       { node: 'mother-calendar', also: ['mother-todo'], today: true, target: '[data-testid="week-col-{today}"]', badge: 'TO TODAY', from: TODO, fromBadge: 'FROM HERE', text: 'Now **plan it**: drag the task from the **Todo** onto **today** in the Calendar, at a time later than now. Or open its card and pick a time today.', waitFor: { board: plannedToday }, nudge: notToday, hint: 'Waiting for the task to land on today…' },
       { node: 'mother-clock', target: CLOCK, badge: 'CLOCK', text: 'Your plan is on the **Clock** too, around the edge. Every window shows the same day.' },
@@ -189,7 +196,8 @@ export const TOURS: readonly Tour[] = [
     steps: [
       { text: "Hi — I'm your guide. KRNL0 is **one board** with a window for each part of your day. Press **Next** (or Enter) to go on, **Esc** to stop any time." },
       { node: 'mother-pomo', target: POMO, badge: 'POMO · RECORD', text: '**{pomo}** records what you actually do. Start it when you begin, stop it when you finish — **only recorded time counts** as time spent.' },
-      { node: 'mother-todo', target: TODO, badge: 'TODO · PLANS', text: '**Todo** is your list of plans. Each one can have a **when** (a day and a time, or just a day), a **deadline**, and shows the time you really spent on it.' },
+      { onlyIn: 'advanced', node: 'mother-todo', target: TODO, badge: 'TODO · PLANS', text: '**Todo** is your list of plans. Each one can have a **when** (a day and a time, or just a day), a **deadline**, and shows the time you really spent on it.' },
+      { onlyIn: 'easy', node: 'mother-todo', target: TODO, badge: 'TODO · PLANS', text: '**Todo** is your list of plans. Each one can have a **when**: a day and a time, or just a day.' },
       { node: 'mother-calendar', target: CAL, badge: 'CALENDAR · PLAN', text: '**Calendar** is your plan: **drag plans onto it**, or **click empty hours** to add one. Classes and shifts are **repeating events** here. Recorded time sits next to the plan.' },
       { node: 'mother-clock', target: CLOCK, badge: 'CLOCK · TODAY', text: '**Clock** shows today on a dial — the **plan around the edge**, what you did as **coloured wedges**.' },
       { node: 'mother-habit', target: HABIT, badge: 'HABITS', text: '**Habits** are the things you want to do regularly. **Tick them off** each day.' },
@@ -220,8 +228,9 @@ export const TOURS: readonly Tour[] = [
     summary: 'Add a plan with its day and time, tick it off',
     steps: [
       { node: 'mother-todo', target: TODO, badge: 'TODO', text: "This is your list. Let's **add a task**." },
-      { target: '[data-testid="add-task-placeholder"]', badge: 'CLICK', text: 'Click **add a plan** at the bottom and type a name. A card shows its **day, time, length and deadline** — pick any of them, or just press **Enter**.', waitFor: { board: newTask }, hint: 'Waiting for a new task…' },
-      { target: '[data-testid="add-task-placeholder"]', badge: 'SAY WHEN', text: 'Faster: say when as you type. **Gym tomorrow 18:00 1h** goes straight onto the Calendar; **Pay rent fri** is on Friday at any time; **by sat** gives it a deadline. The chips above the field show what Enter will do.' },
+      { target: '[data-testid="add-task-placeholder"]', badge: 'CLICK', text: 'Click **add a plan** at the bottom and type a name. A card shows its **day, time and length** — pick any of them, or just press **Enter**.', waitFor: { board: newTask }, hint: 'Waiting for a new task…' },
+      { onlyIn: 'advanced', target: '[data-testid="add-task-placeholder"]', badge: 'SAY WHEN', text: 'Faster: say when as you type. **Gym tomorrow 18:00 1h** goes straight onto the Calendar; **Pay rent fri** is on Friday at any time; **by sat** gives it a deadline. The card above the field shows what Enter will do.' },
+      { onlyIn: 'easy', target: '[data-testid="add-task-placeholder"]', badge: 'SAY WHEN', text: 'Faster: say when as you type. **Gym tomorrow 18:00 1h** goes straight onto the Calendar; **Pay rent fri** is on Friday at any time. The card above the field shows what Enter will do.' },
       { target: '[data-testid^="todo-plan-"]', badge: 'ITS CARD', text: 'Change it later from its **plan card**: click the **calendar icon** on the row (or right-click → **When…**). The same card opens when you click its block on the Calendar.' },
       { onlyIn: 'advanced', target: '[data-testid^="todo-tag-"]', badge: 'TAG', text: 'The **tag** (Code, Study…) groups time in Analytics. Click it to change it.' },
       { target: `${TODO} .todo-check`, badge: 'TICK', text: 'Done? **Tick the box.**', waitFor: { board: taskDone }, hint: 'Waiting for a tick…' },
@@ -235,9 +244,10 @@ export const TOURS: readonly Tour[] = [
     steps: [
       { node: 'mother-calendar', target: CAL, badge: 'CALENDAR', text: 'The Calendar holds your **plan** (blocks) and **what really happened** (the thin track at the left of each day).' },
       { target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', also: ['mother-todo'], from: TODO, fromBadge: 'FROM HERE', badge: 'DROP HERE', text: '**Drag a plan** from the **Todo** onto a time here to plan it.', waitFor: { board: taskScheduled }, hint: 'Waiting for you to drop a task on the grid…' },
-      { target: '[data-testid="calendar-day-only-row"]', node: 'mother-calendar', badge: 'ANY TIME', text: 'On a day but **no set time**? Drop it in the **ANY TIME** strip under the day names. Drag it into the hours later to give it a time. A dashed **flag** there is a deadline.' },
+      { onlyIn: 'advanced', target: '[data-testid="calendar-day-only-row"]', node: 'mother-calendar', badge: 'ANY TIME', text: 'On a day but **no set time**? Drop it in the **ANY TIME** strip under the day names. Drag it into the hours later to give it a time. A dashed **flag** there is a deadline.' },
+      { onlyIn: 'easy', target: '[data-testid="calendar-day-only-row"]', node: 'mother-calendar', badge: 'ANY TIME', text: 'On a day but **no set time**? Drop it in the **ANY TIME** strip under the day names. Drag it into the hours later to give it a time.' },
       { target: '[data-testid="calendar-new"]', node: 'mother-calendar', badge: 'ADD HERE', text: '**Click empty hours** — or this **+** — to add something right on the Calendar: **Once** is a plan, **Repeats** is a class or a shift.' },
-      { target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', badge: 'ITS CARD', text: '**Click a plan** to open its card: move it to another day or **any time**, change how long, set a deadline or a reminder, Focus, Done, Delete.' },
+      { target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', badge: 'ITS CARD', text: '**Click a plan** to open its card: move it to another day or **any time**, change how long, set a reminder, mark it done or delete it.' },
       { onlyIn: 'advanced', target: '[data-testid="calendar-grid-body"]', badge: 'HOW IT WENT', text: 'Once you work on it, the planned block says how it went: **"started 20m late"**, **"+30m over"**.' },
       { target: '[data-testid="calendar-reality-block"]', node: 'mother-calendar', badge: 'RECORDED', text: 'The thin track at the left of each day fills with **recorded time**. Click a filled stretch to see it; **double-click** its start or end time to fix it.' },
       { target: '[data-testid="calendar-grid-body"]', badge: 'RIGHT-CLICK', text: 'Forgot to record something? **Right-click** an empty time and choose **Log time here…**' },
@@ -262,7 +272,7 @@ export const TOURS: readonly Tour[] = [
       { node: 'mother-habit', target: HABIT, badge: 'HABITS', text: 'Habits are things you want to do **regularly** — reading, exercise, a weekly review.' },
       { target: '[data-testid="habit-add-input"]', badge: 'TYPE', text: 'Click **add a habit**, type one. A card opens: **every day, any time** unless you pick days or a time. Press **Enter** to add it.', waitFor: { board: habitAdded }, hint: 'Waiting for a new habit…' },
       { target: `${HABIT} .habit-cell--today`, node: 'mother-habit', badge: 'TICK TODAY', text: "Did it today? Click **today's square**.", waitFor: { board: habitTicked }, hint: "Waiting for today's square…" },
-      { node: 'mother-habit', target: HABIT, badge: 'CHANGE IT LATER', text: '**Right-click** a habit: **Days & time…** changes when (and times a week, an amount); rename, recolour or archive it below.' },
+      { node: 'mother-habit', target: HABIT, badge: 'CHANGE IT LATER', text: '**Right-click** a habit: **Days & time…** changes its days and time; rename, recolour or archive it below.' },
     ],
   },
   {
@@ -282,11 +292,12 @@ export const TOURS: readonly Tour[] = [
     title: 'Staying on track',
     summary: 'Weekly targets, amounts, rest days, deadlines, reminders',
     steps: [
-      { node: 'mother-habit', target: HABIT, badge: 'REAL LIFE', text: 'Not every week goes to plan. Four things keep you on track without lying to the app: **weekly targets**, **rest days**, **deadlines** and **reminders**.' },
-      { node: 'mother-habit', target: HABIT, badge: 'TIMES A WEEK', text: '**Right-click** a habit, choose **Days & time…**, then **Times a week** — say **3**. Any days count, and the streak counts weeks that reach it.', waitFor: { board: targetSet }, hint: 'Waiting for a weekly target… (or Skip)' },
-      { node: 'mother-habit', target: HABIT, badge: 'HOW MUCH', text: 'Some habits are an amount — **8 glasses**, **20 pages**. In **Days & time…** choose **Amount**: each click on the day adds one, and the day counts once it is reached.', waitFor: { board: amountSet }, hint: 'Waiting for an amount… (or Skip)' },
+      { onlyIn: 'advanced', node: 'mother-habit', target: HABIT, badge: 'REAL LIFE', text: 'Not every week goes to plan. Four things keep you on track without lying to the app: **weekly targets**, **rest days**, **deadlines** and **reminders**.' },
+      { onlyIn: 'easy', node: 'mother-habit', target: HABIT, badge: 'REAL LIFE', text: 'Not every week goes to plan. Three things keep you on track without lying to the app: **rest days**, **reminders** and **Won\u2019t do**.' },
+      { onlyIn: 'advanced', node: 'mother-habit', target: HABIT, badge: 'TIMES A WEEK', text: '**Right-click** a habit, choose **Days & time…**, then **Times a week** — say **3**. Any days count, and the streak counts weeks that reach it.', waitFor: { board: targetSet }, hint: 'Waiting for a weekly target… (or Skip)' },
+      { onlyIn: 'advanced', node: 'mother-habit', target: HABIT, badge: 'HOW MUCH', text: 'Some habits are an amount — **8 glasses**, **20 pages**. In **Days & time…** choose **Amount**: each click on the day adds one, and the day counts once it is reached.', waitFor: { board: amountSet }, hint: 'Waiting for an amount… (or Skip)' },
       { node: 'mother-habit', target: HABIT, badge: 'REST DAY', text: 'Sick or away? **Right-click** a habit you have not done today and choose **Rest today**. A rest day never breaks a streak — it shows as a quiet hatch.', waitFor: { board: restAdded }, hint: 'Waiting for a rest day… (or Skip)' },
-      { node: 'mother-todo', target: TODO, badge: 'DEADLINE', text: 'When you do it and when it must be done can differ. **Right-click** a Todo row and choose **Deadline…** — the row shows a flag, the Calendar a dashed flag on that day in its **ANY TIME** strip, and the Clock lists it.', waitFor: { board: dueSet }, hint: 'Waiting for a deadline… (or Skip)' },
+      { onlyIn: 'advanced', node: 'mother-todo', target: TODO, badge: 'DEADLINE', text: 'When you do it and when it must be done can differ. **Right-click** a Todo row and choose **Deadline…** — the row shows a flag, the Calendar a dashed flag on that day in its **ANY TIME** strip, and the Clock lists it.', waitFor: { board: dueSet }, hint: 'Waiting for a deadline… (or Skip)' },
       { node: 'mother-todo', target: TODO, badge: 'REMIND ME', text: 'Want a nudge? **Right-click** a row, choose **When…**, give it a time and pick **Remind**. A notification comes before it starts, even with the window closed.', waitFor: { board: remindSet }, hint: 'Waiting for a reminder… (or Skip)' },
       { node: 'mother-todo', target: TODO, badge: "WON'T DO", text: "Not doing something any more? **Won't do** takes it off your list and the Calendar — not done and not missed. **UNDO** in the notice brings it back." },
     ],
@@ -326,6 +337,7 @@ export const TOURS: readonly Tour[] = [
   },
   {
     id: 'terminal',
+    onlyIn: 'advanced',
     title: 'Terminal & AI',
     summary: 'The krnl commands and Claude Code',
     steps: [

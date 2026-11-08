@@ -11,6 +11,7 @@
  *   - Connect (no shortcut) — sets connect tool mode
  */
 
+import { isEasyBoard, useEasyMode } from '../../store/uiMode';
 import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeKind } from '../../../shared/types/node';
@@ -79,6 +80,7 @@ export interface DockProps {
 }
 
 export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: DockProps) {
+  const easy = useEasyMode();
   const [activeTool, setActiveTool] = useState<ToolMode>('select');
   const penActive = useDrawStore((s) => s.active);
   const togglePen = useDrawStore((s) => s.toggle);
@@ -232,7 +234,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
         useDrawStore.getState().toggle();
         return;
       }
-      if (e.key === 'f' || e.key === 'F') {
+      if ((e.key === 'f' || e.key === 'F') && !isEasyBoard(useBoardStore.getState().board)) {
         fireNode('frame');
         return;
       }
@@ -452,8 +454,9 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
       </button>
 
       {/* Frame — F. Glassy 3D container that softly groups whatever is dropped
-          inside its bounds. Drag the frame and its contents move with it. */}
-      <button
+          inside its bounds. Drag the frame and its contents move with it.
+          easy-mode D24: Advanced only. */}
+      {!easy && <button
         type="button"
         data-testid="dock-btn-frame"
         title="Frame [F]"
@@ -467,7 +470,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
           <path d="M6 5v14" opacity="0.35" />
         </svg>
         <KeyHint k="F" />
-      </button>
+      </button>}
 
       {/* Mother-row chassis-style picker — opens a tile flyout. Button shows
           the active style's glyph; flyout has 4 rich tiles to switch styles. */}

@@ -5,7 +5,8 @@
 import { useRef, useState } from 'react';
 import { Popover } from '../ui/Popover';
 import { startTour } from '../Tour/TourHost';
-import { TOURS } from '../Tour/tours';
+import { toursIn } from '../Tour/tours';
+import { useEasyMode } from '../../store/uiMode';
 import { openFeedback, openShare, openWelcomeBack, openWhatsNew, todayYMD, useLaunchStore } from '../../launch/launchStore';
 import { allShareCards } from '../../launch/milestones';
 import { useBoardStore } from '../../store/boardStore';
@@ -17,6 +18,8 @@ import { currentDiagnostics } from './FeedbackDialog';
 const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0';
 
 export function HelpMenu() {
+  // Only the tutorials for what this mode shows (the Terminal tour is Advanced).
+  const listed = toursIn(useEasyMode() ? 'easy' : 'advanced').filter((t) => t.id !== 'first-day');
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [toursOpen, setToursOpen] = useState(false);
@@ -62,9 +65,9 @@ export function HelpMenu() {
           </button>
           {/* Every tutorial, not just the first one (they were only in the Orb). */}
           <button type="button" role="menuitem" className="ln-menu__item" aria-expanded={toursOpen} data-testid="help-tutorials" onClick={() => setToursOpen((o) => !o)}>
-            <span>Tutorials</span><span>{toursOpen ? 'hide' : `${TOURS.length - 1} more`}</span>
+            <span>Tutorials</span><span>{toursOpen ? 'hide' : `${listed.length} more`}</span>
           </button>
-          {toursOpen && TOURS.filter((t) => t.id !== 'first-day').map((t) => (
+          {toursOpen && listed.map((t) => (
             <button key={t.id} type="button" role="menuitem" className="ln-menu__item" data-testid={`help-tour-${t.id}`} title={t.summary} onClick={run(() => { startTour(t.id); })} style={{ paddingLeft: 22 }}>
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{t.title}</span><span />
             </button>

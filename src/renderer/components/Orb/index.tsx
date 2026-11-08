@@ -64,7 +64,8 @@ import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
 import { launchClaudeInTerminal } from '../../store/claudeLaunch';
-import { TOURS } from '../Tour/tours';
+import { toursIn } from '../Tour/tours';
+import { useEasyMode } from '../../store/uiMode';
 import { useTourAnchor } from '../Tour/tourAnchor';
 
 /** Voice flows not offered in the chat for now. */
@@ -229,6 +230,7 @@ function getBoardSnapshot(): BoardSnapshot {
 }
 
 export function Orb() {
+  const easyMode = useEasyMode();
   const { setViewport } = useReactFlow();
 
   const [orbState, setOrbState] = useState<OrbState>('idle');
@@ -804,7 +806,7 @@ export function Orb() {
                     </span>
                   </button>
                   <div data-testid="orb-tours" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4 }}>
-                    {TOURS.filter((t) => t.id !== 'first-day').map((t) => (
+                    {toursIn(easyMode ? 'easy' : 'advanced').filter((t) => t.id !== 'first-day').map((t) => (
                       <button
                         key={t.id}
                         type="button"

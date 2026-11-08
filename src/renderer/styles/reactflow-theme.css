@@ -4,6 +4,8 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ── Handles ─────────────────────────────────────────────────────────────── */
+/* easy-mode D24 — Easy has no wires: no connection dots to drag from. */
+[data-ui-mode="easy"] .react-flow__handle { display: none !important; }
 .react-flow__handle {
   width: 12px;
   height: 12px;

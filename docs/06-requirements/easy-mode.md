@@ -59,7 +59,7 @@ Each row is one link. **Proposed** is my recommendation. Change any cell you dis
 
 ## Review, 8 Nov 2026: what Easy should hide now (proposal)
 
-*Status: **proposed, waiting for the user's OK** (D19–D26). The first-run part below is built.*
+*Status: **built** 8 Nov 2026 (the user said "build them"). Q6–Q9 went with the recommendation: Deadline hidden, both habit goals hidden, chains to Advanced, Terminal hidden. D22 and D25 were narrowed to what the app actually has (below). Tests: `tests/unit/renderer/easyMode.review.test.tsx`.*
 
 Since D1–D18 were decided, the app grew: one When plus an optional **Deadline** (Decision 40), habit **amounts** and **times a week**, **repeating events**, **reminders**, **task chains**, the Calendar's line-up and zoom tools, the **terminal / Claude Code**, several **canvases**, frames and wires. A first-day user met most of these during testing and found several confusing (when vs deadline, the habit amount, the add card). The test for each row: *does someone planning their first week need it to plan, do and look back?* If not, it goes to Advanced. Data is never touched (principle 2).
 
@@ -80,18 +80,20 @@ Since D1–D18 were decided, the app grew: one When plus an optional **Deadline*
 | D19 | **Todo: Deadline** (menu item, the Deadline tab in the plan card, "by fri" in quick add) | Hidden. One date per plan: its When. Existing deadlines still show their flag. | Shown | "Scheduled vs due" was the first confusion in testing; two dates per plan is a planning concept, not a first-week need. |
 | D20 | **Habits: Times a week and Amount** (the card's switch and Goal row) | Hidden. The card is name, days, time. Existing goals keep working and still show "1 of 8". | Shown | The amount ("why at least 2?") and weekly targets were hard to read for a new user; plain ticks teach the habit loop first. |
 | D21 | **Task chains** (task card: Add next / Add parallel; the cascade) | Creating them is hidden; existing chains keep working. | Shown | Reverses Q2. Chains are a power-planning tool and add a second way a task can move on the Calendar. |
-| D22 | **Calendar tools** (line-up, lens, rail, zoom 2.0×) | Hidden; Today, arrows, + and Events stay. | Shown | Four icon buttons a beginner can't name. |
+| D22 | **Calendar tools**: the layer switches (Recorded · Habits · Events) and zoom (− 2.0× +) | Hidden; arrows, +, the events list and Today stay. All layers stay on. | Shown | Five small controls a beginner can't name. |
 | D23 | **Terminal window, krnl, Claude Code** | The Terminal window is hidden (Station and the top bar); the Orb's chat stays. | Shown | The terminal is for people who want the CLI; it is the most "developer" thing in the app. |
 | D24 | **Canvas: wires, frames, several canvases** | Hidden (the canvas switcher, frame tool, drag-to-wire). Notes, images and the pen stay. | Shown | Wires and frames link things (Easy hides links); one canvas is enough to start. |
-| D25 | **Settings** | General (mode, theme), Floating timer, Sounds, Reminders, Updates. Categories (D16) and terminal settings hidden. | All | Fewer pages to read on day one. |
-| D26 | **Layout** | Starts in **Station** (fixed windows); Free canvas stays one click away. | Either | Station never loses a window; the free canvas is easier once you know the windows. |
+| D25 | **Settings** | The **Finished cards** page (how done cards clear off the canvas) is hidden; General, Floating timer, Sounds, Celebrations, Updates, Reset stay. | All | A canvas-housekeeping page a beginner has no use for yet. |
+| D26 | **Layout** | Starts in **Station** (fixed windows); Free canvas stays one click away. Already so: new boards are Station (ADR 0008 §5). | Either | Station never loses a window; the free canvas is easier once you know the windows. |
 
-### Open questions
+### Decisions
 
-- **Q6 (D19):** hide Deadline in Easy, or keep it as a quiet item at the bottom of the menu?
-- **Q7 (D20):** hide Amount in Easy, or keep Amount and hide only Times a week?
-- **Q8 (D21):** OK to reverse Q2 (chains to Advanced)?
-- **Q9 (D23):** hide the Terminal window in Easy, or keep it but closed?
+- **Q6 (D19):** hidden. The Deadline tab still shows on a plan that already has one, so it can be seen and cleared; "by fri" sets no deadline in Easy.
+- **Q7 (D20):** both hidden. A habit that already has a weekly target or an amount still shows it in its card and keeps it on Save.
+- **Q8 (D21):** reversed: creating chains is Advanced; existing chains keep working.
+- **Q9 (D23):** hidden, and its toolbar toggle too. `krnl` still works from Advanced.
+- **Tours:** the Terminal tour is listed in Advanced only; steps that mention deadlines, weekly targets or amounts have an Easy wording (tested).
+- **How it is gated:** `useEasyMode()` in components, plus `<html data-ui-mode>` for CSS-only rules (no connection dots) and the Station rule for the Terminal, both set from `store/uiMode.ts`.
 
 ## First run (built 8 Nov 2026)
 

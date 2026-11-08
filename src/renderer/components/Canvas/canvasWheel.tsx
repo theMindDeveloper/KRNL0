@@ -2,6 +2,8 @@
 // each opening its own ring (sticky colours, shape kinds, media, pen tools).
 
 import type { PieItem } from '../ui/PieMenu';
+import { isEasyBoard } from '../../store/uiMode';
+import { useBoardStore } from '../../store/boardStore';
 import { STICKY_COLORS, type TextLook } from '../nodes/TextNode/types';
 
 export interface CanvasWheelActions {
@@ -59,7 +61,8 @@ export function canvasWheelItems(a: CanvasWheelActions): PieItem[] {
         { key: 'file', label: 'Video/PDF', icon: I.file, onSelect: a.mediaFile },
       ],
     },
-    { key: 'frame', label: 'Frame', shortcut: 'F', icon: I.frame, onSelect: a.frame },
+    // easy-mode D24 — frames are Advanced.
+    ...(isEasyBoard(useBoardStore.getState().board) ? [] : [{ key: 'frame', label: 'Frame', shortcut: 'F', icon: I.frame, onSelect: a.frame }]),
     // Pen turns the pen on and opens the pen wheel right where you are.
     { key: 'pen', label: 'Pen', shortcut: 'P', icon: I.pen, onSelect: a.pen },
   ];
