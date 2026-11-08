@@ -381,6 +381,13 @@ export class SysFacade {
       };
     }
 
+    // `krnl show`: the agent points at something in the window while it explains.
+    if (command.kind === 'show') {
+      return this.inWindow('ui.show', command.sub === 'clear'
+        ? { sub: 'clear' }
+        : { sub: 'target', scope: command.scope, ref: command.ref, ...(command.note ? { note: command.note } : {}), ...(command.seconds ? { seconds: command.seconds } : {}) });
+    }
+
     // Guided tours (#207): list is headless, start needs the window.
     if (command.kind === 'tour') {
       if (command.sub === 'list') {

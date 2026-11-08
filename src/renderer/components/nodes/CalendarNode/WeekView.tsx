@@ -4,7 +4,8 @@
 // rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
 // HabitSwapModal. NowLine is rendered as an overlay.
 
-import { CALENDAR_REVEAL_EVENT, showTaskOnCanvas, unscheduleTask } from '../../../store/scheduleActions';
+import { CALENDAR_REVEAL_EVENT, showTask, unscheduleTask } from '../../../store/scheduleActions';
+import { highlightElement } from '../../../store/highlight';
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -994,10 +995,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       if (det?.itemId) {
         // An any-time plan: blink its chip in the ANY TIME strip.
         window.setTimeout(() => {
-          document.querySelector<HTMLElement>(`[data-testid="calendar-day-only-${CSS.escape(det.itemId!)}"]`)?.animate(
-            [{ boxShadow: '0 0 0 0 var(--acid)' }, { boxShadow: '0 0 0 3px var(--acid)' }, { boxShadow: '0 0 0 0 var(--acid)' }],
-            { duration: 700, iterations: 3, easing: 'ease-in-out' },
-          );
+          const chip = document.querySelector<HTMLElement>(`[data-testid="calendar-day-only-${CSS.escape(det.itemId!)}"]`);
+          if (chip) highlightElement(chip);
         }, 80);
         return;
       }
@@ -1010,10 +1009,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       window.setTimeout(() => {
         const block = el.querySelector<HTMLElement>(`[data-testid="task-block-${CSS.escape(det.taskId!)}"]`);
         if (!block) return;
-        block.animate(
-          [{ boxShadow: '0 0 0 0 var(--acid)' }, { boxShadow: '0 0 0 4px var(--acid)' }, { boxShadow: '0 0 0 0 var(--acid)' }],
-          { duration: 700, iterations: 3, easing: 'ease-in-out' },
-        );
+        highlightElement(block);
       }, 80);
     };
     window.addEventListener(CALENDAR_REVEAL_EVENT, onReveal);
@@ -2896,7 +2892,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             actions={[
               { key: 'timer', label: observe ? 'Track it now' : 'Focus on it', icon: observe ? 'observe' : 'play', onClick: () => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); close(); } },
               { key: 'done', label: taskPopup.task.done ? 'Not done yet' : 'Mark done', icon: taskPopup.task.done ? 'undo' : 'check', onClick: () => { void toggleTaskDone(taskPopup.task.id); close(); } },
-              { key: 'find', label: 'Show on canvas', icon: 'show', onClick: () => { const t = taskPopup.task.id; close(); showTaskOnCanvas(t); } },
+              { key: 'show', label: 'Show', icon: 'show', onClick: () => { const t = taskPopup.task.id; close(); void showTask(t); } },
               { key: 'delete', label: 'Delete', icon: 'delete', danger: true, onClick: () => { void deletePlanOfTask(taskPopup.task.id); close(); } },
             ]}
             onApply={(next) => { void applyPlanWhen(plan, next); close(); }}

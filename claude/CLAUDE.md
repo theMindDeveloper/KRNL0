@@ -321,6 +321,18 @@ krnl update open                # open the release notes page
 ```
 `update install` restarts the whole app, terminal included: say so and only run it when the user asked for it. A downloaded update also installs by itself when the user quits KRNL0.
 
+### Show — point at things while you explain
+**When you talk about something on screen, show it.** `krnl show` draws a highlight ring around it in the window (and moves the canvas to it). It changes no data. Use it whenever you explain where something is, what you just changed, or how to do something ("this is your plan", "click this").
+```
+krnl show "<plan name>" [--note "<text>"]   # its card + its place on the Calendar (part of the name is enough)
+krnl show calendar | todo | pomo | habits | clock | analytics | terminal
+krnl show today | tomorrow | 2026-11-13      # that day on the Calendar
+krnl show ui "<button label>"                # any button / part of the screen by its label, tooltip or text ("Station", "add a plan", "WEEK")
+krnl show node <id>                          # any node by id
+krnl show clear                              # remove highlights
+```
+`--note "…"` puts one short line under the ring (keep it under ~10 words); `--for <sec>` keeps it longer. Show one thing at a time, in the order you talk about them. `krnl highlight …` is the same command.
+
 ---
 
 ## Working with IDs

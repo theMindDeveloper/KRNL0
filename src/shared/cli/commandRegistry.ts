@@ -399,6 +399,18 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'show',
+    summary: 'Highlight something in the KRNL0 window while explaining it (alias: highlight)',
+    subcommands: [
+      { name: 'target', usage: 'show <plan name|window|day> [--note "<text>"] [--for <sec>]', summary: 'A plan (its card + its place on the Calendar), a window (todo, calendar, pomo, habits, clock, analytics, terminal) or a day (today, tomorrow, YYYY-MM-DD)' },
+      { name: 'plan', usage: 'show plan "<name|id>" [--note "<text>"]', summary: 'A plan by name, part of its name, or id' },
+      { name: 'node', usage: 'show node <id> [--note "<text>"]', summary: 'Any node on the canvas by id or id prefix' },
+      { name: 'day', usage: 'show day <YYYY-MM-DD|today|tomorrow> [--note "<text>"]', summary: 'That day on the Calendar' },
+      { name: 'ui', usage: 'show ui "<label|test id>" [--note "<text>"]', summary: 'Any button or part of the screen by its label, tooltip, text or test id' },
+      { name: 'clear', usage: 'show clear', summary: 'Remove the highlights' },
+    ],
+  },
+  {
     group: 'tour',
     summary: 'Guided tutorials — one per part of the app',
     subcommands: [

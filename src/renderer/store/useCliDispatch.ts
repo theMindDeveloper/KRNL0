@@ -30,6 +30,7 @@ import { isFrameStyleId } from '../../shared/frameStyles';
 import { radioControl } from '../components/AmbientRadio/radioControl';
 import { launchClaudeInTerminal } from './claudeLaunch';
 import { startTour } from '../components/Tour/TourHost';
+import { runShow, type ShowArgs } from './showCli';
 import { flushBeforeRestart } from './updateStore';
 import { openFeedback, openShare, openWelcomeBack, openWhatsNew, todayYMD } from '../launch/launchStore';
 import { shareCardFor } from '../launch/milestones';
@@ -43,6 +44,11 @@ export function useCliDispatch(): void {
     if (!bridge?.onCliDispatch || !bridge?.cliDispatchReply) return;
 
     const unsubscribe = bridge.onCliDispatch((id, command, args) => {
+      if (command === 'ui.show') {
+        const r = runShow(args as unknown as ShowArgs);
+        bridge.cliDispatchReply!(id, r.ok, r.message);
+        return;
+      }
       if (command === 'tour.start') {
         const ok = startTour(String(args['id'] ?? ''));
         bridge.cliDispatchReply!(id, ok, ok ? `Tour "${String(args['id'])}" started` : `No tour "${String(args['id'])}"`);

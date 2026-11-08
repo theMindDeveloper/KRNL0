@@ -12,7 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { PomoState } from '../PomoNode/types';
 import { trackedSecondsForTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { DoneCard } from './DoneCard';
-import { CardIcon, CardMetaRow, CardMeter, cardFrameStyle, fmtDur, fmtWhen } from './CardParts';
+import { CardIcon, CardMetaRow, CardMeter, cardFrameStyle, fmtDayAnyTime, fmtDur, fmtWhen } from './CardParts';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
 import { toneVarForTask } from '../../../utils/taskColor';
@@ -84,6 +84,12 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       (state.scheduledDurationMin ?? state.plannedMin ?? state.durationMin ?? 25) * 60_000
     : null;
   const isPastScheduled = scheduledEndMs !== null && scheduledEndMs <= nowMs;
+  // Decision 40 — a plan on a day at any time is on the Calendar too (ANY TIME strip).
+  const onDay = useBoardStore((s) => {
+    const todo = s.board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+    const items = (todo?.state as { items?: Array<{ taskNodeId: string | null; onDay?: string }> } | undefined)?.items;
+    return items?.find((i) => i.taskNodeId === taskId)?.onDay ?? null;
+  });
 
   // engagement.md F1–F2 — the done moment: ticking turns the card into the
   // done card and plays its one-shot reward. Reopening restores the full card.
@@ -343,9 +349,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
       onSelect: startNoteEdit,
     },
-    // Only for tasks that are on the calendar (anchors and chain successors).
-    ...(onCalendar
-      ? [{ label: 'Show on Calendar', icon: <MenuIcon name="show" />, onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTaskOnCalendar(taskId)); } }]
+    // The eye: this card and its place on the Calendar, at once.
+    ...(onCalendar || onDay
+      ? [{ label: 'Show', icon: <MenuIcon name="show" />, hint: 'card + Calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTask(taskId)); } }]
       : []),
     {
       label: 'Delete',
@@ -385,7 +391,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   // One card shape for every state (CardParts.tsx): nothing moves on tick.
   const cardTone = isActiveRunning ? 'running' : isActivePaused ? 'paused' : isPastScheduled ? 'missed' : 'open';
   const tagTone = toneVarForTask(taskId);
-  const when = fmtWhen(state.scheduledFor, nowMs);
+  const when = fmtWhen(state.scheduledFor, nowMs) ?? (onDay ? fmtDayAnyTime(onDay, nowMs) : null);
+  // Icons show state: green = set (on the Calendar / has a length), grey = not yet, rust = missed.
+  const planCol = isPastScheduled ? 'var(--rust)' : when ? 'var(--planned)' : 'var(--ink-4)';
   const plannedMin = state.plannedMin ?? state.durationMin ?? 25;
   const trackedMin = elapsedSec / 60;
   const over = !state.timeOpen && trackedMin > plannedMin + 0.5;
@@ -454,7 +462,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             data-testid="task-calendar-grip"
             className="nodrag task-card-action"
             draggable
-            title={isPastScheduled ? 'Missed — drag onto the Calendar to move it' : 'Drag onto the Calendar to plan it'}
+            title={isPastScheduled ? 'Missed — drag onto the Calendar to move it' : when ? `On the Calendar (${when}) — drag to move it` : 'Not on the Calendar — drag it there to plan it'}
             onDragStart={(e) => {
               e.stopPropagation();
               e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId, durationMin: state.plannedMin }));
@@ -462,8 +470,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             }}
             style={{
               width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'grab',
-              color: isPastScheduled ? 'var(--rust)' : 'var(--ink-3)',
-              background: isPastScheduled ? 'color-mix(in srgb, var(--rust) 14%, transparent)' : 'var(--paper-2)',
+              color: planCol,
+              background: isPastScheduled || when ? `color-mix(in srgb, ${planCol} 14%, transparent)` : 'var(--paper-2)',
             }}
           >
             <CardIcon name={isPastScheduled ? 'replan' : 'grip'} size={13} />
@@ -477,6 +485,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         icon={isActiveRunning ? 'clock' : 'calendar'}
         when={isActiveRunning ? 'Focusing now' : isActivePaused ? 'Paused' : when ? (isPastScheduled ? `Was ${when}` : when) : 'Not on the calendar'}
         whenColor={isActiveRunning ? 'var(--acid-ink, var(--acid))' : isPastScheduled ? 'color-mix(in srgb, var(--rust) 72%, var(--ink))' : undefined}
+        iconColor={isActiveRunning || isActivePaused ? undefined : planCol}
       />
 
         {/* Note — free-form text under the task body. Click to edit.
@@ -566,7 +575,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               onDoubleClick={(e) => { e.stopPropagation(); startEtaEdit(); }}
               style={{ cursor: 'text', display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
-              <CardIcon name="clock" size={11} />
+              <span style={{ display: 'inline-flex', color: state.timeOpen ? 'var(--ink-4)' : 'var(--planned)' }}><CardIcon name="clock" size={11} /></span>
               {state.timeOpen ? 'no set time' : trackedMin >= 1 ? `of ${fmtDur(plannedMin)}` : fmtDur(plannedMin)}
             </span>
           )}

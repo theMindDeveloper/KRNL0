@@ -66,7 +66,7 @@ export function CardIcon({ name, size = 12 }: { name: CardIconName; size?: numbe
 }
 
 /** Row 2: the tag (its colour dot) and when — always in the same place. */
-export function CardMetaRow({ tag, tone, icon, when, whenColor }: { tag: string; tone: string; icon: CardIconName; when: string; whenColor?: string | undefined }) {
+export function CardMetaRow({ tag, tone, icon, when, whenColor, iconColor }: { tag: string; tone: string; icon: CardIconName; when: string; whenColor?: string | undefined; iconColor?: string | undefined }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
       {tag && (
@@ -83,7 +83,7 @@ export function CardMetaRow({ tag, tone, icon, when, whenColor }: { tag: string;
         </span>
       )}
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, color: whenColor ?? 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        <CardIcon name={icon} size={11} />
+        <span style={{ display: 'inline-flex', flexShrink: 0, ...(iconColor ? { color: iconColor } : {}) }}><CardIcon name={icon} size={11} /></span>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{when}</span>
       </span>
     </div>
@@ -119,6 +119,18 @@ export function fmtWhen(iso: string | undefined, nowMs = Date.now()): string | n
   if (sameDay(d, today)) return `Today ${hm}`;
   if (sameDay(d, tomorrow)) return `Tomorrow ${hm}`;
   return `${d.toLocaleDateString('en-GB', { weekday: 'short' })} ${d.getDate()} · ${hm}`;
+}
+
+/** A plan on a day at any time: "Today, any time" / "Fri 13, any time". */
+export function fmtDayAnyTime(ymd: string, nowMs = Date.now()): string {
+  const d = new Date(`${ymd}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return ymd;
+  const today = new Date(nowMs);
+  const tomorrow = new Date(nowMs); tomorrow.setDate(tomorrow.getDate() + 1);
+  const day = d.toDateString() === today.toDateString() ? 'Today'
+    : d.toDateString() === tomorrow.toDateString() ? 'Tomorrow'
+      : `${d.toLocaleDateString('en-GB', { weekday: 'short' })} ${d.getDate()}`;
+  return `${day}, any time`;
 }
 
 /** "1h 20m" / "45m". */

@@ -54,6 +54,8 @@
   --lilac: #9c8ec4;
   --sand:  #b8a17a;
   --moss:  #7a8f5a;
+  /* State colour: "this is set" (on the Calendar, has a length). */
+  --planned: #4a7d22;
 
   /* Terminal — always dark */
   --term-bg:    #0c0a08;
@@ -143,6 +145,7 @@
   --spine-hot: #a8d244;
   --rust:      #ee8466;
   --rust-deep: #d05f47;
+  --planned:   #8fd05c;
 
   --term-bg:   #05040a;
   --term-bg-2: #0a0812;

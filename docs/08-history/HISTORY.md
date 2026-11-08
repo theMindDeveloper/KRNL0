@@ -2359,3 +2359,15 @@ Checked in the preview as a user (plain Enter, card day/length/deadline, words f
 **Branch:** `experiment/new-user-review`
 **Files changed:** `store/scheduleActions.ts` (`showTaskOnCanvas`, any-time plans in `showTaskOnCalendar`), `TodoNode/index.tsx`, `TaskNode/index.tsx`, `CalendarNode/WeekView.tsx`, `ui/menuIcons.tsx`.
 **Summary:** A plan's right-click menu has two eye items: **Show on canvas** centres its card and makes it blink; **Show on Calendar** opens the Calendar on its day and blinks the block (or its chip in the ANY TIME strip). Show on Calendar is greyed out with "no day yet" when the plan has no day. The plan card has the same two actions, and on the Calendar "Show its card" became "Show on canvas". The Calendar no longer draws the dashed lines for when KRNL0 was first opened and last closed each day; the times are still recorded. 2,447 tests and typecheck green.
+
+## [2026-11-08] — One Show, a highlight that keeps the card's shape, state colours, `krnl show` (experimental, #223)
+
+**Type:** UX + CLI
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/highlight.ts` (new), `store/showCli.ts` (new), `store/scheduleActions.ts` (`showTask`), `store/useCliDispatch.ts`, `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `TodoNode/index.tsx`, `TaskNode/index.tsx`, `TaskNode/CardParts.tsx`, `CalendarNode/WeekView.tsx`, `styles/tokens.css` (`--planned`), `claude/CLAUDE.md`, `tests/unit/sys/show.cli.test.ts`.
+**Summary:**
+- **One Show (eye).** The two items (Show on canvas / Show on Calendar) became one **Show**: the plan's card and its place on the Calendar come on screen together and are highlighted. A plan with no day shows its card only. Same in the plan card and the task card's menu.
+- **The highlight keeps the shape.** It used to put a square glow on the card's wrapper. It is now a ring drawn above the screen, with the same rounded corners as the thing it points at, following it while the canvas moves. The card itself is not restyled. The Calendar block and the ANY TIME chip use the same ring.
+- **Card icons show state.** The drag-to-Calendar icon and the date icon are green when the plan is on the Calendar, grey when not, rust when missed. The length icon is green when a length is set. A plan on a day at any time now reads "Fri 13, any time" on its card (it said "Not on the calendar").
+- **`krnl show` (alias `highlight`)** lets the in-app agent point at things while it explains: a plan by name (card + Calendar), a window (`calendar`, `todo`, `pomo`, `habits`, `clock`, `analytics`, `terminal`), a day (`today`, `2026-11-13`), any button (`show ui "Station"`), a node (`show node <id>`), with `--note "…"` under the ring and `show clear`. The assistant instructions tell it to show what it talks about.
+2,457 tests and typecheck green; checked in the preview.

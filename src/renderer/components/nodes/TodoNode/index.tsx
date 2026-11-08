@@ -27,7 +27,7 @@ import { WhenPopover, dayWord, fmtLength, type WhenValue } from '../../ui/WhenPo
 import { MenuIcon } from '../../ui/menuIcons';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
-import { scheduleTaskAt, setTaskReminder, showTaskOnCalendar, showTaskOnCanvas, unscheduleTask } from '../../../store/scheduleActions';
+import { scheduleTaskAt, setTaskReminder, showTask, unscheduleTask } from '../../../store/scheduleActions';
 import { parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
 import { effectiveDraft, type PlanDraft, type PlanOverrides } from './PlanAddCard';
 
@@ -497,12 +497,10 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           ? { label: 'Track it now', icon: <MenuIcon name="observe" />, onSelect: () => onCommand('todo.startPomoForItem', { itemId }) }
           : { label: 'Focus on it', icon: <MenuIcon name="play" />, hint: `${pomoConfig.sessionMin} min`, onSelect: () => onCommand('todo.startPomoForItem', { itemId }) };
     const tagLabel = item.tag !== undefined ? tagDisplay(tagLibrary, item.tag).label : undefined;
-    // Eye items: find the plan's card on the canvas, or its place on the Calendar.
+    // The eye: its card on the canvas and its place on the Calendar, at once.
     const taskId = item.taskNodeId;
-    const onCalendar = !!(w.day);
     const show: ContextMenuItem[] = taskId ? [
-      { label: 'Show on canvas', icon: <MenuIcon name="show" />, divider: true, onSelect: () => showTaskOnCanvas(taskId) },
-      { label: 'Show on Calendar', icon: <MenuIcon name="show" />, ...(onCalendar ? {} : { hint: 'no day yet', disabled: true }), onSelect: () => { void showTaskOnCalendar(taskId); } },
+      { label: 'Show', icon: <MenuIcon name="show" />, hint: w.day ? 'card + Calendar' : 'card', divider: true, onSelect: () => { void showTask(taskId); } },
     ] : [];
     return [
       { label: 'When…', icon: <MenuIcon name="when" />, ...(whenText(w) ? { hint: whenText(w)! } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId) },
@@ -1076,8 +1074,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             actions={[
               ...(!easy && it.taskNodeId ? [{ key: 'timer', label: pomoConfig.mode === 'observe' ? 'Track it now' : 'Focus on it', icon: (pomoConfig.mode === 'observe' ? 'observe' : 'play') as 'observe' | 'play', onClick: () => { onCommand('todo.startPomoForItem', { itemId: it.id }); setWhenPick(null); } }] : []),
               { key: 'done', label: it.done ? 'Not done yet' : 'Mark done', icon: (it.done ? 'undo' : 'check') as 'undo' | 'check', onClick: () => { onCommand('todo.toggle', { id: it.id }); setWhenPick(null); } },
-              ...(it.taskNodeId ? [{ key: 'canvas', label: 'Show on canvas', icon: 'show' as const, onClick: () => { const t = it.taskNodeId!; setWhenPick(null); showTaskOnCanvas(t); } }] : []),
-              ...(it.taskNodeId && whenOf(it).day ? [{ key: 'calendar', label: 'Show on Calendar', icon: 'show' as const, onClick: () => { const t = it.taskNodeId!; setWhenPick(null); void showTaskOnCalendar(t); } }] : []),
+              ...(it.taskNodeId ? [{ key: 'show', label: 'Show', icon: 'show' as const, onClick: () => { const t = it.taskNodeId!; setWhenPick(null); void showTask(t); } }] : []),
               { key: 'delete', label: 'Delete', icon: 'delete' as const, danger: true, onClick: () => { removeItem(it.id); setWhenPick(null); } },
             ]}
             onApply={(next) => { applyWhen(it, prev, next); setWhenPick(null); }}

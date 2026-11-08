@@ -11,6 +11,7 @@
 // CLI twins (rule 8): pomo retag <seg> <task|none> · pomo delete-segment <seg>
 // · task toggle <ref> · task pomo <ref> · task unschedule <ref>.
 
+import { highlightElement, nodeElement } from './highlight';
 import { useBoardStore, pushHistory } from './boardStore';
 import { unscheduleOne } from './chainSchedule';
 import type { Board } from '../../shared/types';
@@ -253,13 +254,12 @@ export function focusNode(nodeId: string): void {
 /** "Show on canvas": centre the plan's card on the canvas and make it blink. */
 export function showTaskOnCanvas(taskId: string): void {
   focusNode(taskId);
-  window.setTimeout(() => {
-    const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(taskId)}"]`);
-    el?.animate(
-      [{ boxShadow: '0 0 0 0 var(--acid)' }, { boxShadow: '0 0 0 5px var(--acid)' }, { boxShadow: '0 0 0 0 var(--acid)' }],
-      { duration: 700, iterations: 3, easing: 'ease-in-out' },
-    );
-  }, 450);
+  window.setTimeout(() => blinkCard(taskId), 450);
+}
+
+function blinkCard(taskId: string, note?: string): void {
+  const el = nodeElement(taskId);
+  if (el) highlightElement(el, { note });
 }
 
 /** Window event the Calendar listens for to bring a task block into view and pulse it. */
@@ -271,6 +271,37 @@ export const CALENDAR_REVEAL_EVENT = 'krnl:calendar-reveal';
  * Calendar into view, then let the week view scroll to and pulse the block.
  */
 export async function showTaskOnCalendar(taskId: string): Promise<void> {
+  await revealOnCalendar(taskId, true);
+}
+
+/**
+ * The eye ("Show"): one click shows the plan everywhere it is — its card on
+ * the canvas and its place on the Calendar, both on screen and blinking.
+ * A plan with no day yet is shown on the canvas only.
+ */
+export async function showTask(taskId: string, note?: string): Promise<void> {
+  const board = useBoardStore.getState().board;
+  const calId = await revealOnCalendar(taskId, false);
+  if (calId && board?.layoutMode !== 'station') {
+    window.dispatchEvent(new CustomEvent(FIT_NODES_EVENT, { detail: { nodeIds: [taskId, calId] } }));
+    window.setTimeout(() => blinkCard(taskId, note), 450);
+  } else {
+    focusNode(taskId);
+    window.setTimeout(() => blinkCard(taskId, note), 450);
+  }
+}
+
+/** Is the plan on the Calendar (a time, or a day at any time)? */
+export function taskHasDay(taskId: string): boolean {
+  const board = useBoardStore.getState().board;
+  if (placementOf(taskId)) return true;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const item = (todo?.state as { items?: Array<{ taskNodeId: string | null; onDay?: string }> } | undefined)?.items?.find((i) => i.taskNodeId === taskId);
+  return !!item?.onDay;
+}
+
+/** Opens the Calendar on the plan's day and blinks it there. Returns the Calendar's id, or null when the plan has no day. */
+async function revealOnCalendar(taskId: string, moveCamera: boolean): Promise<string | null> {
   const board = useBoardStore.getState().board;
   // The block's real start: a chain successor has no scheduledFor, and a
   // pushed anchor (Decision 30) can land on a later day than it stores.
@@ -280,9 +311,9 @@ export async function showTaskOnCalendar(taskId: string): Promise<void> {
   const item = (todo?.state as { items?: Array<{ id: string; taskNodeId: string | null; onDay?: string }> } | undefined)?.items?.find((i) => i.taskNodeId === taskId);
   const when = placed ?? (item?.onDay ? `${item.onDay}T00:00` : undefined);
   const cal = board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
-  if (!when || !cal) return;
+  if (!when || !cal) return null;
   const d = new Date(when);
-  if (Number.isNaN(d.getTime())) return;
+  if (Number.isNaN(d.getTime())) return null;
   const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
   const send = makeCommandHandler(cal.id);
@@ -290,11 +321,12 @@ export async function showTaskOnCalendar(taskId: string): Promise<void> {
   if (view !== 'week' && view !== 'day') send('calendar.setView', { view: 'week' });
   send('calendar.setAnchor', { date: ymd });
   // Station mode shows the Calendar as a fixed panel: don't move the camera.
-  if (board?.layoutMode !== 'station') focusNode(cal.id);
+  if (moveCamera && board?.layoutMode !== 'station') focusNode(cal.id);
   // After the calendar re-renders on the new week.
   window.setTimeout(() => {
     window.dispatchEvent(new CustomEvent(CALENDAR_REVEAL_EVENT, { detail: placed ? { taskId, startISO: when } : { taskId, itemId: item?.id } }));
   }, 120);
+  return cal.id;
 }
 
 // ── #207 corrections — move / add recorded time, stop at an earlier time ──

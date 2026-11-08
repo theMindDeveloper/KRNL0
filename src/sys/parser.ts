@@ -108,6 +108,8 @@ export type SysCommand =
   | { kind: 'term'; sub: 'clear' }
   | { kind: 'term'; sub: 'setShell'; shell: string | undefined }
   | { kind: 'term'; sub: 'claude'; bypass: boolean }
+  | { kind: 'show'; sub: 'clear' }
+  | { kind: 'show'; sub: 'target'; scope: 'auto' | 'plan' | 'node' | 'day' | 'ui'; ref: string; note: string | undefined; seconds: number | undefined }
   | { kind: 'tour'; sub: 'list' }
   | { kind: 'tour'; sub: 'start'; id: string | undefined }
   | { kind: 'node'; sub: 'move'; id: string | undefined; to: { x: number; y: number } | undefined }
@@ -852,6 +854,23 @@ export class SysParser {
       if (sub === 'clear') {
         return { kind: 'image', sub: 'clear', id: rest[0] };
       }
+    }
+
+    // `krnl show <thing>` (alias highlight): point at something in the window.
+    if (cmd === 'show' || cmd === 'highlight') {
+      if (sub === 'clear') return { kind: 'show', sub: 'clear' };
+      const scoped = sub === 'plan' || sub === 'node' || sub === 'day' || sub === 'ui';
+      const args = scoped ? rest : [...(sub !== undefined ? [sub] : []), ...rest];
+      const firstFlag = args.findIndex((a) => a.startsWith('--'));
+      const ref = (firstFlag < 0 ? args : args.slice(0, firstFlag)).join(' ').trim();
+      if (!ref) return { kind: 'invalid', message: 'show needs something to show. Try: show "<plan name>" | show calendar | show today | show ui "<button label>" | show clear' };
+      return {
+        kind: 'show', sub: 'target',
+        scope: scoped ? sub : 'auto',
+        ref,
+        note: flag(rest, 'note'),
+        seconds: positiveNum(flag(rest, 'for'), '--for'),
+      };
     }
 
     if (cmd === 'tour') {
