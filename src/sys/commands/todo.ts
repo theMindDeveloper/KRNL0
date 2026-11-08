@@ -1,10 +1,11 @@
+import { parseDue, dueLabel } from '../../shared/due';
 // sys todo CLI — real board.json operations for the sys CLI.
 // Operates on the first todo mother node in board.json.
 
 import { randomUUID } from 'crypto';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
-import {
+import { todoDrop, todoUndrop, todoSetDue,
   todoToggle as fsmTodoToggle,
   visibleItems,
   todoBuckets,
@@ -207,6 +208,48 @@ export async function todoTag(ctx: TodoCtx, ref?: string, tag?: string): Promise
     message: `Todo "${item?.text ?? ref}" tagged ${label}${auto ? ' (auto)' : ''}.`,
     data: { id: r.id.itemId, tag: item?.tag ?? null, tagSource: item?.tagSource ?? null },
   };
+}
+
+/** `krnl todo due <ref> <YYYY-MM-DD|today|tomorrow|fri|off>` (review 2.1). */
+export async function todoDue(ctx: TodoCtx, ref?: string, when?: string): Promise<SysResult> {
+  if (!ref || !when) return { ok: false, message: 'todo due requires <ref> and <YYYY-MM-DD|today|tomorrow|mon..sun|off>' };
+  const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  const dueOn = parseDue(when, today);
+  if (dueOn === undefined) return { ok: false, message: `todo due: "${when}" is not a day (YYYY-MM-DD, today, tomorrow, mon..sun, off)` };
+  const board = loadBoard(ctx);
+  const r = resolveTodoItemRef(board, ref);
+  if (!r.ok) return { ok: false, message: resolutionError('todo item', ref, r) };
+  const m = mutateTodo(ctx, (st) => todoSetDue(st, { id: r.id.itemId, dueOn }));
+  if (!m.ok) return m;
+  saveBoard(ctx, m.board);
+  const item = m.after.items.find((i) => i.id === r.id.itemId);
+  return {
+    ok: true,
+    message: dueOn === null ? `Todo "${item?.text ?? ref}": no due date.` : `Todo "${item?.text ?? ref}" due ${dueOn} (${dueLabel(dueOn, today).text}).`,
+    data: { id: r.id.itemId, dueOn },
+  };
+}
+
+/** `krnl todo drop <ref>` / `todo undrop <ref>` — not doing it any more (review 6.1). */
+export async function todoDropCmd(ctx: TodoCtx, ref: string | undefined, undo: boolean): Promise<SysResult> {
+  if (!ref) return { ok: false, message: `todo ${undo ? 'undrop' : 'drop'} requires <ref>` };
+  const board = loadBoard(ctx);
+  const r = resolveTodoItemRef(board, ref);
+  if (!r.ok) return { ok: false, message: resolutionError('todo item', ref, r) };
+  const m = mutateTodo(ctx, (st) => (undo ? todoUndrop(st, { id: r.id.itemId }) : todoDrop(st, { id: r.id.itemId })));
+  if (!m.ok) return m;
+  const item = m.after.items.find((i) => i.id === r.id.itemId);
+  // A dropped plan comes off the Calendar (it is not "missed").
+  if (!undo && item?.taskNodeId) {
+    const t = m.board.nodes.find((n) => n.id === item.taskNodeId);
+    if (t && t.state && typeof t.state === 'object') {
+      const { scheduledFor: _s, ...rest } = t.state as Record<string, unknown>;
+      t.state = rest;
+    }
+  }
+  saveBoard(ctx, m.board);
+  if (m.after === m.before) return { ok: true, message: `Todo "${item?.text ?? ref}" was ${undo ? 'not dropped' : 'already dropped or done'}.`, data: { id: r.id.itemId } };
+  return { ok: true, message: undo ? `Todo "${item?.text}" is back on the list.` : `Todo "${item?.text}" dropped (in the Archive; todo undrop brings it back).`, data: { id: r.id.itemId, dropped: !undo } };
 }
 
 export async function todoTags(

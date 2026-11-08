@@ -104,6 +104,9 @@ import {
   todoClearArchived,
   todoReclassify,
   todoBuckets,
+  todoSetDue,
+  todoDrop,
+  todoUndrop,
 } from '../nodes/TodoNode/commands';
 import type { TodoState } from '../nodes/TodoNode/types';
 
@@ -382,6 +385,9 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'todo.edit':           return { state: todoEdit(s as never, args as never) };
         case 'todo.remove':         return { state: todoRemove(s as never, args as never) };
         case 'todo.clearDone':      return { state: todoClearDone(s as never) };
+        case 'todo.setDue':         return { state: todoSetDue(s as never, args as never) };
+        case 'todo.drop':           return { state: todoDrop(s as never, args as never) };
+        case 'todo.undrop':         return { state: todoUndrop(s as never, args as never) };
         // ADR 0016 — tags + Done/Archive lifecycle.
         case 'todo.setItemTag':     return { state: todoSetItemTag(s as never, args as never) };
         case 'todo.addTag':         return { state: todoAddTag(s as never, args as never) };

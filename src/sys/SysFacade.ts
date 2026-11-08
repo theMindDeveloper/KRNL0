@@ -790,6 +790,9 @@ export class SysFacade {
         case 'check': return todo.todoCheck(ctx, command.id);
         case 'list':  return todo.todoList(ctx, command.json, command.scope);
         case 'tag':   return todo.todoTag(ctx, command.ref, command.tag);
+        case 'due':   return todo.todoDue(ctx, command.ref, command.when);
+        case 'drop':   return todo.todoDropCmd(ctx, command.ref, false);
+        case 'undrop': return todo.todoDropCmd(ctx, command.ref, true);
         case 'tags': {
           const opts: Parameters<typeof todo.todoTags>[1] = { json: command.json };
           if (command.action !== undefined) opts.action = command.action;

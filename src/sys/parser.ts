@@ -16,6 +16,8 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
   | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
+  | { kind: 'todo'; sub: 'due'; ref: string | undefined; when: string | undefined }
+  | { kind: 'todo'; sub: 'drop' | 'undrop'; ref: string | undefined }
   | { kind: 'todo'; sub: 'tags'; action: string | undefined; label: string | undefined; keywords: string | undefined; color: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'archive' | 'clear-archive' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
@@ -457,6 +459,8 @@ export class SysParser {
       }
       // ADR 0016 — tags + archive.
       if (sub === 'tag') return { kind: 'todo', sub: 'tag', ref: rest[0], tag: rest[1] };
+      if (sub === 'due') return { kind: 'todo', sub: 'due', ref: rest[0], when: rest[1] };
+      if (sub === 'drop' || sub === 'undrop') return { kind: 'todo', sub, ref: rest[0] };
       if (sub === 'tags') {
         return {
           kind: 'todo', sub: 'tags',
