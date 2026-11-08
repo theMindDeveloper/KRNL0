@@ -1916,3 +1916,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `feat/routines`
 **Files changed:** `src/shared/whatsnew.ts`.
 **Summary:** Workflow rule: every feature in a release appears in its notes. The 0.11 "more" list now names Habits & Routines, the ask-first add flow, weekly targets / rest days / archive, due dates / reminders / Drop, and the Staying on track tour. The designed headline slides for these still need drafts on the design canvas and the user's approval before the release PR.
+
+## [2026-11-08] — Analytics shows the same habit streak as the Habit node
+
+**Type:** Bug Fix
+**Branch:** `feat/routines` (and `experiment/new-user-review`)
+**Files changed:** `analytics/engine.ts`, `analytics/sources/habitSource.ts`, `analytics/types.ts`, `AnalyticsNode/index.tsx`; test `analytics/__tests__/streaks.sameEverywhere.test.ts` (new).
+**Summary:** Found in the new-user review: Analytics kept its own copy of the streak (`calcHabitStreak`), which knew nothing of rest days or weekly targets — a habit with a rest day read 2 days in Analytics and 4 in the Habit node. Analytics now asks `habitStreak` like every other screen; a weekly-target habit's streak is in weeks ("2w" in the per-habit list) and stays out of the "longest streak" figure, which is in days (as milestones do).
