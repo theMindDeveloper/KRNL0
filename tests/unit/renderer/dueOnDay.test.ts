@@ -1,6 +1,7 @@
 /** New-user review 4.3 — the Clock lists what is due that day; today also what is overdue. */
 import { describe, it, expect } from 'vitest';
 import { dueOnDay } from '../../../src/shared/dueOn';
+import { computeCatchup, isEmptyCatchup } from '../../../src/renderer/launch/catchup';
 
 const todo = (items: unknown[]) => [{ kind: 'todo', isMother: true, state: { items } }];
 const TODAY = '2026-11-08';
@@ -24,5 +25,16 @@ describe('dueOnDay', () => {
   });
   it('no todo node, no items', () => {
     expect(dueOnDay([], TODAY, TODAY)).toEqual([]);
+  });
+});
+
+describe('Welcome back lists what is due', () => {
+  it('overdue opens it; merely due today rides along but does not open it', () => {
+    const over = computeCatchup({ nodes: todo([{ id: 'a', text: 'Tax form', done: false, dueOn: '2026-11-06' }]), edges: [] } as never, TODAY);
+    expect(over.due?.map((d) => d.text)).toEqual(['Tax form']);
+    expect(isEmptyCatchup(over)).toBe(false);
+    const today = computeCatchup({ nodes: todo([{ id: 'b', text: 'Pay rent', done: false, dueOn: TODAY }]), edges: [] } as never, TODAY);
+    expect(today.due?.length).toBe(1);
+    expect(isEmptyCatchup(today)).toBe(true);
   });
 });

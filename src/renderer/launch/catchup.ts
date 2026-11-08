@@ -7,6 +7,7 @@
 // changes the board: every fix is a button the user presses.
 
 import { calcStreak } from '../components/nodes/HabitNode/commands';
+import { dueOnDay, type DueItem } from '../../shared/dueOn';
 import { isDayScheduled } from '../components/nodes/HabitNode/types';
 import type { HabitSchedule } from '../components/nodes/HabitNode/types';
 
@@ -45,6 +46,8 @@ export interface Catchup {
   today: string;
   tasks: SlippedTask[];
   habits: HabitCatchup[];
+  /** Review 4.3 — open Todo items due today, or overdue (overdue first). */
+  due?: DueItem[];
 }
 
 const rec = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {});
@@ -139,7 +142,8 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
     }
   }
   habits.sort((a, b) => Number(b.broken) - Number(a.broken) || b.best - a.best);
-  return { today, tasks: slipped, habits: habits.slice(0, 4) };
+  const due = dueOnDay(board.nodes as never, today, today);
+  return { today, tasks: slipped, habits: habits.slice(0, 4), ...(due.length ? { due } : {}) };
 }
 
 /** The new plan for a moved task: the same time of day on `day`. */
@@ -198,7 +202,8 @@ export function landingTimes(
 
 /** Nothing slipped and no habit to mention: the dialog has nothing to say. */
 export function isEmptyCatchup(c: Catchup): boolean {
-  return c.tasks.length === 0 && c.habits.length === 0;
+  // A missed deadline is worth opening for; something merely due today is not.
+  return c.tasks.length === 0 && c.habits.length === 0 && !(c.due ?? []).some((d) => d.overdue);
 }
 
 export function describeCatchup(c: Catchup): string {

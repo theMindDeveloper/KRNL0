@@ -193,6 +193,25 @@ export function WelcomeBack() {
             </section>
           )}
 
+          {(catchup.due ?? []).length > 0 && (
+            <section className="wb-section" data-testid="welcome-due">
+              <div className="wb-section__head"><h3>Due</h3></div>
+              {(catchup.due ?? []).map((d) => {
+                const was = dayParts(d.dueOn);
+                return (
+                  <div key={d.id} className="wb-task">
+                    <div className="wb-task__main">
+                      <div className="wb-task__title" title={d.text}>{d.text}</div>
+                      <div className="wb-task__meta">
+                        <span className="wb-was" style={d.overdue ? { color: 'var(--rust)' } : undefined}>{d.overdue ? `overdue · was due ${was.dow} ${was.num}` : 'due today'}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+          )}
+
           {catchup.habits.length > 0 && (
             <section className="wb-section">
               <div className="wb-section__head"><h3>Habits</h3></div>

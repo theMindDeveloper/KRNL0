@@ -42,7 +42,7 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 |---|---|---|---|
 | 4.1 | "Remind me before the dentist call" | No reminders at all | **Fixed on `feat/routines`** — Remind me… (at start … 1 h before), system notification from the main process |
 | 4.2 | "Remind me before class" (a routine) | Routines could not remind | **Fixed here** — routine menu **Remind me…** (same picker), a notification before each time it happens, never on a skipped day; `krnl routine remind <id|name> <minutes|off>` |
-| 4.3 | "Something is due today" | The due chip showed only in the Todo row | **Fixed here (Clock)** — a **DUE** line under the Clock's list for the day you are viewing, overdue first in rust (it wraps; nothing is hidden). **Proposed:** the same in Welcome back |
+| 4.3 | "Something is due today" | The due chip showed only in the Todo row | **Fixed here** — a **DUE** line under the Clock's list for the day you are viewing, overdue first in rust (it wraps; nothing is hidden), and a **Due** section in Welcome back (a missed deadline opens it on its own; something merely due today rides along) |
 
 ## 5. Smaller logic notes
 
@@ -66,5 +66,4 @@ Companion to [design-usecase-review-2026-11-07.md](design-usecase-review-2026-11
 ## Proposed order for what is left
 
 1. Date-only plans + an "Anytime" row (2.4) — pick a design first.
-2. Due-today in Welcome back (4.3).
 4. Overnight routines (2.3), habit amounts (5.2), repeating tasks (5.3).

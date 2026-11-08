@@ -61,7 +61,7 @@ describe('model', () => {
   });
   it('Welcome back never lists a weekly-target habit as a broken day streak', () => {
     const board = { nodes: [{ id: 'h', kind: 'habit', isMother: true, state: { habits: [{ id: 'g', name: 'Gym', log: ['2026-10-20', '2026-10-21'], archived: false, perWeek: 3 }] } }], edges: [] };
-    expect(computeCatchup(board as never, Date.parse('2026-11-04T09:00:00')).habits).toEqual([]);
+    expect(computeCatchup(board as never, '2026-11-04').habits).toEqual([]);
   });
 });
 
