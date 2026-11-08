@@ -7,7 +7,7 @@
 // viewport (client) coords. Position is rounded → crisp text, no blur on
 // nested sub-pickers (color/icon grid).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Habit, HabitColor } from './types';
 import { HABIT_COLORS } from './types';
@@ -96,7 +96,15 @@ export function HabitContextMenu({
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const clampedX = Math.round(Math.min(Math.max(0, anchor.x), Math.max(0, vw - MENU_WIDTH)));
-  const clampedY = Math.round(Math.min(Math.max(0, anchor.y), Math.max(0, vh - estHeight)));
+  // The real height once drawn (routine items and pickers make it taller than
+  // any fixed guess): a menu opened low on the screen moves up to fit.
+  const [measured, setMeasured] = useState(0);
+  useLayoutEffect(() => {
+    const h = ref.current?.offsetHeight ?? 0;
+    if (h && Math.abs(h - measured) > 1) setMeasured(h);
+  });
+  const height = Math.min(Math.max(estHeight, measured), vh - 16);
+  const clampedY = Math.round(Math.min(Math.max(8, anchor.y), Math.max(8, vh - height - 8)));
 
   const commitRename = () => {
     if (cancelledRef.current) return;
@@ -116,6 +124,9 @@ export function HabitContextMenu({
         left: clampedX,
         top: clampedY,
         width: MENU_WIDTH,
+        maxHeight: vh - 16,
+        overflowY: 'auto',
+        boxSizing: 'border-box',
         // Same shell as the shared ContextMenu.
         background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
@@ -124,8 +135,6 @@ export function HabitContextMenu({
         padding: 8,
         zIndex: Z.contextMenu,
         fontFamily: 'var(--font-sans)',
-        maxHeight: `calc(100vh - ${clampedY + 16}px)`,
-        overflowY: 'auto',
       }}
     >
       {/* Header: icon + name (or rename input) */}

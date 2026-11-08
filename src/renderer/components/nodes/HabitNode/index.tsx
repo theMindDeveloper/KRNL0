@@ -15,7 +15,7 @@
 
 import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { RepeatEditor, describeRepeat, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
@@ -104,6 +104,14 @@ export function HabitNode({
   // Optional repeat for the habit being added (null = no schedule).
   const [newRepeat, setNewRepeat] = useState<RepeatValue | null>(null);
   const [repeatAt, setRepeatAt] = useState<{ x: number; y: number } | null>(null);
+  // The Repeat popover's real height once drawn (a routine's time and length
+  // rows make it taller): it moves up to stay inside the window.
+  const repeatPopRef = useRef<HTMLDivElement>(null);
+  const [repeatPopH, setRepeatPopH] = useState(330);
+  useLayoutEffect(() => {
+    const h = repeatPopRef.current?.offsetHeight ?? 0;
+    if (h && Math.abs(h - repeatPopH) > 1) setRepeatPopH(h);
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -459,6 +467,7 @@ export function HabitNode({
                 {/* Above a guided tour's card (Z.popover): a tour step asks the user to use this. */}
                 <div onClick={() => setRepeatAt(null)} onMouseDown={(e) => e.stopPropagation()} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
                 <div
+                  ref={repeatPopRef}
                   data-testid="habit-add-repeat-pop"
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -466,7 +475,8 @@ export function HabitNode({
                   style={{
                     position: 'fixed', zIndex: Z.popover, width: 380, boxSizing: 'border-box',
                     left: Math.max(8, Math.min(repeatAt.x - 380, window.innerWidth - 388)),
-                    top: Math.max(8, Math.min(repeatAt.y + 6, window.innerHeight - 330)),
+                    top: Math.max(8, Math.min(repeatAt.y + 6, window.innerHeight - repeatPopH - 8)),
+                    maxHeight: window.innerHeight - 16, overflowY: 'auto',
                     padding: 16, borderRadius: 14, background: 'var(--paper)', color: 'var(--ink)',
                     border: '1px solid var(--paper-3)', boxShadow: '0 24px 60px rgba(0,0,0,0.5)', fontFamily: 'var(--font-sans)',
                   }}
