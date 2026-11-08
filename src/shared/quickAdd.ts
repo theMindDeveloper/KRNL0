@@ -30,8 +30,24 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   const out: QuickAdd = { text: raw.trim() };
   const cut = (m: RegExpExecArray) => { s = s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length); };
 
+  // "in 2 hours", "in 30 min": a start time from now (rounded up to 5 min).
+  const rel = /\bin\s+(\d{1,3})\s?(min|mins|minutes|m|h|hr|hrs|hour|hours)\b/i.exec(s);
+  if (rel) {
+    const n = Number(rel[1]);
+    const mins = /^h/i.test(rel[2]!) ? n * 60 : n;
+    if (mins >= 1 && mins <= 24 * 60) {
+      const at = new Date(now.getTime() + mins * 60_000);
+      const rounded = Math.ceil((at.getHours() * 60 + at.getMinutes()) / 5) * 5;
+      const day = new Date(at); if (rounded >= 24 * 60) day.setDate(day.getDate() + 1);
+      const r = rounded % (24 * 60);
+      out.time = `${pad(Math.floor(r / 60))}:${pad(r % 60)}`;
+      out.day = ymd(day);
+      s = s.slice(0, rel.index) + ' ' + s.slice(rel.index + rel[0].length);
+    }
+  }
+
   // A range first: "14:00-15:30", "6pm-7pm", "9-10am" — the start and the length.
-  let m: RegExpExecArray | null = /\b(?:from\s+)?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?\s?(?:-|–|to)\s?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?\b/i.exec(s);
+  let m: RegExpExecArray | null = out.time ? null : /\b(?:from\s+)?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?\s?(?:-|–|to)\s?(\d{1,2})(?::([0-5]\d))?\s?(am|pm)?\b/i.exec(s);
   if (m && (m[2] || m[5] || m[3] || m[6])) {
     const endAp = m[6] ?? m[3];
     const to24 = (h: number, ap?: string) => (ap ? (h % 12) + (ap.toLowerCase() === 'pm' ? 12 : 0) : h);

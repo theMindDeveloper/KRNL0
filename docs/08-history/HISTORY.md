@@ -2170,3 +2170,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
 **Summary:** "Meeting 14:00-15:30" left "-15:30" in the name. A range now gives the start and the length: "14:00-15:30" (90 min), "6pm-7pm", "9-10am" (the am/pm of the end applies to the start). Numbers without clock words stay in the name ("Pages 10-20").
+
+## [2026-11-08] — Quick add reads "in 2 hours" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Call back in 2 hours" took "2 hours" as the length. "in N min / N hours" is now a start time from now, rounded up to the next 5 minutes (crossing midnight moves it to tomorrow); a length can still follow ("Stretch in 15 min for 10 min").

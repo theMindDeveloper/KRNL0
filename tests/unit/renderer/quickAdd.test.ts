@@ -54,6 +54,11 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('Class 9-11am monday', NOW)).toEqual({ text: 'Class', day: '2026-11-09', time: '09:00', durationMin: 120 });
     expect(parseQuickAdd('Pages 10-20', NOW)).toEqual({ text: 'Pages 10-20' }); // no clock words: not a time
   });
+  it('"in 2 hours" is a start from now; a length can follow', () => {
+    expect(parseQuickAdd('Call back in 2 hours', NOW)).toEqual({ text: 'Call back', time: '12:00', day: '2026-11-08' });
+    expect(parseQuickAdd('Stretch in 17 min for 10 min', new Date(2026, 10, 8, 10, 1))).toEqual({ text: 'Stretch', time: '10:20', day: '2026-11-08', durationMin: 10 });
+    expect(parseQuickAdd('Sleep in 3 hours', new Date(2026, 10, 8, 22, 30)).day).toBe('2026-11-09');
+  });
   it('plain names are left alone', () => {
     expect(parseQuickAdd('Read chapter 3', NOW)).toEqual({ text: 'Read chapter 3' });
     expect(parseQuickAdd('Buy 2 m cable', NOW)).toEqual({ text: 'Buy 2 m cable' });
