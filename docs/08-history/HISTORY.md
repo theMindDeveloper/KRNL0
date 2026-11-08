@@ -1929,3 +1929,9 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/dueOn.ts` (new), `ClockNode/index.tsx`, `CalendarNode/WeekView.tsx`, `analytics/charts/PlanVsActual.tsx`, `docs/research/new-user-review-2026-11-08.md`; tests `dueOnDay.test.ts`, `analytics.dailyEmpty.test.tsx` (new).
 **Summary:** From the new-user review. (4.3) The Clock lists what is **DUE** on the day you view under its schedule, overdue first in rust; it wraps, nothing hides. (1.5) Opened at 4 am the Calendar showed an empty 02:00–03:30 night; before 06:00 with nothing planned within 3 h of now it opens on the week's first plan or 08:00. (1.4) "Planned vs worked" drew bare 30m / 15m axes on an empty range; it now says what to do, like the other cards. The review doc corrects its own first read (only one Analytics view shows at a time, not a wall of 15 charts).
+## [2026-11-08] — "Staying on track" tour; a tour no longer hides the menu its step asks for
+
+**Type:** Feature (tutorial) + Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `Tour/tours.ts` (`on-track` tour + predicates), `Tour/TourHost.tsx` (`coveringPanel`), `tests/unit/renderer/tours.test.tsx`.
+**Summary:** The workflow rule says a feature is done only once its tour exists and has run. New tour **Staying on track** (Help → Tutorials, `krnl tour start on-track`): weekly targets (Times a week… → 3×), rest days (Rest today), due dates (Due date…), reminders (Remind me…) and dropping a plan — each step waits for the real action. Running it in the app found a bug: the tour fades out any fixed panel covering the window it points at, and that included the right-click menu the step had just asked for, so "right-click a habit and choose Times a week…" could not be done. Menus and popovers (layered at popover level or above) are now never tucked. Run once in the preview, all six steps with real clicks.

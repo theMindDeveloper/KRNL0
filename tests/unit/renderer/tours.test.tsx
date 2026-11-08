@@ -52,7 +52,7 @@ describe('Easy and Advanced tour — a live demo', () => {
 
 describe('tour catalogue', () => {
   it('has a tour for each part of the app', () => {
-    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'analytics', 'modes', 'terminal']);
+    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'on-track', 'analytics', 'modes', 'terminal']);
     for (const t of TOURS) {
       expect(t.steps.length).toBeGreaterThan(1);
       for (const s of t.steps) expect(s.text.length).toBeGreaterThan(10);
@@ -104,6 +104,27 @@ describe('krnl tour', () => {
   it('parses list / start', () => {
     expect(SysParser.parse(['tour'])).toEqual({ kind: 'tour', sub: 'list' });
     expect(SysParser.parse(['tour', 'start', 'pomo'])).toEqual({ kind: 'tour', sub: 'start', id: 'pomo' });
+  });
+});
+
+describe('Staying on track tour', () => {
+  const b = (habits: unknown[], items: unknown[] = [], taskStates: unknown[] = []) => ({
+    nodes: [
+      { id: 'mother-habit', kind: 'habit', isMother: true, state: { habits } },
+      { id: 'mother-todo', kind: 'todo', isMother: true, state: { items } },
+      ...taskStates.map((state, i) => ({ id: `t${i}`, kind: 'todo.task', state })),
+    ],
+    edges: [],
+  }) as never;
+  it('waits for a weekly target, a rest day, a due date and a reminder', () => {
+    const t = tourById('on-track')!;
+    const waits = t.steps.filter((s) => s.waitFor && 'board' in s.waitFor).map((s) => (s.waitFor as { board: (a: never, c: never) => boolean }).board);
+    expect(waits).toHaveLength(4);
+    const [target, rest, due, remind] = waits as Array<(a: never, c: never) => boolean>;
+    expect(target!(b([{ id: 'g', perWeek: 3 }]), b([{ id: 'g' }]))).toBe(true);
+    expect(rest!(b([{ id: 'g', rest: ['2026-11-08'] }]), b([{ id: 'g' }]))).toBe(true);
+    expect(due!(b([], [{ id: 'a', dueOn: '2026-11-13' }]), b([], [{ id: 'a' }]))).toBe(true);
+    expect(remind!(b([], [], [{ remindMin: 10 }]), b([], [], [{}]))).toBe(true);
   });
 });
 
