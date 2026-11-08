@@ -2143,3 +2143,9 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `Tour/tours.ts`.
 **Summary:** The first tour a new user runs had two gaps after today's changes. Its habit step said only "press Enter" (Enter now asks habit or routine) — it now says to answer Yes and how often. Its "plan it" step waited for a task to land on the Calendar; a task added with quick add ("Stretch 23:00 30 min") is already there, so the step waited forever — it now also passes when the newest task is already planned. Run in the preview on a fresh board: step 5 passed on its own after a quick add.
+## [2026-11-08] — Every tutorial is in Help
+
+**Type:** UX (tutorials)
+**Branch:** `feat/routines` (and `experiment/new-user-review`)
+**Files changed:** `Launch/HelpMenu.tsx`.
+**Summary:** Help offered only "Take the tour"; the other tutorials (Habits & Routines, Staying on track, Calendar, …) could be started only from the Orb, yet the 0.11 notes say "Help › Staying on track". Help now has **Tutorials** (N more), which opens the full list in place; each starts its tour, with its summary as the tooltip. Checked in the preview.
