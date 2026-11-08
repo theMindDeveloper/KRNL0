@@ -35,6 +35,7 @@ import type { CalendarConfig, CalendarLayers, CalendarState } from './types';
 import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularityFor } from './types';
 import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, routineSpansOn, type RoutineOccurrence, type RoutineSpan } from '../HabitNode/types';
 import { routineLanes } from './routineLanes';
+import { dayOnlyPlans } from './dayOnly';
 import { TimeField } from '../../ui/TimeField';
 import { habitMotherCommand } from '../../../store/scheduleActions';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
@@ -759,6 +760,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       }
       return result;
   }, [boardForCal]);
+
+  // Plans with a day but no time yet (draft D, "slim line"): a plan due a day
+  // that is not on the grid. Shown under the day names; drag one onto the
+  // grid to give it a time (it then leaves the line).
+  const dueByDay = useMemo(
+    () => dayOnlyPlans(boardForCal?.nodes ?? [], weekDays, new Set(scheduledTasks.map((t) => t.id)), todayYMD()),
+    [boardForCal, scheduledTasks, weekDays],
+  );
 
   // Decision 39 — routines: bands behind the plans (F6), never ticked.
   const routinesForCal = useMemo((): Habit[] => {
@@ -2398,6 +2407,38 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           );
         })}
       </div>
+
+      {/* Draft D — plans with a day but no time yet, one slim line; only when the week has one. */}
+      {dueByDay.size > 0 && (
+        <div data-testid="calendar-day-only-row" style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid var(--paper-3)' }}>
+          <div title="A day, no time yet — drag one onto the grid to give it a time" style={{ width: GUTTER_WIDTH, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', color: 'var(--ink-4)' }}>DAY</div>
+          {weekDays.map((dayYMD) => (
+            <div key={dayYMD} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 3px' }}>
+              {(dueByDay.get(dayYMD) ?? []).map((d) => (
+                <div
+                  key={d.id}
+                  data-testid={`calendar-day-only-${d.id}`}
+                  className="nodrag"
+                  draggable
+                  title={`${d.text} — due this day, no time yet. Drag it onto the grid to give it a time.`}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/krnl-task', JSON.stringify(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin }));
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  style={{
+                    height: 18, lineHeight: '16px', padding: '0 6px', borderRadius: 5, boxSizing: 'border-box', cursor: 'grab',
+                    fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    border: `1px solid ${d.overdue ? 'color-mix(in srgb, var(--rust) 60%, transparent)' : 'var(--paper-3)'}`,
+                    background: 'var(--paper-2)', color: d.overdue ? 'var(--rust)' : 'var(--ink)',
+                  }}
+                >
+                  {d.text}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
 
       {useAgenda && renderAgenda(weekDays[0]!)}
       {!useAgenda && singleDay && narrowDay && (

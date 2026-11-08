@@ -952,7 +952,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             <div data-testid="todo-quick-preview" style={{ padding: '6px 14px 0', borderTop: '1px dashed var(--paper-3)', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
               <span style={{ color: 'var(--ink)' }}>{q.text}</span> → <span style={{ color: 'var(--acid-ink, var(--acid))' }}>{said}</span>
               {q.rolledToTomorrow ? <span> (that time has passed today)</span> : null}
-              {q.day && !q.time ? <span> · no time yet: drag it onto the Calendar for one</span> : null}
+              {q.day && !q.time ? <span> · shows on that day in the Calendar; drag it into the hours for a time</span> : null}
             </div>
           );
         })()}
