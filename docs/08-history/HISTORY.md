@@ -2066,3 +2066,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `HabitNode/index.tsx`; test `HabitNode.repairAmount.test.tsx` (new).
 **Summary:** Found while checking amounts against the rest of the habit flow: on "8 glasses a day", answering **Yes** to "Did it yesterday?" used the grid's click — one more glass — so yesterday stayed undone and the card stayed. Yes now sets yesterday to the full amount.
+
+## [2026-11-08] — `todo list` and `habit list` show what the rows show (experimental)
+
+**Type:** CLI
+**Branch:** `experiment/new-user-review`
+**Files changed:** `sys/commands/todo.ts`, `sys/commands/habit.ts`; tests `repeatTask.test.ts`, `habit.amount.test.ts`.
+**Summary:** Rule 8 — the assistant works through `krnl`, so it must see what a person sees. `krnl todo list` now adds "· due 2026-11-13 · repeats every Sunday · reminder 10 min before · dropped" to a row where they apply; `krnl habit list` shows the streak in weeks for a weekly target ("▲2w"), "3× a week", "2 of 8 glasses today", "rest day today", and "routine" instead of a streak for routines (JSON gains the same fields).

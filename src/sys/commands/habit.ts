@@ -50,6 +50,7 @@ import {
   isValidTimeOfDay,
   routineOccurrence,
   todayLocal,
+  countOn,
 } from '../../renderer/components/nodes/HabitNode/types';
 import { isValidYMD } from '../../shared/ymd';
 
@@ -353,7 +354,12 @@ export async function cliList(ctx: HabitCtx, json = false): Promise<SysResult> {
     color: h.color,
     archived: h.archived,
     streak: habitStreak(h, today).current,
+    unit: habitStreak(h, today).unit,
     logCount: h.log.length,
+    ...(h.kind === 'routine' ? { kind: 'routine' as const } : {}),
+    ...(typeof h.perWeek === 'number' ? { perWeek: h.perWeek } : {}),
+    ...(h.amount ? { amount: h.amount, today: countOn(h, today) } : {}),
+    ...(h.rest?.includes(today) ? { restToday: true } : {}),
   }));
   if (json) {
     return { ok: true, message: JSON.stringify(rows), data: rows };
@@ -361,7 +367,16 @@ export async function cliList(ctx: HabitCtx, json = false): Promise<SysResult> {
   const lines = rows.length === 0
     ? '(no habits)'
     : rows
-        .map((r) => `  ${r.archived ? '[archived] ' : ''}${r.name}  ·  ${r.color}  ·  ▲${r.streak}d  ·  ${r.logCount} logged  ·  ${r.id}`)
+        .map((r) => {
+          // What the Habit node shows, so the assistant sees it too.
+          const facts = [
+            r.kind === 'routine' ? 'routine' : `▲${r.streak}${r.unit === 'week' ? 'w' : 'd'}`,
+            ...(r.perWeek ? [`${r.perWeek}× a week`] : []),
+            ...(r.amount ? [`${r.today ?? 0} of ${r.amount.target}${r.amount.unit ? ` ${r.amount.unit}` : ''} today`] : []),
+            ...(r.restToday ? ['rest day today'] : []),
+          ];
+          return `  ${r.archived ? '[archived] ' : ''}${r.name}  ·  ${r.color}  ·  ${facts.join('  ·  ')}  ·  ${r.logCount} logged  ·  ${r.id}`;
+        })
         .join('\n');
   return {
     ok: true,

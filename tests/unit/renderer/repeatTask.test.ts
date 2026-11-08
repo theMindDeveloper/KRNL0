@@ -72,5 +72,9 @@ describe('krnl todo repeat + check', () => {
     expect(next.dueOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(all.find((i) => i.done)!.repeat).toBeUndefined();
     expect((await f.run(['todo', 'repeat', next.id, 'hourly'])).ok).toBe(false);
+    // The assistant sees what the row shows.
+    const list = String((await f.run(['todo', 'list'])).message);
+    expect(list).toContain('repeats every day');
+    expect(list).toMatch(/due \d{4}-\d{2}-\d{2}/);
   });
 });

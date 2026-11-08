@@ -168,11 +168,24 @@ export async function todoList(
     };
   }
 
+  // The facts the app shows on a row, so the assistant sees them too.
+  const remindOf = (taskId: string | null) => {
+    const t = taskId ? board.nodes.find((n) => n.id === taskId) : undefined;
+    const r = (t?.state as { remindMin?: unknown } | undefined)?.remindMin;
+    return typeof r === 'number' ? r : null;
+  };
   const lines = items.map((i) => {
     const status = archivedIds.has(i.id) ? '[a]' : i.done ? '[x]' : '[ ]';
     const label = i.tag ? tagDisplay(library, i.tag).label : '';
     const tag = label ? ` [${label}${i.tagSource === 'auto' ? '?' : ''}]` : '';
-    return `${status} ${i.id.slice(0, 8)}  ${i.text}${tag}`;
+    const facts: string[] = [];
+    if (i.droppedAt) facts.push('dropped');
+    if (i.dueOn && !i.done) facts.push(`due ${i.dueOn}`);
+    const rep = parseRepeat(i.repeat);
+    if (rep) facts.push(`repeats ${describeTaskRepeat(rep)}`);
+    const rem = remindOf(i.taskNodeId);
+    if (rem !== null && !i.done) facts.push(`reminder ${rem === 0 ? 'at start' : `${rem} min before`}`);
+    return `${status} ${i.id.slice(0, 8)}  ${i.text}${tag}${facts.length ? `  · ${facts.join(' · ')}` : ''}`;
   });
 
   return {

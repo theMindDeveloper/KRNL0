@@ -78,6 +78,7 @@ describe('krnl habit amount / count', () => {
     expect(water2()?.amount).toEqual({ target: 8, unit: 'glasses' });
     const c = await f.run(['habit', 'count', 'Water', '8']);
     expect(c.message).toContain('done');
+    expect(String((await f.run(['habit', 'list'])).message)).toContain('8 of 8 glasses today');
     expect((await f.run(['habit', 'amount', 'Water', 'off'])).ok).toBe(true);
     expect(water2()?.amount).toBeUndefined();
   });
