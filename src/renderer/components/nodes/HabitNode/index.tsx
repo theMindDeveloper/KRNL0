@@ -21,6 +21,7 @@ import { createPortal } from 'react-dom';
 import { RepeatEditor, fromSchedule, isRepeatValid, toSchedule, type RepeatValue } from '../../ui/RepeatEditor';
 import { HabitAddAsk, type AddAnswer } from './HabitAddAsk';
 import { RemindPicker } from '../../ui/RemindPicker';
+import { AmountPopover, TargetPopover } from './HabitPopovers';
 import { countOn, weeklyTarget } from './types';
 import { RoutineShelf, routineStatus } from './RoutineShelf';
 import { isRoutine } from './types';
@@ -486,85 +487,24 @@ export function HabitNode({
           onClose={() => setRoutineRemind(null)}
         />
       )}
-      {amountEdit && createPortal(
-        <>
-          <div onMouseDown={(e) => { e.stopPropagation(); setAmountEdit(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
-          <div
-            data-testid="habit-amount-pop"
-            onMouseDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-            style={{
-              position: 'fixed', left: Math.min(amountEdit.x, window.innerWidth - 300), top: Math.min(amountEdit.y, window.innerHeight - 200),
-              width: 284, zIndex: Z.popover, padding: 14, borderRadius: 12, background: 'var(--paper)', boxSizing: 'border-box',
-              border: '1px solid var(--paper-3)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 10, fontFamily: 'var(--font-sans)',
-            }}
-          >
-            <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.4 }}>How much a day? Each click on the day adds one; the day counts once it is reached.</div>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {[2, 3, 4, 5, 6, 8, 10, 20].map((n) => (
-                <button key={n} type="button" data-testid={`habit-amount-${n}`}
-                  onClick={() => setAmountEdit((cur) => (cur ? { ...cur, target: n } : cur))}
-                  style={{ minWidth: 34, height: 30, borderRadius: 999, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 650,
-                    border: `1px solid ${amountEdit.target === n ? 'var(--acid)' : 'var(--paper-3)'}`, background: amountEdit.target === n ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent', color: 'var(--ink)' }}>
-                  {n}
-                </button>
-              ))}
-            </div>
-            <input
-              data-testid="habit-amount-unit"
-              value={amountEdit.unit}
-              placeholder="unit, e.g. glasses, pages, km"
-              maxLength={24}
-              onChange={(e) => setAmountEdit((cur) => (cur ? { ...cur, unit: e.target.value } : cur))}
-              style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)', fontFamily: 'var(--font-sans)', fontSize: 12.5, outline: 'none' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <button type="button" data-testid="habit-amount-off" onClick={() => { onCommand('habit.setAmount', { id: amountEdit.habitId, target: null }); setAmountEdit(null); }}
-                style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12 }}>
-                Plain tick
-              </button>
-              <button type="button" data-testid="habit-amount-save" disabled={amountEdit.target === null}
-                onClick={() => { if (amountEdit.target !== null) onCommand('habit.setAmount', { id: amountEdit.habitId, target: amountEdit.target, unit: amountEdit.unit }); setAmountEdit(null); }}
-                style={{ height: 30, padding: '0 14px', borderRadius: 8, border: 'none', background: amountEdit.target === null ? 'var(--paper-3)' : 'var(--btn-primary-bg)', color: amountEdit.target === null ? 'var(--ink-4)' : 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12.5, fontWeight: 650 }}>
-                {amountEdit.target === null ? 'Pick an amount' : `Save · ${amountEdit.target}${amountEdit.unit.trim() ? ` ${amountEdit.unit.trim()}` : ''} a day`}
-              </button>
-            </div>
-          </div>
-        </>,
-        document.body,
+      {amountEdit && (
+        <AmountPopover
+          x={amountEdit.x}
+          y={amountEdit.y}
+          target={amountEdit.target}
+          unit={amountEdit.unit}
+          onSave={(a) => { onCommand('habit.setAmount', a ? { id: amountEdit.habitId, target: a.target, unit: a.unit } : { id: amountEdit.habitId, target: null }); setAmountEdit(null); }}
+          onClose={() => setAmountEdit(null)}
+        />
       )}
-      {targetEdit && createPortal(
-        <>
-          <div onMouseDown={(e) => { e.stopPropagation(); setTargetEdit(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
-          <div
-            data-testid="habit-target-pop"
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              position: 'fixed', left: Math.min(targetEdit.x, window.innerWidth - 300), top: Math.min(targetEdit.y, window.innerHeight - 150),
-              width: 284, zIndex: Z.popover, padding: 14, borderRadius: 12, background: 'var(--paper)', boxSizing: 'border-box',
-              border: '1px solid var(--paper-3)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 10, fontFamily: 'var(--font-sans)',
-            }}
-          >
-            <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.4 }}>How many times a week? Any days count, and a rest day never breaks the streak.</div>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <button key={n} type="button" data-testid={`habit-target-${n}`}
-                  onClick={() => { onCommand('habit.setTarget', { id: targetEdit.habitId, perWeek: n }); setTargetEdit(null); }}
-                  style={{ minWidth: 34, height: 30, borderRadius: 999, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 650,
-                    border: `1px solid ${targetEdit.value === n ? 'var(--acid)' : 'var(--paper-3)'}`, background: targetEdit.value === n ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent', color: 'var(--ink)' }}>
-                  {n}×
-                </button>
-              ))}
-            </div>
-            {targetEdit.value !== null && (
-              <button type="button" data-testid="habit-target-off" onClick={() => { onCommand('habit.setTarget', { id: targetEdit.habitId, perWeek: null }); setTargetEdit(null); }}
-                style={{ alignSelf: 'flex-start', height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 12 }}>
-                No target (every day it repeats)
-              </button>
-            )}
-          </div>
-        </>,
-        document.body,
+      {targetEdit && (
+        <TargetPopover
+          x={targetEdit.x}
+          y={targetEdit.y}
+          value={targetEdit.value}
+          onPick={(n) => { onCommand('habit.setTarget', { id: targetEdit.habitId, perWeek: n }); setTargetEdit(null); }}
+          onClose={() => setTargetEdit(null)}
+        />
       )}
       {editRepeat && createPortal(
         <div

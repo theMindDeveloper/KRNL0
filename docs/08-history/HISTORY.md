@@ -2094,3 +2094,10 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `src/shared/ymd.ts` (`todayYMD`, `addDaysYMD`, `isoDowYMD`, `daysBetweenYMD`), `src/shared/due.ts`, `src/shared/repeatTask.ts`, `src/sys/commands/todo.ts`; test `tests/unit/shared.ymd.test.ts` (new).
 **Summary:** Structure: today's new modules each carried their own copy of "pad / date to YYYY-MM-DD / add days / ISO weekday". They now share `shared/ymd.ts` (which already held `isValidYMD` and `localYMD`), with a test across month ends and a DST weekend. No behaviour change.
+
+## [2026-11-08] — Habit popovers in their own file (experimental)
+
+**Type:** Refactor
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitPopovers.tsx` (new: `TargetPopover`, `AmountPopover`), `HabitNode/index.tsx` (−60 lines).
+**Summary:** Structure: the "Times a week…" and "Amount a day…" popovers were inline portals in the 1,350-line Habit node. They are now two small components sharing one shell (Esc closes, focus on the current choice), and the amount editor keeps its own draft state. Same behaviour; the Staying on track tour ran 8/8 after the move.
