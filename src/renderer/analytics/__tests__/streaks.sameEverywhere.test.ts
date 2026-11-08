@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildAnalytics } from '../engine';
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); });
 
 describe('analytics streaks = habitStreak', () => {
   it('a rest day keeps the run; a weekly target is in weeks and stays out of the day record', () => {

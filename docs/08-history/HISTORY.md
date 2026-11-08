@@ -2053,3 +2053,9 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Branch:** `experiment/new-user-review`
 **Files changed:** `App.tsx`, `Canvas/CanvasFlow.tsx`, `docs/research/new-user-review-2026-11-08.md`.
 **Summary:** New-user review 1.10: switching to Free fitted all six windows side by side at about 34%, where nothing can be read. Free now fits the first four windows from the left (Pomo, Todo, Habits, Calendar) at a readable size (52% at 1440 × 900); FIT and the minimap still show everything. The first fit of a fresh canvas also never goes below 55%. Checked in the preview.
+## [2026-11-08] — Analytics shows the same habit streak as the Habit node
+
+**Type:** Bug Fix
+**Branch:** `feat/routines` (and `experiment/new-user-review`)
+**Files changed:** `analytics/engine.ts`, `analytics/sources/habitSource.ts`, `analytics/types.ts`, `AnalyticsNode/index.tsx`; test `analytics/__tests__/streaks.sameEverywhere.test.ts` (new).
+**Summary:** Found in the new-user review: Analytics kept its own copy of the streak (`calcHabitStreak`), which knew nothing of rest days or weekly targets — a habit with a rest day read 2 days in Analytics and 4 in the Habit node. Analytics now asks `habitStreak` like every other screen; a weekly-target habit's streak is in weeks ("2w" in the per-habit list) and stays out of the "longest streak" figure, which is in days (as milestones do).
