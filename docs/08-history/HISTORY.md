@@ -2371,3 +2371,9 @@ Checked in the preview as a user (plain Enter, card day/length/deadline, words f
 - **Card icons show state.** The drag-to-Calendar icon and the date icon are green when the plan is on the Calendar, grey when not, rust when missed. The length icon is green when a length is set. A plan on a day at any time now reads "Fri 13, any time" on its card (it said "Not on the calendar").
 - **`krnl show` (alias `highlight`)** lets the in-app agent point at things while it explains: a plan by name (card + Calendar), a window (`calendar`, `todo`, `pomo`, `habits`, `clock`, `analytics`, `terminal`), a day (`today`, `2026-11-13`), any button (`show ui "Station"`), a node (`show node <id>`), with `--note "…"` under the ring and `show clear`. The assistant instructions tell it to show what it talks about.
 2,457 tests and typecheck green; checked in the preview.
+
+## [2026-11-08] — Habit card keeps its size with six days picked (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Summary:** Picking six days made the Add button read every day and grow, resizing the whole habit card. Six days now read "all but Tue", and a long button label is cut instead of growing the card. (`HabitNode/HabitAddAsk.tsx`)

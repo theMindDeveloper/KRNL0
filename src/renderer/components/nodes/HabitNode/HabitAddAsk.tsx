@@ -34,6 +34,7 @@ export const DEFAULT_CARD: CardDraft = { mode: 'days', days: [1, 2, 3, 4, 5, 6, 
 
 const ALL: IsoDow[] = [1, 2, 3, 4, 5, 6, 7];
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 /** What the card adds, or null while it can't (no day picked, half an amount). */
@@ -58,6 +59,7 @@ export function cardSummary(d: CardDraft): string {
     : d.days.length === 7 ? 'every day'
     : [...d.days].sort().join() === '1,2,3,4,5' ? 'weekdays'
     : [...d.days].sort().join() === '6,7' ? 'weekends'
+    : d.days.length === 6 ? `all but ${SHORT[([1, 2, 3, 4, 5, 6, 7] as const).find((x) => !d.days.includes(x))! - 1]}`
     : [...d.days].sort().map((x) => LETTERS[x - 1]).join(' ');
   const amt = d.amount && d.amount.target >= 2 ? ` · ${d.amount.target}${d.amount.unit ? ` ${d.amount.unit}` : ''}` : '';
   return `${when}${t ? ` · ${t}` : ''}${amt}`;
@@ -245,7 +247,10 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
             height: 30, padding: '0 12px', borderRadius: 7, border: 'none', cursor: answer ? 'pointer' : 'default',
             background: answer ? 'var(--btn-primary-bg)' : 'var(--paper-3)', color: answer ? 'var(--btn-primary-fg)' : 'var(--ink-4)',
             fontFamily: 'inherit', fontSize: 12, fontWeight: 650, whiteSpace: 'nowrap', marginLeft: 'auto',
+            // The card never changes size with the words: a long summary is cut, not wrapped.
+            minWidth: 0, maxWidth: '100%', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis',
           }}
+          title={answer ? `${saveLabel ?? 'Add'} · ${cardSummary(d)}` : undefined}
         >
           {!answer ? (d.mode === 'days' && d.days.length === 0 ? 'Pick a day' : 'Check the time or amount') : `${saveLabel ?? 'Add'} · ${cardSummary(d)} ↵`}
         </button>
