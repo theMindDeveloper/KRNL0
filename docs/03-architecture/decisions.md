@@ -2607,3 +2607,22 @@ The orb's "ask anything" box answered with canned text (`submitMock`), and hold-
 ### Consequences
 - The orb needs Claude Code installed and signed in; without it the orb says so instead of pretending to answer.
 - Answers cost the user's Claude usage; the orb never sends anything on its own.
+
+---
+
+## Decision 42 — Habits and repeating events get board cards in the task-card style (2026-11-08)
+
+**Status:** Accepted (maintainer picked draft A "Same card" on the canvas board "Board cards for habits and events · three drafts"). Requirements: docs/06-requirements/board-cards.md. Issue: #229.
+
+### Context
+Plans get a card on the board (TaskNode, CardParts: 220 × 120, name + box, kind + when, a meter). Habits had an older-style board card (`habit.lane`, LifeOS look, 280 wide) that appeared only on request; repeating events had none.
+
+### Decision
+- **One node kind, two faces.** `habit.lane` keeps pointing at a habit by id; it draws a **habit card** for a habit and an **event card** for a repeating event (`kind: 'routine'`). Both use the task card's frame (CardParts), size and ports, so they line up and read as one family.
+- **Habit card:** the box ticks today (an amount: + adds one); row 2 is the kind and its days and time; the meter is the week (seven bars, today ringed) and the streak — for an amount, today's count filling to its goal.
+- **Event card:** never ticked — a repeat mark instead of the box and the Calendar's faint hatch; row 2 is its days and time; the meter is the week's days (hatched) and when it is next — while it happens, how much is left (and the running border).
+- **Cards appear on their own** when a habit or a repeating event is added (the Habits window, the Calendar, `+ Habit` on the board), next to the other habit cards; the board's `+ Habit` puts it where you clicked. Archiving or deleting removes the card, as before. "Put a card on the canvas" / `krnl habit pin|unpin` still add and remove it by hand.
+
+### Consequences
+- No new node kind and no migration: existing lanes redraw in the new style.
+- Older habits get their card only when pinned (nothing is added to boards on load).

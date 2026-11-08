@@ -1165,25 +1165,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       // src/sys/layout.ts. Previously this was motherY + 540 which collided
       // with task chains spawning at motherY + 580 — habit lanes and tasks
       // fought for the same horizontal strip (user report 2026-05-17).
-      const laneCount = board.nodes.filter((n) => n.kind === 'habit.lane').length;
-      const HABIT_LANE_OFFSET_Y = 1300; // mirror of src/sys/layout.ts constant
-      const position = {
-        x: node.position.x + (laneCount % 3) * 300,
-        y: node.position.y + HABIT_LANE_OFFSET_Y + Math.floor(laneCount / 3) * 160,
-      };
-      const lane: Node = {
-        id: `habit-lane-${crypto.randomUUID()}`,
-        kind: 'habit.lane',
-        position,
-        isMother: false,
-        state: { habitId },
-        config: { days: 28 },
-      };
-      const { addNode } = useBoardStore.getState();
-      addNode(lane);
-      const updated = useBoardStore.getState().board;
-      if (updated) void saveBoard(updated);
-      emit('node.added', `habit.lane spawned for habit ${habitId.slice(0, 8)}`, { refId: lane.id });
+      spawnHabitCard(board, node, habitId);
       return;
     }
 
@@ -1816,9 +1798,50 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     if (result.config !== undefined) patch.config = result.config;
     if (Object.keys(patch).length > 0) updateNode(nodeId, patch);
 
+    // Decision 42 — a new habit or repeating event gets its board card.
+    if (command === 'habit.add' && node.kind === 'habit') {
+      const before = new Set(((node.state as HabitState | null)?.habits ?? []).map((h) => h.id));
+      const after = useBoardStore.getState().board;
+      const mother = after?.nodes.find((n) => n.id === nodeId);
+      const added = ((mother?.state as HabitState | null)?.habits ?? []).filter((h) => !before.has(h.id) && !h.archived);
+      if (after && mother) for (const h of added) spawnHabitCard(after, mother, h.id);
+    }
+
     const updatedBoard = useBoardStore.getState().board;
     if (updatedBoard) void saveBoard(updatedBoard);
   };
+}
+
+/**
+ * Decision 42 — put a habit's (or repeating event's) card on the board, in
+ * the habit cards' own band below the Habits window, three to a row. Never two
+ * cards for one habit. Returns the card's id.
+ */
+export function spawnHabitCard(board: { nodes: Node[] }, habitMother: Node, habitId: string): string {
+  const existing = board.nodes.find(
+    (n) => n.kind === 'habit.lane' && (n.state as HabitLaneState | null)?.habitId === habitId,
+  );
+  if (existing) return existing.id;
+  // Their own Y band, below the task chains (HABIT_LANE_OFFSET_Y, src/sys/layout.ts).
+  const laneCount = board.nodes.filter((n) => n.kind === 'habit.lane').length;
+  const HABIT_LANE_OFFSET_Y = 1300;
+  const position = {
+    x: habitMother.position.x + (laneCount % 3) * 250,
+    y: habitMother.position.y + HABIT_LANE_OFFSET_Y + Math.floor(laneCount / 3) * 150,
+  };
+  const lane: Node = {
+    id: `habit-lane-${crypto.randomUUID()}`,
+    kind: 'habit.lane',
+    position,
+    isMother: false,
+    state: { habitId },
+    config: { days: 28 },
+  };
+  useBoardStore.getState().addNode(lane);
+  const updated = useBoardStore.getState().board;
+  if (updated) void saveBoard(updated);
+  emit('node.added', `habit card for ${habitId.slice(0, 8)}`, { refId: lane.id });
+  return lane.id;
 }
 
 /**

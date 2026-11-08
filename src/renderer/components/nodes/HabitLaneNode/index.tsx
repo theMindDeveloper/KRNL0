@@ -1,89 +1,89 @@
-// HabitLaneNode — single-habit child card. Click ring to toggle today.
-// Reads habit from mother HabitNode via board store. Stores only { habitId }.
+// HabitLaneNode — the board card of a habit or a repeating event (Decision 42,
+// canvas draft A "Same card"). It stores only { habitId } and reads the habit
+// from the Habits mother at render time (Decision 14.1).
 //
-// PR-wave-B (LifeOS UI refresh) — full visual upgrade to match the LifeOS
-// HabitChildNode reference: header with kind+cadence, glyph tile, name,
-// done tick, 7-day mini strip with the two-color trick, foot with streak
-// and cadence text, drop-hint that fades in while dragging.
+// Same frame, size and ports as a task card (TaskNode/CardParts), so plans,
+// habits and events read as one family on the board:
+//
+//   habit                                    repeating event
+//   [✓] Read …………………………… [⋯]               [↻] Class ……………………………… [⋯]
+//   (● habit)  every day · any time          (event)  Mon Wed · 10:00–12:00
+//   ▬ ▬ ▬ ▬ ▬ ▬ [▬]                          ▧ · ▧ · · · ·
+//   5 days in a row            today open    Today 10:00                in 2 h
+//
+// A habit is ticked (the box; an amount counts up and fills a meter). An
+// event is never ticked: a repeat mark, the Calendar's hatch, and when it is
+// next — while it happens, how much is left.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
-import type { Habit, HabitColor, HabitSchedule, IsoDow } from '../HabitNode/types';
+import type { Habit, HabitColor, HabitSchedule } from '../HabitNode/types';
 import { habitStreak } from '../HabitNode/commands';
-import { HABIT_COLORS, isDayScheduled, toYMD } from '../HabitNode/types';
+import { HABIT_COLORS, countOn, isDayScheduled, isRoutine, toYMD, weeklyTarget } from '../HabitNode/types';
+import { routineStatus } from '../HabitNode/RoutineShelf';
 import { useBoardStore } from '../../../store/boardStore';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { HabitContextMenu } from '../HabitNode/HabitContextMenu';
-import { HabitIcon } from '../HabitNode/HabitIcon';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
 import { LineGlyph } from '../../ui/LineGlyph';
+import { MenuIcon } from '../../ui/menuIcons';
+import { CardMetaRow, CardMeter, cardFrameStyle, type CardTone } from '../TaskNode/CardParts';
 
-const LANE_WIDTH = 280;
-
-function isValidColor(c: unknown): c is HabitColor {
-  return typeof c === 'string' && (HABIT_COLORS as readonly string[]).includes(c);
-}
+const SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const pad = (n: number) => String(n).padStart(2, '0');
+const hm = (min: number) => `${pad(Math.floor(min / 60) % 24)}:${pad(min % 60)}`;
 
 function habitColor(c: unknown): HabitColor {
-  return isValidColor(c) ? c : 'acid';
+  return typeof c === 'string' && (HABIT_COLORS as readonly string[]).includes(c) ? (c as HabitColor) : 'acid';
 }
 
-// Last 7 days ending at `today` (oldest first). Used to render the mini
-// week strip on the card — Mon-style "rolling 7" rather than calendar week.
-function lastSevenDays(today: string): string[] {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(today);
-  if (!m) return [];
-  const d0 = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  const out: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const dt = new Date(d0);
-    dt.setDate(d0.getDate() - i);
-    out.push(toYMD(dt));
-  }
-  return out;
+/** Mon–Sun of the week holding `today` (the card shows this week). */
+function weekOf(today: string): string[] {
+  const d0 = new Date(`${today}T00:00:00`);
+  const dow = (d0.getDay() + 6) % 7;
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(d0); d.setDate(d0.getDate() - dow + i); return toYMD(d); });
 }
 
-// Render the cadence as a short tag for the header. Matches LifeOS' "DAILY",
-// "TUE", "SET ↘ DAY" style. SET ↘ DAY is the "unscheduled" placeholder so
-// the user knows there's no schedule yet.
-function cadenceTag(schedule: HabitSchedule | null | undefined): string {
-  if (!schedule) return 'SET A DAY';
-  if (schedule.kind === 'daily') return 'DAILY';
-  if (schedule.kind === 'weekdays') return 'WEEKDAYS';
-  if (schedule.kind === 'weekly') {
-    const names: Record<IsoDow, string> = { 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT', 7: 'SUN' } as const;
-    if (schedule.days.length === 1) return names[schedule.days[0]!] ?? 'WEEKLY';
-    return 'WEEKLY';
-  }
-  return 'WEEKLY';
+/** "every day", "weekdays", "Mon Wed", "M W F", "3× a week". */
+function daysWords(h: Habit): string {
+  const target = weeklyTarget(h);
+  if (target) return `${target}× a week`;
+  const s = h.schedule;
+  if (!s || s.kind === 'daily') return 'every day';
+  if (s.kind === 'weekdays') return 'weekdays';
+  const days = [...s.days].sort();
+  if (days.join() === '6,7') return 'weekends';
+  return days.length <= 2 ? days.map((d) => SHORT[d - 1]).join(' ') : days.map((d) => LETTERS[d - 1]).join(' ');
 }
 
-function cadenceFootText(schedule: HabitSchedule | null | undefined): string {
-  if (!schedule) return 'unscheduled';
-  if (schedule.kind === 'daily') return 'every day';
-  if (schedule.kind === 'weekdays') return 'weekdays only';
-  if (schedule.kind === 'weekly') {
-    const names: Record<IsoDow, string> = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun' } as const;
-    if (schedule.days.length === 1) return `every ${names[schedule.days[0]!] ?? '?'}`;
-    return `${schedule.days.length}×/week`;
-  }
-  return 'weekly';
+/** "· 10:00–12:00" for an event, "· 07:30" or "· any time" for a habit. */
+function timeWords(h: Habit, event: boolean): string {
+  const t = (h.schedule as HabitSchedule | undefined)?.timeOfDay;
+  if (!t) return 'any time';
+  if (!event) return t;
+  const [hh, mm] = t.split(':').map(Number) as [number, number];
+  const len = (h.schedule as HabitSchedule | undefined)?.durationMin ?? 60;
+  return `${t}–${hm(hh * 60 + mm + len)}`;
 }
 
+function dayName(ymd: string, today: string): string {
+  if (ymd === today) return 'Today';
+  const t = new Date(`${today}T00:00:00`); t.setDate(t.getDate() + 1);
+  if (toYMD(t) === ymd) return 'Tomorrow';
+  return new Date(`${ymd}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short' });
+}
 
-// The 7-day strip uses the same rule as the tick button and the streak: no
-// schedule means every day (it used to dim every day of an unscheduled habit
-// while today stayed tickable).
-const isHabitDay = (schedule: HabitSchedule | null | undefined, ymd: string): boolean =>
-  isDayScheduled(schedule ?? undefined, ymd);
+function inWords(min: number): string {
+  if (min < 60) return `in ${Math.max(1, min)} min`;
+  if (min < 24 * 60) return `in ${Math.round(min / 60)} h`;
+  return `in ${Math.round(min / (24 * 60))} days`;
+}
 
-export function HabitLaneNode({
-  node,
-  onCommand,
-}: NodeProps<HabitLaneState, HabitLaneConfig>) {
+export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, HabitLaneConfig>) {
   const board = useBoardStore((s) => s.board);
   const [menuOpen, setMenuOpen] = useState<{ x: number; y: number } | null>(null);
 
@@ -92,19 +92,26 @@ export function HabitLaneNode({
     for (const n of board.nodes) {
       if (n.kind !== 'habit' || !n.isMother) continue;
       const s = n.state as { habits?: Habit[] } | null;
-      // An archived habit is no longer tracked: its lane goes like a deleted one's.
+      // An archived habit is no longer tracked: its card goes like a deleted one's.
       const h = s?.habits?.find((x) => x.id === node.state.habitId && !x.archived);
       if (h) return h;
     }
     return null;
   }, [board, node.state.habitId]);
 
-  // Re-renders at local midnight, so a lane left open overnight moves on.
+  // Re-renders at local midnight; events also need the minute (now / in 2 h).
   const today = useLocalDay();
-  const week = useMemo(() => lastSevenDays(today), [today]);
+  const week = useMemo(() => weekOf(today), [today]);
+  const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  const event = !!habit && isRoutine(habit);
+  useEffect(() => {
+    if (!event) return;
+    const id = window.setInterval(() => { const d = new Date(); setNowMin(d.getHours() * 60 + d.getMinutes()); }, 30_000);
+    return () => window.clearInterval(id);
+  }, [event]);
 
   const { getNodes } = useReactFlow();
-  const onContextMenu = (e: React.MouseEvent) => {
+  const openMenu = (e: React.MouseEvent) => {
     const selectedCount = getNodes().filter((n) => n.selected).length;
     if (selectedCount > 1) return;
     e.preventDefault();
@@ -112,20 +119,11 @@ export function HabitLaneNode({
     setMenuOpen({ x: e.clientX, y: e.clientY });
   };
 
-  // If the underlying habit was deleted, this lane is an orphan — auto-clean
-  // it instead of showing a "habit removed — delete this lane" placeholder
-  // the user has to dismiss by hand. The lane node is non-mother, so
-  // removeNode in the board store will accept it.
-  // Cleanup is not a user action: no undo slot (undoing to it re-created the
-  // orphan, which deleted itself again and cleared redo — a stuck undo), and
-  // it is saved so the orphan doesn't come back from board.json.
-  // Only while the lane is still on the board, and once: the canvas can keep
-  // this component mounted a moment after the removal, and writing a fresh
-  // board each render re-rendered it into the same write — an endless loop
-  // that took the whole app down when a habit (or all habits) was deleted.
+  // The habit was deleted or archived: the card removes itself, once, saved,
+  // without an undo slot (undoing to it would re-create the orphan).
   const cleaned = useRef(false);
   useEffect(() => {
-    if (!board) return; // wait until store hydrates
+    if (!board) return;
     if (habit || cleaned.current) return;
     if (!board.nodes.some((n) => n.id === node.id)) return;
     cleaned.current = true;
@@ -135,219 +133,133 @@ export function HabitLaneNode({
     const next = useBoardStore.getState().board;
     if (next) void saveBoard(next);
   }, [board, habit, node.id]);
-  if (!habit) {
-    // Render nothing while the auto-cleanup useEffect fires on the next tick.
-    return null;
-  }
+  if (!habit) return null;
 
-  const color = habitColor(habit.color);
+  const color = `var(--${habitColor(habit.color)})`;
   const logSet = new Set(habit.log);
   const doneToday = logSet.has(today);
-  const scheduledToday = isDayScheduled((habit as { schedule?: HabitSchedule }).schedule, today);
-  const cadence = (habit as { schedule?: HabitSchedule | null }).schedule ?? null;
-  // Pass the schedule like HabitNode does, or a weekdays habit reads 0 on weekends.
-  // The same streak as the Habit node (a weekly target counts weeks; rest days never break it).
-  const { current: streak, unit: streakUnit } = habitStreak(habit as Parameters<typeof habitStreak>[0], today);
-  const cadHeader = cadenceTag(cadence);
-  const cadFoot = cadenceFootText(cadence);
+  const scheduledToday = isDayScheduled(habit.schedule, today);
+  const amount = !event && habit.amount ? habit.amount : null;
+  const count = amount ? countOn(habit, today) : 0;
+  const { current: streak, unit } = habitStreak(habit as Parameters<typeof habitStreak>[0], today);
+  const status = event ? routineStatus(habit, today, nowMin) : null;
+  const tone: CardTone = event ? (status?.kind === 'now' ? 'running' : 'open') : doneToday ? 'done' : 'open';
+  const canTick = scheduledToday || doneToday || !!weeklyTarget(habit);
 
-  // Pull the lane sequence number from the node id suffix if present —
-  // labels like "#01" / "#02" in the header give the cards an identity
-  // even when the names are short.
-  // Its place among the lanes (ids are uuids, whose trailing digits gave
-  // random numbers like "#4821").
-  const laneIndex = (board?.nodes ?? []).filter((n) => n.kind === 'habit.lane').findIndex((n) => n.id === node.id);
-  const seqLabel = laneIndex >= 0 ? `#${String(laneIndex + 1).padStart(2, '0')}` : '';
+  // ── the bottom: the week (habit, event) or a meter (amount, event now) ──
+  const weekBars = (
+    <div data-testid="habit-card-week" style={{ display: 'flex', gap: 3 }}>
+      {week.map((ymd) => {
+        const on = event ? isDayScheduled(habit.schedule, ymd) : logSet.has(ymd);
+        const off = !isDayScheduled(habit.schedule, ymd) && !weeklyTarget(habit);
+        const isToday = ymd === today;
+        return (
+          <span key={ymd} title={ymd}
+            style={{
+              flex: 1, height: 8, borderRadius: 2,
+              background: event
+                ? (on ? 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink-3) 70%, transparent) 0 2px, transparent 2px 4px)' : 'transparent')
+                : on ? color : off ? 'transparent' : 'var(--paper-3)',
+              boxShadow: isToday ? '0 0 0 1px var(--acid)' : off || (event && !on) ? 'inset 0 0 0 1px var(--paper-3)' : 'none',
+              opacity: ymd > today && !event ? 0.55 : 1,
+            }} />
+        );
+      })}
+    </div>
+  );
+  const labels = (left: string, right: string, leftColor = 'var(--ink)') => (
+    <div style={{ display: 'flex', alignItems: 'baseline', marginTop: 5, fontFamily: 'var(--font-mono)', fontSize: 11, gap: 8 }}>
+      <span data-testid="habit-card-left" style={{ color: leftColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{left}</span>
+      <span style={{ marginLeft: 'auto', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{right}</span>
+    </div>
+  );
+
+  let bottom: React.ReactNode;
+  if (event && status) {
+    const occStart = status.kind === 'today' || status.kind === 'next' ? status.at : 0;
+    if (status.kind === 'now') {
+      const t = (habit.schedule as HabitSchedule | undefined)?.timeOfDay ?? '00:00';
+      const [hh, mm] = t.split(':').map(Number) as [number, number];
+      const start = hh * 60 + mm;
+      const ratio = (nowMin - start) / Math.max(1, status.until - start);
+      const leftMin = Math.max(1, status.until - nowMin);
+      bottom = <CardMeter ratio={ratio} color="var(--acid)" left={`Until ${hm(status.until)}`} right={leftMin >= 60 ? `${Math.round(leftMin / 60)} h left` : `${leftMin} min left`} />;
+    } else {
+      const left = status.kind === 'today' ? `Today ${hm(occStart)}`
+        : status.kind === 'next' ? `${dayName(status.date, today)} ${hm(occStart)}`
+        : status.kind === 'skipped' ? `Skipped ${dayName(status.date, today)}`
+        : status.kind === 'ended' ? 'Ended' : 'No more dates';
+      const days = status.kind === 'next' ? Math.round((new Date(`${status.date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000) : 0;
+      const right = status.kind === 'today' ? inWords(occStart - nowMin) : status.kind === 'next' ? inWords(days * 24 * 60 + occStart - nowMin) : '';
+      bottom = <div style={{ marginTop: 'auto' }}>{weekBars}{labels(left, right, 'var(--ink)')}</div>;
+    }
+  } else if (amount) {
+    bottom = <CardMeter ratio={count / Math.max(1, amount.target)} color={color} left={`${Math.min(count, amount.target)} of ${amount.target}${amount.unit ? ` ${amount.unit}` : ''} today`} right={count >= amount.target ? 'done' : 'click to add one'} />;
+  } else {
+    const left = streak > 0 ? `${streak} ${unit}${streak === 1 ? '' : 's'} in a row` : 'No streak yet';
+    const right = doneToday ? 'done today' : scheduledToday || weeklyTarget(habit) ? 'today open' : 'not today';
+    bottom = <div style={{ marginTop: 'auto' }}>{weekBars}{labels(left, right, streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)')}</div>;
+  }
 
   return (
     <div
       data-testid="habit-lane-root"
-      onContextMenu={onContextMenu}
-      style={{
-        width: LANE_WIDTH,
-        background: 'var(--node-bg)',
-        border: '1px solid var(--paper-3)',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-1)',
-        overflow: 'hidden',
-        position: 'relative',
-        // Scope repaints to this card subtree so the 7-day strip and inner
-        // elements don't bleed into surrounding layers during canvas pan.
-        // 'style' excluded to preserve var(--habit-color) inheritance below.
-        contain: 'layout paint',
-        ['--habit-color' as string]: `var(--${color})`,
-      } as React.CSSProperties}
+      data-card={event ? 'event' : 'habit'}
+      onContextMenu={openMenu}
+      style={{ ...cardFrameStyle(tone), cursor: 'grab', overflow: 'visible', ['--habit-color' as string]: color } as React.CSSProperties}
     >
-      {/* Header — HABIT · #NN · ↻ cadence */}
-      <div
-        style={{
-          padding: '6px 10px',
-          borderBottom: '1px solid var(--paper-3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          color: 'var(--ink-3)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-        }}
-      >
-        <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, background: `var(--${color})`, display: 'inline-block' }} />
-        <span>HABIT</span>
-        {seqLabel && (
-          <span style={{ color: 'var(--ink-2)' }}>{`· ${seqLabel}`}</span>
+      {/* An event wears the Calendar's hatch: it happens, it isn't ticked. */}
+      {event && <span aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none', background: 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink-3) 7%, transparent) 0 6px, transparent 6px 12px)' }} />}
+
+      {/* Row 1: box (habit) or repeat mark (event) · name · its menu */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+        {event ? (
+          <span aria-label="Repeating event" style={{ width: 15, height: 15, display: 'grid', placeItems: 'center', flexShrink: 0, color: status?.kind === 'now' ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>
+            <MenuIcon name="repeat" size={13} />
+          </span>
+        ) : amount ? (
+          <button type="button" data-testid="habit-card-add" className="nodrag"
+            disabled={!canTick}
+            onClick={(e) => { e.stopPropagation(); onCommand('habit.lane.toggleToday'); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            aria-label={`${habit.name}: add one (${count} of ${amount.target} today)`}
+            title={canTick ? 'Add one' : 'Not a day for this habit'}
+            style={{ minWidth: 15, height: 15, padding: '0 3px', borderRadius: 4, boxSizing: 'border-box', flexShrink: 0, cursor: canTick ? 'pointer' : 'default', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, lineHeight: 1,
+              border: `1.5px solid ${count >= amount.target ? color : 'var(--ink-4)'}`, background: count >= amount.target ? color : 'transparent', color: count >= amount.target ? 'var(--ink-on-bright, #111)' : 'var(--ink-2)' }}>
+            {count}
+          </button>
+        ) : (
+          <button type="button" data-testid="habit-card-tick" className={`task-check${doneToday ? ' task-check--done' : ''} nodrag`}
+            disabled={!canTick}
+            onClick={(e) => { e.stopPropagation(); onCommand('habit.lane.toggleToday'); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            aria-pressed={doneToday}
+            aria-label={`${habit.name} today ${doneToday ? 'done' : 'not done'}`}
+            title={canTick ? (doneToday ? 'Untick today' : 'Tick today') : 'Not a day for this habit'}
+            style={{ marginTop: 0, opacity: canTick ? 1 : 0.4, ...(doneToday ? { background: color, borderColor: color } : {}) }}>
+            {doneToday && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--ink-on-bright, #111)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+          </button>
         )}
-        <span style={{ marginLeft: 'auto', color: 'var(--ink-3)' }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
-          {cadHeader}
-        </span>
-      </div>
-
-      {/* Body — glyph tile + name + done tick */}
-      <div style={{ padding: '10px 12px 4px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Glyph tile — 28x28 dashed (LifeOS "graph paper" cue) */}
-        <div
-          aria-hidden
-          style={{
-            width: 28,
-            height: 28,
-            display: 'grid',
-            placeItems: 'center',
-            border: '1px dashed var(--paper-3)',
-            borderRadius: 4,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 14,
-            color: `var(--${color})`,
-            flexShrink: 0,
-          }}
-        >
-          <HabitIcon icon={habit.icon} size={15} fallback="" />
-        </div>
-
-        {/* Name */}
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontFamily: 'var(--font-sans)',
-            fontSize: 13,
-            color: 'var(--ink-1)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-          title={habit.name}
-        >
+        <span title={habit.name} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '18px', color: 'var(--ink)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {habit.name}
-        </div>
-
-        {/* Done-today tick — 22px circle. Inverts to filled-color on done. */}
-        <button
-          type="button"
-          aria-label={`${habit.name} today ${doneToday ? 'done' : 'not done'}`}
-          aria-pressed={doneToday}
-          // Same rule as the Habit window: an unscheduled day can't be
-          // ticked (the streak ignores it); an existing tick can be removed.
-          disabled={!scheduledToday && !doneToday}
-          onClick={() => onCommand('habit.lane.toggleToday')}
-          title={!scheduledToday && !doneToday ? 'not scheduled today' : `click to ${doneToday ? 'unmark' : 'mark'} today`}
-          style={{
-            opacity: !scheduledToday && !doneToday ? 0.35 : 1,
-            width: 22,
-            height: 22,
-            borderRadius: '50%',
-            border: `1.5px solid var(--${color})`,
-            background: doneToday ? `var(--${color})` : 'transparent',
-            color: doneToday ? 'var(--ink)' : `var(--${color})`,
-            cursor: !scheduledToday && !doneToday ? 'default' : 'pointer',
-            display: 'grid',
-            placeItems: 'center',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            lineHeight: 1,
-            padding: 0,
-            flexShrink: 0,
-          }}
-        >
-          {doneToday ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : null}
+        </span>
+        <button type="button" data-testid="habit-card-menu" className="nodrag task-card-action" aria-label={`${habit.name}: options`} title="Days, time, name, colour…"
+          onClick={openMenu} onMouseDown={(e) => e.stopPropagation()}
+          style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'pointer', border: 'none', padding: 0, color: 'var(--ink-3)', background: 'var(--paper-2)' }}>
+          <MenuIcon name="edit" size={13} />
         </button>
       </div>
 
-      {/* Mini 7-day strip — last 7 days, last cell is today. */}
-      <div
-        style={{
-          padding: '4px 12px 6px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: 3,
-        }}
-      >
-        {week.map((ymd) => {
-          const done = logSet.has(ymd);
-          const isToday = ymd === today;
-          const isScheduled = isHabitDay(cadence, ymd);
-          return (
-            <div
-              key={ymd}
-              className={
-                'habit-cell '
-                + (done ? 'habit-cell--done ' : '')
-                + (isToday ? 'habit-cell--today ' : '')
-              }
-              style={{
-                height: 14,
-                opacity: !isScheduled && !done ? 0.4 : 1,
-              }}
-              title={`${ymd}${done ? ' ✓' : ''}`}
-            />
-          );
-        })}
-      </div>
+      {/* Row 2: what it is · when */}
+      <CardMetaRow tag={event ? (status?.kind === 'now' ? 'now' : 'event') : 'habit'} tone={event ? (status?.kind === 'now' ? 'var(--acid)' : 'var(--ink-3)') : color} icon="calendar"
+        // A habit at any time just says its days ("every day"); a time shows when it has one.
+        when={!event && timeWords(habit, false) === 'any time' ? daysWords(habit) : `${daysWords(habit)} · ${timeWords(habit, event)}`} />
 
-      {/* Foot — streak + cadence text */}
-      <div
-        style={{
-          padding: '4px 12px 8px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.04em',
-        }}
-      >
-        <span style={{ color: streak > 0 ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', fontWeight: streak > 0 ? 600 : 400 }}>
-          {streak > 0 ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" /></svg>{streak}{streakUnit === 'week' ? 'w' : 'd'} streak</> : 'no streak'}
-        </span>
-        <span style={{ color: 'var(--ink-3)' }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.1em', marginRight: 4 }}><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" /></svg>
-          {cadFoot}
-        </span>
-      </div>
+      {bottom}
 
-      {/* Drop hint — fades in while the lane is being dragged. Wired by
-          .react-flow__node.dragging.krnl-kind-habit--lane in
-          reactflow-theme.css (PR6a). */}
-      <div
-        aria-hidden
-        className="habit-lane-drophint"
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: -22,
-          textAlign: 'center',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--acid-ink, var(--acid))',
-          opacity: 0,
-          transition: 'opacity 0.15s ease',
-          pointerEvents: 'none',
-        }}
-      >
+      {/* Drop hint while dragged (reactflow-theme.css). */}
+      <div aria-hidden className="habit-lane-drophint"
+        style={{ position: 'absolute', left: 0, right: 0, bottom: -22, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--acid-ink, var(--acid))', opacity: 0, transition: 'opacity 0.15s ease', pointerEvents: 'none' }}>
         <LineGlyph name="arrowDownRight" size={11} /> drop on a calendar day
       </div>
 
@@ -359,7 +271,7 @@ export function HabitLaneNode({
           onSetColor={(c) => onCommand('habit.lane.setColor', { color: c })}
           onSetIcon={(icon) => onCommand('habit.lane.setIcon', { icon })}
           onSetNote={(note) => onCommand('habit.lane.setNote', { note })}
-          onDelete={() => undoable(`Deleted habit "${habit.name}"`, () => onCommand('habit.lane.removeHabit'))}
+          onDelete={() => undoable(`Deleted ${event ? 'event' : 'habit'} "${habit.name}"`, () => onCommand('habit.lane.removeHabit'))}
           onUnpinLane={() => {
             useBoardStore.getState().removeNode(node.id);
             const next = useBoardStore.getState().board;

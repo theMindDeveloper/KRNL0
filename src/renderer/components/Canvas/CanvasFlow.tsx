@@ -1188,9 +1188,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       const newHabit = habits.at(-1);
       if (!newHabit) return;
 
-      // Spawn habit.lane at the click flow pos (commandDispatch:1122 mirrors
-      // this shape but slots by laneCount — we want explicit pos here).
-      const lane: KrnlNode = {
+      // Decision 42 — habit.add already put the habit's card on the board;
+      // here it goes where you clicked (never a second card).
+      const existingCard = fresh.nodes.find((n) => n.kind === 'habit.lane' && (n.state as { habitId?: string }).habitId === newHabit.id);
+      const lane: KrnlNode = existingCard ?? {
         id: `habit-lane-${crypto.randomUUID()}`,
         kind: 'habit.lane',
         position: { x: flowX, y: flowY },
@@ -1198,7 +1199,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         state: { habitId: newHabit.id } as unknown as Record<string, unknown>,
         config: { days: 28 },
       };
-      addNode(lane);
+      if (existingCard) useBoardStore.getState().updateNode(existingCard.id, { position: { x: flowX, y: flowY } });
+      else addNode(lane);
       const saved = useBoardStore.getState().board;
       if (saved) void saveBoard(saved);
       emit('node.added', `habit.lane spawned for habit ${newHabit.id.slice(0, 8)}`, {
