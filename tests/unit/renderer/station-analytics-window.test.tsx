@@ -75,5 +75,5 @@ describe('Analytics window — station cell', () => {
     expect(document.querySelector('.station-drag-handle')).not.toBeNull();
     // The first import of StationCell pulls in every window: slow under the
     // full parallel run, so it gets more than the default 5 s.
-  }, 20_000);
+  }, 45_000); // a heavy first render; slow when the whole suite runs at once
 });

@@ -1174,8 +1174,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     for (const slice of [...hit].sort((x, y) => x.sliceStartMin - y.sliceStartMin)) {
       items.push({ kind: 'task', task: slice.task });
     }
-    // Tracked-reality segments covering this minute on this day.
-    for (const seg of realityByDay.get(dayYMD) ?? []) {
+    // Tracked-reality segments covering this minute on this day — only when the
+    // click is on the thin line itself (a few px of slack), never anywhere in
+    // the day at that time (owner, 2026-11-09).
+    const relX = (e.clientX - rect.left) / screenScale(e.currentTarget);
+    const SLACK = 4;
+    const onLine = relX >= trackLeft - SLACK && relX <= trackLeft + trackW + SLACK;
+    if (onLine) for (const seg of realityByDay.get(dayYMD) ?? []) {
       if (minute >= seg.startMin && minute < seg.endMin) {
         items.push({ kind: 'reality', seg });
       }

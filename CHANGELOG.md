@@ -33,7 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A tour's highlight jumped to another task when the board moved.
 - Tours: the plan card's reminder is described as it works (once the plan has a time); a habit or event card off screen is brought into view; removing practice also removes a practice habit's card.
 - Easy: the Time per task page is hidden (Easy never links recorded time to a task, so it showed one "untagged" row and tags).
-- Calendar: the + button is as tall as Repeating.
+- Calendar: the + button is as tall as Repeating; recorded time opens only from a click on its thin line, not from anywhere in the day at that time.
+- Sounds: Crisp is the default pack for a new install (a saved choice is kept).
 - Cursor stutter between pointer and grab on cards (#226).
 - Clock kept the previous day; Clock hover flicker; terminal prompt two characters wide; recorded segments unclickable; tagged time looked untagged (#200–#204).
 - Calendar items that could not be deleted; deadlines of timed plans drawn nowhere (#220, #221).

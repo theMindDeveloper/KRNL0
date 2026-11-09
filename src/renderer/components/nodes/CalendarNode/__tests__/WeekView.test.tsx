@@ -779,7 +779,7 @@ describe('WeekView — overlap disambiguation (#6/#7)', () => {
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
     // rowHeight = 28 (zoom 1); minute 540 (09:00) → clientY 252.
-    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 6 });
 
     const menu = document.querySelector('[data-testid="calendar-layer-menu"]');
     expect(menu).toBeTruthy();
@@ -795,7 +795,7 @@ describe('WeekView — overlap disambiguation (#6/#7)', () => {
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
     // Right-click on recorded time opens the same popup as a left click (#207).
-    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 6 });
 
     const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
     expect(popup).toBeTruthy();
@@ -813,7 +813,7 @@ describe('WeekView — delete tracked-reality segment (#12)', () => {
     render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
-    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 6 });
 
     // Right-click menu → Delete segment.
     const del = screen.getByRole('button', { name: 'Delete segment' });
@@ -834,11 +834,24 @@ describe('WeekView — left-click on a recorded span (#203)', () => {
     render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
-    fireEvent.click(col, { clientY: 252, clientX: 100 });
+    fireEvent.click(col, { clientY: 252, clientX: 6 });
 
     const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
     expect(popup).toBeTruthy();
     expect(popup?.textContent).toMatch(/09:25/);
+  });
+
+  it('a click in the day beside the line, at a recorded time, opens nothing — only the line itself does', () => {
+    boardWith([
+      makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
+    ]);
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
+
+    const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
+    fireEvent.click(col, { clientY: 252, clientX: 100 });
+    expect(document.querySelector('[data-testid="calendar-reality-popup"]')).toBeNull();
+    fireEvent.click(col, { clientY: 252, clientX: 6 });
+    expect(document.querySelector('[data-testid="calendar-reality-popup"]')).toBeTruthy();
   });
 
   it('a left click on empty grid opens nothing', () => {
@@ -861,7 +874,7 @@ describe('WeekView — left-click on a recorded span (#203)', () => {
     render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
-    fireEvent.click(col, { clientY: 252 + 5, clientX: 100 }); // ≈ 09:10
+    fireEvent.click(col, { clientY: 252 + 5, clientX: 6 }); // ≈ 09:10
     const rows = document.querySelectorAll('[data-testid="calendar-layer-item-reality"]');
     expect(rows.length).toBe(2);
     fireEvent.click(rows[0]!);
@@ -892,7 +905,7 @@ describe('WeekView — tagged span shows its task (#204)', () => {
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
     // One popup for left and right click (#207): title and "Counts toward" name the task.
-    fireEvent.contextMenu(col, { clientY: 252, clientX: 100 });
+    fireEvent.contextMenu(col, { clientY: 252, clientX: 6 });
     const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
     expect(popup?.textContent).toMatch(/Task task-a/);
     expect(document.querySelector('[data-testid="calendar-reality-retag"]')?.textContent).toMatch(/Task task-a/);
@@ -903,7 +916,7 @@ describe('WeekView — tagged span shows its task (#204)', () => {
     render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
 
     const col = document.querySelector('[data-testid="week-col-2026-05-11"]') as HTMLElement;
-    fireEvent.click(col, { clientY: 252, clientX: 100 });
+    fireEvent.click(col, { clientY: 252, clientX: 6 });
     const popup = document.querySelector('[data-testid="calendar-reality-popup"]');
     expect(popup?.textContent).toMatch(/build cluster/);
     expect(document.querySelector('[data-testid="calendar-reality-retag"]')?.textContent).toMatch(/build cluster \(deleted\)/);

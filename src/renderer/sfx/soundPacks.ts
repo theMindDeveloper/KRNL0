@@ -23,7 +23,8 @@ export const MOMENT_LABELS: Record<SoundMoment, string> = {
 
 export const SOUND_PACK_IDS = ['snd01', 'zen', 'crisp'] as const;
 export type SoundPackId = (typeof SOUND_PACK_IDS)[number];
-export const DEFAULT_SOUND_PACK: SoundPackId = 'snd01';
+// Crisp is the default for a new install (owner, 2026-11-09). A saved choice is kept.
+export const DEFAULT_SOUND_PACK: SoundPackId = 'crisp';
 
 /** One hit of a phrase: a sound, when (ms after the first), its pitch and level. */
 export interface SoundStep {
