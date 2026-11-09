@@ -858,7 +858,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         label: 'Edit event…', icon: <MenuIcon name="rename" />,
         onSelect: () => setEventCard({ x, y, day: occ.date, allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days, time: h.schedule?.timeOfDay ?? hmOf(s0), lengthMin: h.schedule?.durationMin ?? 60 } }),
       },
-      { label: 'Remind me…', icon: <MenuIcon name="reminder" />, hint: h.remindMin === undefined ? 'Off' : h.remindMin === 0 ? 'at start' : `${h.remindMin} min`, onSelect: () => setEventRemind({ id: h.id, x, y, value: h.remindMin ?? null }) },
+      // Reminders are Advanced (owner, 2026-11-09); a reminder set earlier still shows in Easy, to turn it off.
+      ...(easy && h.remindMin === undefined ? [] : [{ label: 'Remind me…', icon: <MenuIcon name="reminder" />, hint: h.remindMin === undefined ? 'Off' : h.remindMin === 0 ? 'at start' : `${h.remindMin} min`, onSelect: () => setEventRemind({ id: h.id, x, y, value: h.remindMin ?? null }) }]),
       { label: 'End after this day', icon: <MenuIcon name="end" />, hint: 'keeps past', divider: true, onSelect: () => { void habitMotherCommand('routine.end', { id: h.id, date: occ.date }); } },
       { label: 'Delete event', icon: <MenuIcon name="delete" />, danger: true, onSelect: () => { void deleteRoutine(h.id); } },
     ];
@@ -1174,8 +1175,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     for (const slice of [...hit].sort((x, y) => x.sliceStartMin - y.sliceStartMin)) {
       items.push({ kind: 'task', task: slice.task });
     }
-    // Tracked-reality segments covering this minute on this day.
-    for (const seg of realityByDay.get(dayYMD) ?? []) {
+    // Tracked-reality segments covering this minute on this day — only when the
+    // click is on the thin line itself (a few px of slack), never anywhere in
+    // the day at that time (owner, 2026-11-09).
+    const relX = (e.clientX - rect.left) / screenScale(e.currentTarget);
+    const SLACK = 4;
+    const onLine = relX >= trackLeft - SLACK && relX <= trackLeft + trackW + SLACK;
+    if (onLine) for (const seg of realityByDay.get(dayYMD) ?? []) {
       if (minute >= seg.startMin && minute < seg.endMin) {
         items.push({ kind: 'reality', seg });
       }

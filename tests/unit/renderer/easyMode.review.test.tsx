@@ -36,6 +36,25 @@ describe('D19 — Deadline is Advanced', () => {
   });
 });
 
+describe('D27 — reminders are Advanced (owner, 2026-11-09)', () => {
+  const timed = (remindMin: number | null) => (
+    <WhenPopover x={0} y={0} today="2026-11-08" value={{ day: '2026-11-09', time: '16:00', lengthMin: 60, deadline: null, remindMin }} onApply={() => {}} onClose={() => {}} />
+  );
+  it('Advanced: a plan with a time has the Reminder row', () => {
+    setMode('advanced');
+    render(timed(null));
+    expect(screen.queryByTestId('when-remind')).not.toBeNull();
+  });
+  it('Easy: no Reminder row, unless the plan already has a reminder (so it can be turned off)', () => {
+    setMode('easy');
+    render(timed(null));
+    expect(screen.queryByTestId('when-remind')).toBeNull();
+    cleanup();
+    render(timed(10));
+    expect(screen.queryByTestId('when-remind')).not.toBeNull();
+  });
+});
+
 describe('D20 — habit goals are Advanced', () => {
   const card = (simple: boolean, initial = DEFAULT_CARD) => (
     <HabitAddAsk name="Read" anchor={{ left: 0, right: 330, top: 600 }} onAdd={() => {}} onCancel={() => {}} simple={simple} initial={initial} />
@@ -89,12 +108,13 @@ describe('Tours follow the mode', () => {
     expect(toursIn('advanced').map((t) => t.id)).toContain('terminal');
     expect(toursIn('easy').map((t) => t.id)).not.toContain('terminal');
   });
-  it('no Easy step talks about deadlines, weekly targets or amounts', () => {
+  it('no Easy step talks about deadlines, weekly targets, amounts or reminders', () => {
     for (const t of toursIn('easy')) {
       // (The step that pitches Advanced names what Advanced adds, on purpose,
       // and so do the live-demo steps that switch the app to Advanced.)
       for (const s of stepsFor(t, 'easy').filter((x) => !x.then && x.mode !== 'advanced')) {
-        expect(s.text.toLowerCase(), `${t.id}: ${s.text}`).not.toMatch(/deadline|times a week|weekly target|amount/);
+        expect(s.text.toLowerCase(), `${t.id}: ${s.text}`).not.toMatch(/deadline|times a week|weekly target|amount|remind/);
+        expect((s.say ?? '').toLowerCase(), `${t.id}: ${s.say}`).not.toMatch(/deadline|times a week|weekly target|amount|remind/);
       }
     }
   });

@@ -2617,3 +2617,25 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Branch:** `experiment/new-user-review`
 **Files changed:** `Tour/tours.ts`, `Tour/tourVoice.ts`, `Tour/TourHost.tsx`, `store/tourExamples.ts` (new), `store/tourPractice.ts`, `Assistant/orbLines.ts`, `Orb/index.tsx`, `Launch/HelpMenu.tsx`, `AnalyticsNode/guide.ts`, `CalendarNode/WeekView.tsx`, `scripts/gen-tour-voice.ts`, `scripts/print-tour-scripts.ts` (new), `Tour/voice/*`, `Assistant/audio/voice/*`, `docs/releases/tour-review-0.11.md`, tests.
 **Summary:** The owner found the tours describing things Easy doesn't show (a reminder on a plan with no time), the timer called "Pomo" in Record and Observe, and tours pointing at things a new board doesn't have. Every tour was walked in the app in Easy, Advanced · Pomo and Advanced · Observe, on an empty and a full board; 11 problems fixed (review doc). The timer is named as its window shows it (titles, badges, words, voice). On an empty board a tour adds only the examples it needs ("Example: …" plan today, 40 min recorded, a habit, a class), says so on the card, and always removes them; they are never counted. Off-screen habit/event cards are brought into view; a practice habit's card goes with "Remove them". Easy hides Time per task (Easy never links time to a task); its Analytics tour shows Hours. Voice: the owner picked plain, natural lines (no mood tags, no pauses, no trailing dots — they made the voice drop) and a rising "Aha?" for the orb; every tour line (three views) and orb line re-recorded and transcribed back. The 0.11.0 draft built before this stays unpublished.
+
+## [2026-11-09] — Calendar: recorded time opens only from its line; Crisp is the default sound (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/WeekView.tsx` (layersAt), `sfx/soundPacks.ts`, `docs/06-requirements/ui-sounds.md`, tests (`WeekView.test.tsx`, `schedule-menu-parity.test.tsx`, `uiSounds.test.ts`).
+**Summary:** A click anywhere in a Calendar day at a time with recorded work opened the recorded-time popup (the hit test only looked at the time, not where across the day you clicked). Now only a click on the thin line itself (4 px of slack) opens it; left click, right click and double-click alike. Checked in the real Calendar (beside the line: nothing; on it: the popup) and pinned by a test. Crisp is now the default sound pack for a new install; a saved choice is kept.
+
+## [2026-11-09] — Reminders are Advanced (experimental)
+
+**Type:** Feature change
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/WhenPopover.tsx`, `CalendarNode/WeekView.tsx` (an event's Remind me…), `Tour/tours.ts`, `Tour/voice/*`, `shared/whatsnew.ts`, `docs/releases/v0.11.0.md`, `docs/06-requirements/easy-mode.md` (D27), `CHANGELOG.md`, tests.
+**Summary:** The owner decided Easy has no reminders: the plan card's Reminder row only appeared after a time was set, so the first-day tour's "you can add a reminder" was never found. Easy now hides the Reminder row and an event's Remind me…; a reminder set earlier still shows (to turn it off) and still fires. The Easy tours drop reminders (first day, Calendar, Staying on track: "two things — rest days and Won't do"); Advanced's tours and the "what Advanced adds" lines now list them. Changed lines re-recorded and transcribed back.
+
+## [2026-11-09] — The voice says "To-do"; the guide speaks before the first click (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts` (five `say` lines), `Tour/voice/*` (5 clips), `src/main/index.ts` (`autoplayPolicy`), `tests/unit/renderer/tourVoice.test.ts`.
+**Summary:** The voice read "Todo" as "toodoo": the five scripts that name it now say "To-do" (the screen still shows Todo), re-recorded and transcribed back exactly; a test keeps "Todo" out of every script. The main window allows audio without a user gesture, so the first-day tour's first step speaks on a fresh start (the tour already starts by itself with the voice on).
+

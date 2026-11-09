@@ -5,12 +5,6 @@
       "modes"
     ]
   },
-  "59017053": {
-    "text": "Todo is your list of plans. Each one can have a when, a day and a time or just a day. It can have a deadline, and it shows the time you really spent on it.",
-    "tours": [
-      "welcome"
-    ]
-  },
   "65077673": {
     "text": "Hi! Let's plan one real thing and actually do it, together. It takes about four minutes. Press Next or Enter to go on, and Escape whenever you want to stop.",
     "tours": [
@@ -23,8 +17,8 @@
       "first-day"
     ]
   },
-  "028ce51d": {
-    "text": "See the little calendar icon on the row? It opens the plan card, with the day, the time and how long it takes. Once it has a time, you can add a reminder too. You can also right-click the row and choose \"When\".",
+  "5aca9650": {
+    "text": "See the little calendar icon on the row? It opens the plan card, with the day, the time and how long it takes. You can also right-click the row and choose \"When\".",
     "tours": [
       "first-day"
     ]
@@ -35,8 +29,8 @@
       "first-day"
     ]
   },
-  "a0bc02f5": {
-    "text": "Now let's plan it! Drag the task from your Todo list onto today in the Calendar, at a time later than now. Or open its card and pick a time today.",
+  "5a0b9a2e": {
+    "text": "Now let's plan it! Drag the task from your To-do list onto today in the Calendar, at a time later than now. Or open its card and pick a time today.",
     "tours": [
       "first-day"
     ]
@@ -101,14 +95,20 @@
       "first-day"
     ]
   },
-  "6dc73368": {
-    "text": "You're in Easy mode: plan it, do it, see how it went. Give it a few days. When it feels easy, try Advanced! It adds tags and time by tag, focus sessions, naming what you recorded, planned versus spent, deadlines and weekly goals, and the terminal and AI. You can switch here any time: Settings, then Mode.",
+  "26c9a0bf": {
+    "text": "You're in Easy mode: plan it, do it, see how it went. Give it a few days. When it feels easy, try Advanced! It adds tags and time by tag, focus sessions, naming what you recorded, planned versus spent, deadlines and reminders, weekly goals, and the terminal and AI. You can switch here any time: Settings, then Mode.",
     "tours": [
       "first-day"
     ]
   },
   "d6ed49ff": {
     "text": "And that's the whole loop! Every window has its own short tour. You'll find them all in my menu.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "028ce51d": {
+    "text": "See the little calendar icon on the row? It opens the plan card, with the day, the time and how long it takes. Once it has a time, you can add a reminder too. You can also right-click the row and choose \"When\".",
     "tours": [
       "first-day"
     ]
@@ -149,8 +149,8 @@
       "welcome"
     ]
   },
-  "aebb1c31": {
-    "text": "Todo is your list of plans. Each one can have a when: a day and a time, or just a day.",
+  "d44ea4ae": {
+    "text": "To-do is your list of plans. Each one can have a when: a day and a time, or just a day.",
     "tours": [
       "welcome"
     ]
@@ -193,6 +193,12 @@
   },
   "34eadddd": {
     "text": "The Observe timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "f3cbae1e": {
+    "text": "To-do is your list of plans. Each one can have a when, a day and a time or just a day. It can have a deadline, and it shows the time you really spent on it.",
     "tours": [
       "welcome"
     ]
@@ -359,8 +365,8 @@
       "calendar"
     ]
   },
-  "770ea30d": {
-    "text": "Drag a plan from the Todo onto a time here, to plan it.",
+  "fe134724": {
+    "text": "Drag a plan from the To-do onto a time here, to plan it.",
     "tours": [
       "calendar"
     ]
@@ -377,8 +383,8 @@
       "calendar"
     ]
   },
-  "49dd502a": {
-    "text": "Click a plan to open its card. Move it to another day or to any time, change how long it takes, set a reminder, mark it done, or delete it.",
+  "8bba553f": {
+    "text": "Click a plan to open its card. Move it to another day or to any time, change how long it takes, mark it done, or delete it.",
     "tours": [
       "calendar"
     ]
@@ -397,6 +403,12 @@
   },
   "2c928a2b": {
     "text": "On a day, but no set time? Drop it in the \"any time\" strip under the day names, and drag it into the hours later to give it a time. A dashed flag there is a deadline.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "49dd502a": {
+    "text": "Click a plan to open its card. Move it to another day or to any time, change how long it takes, set a reminder, mark it done, or delete it.",
     "tours": [
       "calendar"
     ]
@@ -503,20 +515,14 @@
       "routines"
     ]
   },
-  "ca095946": {
-    "text": "Not every week goes to plan, and that's fine! Three things keep you on track without lying to the app: rest days, reminders, and \"Won't do\".",
+  "c2d2fe4d": {
+    "text": "Not every week goes to plan, and that's fine! Two things keep you on track without lying to the app: rest days, and \"Won't do\".",
     "tours": [
       "on-track"
     ]
   },
   "947e2fc3": {
     "text": "Sick or away? Right-click a habit you haven't done today, and choose \"Rest today\". A rest day never breaks a streak. It shows as a quiet hatch.",
-    "tours": [
-      "on-track"
-    ]
-  },
-  "3006df4f": {
-    "text": "Want a nudge? Right-click a row, choose \"When\", give it a time, and set a reminder. A notification comes before it starts, even with the window closed!",
     "tours": [
       "on-track"
     ]
@@ -545,8 +551,14 @@
       "on-track"
     ]
   },
-  "f61e2934": {
-    "text": "When you do something and when it must be done can differ. Right-click a Todo row and choose \"Deadline\". The row shows a flag, the Calendar a dashed flag on that day, and the Clock lists it.",
+  "e747b2bd": {
+    "text": "When you do something and when it must be done can differ. Right-click a To-do row and choose \"Deadline\". The row shows a flag, the Calendar a dashed flag on that day, and the Clock lists it.",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "3006df4f": {
+    "text": "Want a nudge? Right-click a row, choose \"When\", give it a time, and set a reminder. A notification comes before it starts, even with the window closed!",
     "tours": [
       "on-track"
     ]
@@ -641,8 +653,8 @@
       "modes"
     ]
   },
-  "c531c531": {
-    "text": "Plans get deadlines, like \"by Friday\", and cards can be chained. A card's \"Add next\" plans what comes after, and wires show the order.",
+  "814f0333": {
+    "text": "Plans get deadlines, like \"by Friday\", and reminders. And cards can be chained. A card's \"Add next\" plans what comes after, and wires show the order.",
     "tours": [
       "modes"
     ]

@@ -27,9 +27,9 @@ function resetSettings() {
 describe('F1 — packs and defaults', () => {
   beforeEach(resetSettings);
 
-  it('ships snd01, zen and crisp; snd01 is the default, sounds on', () => {
+  it('ships snd01, zen and crisp; crisp is the default, sounds on', () => {
     expect([...SOUND_PACK_IDS]).toEqual(['snd01', 'zen', 'crisp']);
-    expect(parseSoundSettings(null)).toEqual({ pack: 'snd01', volume: 70, enabled: true });
+    expect(parseSoundSettings(null)).toEqual({ pack: 'crisp', volume: 70, enabled: true });
   });
 
   it('every pack has a bundled sound for every moment', () => {
@@ -122,7 +122,7 @@ describe('F5 — settings persist', () => {
 
   it('bad stored values fall back to defaults; volume is clamped', () => {
     expect(parseSoundSettings('not json')).toEqual(DEFAULT_SOUND_SETTINGS);
-    expect(parseSoundSettings('{"pack":"nope","volume":250,"enabled":"yes"}')).toEqual({ pack: 'snd01', volume: 100, enabled: true });
+    expect(parseSoundSettings('{"pack":"nope","volume":250,"enabled":"yes"}')).toEqual({ pack: 'crisp', volume: 100, enabled: true });
   });
 });
 

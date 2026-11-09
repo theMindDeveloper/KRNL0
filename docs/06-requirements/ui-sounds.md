@@ -8,9 +8,9 @@ Background research: [docs/research/engagement-and-onboarding.md](../research/en
 
 | Id | Name | Made by | Licence | Files |
 |---|---|---|---|---|
-| `snd01` (default) | SND01 · Sine | Yasuhiro Tsuchiya, [snd.dev](https://snd.dev) | Free for commercial and non-commercial use; the designer keeps the copyright | one sprite (`audioSprite.mp3` + `.json`) |
+| `snd01` | SND01 · Sine | Yasuhiro Tsuchiya, [snd.dev](https://snd.dev) | Free for commercial and non-commercial use; the designer keeps the copyright | one sprite (`audioSprite.mp3` + `.json`) |
 | `zen` | Zen | Romain Simon, [UI SFX](https://github.com/romainsimon/uisfx) | CC0 1.0 | one `.mp3` per cue |
-| `crisp` | Crisp | Anipixels, [Crisp UI Sounds Free](https://github.com/Anipixels/crisp-ui-sounds-free) | CC BY 4.0, credit required | one `.ogg` per cue |
+| `crisp` (default) | Crisp | Anipixels, [Crisp UI Sounds Free](https://github.com/Anipixels/crisp-ui-sounds-free) | CC BY 4.0, credit required | one `.ogg` per cue |
 
 The credits live in `src/renderer/sfx/packs/CREDITS.md` and in Settings → Sounds.
 
@@ -36,7 +36,7 @@ Each moment is a short **phrase** (`soundPacks.ts`): a few hits with their own t
 
 ## Functional Requirements
 
-- **F1** The app ships three packs: `snd01`, `zen`, `crisp`. `snd01` is the default for a new install.
+- **F1** The app ships three packs: `snd01`, `zen`, `crisp`. `crisp` is the default for a new install (a saved choice is kept).
 - **F2** Each moment in the table above plays its pack's sound when the user does that action in the UI.
 - **F3** The moment is read from what changed on the board (done count, habit check-ins, timer status, item count, schedules), not from the command name, so every UI path that does the same thing sounds the same.
 - **F4** Settings → Sounds has: sound on/off, a volume slider (0–100), and one button per pack. Choosing a pack plays a sample, so the user hears it at once.
@@ -72,7 +72,7 @@ Feature: Sound packs
 
   Scenario: F1 default pack
     Given a fresh install
-    Then the sound pack is "snd01" and sounds are on
+    Then the sound pack is "crisp" and sounds are on
 
   Scenario: F2/F3 task done plays the done sound
     Given a task that is not done

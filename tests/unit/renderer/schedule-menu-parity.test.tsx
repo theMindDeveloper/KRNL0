@@ -76,7 +76,7 @@ function menuLabels(): string[] {
 function calendarMenuAt(hour: number): string[] {
   const view = render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
   const col = document.querySelector(`[data-testid="week-col-${TODAY}"]`) as HTMLElement;
-  fireEvent.contextMenu(col, { clientY: hour * 28, clientX: 60 });
+  fireEvent.contextMenu(col, { clientY: hour * 28, clientX: 6 });
   const labels = menuLabels();
   view.unmount();
   return labels;
@@ -106,7 +106,7 @@ describe('Calendar ↔ Clock right-click parity', () => {
     seed();
     let view = render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
     const col = document.querySelector(`[data-testid="week-col-${TODAY}"]`) as HTMLElement;
-    fireEvent.contextMenu(col, { clientY: 10.2 * 28, clientX: 60 });
+    fireEvent.contextMenu(col, { clientY: 10.2 * 28, clientX: 6 });
     expect(document.querySelector('[data-testid="calendar-reality-popup"]')).toBeTruthy();
     // No separate right-click menu for recorded time any more.
     expect(menuLabels()).not.toContain('Untag');
@@ -123,7 +123,7 @@ describe('Calendar ↔ Clock right-click parity', () => {
     const col = document.querySelector(`[data-testid="week-col-${TODAY}"]`) as HTMLElement;
     const pomo = () => useBoardStore.getState().board!.nodes.find((n) => n.kind === 'pomo')!.state as { history: Array<{ taskId: string | null }> };
 
-    fireEvent.contextMenu(col, { clientY: 10.2 * 28, clientX: 60 });
+    fireEvent.contextMenu(col, { clientY: 10.2 * 28, clientX: 6 });
     act(() => { fireEvent.click(screen.getByTestId('calendar-reality-retag')); });
     act(() => { fireEvent.click(screen.getByTestId('calendar-reality-retag-picker-task-t-phys')); });
     expect(pomo().history[0]!.taskId).toBe('t-phys');
@@ -131,7 +131,7 @@ describe('Calendar ↔ Clock right-click parity', () => {
     act(() => { fireEvent.click(screen.getByTestId('calendar-reality-delete')); });
     expect(pomo().history).toEqual([]);
 
-    fireEvent.contextMenu(col, { clientY: 8.5 * 28, clientX: 60 });
+    fireEvent.contextMenu(col, { clientY: 8.5 * 28, clientX: 6 });
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Unschedule' })); });
     // Unschedule goes through the dispatcher (lazy-loaded), so it lands a tick later.
     await waitFor(() => {

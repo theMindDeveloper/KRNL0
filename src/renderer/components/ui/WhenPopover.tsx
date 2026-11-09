@@ -228,7 +228,9 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
               <span data-testid="when-length" style={{ minWidth: 52, textAlign: 'center', color: v.lengthMin ? 'var(--ink)' : 'var(--ink-3)' }}>{fmtLength(v.lengthMin)}</span>
               <button type="button" aria-label="Longer" data-testid="when-len-plus" onClick={() => setV((p) => ({ ...p, lengthMin: Math.min(480, (p.lengthMin ?? 0) + 15) }))} style={stepBtn}>+</button>
             </div>
-            {hasTime && (
+            {/* Reminders are Advanced (owner, 2026-11-09); in Easy a reminder set
+                earlier still shows, so it can be seen and turned off. */}
+            {hasTime && (!easy || value.remindMin !== null) && (
               <div style={rowStyle}>
                 <span style={iconCol}><MenuIcon name="reminder" /></span>
                 <AppSelect
