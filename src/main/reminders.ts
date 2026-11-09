@@ -18,7 +18,12 @@ export function startReminders(): void {
   const shown = new Set<string>();
   const tick = () => {
     const now = Date.now();
+    // Back from sleep: only the last tick's window counts, so plans that
+    // started while the laptop slept are not announced late.
+    if (now - lastMs > 2 * TICK_MS) lastMs = now - TICK_MS;
     let board: Board | null = null;
+    // Unreadable right now (locked, or broken and kept aside): try again next
+    // tick without moving the window, so no reminder is skipped.
     try { board = readBoardFile() as unknown as Board | null; } catch { return; }
     for (const r of dueReminders(board, lastMs, now)) {
       if (shown.has(r.key)) continue;

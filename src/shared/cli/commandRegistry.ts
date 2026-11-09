@@ -195,7 +195,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Low-level node management — all refs accept id-prefix or unique text',
     subcommands: [
       { name: 'read', usage: 'node read <ref> [--json]', summary: 'Print full state + config + incident edges for one node' },
-      { name: 'remove', usage: 'node remove <ref> [--force]', summary: 'Remove a node (cascades for tasks; --force needed for mothers)' },
+      { name: 'remove', usage: 'node remove <ref> [--force]', summary: 'Remove a node (cascades for tasks; main windows can never be removed)' },
       { name: 'set-position', usage: 'node set-position <ref> --x N --y N', summary: 'Set node position directly' },
       { name: 'move', usage: 'node move <ref> --to x,y', summary: 'Animate node move (requires renderer)' },
       { name: 'list', usage: 'node list [--kind <k>] [--mother|--child] [--json]', summary: 'List all nodes' },

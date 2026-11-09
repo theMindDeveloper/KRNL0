@@ -293,13 +293,22 @@ export async function cliColor(
 export async function cliRemove(
   ctx: HabitCtx,
   idOrName: string | undefined,
+  opts: { onlyRoutine?: boolean } = {},
 ): Promise<SysResult> {
-  if (!idOrName) return { ok: false, message: 'habit remove requires <id|name>' };
+  if (!idOrName) return { ok: false, message: opts.onlyRoutine ? 'event delete requires <id|name>' : 'habit remove requires <id|name>' };
   const board = loadBoard(ctx);
   const mother = findMother(board);
   if (!mother) return notFound();
-  const resolved = resolveHabit(mother.state, idOrName);
-  if ('error' in resolved) return { ok: false, message: resolved.error };
+  const pool = opts.onlyRoutine
+    ? { ...mother.state, habits: mother.state.habits.filter((h) => h.kind === 'routine') }
+    : mother.state;
+  const resolved = resolveHabit(pool, idOrName);
+  if ('error' in resolved) {
+    if (opts.onlyRoutine && !('error' in resolveHabit(mother.state, idOrName))) {
+      return { ok: false, message: `"${idOrName}" is a habit, not a repeating event; nothing was deleted (use habit remove to delete a habit)` };
+    }
+    return { ok: false, message: resolved.error };
+  }
   mother.state = habitRemove(mother.state, { id: resolved.habit.id });
   // Its lanes go with it (left behind they were orphans that only the open
   // window cleaned up, in memory).

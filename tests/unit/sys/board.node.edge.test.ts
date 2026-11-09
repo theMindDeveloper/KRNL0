@@ -152,11 +152,15 @@ describe('node read', () => {
 });
 
 describe('node remove', () => {
-  it('refuses to remove a mother node without --force', async () => {
+  it('never removes a main window, even with --force (it was gone for good)', async () => {
     const ctx: NodeCtx = { boardPath };
-    const res = await nodeRemove(ctx, TODO_MOTHER, false);
-    expect(res.ok).toBe(false);
-    expect(res.message).toContain('--force');
+    for (const force of [false, true]) {
+      const res = await nodeRemove(ctx, TODO_MOTHER, force);
+      expect(res.ok).toBe(false);
+      expect(res.message).toContain("can't be removed");
+    }
+    const list = await nodeList(ctx, { kind: 'todo' }, true);
+    expect((JSON.parse(list.message!) as unknown[]).length).toBe(1);
   });
 
   it('cascades a task removal via shared dispatch', async () => {

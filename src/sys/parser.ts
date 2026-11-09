@@ -172,7 +172,7 @@ export type SysCommand =
   | { kind: 'routine'; sub: 'list'; json: boolean }
   | { kind: 'routine'; sub: 'skip' | 'unskip' | 'end'; ref: string | undefined; on: string | undefined }
   | { kind: 'routine'; sub: 'move'; ref: string | undefined; on: string | undefined; at: string | undefined }
-  | { kind: 'routine'; sub: 'restart'; ref: string | undefined }
+  | { kind: 'routine'; sub: 'restart' | 'delete'; ref: string | undefined }
   | { kind: 'routine'; sub: 'remind'; ref: string | undefined; value: string | undefined }
   | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined; mode?: string | undefined }
   | {
@@ -728,7 +728,8 @@ export class SysParser {
     // Decision 39 / 40 — repeating events (stored as routines): never ticked.
     // `event` is the name people see; `routine` keeps working.
     if (cmd === 'routine' || cmd === 'event') {
-      if (sub === 'delete') return { kind: 'habit', sub: 'remove', name: rest[0] };
+      // Only a repeating event: a habit with the same name is not touched.
+      if (sub === 'delete') return { kind: 'routine', sub: 'delete', ref: rest[0] };
       if (sub === 'add') {
         const forRaw = flag(rest, 'for');
         return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: flag(rest, 'at'), forMin: forRaw !== undefined && /^\d+$/.test(forRaw) ? Number(forRaw) : undefined };

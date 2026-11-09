@@ -435,6 +435,8 @@ export const useBoardStore = create<BoardStore>((set) => ({
       void _drop;
       const cleared: Board = {
         ...(rest as Board),
+        completions: [],
+        completionsClearedAt: new Date().toISOString(),
         nodes: s.board.nodes.map((n) =>
           n.kind === 'pomo'
             ? { ...n, state: { ...(n.state as Record<string, unknown>), history: [] } }

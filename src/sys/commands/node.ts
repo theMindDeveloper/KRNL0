@@ -180,10 +180,14 @@ export async function nodeRemove(
   const node = board.nodes.find((n) => n.id === r.id);
   if (!node) return { ok: false, message: `node "${r.id}" not found.` };
 
-  if (node.isMother === true && !force) {
+  // Main windows (Todo, Pomo, Habits, Calendar, Clock, Terminal, …) are part
+  // of the app: removing one left it gone for good (AGENTS.md rule 6). The UI
+  // can't remove them either; --force no longer overrides this.
+  void force;
+  if (node.isMother === true) {
     return {
       ok: false,
-      message: `Refusing to remove mother node "${node.kind}" — pass --force to override.`,
+      message: `"${node.kind}" is one of KRNL0's main windows and can't be removed. To hide it, use the window's hide button.`,
     };
   }
 
