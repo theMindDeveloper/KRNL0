@@ -858,7 +858,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         label: 'Edit event…', icon: <MenuIcon name="rename" />,
         onSelect: () => setEventCard({ x, y, day: occ.date, allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days, time: h.schedule?.timeOfDay ?? hmOf(s0), lengthMin: h.schedule?.durationMin ?? 60 } }),
       },
-      { label: 'Remind me…', icon: <MenuIcon name="reminder" />, hint: h.remindMin === undefined ? 'Off' : h.remindMin === 0 ? 'at start' : `${h.remindMin} min`, onSelect: () => setEventRemind({ id: h.id, x, y, value: h.remindMin ?? null }) },
+      // Reminders are Advanced (owner, 2026-11-09); a reminder set earlier still shows in Easy, to turn it off.
+      ...(easy && h.remindMin === undefined ? [] : [{ label: 'Remind me…', icon: <MenuIcon name="reminder" />, hint: h.remindMin === undefined ? 'Off' : h.remindMin === 0 ? 'at start' : `${h.remindMin} min`, onSelect: () => setEventRemind({ id: h.id, x, y, value: h.remindMin ?? null }) }]),
       { label: 'End after this day', icon: <MenuIcon name="end" />, hint: 'keeps past', divider: true, onSelect: () => { void habitMotherCommand('routine.end', { id: h.id, date: occ.date }); } },
       { label: 'Delete event', icon: <MenuIcon name="delete" />, danger: true, onSelect: () => { void deleteRoutine(h.id); } },
     ];

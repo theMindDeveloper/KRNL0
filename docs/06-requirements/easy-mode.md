@@ -65,7 +65,7 @@ Since D1–D18 were decided, the app grew: one When plus an optional **Deadline*
 
 ### What a beginner keeps (Easy)
 
-- **Todo:** add a plan, its **When** (a day, any time or a time), how long, a reminder, tick, Won't do, Show.
+- **Todo:** add a plan, its **When** (a day, any time or a time), how long, tick, Won't do, Show. (Reminders are Advanced, D27.)
 - **Calendar:** Day / Week / Month, drag plans on, the ANY TIME strip, click empty hours to add, **repeating events** (classes and shifts are real life from day one).
 - **Clock:** today's plan and what you recorded.
 - **Record:** the stopwatch with Break and Stop (D1), the session list, + log past time.
@@ -84,6 +84,7 @@ Since D1–D18 were decided, the app grew: one When plus an optional **Deadline*
 | D23 | **Terminal window, krnl, Claude Code** | The Terminal window is hidden (Station and the top bar); the Orb's chat stays. | Shown | The terminal is for people who want the CLI; it is the most "developer" thing in the app. |
 | D24 | **Canvas: wires, frames, several canvases** | Hidden (the canvas switcher, frame tool, drag-to-wire). Notes, images and the pen stay. | Shown | Wires and frames link things (Easy hides links); one canvas is enough to start. |
 | D25 | **Settings** | The **Finished cards** page (how done cards clear off the canvas) is hidden; General, Floating timer, Sounds, Celebrations, Updates, Reset stay. | All | A canvas-housekeeping page a beginner has no use for yet. |
+| D27 | **Reminders** (the Reminder row in the plan card, "Remind me…" on a repeating event) | Hidden. A reminder set earlier still shows, so it can be turned off, and still fires. | Shown | Owner, 2026-11-09: Easy has no reminders; the row only appeared after a time was set, so the tour's "you can add a reminder" was never found. |
 | D26 | **Layout** | Starts in **Station** (fixed windows); Free canvas stays one click away. Already so: new boards are Station (ADR 0008 §5). | Either | Station never loses a window; the free canvas is easier once you know the windows. |
 
 ### Decisions

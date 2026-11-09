@@ -2625,3 +2625,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `CalendarNode/WeekView.tsx` (layersAt), `sfx/soundPacks.ts`, `docs/06-requirements/ui-sounds.md`, tests (`WeekView.test.tsx`, `schedule-menu-parity.test.tsx`, `uiSounds.test.ts`).
 **Summary:** A click anywhere in a Calendar day at a time with recorded work opened the recorded-time popup (the hit test only looked at the time, not where across the day you clicked). Now only a click on the thin line itself (4 px of slack) opens it; left click, right click and double-click alike. Checked in the real Calendar (beside the line: nothing; on it: the popup) and pinned by a test. Crisp is now the default sound pack for a new install; a saved choice is kept.
 
+## [2026-11-09] — Reminders are Advanced (experimental)
+
+**Type:** Feature change
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/WhenPopover.tsx`, `CalendarNode/WeekView.tsx` (an event's Remind me…), `Tour/tours.ts`, `Tour/voice/*`, `shared/whatsnew.ts`, `docs/releases/v0.11.0.md`, `docs/06-requirements/easy-mode.md` (D27), `CHANGELOG.md`, tests.
+**Summary:** The owner decided Easy has no reminders: the plan card's Reminder row only appeared after a time was set, so the first-day tour's "you can add a reminder" was never found. Easy now hides the Reminder row and an event's Remind me…; a reminder set earlier still shows (to turn it off) and still fires. The Easy tours drop reminders (first day, Calendar, Staying on track: "two things — rest days and Won't do"); Advanced's tours and the "what Advanced adds" lines now list them. Changed lines re-recorded and transcribed back.
+
