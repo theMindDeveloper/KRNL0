@@ -65,12 +65,6 @@
       "first-day"
     ]
   },
-  "eec77316": {
-    "text": "Done with it? [excited] Tick it!",
-    "tours": [
-      "first-day"
-    ]
-  },
   "8da22065": {
     "text": "[happily] Did it today? Then click today's square.",
     "tours": [
@@ -301,12 +295,6 @@
   },
   "b5e2f383": {
     "text": "[friendly] Change it later from its plan card: click the calendar icon on the row, or right-click, then \"When\". [Brief pause] The same card opens when you click its block on the Calendar.",
-    "tours": [
-      "todo"
-    ]
-  },
-  "3b3fbdf8": {
-    "text": "[excited] Done? Tick the box!",
     "tours": [
       "todo"
     ]
@@ -717,6 +705,18 @@
     "text": "[thoughtfully] \"Claude code\" starts Claude Code in the terminal, ready to work on your board. [Brief pause] It runs without asking permission for each step.",
     "tours": [
       "terminal"
+    ]
+  },
+  "c0c3b70e": {
+    "text": "Done with it? [excited] Then tick it off... right there in the list!",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "74a4138c": {
+    "text": "[excited] Done? Then tick the little box on its row!",
+    "tours": [
+      "todo"
     ]
   }
 }

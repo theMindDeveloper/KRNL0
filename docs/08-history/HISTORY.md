@@ -2596,3 +2596,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Branch:** `experiment/new-user-review`
 **Files changed:** `package.json` (0.11.0), `CHANGELOG.md`, `docs/releases/v0.11.0.md`, `src/shared/whatsnew.ts`, `Launch/WhatsNewDialog.tsx` (Show me starts the first-day tour; two new plates `plate-guide`, `plate-board`), `docs/releases/pre-release-todo.md`.
 **Summary:** Everything on this branch since 0.10.1 ships as **0.11.0** (a feature release). What's new: three headlines picked for everyone who plans a day — Easy mode and a voiced guide, plans/habits/events on one board, the floating timer — plus the full "more" list; laid out on the design canvas ("What's new in 0.11 · for approval"). Release notes and changelog cover every feature. GitHub housekeeping: 13 finished issues closed (#200–#206, #217, #219–#221, #102, #176), #222–#229 marked built and waiting for the owner's check, #170 #172–#175 #180 kept for after the release. **Not tagged, not published:** the owner approves What's new and checks the app, then merges the PR and runs RELEASING.md §3–4.
+
+## [2026-11-09] — Release checks: every clip transcribed back, the real app driven, Claude CLI states (experimental)
+
+**Type:** Chore
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts` (two voice lines reworded), `Tour/voice/*` (2 clips re-recorded, 2 removed), `docs/releases/pre-release-todo.md`.
+**Summary:** All 155 recordings were transcribed back with ElevenLabs speech-to-text and compared with their scripts (mean word match 0.98; no audio tag read aloud). Two slips — "Tick it" heard as "Ticket", "Tick the box" as "Take the box" — were reworded ("Then tick it off… right there in the list", "Then tick the little box on its row") and re-recorded; both now transcribe exactly. The real Electron build was driven over CDP with its own profile and board (the owner's running app untouched): windows open, the board tour opens, the orb answers through Claude Code. Claude CLI states checked on Windows: not installed, not signed in, ready, and a question with quotes and `&`. Issues #222–#229 closed with this evidence.
