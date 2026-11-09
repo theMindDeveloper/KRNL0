@@ -2688,3 +2688,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/releases/v0.11.2.md`, `README.md` (badge), this file.
 **Summary:** Patch release for PR #238: the plan card stays open while picking a time, one Calendar + (Repeating button removed), hours written once in the Calendar's time column, no app opened / closed ticks on the clock. What's new is per feature release (0.11), so no new slides; the notes page is `docs/releases/v0.11.2.md`. Tag `v0.11.2` and Publish wait for the owner's OK.
 
+
+## [2026-11-09] — v0.11.2 published
+
+**Type:** Release
+**Branch:** `docs/v0.11.2-published`
+**Files changed:** this file; the v0.11.2 GitHub release.
+**Summary:** Tag `v0.11.2` built by CI run 42663900156 (draft with `KRNL0-Setup-0.11.2.exe`, `.blockmap`, `latest.yml` at 0.11.2), checked, and published on the owner's OK. It is now Latest; installs on 0.11.1 (and the rebuilt 0.10.1) update to it by themselves.
