@@ -2660,3 +2660,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** this file.
 **Summary:** On the owner's OK ("ship 0.11.1") v0.11.1 was published and marked Latest after checking the CI draft (installer, `.blockmap`, `latest.yml` version 0.11.1 with matching size and sha512, notes). It fixes the updater that failed on every Windows install of 0.10.1 and 0.11.0. Those installs can't receive the fix by themselves (the broken code is in them and fails before reaching GitHub), so their users install 0.11.1 by hand once. The owner chose to point the old releases at 0.11.1 rather than rebuild 0.10.1 under the same version (AGENTS.md rule 11): the v0.10.1 and v0.11.0 pages now open with "Download 0.11.1 instead", and their installers and blockmaps were removed, so every new download gets a working updater.
 
+## [2026-11-09] — Website link in the README and on the repo
+
+**Type:** Docs
+**Branch:** `docs/website-link`
+**Files changed:** `README.md`, this file; the repo's About → Website.
+**Summary:** The README now links the website (https://theminddev.com/krnl0/) and the latest download under the tagline, with a Website badge; the stale "v0.10.0 latest" badge reads v0.11.1 and opens the latest release. The repository's Website field is set to the same address, so it shows in the About box.
+
