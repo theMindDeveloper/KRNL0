@@ -2710,3 +2710,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `src/sys/commands/window.ts` (new), `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, `claude/CLAUDE.md`, `CalendarNode/WeekView.tsx`, `CHANGELOG.md`, `tests/unit/sys/window.commands.test.ts` (new).
 **Summary:** The last audit item: actions the window had with no `krnl` command (AGENTS.md rule 8). Added `window list|show|hide|swap` (Station visibility and swapping main windows, as the toolbar and dragging do), `pomo label` (the timer's free-text label, tagged like the window does), `analytics set` (page, range, metric, year), `media title` and `image alt`; all in `krnl help` and the assistant's instructions. Also, the owner found that "End after today" in the Calendar's Repeating events list seemed to do nothing: an event ending today still runs today, so the row didn't change. It now reads "ends after today" with a Keep button that takes the end back.
 
+
+## [2026-11-09] — Release 0.11.3 prepared
+
+**Type:** Release
+**Branch:** `chore/release-v0.11.3`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/releases/v0.11.3.md`, `README.md` (badge), this file.
+**Summary:** Patch release for the full audit (PR #246, issues #241–#245) and the new window commands (PR #247). What's new is per feature release (0.11), so no new slides; the notes page is `docs/releases/v0.11.3.md`. The owner asked for the release to be done end to end ("make new release … do all by yourself").
