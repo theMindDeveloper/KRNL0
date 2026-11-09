@@ -2653,3 +2653,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `src/main/updater/backends.ts` (`pickAutoUpdater`), `tests/unit/main/updater.backends.test.ts`, `package.json` / `package-lock.json` (0.11.1), `CHANGELOG.md`, `docs/releases/v0.11.1.md`.
 **Summary:** The owner's installed 0.10.1 showed "Couldn't check for updates: Cannot set properties of undefined (setting 'autoDownload')" and never offered 0.11.0. Cause: the bundled main process keeps a real `import('electron-updater')`; electron-updater is CommonJS and defines `autoUpdater` with a getter, which Node's import does not expose as a named export, so `mod.autoUpdater` was undefined (it is on `mod.default`). Every check on every Windows install failed, silently at start (the error only showed in Settings). Fixed by taking `autoUpdater` from either shape, with a clear error if neither; proven inside Electron (old way `undefined`, fixed way `NsisUpdater`) and pinned by tests. 0.10.1 and 0.11.0 still carry the bug, so their users install 0.11.1 by hand once (the notes say so); updates work by themselves from then on.
 
+## [2026-11-09] — v0.11.1 published; old installers point to it
+
+**Type:** Release
+**Branch:** `main` (tag `v0.11.1` at ab002a9, PR #234)
+**Files changed:** this file.
+**Summary:** On the owner's OK ("ship 0.11.1") v0.11.1 was published and marked Latest after checking the CI draft (installer, `.blockmap`, `latest.yml` version 0.11.1 with matching size and sha512, notes). It fixes the updater that failed on every Windows install of 0.10.1 and 0.11.0. Those installs can't receive the fix by themselves (the broken code is in them and fails before reaching GitHub), so their users install 0.11.1 by hand once. The owner chose to point the old releases at 0.11.1 rather than rebuild 0.10.1 under the same version (AGENTS.md rule 11): the v0.10.1 and v0.11.0 pages now open with "Download 0.11.1 instead", and their installers and blockmaps were removed, so every new download gets a working updater.
+
