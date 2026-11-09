@@ -471,7 +471,8 @@ export function TourHost(): JSX.Element | null {
         // A card on the canvas off screen: the camera goes to it (scrolling can't move the canvas).
         const card = (found.el as HTMLElement).closest?.('.react-flow__node');
         const cardId = card?.getAttribute('data-id');
-        if (cardId && useBoardStore.getState().board?.layoutMode !== 'station') focusNode(cardId);
+        // (In Station too: its cards sit on a real canvas beside the panels.)
+        if (cardId) focusNode(cardId);
         else try { (found.el as HTMLElement).scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch { /* never break a tour */ }
       }
       // A floating panel covering it steps aside for this step (put back when the step ends).
