@@ -118,7 +118,10 @@ describe('bucketBy', () => {
       ];
       const out = byHourOfDay(events, { start: '2026-05-10', end: '2026-05-10' });
       expect(out[9]?.tasks).toBe(1);
-      expect(out[14]?.focusMin).toBe(25);
+      // A 25-minute span ending at 14:00 ran 13:35–14:00: it counts in hour 13
+      // (the hours it covered, not the hour it ended in).
+      expect(out[13]?.focusMin).toBe(25);
+      expect(out[14]?.focusMin).toBe(0);
     });
   });
 

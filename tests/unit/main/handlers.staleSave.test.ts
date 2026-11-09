@@ -80,3 +80,21 @@ describe('board:save after a CLI write', () => {
     expect(after['uiMode']).toBe('advanced');
   });
 });
+
+describe('board:save when board.json was damaged meanwhile (audit 2026-11-09)', () => {
+  it('writes the window\'s board back as it is, never merged with an empty board', async () => {
+    const loaded = (await invoke('board:load')) as Board;
+    const note = { id: 'note-keep', kind: 'text', isMother: false, position: { x: 0, y: 0 }, state: { text: 'keep me' }, config: {} };
+    const mine = { ...clone(loaded), uiMode: 'advanced', nodes: [...clone(loaded).nodes, note] };
+    await invoke('board:save', mine);
+    // Someone breaks the file (a bad hand edit): newer mtime, not JSON.
+    writeFileSync(boardPath, '{"nodes": [ {"id"', 'utf-8');
+    const later = new Date(Date.now() + 10_000);
+    utimesSync(boardPath, later, later);
+    // The user's next edit (a stale save) must keep everything.
+    await invoke('board:save', clone(mine));
+    const after = readFile();
+    expect(ids(after)).toContain('note-keep');
+    expect(after['uiMode']).toBe('advanced');
+  });
+});
