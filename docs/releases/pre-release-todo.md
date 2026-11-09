@@ -21,9 +21,9 @@ Updated 2026-11-09 (overnight run). Everything that can be done without the owne
 
 ## Only you can do these (by their nature)
 
-- [ ] **Approve What's new** — canvas board "What's new in 0.11 · for approval". Approving is your call; everything in it is built and in the PR.
+- [x] **Approve What's new** — approved by the owner with the go-ahead to release (2026-11-09), after the two plates were redrawn sharp.
 - [ ] **Rotate the ElevenLabs API key** that was pasted in chat — it lives in your ElevenLabs account (it is in no file here).
-- [ ] **Release** (you asked not to): mark PR #230 ready and merge it, then RELEASING.md §3–4 — `git tag v0.11.0` on main, push the tag, check the draft has `latest.yml`, Publish.
+- [x] **Release** — the owner said go (2026-11-09): PR #230 merged, `v0.11.0` tagged on main, CI draft checked for `latest.yml`, published.
 
 ## After the release
 
