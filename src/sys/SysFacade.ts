@@ -2,6 +2,7 @@ import { dirname } from 'path';
 import { SysParser } from './parser';
 import type { SysCommand } from './parser';
 import { boardFileIsCorrupt, loadBoardFrom } from '../main/persistence/board';
+import * as windowCmd from './commands/window';
 import { logBoardChange, appendTimeLog } from '../main/persistence/timelog';
 import { TOURS } from '../renderer/components/Tour/tours';
 
@@ -563,6 +564,26 @@ export class SysFacade {
     }
 
     // ── Decision 29 — analytics reads ──────────────────────────────────────
+    // Audit #52 — window actions (commands/window.ts).
+    if (command.kind === 'window' || command.kind === 'pomoLabel' || command.kind === 'analyticsSet' || command.kind === 'mediaTitle' || command.kind === 'imageAlt') {
+      const wctx = { boardPath: this.deps.boardPath, ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}) };
+      switch (command.kind) {
+        case 'window':
+          if (command.sub === 'list') return windowCmd.windowList(wctx, command.json);
+          if (command.sub === 'swap') return windowCmd.windowSwap(wctx, command.a, command.b);
+          return windowCmd.windowSetShown(wctx, command.name, command.sub === 'show');
+        case 'pomoLabel': return windowCmd.pomoLabel(wctx, command.text, command.tag);
+        case 'analyticsSet': return windowCmd.analyticsSet(wctx, {
+          ...(command.view !== undefined ? { view: command.view } : {}),
+          ...(command.range !== undefined ? { range: command.range } : {}),
+          ...(command.metric !== undefined ? { metric: command.metric } : {}),
+          ...(command.year !== undefined ? { year: command.year } : {}),
+        });
+        case 'mediaTitle': return windowCmd.mediaTitle(wctx, command.id, command.title);
+        case 'imageAlt': return windowCmd.imageAlt(wctx, command.id, command.alt);
+      }
+    }
+
     if (command.kind === 'analytics') {
       const aCtx: AnalyticsCtx = { boardPath: this.deps.boardPath };
       switch (command.sub) {

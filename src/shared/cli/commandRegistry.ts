@@ -117,6 +117,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'add', usage: 'pomo add --start HH:MM --end HH:MM [--task <ref>] [--text "what"]', summary: 'Record time you did not record (HH:MM = today, or YYYY-MM-DDTHH:MM)' },
       { name: 'delete-segment', usage: 'pomo delete-segment <segmentId>', summary: 'Delete a recorded focus/break span (Calendar/Clock right-click → Delete segment)' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
+      { name: 'label', usage: 'pomo label "<what you are doing>" [--tag <id>]', summary: 'Name what the running timer records (Observe); "" clears it' },
       { name: 'config', usage: 'pomo config [--mode observe|pomodoro] [--session N] [--short N] [--long N] [--every N] [--face auto|minimal|ascii|lcd|blocks|vapor|vu|outline|mac] [--count-stopped on|off]', summary: 'Timer settings: --mode observe (a stopwatch) or pomodoro (sessions and breaks); count-stopped: does Stop record the session so far' },
     ],
   },
@@ -137,6 +138,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'add', usage: 'image add <abs-path> [--at x,y] [--near <ref>]', summary: 'Add an image node. --near positions at srcX + srcW + 24, srcY' },
       { name: 'replace', usage: 'image replace <id> <abs-path>', summary: 'Replace image asset' },
       { name: 'resize', usage: 'image resize <id> --w N --h N', summary: 'Resize an image node' },
+      { name: 'alt', usage: 'image alt <id> "<text>"', summary: 'Describe what the picture shows (screen readers)' },
       { name: 'clear', usage: 'image clear <id>', summary: 'Remove image asset from node' },
     ],
   },
@@ -158,6 +160,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Analytics reads from board state (headless-capable)',
     subcommands: [
       { name: 'show', usage: 'analytics show [--view overview|calendar|patterns|sources|estimates|tags] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--json]', summary: 'Show analytics summary for a range' },
+      { name: 'set', usage: 'analytics set [--view overview|calendar|patterns|insights|estimates|time|sources] [--range 7|30|90|365] [--metric taskCount|habitCount|focusMin|sessions] [--year YYYY]', summary: 'Set the page, range and metric of the Analytics window' },
       { name: 'totals', usage: 'analytics totals [--range N] [--json]', summary: 'Show task/habit/focus totals over N days (default 30)' },
       { name: 'streaks', usage: 'analytics streaks [--json]', summary: 'Show habit streak data' },
       { name: 'summary', usage: 'analytics summary [--range N] [--json]', summary: 'Plain-language summary (the text on top of the Overview tab)' },
@@ -217,6 +220,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'add', usage: 'media add <url> [--at x,y]', summary: 'YouTube/Vimeo/SoundCloud/… → embedded player; other URLs → link card' },
       { name: 'list', usage: 'media list [--json]', summary: 'List media nodes' },
       { name: 'resize', usage: 'media resize <id> --w N --h N', summary: 'Resize a media node' },
+      { name: 'title', usage: 'media title <id> "<title>"', summary: 'Rename a media card' },
       { name: 'page', usage: 'media page <id> <n>', summary: 'Show page n of a PDF card' },
     ],
   },
@@ -460,6 +464,16 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'show', usage: 'theme show [--json]', summary: 'Read current theme from settings (headless-capable)' },
       { name: 'frames', usage: 'theme frames [--json]', summary: 'List the window frame styles' },
       { name: 'frame', usage: 'theme frame <style>', summary: 'Set the window frame style' },
+    ],
+  },
+  {
+    group: 'window',
+    summary: 'Show, hide and arrange the main windows (Station layout)',
+    subcommands: [
+      { name: 'list', usage: 'window list [--json]', summary: 'Each main window and whether it is shown' },
+      { name: 'show', usage: 'window show <todo|timer|habits|calendar|clock|terminal|analytics>', summary: 'Show a window (the toolbar eye button)' },
+      { name: 'hide', usage: 'window hide <name>', summary: 'Hide a window' },
+      { name: 'swap', usage: 'window swap <a> <b>', summary: 'Swap the places of two windows' },
     ],
   },
   {

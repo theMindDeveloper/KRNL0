@@ -1,4 +1,12 @@
 export type SysCommand =
+  // Audit #52 — window actions that had no command (commands/window.ts).
+  | { kind: 'window'; sub: 'list'; json: boolean }
+  | { kind: 'window'; sub: 'show' | 'hide'; name: string | undefined }
+  | { kind: 'window'; sub: 'swap'; a: string | undefined; b: string | undefined }
+  | { kind: 'pomoLabel'; text: string | undefined; tag: string | undefined }
+  | { kind: 'analyticsSet'; view: string | undefined; range: number | undefined; metric: string | undefined; year: number | undefined }
+  | { kind: 'mediaTitle'; id: string | undefined; title: string | undefined }
+  | { kind: 'imageAlt'; id: string | undefined; alt: string | undefined }
   | { kind: 'board'; sub: 'show' | 'summary' | 'stats'; json: boolean }
   | { kind: 'board'; sub: 'save' | 'load'; path: string | undefined }
   | { kind: 'node'; sub: 'list'; nodeKind: string | undefined; motherOnly: boolean; childOnly: boolean; json: boolean }
@@ -299,6 +307,18 @@ export class SysParser {
 
     if (!cmd || cmd === 'help') return { kind: 'help', group: sub, sub: rest[0] };
     if (cmd === 'version') return { kind: 'version' };
+    if (cmd === 'window') {
+      if (sub === 'list' || sub === undefined) return { kind: 'window', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'show' || sub === 'hide') return { kind: 'window', sub, name: rest[0] };
+      if (sub === 'swap') return { kind: 'window', sub: 'swap', a: rest[0], b: rest[1] };
+    }
+    if (cmd === 'pomo' && sub === 'label') return { kind: 'pomoLabel', text: rest[0] !== undefined && !rest[0].startsWith('--') ? rest[0] : undefined, tag: flag(rest, 'tag') };
+    if (cmd === 'analytics' && sub === 'set') {
+      const num = (v: string | undefined) => (v === undefined ? undefined : Number(v));
+      return { kind: 'analyticsSet', view: flag(rest, 'view'), range: num(flag(rest, 'range')), metric: flag(rest, 'metric'), year: num(flag(rest, 'year')) };
+    }
+    if (cmd === 'media' && sub === 'title') return { kind: 'mediaTitle', id: rest[0], title: rest.slice(1).find((w) => !w.startsWith('--')) };
+    if (cmd === 'image' && sub === 'alt') return { kind: 'imageAlt', id: rest[0], alt: rest.slice(1).find((w) => !w.startsWith('--')) };
     if (cmd === 'whoami')  return { kind: 'whoami' };
     if (cmd === 'say')  return { kind: 'say', text: [sub, ...rest].filter(Boolean).join(' ') };
     if (cmd === 'hear') return { kind: 'hear' };
