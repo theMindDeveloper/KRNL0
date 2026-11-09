@@ -24,7 +24,11 @@ export function createNsisBackend(log: (m: string) => void): UpdateBackend {
   let loaded: Promise<AppUpdater> | null = null;
   const updater = (): Promise<AppUpdater> => {
     loaded ??= import('electron-updater').then((mod) => {
-      const u = mod.autoUpdater;
+      // Rebuild of 0.10.1 with the 0.11.1 fix: electron-updater is CommonJS and
+      // its getter-defined autoUpdater is only on `default` through import().
+      const m = mod as unknown as { autoUpdater?: AppUpdater; default?: { autoUpdater?: AppUpdater } };
+      const u = m.autoUpdater ?? m.default?.autoUpdater;
+      if (!u) throw new Error('electron-updater did not load (no autoUpdater)');
       // We decide when to download (UpdateService), never electron-updater.
       u.autoDownload = false;
       // "Later" still gets the update: installed silently when the app quits (F2).
