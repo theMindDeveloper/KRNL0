@@ -2632,3 +2632,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `ui/WhenPopover.tsx`, `CalendarNode/WeekView.tsx` (an event's Remind me…), `Tour/tours.ts`, `Tour/voice/*`, `shared/whatsnew.ts`, `docs/releases/v0.11.0.md`, `docs/06-requirements/easy-mode.md` (D27), `CHANGELOG.md`, tests.
 **Summary:** The owner decided Easy has no reminders: the plan card's Reminder row only appeared after a time was set, so the first-day tour's "you can add a reminder" was never found. Easy now hides the Reminder row and an event's Remind me…; a reminder set earlier still shows (to turn it off) and still fires. The Easy tours drop reminders (first day, Calendar, Staying on track: "two things — rest days and Won't do"); Advanced's tours and the "what Advanced adds" lines now list them. Changed lines re-recorded and transcribed back.
 
+## [2026-11-09] — The voice says "To-do"; the guide speaks before the first click (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts` (five `say` lines), `Tour/voice/*` (5 clips), `src/main/index.ts` (`autoplayPolicy`), `tests/unit/renderer/tourVoice.test.ts`.
+**Summary:** The voice read "Todo" as "toodoo": the five scripts that name it now say "To-do" (the screen still shows Todo), re-recorded and transcribed back exactly; a test keeps "Todo" out of every script. The main window allows audio without a user gesture, so the first-day tour's first step speaks on a fresh start (the tour already starts by itself with the voice on).
+

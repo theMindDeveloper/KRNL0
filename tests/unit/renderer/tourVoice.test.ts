@@ -41,6 +41,8 @@ describe('Every tour is voiced (#227), in plain words', () => {
       // Tags, [Brief pause] and "..." make the voice drop at the end of a line (owner, 2026-11-09).
       expect(s.say!, `${t.id}: ${s.say}`).not.toMatch(/\[[a-zA-Z ]+\]|\.\.\.|…/);
       expect(s.say!, `${t.id}: ${s.say}`).not.toMatch(/\bEsc\b|→|\*\*|\b[A-Z]{3,}\b|\d|KRNL0/);
+      // The voice reads "Todo" as "toodoo": the words say "To-do" (owner, 2026-11-09).
+      expect(s.say!, `${t.id}: ${s.say}`).not.toMatch(/\bTodo\b/);
     }
   });
   it('the orb speaks the same way, and its "Aha" goes up', () => {

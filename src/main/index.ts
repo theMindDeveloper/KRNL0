@@ -215,6 +215,8 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // The first-day tour starts by itself and its guide speaks from the first step, before any click.
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
 

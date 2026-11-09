@@ -5,12 +5,6 @@
       "modes"
     ]
   },
-  "59017053": {
-    "text": "Todo is your list of plans. Each one can have a when, a day and a time or just a day. It can have a deadline, and it shows the time you really spent on it.",
-    "tours": [
-      "welcome"
-    ]
-  },
   "65077673": {
     "text": "Hi! Let's plan one real thing and actually do it, together. It takes about four minutes. Press Next or Enter to go on, and Escape whenever you want to stop.",
     "tours": [
@@ -35,8 +29,8 @@
       "first-day"
     ]
   },
-  "a0bc02f5": {
-    "text": "Now let's plan it! Drag the task from your Todo list onto today in the Calendar, at a time later than now. Or open its card and pick a time today.",
+  "5a0b9a2e": {
+    "text": "Now let's plan it! Drag the task from your To-do list onto today in the Calendar, at a time later than now. Or open its card and pick a time today.",
     "tours": [
       "first-day"
     ]
@@ -155,8 +149,8 @@
       "welcome"
     ]
   },
-  "aebb1c31": {
-    "text": "Todo is your list of plans. Each one can have a when: a day and a time, or just a day.",
+  "d44ea4ae": {
+    "text": "To-do is your list of plans. Each one can have a when: a day and a time, or just a day.",
     "tours": [
       "welcome"
     ]
@@ -199,6 +193,12 @@
   },
   "34eadddd": {
     "text": "The Observe timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "f3cbae1e": {
+    "text": "To-do is your list of plans. Each one can have a when, a day and a time or just a day. It can have a deadline, and it shows the time you really spent on it.",
     "tours": [
       "welcome"
     ]
@@ -365,8 +365,8 @@
       "calendar"
     ]
   },
-  "770ea30d": {
-    "text": "Drag a plan from the Todo onto a time here, to plan it.",
+  "fe134724": {
+    "text": "Drag a plan from the To-do onto a time here, to plan it.",
     "tours": [
       "calendar"
     ]
@@ -551,8 +551,8 @@
       "on-track"
     ]
   },
-  "f61e2934": {
-    "text": "When you do something and when it must be done can differ. Right-click a Todo row and choose \"Deadline\". The row shows a flag, the Calendar a dashed flag on that day, and the Clock lists it.",
+  "e747b2bd": {
+    "text": "When you do something and when it must be done can differ. Right-click a To-do row and choose \"Deadline\". The row shows a flag, the Calendar a dashed flag on that day, and the Clock lists it.",
     "tours": [
       "on-track"
     ]
