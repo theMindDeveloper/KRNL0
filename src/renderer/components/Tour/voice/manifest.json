@@ -772,5 +772,17 @@
     "tours": [
       "terminal"
     ]
+  },
+  "b67e0d17": {
+    "text": "Double-click empty hours, or press this plus, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "4d4ae2b3": {
+    "text": "Press the plus in the Calendar's header, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
+    "tours": [
+      "routines"
+    ]
   }
 }
